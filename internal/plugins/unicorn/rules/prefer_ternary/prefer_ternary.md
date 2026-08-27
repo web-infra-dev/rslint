@@ -78,15 +78,6 @@ auto-fixes via `--fix`. The current port reproduces that contract:
 - The `let x = a; if (test) x = b;` form is reported with a diagnostic
   whose `suggest` rewrites the source to `const x = test ? b : a;`
   (or `let` when the variable receives a later write).
-- Two upstream test cases are not ported: the
-  `(foo)['b' + 'ar'] = a` / `foo.bar = b` shape (the LHS is not the same
-  reference after `isSameReference` walks through the parens and
-  computed-key access) and the nested `if` outer branches whose
-  alternate is another `if` (upstream reports both, but the rslint port
-  only reports the inner one whose consequent and alternate are
-  mergeable). These are surfaced as no-report in the upstream suite
-  here; they remain as `// Reported upstream, not flagged here` notes in
-  the test file for traceability.
 
 ## Original Documentation
 

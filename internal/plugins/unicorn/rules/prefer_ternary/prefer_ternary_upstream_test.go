@@ -610,9 +610,9 @@ if (test) {
 				Output: []string{`function unicorn() {
 	return test ? (foo as string) : b;
 }`},
-				Errors:     []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
-				FileName:   "file.ts",
-				Tsx:       false,
+				Errors:   []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
+				FileName: "file.ts",
+				Tsx:      false,
 			},
 			{
 				Code: `function unicorn() {
@@ -625,9 +625,9 @@ if (test) {
 				Output: []string{`function unicorn() {
 	return (test as boolean) ? foo : b;
 }`},
-				Errors:     []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
-				FileName:   "file.ts",
-				Tsx:       false,
+				Errors:   []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
+				FileName: "file.ts",
+				Tsx:      false,
 			},
 			// `satisfies` binds tighter than `?:`, so no parens are needed in test position.
 			{
@@ -641,9 +641,9 @@ if (test) {
 				Output: []string{`function unicorn() {
 	return test satisfies boolean ? foo : b;
 }`},
-				Errors:     []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
-				FileName:   "file.ts",
-				Tsx:       false,
+				Errors:   []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
+				FileName: "file.ts",
+				Tsx:      false,
 			},
 			{
 				Code: `function unicorn() {
@@ -656,9 +656,9 @@ if (test) {
 				Output: []string{`function unicorn() {
 	return test ? foo! : b;
 }`},
-				Errors:     []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
-				FileName:   "file.ts",
-				Tsx:       false,
+				Errors:   []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
+				FileName: "file.ts",
+				Tsx:      false,
 			},
 			{
 				Code: `function unicorn() {
@@ -671,9 +671,9 @@ if (test) {
 				Output: []string{`function unicorn() {
 	return test! ? foo : b;
 }`},
-				Errors:     []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
-				FileName:   "file.ts",
-				Tsx:       false,
+				Errors:   []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
+				FileName: "file.ts",
+				Tsx:      false,
 			},
 
 			// ---- AssignmentExpression → ternary ----
@@ -744,7 +744,7 @@ if (test) {
 				Errors: []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
 			},
 			// ASI safety: leading `;` is required when the previous statement ends in `)`.
-						// Compound operator chain on the LHS, with a long LHS so the result needs parens.
+			// Compound operator chain on the LHS, with a long LHS so the result needs parens.
 			{
 				Code: `if(test){
 	$0 |= $1 ^= $2 &= $3 >>>= $4 >>= $5 <<= $6 %= $7 /= $8 *= $9 **= $10 -= $11 += $12 =
@@ -765,7 +765,7 @@ if (test) {
 				Errors: []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
 			},
 			// TypeScript `as` cast on the LHS, with ASI hazard.
-						// ---- `only-single-line`: cases that survive because they ARE single-line ----
+			// ---- `only-single-line`: cases that survive because they ARE single-line ----
 			// (The first only-single-line invalid case from upstream uses
 			// multi-line bodies with the option, which is contradictory —
 			// the rule's only-single-line gate explicitly rejects
@@ -778,8 +778,8 @@ if (test) {
 			// contradicts the rule's gate: the multi-line test should
 			// suppress the report.)
 			// Parenthesized assignment body is unwrapped.
-						// Trailing semicolon as separate statement is dropped.
-						// Empty statements are excluded.
+			// Trailing semicolon as separate statement is dropped.
+			// Empty statements are excluded.
 			{
 				Code: `if (test) {
 	;;;;;;
@@ -789,7 +789,7 @@ if (test) {
 	a = bar;
 }`,
 				Output: []string{`a = test ? foo : bar;`},
-				Errors:  []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
 			},
 
 			// ---- General: nested / mixed-shape / comment-preserving ----
@@ -839,12 +839,12 @@ if (test) {
 	foo = 1;
 } else foo = 2;`,
 				Output: []string{`foo = (a = b) ? 1 : 2;`},
-				Errors:  []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
 			},
-									// Nested: only the inner ternary is emitted.
-												// Inline comment inside the if body suppresses the fix.
+			// Nested: only the inner ternary is emitted.
+			// Inline comment inside the if body suppresses the fix.
 			{
-				Code: `if (test) {foo = /* comment */1;} else {foo = 2;}`,
+				Code:   `if (test) {foo = /* comment */1;} else {foo = 2;}`,
 				Errors: []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
 			},
 
@@ -855,13 +855,13 @@ if (test) {
 if (data.length) {
 	items = data;
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const items = data.length ? data : defaultData;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const items = data.length ? data : defaultData;", 0, 0, 0, 0)},
 			},
 			// Without braces
 			{
 				Code: `let x = a;
 if (test) x = b;`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : a;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : a;", 0, 0, 0, 0)},
 			},
 			// Keep `let` when there are other writes.
 			{
@@ -883,7 +883,7 @@ if (test) x = b;`,
 if (test) {
 	x = b;
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : a;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : a;", 0, 0, 0, 0)},
 			},
 			// `only-single-line` with all single-line expressions
 			{
@@ -933,7 +933,7 @@ if (test) {
 if (y = 0) {
 	x = 1;
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = (y = 0) ? 1 : y;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = (y = 0) ? 1 : y;", 0, 0, 0, 0)},
 			},
 			// Init may be observable.
 			{
@@ -941,7 +941,7 @@ if (y = 0) {
 if (test) {
 	x = b;
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : object.value;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : object.value;", 0, 0, 0, 0)},
 			},
 			// Test may be observable.
 			{
@@ -949,7 +949,7 @@ if (test) {
 if (object.flag) {
 	x = 1;
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = object.flag ? 1 : y;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = object.flag ? 1 : y;", 0, 0, 0, 0)},
 			},
 			// Parenthesized init value.
 			{
@@ -957,7 +957,7 @@ if (object.flag) {
 if (test) {
 	x = b;
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : (a);", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : (a);", 0, 0, 0, 0)},
 			},
 			// Assignment value needs parentheses (await).
 			{
@@ -979,7 +979,7 @@ if (test) {
 	x = b;
 	;;;
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : a;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? b : a;", 0, 0, 0, 0)},
 			},
 			// Assignment right side has side effects (still flags, only init is checked).
 			{
@@ -987,7 +987,7 @@ if (test) {
 if (test) {
 	x = foo();
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? foo() : a;", 0, 0, 0, 0)},
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError("const x = test ? foo() : a;", 0, 0, 0, 0)},
 			},
 			// Inside a block scope.
 			{
@@ -997,7 +997,7 @@ if (test) {
 		x = b;
 	}
 }`,
-				Errors:  []rule_tester.InvalidTestCaseError{suggestionError(`{
+				Errors: []rule_tester.InvalidTestCaseError{suggestionError(`{
 	const x = test ? b : a;
 }`, 0, 0, 0, 0)},
 			},
@@ -1026,9 +1026,9 @@ if (test) {
 if (test) {
 	x = b;
 }`,
-				Errors:     []rule_tester.InvalidTestCaseError{suggestionError("const x: string = test ? b : a;", 0, 0, 0, 0)},
-				FileName:   "file.ts",
-				Tsx:       false,
+				Errors:   []rule_tester.InvalidTestCaseError{suggestionError("const x: string = test ? b : a;", 0, 0, 0, 0)},
+				FileName: "file.ts",
+				Tsx:      false,
 			},
 		},
 	)

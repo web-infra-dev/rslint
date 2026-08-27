@@ -49,12 +49,23 @@ var PreferTernaryRule = rule.Rule{
 			}
 		}
 
+		// The static evaluator is optional: a nil evaluator just means the
+		// computed-key fast path falls back to literal-only static names.
+		// The rule stays syntactic on JS/gap files where no TypeChecker is
+		// available — literal concat (`x['b' + 'ar']`) still folds through
+		// the evaluator's literal handling, but identifier resolution
+		// degrades to "unknown".
+		var staticStrings *utils.StaticStringEvaluator
+		if ctx.TypeChecker != nil {
+			staticStrings = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+		}
+
 		return rule.RuleListeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				if node.AsIfStatement() == nil {
 					return
 				}
-				checkIfStatement(ctx, node, isOnlySingleLine)
+				checkIfStatement(ctx, node, isOnlySingleLine, staticStrings)
 			},
 		}
 	},
@@ -62,7 +73,7 @@ var PreferTernaryRule = rule.Rule{
 
 // checkIfStatement dispatches to the simple-return/assignment branch when the
 // if has an else, otherwise to the let-then-if branch.
-func checkIfStatement(ctx rule.RuleContext, node *ast.Node, isOnlySingleLine bool) {
+func checkIfStatement(ctx rule.RuleContext, node *ast.Node, isOnlySingleLine bool, staticStrings *utils.StaticStringEvaluator) {
 	ifStmt := node.AsIfStatement()
 
 	if ifStmt.ElseStatement == nil {
@@ -83,18 +94,12 @@ func checkIfStatement(ctx rule.RuleContext, node *ast.Node, isOnlySingleLine boo
 		}
 	}
 
-	// The test cannot already be a ternary.
-	if isConditionalExpression(ifStmt.Expression) {
+	// The test cannot already be a ternary. Parens are transparent in ESTree
+	// and must be unwrapped before the check, otherwise `(cond ? a : b)` is
+	// a ParenthesizedExpression, not a ConditionalExpression, and would slip
+	// through.
+	if isConditionalExpression(ast.SkipParentheses(ifStmt.Expression)) {
 		return
-	}
-
-	lineStarts := ctx.SourceFile.ECMALineMap()
-	if isOnlySingleLine {
-		if !isSingleLineNode(ctx, ifStmt.Expression, lineStarts) ||
-			!isSingleLineNode(ctx, ifStmt.ThenStatement, lineStarts) ||
-			!isSingleLineNode(ctx, ifStmt.ElseStatement, lineStarts) {
-			return
-		}
 	}
 
 	consequent := getNodeBody(ifStmt.ThenStatement)
@@ -104,7 +109,23 @@ func checkIfStatement(ctx rule.RuleContext, node *ast.Node, isOnlySingleLine boo
 		return
 	}
 
-	result, ok := buildMerge(ctx, consequent, alternate)
+	if isOnlySingleLine {
+		lineStarts := ctx.SourceFile.ECMALineMap()
+		// Upstream's getLoc is unaffected by expression-statement wrappers or
+		// parens, so it reports `if (t) { x=a; } else { x=b; }` even when the
+		// `if` block spans multiple lines (t, x=a, x=b are individually
+		// single-line). Mirror that by checking the unwrapped consequent /
+		// alternate, and walk parens off the test so a multi-line parenthesized
+		// `t` doesn't reject a single-line inner expression.
+		testNode := ast.SkipParentheses(ifStmt.Expression)
+		if !isSingleLineNode(ctx, testNode, lineStarts) ||
+			!isSingleLineNode(ctx, consequent, lineStarts) ||
+			!isSingleLineNode(ctx, alternate, lineStarts) {
+			return
+		}
+	}
+
+	result, ok := buildMerge(ctx, consequent, alternate, staticStrings)
 	if !ok {
 		return
 	}
@@ -136,11 +157,12 @@ func getNodeBody(node *ast.Node) *ast.Node {
 	case ast.KindExpressionStatement:
 		return getNodeBody(node.AsExpressionStatement().Expression)
 	case ast.KindParenthesizedExpression:
-		// Walk through any chain of parenthesized wrappers, mirroring how
-		// ESTree flattens parens so the parent is the semantic construct.
-		// WalkUpParenthesizedExpressions returns the innermost expression
-		// (skipping wrappers), so recurse on that.
-		return getNodeBody(ast.WalkUpParenthesizedExpressions(node).AsParenthesizedExpression().Expression)
+		// Unwrap through THIS node's expression field. ast.WalkUpParenthesizedExpressions
+		// climbs past parens toward a value's parent context and can return the
+		// surrounding ExpressionStatement, which would panic when cast back to a
+		// ParenthesizedExpression here. Mirroring upstream `getNodeBody` only
+		// requires peeling parens off the current node, not the enclosing one.
+		return getNodeBody(node.AsParenthesizedExpression().Expression)
 	case ast.KindBlock:
 		block := node.AsBlock()
 		if block == nil || block.Statements == nil {
@@ -205,8 +227,12 @@ func isMergeableReturnStatement(consequent, alternate *ast.Node) bool {
 
 // isMergeableAssignmentExpression matches the `x = …` shape on both sides.
 // Requires identical `left` and `operator`, and no ternary anywhere — those
-// shape gates mirror upstream.
-func isMergeableAssignmentExpression(consequent, alternate *ast.Node) bool {
+// shape gates mirror upstream. The `left` comparison goes through
+// isSameAssignmentTarget, which extends utils.IsSameReference with a static
+// evaluator so that `(x)['b' + 'ar']` matches `x.bar` (the literal-only
+// `AccessExpressionStaticName` used by IsSameReference cannot fold string
+// concatenation).
+func isMergeableAssignmentExpression(consequent, alternate *ast.Node, staticStrings *utils.StaticStringEvaluator) bool {
 	if consequent.Kind != ast.KindBinaryExpression || alternate.Kind != ast.KindBinaryExpression {
 		return false
 	}
@@ -230,7 +256,72 @@ func isMergeableAssignmentExpression(consequent, alternate *ast.Node) bool {
 	if isConditionalExpression(c.Right) || isConditionalExpression(a.Right) {
 		return false
 	}
-	return utils.IsSameReference(c.Left, a.Left, false)
+	return isSameAssignmentTarget(staticStrings, c.Left, a.Left)
+}
+
+// isSameAssignmentTarget mirrors utils.IsSameReference for the assignment LHS
+// comparison, but uses a static evaluator for the computed-name fast path so
+// that e.g. (x)['b' + 'ar'] and x.bar are considered the same reference. The
+// fallback to utils.IsSameReference handles literal-only computed keys and
+// structural comparison for non-access nodes.
+func isSameAssignmentTarget(staticStrings *utils.StaticStringEvaluator, left, right *ast.Node) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions)
+	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions)
+	if left == nil || right == nil {
+		return false
+	}
+
+	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) && staticStrings != nil {
+		// Try the static-name fast path first. This handles the case where one
+		// side uses `x.bar` and the other uses `(x)['b' + 'ar']` — both fold to
+		// the same property name through the static evaluator.
+		leftName, leftOK := staticAccessName(staticStrings, left)
+		if leftOK {
+			rightName, rightOK := staticAccessName(staticStrings, right)
+			if rightOK && leftName == rightName {
+				return isSameAssignmentTarget(staticStrings, utils.AccessExpressionObject(left), utils.AccessExpressionObject(right))
+			}
+			return false
+		}
+	}
+
+	return utils.IsSameReference(left, right, false)
+}
+
+// staticAccessName returns the static property name of an access expression,
+// evaluating a computed argument through the static evaluator so that
+// `x['b' + 'ar']` and `x.bar` produce the same name. Mirrors upstream's
+// `astUtils.getStaticPropertyName` but with broader computed-key support.
+func staticAccessName(staticStrings *utils.StaticStringEvaluator, node *ast.Node) (string, bool) {
+	if staticStrings == nil || node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		name := node.AsPropertyAccessExpression().Name()
+		if name != nil {
+			return name.Text(), true
+		}
+	case ast.KindElementAccessExpression:
+		arg := node.AsElementAccessExpression().ArgumentExpression
+		if arg == nil {
+			return "", false
+		}
+		arg = ast.SkipOuterExpressions(arg, ast.OEKParentheses|ast.OEKAssertions)
+		if arg == nil {
+			return "", false
+		}
+		// EvalToString mirrors JavaScript's String() coercion, which is what
+		// computed property names see at runtime (e.g. `[0]` → "0", `[true]`
+		// → "true"). Falls back to false when the argument can't be folded.
+		if str, ok := staticStrings.EvalToString(arg); ok {
+			return str, true
+		}
+	}
+	return "", false
 }
 
 // hasCommentsInside reports whether any comment falls within node's source
@@ -274,13 +365,17 @@ func checkLetPlusIfProblem(ctx rule.RuleContext, node *ast.Node, isOnlySingleLin
 	if left == nil || left.Kind != ast.KindIdentifier {
 		return nil, false
 	}
-	if isConditionalExpression(ifStmt.Expression) || isConditionalExpression(consBin.Right) {
+	if isConditionalExpression(ast.SkipParentheses(ifStmt.Expression)) || isConditionalExpression(consBin.Right) {
 		return nil, false
 	}
 
 	lineStarts := ctx.SourceFile.ECMALineMap()
 	if isOnlySingleLine {
-		if !isSingleLineNode(ctx, ifStmt.Expression, lineStarts) ||
+		// Walk parens off the test for the same reason the if/else branch
+		// does: a multi-line parenthesized test should be treated as the
+		// inner expression for the single-line gate.
+		testNode := ast.SkipParentheses(ifStmt.Expression)
+		if !isSingleLineNode(ctx, testNode, lineStarts) ||
 			!isSingleLineNode(ctx, consBin.Right, lineStarts) {
 			return nil, false
 		}
@@ -426,29 +521,80 @@ func reportLetPlusIfProblem(ctx rule.RuleContext, p *letPlusIfProblem) {
 	})
 }
 
-// hasSideEffect is a small subset of hasSideEffect from eslint-community, used
-// only to reject `let x = fn();` / `let x = new Foo();` where the init cannot
-// be inlined into the alternate position of the ternary. It deliberately
-// stays narrow — a more general side-effect classifier would re-evaluate
-// arbitrary expressions and over-approximate the cases upstream rules out.
+// hasSideEffect reports whether evaluating node can produce a side effect.
+// This is a port of @eslint-community/eslint-utils' hasSideEffect with
+// default options ({considerGetters: false, considerImplicitTypeConversion:
+// false}): only the leaves that are unconditionally side-effect-bearing —
+// CallExpression, NewExpression, AwaitExpression, YieldExpression, ++/--, and
+// assignments (plain `=`) — trip the predicate. Everything else recurses
+// into its children so nested effects (a call inside an object literal, an
+// assignment inside parentheses, a `new` inside a binary expression) are
+// still caught. ArrowFunction and FunctionExpression short-circuit to false:
+// their bodies do not run until invoked.
+//
+// The non-assignment BinaryExpression case intentionally visits children
+// rather than returning true: upstream considers `a + b` and `a ? b : c`
+// pure, and the only assignment-shaped binary with a side effect is the
+// plain `=` (compound assignments like `+=` also visit children — the
+// right-hand side carries the effect, and the LHS write is recursed into
+// separately).
 func hasSideEffect(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
 	switch node.Kind {
+	case ast.KindArrowFunction, ast.KindFunctionExpression:
+		// Bodies don't run until called.
+		return false
 	case ast.KindCallExpression,
 		ast.KindNewExpression,
-		ast.KindYieldExpression,
 		ast.KindAwaitExpression,
-		ast.KindPostfixUnaryExpression,
-		ast.KindPrefixUnaryExpression,
-		ast.KindTaggedTemplateExpression,
-		ast.KindBinaryExpression, // AssignmentExpression lives here too
-		ast.KindFunctionExpression,
-		ast.KindArrowFunction:
+		ast.KindYieldExpression,
+		ast.KindPostfixUnaryExpression:
+		// PostfixUnaryExpression covers `x++` / `x--`.
 		return true
+	case ast.KindPrefixUnaryExpression:
+		prefix := node.AsPrefixUnaryExpression()
+		if prefix == nil {
+			return false
+		}
+		// `delete x`, `++x`, `--x` are always side-effect-bearing. Other
+		// prefix operators (`!x`, `+x`, `-x`, `~x`, `typeof x`,
+		// `void x`) visit children to surface any nested effect.
+		switch prefix.Operator {
+		case ast.KindDeleteKeyword, ast.KindPlusPlusToken, ast.KindMinusMinusToken:
+			return true
+		}
+		return hasSideEffectInChildren(node)
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
+			// Plain `=` — the assignment itself is a side effect. Compound
+			// assignments (`+=`, etc.) fall through to the child walk below,
+			// so the LHS write and the RHS are both recursed into.
+			return true
+		}
+		return hasSideEffectInChildren(node)
 	}
-	return false
+	return hasSideEffectInChildren(node)
+}
+
+// hasSideEffectInChildren walks the immediate children of node and returns
+// true as soon as any of them reports a side effect. Mirrors the visitor
+// fallthrough in eslint-utils' hasSideEffect.
+func hasSideEffectInChildren(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	found := false
+	node.ForEachChild(func(child *ast.Node) bool {
+		if hasSideEffect(child) {
+			found = true
+			return true
+		}
+		return false
+	})
+	return found
 }
 
 func rangeContains(outer, inner core.TextRange) bool {
@@ -619,7 +765,7 @@ type mergeResult struct {
 // buildMerge walks the two bodies, descending into ReturnStatement and
 // AssignmentExpression one level, exactly as upstream's `merge` function does.
 // The boolean returned is false when the pair is not mergeable.
-func buildMerge(ctx rule.RuleContext, consequent, alternate *ast.Node) (mergeResult, bool) {
+func buildMerge(ctx rule.RuleContext, consequent, alternate *ast.Node, staticStrings *utils.StaticStringEvaluator) (mergeResult, bool) {
 	if consequent == nil || alternate == nil || consequent.Kind != alternate.Kind {
 		return mergeResult{}, false
 	}
@@ -644,7 +790,7 @@ func buildMerge(ctx rule.RuleContext, consequent, alternate *ast.Node) (mergeRes
 		}, true
 	}
 
-	if isMergeableAssignmentExpression(consequent, alternate) {
+	if isMergeableAssignmentExpression(consequent, alternate, staticStrings) {
 		c := consequent.AsBinaryExpression()
 		a := alternate.AsBinaryExpression()
 		// The merge's `before` and the consequent/alternate operands need to
@@ -745,6 +891,7 @@ func findMatchingRight(start *ast.BinaryExpression, op *ast.Node) *ast.Node {
 	}
 	return cur.Right
 }
+
 // what upstream reads off the `consequent.operator` field. tsgo keeps the
 // operator in an internal Token wrapper that has no Text() method, so we map
 // the kind to its canonical string for the assignment operators this rule
