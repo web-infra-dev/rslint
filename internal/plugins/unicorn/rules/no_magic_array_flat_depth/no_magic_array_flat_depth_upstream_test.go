@@ -31,6 +31,30 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 				FileName: "file.ts",
 			},
 
+			// Arrow / class expressions are deliberately NOT in the
+			// `directlyReportableReceiverTypes` set; they fall through to
+			// `isKnownNonIndexedCollection`, which classifies both as
+			// non-array expressions and skips them. Lock in every shape
+			// upstream marks as "skip" so future refactors don't promote
+			// them to the reportable set.
+			jsValid(`(() => {}).flat(2)`),
+			jsValid(`(async () => {}).flat(2)`),
+			jsValid(`(class {}).flat(2)`),
+			jsValid(`(class extends Array {}).flat(2)`),
+			jsValid(`(class { flat() {} }).flat(2)`),
+			jsValid(`(() => {})?.flat(2)`),
+			jsValid(`(class {})?.flat(2)`),
+			jsValid(`(((() => {}))).flat(2)`),
+			jsValid(`(((class {}))).flat(2)`),
+
+			// Constructor calls that the static evaluator resolves to a
+			// known non-array value — upstream (and rslint) legitimately
+			// skip these.
+			jsValid(`Number(1).flat(2)`),
+			jsValid(`String("x").flat(2)`),
+			jsValid(`Boolean(0).flat(2)`),
+			jsValid(`BigInt(1).flat(2)`),
+
 			// ---- depth is 1 (the default) ----
 			jsValid(`array.flat(1)`),
 			jsValid(`array.flat(1.0)`),
@@ -96,6 +120,69 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			// is the right call.
 			{
 				Code:     `new Uint8Array().flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+
+			// Source-only unknown receivers — upstream's `getStaticType`
+			// returns "unknown" for bare identifiers and member expressions
+			// without an evaluable static value, so the rule reports. These
+			// exercise the source-only branch of
+			// `ShouldSkipKnownNonArrayReceiver`, which would otherwise lean
+			// on the type checker and over-classify globals.
+			{
+				Code:     `undefined.flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `NaN.flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Infinity.flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Number.NaN.flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Math.PI.flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Symbol.iterator.flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Symbol().flat(2)`,
 				FileName: "file.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: messageID,
