@@ -153,6 +153,31 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			{Code: `class C extends B { foo() { super.foo(); } }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: JSDoc must not synthesize ESTree modifiers ----
+			{
+				Code:     "class Example {\n  /** @override */\n  method() {}\n}",
+				FileName: "jsdoc-override.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreOverrideMethods": true}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 3, 3, 3, 9)},
+			},
+
+			// ---- Review regression: JSDoc must not synthesize ESTree heritage ----
+			{
+				Code:     "/** @implements {Contract} */\nclass Example {\n  method() {}\n}",
+				FileName: "jsdoc-implements-all.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreClassesWithImplements": "all"}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 3, 3, 3, 9)},
+			},
+			{
+				Code:     "/** @implements {Contract} */\nclass Example {\n  method() {}\n}",
+				FileName: "jsdoc-implements-public-fields.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreClassesWithImplements": "public-fields"}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 3, 3, 3, 9)},
+			},
+
 			// A plain `this` type is TSThisType upstream, not the ThisExpression
 			// operand of a type query, so it does not count as runtime `this` use.
 			{
