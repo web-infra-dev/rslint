@@ -1,13 +1,12 @@
 /* Monaco Editor specific styles - cannot be done with Tailwind */
 
-/* Body-level host for Monaco hover/suggest widgets, above the site nav bar */
-.playground-overflow-widgets {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  z-index: 100000;
+/*
+ * Monaco gives the hover widget an inline `z-index: 50`, which sits below the
+ * Rspress header's `z-index: 60`, so the header paints over any hover opened
+ * near the top of the page.
+ */
+.monaco-resizable-hover {
+  z-index: 1000000 !important;
 }
 
 .monaco-editor .ast-node-highlight {
