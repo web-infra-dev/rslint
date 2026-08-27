@@ -113,7 +113,11 @@ ruleTester.run('prefer-ternary', null as never, {
         {
           message,
           suggestions: [
-            { messageId: 'prefer-ternary/suggestion', data: {}, output: 'const items = data.length ? data : defaultData;' },
+            {
+              messageId: 'prefer-ternary/suggestion',
+              data: {},
+              output: 'const items = data.length ? data : defaultData;',
+            },
           ],
         },
       ],
@@ -132,10 +136,14 @@ ruleTester.run('prefer-ternary', null as never, {
         {
           message,
           suggestions: [
-            { messageId: 'prefer-ternary/suggestion', data: {}, output: `function foo() {
+            {
+              messageId: 'prefer-ternary/suggestion',
+              data: {},
+              output: `function foo() {
         let x = test ? b : a;
         x = c;
-      }` },
+      }`,
+            },
           ],
         },
       ],
