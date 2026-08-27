@@ -120,7 +120,8 @@ func ascendThroughWrappers(node *ast.Node) *ast.Node {
 // below hands the promise to something that can settle it — a concise arrow
 // body returns it, an initializer, assignment or property binds it, a call
 // argument passes it on (which is how `Promise.all([...])` and
-// `Promise.allSettled([...])` are written), and `yield` suspends on it.
+// `Promise.allSettled([...])` are written), a destructuring or parameter
+// default binds it when the default runs, and `yield` suspends on it.
 // Reporting those would be a false positive; the cost is that a promise stored
 // and then dropped goes unreported.
 func isHandled(node *ast.Node) bool {
@@ -148,6 +149,24 @@ func isHandled(node *ast.Node) bool {
 		return binary.OperatorToken != nil &&
 			ast.IsAssignmentOperator(binary.OperatorToken.Kind) &&
 			binary.Right == node
+	case ast.KindBindingElement:
+		// A destructuring declaration's own default value, e.g. `const [p =
+		// expect.poll(fn).toBe(1)] = values`. BindingElement is shared by
+		// array and object patterns, nested patterns, and the bindings a
+		// for-of/for-in declaration or a destructured parameter introduces,
+		// so this one case covers all of them.
+		return parent.AsBindingElement().Initializer == node
+	case ast.KindParameter:
+		// A plain or destructured parameter's default value, e.g. `function
+		// run(p = expect.poll(fn).toBe(1)) {}`.
+		return parent.AsParameterDeclaration().Initializer == node
+	case ast.KindShorthandPropertyAssignment:
+		// An object assignment pattern's shorthand default, e.g. `({p =
+		// expect.poll(fn).toBe(1)} = values)`. Object literals can't write a
+		// bare `key = value` property, so ts-go parses this default into its
+		// own node instead of the BinaryExpression an array pattern's `[p =
+		// ...]` produces.
+		return parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == node
 	default:
 		return false
 	}

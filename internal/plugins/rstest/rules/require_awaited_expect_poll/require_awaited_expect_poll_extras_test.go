@@ -32,7 +32,7 @@ func TestRequireAwaitedExpectPollExtras(t *testing.T) {
 			// ---- B. Positions this port adds to the handled set ----
 			// The promise is bound or passed on rather than dropped, so
 			// reporting would be a false positive. Upstream reports every one
-			// of these; see the rule doc's Differences section.
+			// of these.
 			{Code: `const assertion = expect.poll(() => el).toBeVisible();`},
 			{Code: `let assertion; assertion = expect.poll(() => el).toBeVisible();`},
 			{Code: `let assertions = []; assertions[0] = expect.poll(() => el).toBeVisible();`},
@@ -43,6 +43,28 @@ func TestRequireAwaitedExpectPollExtras(t *testing.T) {
 			{Code: `function* pending() { yield expect.poll(() => el).toBeVisible(); }`},
 			{Code: `const pending = { visible: expect.element(el).toBeVisible() };`},
 			{Code: `collect(expect.poll(() => el).toBeVisible());`},
+
+			// ---- B2. Destructuring and parameter defaults bind the promise too ----
+			// Locks in a review finding on PR #1920: BindingElement,
+			// ParameterDeclaration and ShorthandPropertyAssignment initializers
+			// are all handled positions, on the same theory as B — the default
+			// only runs when it binds the promise to a name.
+			{Code: `const [p = expect.poll(() => el).toBeVisible()] = values;`},
+			{Code: `const {p = expect.poll(() => el).toBeVisible()} = values;`},
+			// Nested pattern: the default sits two BindingElement levels deep.
+			{Code: `const [[p = expect.poll(() => el).toBeVisible()]] = values;`},
+			{Code: `const {a: {p = expect.poll(() => el).toBeVisible()}} = values;`},
+			{Code: `for (const [p = expect.poll(() => el).toBeVisible()] of list) {}`},
+			{Code: `function run(p = expect.poll(() => el).toBeVisible()) {}`},
+			{Code: `function run([p = expect.poll(() => el).toBeVisible()]) {}`},
+			{Code: `function run({p = expect.poll(() => el).toBeVisible()} = {}) {}`},
+			// Assignment-pattern defaults (no declaration): an array element
+			// default is an ordinary BinaryExpression already covered by the
+			// KindBinaryExpression case above; an object shorthand default is
+			// its own ShorthandPropertyAssignment node with no BinaryExpression
+			// anywhere in it, so it needed its own case to match.
+			{Code: `let p; ([p = expect.poll(() => el).toBeVisible()] = values);`},
+			{Code: `let p; ({p = expect.poll(() => el).toBeVisible()} = values);`},
 
 			// ---- C. Wrappers that do not consume the promise ----
 			// tsgo keeps parentheses and TypeScript assertions as real nodes
