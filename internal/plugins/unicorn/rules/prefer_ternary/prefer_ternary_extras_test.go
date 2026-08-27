@@ -121,6 +121,9 @@ if (t) { x[key] = a; } else { x.bar = b; }`},
 			{Code: `if (t) { x = (a ? b : c); } else { x = d; }`},
 			{Code: `let x = (a ? b : c);
 if (t) { x = d; }`},
+			// Evaluating a method decorator is immediate, so it blocks the fold.
+			{Code: `let x = class { @dec(call()) m() {} };
+if (t) { x = next; }`},
 
 			// ---- N1: private field vs string-keyed property ----
 			// `this.#x` and `this["#x"]` are different assignment
@@ -180,6 +183,30 @@ if (t) { x = next; }`,
 			{
 				Code:     `for (;;) if (t) { (x).y = a; } else { (x).y = b; }`,
 				Output:   []string{`for (;;) (x).y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     `for (k in object) if (t) { (x).y = a; } else { (x).y = b; }`,
+				Output:   []string{`for (k in object) (x).y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     `for (const item of items) if (t) { (x).y = a; } else { (x).y = b; }`,
+				Output:   []string{`for (const item of items) (x).y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     `with (scope) if (t) { (x).y = a; } else { (x).y = b; }`,
+				Output:   []string{`with (scope) (x).y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     "const value = {}\nif (t) { (x).y = a; } else { (x).y = b; }",
+				Output:   []string{"const value = {}\n;(x).y = t ? a : b;"},
 				FileName: "file.js",
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
 			},
