@@ -608,6 +608,7 @@ export default defineConfig({
     './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
+    './tests/rstest/rules/require-awaited-expect-poll.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
     './tests/rstest/rules/valid-expect-in-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
