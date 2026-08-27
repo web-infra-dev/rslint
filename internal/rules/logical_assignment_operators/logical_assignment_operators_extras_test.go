@@ -72,8 +72,22 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `if (obj.Boolean(a)) a = b`},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `function f(Boolean) { if (Boolean(a)) a = b }`},
 			// ---- Dimension 4: `undefined` and `Boolean` resolved against file declarations ----
-			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `type Boolean = 1; if (Boolean(a)) a = b`},
+			{
+				Options:         []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				Code:            `type Boolean = 1; if (Boolean(a)) a = b`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Options:         []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				Code:            `type undefined = string; if (a === null || a === undefined) a = b`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `declare const undefined: any; if (a == undefined) a = b`},
+			{
+				Options:         []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				Code:            `namespace Boolean {} if (Boolean(a)) a = b`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `namespace N { const undefined = 1; if (a == undefined) a = b }`},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `var undefined; if (a == undefined) a = b`},
 			{
@@ -433,6 +447,24 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 				},
 			},
 			// ---- Dimension 4: `undefined` and `Boolean` resolved against file declarations ----
+			{
+				Code:            `type undefined = string; if (a === null || a === undefined) a = b`,
+				Options:         []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Output:          []string{`type undefined = string; a ??= b`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `if`, Message: `'if' statement can be replaced with a logical operator assignment with operator ??=.`},
+				},
+			},
+			{
+				Code:            `interface Boolean {} if (Boolean(a)) a = b`,
+				Options:         []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Output:          []string{`interface Boolean {} a &&= b`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `if`, Message: `'if' statement can be replaced with a logical operator assignment with operator &&=.`},
+				},
+			},
 			{
 				Code: `{ const undefined = 0; }
 if (a == undefined) a = b`,
