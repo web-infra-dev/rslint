@@ -348,7 +348,7 @@ func isNonReferenceIdentifier(node *ast.Node) bool {
 // in the project is reported against a pattern its author never chose. A name
 // the file itself declares or imports still counts as the author's.
 func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
-	if r.ctx.SourceFile == nil || !ast.IsPartOfTypeNode(node) {
+	if r.ctx.SourceFile == nil || !ast.IsPartOfTypeNode(node) || !isTypeGlobalReference(node) {
 		return false
 	}
 	// The standard library's own names are answered without asking for a
@@ -357,8 +357,7 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 	// tsconfig owns and stays quiet in one a tsconfig does. This list is the
 	// type-capable global scope typescript-eslint seeds, which is where its
 	// own scope model finds these names.
-	if rule.IsDefaultTypeScriptTypeGlobal(name) && isTypeGlobalReference(node) &&
-		!r.isDeclaredInFile(node, name) {
+	if rule.IsDefaultTypeScriptTypeGlobal(name) && !r.isDeclaredInFile(node, name) {
 		return true
 	}
 	symbol := r.ctx.Refs.Resolve(node)

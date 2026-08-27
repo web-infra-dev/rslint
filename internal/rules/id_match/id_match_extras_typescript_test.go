@@ -224,6 +224,21 @@ let x: Local_1;`,
 					},
 				},
 			},
+			// ---- A resolved import-type member still belongs to the imported module ----
+			{
+				Code:    `type X = import("./foo").T;`,
+				Options: []any{`^X$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'T' does not match the pattern '^X$'.`,
+						Line:      1,
+						Column:    26,
+						EndLine:   1,
+						EndColumn: 27,
+					},
+				},
+			},
 			{
 				Code:    `type X = typeof Partial;`,
 				Options: []any{`^X$`},
