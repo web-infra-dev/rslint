@@ -105,6 +105,9 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			{Code: `class Outer { outer() { return class Inner { static method(x: typeof this.x): void; }; } }`},
 			{Code: `class Outer { outer() { abstract class Inner { abstract get value(): typeof this.x; } return Inner; } }`},
 			{Code: `class Outer { outer() { function inner(x: typeof this.x): void; return inner; } }`},
+			{Code: `class Outer { outer() { abstract class Inner { abstract value: typeof this.x; } return Inner; } }`},
+			{Code: `class Outer { outer() { abstract class Inner { abstract [key]: typeof this.x; } return Inner; } }`},
+			{Code: `class Outer { outer() { abstract class Inner { abstract accessor value: typeof this.x; } return Inner; } }`},
 
 			// ---- Dimension 4: class-field function wrappers ----
 			{Code: `class C { foo = (() => { this.value; }); }`},
@@ -153,13 +156,48 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			{Code: `class C extends B { foo() { super.foo(); } }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Abstract properties do not create a frame, but the following
+			// concrete method still does and reports independently.
+			{
+				Code:   `class Outer { outer() { abstract class Inner { abstract value: typeof this.x; method() {} } return Inner; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 1, 79, 1, 85)},
+			},
+
+			// A bodyless `declare` field remains a PropertyDefinition upstream,
+			// so its type annotation stays isolated from the enclosing method.
+			{
+				Code:   `class Outer { outer() { return class Inner { declare value: typeof this.x; }; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'outer'.", 1, 15, 1, 20)},
+			},
+
 			// ---- Review regression: JSDoc must not synthesize ESTree modifiers ----
 			{
 				Code:     "class Example {\n  /** @override */\n  method() {}\n}",
-				FileName: "jsdoc-override.mjs",
+				FileName: "jsdoc-override.js",
 				TSConfig: "tsconfig.allow-js.json",
 				Options:  coreOptions(map[string]interface{}{"ignoreOverrideMethods": true}),
 				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 3, 3, 3, 9)},
+			},
+			{
+				Code:     "class Example {\n  /** @override */\n  method() {}\n}",
+				FileName: "jsdoc-override-checked.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreOverrideMethods": true}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 3, 3, 3, 9)},
+			},
+			{
+				Code:     "class Example {\n  /** @override */\n  field = () => {};\n}",
+				FileName: "jsdoc-override-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreOverrideMethods": true}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'field'.", 3, 3, 3, 11)},
+			},
+			{
+				Code:     "class Example {\n  /** @override */\n  get value() {}\n}",
+				FileName: "jsdoc-override-getter.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreOverrideMethods": true}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class getter 'value'.", 3, 3, 3, 12)},
 			},
 
 			// ---- Review regression: JSDoc must not synthesize ESTree heritage ----
@@ -172,10 +210,24 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			},
 			{
 				Code:     "/** @implements {Contract} */\nclass Example {\n  method() {}\n}",
+				FileName: "jsdoc-implements-all-checked.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreClassesWithImplements": "all"}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 3, 3, 3, 9)},
+			},
+			{
+				Code:     "/** @implements {Contract} */\nclass Example {\n  method() {}\n}",
 				FileName: "jsdoc-implements-public-fields.mjs",
 				TSConfig: "tsconfig.allow-js.json",
 				Options:  coreOptions(map[string]interface{}{"ignoreClassesWithImplements": "public-fields"}),
 				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 3, 3, 3, 9)},
+			},
+			{
+				Code:     "/** @implements {Contract} */\nconst Example = class { method() {} };",
+				FileName: "jsdoc-implements-class-expression.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  coreOptions(map[string]interface{}{"ignoreClassesWithImplements": "all"}),
+				Errors:   []rule_tester.InvalidTestCaseError{missingThisAt("Expected 'this' to be used by class method 'method'.", 2, 25, 2, 31)},
 			},
 
 			// A plain `this` type is TSThisType upstream, not the ThisExpression

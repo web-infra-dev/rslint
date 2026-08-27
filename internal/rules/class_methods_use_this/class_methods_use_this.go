@@ -180,6 +180,11 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return n != nil && n.Kind == ast.KindComputedPropertyName
 	}
 
+	isAbstractProperty := func(member *ast.Node) bool {
+		return member.Kind == ast.KindPropertyDeclaration &&
+			ast.HasSyntacticModifier(member, ast.ModifierFlagsAbstract)
+	}
+
 	// memberKey returns the canonical key used to match against
 	// `exceptMethods`. Mirrors upstream's `(hashIfNeeded) + getStaticMemberAccessValue(node)`:
 	// PrivateIdentifier text already carries the `#` prefix in tsgo, so no
@@ -451,12 +456,16 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// non-computed keys push on enter, but computed keys defer the push
 		// to ComputedPropertyName:exit.
 		ast.KindPropertyDeclaration: func(node *ast.Node) {
-			if isComputedKey(node) || lastDecorator(node) != nil {
+			if isAbstractProperty(node) || isComputedKey(node) || lastDecorator(node) != nil {
 				return
 			}
 			pushAnonymous()
 		},
-		rule.ListenerOnExit(ast.KindPropertyDeclaration): func(*ast.Node) { popContext() },
+		rule.ListenerOnExit(ast.KindPropertyDeclaration): func(node *ast.Node) {
+			if !isAbstractProperty(node) {
+				popContext()
+			}
+		},
 		rule.ListenerOnExit(ast.KindComputedPropertyName): func(node *ast.Node) {
 			parent := node.Parent
 			if parent == nil {
@@ -464,7 +473,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			}
 			switch parent.Kind {
 			case ast.KindPropertyDeclaration:
-				pushAnonymous()
+				if !isAbstractProperty(parent) {
+					pushAnonymous()
+				}
 			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 				// Deferred push for computed-key class members. Bodyless
 				// members never enter the upstream function listener.
@@ -482,7 +493,9 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 				pushClassLikeMember(parent)
 			case ast.KindPropertyDeclaration:
-				pushAnonymous()
+				if !isAbstractProperty(parent) {
+					pushAnonymous()
+				}
 			}
 		},
 
