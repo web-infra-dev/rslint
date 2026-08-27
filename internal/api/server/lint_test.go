@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type canonicalPathBaseFS struct {
@@ -111,6 +112,73 @@ func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "canonicalFiles must be parallel to files") {
 		t.Fatalf("expected canonicalFiles length error, got %v", err)
+	}
+}
+
+func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAlias(t *testing.T) {
+	root := t.TempDir()
+	realPath := filepath.Join(root, "real.ts")
+	aliasPath := filepath.Join(root, "alias.ts")
+	if err := os.WriteFile(realPath, []byte("const value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(`{"compilerOptions":{"noLib":true},"files":["real.ts"]}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	var wirePath string
+	response, err := (&Handler{}).handleLint(
+		context.Background(),
+		api.LintRequest{
+			Files:          []string{aliasPath},
+			CanonicalFiles: []string{realPath},
+			Config: json.RawMessage(`[{
+				"files":["**/*.ts"],
+				"plugins":["community"],
+				"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},
+				"rules":{"community/check":"error"}
+			}]`),
+			ConfigDirectory:  root,
+			WorkingDirectory: root,
+			EslintPlugins: []api.EslintPluginEntry{{
+				Prefix:    "community",
+				RuleNames: []string{"check"},
+			}},
+		},
+		func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			if len(request.Files) != 1 {
+				return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
+			}
+			wirePath = request.Files[0].Path
+			return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+				FilePath: wirePath,
+				Diagnostics: []linter.EslintPluginDiagnostic{{
+					RuleName: "community/check",
+					Message:  "reported",
+					StartPos: 0,
+					EndPos:   5,
+				}},
+			}}}, nil
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wirePath != tspath.NormalizePath(realPath) {
+		t.Fatalf("plugin wire path = %q, want Program identity %q", wirePath, tspath.NormalizePath(realPath))
+	}
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "alias.ts" {
+		t.Fatalf("projected diagnostics = %+v, want requested alias", response.Diagnostics)
+	}
+	if !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) {
+		t.Fatalf("linted files = %v, want requested alias", response.LintedFiles)
 	}
 }
 
@@ -1423,6 +1491,35 @@ func TestHandleLint_FixProducesInBandOutput(t *testing.T) {
 	}
 	if want := "let a: string[] = [];\n"; got != want {
 		t.Fatalf("expected fixed output %q, got %q", want, got)
+	}
+}
+
+func TestHandleLint_FixOutputPreservesOverlayBOM(t *testing.T) {
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
+	if err != nil {
+		t.Fatalf("resolve fixtures dir: %v", err)
+	}
+	config := json.RawMessage(`[{
+		"files": ["**/*.ts"],
+		"languageOptions": { "parserOptions": { "project": ["./tsconfig.json"] } },
+		"rules": { "@typescript-eslint/array-type": "error" },
+		"plugins": ["@typescript-eslint"]
+	}]`)
+	targetPath := filepath.Join(fixturesDir, "gap-fix-bom.ts")
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  fixturesDir,
+		WorkingDirectory: fixturesDir,
+		Files:            []string{targetPath},
+		FileContents:     map[string]string{targetPath: utils.BOM + "let a: Array<string> = [];\n"},
+		Fix:              true,
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	want := utils.BOM + "let a: string[] = [];\n"
+	if got := response.Output["gap-fix-bom.ts"]; got != want {
+		t.Fatalf("fixed BOM output = %q, want %q", got, want)
 	}
 }
 

@@ -53,6 +53,11 @@ func TestDefaultParamLastRule(t *testing.T) {
 		{Code: `class A { constructor(a: number, b = 0) {} }`},
 		{Code: `class A { constructor(a: number, b?: number) {} }`},
 
+		// Valid: bodyless declarations are outside the upstream listeners
+		{Code: `declare function f(a?: number, b: number): void;`},
+		{Code: `abstract class A { abstract method(a?: number, b: number): void; }`},
+		{Code: `class A { constructor(a?: number, b: number); constructor(b: number) {} }`},
+
 		// Valid: parameter properties
 		{Code: `class A { constructor(public a: number, public b = 0) {} }`},
 		{Code: `class A { constructor(private a: number, public b?: number) {} }`},
@@ -130,9 +135,9 @@ func TestDefaultParamLastRule(t *testing.T) {
 
 		// Invalid: method
 		{
-			Code: `class A { method(a = 0, b: number) {} }`,
+			Code: `class A { method(@first @second a?: number, b: number) {} }`,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "shouldBeLast"},
+				{MessageId: "shouldBeLast", Line: 1, Column: 33, EndLine: 1, EndColumn: 43},
 			},
 		},
 
