@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
+	"github.com/web-infra-dev/rslint/internal/rules/func_name_matching"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
@@ -242,6 +243,7 @@ func coreRules() []rule.Rule {
 		default_case_last.DefaultCaseLastRule,
 		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
+		func_name_matching.FuncNameMatchingRule,
 		func_names.FuncNamesRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
