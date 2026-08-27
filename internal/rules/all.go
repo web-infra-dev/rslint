@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
+	"github.com/web-infra-dev/rslint/internal/rules/func_name_matching"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
@@ -40,6 +41,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/max_nested_callbacks"
 	"github.com/web-infra-dev/rslint/internal/rules/max_params"
 	"github.com/web-infra-dev/rslint/internal/rules/max_statements"
+	"github.com/web-infra-dev/rslint/internal/rules/new_cap"
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
@@ -189,6 +191,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
+	"github.com/web-infra-dev/rslint/internal/rules/sort_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/sort_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/sort_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
@@ -196,6 +199,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
+	"github.com/web-infra-dev/rslint/internal/rules/vars_on_top"
 )
 
 var allRuleCatalog = sync.OnceValue(func() *rule.Catalog {
@@ -239,6 +243,7 @@ func coreRules() []rule.Rule {
 		default_case_last.DefaultCaseLastRule,
 		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
+		func_name_matching.FuncNameMatchingRule,
 		func_names.FuncNamesRule,
 		getter_return.GetterReturnRule,
 		guard_for_in.GuardForInRule,
@@ -251,6 +256,7 @@ func coreRules() []rule.Rule {
 		max_nested_callbacks.MaxNestedCallbacksRule,
 		max_params.MaxParamsRule,
 		max_statements.MaxStatementsRule,
+		new_cap.NewCapRule,
 		no_alert.NoAlertRule,
 		no_async_promise_executor.NoAsyncPromiseExecutorRule,
 		no_await_in_loop.NoAwaitInLoopRule,
@@ -358,6 +364,7 @@ func coreRules() []rule.Rule {
 		prefer_template.PreferTemplateRule,
 		no_this_before_super.NoThisBeforeSuperRule,
 		no_var.NoVarRule,
+		vars_on_top.VarsOnTopRule,
 		no_void.NoVoidRule,
 		no_warning_comments.NoWarningCommentsRule,
 		no_with.NoWithRule,
@@ -406,6 +413,7 @@ func coreRules() []rule.Rule {
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
 		unicode_bom.UnicodeBomRule,
 		operator_assignment.OperatorAssignmentRule,
+		sort_imports.SortImportsRule,
 		sort_keys.SortKeysRule,
 		sort_vars.SortVarsRule,
 	}

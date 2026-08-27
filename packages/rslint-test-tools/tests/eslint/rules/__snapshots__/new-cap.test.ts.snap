@@ -1,0 +1,628 @@
+// Rstest Snapshot v1
+
+exports[`new-cap > invalid 1`] = `
+{
+  "code": "var x = new c();",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 2`] = `
+{
+  "code": "var x = new φ;",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 3`] = `
+{
+  "code": "var x = new a.b.c;",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 4`] = `
+{
+  "code": "var x = new a.b['c'];",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 5`] = `
+{
+  "code": "var b = Foo();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 6`] = `
+{
+  "code": "var b = a.Foo();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 7`] = `
+{
+  "code": "var b = a['Foo']();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 8`] = `
+{
+  "code": "var b = a.Date.UTC();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 9`] = `
+{
+  "code": "var b = UTC();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 10`] = `
+{
+  "code": "var a = B.C();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 11`] = `
+{
+  "code": "var a = B
+.C();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 2,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 12`] = `
+{
+  "code": "var a = new B.c();",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 13`] = `
+{
+  "code": "var a = new B.
+c();",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 14`] = `
+{
+  "code": "var a = new c();",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 15`] = `
+{
+  "code": "var a = new b[ ( 'foo' ) ]();",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 16`] = `
+{
+  "code": "var a = new b[\`foo\`];",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 17`] = `
+{
+  "code": "var a = b[\`\\
+Foo\`]();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 18`] = `
+{
+  "code": "var x = Foo.Bar(42);",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 19`] = `
+{
+  "code": "var x = Bar.Foo(42);",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 20`] = `
+{
+  "code": "var x = new foo.bar(42);",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 21`] = `
+{
+  "code": "var x = new bar.foo(42);",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 22`] = `
+{
+  "code": "new (foo?.bar)();",
+  "diagnostics": [
+    {
+      "message": "A constructor name should not start with a lowercase letter.",
+      "messageId": "lower",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 23`] = `
+{
+  "code": "foo?.Bar();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`new-cap > invalid 24`] = `
+{
+  "code": "(foo?.Bar)();",
+  "diagnostics": [
+    {
+      "message": "A function with a name starting with an uppercase letter should only be used as a constructor.",
+      "messageId": "upper",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "new-cap",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

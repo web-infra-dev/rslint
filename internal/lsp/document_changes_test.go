@@ -307,7 +307,7 @@ func lintOffTheEditorPath(program *compiler.Program, file string, resolver *conf
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		File:    file,
-		GetRulesForFile: func(f *ast.SourceFile) []linter.ConfiguredRule {
+		GetRulesForFile: func(f *ast.SourceFile) []rule.ConfiguredRule {
 			rules, _ := resolver.EnabledRulesForFile(f.FileName())
 			return rules
 		},

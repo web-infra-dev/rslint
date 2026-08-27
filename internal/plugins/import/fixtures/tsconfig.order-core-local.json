@@ -5,7 +5,11 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "fs": ["order-internal-modules/api/service.ts"]
+      "buffer": ["order-internal-modules/api/service.ts"],
+      "fs": ["order-internal-modules/api/service.ts"],
+      "fs/not-a-builtin": ["order-internal-modules/api/service.ts"],
+      "local-api": ["order-internal-modules/api/service.ts"],
+      "virtual": ["order-internal-modules/api/service.ts"]
     },
     "lib": ["es2015", "es2017", "esnext", "DOM"]
   },

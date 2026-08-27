@@ -7,7 +7,8 @@
     "esModuleInterop": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/order-internal-modules/*"]
+      "@/*": ["src/order-internal-modules/*"],
+      "buffer": ["src/order-internal-modules/api/service.ts"]
     },
     "lib": ["es2015", "es2017", "esnext"],
     "experimentalDecorators": true

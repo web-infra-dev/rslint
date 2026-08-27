@@ -2,54 +2,25 @@
 
 ## Rule Details
 
-Disallow calling Rstest `expect` APIs conditionally. When an assertion only
-runs on one branch, the test can pass without executing that assertion.
+Disallows assertions that only run on some execution paths. A test can pass without checking anything when its assertion is skipped by a condition.
 
-Examples of incorrect code:
+The rule recognizes `expect` from globals, imports, the local test context, Browser Mode, and Playwright integrations.
+
+## Incorrect
 
 ```ts
-test("loads user", () => {
+test('returns the user name', () => {
   if (user) {
-    expect(user.name).toBe("Alice");
+    expect(user.name).toBe('Ada');
   }
-});
-
-test("rejects", async () => {
-  await request().catch((error) => {
-    expect(error).toBeInstanceOf(Error);
-  });
-});
-
-test("uses local expect", ({ expect }) => {
-  ready && expect(value).toBeDefined();
 });
 ```
 
-The rule recognizes Rstest APIs from globals, `@rstest/core`,
-`import.meta.rstest`, test context `expect`, Browser Mode `expect.element`,
-and `@rstest/playwright`.
-
-Examples of correct code:
+## Correct
 
 ```ts
-test("loads user", () => {
+test('returns the user name', () => {
   expect(user).toBeDefined();
-  expect(user?.name).toBe("Alice");
-});
-
-test("rejects", async () => {
-  await expect(request()).rejects.toThrow();
-});
-
-test("prepares conditionally", () => {
-  if (mode === "a") {
-    setupA();
-  } else {
-    setupB();
-  }
-
-  expect(result).toBeDefined();
+  expect(user.name).toBe('Ada');
 });
 ```
-
-The rule has no options and does not provide an automatic fix.

@@ -1,0 +1,105 @@
+// Rstest Snapshot v1
+
+exports[`vars-on-top > invalid 1`] = `
+{
+  "code": "function foo() { var first; first = 1; var second = 1; }",
+  "diagnostics": [
+    {
+      "message": "All 'var' declarations must be at the top of the function scope.",
+      "messageId": "top",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "vars-on-top",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`vars-on-top > invalid 2`] = `
+{
+  "code": "function foo() { if (true) { var second = true; } }",
+  "diagnostics": [
+    {
+      "message": "All 'var' declarations must be at the top of the function scope.",
+      "messageId": "top",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "vars-on-top",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`vars-on-top > invalid 3`] = `
+{
+  "code": "function foo() { for (var i = 0; i < 10; i++) {} }",
+  "diagnostics": [
+    {
+      "message": "All 'var' declarations must be at the top of the function scope.",
+      "messageId": "top",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "vars-on-top",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`vars-on-top > invalid 4`] = `
+{
+  "code": "'use strict'; 0; var x; f();",
+  "diagnostics": [
+    {
+      "message": "All 'var' declarations must be at the top of the function scope.",
+      "messageId": "top",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "vars-on-top",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
