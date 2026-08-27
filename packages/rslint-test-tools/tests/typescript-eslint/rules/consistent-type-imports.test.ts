@@ -1,6 +1,7 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import path from 'node:path';
 
-
+const rootDir = path.join(import.meta.dirname, '..');
 
 const PARSER_OPTION_COMBOS = [
   {
@@ -21,7 +22,13 @@ describe.for(PARSER_OPTION_COMBOS)(
   'experimentalDecorators: $experimentalDecorators + emitDecoratorMetadata: $emitDecoratorMetadata',
   parserOptions => {
     const ruleTester = new RuleTester({
-      languageOptions: { parserOptions },
+      languageOptions: {
+        parserOptions: {
+          ...parserOptions,
+          project: `./tsconfig.decorators-${Number(parserOptions.experimentalDecorators)}${Number(parserOptions.emitDecoratorMetadata)}.json`,
+          tsconfigRootDir: rootDir,
+        },
+      },
     });
 
     ruleTester.run('consistent-type-imports', {
@@ -126,7 +133,7 @@ describe.for(PARSER_OPTION_COMBOS)(
         },
         {
           code: `
-    import * as Type from 'foo' assert { type: 'json' };
+    import * as Type from 'foo' with { type: 'json' };
     const a: typeof Type = Type;
           `,
           options: [{ prefer: 'no-type-imports' }],
@@ -313,6 +320,7 @@ describe.for(PARSER_OPTION_COMBOS)(
                 jsx: true,
               },
               jsxPragma: 'h',
+              project: './tsconfig.jsx-h.json',
             },
           },
         },
@@ -330,6 +338,7 @@ describe.for(PARSER_OPTION_COMBOS)(
                 jsx: true,
               },
               jsxFragmentName: 'Fragment',
+              project: './tsconfig.jsx-fragment.json',
             },
           },
         },
@@ -1920,7 +1929,7 @@ describe.for(PARSER_OPTION_COMBOS)(
     function test(foo: Foo) {}
           `,
           errors: [
-            { column: 1, line: 3, messageId: 'someImportsAreOnlyTypes' },
+            { column: 5, line: 3, messageId: 'someImportsAreOnlyTypes' },
           ],
           output: `
     import 'foo';
@@ -1936,7 +1945,7 @@ describe.for(PARSER_OPTION_COMBOS)(
     function test(foo: Foo) {}
           `,
           errors: [
-            { column: 1, line: 3, messageId: 'someImportsAreOnlyTypes' },
+            { column: 5, line: 3, messageId: 'someImportsAreOnlyTypes' },
           ],
           output: `
     import {} from 'foo';
@@ -1957,6 +1966,8 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
       parserOptions: {
         emitDecoratorMetadata: true,
         experimentalDecorators: true,
+        project: './tsconfig.decorators-11.json',
+        tsconfigRootDir: rootDir,
       },
     },
   });

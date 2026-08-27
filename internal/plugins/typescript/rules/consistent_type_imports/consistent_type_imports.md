@@ -2,27 +2,98 @@
 
 ## Rule Details
 
-Enforce consistent usage of type imports. TypeScript allows marking imports as type-only using `import type`, which ensures the import is erased at compile time. This rule enforces that type-only imports use the `import type` syntax, and can optionally disallow `import()` type annotations.
+Enforce consistent use of type-only imports. TypeScript erases imports marked
+with `type`, which makes their runtime behavior explicit and works with module
+settings that preserve value imports.
 
-The `prefer` option supports `"type-imports"` (default) and `"no-type-imports"`. The `disallowTypeAnnotations` option (default `true`) forbids using `import()` in type annotations.
-
-Examples of **incorrect** code for this rule:
-
-```typescript
-import { MyType } from './types'; // MyType is only used as a type
-
-type Foo = import('./types').Bar; // disallowTypeAnnotations
-```
-
-Examples of **correct** code for this rule:
+Examples of **incorrect** code for this rule with the default options:
 
 ```typescript
-import type { MyType } from './types';
+import { Model, createModel } from './models';
 
-import { value } from './values';
+export function create(): Model {
+  return createModel();
+}
 
-import { value, type MyType } from './mixed';
+type External = import('./external').External;
 ```
+
+Examples of **correct** code for this rule with the default options:
+
+```typescript
+import type { Model } from './models';
+import { createModel } from './models';
+
+export function create(): Model {
+  return createModel();
+}
+```
+
+### `prefer`
+
+The default, `"type-imports"`, requires imports used only in type positions to
+be marked as type-only. `"no-type-imports"` instead forbids both top-level and
+inline `type` modifiers.
+
+```json
+{
+  "consistent-type-imports": ["error", { "prefer": "no-type-imports" }]
+}
+```
+
+```typescript
+import { Model } from './models';
+
+type LocalModel = Model;
+```
+
+### `fixStyle`
+
+When `prefer` is `"type-imports"`, `"separate-type-imports"` (the default)
+moves type-only names into a separate declaration. `"inline-type-imports"`
+keeps named type imports in the value declaration when possible.
+
+```json
+{
+  "consistent-type-imports": [
+    "error",
+    { "fixStyle": "inline-type-imports" }
+  ]
+}
+```
+
+```typescript
+import { type Model, createModel } from './models';
+```
+
+### `disallowTypeAnnotations`
+
+`disallowTypeAnnotations` defaults to `true` and reports `import()` type
+annotations. Set it to `false` to allow them.
+
+```json
+{
+  "consistent-type-imports": [
+    "error",
+    { "disallowTypeAnnotations": false }
+  ]
+}
+```
+
+```typescript
+type Model = import('./models').Model;
+```
+
+## Differences from ESLint
+
+The pinned upstream implementation stores module sources in a plain JavaScript
+object, so imports from `"constructor"`, `"toString"`, `"__proto__"`, or
+`"hasOwnProperty"` throw while linting. The Go map intentionally handles these
+names normally and still reports and fixes the import.
+
+With `"inline-type-imports"`, rslint also emits a valid inline fix when an
+earlier default-only or default-plus-namespace value import from the same module
+causes the pinned upstream implementation to suppress its fix.
 
 ## Original Documentation
 
