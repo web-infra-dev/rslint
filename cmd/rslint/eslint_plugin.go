@@ -39,6 +39,14 @@ func reportEslintPluginDispatchOutcome(outcome linter.EslintPluginDispatchOutcom
 }
 
 func writeEslintPluginDispatchOutcome(w io.Writer, outcome linter.EslintPluginDispatchOutcome) {
+	for _, notice := range outcome.Notices {
+		switch notice.Kind {
+		case linter.EslintPluginMissingFileResult:
+			fmt.Fprintf(w, "rslint: plugin-lint returned no result for %q\n", notice.FilePath)
+		case linter.EslintPluginUnconfiguredDiagnostic:
+			fmt.Fprintf(w, "rslint: plugin diagnostic for unconfigured rule %q in %q\n", notice.RuleName, notice.FilePath)
+		}
+	}
 	if outcome.DispatchError != nil && !errors.Is(outcome.DispatchError, context.Canceled) {
 		fmt.Fprintf(w, "rslint: eslint-plugin lint error: %v\n", outcome.DispatchError)
 	}
