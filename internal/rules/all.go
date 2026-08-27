@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
+	"github.com/web-infra-dev/rslint/internal/rules/default_param_last"
 	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
@@ -43,6 +44,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/max_statements"
 	"github.com/web-infra-dev/rslint/internal/rules/new_cap"
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
+	"github.com/web-infra-dev/rslint/internal/rules/no_array_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
 	"github.com/web-infra-dev/rslint/internal/rules/no_bitwise"
@@ -241,6 +243,7 @@ func coreRules() []rule.Rule {
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,
 		default_case_last.DefaultCaseLastRule,
+		default_param_last.DefaultParamLastRule,
 		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
 		func_name_matching.FuncNameMatchingRule,
@@ -258,6 +261,7 @@ func coreRules() []rule.Rule {
 		max_statements.MaxStatementsRule,
 		new_cap.NewCapRule,
 		no_alert.NoAlertRule,
+		no_array_constructor.NoArrayConstructorRule,
 		no_async_promise_executor.NoAsyncPromiseExecutorRule,
 		no_await_in_loop.NoAwaitInLoopRule,
 		no_bitwise.NoBitwiseRule,
