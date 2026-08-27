@@ -312,11 +312,36 @@ identity(values);
 `,
 			},
 			{
-				// Locks in checkUnsafeArguments()'s non-array iterable spread branch.
+				// A safe iterable element type flows to the rest element type.
 				Code: `
 declare function acceptStrings(...values: string[]): void;
-declare const values: Set<any>;
+declare const values: Set<string>;
 acceptStrings(...values);
+`,
+			},
+			{
+				// The generic constraint supplies the iterable element type.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends Iterable<string>>(values: T): void {
+  acceptStrings(...values);
+}
+forward(new Set<string>());
+`,
+			},
+			{
+				// Any is safe when the iterable feeds a rest parameter that accepts any.
+				Code: `
+declare function acceptAnything(...values: any[]): void;
+declare const values: Set<any>;
+acceptAnything(...values);
+`,
+			},
+			{
+				// Strings use the same iterable yield path without introducing any.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+acceptStrings(...'safe');
 `,
 			},
 			{
@@ -343,6 +368,54 @@ optional();
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				// A non-array iterable still spreads its element type into the rest parameter.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+declare const values: Set<any>;
+acceptStrings(...values);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    15,
+					EndLine:   4,
+					EndColumn: 24,
+				}},
+			},
+			{
+				// A type parameter gets its iteration type through the generic constraint.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends Iterable<any>>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Line:      4,
+					Column:    17,
+					EndLine:   4,
+					EndColumn: 26,
+				}},
+			},
+			{
+				// Array-like generic constraints reach the same iterable path because T is not itself an array.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends readonly any[]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Line:      4,
+					Column:    17,
+					EndLine:   4,
+					EndColumn: 26,
+				}},
+			},
 			{
 				// ---- Dimension 4: one parenthesized argument; ESTree excludes parens ----
 				Code: `

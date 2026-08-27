@@ -247,12 +247,37 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 							signature.consumeRemainingArguments()
 						}
 
-					} else
-					//nolint:staticcheck // FIXME: todo
-					{
-						// something that's iterable
-						// handling this will be pretty complex - so we ignore it for now
-						// TODO - handle generic iterable case
+					} else {
+						// NOTE: Unlike typescript-eslint, rslint checks the element
+						// type of non-array iterable spreads instead of ignoring them.
+						// A non-array iterable contributes an unknown number of values.
+						// Ask the checker for the same yield type TypeScript uses for a
+						// spread, which also follows generic iterable constraints.
+						spreadElementType := checker.Checker_getIterationTypeOfIterable(
+							ctx.TypeChecker,
+							checker.IterationUseSpread,
+							checker.IterationTypeKindYield,
+							spreadArgType,
+							nil,
+						)
+						parameterType := signature.getNextParameterType()
+						if spreadElementType != nil && parameterType != nil {
+							_, _, unsafe := utils.IsUnsafeAssignment(
+								spreadElementType,
+								parameterType,
+								ctx.TypeChecker,
+								nil,
+							)
+							if unsafe {
+								ctx.ReportNode(argument, buildUnsafeArgumentMessage(
+									describeType(spreadElementType),
+									describeType(parameterType),
+								))
+							}
+						}
+						// The spread can supply any number of values, so subsequent
+						// arguments can only be compared with a rest parameter.
+						signature.consumeRemainingArguments()
 					}
 
 				default:
