@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_expect"
 	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_hooks"
@@ -36,6 +37,7 @@ func GetAllRules() []rule.Rule {
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_conditional_expect.NoConditionalExpectRule,
 		no_conditional_in.NoConditionalInTestRule,
+		no_conditional_tests.NoConditionalTestsRule,
 		no_disabled_tests.NoDisabledTestsRule,
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
