@@ -194,6 +194,10 @@ together. Only meaningful with `"always-and-inside-groups"` newline modes.
 | `import/core-modules` | Extra names treated as `builtin`. |
 | `import/external-module-folders` | Resolved paths outside the importing package, or under one of these package-relative folders, classify as `external` (default `["node_modules"]`). An explicit `[]` disables the folder check; `""` denotes the package root. |
 
+Exact Node.js builtin specifiers take precedence over TypeScript filesystem
+resolution. Non-exact builtin subpath specifiers and names from
+`import/core-modules` remain resolution-sensitive.
+
 ## Differences from ESLint
 
 Compared with eslint-plugin-import 2.32.0, users may observe:

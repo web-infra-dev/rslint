@@ -90,6 +90,7 @@ Cbar
 cdylib
 centralising
 CHARCLASS
+cerialize
 checkerpool
 Citi
 classnames
@@ -169,6 +170,7 @@ esmodule
 espree
 esregexp
 estree
+esutils
 eszett
 Ethi
 exclam

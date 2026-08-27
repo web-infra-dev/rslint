@@ -559,11 +559,11 @@ consume(outer);
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                sourceProgram,
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 			if sourceFile.FileName() != filePath {
 				return nil
 			}
-			return []linter.ConfiguredRule{{
+			return []rule.ConfiguredRule{{
 				Name:     NoUnusedVarsRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -843,11 +843,11 @@ consume(data);`,
 				testutil.LintProgram(t, testutil.LintProgramOptions{
 					Program:                sourceProgram,
 					ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-					GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+					GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 						if sourceFile.FileName() != filePath {
 							return nil
 						}
-						return []linter.ConfiguredRule{{
+						return []rule.ConfiguredRule{{
 							Name:     NoUnusedVarsRule.Name,
 							Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -931,8 +931,8 @@ assigned = 2;
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        filePath,
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     NoUnusedVarsRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

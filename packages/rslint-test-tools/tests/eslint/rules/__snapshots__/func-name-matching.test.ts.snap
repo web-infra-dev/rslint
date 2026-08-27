@@ -1,0 +1,521 @@
+// Rstest Snapshot v1
+
+exports[`func-name-matching > invalid 1`] = `
+{
+  "code": "let foo = function bar() {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match variable name \`foo\`.",
+      "messageId": "matchVariable",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 2`] = `
+{
+  "code": "foo = function bar() {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match variable name \`foo\`.",
+      "messageId": "matchVariable",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 3`] = `
+{
+  "code": "foo &&= function bar() {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match variable name \`foo\`.",
+      "messageId": "matchVariable",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 4`] = `
+{
+  "code": "obj['foo'] ??= function bar() {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match property name \`foo\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 5`] = `
+{
+  "code": "obj.foo = function bar() {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match property name \`foo\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 6`] = `
+{
+  "code": "let obj = {foo: function bar() {}};",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match property name \`foo\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 7`] = `
+{
+  "code": "({['foo']: function bar() {}})",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match property name \`foo\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 8`] = `
+{
+  "code": "module.exports = function foo(name) {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`foo\` should match property name \`exports\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 9`] = `
+{
+  "code": "module.exports = function exports(name) {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`exports\` should not match property name \`exports\`.",
+      "messageId": "notMatchProperty",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 10`] = `
+{
+  "code": "var foo = function foo(name) {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`foo\` should not match variable name \`foo\`.",
+      "messageId": "notMatchVariable",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 11`] = `
+{
+  "code": "obj.foo = function foo(name) {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`foo\` should not match property name \`foo\`.",
+      "messageId": "notMatchProperty",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 12`] = `
+{
+  "code": "Object.defineProperty(foo, 'bar', { value: function baz() {} })",
+  "diagnostics": [
+    {
+      "message": "Function name \`baz\` should match property name \`bar\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 13`] = `
+{
+  "code": "Object.defineProperties(foo, { bar: { value: function baz() {} } })",
+  "diagnostics": [
+    {
+      "message": "Function name \`baz\` should match property name \`bar\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 14`] = `
+{
+  "code": "Object.create(proto, { bar: { value: function baz() {} } })",
+  "diagnostics": [
+    {
+      "message": "Function name \`baz\` should match property name \`bar\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 15`] = `
+{
+  "code": "var obj = { value: function foo(name) {} }",
+  "diagnostics": [
+    {
+      "message": "Function name \`foo\` should match property name \`value\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 16`] = `
+{
+  "code": "Reflect.defineProperty(foo, 'bar', { value: function baz() {} })",
+  "diagnostics": [
+    {
+      "message": "Function name \`baz\` should match property name \`bar\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 17`] = `
+{
+  "code": "(obj?.aaa).foo = function bar() {};",
+  "diagnostics": [
+    {
+      "message": "Function name \`bar\` should match property name \`foo\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 18`] = `
+{
+  "code": "Object?.defineProperty(foo, 'bar', { value: function baz() {} })",
+  "diagnostics": [
+    {
+      "message": "Function name \`baz\` should match property name \`bar\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 19`] = `
+{
+  "code": "class C { x = function y() {}; }",
+  "diagnostics": [
+    {
+      "message": "Function name \`y\` should match property name \`x\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-name-matching > invalid 20`] = `
+{
+  "code": "class C { static x = function y() {}; }",
+  "diagnostics": [
+    {
+      "message": "Function name \`y\` should match property name \`x\`.",
+      "messageId": "matchProperty",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-name-matching",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -88,7 +88,7 @@ func collectLintedFiles(t *testing.T, programs []*compiler.Program) map[string]i
 	counts := make(map[string]int)
 	_, err := runLinterPositional(
 		programs, true, nil, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			counts[sf.FileName()]++
 			return noopRule()
 		},
@@ -281,7 +281,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 	// Baseline: diagnostic count for lib.ts in single-program mode
 	singleDiags := 0
 	runLinterInCompilerProgram(programLib, nil, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
 				singleDiags++
@@ -297,7 +297,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 	runLinterPositional(
 		[]*compiler.Program{programLib, programApp},
 		true, nil, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
+		func(sf *ast.SourceFile) []rule.ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
 			if d.FilePath == libPath {
 				multiDiags++
@@ -426,7 +426,7 @@ func TestLegacySingleProgramScopeCanSelectImportedFile(t *testing.T) {
 	// The explicit compatibility scope is not constrained by root ownership.
 	lintedFiles := make(map[string]int)
 	runLinterInCompilerProgram(program, []string{libPath}, nil, legacyDefaultExcludedPathSubstrings,
-		func(sf *ast.SourceFile) []ConfiguredRule {
+		func(sf *ast.SourceFile) []rule.ConfiguredRule {
 			lintedFiles[sf.FileName()]++
 			return noopRule()
 		},

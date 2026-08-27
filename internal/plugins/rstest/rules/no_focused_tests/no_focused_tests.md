@@ -2,49 +2,26 @@
 
 ## Rule Details
 
-Disallow focused Rstest tests and `describe` blocks. The rule reports an
-explicit `.only` in a test or suite registration, including conditional,
-parameterized, and extended test APIs.
+Disallows focused tests and suites. Leaving `.only` in committed code prevents the rest of the suite from running.
 
-The rule recognizes Rstest globals, `@rstest/core`, `import.meta.rstest`, and
-`@rstest/playwright`. It follows same-file `const` aliases, including aliases
-that store an already-focused API.
+The rule recognizes `.only` on Rstest tests and suites, including aliases, parameterized registrations, fixtures, and Playwright integrations.
 
-The rule provides a suggestion that removes every `.only` contributing to the
-registration. Suggestions preserve comments and optional-chain boundaries.
+## Incorrect
 
-Examples of **incorrect** code for this rule:
-
-```typescript
-import { describe, test } from '@rstest/core';
-
-test.only('adds two numbers', () => {});
-describe.only('math', () => {});
-test.concurrent.only('runs concurrently', () => {});
-test.only.for([1, 2])('handles %s', () => {});
-test.extend({ database }).only('uses a database', () => {});
-
-const focused = test.only;
-focused('focused through an alias', () => {});
-
-import.meta.rstest.test.only('in-source test', () => {});
+```ts
+describe.only('user service', () => {
+  test('creates a user', () => {});
+});
 ```
 
-Examples of **correct** code for this rule:
+## Correct
 
-```typescript
-import { describe, test } from '@rstest/core';
-
-test('adds two numbers', () => {});
-describe('math', () => {});
-test.concurrent('runs concurrently', () => {});
-test.extend({ database })('uses a database', () => {});
+```ts
+describe('user service', () => {
+  test('creates a user', () => {});
+});
 ```
 
-Rstest does not expose Jest's `fit` or `fdescribe` aliases, so this rule does
-not treat those names as Rstest registrations.
+## Suggestions
 
-## References
-
-- [Rstest `test` API](https://rstest.rs/api/runtime-api/test-api/test)
-- [Rstest `describe` API](https://rstest.rs/api/runtime-api/test-api/describe)
+Offers a suggestion to remove `.only` when the focused modifier is unambiguous.

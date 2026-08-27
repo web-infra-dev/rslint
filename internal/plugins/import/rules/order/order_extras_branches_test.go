@@ -28,9 +28,9 @@ func TestOrderBranchCoverage(t *testing.T) {
 		&order.OrderRule,
 		[]rule_tester.ValidTestCase{
 			// Node resolves an empty external-module folder to the package root,
-			// making the local `fs` path alias external just like `async`.
+			// making a local path alias external just like `async`.
 			{
-				Code:     "import external from 'async';\nimport local from 'fs';",
+				Code:     "import external from 'async';\nimport local from 'local-api';",
 				TSConfig: "tsconfig.order-core-local.json",
 				Options: map[string]any{
 					"groups":      []any{"internal", "external"},
@@ -66,11 +66,33 @@ func TestOrderBranchCoverage(t *testing.T) {
 				Code:    "import {} from './z';\nimport a from './a';",
 				Options: map[string]any{"alphabetize": map[string]any{"order": "asc"}},
 			},
-			// A project module named `fs` resolves locally and is internal, not builtin.
+			// A Node builtin remains builtin even when TypeScript paths maps the
+			// exact specifier to a project file. The configured TypeScript resolver
+			// checks Node builtins before attempting filesystem resolution.
 			{
-				Code:     "import external from 'async';\nimport local from 'fs';",
+				Code:     "import builtin from 'buffer';\nimport external from 'async';",
 				TSConfig: "tsconfig.order-core-local.json",
-				Options:  map[string]any{"groups": []any{"external", "internal", "builtin"}},
+				Options:  map[string]any{"groups": []any{"builtin", "external", "internal"}},
+			},
+			// import/internal-regex retains the upstream precedence over builtins.
+			{
+				Code:     "import overridden from 'buffer';\nimport external from 'async';",
+				TSConfig: "tsconfig.order-core-local.json",
+				Options:  map[string]any{"groups": []any{"internal", "external", "builtin"}},
+				Settings: map[string]any{"import/internal-regex": "^buffer$"},
+			},
+			// Non-exact builtin subpath specifiers remain resolution-sensitive.
+			{
+				Code:     "import local from 'fs/not-a-builtin';\nimport external from 'async';",
+				TSConfig: "tsconfig.order-core-local.json",
+				Options:  map[string]any{"groups": []any{"internal", "external", "builtin"}},
+			},
+			// Configured core modules also remain resolution-sensitive.
+			{
+				Code:     "import local from 'virtual';\nimport external from 'async';",
+				TSConfig: "tsconfig.order-core-local.json",
+				Options:  map[string]any{"groups": []any{"internal", "external", "builtin"}},
+				Settings: map[string]any{"import/core-modules": []any{"virtual"}},
 			},
 			// CommonJS export assignments are not sorted when alphabetize is ignored.
 			{
@@ -498,8 +520,8 @@ func lintOrderWithDemand(program *compiler.Program, sourceFile *ast.SourceFile, 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(), HasTypeInfo: true,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name: order.OrderRule.Name, Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners { return order.OrderRule.Run(ctx, options) },
 			}}

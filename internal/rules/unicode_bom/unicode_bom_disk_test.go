@@ -185,11 +185,11 @@ func lintFile(t *testing.T, filePath string, fs vfs.FS) []rule.RuleDiagnostic {
 	testutil.LintProgram(t, testutil.LintProgramOptions{
 		Program:                lintprogram.NewFromCompiler(program),
 		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
-		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 			if sourceFile.FileName() != filePath {
 				return nil
 			}
-			return []linter.ConfiguredRule{{
+			return []rule.ConfiguredRule{{
 				Name:     UnicodeBomRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
