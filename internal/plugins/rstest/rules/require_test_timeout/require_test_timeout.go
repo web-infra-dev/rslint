@@ -169,44 +169,53 @@ func resolvesToFunction(ctx rule.RuleContext, node *ast.Node) bool {
 	return false
 }
 
-// objectTimeout reads property from an options object literal. A spread or a
-// key that is not statically known could carry the property, so either one
-// makes the whole object unreadable rather than absent.
+// objectTimeout reads property from an options object literal.
+//
+// The whole object is scanned and later members overwrite earlier ones,
+// because that is the order JavaScript builds it in: in
+// `{ timeout: -1, ...options }` the spread has the last word, and stopping at
+// the first `timeout` would report a test whose timeout the spread supplies.
+// A spread and a key that is not statically known are both unreadable, and
+// both can carry the property, so each one erases what came before it.
 func objectTimeout(ctx rule.RuleContext, object *ast.Node, property string) timeoutFinding {
 	literal := object.AsObjectLiteralExpression()
 	if literal == nil || literal.Properties == nil {
 		return timeoutAbsent
 	}
+	finding := timeoutAbsent
 	for _, member := range literal.Properties.Nodes {
 		if member == nil {
 			continue
 		}
 		if member.Kind == ast.KindSpreadAssignment {
-			return timeoutUnknown
+			finding = timeoutUnknown
+			continue
 		}
 		name := member.Name()
 		if name == nil {
-			return timeoutUnknown
+			finding = timeoutUnknown
+			continue
 		}
 		key, ok := internalUtils.GetStaticPropertyName(name)
 		if !ok {
-			return timeoutUnknown
+			finding = timeoutUnknown
+			continue
 		}
 		if key != property {
 			continue
 		}
 		switch member.Kind {
 		case ast.KindPropertyAssignment:
-			return scalarTimeout(ctx, member.AsPropertyAssignment().Initializer)
+			finding = scalarTimeout(ctx, member.AsPropertyAssignment().Initializer)
 		case ast.KindShorthandPropertyAssignment:
-			return scalarTimeout(ctx, name)
+			finding = scalarTimeout(ctx, name)
 		default:
 			// A method or accessor named `timeout` is not a number, and the
 			// rule stays silent on everything it cannot read as one.
-			return timeoutUnknown
+			finding = timeoutUnknown
 		}
 	}
-	return timeoutAbsent
+	return finding
 }
 
 // scalarTimeout reads a value written in a timeout position: a number, or a
@@ -317,11 +326,15 @@ func inheritsSuiteTimeout(
 		if call == nil {
 			return true
 		}
-		parsed := analysis.ParseFnCall(call)
-		if parsed != nil &&
-			parsed.Kind == rstestUtils.RstestFnTypeDescribe &&
-			registrationTimeout(ctx, call) != timeoutAbsent {
-			return true
+		if parsed := analysis.ParseFnCall(call); parsed != nil &&
+			parsed.Kind == rstestUtils.RstestFnTypeDescribe {
+			// A suite whose own timeout is negative hands its tests a value
+			// this rule already refuses to accept on a test, so inheriting it
+			// is not a timeout either.
+			switch registrationTimeout(ctx, call) {
+			case timeoutDeclared, timeoutUnknown:
+				return true
+			}
 		}
 		// Anything else — another registration, or a plain callback such as
 		// `forEach` — still registers the test wherever it is called from, so
@@ -376,21 +389,25 @@ func enclosingCallOfArgument(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// runtimeConfigEvent records one `setConfig` that declared a test timeout, or
-// one `resetConfig` that took it back, at the offset the call ends on.
-type runtimeConfigEvent struct {
-	root   string
-	offset int
-	sets   bool
-}
-
 // runtimeConfigTracker follows the runtime timeout configured through the
-// Rstest utility object. Positions are compared rather than scopes because
-// `setConfig` takes effect from the moment it runs, which for a file of
-// top-level registrations is exactly "from this point in the source down".
+// Rstest utility object.
+//
+// There is only one such object, however it is spelled: `rs` and `rstest` are
+// two names for the same instance, and a namespace member, a `require`
+// binding and `import.meta.rstest` all reach it too. So the tracker holds one
+// state rather than one per binding, and a `resetConfig()` written on any
+// spelling cancels a `setConfig` written on any other.
+//
+// The state is kept incrementally. The rule's own walk visits calls in source
+// order, so by the time a test is reached every configuration call before it
+// has already been folded in and the lookup is a comparison. `configuredFrom`
+// is the offset the enabling call ends on, which rejects the one shape the
+// walk order cannot: a test nested inside the configuration call's own
+// arguments.
 type runtimeConfigTracker struct {
-	ctx    rule.RuleContext
-	events []runtimeConfigEvent
+	ctx            rule.RuleContext
+	configured     bool
+	configuredFrom int
 }
 
 func (tracker *runtimeConfigTracker) observe(node *ast.Node) {
@@ -402,48 +419,24 @@ func (tracker *runtimeConfigTracker) observe(node *ast.Node) {
 	if method != "setConfig" && method != "resetConfig" {
 		return
 	}
-	root, ok := runtimeObjectRoot(tracker.ctx, receiver)
-	if !ok {
+	if !isRuntimeObject(tracker.ctx, receiver) {
 		return
 	}
 	if method == "resetConfig" {
-		tracker.events = append(tracker.events, runtimeConfigEvent{
-			root:   root,
-			offset: node.End(),
-		})
+		tracker.configured = false
 		return
 	}
 	if !setsTestTimeout(tracker.ctx, call) {
 		return
 	}
-	tracker.events = append(tracker.events, runtimeConfigEvent{
-		root:   root,
-		offset: node.End(),
-		sets:   true,
-	})
+	tracker.configured = true
+	tracker.configuredFrom = node.End()
 }
 
 // exemptsAt reports whether a test starting at offset runs under a configured
-// test timeout. Events are recorded in source order by the rule's own walk, so
-// replaying the ones that end before the test reproduces the state the runtime
-// would be in when the test is registered.
+// test timeout.
 func (tracker *runtimeConfigTracker) exemptsAt(offset int) bool {
-	if len(tracker.events) == 0 {
-		return false
-	}
-	configured := map[string]bool{}
-	for _, event := range tracker.events {
-		if event.offset > offset {
-			continue
-		}
-		configured[event.root] = event.sets
-	}
-	for _, sets := range configured {
-		if sets {
-			return true
-		}
-	}
-	return false
+	return tracker.configured && tracker.configuredFrom <= offset
 }
 
 // setsTestTimeout reads the `RuntimeOptions` argument of a `setConfig` call.
@@ -500,56 +493,49 @@ func configMethodAndReceiver(callee *ast.Node) (string, *ast.Node) {
 	return "", nil
 }
 
-// runtimeObjectRoot recognizes the Rstest utility object and returns a key
-// that identifies the binding it was reached through, so that a `resetConfig`
-// is only paired with a `setConfig` on the same one.
+// isRuntimeObject recognizes the Rstest utility object, whichever of its
+// spellings was used to reach it. All of them name the same instance, so the
+// caller keeps one configuration state for the lot.
 //
 // This recognizer is deliberately private to the rule. Modeling the utility
 // object in general — its mocking, timer and spy surface — is a separate piece
 // of work, and a half-built shared version would invite rules to depend on it.
-// It is also deliberately narrow: failing to recognize a root only costs the
-// exemption it would have granted.
-func runtimeObjectRoot(ctx rule.RuleContext, receiver *ast.Node) (string, bool) {
+// It is also deliberately narrow: failing to recognize the object only costs
+// the exemption it would have granted.
+func isRuntimeObject(ctx rule.RuleContext, receiver *ast.Node) bool {
 	receiver = internalUtils.SkipAssertionsAndParens(receiver)
 	if receiver == nil {
-		return "", false
+		return false
 	}
 	if isImportMetaRstest(receiver) {
-		return "import.meta.rstest", true
+		return true
 	}
 	if receiver.Kind == ast.KindIdentifier {
-		local := receiver.AsIdentifier().Text
 		// `rs` and `rstest` are the same object under two names
 		// (packages/core/src/runtime/api/public.ts:63-64), and either may be
 		// imported under a further name of its own.
 		name, _, _ := testFramework.ResolveFunctionIdentifierReference(
-			local,
+			receiver.AsIdentifier().Text,
 			receiver,
 			ctx.TypeChecker,
 			ctx.SourceFile,
 			rstestUtils.RstestImportModule,
 		)
-		if name != "rs" && name != "rstest" {
-			return "", false
-		}
-		return "identifier:" + local, true
+		return name == "rs" || name == "rstest"
 	}
 
 	// A namespace import or whole-module require reaches the same object
 	// through a member: `core.rs.setConfig(...)`.
 	member, namespace := configMethodAndReceiver(receiver)
 	if member != "rs" && member != "rstest" {
-		return "", false
+		return false
 	}
 	namespace = internalUtils.SkipAssertionsAndParens(namespace)
 	if namespace == nil || namespace.Kind != ast.KindIdentifier || ctx.TypeChecker == nil {
-		return "", false
+		return false
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(namespace)
-	if !testFramework.IsModuleNamespaceSymbol(symbol, rstestUtils.RstestImportModule) {
-		return "", false
-	}
-	return "namespace:" + namespace.AsIdentifier().Text + "." + member, true
+	return testFramework.IsModuleNamespaceSymbol(symbol, rstestUtils.RstestImportModule)
 }
 
 // isImportMetaRstest reports whether node is `import.meta.rstest`, the third

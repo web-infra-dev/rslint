@@ -81,6 +81,13 @@ it("a", () => {})`},
 			// A computed key could be `timeout`, and a spread could carry it.
 			{Code: `test("a", { [key]: 500 }, () => {})`},
 			{Code: `test("a", { ...options }, () => {})`},
+			// Later members overwrite earlier ones, so a spread or a computed
+			// key after an explicit `timeout` can still supply the timeout.
+			{Code: `test("a", { timeout: -1, ...options }, () => {})`},
+			{Code: `test("a", { timeout: -1, [key]: 500 }, () => {})`},
+			{Code: `test("a", { timeout: -1, timeout: 500 }, () => {})`},
+			{Code: `test("a", { retry: 2, ...options }, () => {})`},
+			{Code: `rs.setConfig({ testTimeout: -1, ...config }); test("a", () => {})`},
 			// A `timeout` that is not a readable number leaves the options
 			// object unread rather than reported.
 			{Code: `test("a", { timeout: getTimeout() }, () => {})`},
@@ -179,8 +186,6 @@ describe("s", suite)`},
 			{Code: `rs.setConfig({ ...config }); test("a", () => {})`},
 			{Code: `rs.setConfig({ [key]: 5000 }); test("a", () => {})`},
 			{Code: `rs.setConfig({ testTimeout: getTimeout() }); test("a", () => {})`},
-			// A reset only cancels the configuration on the same binding.
-			{Code: `rs.setConfig({ testTimeout: 5000 }); rstest.resetConfig(); test("a", () => {})`},
 			{Code: `rs.setConfig({ testTimeout: 5000 }); rs.resetConfig(); rs.setConfig({ testTimeout: 5000 }); test("a", () => {})`},
 			{Code: `rs.resetConfig(); rs.setConfig({ testTimeout: 5000 }); test("a", () => {})`},
 			// The configuration applies to every test registered after it.
@@ -281,6 +286,26 @@ describe("s", suite)`},
 				`const t = -1; test("a", () => {}, t)`,
 				`test("a", () => {}, t)`,
 			),
+			// An explicit member after a spread has the last word.
+			invalidCase(
+				`test("a", { ...options, timeout: -1 }, () => {})`,
+				`test("a", { ...options, timeout: -1 }, () => {})`,
+			),
+			invalidCase(
+				`test("a", { timeout: 500, timeout: -1 }, () => {})`,
+				`test("a", { timeout: 500, timeout: -1 }, () => {})`,
+			),
+
+			// ---- E. A suite timeout the rule refuses on a test ----
+			// A negative suite timeout is not a timeout its tests can use.
+			invalidCase(
+				`describe("s", { timeout: -1 }, () => { test("a", () => {}) })`,
+				`test("a", () => {})`,
+			),
+			invalidCase(
+				`describe("s", () => { test("a", () => {}) }, -1)`,
+				`test("a", () => {})`,
+			),
 
 			// ---- E. Suite inheritance that does not apply ----
 			invalidCase(
@@ -321,6 +346,21 @@ describe("s", suite)`},
 			),
 			invalidCase(
 				`rs.setConfig({ testTimeout: 5000 }); rs["resetConfig"](); test("a", () => {})`,
+				`test("a", () => {})`,
+			),
+			// `rs`, `rstest` and `import.meta.rstest` name one runtime
+			// configuration, so a reset on any spelling cancels a `setConfig`
+			// written on any other.
+			invalidCase(
+				`rs.setConfig({ testTimeout: 5000 }); rstest.resetConfig(); test("a", () => {})`,
+				`test("a", () => {})`,
+			),
+			invalidCase(
+				`rstest.setConfig({ testTimeout: 5000 }); import.meta.rstest.resetConfig(); test("a", () => {})`,
+				`test("a", () => {})`,
+			),
+			invalidCase(
+				`import * as core from '@rstest/core'; core.rs.setConfig({ testTimeout: 5000 }); rstest.resetConfig(); test("a", () => {})`,
 				`test("a", () => {})`,
 			),
 			// The utility object is not Rstest's.
