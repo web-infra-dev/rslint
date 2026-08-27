@@ -44,12 +44,18 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: `const f = (value = 1) => value;`},
 		// Locks in upstream ignoreInferredTypes arm: inferred parameters are skipped.
 		{Code: `const f = (value = []) => value;`, Options: map[string]any{"ignoreInferredTypes": true}},
+		// An ESTree AssignmentPattern has no direct type annotation, even when its
+		// left-hand parameter does, so ignoreInferredTypes skips typed defaults too.
+		{Code: `function f(value: string[] = []) {}`, Options: map[string]any{"ignoreInferredTypes": true}},
 		// Locks in getParameterType() annotation arm: alias identity survives a union.
 		{Code: `type Allowed = string[] | null; function f(value: Allowed) {}`, Options: map[string]any{"allow": []any{"Allowed"}}},
 		// Locks in isTypeReadonly() union arm: every constituent is readonly.
 		{Code: `function f(value: string | readonly number[]) {}`},
 		// Locks in isTypeReadonly() conditional-type arm: both outcomes are readonly.
 		{Code: `type C<T> = T extends string ? readonly string[] : number; function f<T>(value: C<T>) {}`},
+		// Conditional branches are inspected before the outer type arguments are
+		// instantiated, matching upstream's walk through the branch type nodes.
+		{Code: `type C<T, U> = T extends string ? U : number; function f<T>(value: C<T, string[]>) {}`},
 		// Locks in isTypeReadonly() pure-call-signature arm.
 		{Code: `function f(value: { (x: number): string }) {}`},
 		// Locks in isTypeReadonlyObject() readonly string and number index arms.
@@ -65,6 +71,8 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: `function f(value: ReadonlySet<string>) {}`, Options: map[string]any{"treatMethodsAsReadonly": true}},
 		// Mapped property symbols retain their source method semantics.
 		{Code: `interface S { method(): void } type M<T> = { [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Options: map[string]any{"treatMethodsAsReadonly": true}},
+		// Computed unique-symbol properties need symbol-aware type lookup.
+		{Code: `declare const tag: unique symbol; interface S { readonly [tag]: string[] } function f(value: S) {}`},
 		// Const declarations are readonly property declarations upstream.
 		{Code: `namespace Constants { export const version = 1 } function consume(value: typeof Constants) {}`},
 		// Readonly assignment declarations from checked JavaScript are also readonly.
@@ -110,6 +118,10 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: `function f(value: ReadonlySet<string>) {}`, Options: map[string]any{"treatMethodsAsReadonly": false}, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(12, 38)}},
 		// A mapped -readonly modifier applies to computed unique-symbol keys.
 		{Code: `declare const tag: unique symbol; interface S { readonly [tag]: string } type M<T> = { -readonly [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(133, 144)}},
+		// Key remapping does not inherit readonly from the source property.
+		{Code: "interface S { readonly item: string } type M<T> = { [K in keyof T as `get${Capitalize<K & string>}`]: T[K] }; function f(value: M<S>) {}", Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(122, 133)}},
+		// Explicit mapped modifiers also apply to well-known symbol properties.
+		{Code: `interface S { readonly [Symbol.iterator]: string } type M<T> = { -readonly [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(111, 122)}},
 		// Locks in allowlist provenance: a file type does not match a lib specifier.
 		{Code: `interface Local { x: string } function f(value: Local) {}`, Options: map[string]any{"allow": []any{map[string]any{"from": "lib", "name": "Local"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "shouldBeReadonly", Message: "Parameter should be a read only type.", Line: 1, Column: 42, EndLine: 1, EndColumn: 54}}},
 		// ---- Real-user: #8013 mutable Set remains rejected beside ReadonlySet ----

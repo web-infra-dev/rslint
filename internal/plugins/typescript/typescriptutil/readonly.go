@@ -97,9 +97,12 @@ func isTypeReadonly(
 	}
 
 	if flags&checker.TypeFlagsConditional != 0 {
+		conditional := t.AsConditionalType()
+		root := checker.ConditionalType_root(conditional)
+		node := checker.ConditionalRoot_node(root)
 		for _, part := range []*checker.Type{
-			typeChecker.GetTrueTypeOfConditionalType(t),
-			typeChecker.GetFalseTypeOfConditionalType(t),
+			typeChecker.GetTypeFromTypeNode(node.TrueType),
+			typeChecker.GetTypeFromTypeNode(node.FalseType),
 		} {
 			if _, ok := seen[part]; ok {
 				continue
@@ -184,11 +187,11 @@ func isReadonlyObject(
 		if isPrivateProperty(property) {
 			continue
 		}
-		// tsgo materializes the array's well-known symbol property as a mapped
-		// object whose inherited method keys appear mutable. Upstream treats the same
-		// well-known-symbol member as readonly; it cannot be assigned through a
-		// normal property name, so keep it out of the deep value walk.
-		if isWellKnownSymbolName(property.Name) {
+		// Upstream's computed-symbol lookup reads the property's declared type,
+		// which is `any` for these escaped property symbols. tsgo's equivalent API
+		// exposes the authored value type instead, so omit the deep value walk while
+		// retaining the readonly-property check above.
+		if strings.HasPrefix(property.Name, ast.InternalSymbolNamePrefix+"@") {
 			continue
 		}
 		propertyType := typeChecker.GetTypeOfPropertyOfType(t, property.Name)
@@ -265,14 +268,19 @@ func isPropertyReadonly(typeChecker *checker.Checker, t *checker.Type, name stri
 	// Mapped types can synthesize transient property symbols whose declarations
 	// point back to the original (mutable) member. Read the mapped declaration's
 	// readonly modifier before falling back to those declarations. As upstream
-	// does, leave well-known symbol properties to their original declarations.
-	if checker.Type_objectFlags(t)&checker.ObjectFlagsMapped != 0 && !isWellKnownSymbolName(name) {
+	// does, apply explicit modifiers to every key spelling and do not inherit a
+	// source property's modifier when the mapped type remaps its keys.
+	if checker.Type_objectFlags(t)&checker.ObjectFlagsMapped != 0 {
 		if symbol := checker.Type_symbol(t); symbol != nil && len(symbol.Declarations) > 0 {
 			declaration := symbol.Declarations[0]
 			if declaration.Kind == ast.KindMappedType {
-				readonlyToken := declaration.AsMappedTypeNode().ReadonlyToken
+				mapped := declaration.AsMappedTypeNode()
+				readonlyToken := mapped.ReadonlyToken
 				if readonlyToken != nil {
 					return readonlyToken.Kind != ast.KindMinusToken
+				}
+				if mapped.NameType != nil {
+					return false
 				}
 			}
 		}
@@ -327,23 +335,6 @@ func isReadonlyAssignmentDeclaration(typeChecker *checker.Checker, declaration *
 		return utils.IsFalseLiteralType(writableType)
 	}
 	return typeChecker.GetPropertyOfType(descriptorType, "set") == nil
-}
-
-func isWellKnownSymbolName(name string) bool {
-	if !strings.HasPrefix(name, ast.InternalSymbolNamePrefix+"@") {
-		return false
-	}
-	rest := strings.TrimPrefix(name, ast.InternalSymbolNamePrefix+"@")
-	if index := strings.LastIndexByte(rest, '@'); index >= 0 {
-		rest = rest[:index]
-	}
-	// cspell:ignore unscopables
-	switch rest {
-	case "asyncDispose", "asyncIterator", "dispose", "hasInstance", "isConcatSpreadable", "iterator", "match", "matchAll", "metadata", "replace", "search", "species", "split", "toPrimitive", "toStringTag", "unscopables":
-		return true
-	default:
-		return false
-	}
 }
 
 // IsTypeBrandedLiteralLike reports whether t is a branded primitive/literal

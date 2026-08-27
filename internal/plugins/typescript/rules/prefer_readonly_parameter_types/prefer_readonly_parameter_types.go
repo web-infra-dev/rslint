@@ -60,8 +60,10 @@ func checkParameter(ctx rule.RuleContext, param *ast.Node, opts PreferReadonlyPa
 		return
 	}
 
-	// Skip if ignoring inferred types and parameter has no explicit type annotation
-	if opts.IgnoreInferredTypes && paramDecl.Type == nil {
+	// typescript-estree represents a defaulted parameter as an
+	// AssignmentPattern. Its annotation belongs to the left-hand node rather
+	// than the AssignmentPattern itself, which is the node upstream checks.
+	if opts.IgnoreInferredTypes && (paramDecl.Type == nil || paramDecl.Initializer != nil) {
 		return
 	}
 
