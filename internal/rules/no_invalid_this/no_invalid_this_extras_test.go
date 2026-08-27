@@ -678,6 +678,16 @@ function outer() {
 			{Code: `foo(/** @this */ (function(){ this; } satisfies Function));`, Errors: unexpected(1, 31)},
 			{Code: `type T = typeof this;`, Errors: unexpected(1, 17)},
 			{Code: `type T = typeof this.x;`, Errors: unexpected(1, 17)},
+			// Bodyless TypeScript declarations have no ESTree function listener,
+			// so their type-query `this` remains in the enclosing module frame.
+			{Code: `function F(x: typeof this): void;`, Errors: unexpected(1, 22)},
+			{Code: `function f(this: typeof this): void;`, Errors: unexpected(1, 25)},
+			{Code: `/** @this */ function f(x: typeof this): void;`, Errors: unexpected(1, 35)},
+			{Code: `declare function F(x: typeof this): void;`, Errors: unexpected(1, 30)},
+			{Code: `abstract class C { abstract m(x: typeof this): void; }`, Errors: unexpected(1, 41)},
+			{Code: `abstract class C { abstract get value(): typeof this; }`, Errors: unexpected(1, 49)},
+			{Code: `class C { [key](x: typeof this): void; }`, Errors: unexpected(1, 27)},
+			{Code: `abstract class C { abstract x: typeof this; }`, Errors: unexpected(1, 39)},
 			{Code: `class C { x: typeof this; }`, Errors: unexpected(1, 21)},
 			{Code: `class C { accessor x: typeof this = 1; }`, Errors: unexpected(1, 30)},
 			{

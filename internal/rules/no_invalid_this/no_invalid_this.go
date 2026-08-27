@@ -151,7 +151,15 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 	}
 
 	pushFunction := func(node *ast.Node) {
+		if !hasFunctionBody(node) {
+			return
+		}
 		push(computeFunctionValid(node, sf, ctx.Comments.All(), eo.CapIsConstructor, eo.IsStrict))
+	}
+	exitFunction := func(node *ast.Node) {
+		if hasFunctionBody(node) {
+			pop()
+		}
 	}
 
 	// enterMethodLike defers push past the computed key (if any). Applies
@@ -161,10 +169,15 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 	// here — only the ES2015-class-is-always-strict outcome, applied
 	// unconditionally.
 	enterMethodLike := func(node *ast.Node) {
-		if hasComputedKey(node) {
+		if !hasFunctionBody(node) || hasComputedKey(node) {
 			return
 		}
 		push(true)
+	}
+	exitMethodLike := func(node *ast.Node) {
+		if hasFunctionBody(node) {
+			pop()
+		}
 	}
 
 	// enterPropertyDeclaration defers the physical push past a computed key
@@ -181,10 +194,18 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 	// wrapper's `PropertyDefinition()` / `AccessorProperty()` listeners push
 	// on entry unconditionally, so there the key is covered too.
 	enterPropertyDeclaration := func(node *ast.Node) {
+		if isAbstractPropertyDeclaration(node) {
+			return
+		}
 		if eo.FieldFrameScopedToValue && hasComputedKey(node) {
 			return
 		}
 		push(true)
+	}
+	exitPropertyDeclaration := func(node *ast.Node) {
+		if !isAbstractPropertyDeclaration(node) {
+			pop()
+		}
 	}
 
 	reportThis := func(node *ast.Node) {
@@ -206,41 +227,42 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 	}
 
 	return rule.RuleListeners{
-		// Non-arrow function-like containers — push a frame whose validity
-		// depends on strict mode, parameter shape, JSDoc, name, and
-		// surrounding context.
+		// Non-arrow function-like containers with bodies — push a frame whose
+		// validity depends on strict mode, parameter shape, JSDoc, name, and
+		// surrounding context. Bodyless TypeScript declarations have no matching
+		// ESTree function listener and leave the enclosing frame active.
 		ast.KindFunctionDeclaration:                      pushFunction,
-		rule.ListenerOnExit(ast.KindFunctionDeclaration): func(*ast.Node) { pop() },
+		rule.ListenerOnExit(ast.KindFunctionDeclaration): exitFunction,
 		ast.KindFunctionExpression:                       pushFunction,
-		rule.ListenerOnExit(ast.KindFunctionExpression):  func(*ast.Node) { pop() },
+		rule.ListenerOnExit(ast.KindFunctionExpression):  exitFunction,
 
-		// Class members (and equivalent object-literal accessors): `this`
-		// always refers to the class instance / static class object — VALID.
+		// Class members with bodies (and equivalent object-literal accessors):
+		// `this` always refers to the class instance / static class object — VALID.
 		// Computed-key members defer the push to ComputedPropertyName:exit
 		// to mirror the upstream wrapper, whose `FunctionExpression`
 		// listener fires on the method's FE value (visited AFTER the key).
 		ast.KindMethodDeclaration:                      enterMethodLike,
-		rule.ListenerOnExit(ast.KindMethodDeclaration): func(*ast.Node) { pop() },
+		rule.ListenerOnExit(ast.KindMethodDeclaration): exitMethodLike,
 		ast.KindConstructor:                            enterMethodLike,
-		rule.ListenerOnExit(ast.KindConstructor):       func(*ast.Node) { pop() },
+		rule.ListenerOnExit(ast.KindConstructor):       exitMethodLike,
 		ast.KindGetAccessor:                            enterMethodLike,
-		rule.ListenerOnExit(ast.KindGetAccessor):       func(*ast.Node) { pop() },
+		rule.ListenerOnExit(ast.KindGetAccessor):       exitMethodLike,
 		ast.KindSetAccessor:                            enterMethodLike,
-		rule.ListenerOnExit(ast.KindSetAccessor):       func(*ast.Node) { pop() },
+		rule.ListenerOnExit(ast.KindSetAccessor):       exitMethodLike,
 
 		// Class field (regular + `accessor` auto-accessor — tsgo collapses
 		// ESTree's PropertyDefinition / AccessorProperty onto this kind,
 		// distinguishing the latter via `ModifierFlagsAccessor`). Push on
 		// entry verbatim with upstream's `PropertyDefinition()` /
-		// `AccessorProperty()` listeners.
+		// `AccessorProperty()` listeners. Abstract properties map to a different
+		// ESTree node and therefore do not create this frame.
 		ast.KindPropertyDeclaration:                      enterPropertyDeclaration,
-		rule.ListenerOnExit(ast.KindPropertyDeclaration): func(*ast.Node) { pop() },
+		rule.ListenerOnExit(ast.KindPropertyDeclaration): exitPropertyDeclaration,
 
 		// Deferred push for computed-key method-likes and property
-		// declarations. The matching pop happens unconditionally on the
-		// member's own exit listener, so the stack stays balanced
-		// regardless of whether the push happened on enter (non-computed)
-		// or here (computed).
+		// declarations. Bodyless method-likes and abstract properties have no
+		// corresponding ESTree listener, so they neither push here nor pop at
+		// member exit.
 		rule.ListenerOnExit(ast.KindComputedPropertyName): func(node *ast.Node) {
 			parent := node.Parent
 			if parent == nil {
@@ -249,8 +271,13 @@ func BuildListeners(ctx rule.RuleContext, eo EngineOptions) rule.RuleListeners {
 			switch parent.Kind {
 			case ast.KindMethodDeclaration, ast.KindConstructor,
 				ast.KindGetAccessor, ast.KindSetAccessor:
-				push(true)
+				if hasFunctionBody(parent) {
+					push(true)
+				}
 			case ast.KindPropertyDeclaration:
+				if isAbstractPropertyDeclaration(parent) {
+					return
+				}
 				// Already pushed on entry unless the field's frame is
 				// scoped to the initializer value.
 				if eo.FieldFrameScopedToValue {
@@ -1040,6 +1067,9 @@ func enclosingFrameSkip(thisNode *ast.Node, fieldFrameScopedToValue bool) int {
 		case ast.KindArrowFunction:
 			// Lexical `this` — keep walking up.
 		case ast.KindPropertyDeclaration:
+			if isAbstractPropertyDeclaration(current) {
+				return skip
+			}
 			if !fieldFrameScopedToValue {
 				return skip
 			}
@@ -1069,11 +1099,27 @@ func enclosingFrameSkip(thisNode *ast.Node, fieldFrameScopedToValue bool) int {
 func isDecoratedClassMember(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindConstructor,
-		ast.KindGetAccessor, ast.KindSetAccessor,
-		ast.KindPropertyDeclaration:
-		return true
+		ast.KindGetAccessor, ast.KindSetAccessor:
+		return hasFunctionBody(node)
+	case ast.KindPropertyDeclaration:
+		return !isAbstractPropertyDeclaration(node)
 	}
 	return false
+}
+
+// hasFunctionBody reports whether tsgo's function-like node corresponds to an
+// ESTree function node visited by this rule. Bodyless TypeScript declarations
+// use TSDeclareFunction, TSEmptyBodyFunctionExpression, or abstract method
+// nodes upstream and therefore must not create a validity frame here.
+func hasFunctionBody(node *ast.Node) bool {
+	return node != nil && node.Body() != nil
+}
+
+// isAbstractPropertyDeclaration reports the tsgo shape that maps to
+// TSAbstractPropertyDefinition rather than ESTree PropertyDefinition.
+func isAbstractPropertyDeclaration(node *ast.Node) bool {
+	return node != nil && node.Kind == ast.KindPropertyDeclaration &&
+		ast.HasSyntacticModifier(node, ast.ModifierFlagsAbstract)
 }
 
 // hasComputedKey is exposed as a package-level helper so the
