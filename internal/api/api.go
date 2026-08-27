@@ -112,11 +112,11 @@ type LintRequest struct {
 	// EslintPlugins carries the names included as Node-dispatched placeholders
 	// in this request's rule catalog. The live implementations remain in JS.
 	EslintPlugins []EslintPluginEntry `json:"eslintPlugins,omitempty"`
-	// Fix, when true, applies rule auto-fixes in-band and returns the fixed
-	// source per file in LintResponse.Output (ESLint's `fix: true`). The fix is
-	// computed but NOT written to disk — the JS side (Rslint.outputFixes) writes
-	// it. Diagnostics describe the original input; callers can lint Output again
-	// when they need post-fix diagnostics.
+	// Fix, when true, applies rule auto-fixes in-band and returns the final source
+	// for each file to which a fix was applied in LintResponse.Output (ESLint's
+	// `fix: true`). The fix is computed but NOT written to disk — the JS side
+	// (Rslint.outputFixes) writes it. Diagnostics and encoded sources describe the
+	// final post-fix generation.
 	Fix                       bool `json:"fix,omitempty"`
 	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
