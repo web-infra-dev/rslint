@@ -889,6 +889,9 @@ var LogicalAssignmentOperatorsRule = rule.Rule{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if binary.OperatorToken.Kind == ast.KindEqualsToken {
+					if utils.IsDefaultValueInDestructuringAssignment(node) {
+						return
+					}
 					state.checkAssignment(node, binary)
 					return
 				}

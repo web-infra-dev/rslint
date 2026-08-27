@@ -52,6 +52,10 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 			{Code: `[a] = a || b`},
 			{Code: `({ a } = a || b)`},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `if (a) [a] = b`},
+			// ---- AST-01: destructuring defaults are AssignmentPattern nodes upstream ----
+			{Code: `[a = a || b] = array`},
+			{Code: `({ x: { a = a || b } } = object)`},
+			{Code: `for ([a = a || b] of arrays) {}`},
 			// ---- Dimension 4: options coverage ----
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: false}}, Code: `if (a) a = b`},
 			{Options: []any{`always`}, Code: `if (a) a = b`},
@@ -813,11 +817,10 @@ commented = commented /* keep */ || fallback;`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			ExcludePaths: []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			Program: lintprogram.NewFromCompiler(program),
+			File:    sourceFile.FileName(),
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     LogicalAssignmentOperatorsRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
