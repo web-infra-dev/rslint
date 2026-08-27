@@ -1,0 +1,1216 @@
+// Rstest Snapshot v1
+
+exports[`no-restricted-properties > invalid 1`] = `
+{
+  "code": "someObject.disallowedProperty",
+  "diagnostics": [
+    {
+      "message": "'someObject.disallowedProperty' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 2`] = `
+{
+  "code": "someObject.disallowedProperty",
+  "diagnostics": [
+    {
+      "message": "'someObject.disallowedProperty' is restricted from being used. Please use someObject.allowedProperty instead.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 3`] = `
+{
+  "code": "someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()",
+  "diagnostics": [
+    {
+      "message": "'someObject.disallowedProperty' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+    {
+      "message": "'anotherObject.anotherDisallowedProperty' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 4`] = `
+{
+  "code": "foo.__proto__",
+  "diagnostics": [
+    {
+      "message": "'__proto__' is restricted from being used. Please use Object.getPrototypeOf instead.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 5`] = `
+{
+  "code": "foo['__proto__']",
+  "diagnostics": [
+    {
+      "message": "'__proto__' is restricted from being used. Please use Object.getPrototypeOf instead.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 6`] = `
+{
+  "code": "foo.bar.baz;",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 7`] = `
+{
+  "code": "foo.bar();",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 8`] = `
+{
+  "code": "foo.bar.baz();",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 9`] = `
+{
+  "code": "foo.bar.baz;",
+  "diagnostics": [
+    {
+      "message": "'bar' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 10`] = `
+{
+  "code": "foo.bar();",
+  "diagnostics": [
+    {
+      "message": "'bar' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 11`] = `
+{
+  "code": "foo.bar.baz();",
+  "diagnostics": [
+    {
+      "message": "'bar' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 12`] = `
+{
+  "code": "foo[/(?<zero>0)/]",
+  "diagnostics": [
+    {
+      "message": "'/(?<zero>0)/' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 13`] = `
+{
+  "code": "require.call({}, 'foo')",
+  "diagnostics": [
+    {
+      "message": "'require.call' is restricted from being used. Please call require() directly.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 14`] = `
+{
+  "code": "require['resolve']",
+  "diagnostics": [
+    {
+      "message": "'require.resolve' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 15`] = `
+{
+  "code": "let {bar} = foo;",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 16`] = `
+{
+  "code": "let {bar: baz} = foo;",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 17`] = `
+{
+  "code": "let {'bar': baz} = foo;",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 18`] = `
+{
+  "code": "let {bar: {baz: qux}} = foo;",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 19`] = `
+{
+  "code": "let {bar} = foo;",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 20`] = `
+{
+  "code": "let {bar: baz} = foo;",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 21`] = `
+{
+  "code": "let {bar} = foo;",
+  "diagnostics": [
+    {
+      "message": "'bar' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 22`] = `
+{
+  "code": "let bar; ({bar} = foo);",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 23`] = `
+{
+  "code": "let bar; ({bar: baz = 1} = foo);",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 24`] = `
+{
+  "code": "function qux({bar} = foo) {}",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 25`] = `
+{
+  "code": "function qux({bar: baz} = foo) {}",
+  "diagnostics": [
+    {
+      "message": "'foo.bar' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 26`] = `
+{
+  "code": "var {['foo']: qux, bar} = baz",
+  "diagnostics": [
+    {
+      "message": "'baz.foo' is restricted from being used.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 27`] = `
+{
+  "code": "obj['#foo']",
+  "diagnostics": [
+    {
+      "message": "'#foo' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 28`] = `
+{
+  "code": "const { bar: { bad } = {} } = foo;",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 29`] = `
+{
+  "code": "const { bar: { bad } } = foo;",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 30`] = `
+{
+  "code": "const { bad } = foo();",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 31`] = `
+{
+  "code": "({ bad } = foo());",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 32`] = `
+{
+  "code": "({ bar: { bad } } = foo);",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 33`] = `
+{
+  "code": "({ bar: { bad } = {} } = foo);",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 34`] = `
+{
+  "code": "({ bad }) => {};",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 35`] = `
+{
+  "code": "({ bad } = {}) => {};",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 36`] = `
+{
+  "code": "({ bad: bar }) => {};",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 37`] = `
+{
+  "code": "({ bar: { bad } = {} }) => {};",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 38`] = `
+{
+  "code": "[{ bad }] = foo;",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 39`] = `
+{
+  "code": "const [{ bad }] = foo;",
+  "diagnostics": [
+    {
+      "message": "'bad' is restricted from being used.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 40`] = `
+{
+  "code": "someObject.disallowedProperty",
+  "diagnostics": [
+    {
+      "message": "'disallowedProperty' is restricted from being used. Property 'disallowedProperty' is only allowed on these objects: anotherObject.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 41`] = `
+{
+  "code": "someObject.disallowedProperty",
+  "diagnostics": [
+    {
+      "message": "'disallowedProperty' is restricted from being used. Property 'disallowedProperty' is only allowed on these objects: anotherObject. Please use someObject.allowedProperty instead.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 42`] = `
+{
+  "code": "someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()",
+  "diagnostics": [
+    {
+      "message": "'disallowedProperty' is restricted from being used. Property 'disallowedProperty' is only allowed on these objects: anotherObject.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+    {
+      "message": "'anotherDisallowedProperty' is restricted from being used. Property 'anotherDisallowedProperty' is only allowed on these objects: someObject.",
+      "messageId": "restrictedProperty",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 43`] = `
+{
+  "code": "someObject.disallowedProperty",
+  "diagnostics": [
+    {
+      "message": "'someObject.disallowedProperty' is restricted from being used. Only these properties are allowed: allowedProperty.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 44`] = `
+{
+  "code": "someObject.disallowedProperty",
+  "diagnostics": [
+    {
+      "message": "'someObject.disallowedProperty' is restricted from being used. Only these properties are allowed: allowedProperty. Please use someObject.allowedProperty instead.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-properties > invalid 45`] = `
+{
+  "code": "someObject.disallowedProperty; anotherObject.anotherDisallowedProperty()",
+  "diagnostics": [
+    {
+      "message": "'someObject.disallowedProperty' is restricted from being used. Only these properties are allowed: anotherDisallowedProperty.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+    {
+      "message": "'anotherObject.anotherDisallowedProperty' is restricted from being used. Only these properties are allowed: disallowedProperty.",
+      "messageId": "restrictedObjectProperty",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

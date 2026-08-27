@@ -65,10 +65,9 @@ const v: number = bad;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -109,10 +108,9 @@ export const x: T = {} as T;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -150,10 +148,9 @@ export const x: T = {} as T;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -205,10 +202,9 @@ func TestTypeCheck_DedupsAcrossPrograms(t *testing.T) {
 
 	var ts2322 int
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(progA, progB),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(progA, progB),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if d.RuleName == "TypeScript(TS2322)" {
@@ -243,9 +239,9 @@ func TestTypeCheck_SourceOnlyProgramSkipped(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       testPrograms(sourceOnly),
-		SingleThreaded: true,
-		TypeCheck:      true,
+		TypeCheckOnlyPrograms: testPrograms(sourceOnly),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		},
@@ -277,10 +273,9 @@ const x: number = 1;
 
 	var found bool
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if d.RuleName == "TypeScript(TS2578)" {

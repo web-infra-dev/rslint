@@ -30,7 +30,7 @@
     "@rslint/core": "workspace:*",
     "@rspress/core": "catalog:",
     "@rspress/plugin-sitemap": "catalog:",
-    "@rstack-dev/doc-ui": "catalog:",
+    "@rstackjs/doc-ui": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@types/dagre": "catalog:",
     "@types/node": "catalog:",

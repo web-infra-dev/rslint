@@ -55,12 +55,18 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 	if len(configuredRules) != 1 || configuredRules[0].Name != "@typescript-eslint/no-unsafe-member-access" || !configuredRules[0].RequiresTypeInfo {
 		t.Fatalf("fixture did not resolve the expected type-aware rule: %+v", configuredRules)
 	}
-	result, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs: loaded.Programs,
-		Scope:    linter.FileScope{Files: []string{targetFile}},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         loaded.Programs,
+		TargetsByProgram: loaded.TargetsByProgram,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return configuredRules
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	result, err := linter.RunLinter(linter.RunLinterOptions{
+		LintPlan: lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(rule.RuleDiagnostic) {},
 		},

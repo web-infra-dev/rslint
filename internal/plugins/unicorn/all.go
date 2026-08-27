@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_thenable"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
@@ -38,6 +39,7 @@ func GetAllRules() []rule.Rule {
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
 		no_static_only_class.NoStaticOnlyClassRule,
 		no_thenable.NoThenableRule,
+		no_this_assignment.NoThisAssignmentRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		prefer_array_flat.PreferArrayFlatRule,

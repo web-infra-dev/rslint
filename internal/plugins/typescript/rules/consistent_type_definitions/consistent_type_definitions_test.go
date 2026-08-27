@@ -469,11 +469,10 @@ declare global { interface Array<T> { item: T; } }`,
 
 				var diagnostics []rule.RuleDiagnostic
 				linter.LintSingleFile(linter.LintSingleFileOptions{
-					Program:      lintprogram.NewFromCompiler(program),
-					File:         sourceFile.FileName(),
-					ExcludePaths: []string{},
-					GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-						return []linter.ConfiguredRule{{
+					Program: lintprogram.NewFromCompiler(program),
+					File:    sourceFile.FileName(),
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{
 							Name:     ConsistentTypeDefinitionsRule.Name,
 							Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -693,11 +692,10 @@ func lintConsistentTypeDefinitions(
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:      lintprogram.NewFromCompiler(program),
-		File:         sourceFile.FileName(),
-		ExcludePaths: []string{},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		Program: lintprogram.NewFromCompiler(program),
+		File:    sourceFile.FileName(),
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     ConsistentTypeDefinitionsRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {

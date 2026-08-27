@@ -579,13 +579,13 @@ const suppressed = maybe as string;
 		t.Helper()
 
 		var diagnostics []rule.RuleDiagnostic
-		_, err := linter.RunLinter(linter.RunLinterOptions{
-			Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-			SingleThreaded: true,
-			TargetFiles:    [][]string{{sourceFile.FileName()}},
-			ExcludePaths:   []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+		programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+		lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+			Programs:         programs,
+			TargetsByProgram: [][]string{{sourceFile.FileName()}},
+			SingleThreaded:   true,
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:             NonNullableTypeAssertionStyleRule.Name,
 					Severity:         rule.SeverityError,
 					RequiresTypeInfo: NonNullableTypeAssertionStyleRule.RequiresTypeInfo,
@@ -594,6 +594,13 @@ const suppressed = maybe as string;
 					},
 				}}
 			},
+		})
+		if err != nil {
+			t.Fatalf("PrepareLintPlan: %v", err)
+		}
+		_, err = linter.RunLinter(linter.RunLinterOptions{
+			SingleThreaded: true,
+			LintPlan:       lintPlan,
 			Consumer: rule.DiagnosticConsumer{
 				Demand: demand,
 				Report: func(diagnostic rule.RuleDiagnostic) {

@@ -2,107 +2,43 @@
 
 ## Rule Details
 
-Disallow Rstest setup and teardown hooks. This rule reports the four lifecycle
-hooks Rstest exposes: `beforeAll`, `beforeEach`, `afterEach`, and `afterAll`.
+Disallows lifecycle hooks when a project prefers each test to set up and clean up its own state explicitly.
 
-Examples of **incorrect** code for this rule:
+The rule covers `beforeAll`, `beforeEach`, `afterEach`, and `afterAll` from globals, imports, aliases, and Playwright test objects.
 
-```typescript
-import { beforeEach, test } from '@rstest/core';
-import { test as playwrightTest } from '@rstest/playwright';
+## Incorrect
 
+```ts
 beforeEach(() => {
   resetDatabase();
 });
 
-playwrightTest.beforeAll(async () => {
-  await seedFixtures();
-});
-
-test('reads state', () => {});
+test('creates a user', () => {});
 ```
 
-Examples of **correct** code for this rule:
+## Correct
 
-```typescript
-import { test } from '@rstest/core';
-import { beforeEach } from 'vitest';
+```ts
+test('creates a user', () => {
+  const database = createTestDatabase();
 
-test('reads state', () => {
-  const database = createDatabase();
-  expect(database.ready()).toBe(true);
+  expect(database.users.create({ name: 'Ada' }).name).toBe('Ada');
 });
-
-beforeEach(() => {});
 ```
 
 ## Options
 
 ```json
 {
-  "rstest/no-hooks": ["error", { "allow": ["afterEach", "afterAll"] }]
+  "rstest/no-hooks": [
+    "error",
+    {
+      "allow": ["afterEach"]
+    }
+  ]
 }
 ```
 
-### `allow`
-
-This array option controls which Rstest hooks are allowed. Supported values
-are:
-
-- `"beforeAll"`
-- `"beforeEach"`
-- `"afterAll"`
-- `"afterEach"`
-
-By default, no hook is allowed.
-
-Examples of **incorrect** code for the `{ "allow": ["afterEach"] }` option:
-
-```json
-{ "rstest/no-hooks": ["error", { "allow": ["afterEach"] }] }
-```
-
-```typescript
-import { afterEach, beforeEach } from '@rstest/core';
-
-beforeEach(() => {
-  setupDatabase();
-});
-
-afterEach(() => {
-  resetModules();
-});
-```
-
-Examples of **correct** code for the `{ "allow": ["afterEach"] }` option:
-
-```json
-{ "rstest/no-hooks": ["error", { "allow": ["afterEach"] }] }
-```
-
-```typescript
-import { afterEach, test } from '@rstest/core';
-
-afterEach(() => {
-  resetModules();
-});
-
-test('reads state', () => {
-  const database = setupDatabase();
-  expect(database.ready()).toBe(true);
-});
-```
-
-## Differences from ESLint
-
-- `@rstest/playwright` member hooks such as `test.beforeEach()` and
-  `test.extend({}).afterAll()` are reported because they are real Rstest hook
-  registrations.
-- `@rstest/core` lookalikes such as `test.beforeEach()`, invalid chains such as
-  `test.skip.beforeEach()`, and execution-time APIs like `onTestFinished()` are
-  not reported.
-
-## Original Documentation
-
-- [eslint-plugin-jest: no-hooks](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.1/docs/rules/no-hooks.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.1/src/rules/no-hooks.ts)
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `allow` | `string[]` | `[]` | Lifecycle hooks to allow: `beforeAll`, `beforeEach`, `afterEach`, or `afterAll`. |

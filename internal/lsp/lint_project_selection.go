@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -8,6 +9,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -335,4 +338,102 @@ func (cache *lintSessionProjectRootCache) Invalidate() bool {
 	hadState := len(cache.entries) != 0
 	clear(cache.entries)
 	return hadState
+}
+
+// selectLintProgram chooses type information according to the authored
+// parserOptions.project order while adapting already-loaded Session Programs
+// and LSP-owned standalone Programs through one project-selection policy.
+func selectLintProgram(
+	uri lsproto.DocumentUri,
+	target target.File,
+	session *project.Session,
+	ctx context.Context,
+	tsConfigPaths []string,
+	fs vfs.FS,
+	fallbackLoaders lintProjectLoaders,
+	sessionRoots *lintSessionProjectRootCache,
+) (*compiler.Program, *ast.SourceFile, bool, error) {
+	_, languageService, loadedProjects, err := session.GetLanguageServiceAndProjectsForFile(ctx, uri)
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("failed to get language service: %w", err)
+	}
+	program := languageService.GetProgram()
+
+	type loadedLintProject struct {
+		program     *compiler.Program
+		commandLine *tsoptions.ParsedCommandLine
+	}
+	loadedByConfig := make(map[tspath.Path]loadedLintProject, len(loadedProjects))
+	for _, candidate := range loadedProjects {
+		if candidate == nil || candidate.GetProgram() == nil {
+			continue
+		}
+		candidateProgram := candidate.GetProgram()
+		configPath := string(candidate.Id())
+		if configPath == "" {
+			continue
+		}
+		commandLine := candidateProgram.CommandLine()
+		if sessionProject, ok := candidate.(*project.Project); ok && sessionProject.CommandLine != nil {
+			commandLine = sessionProject.CommandLine
+		}
+		loadedByConfig[lintProgramLexicalPathID(configPath, fs)] = loadedLintProject{
+			program:     candidateProgram,
+			commandLine: commandLine,
+		}
+	}
+	loaders := lintProjectLoaders{
+		metadata: func(tsConfigPath string) (*lintProjectMetadata, bool, error) {
+			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+				metadata := sessionRoots.metadata(tsConfigPath, loadedProject.commandLine, fs)
+				return metadata, metadata != nil, nil
+			}
+			if fallbackLoaders.metadata == nil {
+				return nil, false, nil
+			}
+			return fallbackLoaders.metadata(tsConfigPath)
+		},
+		program: func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
+			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
+				return loadedProject.program, sourceFileForTarget(loadedProject.program, target, fs), nil
+			}
+			if fallbackLoaders.program == nil {
+				return nil, nil, nil
+			}
+			return fallbackLoaders.program(tsConfigPath)
+		},
+	}
+	selected, found, err := selectConfiguredLintProject(tsConfigPaths, target, loaders)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if found {
+		return selected.program, selected.sourceFile, true, nil
+	}
+	return program, sourceFileForTarget(program, target, fs), false, nil
+}
+
+func sourceFileForPath(program *compiler.Program, filename string, fs vfs.FS) *ast.SourceFile {
+	return utils.NewProgramSourceLookup(program, fs).SourceFileForPath(filename)
+}
+
+func sourceFileForTarget(
+	program *compiler.Program,
+	target target.File,
+	fs vfs.FS,
+) *ast.SourceFile {
+	return utils.NewProgramSourceLookup(program, fs).
+		SourceFileForTarget(target.Path, target.CanonicalPath)
+}
+
+func createStandaloneFallbackProgram(filename string, cwd string, fs vfs.FS) (*compiler.Program, error) {
+	host := utils.CreateCompilerHost(cwd, fs)
+	return utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+		Target:    core.ScriptTargetESNext,
+		Module:    core.ModuleKindESNext,
+		Jsx:       core.JsxEmitPreserve,
+		AllowJs:   core.TSTrue,
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}, []string{filename}, host)
 }

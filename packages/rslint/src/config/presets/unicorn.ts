@@ -144,7 +144,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-static-only-class': 'error',
     // 'unicorn/no-subtraction-comparison': 'error', // not implemented
     'unicorn/no-thenable': 'error',
-    // 'unicorn/no-this-assignment': 'error', // not implemented
+    'unicorn/no-this-assignment': 'error',
     // 'unicorn/no-this-outside-of-class': 'error', // not implemented
     // 'unicorn/no-top-level-assignment-in-function': 'error', // not implemented
     // 'unicorn/no-top-level-side-effects': 'error', // not implemented

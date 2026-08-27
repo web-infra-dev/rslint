@@ -728,7 +728,6 @@ func TestFirstEditDemand(t *testing.T) {
 					File:            sourceFile.FileName(),
 					HasTypeInfo:     true,
 					GetRulesForFile: firstConfiguredRules,
-					ExcludePaths:    []string{},
 					Consumer: rule.DiagnosticConsumer{
 						Demand: demand,
 						Report: func(diagnostic rule.RuleDiagnostic) {
@@ -824,8 +823,8 @@ func createFirstProgram(t testing.TB, fileName string, code string) (*compiler.P
 	return program, sourceFile
 }
 
-func firstConfiguredRules(*ast.SourceFile) []linter.ConfiguredRule {
-	return []linter.ConfiguredRule{{
+func firstConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{{
 		Name:     first.FirstRule.Name,
 		Severity: rule.SeverityError,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {

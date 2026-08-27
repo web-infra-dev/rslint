@@ -19,7 +19,7 @@
 // Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
 // wait `init` (or signal) → redirect stdout through `output` frames →
 // dispatch on intent (--help / --init / lint) → run the shared
-// executeLintPipeline (using either a typed Go-discovered catalog or the
+// handleLintCommand (using either a typed Go-discovered catalog or the
 // native JSON/JSONC loader) → drain output, send `shutdown`, exit.
 //
 // Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
@@ -374,7 +374,7 @@ func runCLI(args []string) int {
 
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
 	// over the IPC channel and decode its result. Runs concurrently with the
-	// native lint pass (executeLintPipeline awaits it before output / --fix).
+	// native lint pass (handleLintCommand awaits it before output / --fix).
 	dispatch := func(reqCtx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		msg, sendErr := ch.SendRequest(reqCtx, kindPluginLint, req)
 		if sendErr != nil {
@@ -393,7 +393,7 @@ func runCLI(args []string) int {
 	var timingTable string
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
 
-	exitCode := executeLintPipeline(baseArgs, lintCtx, dispatch)
+	exitCode := handleLintCommand(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
 	stdoutFlushed := shutdownPeer(ch, state)
@@ -437,8 +437,8 @@ func shutdownPeer(ch *ipc.Channel, state *runCLIState) bool {
 // classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
 // mirroring parseLintFlags's positional handling (filepath.Abs +
 // tspath.NormalizePath) so the IPC and flag entry paths produce identical
-// FileScope downstream. An Abs failure is skipped with a stderr warning rather
-// than silently dropping the path.
+// target-planning inputs. An Abs failure is skipped with a stderr warning
+// rather than silently dropping the path.
 func classifyPaths(paths []string) (files []string, dirs []string) {
 	for _, p := range paths {
 		absPath, err := filepath.Abs(p)

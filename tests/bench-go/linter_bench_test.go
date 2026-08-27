@@ -29,46 +29,56 @@ var (
 func BenchmarkLinterSyntaxRules(b *testing.B) {
 	program := lintprogram.NewFromCompiler(createBenchmarkProgramInDir(b, filepath.Join(b.TempDir(), "syntax"), 32, false))
 	rules := benchmarkSyntaxRules()
-	getRules := func(*ast.SourceFile) []linter.ConfiguredRule { return rules }
+	getRules := func(*ast.SourceFile) []rule.ConfiguredRule { return rules }
 	onDiag := func(rule.RuleDiagnostic) {}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		linter.RunLinterInProgram(
-			program,
-			nil,
-			nil,
-			utils.ExcludePaths,
-			getRules,
-			false,
-			onDiag,
-			nil,
-		)
+		runLintBenchmark(b, program, getRules, onDiag)
 	}
 }
 
 func BenchmarkLinterTypeAwareRules(b *testing.B) {
 	program := lintprogram.NewFromCompiler(createBenchmarkProgramInDir(b, filepath.Join(b.TempDir(), "type-aware"), 32, false))
 	rules := benchmarkTypeAwareRules()
-	getRules := func(*ast.SourceFile) []linter.ConfiguredRule { return rules }
+	getRules := func(*ast.SourceFile) []rule.ConfiguredRule { return rules }
 	onDiag := func(rule.RuleDiagnostic) {}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		linter.RunLinterInProgram(
-			program,
-			nil,
-			nil,
-			utils.ExcludePaths,
-			getRules,
-			false,
-			onDiag,
-			nil,
-		)
+		runLintBenchmark(b, program, getRules, onDiag)
+	}
+}
+
+func runLintBenchmark(
+	b *testing.B,
+	sourceProgram *lintprogram.Program,
+	getRulesForFile linter.RuleHandler,
+	onDiagnostic linter.DiagnosticHandler,
+) {
+	b.Helper()
+	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceProgram},
+		TargetsByProgram: [][]string{sourceProgram.RootFileNames()},
+		SingleThreaded:   true,
+		GetRulesForFile:  getRulesForFile,
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		LintPlan:       plan,
+		SingleThreaded: true,
+		Consumer: rule.DiagnosticConsumer{
+			Report: onDiagnostic,
+		},
+	})
+	if err != nil {
+		b.Fatal(err)
 	}
 }
 
@@ -95,8 +105,8 @@ func BenchmarkLinterSemanticDiagnostics(b *testing.B) {
 	}
 }
 
-func benchmarkSyntaxRules() []linter.ConfiguredRule {
-	return []linter.ConfiguredRule{
+func benchmarkSyntaxRules() []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{
 		{
 			Name:     "bench-syntax-vars",
 			Severity: rule.SeverityWarning,
@@ -140,8 +150,8 @@ func benchmarkSyntaxRules() []linter.ConfiguredRule {
 	}
 }
 
-func benchmarkTypeAwareRules() []linter.ConfiguredRule {
-	return []linter.ConfiguredRule{
+func benchmarkTypeAwareRules() []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{
 		{
 			Name:             "bench-type-identifiers",
 			Severity:         rule.SeverityWarning,
