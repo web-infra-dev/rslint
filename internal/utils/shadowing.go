@@ -210,32 +210,49 @@ func cachedScopeManagerAnswer(cache *map[scopeManagerShadowKey]bool, key scopeMa
 }
 
 func (cache *ScopeManagerShadowCache) hasTypeParameter(scope *ast.Node, name string) bool {
+	if cache == nil {
+		return hasScopeManagerTypeParameter(scope, name)
+	}
 	return cachedScopeManagerAnswer(&cache.typeParameters, scopeManagerShadowKey{node: scope, name: name}, func() bool {
-		for _, typeParameter := range scope.TypeParameters() {
-			// TypeScript creates synthetic type parameters from JSDoc @template
-			// tags and attaches them to the host declaration. They remain comments
-			// rather than scope variables in ESTree and scope-manager.
-			if typeParameter != nil && typeParameter.Flags&ast.NodeFlagsReparsed == 0 &&
-				typeParameter.Name() != nil && typeParameter.Name().Text() == name {
-				return true
-			}
-		}
-		return false
+		return hasScopeManagerTypeParameter(scope, name)
 	})
+}
+
+func hasScopeManagerTypeParameter(scope *ast.Node, name string) bool {
+	for _, typeParameter := range scope.TypeParameters() {
+		// TypeScript creates synthetic type parameters from JSDoc @template
+		// tags and attaches them to the host declaration. They remain comments
+		// rather than scope variables in ESTree and scope-manager.
+		if typeParameter != nil && typeParameter.Flags&ast.NodeFlagsReparsed == 0 &&
+			typeParameter.Name() != nil && typeParameter.Name().Text() == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (cache *ScopeManagerShadowCache) hasParameter(fn *ast.Node, name string) bool {
+	if cache == nil {
+		return hasScopeManagerParameter(fn, name)
+	}
 	return cachedScopeManagerAnswer(&cache.parameters, scopeManagerShadowKey{node: fn, name: name}, func() bool {
-		for _, parameter := range fn.Parameters() {
-			if parameter != nil && parameter.Name() != nil && HasNameInBindingPattern(parameter.Name(), name) {
-				return true
-			}
-		}
-		return false
+		return hasScopeManagerParameter(fn, name)
 	})
 }
 
+func hasScopeManagerParameter(fn *ast.Node, name string) bool {
+	for _, parameter := range fn.Parameters() {
+		if parameter != nil && parameter.Name() != nil && HasNameInBindingPattern(parameter.Name(), name) {
+			return true
+		}
+	}
+	return false
+}
+
 func (cache *ScopeManagerShadowCache) hasBodyDeclaration(body *ast.Node, name string) bool {
+	if cache == nil {
+		return hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)
+	}
 	return cachedScopeManagerAnswer(&cache.bodyDeclarations, scopeManagerShadowKey{node: body, name: name}, func() bool {
 		return hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)
 	})
@@ -247,8 +264,9 @@ func (cache *ScopeManagerShadowCache) hasBodyDeclaration(body *ast.Node, name st
 // TypeScript's own resolver deliberately hides them there, so rules that model
 // scope-manager variables need this on top of a resolver-based lookup.
 func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
-	var cache ScopeManagerShadowCache
-	return cache.HasEnclosingTypeParameter(node, name)
+	// A one-shot package lookup cannot reuse a cache, so keep this path free of
+	// cache-map allocations. Rules with repeated queries should own a cache.
+	return (*ScopeManagerShadowCache)(nil).HasEnclosingTypeParameter(node, name)
 }
 
 // HasEnclosingTypeParameter is the cached form of the package-level helper.
@@ -284,8 +302,9 @@ func (cache *ScopeManagerShadowCache) HasEnclosingTypeParameter(node *ast.Node, 
 // class scope. A scope created inside the decorator drops the function scope
 // from the chain, just as it does for type parameters and body declarations.
 func HasEnclosingParameter(node *ast.Node, name string) bool {
-	var cache ScopeManagerShadowCache
-	return cache.HasEnclosingParameter(node, name)
+	// A one-shot package lookup cannot reuse a cache, so keep this path free of
+	// cache-map allocations. Rules with repeated queries should own a cache.
+	return (*ScopeManagerShadowCache)(nil).HasEnclosingParameter(node, name)
 }
 
 // HasEnclosingParameter is the cached form of the package-level helper.
@@ -395,8 +414,9 @@ func escapesClassScope(prevChild *ast.Node, crossedScope bool) bool {
 // once an arrow, function, or class body intervenes the decorated function's
 // scope is out of the chain entirely.
 func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
-	var cache ScopeManagerShadowCache
-	return cache.IsShadowedFromParameterInitializer(node, name)
+	// A one-shot package lookup cannot reuse a cache, so keep this path free of
+	// cache-map allocations. Rules with repeated queries should own a cache.
+	return (*ScopeManagerShadowCache)(nil).IsShadowedFromParameterInitializer(node, name)
 }
 
 // IsShadowedFromParameterInitializer is the cached form of the package-level

@@ -485,8 +485,7 @@ func TestNoArrayConstructorEmptyParserLibDivergence(t *testing.T) {
 		Program:         lintprogram.NewFromCompiler(program),
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule { return configuredRules },
-		ExcludePaths:    []string{},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return configuredRules },
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAutofix,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -617,7 +616,6 @@ func lintNoArrayConstructorWithDemand(
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noArrayConstructorConfiguredRules(options),
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -628,9 +626,9 @@ func lintNoArrayConstructorWithDemand(
 	return diagnostics
 }
 
-func noArrayConstructorConfiguredRules(options []any) func(*ast.SourceFile) []linter.ConfiguredRule {
-	return func(*ast.SourceFile) []linter.ConfiguredRule {
-		return []linter.ConfiguredRule{{
+func noArrayConstructorConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
+	return func(*ast.SourceFile) []rule.ConfiguredRule {
+		return []rule.ConfiguredRule{{
 			Name:     NoArrayConstructorRule.Name,
 			Severity: rule.SeverityError,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {

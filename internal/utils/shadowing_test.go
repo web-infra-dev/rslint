@@ -419,3 +419,27 @@ func TestShadowingScopeModels(t *testing.T) {
 		})
 	}
 }
+
+func TestScopeManagerShadowPackageHelpersDoNotAllocateCaches(t *testing.T) {
+	code := `class C<Target> { m<Target>(@dec(Target()) x: number, Target: any) { var Target; } }`
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, code, core.ScriptKindTS)
+	callee := findNodeWithText(t, sourceFile, "Target()").Expression()
+
+	allocs := testing.AllocsPerRun(100, func() {
+		if !HasEnclosingTypeParameter(callee, "Target") {
+			panic("type parameter should be visible")
+		}
+		if !HasEnclosingParameter(callee, "Target") {
+			panic("parameter should be visible")
+		}
+		if !IsShadowedFromParameterInitializer(callee, "Target") {
+			panic("body declaration should be visible")
+		}
+	})
+	if allocs != 0 {
+		t.Fatalf("package-level shadow helpers allocated %.2f objects per run, want 0", allocs)
+	}
+}
