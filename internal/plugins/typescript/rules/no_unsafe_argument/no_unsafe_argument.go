@@ -251,11 +251,11 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 						}
 
 					} else {
-						// NOTE: Unlike typescript-eslint, rslint checks the element
-						// type of non-array iterable spreads instead of ignoring them.
-						// A non-array iterable contributes an unknown number of values.
-						// Ask the checker for the same yield type TypeScript uses for a
-						// spread, which also follows generic iterable constraints.
+						// A non-tuple spread contributes an unknown number of values.
+						// Prefer the iterable yield type, which follows generic iterable
+						// constraints. When the active libs do not define Iterable (for
+						// example, lib.es5), arrays are still valid spread sources, so
+						// fall back to their numeric index type.
 						spreadElementType := checker.Checker_getIterationTypeOfIterable(
 							ctx.TypeChecker,
 							checker.IterationUseSpread,
@@ -263,6 +263,15 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 							spreadArgType,
 							nil,
 						)
+						if spreadElementType == nil {
+							constrainedType := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, spreadArgType)
+							if constrainedType == nil {
+								constrainedType = spreadArgType
+							}
+							if checker.Checker_isArrayType(ctx.TypeChecker, constrainedType) || checker.IsTupleType(constrainedType) {
+								spreadElementType = utils.GetNumberIndexType(ctx.TypeChecker, constrainedType)
+							}
+						}
 						parameterType := signature.getNextParameterType()
 						if spreadElementType != nil && parameterType != nil {
 							_, _, unsafe := utils.IsUnsafeAssignment(

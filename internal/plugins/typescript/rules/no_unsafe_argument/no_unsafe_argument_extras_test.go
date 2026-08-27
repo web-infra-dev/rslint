@@ -135,6 +135,35 @@ export type InfrastructureLogging = {
 	}
 }
 
+func TestNoUnsafeArgumentES5ArrayConstraintSpread(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.es5.json",
+		t,
+		&NoUnsafeArgumentRule,
+		nil,
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+
+function forward<T extends readonly any[]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      5,
+					Column:    17,
+					EndLine:   5,
+					EndColumn: 26,
+				}},
+			},
+		},
+	)
+}
+
 func TestNoUnsafeArgumentLogicalExpressionBoundaries(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
