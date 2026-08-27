@@ -74,7 +74,7 @@ func checkConditionalExpression(ctx rule.RuleContext, node *ast.Node) {
 		// (nestLevel-2)th effective parent); otherwise report on the innermost
 		// node itself.
 		target := node
-		for i := 0; i < nestLevel-2; i++ {
+		for range nestLevel - 2 {
 			target = effectiveParent(target)
 		}
 		ctx.ReportNode(target, messageTooDeep())
