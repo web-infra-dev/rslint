@@ -1,0 +1,628 @@
+// Rstest Snapshot v1
+
+exports[`no-array-constructor > invalid 1`] = `
+{
+  "code": "new Array()",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 2`] = `
+{
+  "code": "new Array",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 3`] = `
+{
+  "code": "new Array(x, y)",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 4`] = `
+{
+  "code": "new Array(0, 1, 2)",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 5`] = `
+{
+  "code": "const array = Array?.();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 6`] = `
+{
+  "code": "const array = Array(...args);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 7`] = `
+{
+  "code": "const array = Array(5, 6, ...args);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 8`] = `
+{
+  "code": "a = new (Array);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 9`] = `
+{
+  "code": "
+foo
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 10`] = `
+{
+  "code": "
+new foo
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 11`] = `
+{
+  "code": "
+const foo = function() {}
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 12`] = `
+{
+  "code": "
+{}
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 13`] = `
+{
+  "code": "foo: Array();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 14`] = `
+{
+  "code": "while (a) Array();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 15`] = `
+{
+  "code": "with (obj) Array();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 16`] = `
+{
+  "code": "
+a++
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 17`] = `
+{
+  "code": "
+function foo() {
+    return
+    Array();
+}
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 18`] = `
+{
+  "code": "
+debugger
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 19`] = `
+{
+  "code": "
+export { foo } from 'bar'
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 20`] = `
+{
+  "code": "
+var foo
+Array()
+",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 21`] = `
+{
+  "code": "new Array();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 22`] = `
+{
+  "code": "Array(0, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 23`] = `
+{
+  "code": "Array?.(0, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

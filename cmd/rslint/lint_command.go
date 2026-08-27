@@ -549,7 +549,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			cliFinalChangeCommitter{},
 			observationPolicy,
 			linter.AutofixPolicy{
-				MaxRounds:            linter.MaxFixRounds,
 				VerifyAfterLastRound: true,
 				VerificationDemand: linter.ArtifactDemand{
 					Native: rule.EditDemandNone,

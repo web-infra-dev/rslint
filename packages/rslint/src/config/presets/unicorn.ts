@@ -198,7 +198,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-useless-switch-case': 'error',
     // 'unicorn/no-useless-template-literals': 'error', // not implemented
     // 'unicorn/no-useless-undefined': 'error', // not implemented
-    // 'unicorn/no-xor-as-exponentiation': 'error', // not implemented
+    'unicorn/no-xor-as-exponentiation': 'error',
     // 'unicorn/no-zero-fractions': 'error', // not implemented
     // 'unicorn/number-literal-case': 'error', // not implemented
     // 'unicorn/numeric-separators-style': 'error', // not implemented
