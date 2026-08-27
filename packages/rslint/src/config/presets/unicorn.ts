@@ -95,7 +95,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-duplicate-set-values': 'error', // not implemented
     // 'unicorn/no-empty-file': 'error', // not implemented
     // 'unicorn/no-error-property-assignment': 'error', // not implemented
-    // 'unicorn/no-exports-in-scripts': 'error', // not implemented
+    'unicorn/no-exports-in-scripts': 'error',
     // 'unicorn/no-for-each': 'error', // not implemented
     // 'unicorn/no-for-loop': 'error', // not implemented
     // 'unicorn/no-global-object-property-assignment': 'error', // not implemented
