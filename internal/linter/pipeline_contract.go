@@ -9,10 +9,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// MaxFixRounds is the product-wide safety bound. A round is one non-empty
+// maxFixRounds is the product-wide safety bound. A round is one non-empty
 // in-memory change-set application; a final verification observation and the
-// optional external commit are not rounds.
-const MaxFixRounds = 10
+// optional external commit are not rounds. The bound stays private so
+// integrations cannot independently select a pass count and drift apart.
+const maxFixRounds = 10
 
 // ReleaseFunc ends the producer lease for one acquired generation. The
 // pipeline wraps it with exact-once semantics immediately after acquisition;
@@ -225,12 +226,17 @@ type ProgressiveDiagnostics interface {
 	Submit(parentCtx context.Context, run DeferredPluginRun)
 }
 
-// AutofixPolicy configures bounded apply-and-observe behavior.
+// AutofixPolicy configures the observable result and syntax behavior of the
+// product-owned bounded apply-and-observe operation.
 type AutofixPolicy struct {
-	MaxRounds                int
 	VerifyAfterLastRound     bool
 	VerificationDemand       ArtifactDemand
 	StopOnTargetSyntaxErrors bool
+
+	// maxRounds is fixed by the constructors for production requests. Keeping
+	// it private prevents CLI, API, and LSP from acquiring separate fix limits;
+	// package tests may lower it to exercise boundary behavior economically.
+	maxRounds int
 }
 
 type pipelineRequestKind uint8
@@ -303,6 +309,9 @@ func NewAutofixRequest(
 	autofix AutofixPolicy,
 	dispatcher EslintPluginDispatcher,
 ) PipelineRequest {
+	if autofix.maxRounds == 0 {
+		autofix.maxRounds = maxFixRounds
+	}
 	return PipelineRequest{
 		kind:       pipelineRequestAutofix,
 		provider:   provider,
@@ -371,11 +380,11 @@ func (r PipelineRequest) validate() error {
 		if !r.policy.Demand.plansAutofixes() {
 			return errors.New("linter pipeline: autofix observations must request autofix artifacts")
 		}
-		if r.autofix.MaxRounds <= 0 {
-			return errors.New("linter pipeline: autofix MaxRounds must be positive")
+		if r.autofix.maxRounds <= 0 {
+			return errors.New("linter pipeline: autofix round limit must be positive")
 		}
-		if r.autofix.MaxRounds > MaxFixRounds {
-			return errors.New("linter pipeline: autofix MaxRounds exceeds the product safety bound")
+		if r.autofix.maxRounds > maxFixRounds {
+			return errors.New("linter pipeline: autofix round limit exceeds the product safety bound")
 		}
 		if !r.autofix.VerificationDemand.valid() {
 			return errors.New("linter pipeline: verification artifact demand is invalid")

@@ -28,7 +28,7 @@ func TestAutofixPipelineOwnsMemoryRoundsAndReobservesSnapshots(t *testing.T) {
 	result, err := RunPipeline(context.Background(), NewAutofixRequest(
 		provider,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: MaxFixRounds},
+		AutofixPolicy{},
 		nil,
 	))
 	if err != nil {
@@ -70,7 +70,7 @@ func TestAutofixSyntaxGateStopsBeforeAfterNativePluginDispatch(t *testing.T) {
 			Plugin:        PluginAfterNativeJoined,
 			PluginFailure: PluginDiscardOnFailure,
 		},
-		AutofixPolicy{MaxRounds: MaxFixRounds, StopOnTargetSyntaxErrors: true},
+		AutofixPolicy{StopOnTargetSyntaxErrors: true},
 		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			dispatches++
 			return &EslintPluginLintResult{}, nil
@@ -119,7 +119,7 @@ func TestAutofixSyntaxGateStopsConcurrentPluginBeforeDispatch(t *testing.T) {
 			Demand: ArtifactDemand{Plugin: rule.EditDemandAutofix},
 			Plugin: PluginConcurrentJoined,
 		},
-		AutofixPolicy{MaxRounds: 1, StopOnTargetSyntaxErrors: true},
+		autofixPolicyForTest(1, AutofixPolicy{StopOnTargetSyntaxErrors: true}),
 		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			dispatches++
 			return &EslintPluginLintResult{}, nil
@@ -137,8 +137,8 @@ func TestAutofixSyntaxGateStopsConcurrentPluginBeforeDispatch(t *testing.T) {
 
 func TestAutofixUsesProductRoundLimitThenVerifiesOnce(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
-	next := make(map[string]string, MaxFixRounds)
-	for round := range MaxFixRounds {
+	next := make(map[string]string, maxFixRounds)
+	for round := range maxFixRounds {
 		next[strconv.Itoa(round)] = strconv.Itoa(round + 1)
 	}
 	var fixArtifactBuilds atomic.Int32
@@ -170,7 +170,6 @@ func TestAutofixUsesProductRoundLimitThenVerifiesOnce(t *testing.T) {
 		provider,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
 		AutofixPolicy{
-			MaxRounds:            MaxFixRounds,
 			VerifyAfterLastRound: true,
 			VerificationDemand: ArtifactDemand{
 				Native:      rule.EditDemandSuggestion,
@@ -183,7 +182,7 @@ func TestAutofixUsesProductRoundLimitThenVerifiesOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	applied, ok := result.AppliedFixes()
-	if !ok || !applied.Verified || len(applied.Rounds) != MaxFixRounds || applied.Last.Index != MaxFixRounds {
+	if !ok || !applied.Verified || len(applied.Rounds) != maxFixRounds || applied.Last.Index != maxFixRounds {
 		t.Fatalf("applied result = %+v", applied)
 	}
 	if applied.Initial.Native.Files != nil || len(applied.Last.Native.Files) != 1 {
@@ -193,11 +192,11 @@ func TestAutofixUsesProductRoundLimitThenVerifiesOnce(t *testing.T) {
 			applied.Last.Native.Files,
 		)
 	}
-	if provider.acquisitions != MaxFixRounds+1 || provider.observed[len(provider.observed)-1] != strconv.Itoa(MaxFixRounds) {
+	if provider.acquisitions != maxFixRounds+1 || provider.observed[len(provider.observed)-1] != strconv.Itoa(maxFixRounds) {
 		t.Fatalf("provider acquisitions/observations = %d/%+v", provider.acquisitions, provider.observed)
 	}
-	if fixArtifactBuilds.Load() != MaxFixRounds {
-		t.Fatalf("autofix artifact builds = %d, want %d; final verification demand was not isolated", fixArtifactBuilds.Load(), MaxFixRounds)
+	if fixArtifactBuilds.Load() != maxFixRounds {
+		t.Fatalf("autofix artifact builds = %d, want %d; final verification demand was not isolated", fixArtifactBuilds.Load(), maxFixRounds)
 	}
 }
 
@@ -213,7 +212,7 @@ func TestAutofixCanStopAtRoundLimitWithoutVerification(t *testing.T) {
 	result, err := RunPipeline(context.Background(), NewAutofixRequest(
 		provider,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 2},
+		autofixPolicyForTest(2, AutofixPolicy{}),
 		nil,
 	))
 	if err != nil {
@@ -241,7 +240,7 @@ func TestAutofixRestoredInitialReusesInitialObservation(t *testing.T) {
 	result, err := RunPipeline(context.Background(), NewAutofixRequest(
 		provider,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 3},
+		autofixPolicyForTest(3, AutofixPolicy{}),
 		nil,
 	))
 	if err != nil {
@@ -249,7 +248,8 @@ func TestAutofixRestoredInitialReusesInitialObservation(t *testing.T) {
 	}
 	applied, ok := result.AppliedFixes()
 	if !ok || !applied.Verified || len(applied.Rounds) != 2 || !applied.Rounds[1].RestoredInitial ||
-		applied.Last.Index != applied.Initial.Index || result.Observation.Index != 0 || len(applied.FinalChanges) != 0 {
+		applied.Last.Index != applied.Initial.Index || result.Observation.Index != 0 || len(applied.FinalChanges) != 0 ||
+		len(applied.FinalSources) != 1 || applied.FinalSources[0].Path != provider.fileName || applied.FinalSources[0].Text != "a" {
 		t.Fatalf("restored applied result/provider = %+v / %+v", applied, provider)
 	}
 	if provider.acquisitions != 2 || strings.Join(provider.observed, ",") != "a,b" {
@@ -269,7 +269,7 @@ func TestAutofixSameTextFixConsumesRound(t *testing.T) {
 	result, err := RunPipeline(context.Background(), NewAutofixRequest(
 		provider,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		nil,
 	))
 	if err != nil {
@@ -277,8 +277,38 @@ func TestAutofixSameTextFixConsumesRound(t *testing.T) {
 	}
 	applied, ok := result.AppliedFixes()
 	if !ok || !applied.Verified || len(applied.Rounds) != 1 || len(applied.FinalChanges) != 0 ||
+		len(applied.FinalSources) != 1 || applied.FinalSources[0].Text != "a" ||
 		len(applied.Rounds[0].ChangedPaths) != 1 || applied.Rounds[0].AppliedDiagnostics != 1 {
 		t.Fatalf("same-text applied result/provider = %+v / %+v", applied, provider)
+	}
+}
+
+func TestAutofixFinalSourcesIncludePartiallyRestoredFiles(t *testing.T) {
+	state := newAutofixState()
+	if _, err := state.apply([]FileChange{
+		{Path: "a.js", Before: "a", After: "b", AppliedDiagnostics: 1},
+		{Path: "b.js", Before: "x", After: "y", AppliedDiagnostics: 1},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	round, err := state.apply([]FileChange{
+		{Path: "a.js", Before: "b", After: "a", AppliedDiagnostics: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if round.RestoredInitial {
+		t.Fatal("one restored file must not hide another file's remaining change")
+	}
+	changes := state.finalChanges()
+	if len(changes) != 1 || changes[0].Path != "b.js" || changes[0].After != "y" {
+		t.Fatalf("net changes = %+v, want only b.js", changes)
+	}
+	sources := state.finalSources()
+	if len(sources) != 2 ||
+		sources[0] != (SourceFileSnapshot{Path: "a.js", Text: "a"}) ||
+		sources[1] != (SourceFileSnapshot{Path: "b.js", Text: "y"}) {
+		t.Fatalf("final fixed sources = %+v", sources)
 	}
 }
 
@@ -287,7 +317,7 @@ func TestAutofixRejectsRoundLimitAboveProductBound(t *testing.T) {
 	_, err := RunPipeline(context.Background(), NewAutofixRequest(
 		provider,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: MaxFixRounds + 1},
+		autofixPolicyForTest(maxFixRounds+1, AutofixPolicy{}),
 		nil,
 	))
 	if err == nil || !strings.Contains(err.Error(), "product safety bound") {
@@ -336,7 +366,7 @@ func TestAutofixReobserveFailurePreservesLastSuccessfulObservation(t *testing.T)
 			Plugin:        PluginConcurrentJoined,
 			PluginFailure: PluginDiscardOnFailure,
 		},
-		AutofixPolicy{MaxRounds: 1, VerifyAfterLastRound: true},
+		autofixPolicyForTest(1, AutofixPolicy{VerifyAfterLastRound: true}),
 		func(dispatchCtx context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			if dispatches.Add(1) == 2 {
 				<-nativeFinished
@@ -384,7 +414,7 @@ func TestAutofixRejectsProviderThatIgnoresMemorySnapshot(t *testing.T) {
 	result, err := RunPipeline(context.Background(), NewAutofixRequest(
 		provider,
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 2},
+		autofixPolicyForTest(2, AutofixPolicy{}),
 		nil,
 	))
 	if err == nil || !strings.Contains(err.Error(), "did not materialize in-memory target") {

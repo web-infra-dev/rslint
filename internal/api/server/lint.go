@@ -455,9 +455,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			provider,
 			policy,
 			linter.AutofixPolicy{
-				MaxRounds:            1,
-				VerifyAfterLastRound: false,
-				VerificationDemand:   linter.ArtifactDemand{},
+				VerifyAfterLastRound: true,
+				VerificationDemand:   demand,
 			},
 			dispatch,
 		)
@@ -500,19 +499,20 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	linter.StableSortDiagnosticsByFileAndStart(diagnostics)
 	diagnosticProjection := projectLintDiagnostics(diagnostics)
 
-	// The core applies one bounded round to request-local memory. This adapter
-	// only maps the resulting net whole-file delta into Output; the JS API keeps
-	// ownership of any later physical persistence.
+	// The core applies every bounded round to request-local memory and returns a
+	// final observation over the resulting source. This adapter maps every
+	// successfully fixed file's complete final source into Output; the JS API
+	// keeps ownership of any later physical persistence.
 	var output map[string]string
 	if req.Fix {
 		applied, ok := pipelineResult.AppliedFixes()
 		if !ok {
 			return nil, errors.New("error running linter: API fix did not return an in-memory result")
 		}
-		if len(applied.FinalChanges) > 0 {
-			output = make(map[string]string, len(applied.FinalChanges))
-			for _, change := range applied.FinalChanges {
-				output[tspath.ConvertToRelativePath(change.Path, comparePathOptions)] = change.After
+		if len(applied.FinalSources) > 0 {
+			output = make(map[string]string, len(applied.FinalSources))
+			for _, source := range applied.FinalSources {
+				output[tspath.ConvertToRelativePath(source.Path, comparePathOptions)] = source.Text
 			}
 		}
 		if len(output) == 0 {

@@ -73,7 +73,7 @@ func TestPipelineFreezesTextOnlyForFixableTargets(t *testing.T) {
 	result, err := RunPipeline(context.Background(), NewAutofixRequest(
 		pipelineTestProvider(generation, nil),
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		nil,
 	))
 	if err != nil {
