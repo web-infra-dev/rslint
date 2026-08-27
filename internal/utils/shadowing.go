@@ -184,12 +184,93 @@ func isDirectParameterOf(fn *ast.Node, child *ast.Node) bool {
 	return false
 }
 
+type scopeManagerShadowKey struct {
+	node *ast.Node
+	name string
+}
+
+// ScopeManagerShadowCache reuses declaration-set answers while a rule models
+// typescript-eslint scope-manager boundaries for many references in one file.
+// The zero value is ready to use.
+type ScopeManagerShadowCache struct {
+	typeParameters   map[scopeManagerShadowKey]bool
+	parameters       map[scopeManagerShadowKey]bool
+	bodyDeclarations map[scopeManagerShadowKey]bool
+}
+
+func cachedScopeManagerAnswer(cache *map[scopeManagerShadowKey]bool, key scopeManagerShadowKey, compute func() bool) bool {
+	if *cache == nil {
+		*cache = make(map[scopeManagerShadowKey]bool)
+	} else if result, ok := (*cache)[key]; ok {
+		return result
+	}
+	result := compute()
+	(*cache)[key] = result
+	return result
+}
+
+func (cache *ScopeManagerShadowCache) hasTypeParameter(scope *ast.Node, name string) bool {
+	if cache == nil {
+		return hasScopeManagerTypeParameter(scope, name)
+	}
+	return cachedScopeManagerAnswer(&cache.typeParameters, scopeManagerShadowKey{node: scope, name: name}, func() bool {
+		return hasScopeManagerTypeParameter(scope, name)
+	})
+}
+
+func hasScopeManagerTypeParameter(scope *ast.Node, name string) bool {
+	for _, typeParameter := range scope.TypeParameters() {
+		// TypeScript creates synthetic type parameters from JSDoc @template
+		// tags and attaches them to the host declaration. They remain comments
+		// rather than scope variables in ESTree and scope-manager.
+		if typeParameter != nil && typeParameter.Flags&ast.NodeFlagsReparsed == 0 &&
+			typeParameter.Name() != nil && typeParameter.Name().Text() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (cache *ScopeManagerShadowCache) hasParameter(fn *ast.Node, name string) bool {
+	if cache == nil {
+		return hasScopeManagerParameter(fn, name)
+	}
+	return cachedScopeManagerAnswer(&cache.parameters, scopeManagerShadowKey{node: fn, name: name}, func() bool {
+		return hasScopeManagerParameter(fn, name)
+	})
+}
+
+func hasScopeManagerParameter(fn *ast.Node, name string) bool {
+	for _, parameter := range fn.Parameters() {
+		if parameter != nil && parameter.Name() != nil && HasNameInBindingPattern(parameter.Name(), name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (cache *ScopeManagerShadowCache) hasBodyDeclaration(body *ast.Node, name string) bool {
+	if cache == nil {
+		return hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)
+	}
+	return cachedScopeManagerAnswer(&cache.bodyDeclarations, scopeManagerShadowKey{node: body, name: name}, func() bool {
+		return hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)
+	})
+}
+
 // HasEnclosingTypeParameter reports whether any enclosing function-like or
 // class declaration declares a type parameter called name. scope-manager keeps
 // class type parameters in the lexical scope chain of static members, while
 // TypeScript's own resolver deliberately hides them there, so rules that model
 // scope-manager variables need this on top of a resolver-based lookup.
 func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
+	// A one-shot package lookup cannot reuse a cache, so keep this path free of
+	// cache-map allocations. Rules with repeated queries should own a cache.
+	return (*ScopeManagerShadowCache)(nil).HasEnclosingTypeParameter(node, name)
+}
+
+// HasEnclosingTypeParameter is the cached form of the package-level helper.
+func (cache *ScopeManagerShadowCache) HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 	prevChild := node
 	inParameterDecorator := false
 	crossedScope := false
@@ -199,15 +280,77 @@ func HasEnclosingTypeParameter(node *ast.Node, name string) bool {
 		}
 		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
 		isClassLike := ast.IsClassLike(current)
-		if (isFunctionLike && !escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)) ||
-			(isClassLike && !escapesClassScope(prevChild, crossedScope)) {
-			for _, typeParameter := range current.TypeParameters() {
-				if typeParameter != nil && typeParameter.Name() != nil && typeParameter.Name().Text() == name {
-					return true
-				}
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if (entersFunctionScope || entersClassScope) && cache.hasTypeParameter(current, name) {
+			return true
+		}
+		if entersFunctionScope || entersClassScope {
+			crossedScope = true
+		}
+		prevChild = current
+	}
+	return false
+}
+
+// HasEnclosingParameter reports whether scope-manager exposes an enclosing
+// function-like declaration's parameter called name at node. This is needed
+// in addition to binder-backed resolution for references directly inside a
+// parameter decorator: scope-manager gives the decorator the decorated
+// function's scope, while TypeScript resolves the decorator in the enclosing
+// class scope. A scope created inside the decorator drops the function scope
+// from the chain, just as it does for type parameters and body declarations.
+func HasEnclosingParameter(node *ast.Node, name string) bool {
+	// A one-shot package lookup cannot reuse a cache, so keep this path free of
+	// cache-map allocations. Rules with repeated queries should own a cache.
+	return (*ScopeManagerShadowCache)(nil).HasEnclosingParameter(node, name)
+}
+
+// HasEnclosingParameter is the cached form of the package-level helper.
+func (cache *ScopeManagerShadowCache) HasEnclosingParameter(node *ast.Node, name string) bool {
+	prevChild := node
+	inParameterDecorator := false
+	crossedScope := false
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindParameter {
+			inParameterDecorator = prevChild.Kind == ast.KindDecorator
+		}
+		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
+		isClassLike := ast.IsClassLike(current)
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if entersFunctionScope && inParameterDecorator && isDirectParameterOf(current, prevChild) && cache.hasParameter(current, name) {
+			return true
+		}
+		if entersFunctionScope || entersClassScope {
+			crossedScope = true
+		}
+		prevChild = current
+	}
+	return false
+}
+
+// HasEnclosingClassExpressionName reports whether scope-manager exposes an
+// enclosing class expression's own name at node. A reference sitting directly
+// in the class's decorator acquires the class scope, while a scope created
+// inside that decorator is parented outside the class and cannot see the name.
+func HasEnclosingClassExpressionName(node *ast.Node, name string) bool {
+	prevChild := node
+	crossedScope := false
+	for current := node.Parent; current != nil; current = current.Parent {
+		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
+		isClassLike := ast.IsClassLike(current)
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, false, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if current.Kind == ast.KindClassExpression && entersClassScope {
+			if className := current.Name(); className != nil && className.Kind == ast.KindIdentifier && className.Text() == name {
+				return true
 			}
 		}
-		if isFunctionLike || isClassLike {
+		if entersFunctionScope || entersClassScope {
 			crossedScope = true
 		}
 		prevChild = current
@@ -271,6 +414,14 @@ func escapesClassScope(prevChild *ast.Node, crossedScope bool) bool {
 // once an arrow, function, or class body intervenes the decorated function's
 // scope is out of the chain entirely.
 func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
+	// A one-shot package lookup cannot reuse a cache, so keep this path free of
+	// cache-map allocations. Rules with repeated queries should own a cache.
+	return (*ScopeManagerShadowCache)(nil).IsShadowedFromParameterInitializer(node, name)
+}
+
+// IsShadowedFromParameterInitializer is the cached form of the package-level
+// helper.
+func (cache *ScopeManagerShadowCache) IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
 	prevChild := node
 	inParameterDecorator := false
 	crossedScope := false
@@ -278,14 +429,17 @@ func IsShadowedFromParameterInitializer(node *ast.Node, name string) bool {
 		if current.Kind == ast.KindParameter {
 			inParameterDecorator = prevChild.Kind == ast.KindDecorator
 		}
-		if ast.IsFunctionLikeDeclaration(current) && isDirectParameterOf(current, prevChild) &&
-			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
-			if body := current.Body(); body != nil &&
-				(hasFunctionScopeDeclaration(body, name) || HasHoistedVarDeclaration(body, name)) {
+		isFunctionLike := ast.IsFunctionLikeDeclaration(current)
+		isClassLike := ast.IsClassLike(current)
+		entersFunctionScope := isFunctionLike &&
+			!escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope)
+		entersClassScope := isClassLike && !escapesClassScope(prevChild, crossedScope)
+		if entersFunctionScope && isDirectParameterOf(current, prevChild) {
+			if body := current.Body(); body != nil && cache.hasBodyDeclaration(body, name) {
 				return true
 			}
 		}
-		if ast.IsFunctionLikeDeclaration(current) || ast.IsClassLike(current) {
+		if entersFunctionScope || entersClassScope {
 			crossedScope = true
 		}
 		prevChild = current

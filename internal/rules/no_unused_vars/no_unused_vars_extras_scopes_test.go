@@ -22,6 +22,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -429,6 +430,98 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 	)
 }
 
+func TestNoUnusedVarsSourceTypeScopes(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			// vars:"local" ignores program-level bindings only when the effective
+			// source type gives the file a global program scope.
+			{
+				Code:            `var foo;`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `export {}; var foo; let bar; const baz = 1; function fn() {} class C {}`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `import "./foo"; var foo;`,
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			{
+				Code:            `var foo;`,
+				FileName:        "file.ts",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// The default source type is module even when no import or export
+			// makes the parser classify the file as an external module.
+			{
+				Code:    `var foo;`,
+				Options: map[string]interface{}{"vars": "local"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:     `var foo;`,
+				FileName: "source-type.tsx",
+				Options:  map[string]interface{}{"vars": "local"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:     `var foo;`,
+				FileName: "source-type.jsx",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  map[string]interface{}{"vars": "local"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:            `var foo;`,
+				FileName:        "file.cjs",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			{
+				Code:            `var foo;`,
+				FileName:        "source-type-commonjs.jsx",
+				TSConfig:        "tsconfig.allow-js.json",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedErrorWithSuggestion("foo", false, 1, 5, 8, ""),
+				},
+			},
+			// A nested variable remains local even when script overrides module
+			// syntax at the program boundary.
+			{
+				Code:            "import \"./foo\";\nfunction outer() {\n  var nested;\n  nested = 1;\n}\nouter();",
+				Options:         map[string]interface{}{"vars": "local"},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					extraUnusedError("nested", true, 4, 3, 9, ""),
+				},
+			},
+		},
+	)
+}
+
 func TestNoUnusedVarsGapJavaScriptUsesBinderScopes(t *testing.T) {
 	t.Parallel()
 
@@ -463,16 +556,14 @@ consume(outer);
 
 	ruleRan := false
 	var diagnostics []rule.RuleDiagnostic
-	linter.RunLinterInProgram(
-		sourceProgram,
-		nil,
-		nil,
-		utils.ExcludePaths,
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 			if sourceFile.FileName() != filePath {
 				return nil
 			}
-			return []linter.ConfiguredRule{{
+			return []rule.ConfiguredRule{{
 				Name:     NoUnusedVarsRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -484,12 +575,10 @@ consume(outer);
 				},
 			}}
 		},
-		false,
-		func(diagnostic rule.RuleDiagnostic) {
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		},
-		nil,
-	)
+	})
 
 	if !ruleRan {
 		t.Fatal("core no-unused-vars did not run for gap JavaScript")
@@ -751,16 +840,14 @@ consume(data);`,
 				}
 				var diagnostics []rule.RuleDiagnostic
 				ruleRan := false
-				linter.RunLinterInProgram(
-					sourceProgram,
-					nil,
-					nil,
-					utils.ExcludePaths,
-					func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+				testutil.LintProgram(t, testutil.LintProgramOptions{
+					Program:                sourceProgram,
+					ExcludedPathSubstrings: testutil.DefaultExcludedPathSubstrings,
+					GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 						if sourceFile.FileName() != filePath {
 							return nil
 						}
-						return []linter.ConfiguredRule{{
+						return []rule.ConfiguredRule{{
 							Name:     NoUnusedVarsRule.Name,
 							Severity: rule.SeverityError,
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -772,12 +859,10 @@ consume(data);`,
 							},
 						}}
 					},
-					false,
-					func(diagnostic rule.RuleDiagnostic) {
+					OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 						diagnostics = append(diagnostics, diagnostic)
 					},
-					nil,
-				)
+				})
 				if !ruleRan {
 					t.Fatal("core no-unused-vars did not run")
 				}
@@ -846,8 +931,8 @@ assigned = 2;
 			Program:     lintprogram.NewFromCompiler(program),
 			File:        filePath,
 			HasTypeInfo: true,
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     NoUnusedVarsRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -855,7 +940,6 @@ assigned = 2;
 					},
 				}}
 			},
-			ExcludePaths: []string{},
 			Consumer: rule.DiagnosticConsumer{
 				Demand: demand,
 				Report: func(diagnostic rule.RuleDiagnostic) {

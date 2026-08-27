@@ -27,6 +27,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
@@ -56,7 +57,16 @@ func (fsys *commandReadCountingFS) readCount(fileName string) int {
 	return fsys.reads[tspath.NormalizePath(fileName)]
 }
 
-func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, string, string) {
+func runLintCommandForTest(t *testing.T, cwd string, args lintArgs) (int, string, string) {
+	return runLintCommandWithDispatcherForTest(t, cwd, args, nil)
+}
+
+func runLintCommandWithDispatcherForTest(
+	t *testing.T,
+	cwd string,
+	args lintArgs,
+	dispatch linter.EslintPluginDispatcher,
+) (int, string, string) {
 	t.Helper()
 
 	t.Chdir(cwd)
@@ -75,7 +85,7 @@ func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, strin
 	originalStdout, originalStderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = stdoutW, stderrW
 
-	code := executeLintPipeline(args, context.Background(), nil)
+	code := handleLintCommand(args, context.Background(), dispatch)
 
 	os.Stdout, os.Stderr = originalStdout, originalStderr
 	if err := stdoutW.Close(); err != nil {
@@ -667,62 +677,6 @@ func TestSyntacticErrorType(t *testing.T) {
 	}
 }
 
-// ======== groupDiagsByFile tests ========
-
-func TestGroupDiagsByFile_Empty(t *testing.T) {
-	result := groupDiagsByFile(nil)
-	if len(result) != 0 {
-		t.Errorf("expected empty map for nil input, got %d entries", len(result))
-	}
-
-	result = groupDiagsByFile([]rule.RuleDiagnostic{})
-	if len(result) != 0 {
-		t.Errorf("expected empty map for empty input, got %d entries", len(result))
-	}
-}
-
-func TestGroupDiagsByFile_SingleFile(t *testing.T) {
-	source := "const x = 1;\nconst y = 2;\n"
-	d1, _ := createTestDiagnostic(t, source, 0, 5)
-	// Create a second diagnostic from the SAME source file
-	d2 := d1
-	d2.Range = core.NewTextRange(13, 18)
-	d2.Message = rule.RuleMessage{Id: "test2", Description: "Second diagnostic"}
-
-	result := groupDiagsByFile([]rule.RuleDiagnostic{d1, d2})
-
-	if len(result) != 1 {
-		t.Fatalf("expected 1 file group, got %d", len(result))
-	}
-
-	for _, diags := range result {
-		if len(diags) != 2 {
-			t.Errorf("expected 2 diagnostics in group, got %d", len(diags))
-		}
-	}
-}
-
-func TestGroupDiagsByFile_MultipleFiles(t *testing.T) {
-	// Create diagnostics from two different temp directories (different files)
-	sourceA := "const a = 1;"
-	sourceB := "const b = 2;"
-	dA, _ := createTestDiagnostic(t, sourceA, 0, 5)
-	dB, _ := createTestDiagnostic(t, sourceB, 0, 5)
-
-	result := groupDiagsByFile([]rule.RuleDiagnostic{dA, dB})
-
-	// Each diagnostic comes from a different temp dir → different file names
-	if len(result) != 2 {
-		t.Fatalf("expected 2 file groups, got %d", len(result))
-	}
-
-	for _, diags := range result {
-		if len(diags) != 1 {
-			t.Errorf("expected 1 diagnostic per file, got %d", len(diags))
-		}
-	}
-}
-
 // ======== resolveStartTime tests ========
 
 func TestResolveStartTime_Zero(t *testing.T) {
@@ -838,7 +792,7 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
   {"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}}}
 ]`)
 
-	code, stdout, stderr := runLintPipelineForTest(t, directory, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
 		Config:         configPath,
 		TypeCheck:      true,
 		TypeCheckOnly:  true,
@@ -875,8 +829,8 @@ func TestIsBroadProjectLoadScope(t *testing.T) {
 	}
 }
 
-func TestExecuteLintPipelineRejectsInvalidFormatBeforeWork(t *testing.T) {
-	code, stdout, stderr := runLintPipelineForTest(t, t.TempDir(), lintArgs{
+func TestHandleLintCommandRejectsInvalidFormatBeforeWork(t *testing.T) {
+	code, stdout, stderr := runLintCommandForTest(t, t.TempDir(), lintArgs{
 		Format:         "stylish",
 		NoColor:        true,
 		SingleThreaded: true,
@@ -892,9 +846,9 @@ func TestExecuteLintPipelineRejectsInvalidFormatBeforeWork(t *testing.T) {
 	}
 }
 
-func TestExecuteLintPipelineInitIgnoresLintFormat(t *testing.T) {
+func TestHandleLintCommandInitIgnoresLintFormat(t *testing.T) {
 	dir := t.TempDir()
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Init:           true,
 		Format:         "stylish",
 		NoColor:        true,
@@ -905,7 +859,7 @@ func TestExecuteLintPipelineInitIgnoresLintFormat(t *testing.T) {
 	}
 }
 
-func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
+func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 	dir := t.TempDir()
 	target := tspath.NormalizePath(filepath.Join(dir, "index.js"))
 	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
@@ -921,7 +875,7 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 	configDir := tspath.NormalizePath(dir)
 
 	t.Run("explicit empty export remains a JS config", func(t *testing.T) {
-		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 			ConfigCatalog: &discovery.ConfigCatalog{
 				Configs:  map[string]rslintconfig.RslintConfig{configDir: {}},
 				Explicit: true,
@@ -937,7 +891,7 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 	})
 
 	t.Run("empty automatic catalog uses JSON fallback", func(t *testing.T) {
-		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 			ConfigCatalog:  &discovery.ConfigCatalog{Configs: map[string]rslintconfig.RslintConfig{}},
 			AllowFiles:     []string{target},
 			Format:         "jsonline",
@@ -950,7 +904,7 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 	})
 
 	t.Run("malformed explicit catalog cannot fall back to JSON", func(t *testing.T) {
-		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 			ConfigCatalog:  &discovery.ConfigCatalog{Explicit: true},
 			AllowFiles:     []string{target},
 			Format:         "jsonline",
@@ -963,7 +917,7 @@ func TestExecuteLintPipelineConfigCatalogSelection(t *testing.T) {
 	})
 }
 
-func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
+func TestHandleLintCommandFocusedFileBuildsOnlyDirectProject(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string]string{
 		"target.ts":            `export const target = 1;`,
@@ -994,7 +948,7 @@ func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
 			},
 		}},
 	}}
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		ConfigCatalog: &discovery.ConfigCatalog{
 			Configs:  map[string]rslintconfig.RslintConfig{dir: config},
 			Explicit: true,
@@ -1016,7 +970,7 @@ func TestExecuteLintPipelineFocusedFileBuildsOnlyDirectProject(t *testing.T) {
 	}
 }
 
-func TestExecuteLintPipelineDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testing.T) {
+func TestHandleLintCommandDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testing.T) {
 	dir := t.TempDir()
 	selectedDir := filepath.Join(dir, "selected")
 	unrelatedDir := filepath.Join(dir, "unrelated")
@@ -1040,7 +994,7 @@ func TestExecuteLintPipelineDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *tes
 	}
 	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         filepath.Join(dir, "rslint.jsonc"),
 		FS:             spy,
 		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
@@ -1059,7 +1013,7 @@ func TestExecuteLintPipelineDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *tes
 	}
 }
 
-func TestExecuteLintPipelineExplicitJSONDirectoryTargetUsesInvocationCWD(t *testing.T) {
+func TestHandleLintCommandExplicitJSONDirectoryTargetUsesInvocationCWD(t *testing.T) {
 	repositoryRoot := t.TempDir()
 	cwd := filepath.Join(repositoryRoot, "packages", "app")
 	selectedDir := filepath.Join(cwd, "selected")
@@ -1086,7 +1040,7 @@ func TestExecuteLintPipelineExplicitJSONDirectoryTargetUsesInvocationCWD(t *test
 	}
 	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
 
-	code, stdout, stderr := runLintPipelineForTest(t, cwd, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, cwd, lintArgs{
 		Config:         filepath.Join(repositoryRoot, "rslint.jsonc"),
 		FS:             spy,
 		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
@@ -1112,7 +1066,7 @@ func TestExecuteLintPipelineExplicitJSONDirectoryTargetUsesInvocationCWD(t *test
 	}
 }
 
-func TestExecuteLintPipelineExplicitJSONKeepsDirectoryGitScopesIndependent(t *testing.T) {
+func TestHandleLintCommandExplicitJSONKeepsDirectoryGitScopesIndependent(t *testing.T) {
 	root := t.TempDir()
 	invocationDir := filepath.Join(root, "invocation")
 	configDir := filepath.Join(root, "config")
@@ -1140,7 +1094,7 @@ func TestExecuteLintPipelineExplicitJSONKeepsDirectoryGitScopesIndependent(t *te
 		}
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, invocationDir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, invocationDir, lintArgs{
 		Config:         filepath.Join(configDir, "rslint.jsonc"),
 		FS:             bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		AllowDirs:      []string{tspath.NormalizePath(firstDir), tspath.NormalizePath(secondDir)},
@@ -1174,7 +1128,7 @@ func TestExecuteLintPipelineExplicitJSONKeepsDirectoryGitScopesIndependent(t *te
 	}
 }
 
-func TestExecuteLintPipelineTypedCatalogEnforcesPluginDeclarations(t *testing.T) {
+func TestHandleLintCommandTypedCatalogEnforcesPluginDeclarations(t *testing.T) {
 	dir := t.TempDir()
 	target := tspath.NormalizePath(filepath.Join(dir, "index.ts"))
 	if err := os.WriteFile(target, []byte("let value: any;\n"), 0o644); err != nil {
@@ -1190,7 +1144,7 @@ func TestExecuteLintPipelineTypedCatalogEnforcesPluginDeclarations(t *testing.T)
 		{name: "declared plugin rule runs", plugins: []string{"@typescript-eslint"}, wantFailure: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+			code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 				ConfigCatalog: &discovery.ConfigCatalog{
 					Configs: map[string]rslintconfig.RslintConfig{
 						configDir: {{
@@ -1209,6 +1163,78 @@ func TestExecuteLintPipelineTypedCatalogEnforcesPluginDeclarations(t *testing.T)
 			gotFailure := code != 0 && strings.Contains(stdout, "@typescript-eslint/no-explicit-any")
 			if gotFailure != test.wantFailure {
 				t.Fatalf("plugin enforcement = %v, want %v: code=%d stdout=%q stderr=%q", gotFailure, test.wantFailure, code, stdout, stderr)
+			}
+		})
+	}
+}
+
+func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
+	dir := t.TempDir()
+	targetPath := tspath.NormalizePath(filepath.Join(dir, "index.ts"))
+	content := "const value = 1;\n"
+	if err := os.WriteFile(targetPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDirectory := tspath.NormalizePath(dir)
+	baseArgs := lintArgs{
+		ConfigCatalog: &discovery.ConfigCatalog{
+			Configs: map[string]rslintconfig.RslintConfig{
+				configDirectory: {{
+					Files:   []string{"**/*.ts"},
+					Plugins: []string{"external"},
+					Rules:   rslintconfig.Rules{"external/check": "error"},
+				}},
+			},
+			EslintPlugins: []rslintconfig.EslintPluginEntry{{
+				Prefix:    "external",
+				RuleNames: []string{"check"},
+			}},
+			Explicit: true,
+		},
+		AllowFiles:     []string{targetPath},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	}
+	for _, test := range []struct {
+		name       string
+		fs         vfs.FS
+		wantInline bool
+	}{
+		{name: "production disk host"},
+		{
+			name:       "injected filesystem",
+			fs:         bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+			wantInline: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			args := baseArgs
+			args.FS = test.fs
+			var request linter.EslintPluginLintRequest
+			code, stdout, stderr := runLintCommandWithDispatcherForTest(
+				t,
+				dir,
+				args,
+				func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+					request = got
+					results := make([]linter.EslintPluginFileResult, len(got.Files))
+					for index, file := range got.Files {
+						results[index].FilePath = file.Path
+					}
+					return &linter.EslintPluginLintResult{Results: results}, nil
+				},
+			)
+			if code != 0 || len(request.Files) != 1 {
+				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)
+			}
+			text := request.Files[0].Text
+			if test.wantInline {
+				if text == nil || *text != content {
+					t.Fatalf("injected filesystem text = %v, want %q", text, content)
+				}
+			} else if text != nil {
+				t.Fatalf("production disk host unexpectedly received inline text %q", *text)
 			}
 		})
 	}
@@ -1644,23 +1670,30 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 		t.Fatalf("target discovery should retain the default baseline despite --rule overlay, got %v", targetFiles)
 	}
 
-	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
-		Config:                  activeConfig,
-		CurrentDirectory:        dir,
-		RuleCatalog:             rules.All(),
-		LintTargetBySourcePath:  binding.LintTargetBySourcePath,
-		SourceMappingsCanonical: true,
-		PathSpaces:              targetPlan.PathSpaces(),
-		FS:                      fs,
+	fileConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
+		Config:                              activeConfig,
+		ConfigDirectory:                     dir,
+		Catalog:                             rules.All(),
+		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
+		SourceMappingsIncludeCanonicalPaths: true,
+		PathSpaces:                          targetPlan.PathSpaces(),
+		FS:                                  fs,
 	})
 	var diagnostics []rule.RuleDiagnostic
-	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       binding.Programs,
-		SingleThreaded: true,
-		TargetFiles:    targetsByProgram,
-		GetRulesForFile: func(sf *ast.SourceFile) []linter.ConfiguredRule {
-			return fileConfigResolver.EnabledRulesForFile(sf.FileName())
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         binding.Programs,
+		TargetsByProgram: targetsByProgram,
+		SingleThreaded:   true,
+		GetRulesForFile: func(sf *ast.SourceFile) []rule.ConfiguredRule {
+			return fileConfigResolver.EnabledRulesForSourcePath(sf.FileName())
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandAll,
 			Report: func(d rule.RuleDiagnostic) {
@@ -1701,7 +1734,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 		t.Fatalf("write target: %v", err)
 	}
 
-	code, _, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, _, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         configPath,
 		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
@@ -1711,7 +1744,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 		t.Fatalf("plain lint resolved an inactive project: code=%d stderr=%s", code, stderr)
 	}
 
-	code, _, stderr = runLintPipelineForTest(t, dir, lintArgs{
+	code, _, stderr = runLintCommandForTest(t, dir, lintArgs{
 		Config:         configPath,
 		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
@@ -1742,7 +1775,7 @@ func TestCLIExplicitJSONConfigNoArgsScopesToInvocationCWD(t *testing.T) {
 	write(configDir, "config-only.js", "debugger;\n")
 	write(workspaceDir, "workspace.js", "debugger;\n")
 
-	code, stdout, stderr := runLintPipelineForTest(t, workspaceDir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, workspaceDir, lintArgs{
 		Config:         "../config/rslint.jsonc",
 		Format:         "jsonline",
 		NoColor:        true,
@@ -1781,7 +1814,7 @@ func TestCLIExplicitExternalConfigSkipsDefaultExcludedWorkingDirectory(t *testin
 		{name: "explicit cwd", allowDirs: []string{tspath.NormalizePath(workingDirectory)}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			code, stdout, stderr := runLintPipelineForTest(t, workingDirectory, lintArgs{
+			code, stdout, stderr := runLintCommandForTest(t, workingDirectory, lintArgs{
 				Config:         configPath,
 				AllowDirs:      test.allowDirs,
 				Format:         "jsonline",
@@ -1807,7 +1840,7 @@ func TestCLIExplicitFileOutsideFilesCountsWithNoRules(t *testing.T) {
 		t.Fatalf("write explicit file: %v", err)
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         "rslint.jsonc",
 		Format:         "default",
 		NoColor:        true,
@@ -1840,7 +1873,7 @@ func TestCLIExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.
 		t.Fatalf("write explicit file: %v", err)
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         "rslint.jsonc",
 		Format:         "default",
 		NoColor:        true,
@@ -1876,7 +1909,7 @@ func TestCLIExplicitMalformedFileWithRuleOverlayReportsSyntaxDiagnostic(t *testi
 		t.Fatalf("write explicit file: %v", err)
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		Config:         "rslint.jsonc",
 		Format:         "default",
 		NoColor:        true,
@@ -1997,23 +2030,6 @@ func TestPrintDiagnosticGitLab(t *testing.T) {
 	}
 }
 
-func TestRemapDiagnosticTargetPaths(t *testing.T) {
-	diagnostics := []rule.RuleDiagnostic{
-		{FilePath: "/program/link.ts"},
-		{FilePath: "/program/unchanged.ts"},
-	}
-	remapDiagnosticTargetPaths(diagnostics, map[string]target.File{
-		"/program/link.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "/requested/real.ts"}},
-	})
-
-	if diagnostics[0].FilePath != "/requested/real.ts" {
-		t.Fatalf("expected requested target path, got %q", diagnostics[0].FilePath)
-	}
-	if diagnostics[1].FilePath != "/program/unchanged.ts" {
-		t.Fatalf("unexpected remap of unrelated diagnostic: %q", diagnostics[1].FilePath)
-	}
-}
-
 func TestDeduplicateTypeScriptDiagnosticsAcrossPathAliases(t *testing.T) {
 	dir := t.TempDir()
 	realPath := filepath.Join(dir, "real.ts")
@@ -2092,26 +2108,122 @@ func TestDeduplicateTypeScriptDiagnosticsPrefersCallerTarget(t *testing.T) {
 	}
 }
 
-func TestApplyFixPassReturnsWriteError(t *testing.T) {
-	diagnostic, _ := createTestDiagnostic(t, "a", 0, 1)
-	diagnostic.FixesPtr = &[]rule.RuleFix{{
-		Range: core.NewTextRange(0, 1),
-		Text:  "b",
-	}}
+func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T) {
 	directoryPath := t.TempDir()
+	filePath := filepath.Join(directoryPath, "untouched.ts")
+	if err := os.WriteFile(filePath, []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	committer := cliFinalChangeCommitter{}
 
-	fixed, err := applyFixPass(map[string][]rule.RuleDiagnostic{
-		directoryPath: {diagnostic},
-	}, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	result, err := committer.CommitFinalChanges(context.Background(), []linter.FileChange{
+		{Path: directoryPath, Before: "a", After: "b", AppliedDiagnostics: 1},
+		{Path: filePath, Before: "a", After: "b", AppliedDiagnostics: 1},
+	})
 	if err == nil {
 		t.Fatal("expected a write error")
 		return
 	}
-	if fixed != 0 {
-		t.Fatalf("failed write must not count as a fix, got %d", fixed)
+	if len(result.ConfirmedPaths) != 0 {
+		t.Fatalf("preflight failure confirmed writes: %+v", result)
 	}
-	if !strings.Contains(err.Error(), directoryPath) {
+	if !strings.Contains(err.Error(), fmt.Sprintf("%q", directoryPath)) {
 		t.Fatalf("write error must identify the target path, got %v", err)
+	}
+	if content, readErr := os.ReadFile(filePath); readErr != nil || string(content) != "a" {
+		t.Fatalf("preflight failure mutated another file: content=%q error=%v", content, readErr)
+	}
+}
+
+func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
+	directoryPath := t.TempDir()
+	paths := []string{filepath.Join(directoryPath, "first.ts"), filepath.Join(directoryPath, "second.ts")}
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte("before"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	committer := cliFinalChangeCommitter{}
+	changes := make([]linter.FileChange, len(paths))
+	for index, path := range paths {
+		changes[index] = linter.FileChange{Path: path, Before: "before", After: fmt.Sprintf("after-%d", index)}
+	}
+	result, err := committer.CommitFinalChanges(context.Background(), changes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(result.ConfirmedPaths, paths) {
+		t.Fatalf("confirmed paths = %+v, want %+v", result.ConfirmedPaths, paths)
+	}
+	for index, path := range paths {
+		content, readErr := os.ReadFile(path)
+		if readErr != nil || string(content) != fmt.Sprintf("after-%d", index) {
+			t.Fatalf("committed file %q: content=%q error=%v", path, content, readErr)
+		}
+	}
+}
+
+func TestCLIFinalChangeCommitterRejectsStaleDiskGeneration(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "stale.ts")
+	if err := os.WriteFile(filePath, []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	committer := cliFinalChangeCommitter{}
+
+	result, err := committer.CommitFinalChanges(context.Background(), []linter.FileChange{{
+		Path:               filePath,
+		Before:             "old",
+		After:              "fixed",
+		AppliedDiagnostics: 1,
+	}})
+	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("%q", filePath)) || !strings.Contains(err.Error(), "changed after lint generation") {
+		t.Fatalf("stale write error = %v", err)
+	}
+	if len(result.ConfirmedPaths) != 0 {
+		t.Fatalf("stale write result = %+v", result)
+	}
+	if content, readErr := os.ReadFile(filePath); readErr != nil || string(content) != "new" {
+		t.Fatalf("stale target was overwritten: content=%q error=%v", content, readErr)
+	}
+}
+
+func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
+	directoryPath := t.TempDir()
+	tests := []struct {
+		name string
+		raw  []byte
+		want string
+	}{
+		{
+			name: "UTF-8 encoding mark plus source mark",
+			raw:  []byte(utils.BOM + utils.BOM + "const value = 1;"),
+			want: utils.BOM + utils.BOM + "const value = 1;",
+		},
+		{
+			name: "UTF-16 little endian",
+			raw:  []byte{0xFF, 0xFE, 'a', 0x00},
+			want: utils.BOM + "a",
+		},
+		{
+			name: "UTF-16 big endian",
+			raw:  []byte{0xFE, 0xFF, 0x00, 'a'},
+			want: utils.BOM + "a",
+		},
+	}
+	for index, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			filePath := filepath.Join(directoryPath, fmt.Sprintf("encoded-%d.ts", index))
+			if err := os.WriteFile(filePath, test.raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got, ok := readPhysicalFileText(filePath)
+			if !ok {
+				t.Fatal("physical fix source could not be read")
+			}
+			if got != test.want {
+				t.Fatalf("physical fix source = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 

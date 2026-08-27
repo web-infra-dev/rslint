@@ -299,3 +299,85 @@ export default Foo;
 		},
 	})
 }
+
+func TestExplicitModuleBoundaryTypesIgnoresHostedJSDocSyntax(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&ExplicitModuleBoundaryTypesRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:     "export const f = /** @type {() => void} */ (() => {});",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options: map[string]interface{}{
+					"allowedNames":                  []interface{}{"f"},
+					"allowTypedFunctionExpressions": false,
+				},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:     "/** @param {number} value\n * @returns {number} */\nexport function f(value) { return value; }",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingReturnType"},
+					{MessageId: "missingArgType"},
+				},
+			},
+			hostedJSDocBoundaryMissingReturnCase(
+				"export const f = /** @type {() => void} */ (() => {});",
+				1,
+				48,
+			),
+			hostedJSDocBoundaryMissingReturnCase(
+				"export const f = /** @satisfies {() => void} */ (() => {});",
+				1,
+				53,
+			),
+			hostedJSDocBoundaryMissingReturnCase(
+				"/** @type {() => void} */\nconst f = () => {};\nexport { f };",
+				2,
+				14,
+			),
+			hostedJSDocBoundaryMissingReturnCase(
+				"export class C {\n  /** @type {() => void} */\n  callback = () => {};\n}",
+				3,
+				3,
+			),
+			hostedJSDocBoundaryMissingReturnCase(
+				"/** @type {{ callback: () => void }} */\nconst value = { callback: () => {} };\nexport { value };",
+				2,
+				17,
+			),
+			hostedJSDocBoundaryMissingReturnCase(
+				"export class C {\n  /** @private */\n  method() {}\n}",
+				3,
+				3,
+			),
+			hostedJSDocBoundaryMissingReturnCase(
+				"export function f() { return /** @type {() => void} */ (() => {}); }",
+				1,
+				60,
+			),
+			hostedJSDocBoundaryMissingReturnCase(
+				"export const f = () => /** @type {() => void} */ (() => {});",
+				1,
+				54,
+			),
+		},
+	)
+}
+
+func hostedJSDocBoundaryMissingReturnCase(code string, line, column int) rule_tester.InvalidTestCase {
+	return rule_tester.InvalidTestCase{
+		Code:     code,
+		FileName: "file.mjs",
+		TSConfig: "tsconfig.allow-js.json",
+		Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "missingReturnType", Line: line, Column: column},
+		},
+	}
+}

@@ -2,20 +2,19 @@
 
 ## Rule Details
 
-When using `rs.mock`, tests should import from the original module path, not directly from a `__mocks__` directory. Directly importing a manual mock can create a separate module instance and make assertions behave unexpectedly.
+Disallows importing a manual mock directly from a `__mocks__` directory. Tests should mock the original module path so Rstest controls which module instance is used.
 
-This rule reports `import` declarations and `require()` calls whose module specifier contains a `__mocks__` path segment.
+The rule checks both `import` declarations and `require()` calls.
 
-Examples of **incorrect** code for this rule:
+## Incorrect
 
-```typescript
-import thing from './__mocks__/thing';
-require('./__mocks__/thing');
+```ts
+import userClient from './__mocks__/user-client';
 ```
 
-Examples of **correct** code for this rule:
+## Correct
 
-```typescript
-rs.mock('./thing');
-import thing from './thing';
+```ts
+rs.mock('./user-client');
+import userClient from './user-client';
 ```

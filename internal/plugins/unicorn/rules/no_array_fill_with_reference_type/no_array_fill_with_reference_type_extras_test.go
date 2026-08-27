@@ -234,8 +234,8 @@ func TestNoArrayFillWithReferenceTypeDoesNotResolveConstAcrossFiles(t *testing.T
 		Program:     lintprogram.NewFromCompiler(program),
 		File:        usageFile,
 		HasTypeInfo: true,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -243,7 +243,6 @@ func TestNoArrayFillWithReferenceTypeDoesNotResolveConstAcrossFiles(t *testing.T
 				},
 			}}
 		},
-		ExcludePaths: []string{},
 		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		}},
@@ -271,11 +270,11 @@ func lintSourceOnly(t *testing.T, code string) []rule.RuleDiagnostic {
 	}
 
 	diagnostics := make([]rule.RuleDiagnostic, 0, 1)
-	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{sourceProgram},
-		SingleThreaded: true,
-		Scope:          linter.FileScope{Files: []string{fileName}},
-		ExcludePaths:   []string{},
+	programs := []*lintprogram.Program{sourceProgram}
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{fileName}},
+		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule.Name,
@@ -288,6 +287,13 @@ func lintSourceOnly(t *testing.T, code string) []rule.RuleDiagnostic {
 				},
 			}}
 		},
+	})
+	if err != nil {
+		t.Fatalf("prepare source-only lint plan: %v", err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
 		}},
