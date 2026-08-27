@@ -72,6 +72,11 @@ func pipelineTestProvider(generation Generation, release ReleaseFunc) Generation
 	})
 }
 
+func autofixPolicyForTest(maxRounds int, policy AutofixPolicy) AutofixPolicy {
+	policy.maxRounds = maxRounds
+	return policy
+}
+
 func runPipelineWithParallelRuleResolver(
 	t *testing.T,
 	resolver func(*ast.SourceFile) []rule.ConfiguredRule,

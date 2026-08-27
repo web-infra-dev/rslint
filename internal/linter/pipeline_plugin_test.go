@@ -57,7 +57,7 @@ func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testi
 			Demand: ArtifactDemand{Native: rule.EditDemandAutofix, Plugin: rule.EditDemandAutofix},
 			Plugin: PluginConcurrentJoined,
 		},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			if request.Files[0].Path != fileName {
 				t.Fatalf("plugin wire path = %q, want Program source path %q", request.Files[0].Path, fileName)
@@ -252,7 +252,7 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			Demand: ArtifactDemand{Native: rule.EditDemandAutofix},
 			Plugin: PluginConcurrentJoined,
 		},
-		AutofixPolicy{MaxRounds: 1, VerifyAfterLastRound: true},
+		autofixPolicyForTest(1, AutofixPolicy{VerifyAfterLastRound: true}),
 		func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			dispatches++
 			if len(request.Files) != 2 {
@@ -357,7 +357,7 @@ func TestPipelineRejectsDuplicateProjectedTargetBeforeExecution(t *testing.T) {
 	_, err := RunPipeline(context.Background(), NewAutofixRequest(
 		pipelineTestProvider(generation, nil),
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
-		AutofixPolicy{MaxRounds: 1},
+		autofixPolicyForTest(1, AutofixPolicy{}),
 		nil,
 	))
 	if err == nil || !strings.Contains(err.Error(), "duplicate projected target") || ruleRan {
