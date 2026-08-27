@@ -97,12 +97,6 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 				TSConfig: "tsconfig.allow-js.json",
 				Globals:  map[string]any{"undefined": "off"},
 			},
-			{
-				Options:  []any{`always`, map[string]any{`enforceForIfStatements`: true}},
-				Code:     `/* global Boolean:off */ if (Boolean(a)) a = b`,
-				FileName: "file.mjs",
-				TSConfig: "tsconfig.allow-js.json",
-			},
 			// ---- Locks in upstream isImplicitNullishComparison() arms ----
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `if (a != null) a = b`},
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: true}}, Code: `if (a == 0) a = b`},
@@ -444,6 +438,27 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 				Output:  []string{`a.b &&= c`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: `if`, Message: `'if' statement can be replaced with a logical operator assignment with operator &&=.`, Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:     `/* global Boolean:off */ if (Boolean(a)) a = b`,
+				Options:  []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Output:   []string{`/* global Boolean:off */ a &&= b`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `if`, Message: `'if' statement can be replaced with a logical operator assignment with operator &&=.`},
+				},
+			},
+			{
+				Code:     `if (Boolean(a)) a = b`,
+				Options:  []any{`always`, map[string]any{`enforceForIfStatements`: true}},
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Globals:  map[string]any{"Boolean": "off"},
+				Output:   []string{`a &&= b`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `if`, Message: `'if' statement can be replaced with a logical operator assignment with operator &&=.`},
 				},
 			},
 			// ---- Dimension 4: `undefined` and `Boolean` resolved against file declarations ----

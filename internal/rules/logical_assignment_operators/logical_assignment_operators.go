@@ -336,7 +336,9 @@ func explicitNullishReference(ctx *rule.RuleContext, expression *ast.Node) *ast.
 }
 
 // booleanCastArgument returns the single argument of a `Boolean(value)` call
-// on the global `Boolean`, and whether node is such a call.
+// whose `Boolean` binding is not shadowed by source syntax, and whether node is
+// such a call. typescript-eslint retains its built-in Boolean binding even when
+// the effective global is configured off, unlike its handling of `undefined`.
 func booleanCastArgument(ctx *rule.RuleContext, node *ast.Node) (*ast.Node, bool) {
 	if node == nil || node.Kind != ast.KindCallExpression || ast.IsOptionalChain(node) {
 		return nil, false
@@ -349,8 +351,7 @@ func booleanCastArgument(ctx *rule.RuleContext, node *ast.Node) (*ast.Node, bool
 	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
 		return nil, false
 	}
-	if !ctx.Globals.Access("Boolean").IsDeclared() ||
-		!ctx.Refs.IsGlobalNameReference(callee, "Boolean", globalValueMeaning) {
+	if !ctx.Refs.IsGlobalNameReference(callee, "Boolean", globalValueMeaning) {
 		return nil, false
 	}
 	return skipParens(call.Arguments.Nodes[0]), true
