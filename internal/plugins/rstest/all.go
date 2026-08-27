@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_test_timeout"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_title"
@@ -51,6 +52,7 @@ func GetAllRules() []rule.Rule {
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_todo.PreferTodoRule,
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
+		require_test_timeout.RequireTestTimeoutRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
 		valid_title.ValidTitleRule,
