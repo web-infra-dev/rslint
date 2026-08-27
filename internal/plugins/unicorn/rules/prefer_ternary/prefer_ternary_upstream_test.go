@@ -26,7 +26,7 @@ const (
 )
 
 func basicError(line, column, endLine, endColumn int) rule_tester.InvalidTestCaseError {
-	// The upstream test file uses outdent and counts positions with the
+	// The upstream test file removes common indentation and counts positions with the
 	// post-dedent text. The Go migration keeps the test source verbatim and
 	// relies on rule_tester's line-0 / column-0 sentinel to skip the
 	// position check; pass 0 through and let the test focus on the fix
@@ -1010,7 +1010,7 @@ if (test) {
 }`,
 				Errors: []rule_tester.InvalidTestCaseError{basicError(0, 0, 0, 0)},
 			},
-			// Semicolonless suggestion adds `;` when next token is `(`.
+			// A suggestion without a semicolon adds `;` when the next token is `(`.
 			{
 				Code: `let x = a
 if (test) {

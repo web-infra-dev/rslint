@@ -51,11 +51,12 @@ var PreferTernaryRule = rule.Rule{
 
 		// The static evaluator is optional: a nil evaluator just means the
 		// computed-key fast path falls back to literal-only static names.
-		// The rule stays syntactic on JS/gap files where no TypeChecker is
-		// available — literal concat (`x['b' + 'ar']`) still folds through
-		// the evaluator's literal handling, but identifier resolution
-		// degrades to "unknown".
-		var staticStrings *utils.StaticStringEvaluator
+		// On JS/gap files where no TypeChecker is available we still
+		// construct a no-scope evaluator so literal concatenation
+		// (`x['b' + 'ar']`) keeps folding — identifier resolution is
+		// unavailable in that mode, but literal expressions retain
+		// upstream parity.
+		staticStrings := utils.NewStaticStringEvaluatorWithoutScope()
 		if ctx.TypeChecker != nil {
 			staticStrings = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 		}
@@ -247,6 +248,16 @@ func isMergeableAssignmentExpression(consequent, alternate *ast.Node, staticStri
 	if c.OperatorToken == nil || a.OperatorToken == nil {
 		return false
 	}
+	// Only assignment operators are mergeable. A bare arithmetic
+	// operator like `*` would otherwise be picked up when the source
+	// contains a non-generator `yield*` (parsed as
+	// `BinaryExpression { left: yield, operator: *, right: a }`),
+	// which would merge to a nonsense fix like
+	// `yield  test ? a : b;`.
+	if !isAssignmentOperatorKind(c.OperatorToken.Kind) ||
+		!isAssignmentOperatorKind(a.OperatorToken.Kind) {
+		return false
+	}
 	if c.OperatorToken.Kind != a.OperatorToken.Kind {
 		return false
 	}
@@ -274,6 +285,16 @@ func isSameAssignmentTarget(staticStrings *utils.StaticStringEvaluator, left, ri
 		return false
 	}
 
+	// Private accesses (`this.#x`) are compared structurally and never go
+	// through the static-name fast path: their textual name `#x` would
+	// otherwise match a string-keyed access `this["#x"]`, but the two
+	// are different assignment targets in TypeScript. Two private
+	// accesses still need to compare equal when they name the same
+	// field on the same object.
+	if hasPrivateAccess(left) || hasPrivateAccess(right) {
+		return isSamePrivateAccessTarget(left, right)
+	}
+
 	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) && staticStrings != nil {
 		// Try the static-name fast path first. This handles the case where one
 		// side uses `x.bar` and the other uses `(x)['b' + 'ar']` — both fold to
@@ -289,6 +310,32 @@ func isSameAssignmentTarget(staticStrings *utils.StaticStringEvaluator, left, ri
 	}
 
 	return utils.IsSameReference(left, right, false)
+}
+
+// isSamePrivateAccessTarget compares two access expressions when at
+// least one names a private field. Mixed shapes (private access on one
+// side, public string-keyed access on the other) never match; two
+// private accesses match when they share the same object and the same
+// private name.
+func isSamePrivateAccessTarget(left, right *ast.Node) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	if !hasPrivateAccess(left) || !hasPrivateAccess(right) {
+		return false
+	}
+	if left.Kind != ast.KindPropertyAccessExpression || right.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	if !utils.IsSameReference(utils.AccessExpressionObject(left), utils.AccessExpressionObject(right), false) {
+		return false
+	}
+	lName := left.AsPropertyAccessExpression().Name()
+	rName := right.AsPropertyAccessExpression().Name()
+	if lName == nil || rName == nil {
+		return false
+	}
+	return lName.Text() == rName.Text()
 }
 
 // staticAccessName returns the static property name of an access expression,
@@ -322,6 +369,21 @@ func staticAccessName(staticStrings *utils.StaticStringEvaluator, node *ast.Node
 		}
 	}
 	return "", false
+}
+
+// hasPrivateAccess reports whether an access expression names a private
+// field (`#x`). Used to keep the static-name fast path out of the way
+// for the private-to-public comparison, where textual equivalence is
+// misleading.
+func hasPrivateAccess(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	name := node.AsPropertyAccessExpression().Name()
+	return name != nil && name.Kind == ast.KindPrivateIdentifier
 }
 
 // hasCommentsInside reports whether any comment falls within node's source
@@ -525,58 +587,150 @@ func reportLetPlusIfProblem(ctx rule.RuleContext, p *letPlusIfProblem) {
 // This is a port of @eslint-community/eslint-utils' hasSideEffect with
 // default options ({considerGetters: false, considerImplicitTypeConversion:
 // false}): only the leaves that are unconditionally side-effect-bearing —
-// CallExpression, NewExpression, AwaitExpression, YieldExpression, ++/--, and
-// assignments (plain `=`) — trip the predicate. Everything else recurses
-// into its children so nested effects (a call inside an object literal, an
-// assignment inside parentheses, a `new` inside a binary expression) are
-// still caught. ArrowFunction and FunctionExpression short-circuit to false:
-// their bodies do not run until invoked.
-//
-// The non-assignment BinaryExpression case intentionally visits children
-// rather than returning true: upstream considers `a + b` and `a ? b : c`
-// pure, and the only assignment-shaped binary with a side effect is the
-// plain `=` (compound assignments like `+=` also visit children — the
-// right-hand side carries the effect, and the LHS write is recursed into
-// separately).
+// CallExpression, NewExpression, AwaitExpression, YieldExpression, ++/--,
+// `delete`, and any assignment (`=`, `+=`, `-=`, `||=`, `&&=`, `??=`, …) —
+// trip the predicate. Everything else recurses into its children so nested
+// effects (a call inside an object literal, an assignment inside
+// parentheses, a `new` inside a binary expression) are still caught.
+// ArrowFunction, FunctionExpression, FunctionDeclaration, and
+// method/accessor bodies short-circuit to false: their bodies do not run
+// until invoked. The method/accessor case still walks the immediately
+// evaluated name (computed keys) and parameter initializers, so an effect
+// inside a computed key or default value is still surfaced.
 func hasSideEffect(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
 	switch node.Kind {
-	case ast.KindArrowFunction, ast.KindFunctionExpression:
+	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration:
 		// Bodies don't run until called.
 		return false
 	case ast.KindCallExpression,
 		ast.KindNewExpression,
 		ast.KindAwaitExpression,
 		ast.KindYieldExpression,
-		ast.KindPostfixUnaryExpression:
-		// PostfixUnaryExpression covers `x++` / `x--`.
+		ast.KindPostfixUnaryExpression,
+		ast.KindDeleteExpression:
+		// PostfixUnaryExpression covers `x++` / `x--`. `delete x` is its
+		// own node kind in tsgo (KindDeleteExpression), not a
+		// PrefixUnaryExpression; handle it here.
 		return true
 	case ast.KindPrefixUnaryExpression:
 		prefix := node.AsPrefixUnaryExpression()
 		if prefix == nil {
 			return false
 		}
-		// `delete x`, `++x`, `--x` are always side-effect-bearing. Other
-		// prefix operators (`!x`, `+x`, `-x`, `~x`, `typeof x`,
-		// `void x`) visit children to surface any nested effect.
+		// `++x`, `--x` are always side-effect-bearing. Other prefix
+		// operators (`!x`, `+x`, `-x`, `~x`, `typeof x`, `void x`) visit
+		// children to surface any nested effect.
 		switch prefix.Operator {
-		case ast.KindDeleteKeyword, ast.KindPlusPlusToken, ast.KindMinusMinusToken:
+		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
 			return true
 		}
 		return hasSideEffectInChildren(node)
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
-		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-			// Plain `=` — the assignment itself is a side effect. Compound
-			// assignments (`+=`, etc.) fall through to the child walk below,
-			// so the LHS write and the RHS are both recursed into.
+		if binary != nil && binary.OperatorToken != nil &&
+			isAssignmentOperatorKind(binary.OperatorToken.Kind) {
+			// Every assignment operator — plain (`=`) and compound
+			// (`+=`, `||=`, `??=`, …) — is a side effect. Mirror
+			// upstream's `AssignmentExpression` handler, which always
+			// returns true regardless of the operator.
 			return true
 		}
 		return hasSideEffectInChildren(node)
+	case ast.KindMethodDeclaration,
+		ast.KindGetAccessor,
+		ast.KindSetAccessor:
+		// Method / getter / setter bodies don't run until called, so the
+		// body must be skipped — but the immediately evaluated name
+		// (computed key) and parameter initializers are walked so
+		// `{'x' + 'y'() {}}` and `m(x = sideEffect()) {}` still trip
+		// the predicate.
+		return hasSideEffectInDeferredBody(node)
 	}
 	return hasSideEffectInChildren(node)
+}
+
+// hasSideEffectInDeferredBody walks the immediately evaluated sub-trees of
+// a method/getter/setter (and the analogous function forms, where
+// applicable) without descending into the body. Mirrors upstream's
+// `$visitChildren` on a MethodDefinition, which only sees the key and the
+// FunctionExpression value; in tsgo, the body lives on the
+// MethodDeclaration itself, so we walk the non-body fields explicitly.
+func hasSideEffectInDeferredBody(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindMethodDeclaration:
+		method := node.AsMethodDeclaration()
+		if method == nil {
+			return false
+		}
+		if hasSideEffect(method.Name()) {
+			return true
+		}
+		if hasSideEffectInParameters(method.Parameters) {
+			return true
+		}
+		return false
+	case ast.KindGetAccessor:
+		acc := node.AsGetAccessorDeclaration()
+		if acc == nil {
+			return false
+		}
+		if hasSideEffect(acc.Name()) {
+			return true
+		}
+		if hasSideEffectInParameters(acc.Parameters) {
+			return true
+		}
+		return false
+	case ast.KindSetAccessor:
+		acc := node.AsSetAccessorDeclaration()
+		if acc == nil {
+			return false
+		}
+		if hasSideEffect(acc.Name()) {
+			return true
+		}
+		if hasSideEffectInParameters(acc.Parameters) {
+			return true
+		}
+		return false
+	case ast.KindFunctionDeclaration:
+		fn := node.AsFunctionDeclaration()
+		if fn == nil {
+			return false
+		}
+		if hasSideEffect(fn.Name()) {
+			return true
+		}
+		if hasSideEffectInParameters(fn.Parameters) {
+			return true
+		}
+		return false
+	}
+	return false
+}
+
+// hasSideEffectInParameters walks parameter declarations and reports
+// whether any default-value initializer has a side effect. The parameter
+// identifier itself is pure, so only the initializer is checked.
+func hasSideEffectInParameters(params *ast.NodeList) bool {
+	if params == nil {
+		return false
+	}
+	for _, p := range params.Nodes {
+		if p == nil {
+			continue
+		}
+		if hasSideEffect(p.Initializer()) {
+			return true
+		}
+	}
+	return false
 }
 
 // hasSideEffectInChildren walks the immediate children of node and returns

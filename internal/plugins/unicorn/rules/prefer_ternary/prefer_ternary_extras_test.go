@@ -70,33 +70,70 @@ if (test) {
 			// quiet. This is the same behavior upstream exhibits.
 			{Code: `if (t) { ({x} = a); } else { ({x} = b); }`},
 
-			// ---- P1 #2 (negative): nested side effects in init ----
-			// Object literal with a function call, array literal with
-			// a function call, template literal with a function call,
-			// and a parenthesized assignment all carry effects that
-			// would be skipped when the ternary takes the alternate
-			// branch, so the let-then-if collapse must be suppressed.
-			{
-				Code: `let x = {a: sideEffect()};
-if (test) {
-	x = c;
-}`,
-			},
-			{
-				Code: `let x = [sideEffect()];
-if (test) {
-	x = c;
-}`,
-			},
-			{
-				Code: "let x = `${sideEffect()}`;\nif (test) {\n\tx = c;\n}",
-			},
-			{
-				Code: `let x = (y = 1);
-if (test) {
-	x = c;
-}`,
-			},
+			// ---- P1 #2 / N2 (negative): nested effects in init ----
+			// Every kind of nested effect must short-circuit the
+			// collapse. The previous top-level kind switch did not
+			// recurse, so these slipped through and produced
+			// semantics-changing suggestions that turned unconditional
+			// side effects into conditional ones.
+			{Code: `let x = {a: sideEffect()};
+if (test) { x = c; }`},
+			{Code: `let x = [sideEffect()];
+if (test) { x = c; }`},
+			{Code: "let x = `${sideEffect()}`;\nif (test) { x = c; }"},
+			{Code: `let x = (y = 1);
+if (test) { x = c; }`},
+
+			// ---- N2: every assignment operator has side effects ----
+			// Compound assignments like `+=`, `||=`, `??=` are
+			// assignments too — upstream's `AssignmentExpression`
+			// handler returns true regardless of operator. Each of
+			// these initializers would otherwise slip through and
+			// produce a semantics-changing suggestion that reorders
+			// the write.
+			{Code: `let x = (y += 1);
+if (test) { x = next; }`},
+			{Code: `let x = (y ||= 1);
+if (test) { x = next; }`},
+			{Code: `let x = (y ??= 1);
+if (test) { x = next; }`},
+			{Code: `let x = {value: (y += 1)};
+if (test) { x = next; }`},
+			{Code: `let x = delete object.x;
+if (test) { x = next; }`},
+
+			// ---- N2: `new` of a class with a side-effecting method ----
+			// The class constructor is invoked at the `new` site, so
+			// any side effect in the method body fires whether or not
+			// the ternary's alternate branch runs. The collapse must
+			// NOT be offered.
+			{Code: `class C { m() { sideEffect(); } }
+let x = new C();
+if (test) { x = next; }`},
+
+			// ---- N2: parameter default values are walked ----
+			// Method bodies are deferred, but a side-effecting default
+			// value fires when the method is called. The upstream
+			// hasSideEffect visitor walks parameter initializers, so
+			// the let-then-if check sees the side effect and refuses
+			// to offer the collapse.
+			{Code: `let x = {m(x = sideEffect()) {}};
+if (test) { x = next; }`},
+
+			// ---- N1: private field vs string-keyed property ----
+			// `this.#x` and `this["#x"]` are different assignment
+			// targets in TypeScript. The static-name fast path must
+			// skip when either side uses a private identifier.
+			{Code: `class C {
+	#x;
+	m() {
+		if (t) {
+			this.#x = a;
+		} else {
+			this["#x"] = b;
+		}
+	}
+}`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: nested return if/else inside a function body ----
@@ -270,6 +307,134 @@ if (test) {
 							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? b : () => a;"},
 						},
 					},
+				},
+			},
+
+			// ---- N2: deferred method/getter bodies are pure ----
+			// A method body is not invoked at construction time, so
+			// the side effect inside must NOT block the collapse.
+			// Upstream's MethodDefinition visitor returns false via
+			// its FunctionExpression value; the equivalent on the
+			// tsgo side skips the MethodDeclaration body.
+			{
+				Code: `let x = {m() { sideEffect(); }};
+if (test) {
+	x = next;
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "prefer-ternary",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? next : {m() { sideEffect(); }};"},
+						},
+					},
+				},
+			},
+			{
+				Code: `let x = {get m() { sideEffect(); }};
+if (test) {
+	x = next;
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "prefer-ternary",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? next : {get m() { sideEffect(); }};"},
+						},
+					},
+				},
+			},
+			// Class member bodies are likewise deferred. The class expression is
+			// safe to move into the alternate branch even though its method body
+			// contains a call.
+			{
+				Code: `let x = class C { m() { sideEffect(); } };
+if (test) {
+	x = next;
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "prefer-ternary",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? next : class C { m() { sideEffect(); } };"},
+						},
+					},
+				},
+			},
+			// Computed method key with a pure-literal expression and
+			// a side-effecting body. The body is deferred (no effect
+			// at construction), the computed key `'y' + 'z'` is pure,
+			// so the let-then-if collapse is offered.
+			{
+				Code: "let x = {['y' + 'z']() { sideEffect(); }};\nif (test) {\n\tx = next;\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "prefer-ternary",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? next : {['y' + 'z']() { sideEffect(); }};"},
+						},
+					},
+				},
+			},
+			// Method with a side-effecting parameter default. The
+			// default fires when the method is called, not at the
+			// construction site, so the collapse is offered.
+			{
+				Code: `let x = {m() {}};
+if (test) {
+	x = next;
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "prefer-ternary",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "prefer-ternary/suggestion", Output: "const x = test ? next : {m() {}};"},
+						},
+					},
+				},
+			},
+
+			// ---- N1: two matching private accesses ----
+			// `this.#x` on both sides is the same target, so the
+			// collapse is offered with a plain `this.#x` LHS.
+			{
+				Code: `class C {
+	#x;
+	m() {
+		if (t) {
+			this.#x = a;
+		} else {
+			this.#x = b;
+		}
+	}
+}`,
+				Output: []string{`class C {
+	#x;
+	m() {
+		this.#x = t ? a : b;
+	}
+}`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "prefer-ternary"},
+				},
+			},
+
+			// ---- N3: computed-key evaluation without a TypeChecker ----
+			// Mirrors the upstream `'b' + 'ar'` case but exercises
+			// the literal-only evaluator that the rule now constructs
+			// when ctx.TypeChecker is nil. The Go test harness always
+			// supplies a TypeChecker for the TypeScript cases, so the
+			// pure-literal case below is the JS-side lock-in for
+			// that path. The LHS is kept verbatim — `(x)['b' + 'ar']`
+			// — because the merge keeps the source text of the
+			// leftmost access rather than rewriting it to a
+			// dotted form.
+			{
+				Code:     `if (t) { (x)['b' + 'ar'] = a; } else { x.bar = b; }`,
+				Output:   []string{`(x)['b' + 'ar'] = t ? a : b;`},
+				FileName: "file.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "prefer-ternary"},
 				},
 			},
 		},
