@@ -47,21 +47,3 @@ test.skipIf(!process.env.CI)('uploads the report', async () => {
 
 `test.runIf(condition)` expresses the same thing from the other side, and both
 modifiers are available on `describe` as well.
-
-## Options
-
-This rule has no options.
-
-## Differences from the Vitest plugin
-
-- The Vitest plugin matches any identifier literally named `test`, `it`, or
-  `describe`, so an ordinary variable with one of those names is reported even
-  when it has nothing to do with the test framework. This rule reports only
-  calls it can resolve to a Rstest registration, which covers imports from
-  `@rstest/core` and `@rstest/playwright`, `require` forms, `import.meta.rstest`
-  members, globals, and local aliases of any of those, while leaving shadowed
-  names and same-named APIs from other frameworks alone.
-- The Vitest plugin looks a fixed four levels up from the identifier, so it
-  misses `if (cond) test('a', fn)` written without braces and every other
-  spacing of the same code. This rule walks up to the enclosing function
-  instead, so the shape of the intervening statements does not matter.
