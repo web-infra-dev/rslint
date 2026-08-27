@@ -646,6 +646,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/no-this-assignment.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-xor-as-exponentiation.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
