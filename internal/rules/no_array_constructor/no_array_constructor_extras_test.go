@@ -26,6 +26,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -240,6 +242,10 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			// NewExpression listener is independent of the CallExpression
 			// one and doesn't cross-report.
 			directFixCase(`new Array(new Array());`, `new Array()`, `new Array([]);`),
+			// A valid sparse array nested inside the argument list is not parser
+			// recovery. Only omitted expressions directly in a malformed call's
+			// argument list make that call unsafe to edit.
+			directFixCase(`Array([,], 1);`, `Array([,], 1)`, `[[,], 1];`),
 
 			// Locks in the `nonSpreadCount` reduce (not just a length check):
 			// three arguments where two are non-spread is still safe to
@@ -602,6 +608,203 @@ func testNoArrayConstructorEditDemand(t *testing.T, source string, wantSuggestio
 			t.Errorf("demand %d: unexpected autofix %#v", demand, d.FixesPtr)
 		}
 	}
+}
+
+func TestNoArrayConstructorRecoveryAST(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{name: "empty call", source: "Array("},
+		{name: "truncated arguments", source: "Array(a, b"},
+		{name: "new expression", source: "new Array("},
+		{name: "optional call", source: "Array?.("},
+		{name: "parenthesized callee", source: "(Array)(a, b"},
+		{name: "unclosed callee grouping", source: "new (Array"},
+		{name: "missing argument separator", source: "Array(a b)"},
+		{name: "omitted arguments", source: "Array(,,)"},
+		{name: "interior omitted argument", source: "Array(a,,b)"},
+		{name: "incomplete spread", source: "Array(...,)"},
+		{name: "comment before incomplete call", source: "Array/*keep*/("},
+		{name: "unterminated comment", source: "Array(/* keep"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			sourceFile := parseNoArrayConstructorSource(test.source)
+			if len(sourceFile.Diagnostics()) == 0 && len(sourceFile.JSDiagnostics()) == 0 {
+				t.Fatal("recovery fixture has no parser diagnostic")
+			}
+
+			diagnostics := make(map[rule.EditDemand][]rule.RuleDiagnostic, 4)
+			for _, demand := range []rule.EditDemand{
+				rule.EditDemandNone,
+				rule.EditDemandAutofix,
+				rule.EditDemandSuggestion,
+				rule.EditDemandAll,
+			} {
+				diagnostics[demand] = lintParsedNoArrayConstructor(sourceFile, demand)
+			}
+
+			want := diagnostics[rule.EditDemandNone]
+			if len(want) != 1 {
+				t.Fatalf("diagnostics-only count = %d, want 1", len(want))
+			}
+			if !reflect.DeepEqual(want[0].Message, preferLiteralMessage()) {
+				t.Fatalf("diagnostic message = %#v, want %#v", want[0].Message, preferLiteralMessage())
+			}
+			if start, end := want[0].Range.Pos(), want[0].Range.End(); start < 0 || start > end || end > len(test.source) {
+				t.Fatalf("diagnostic range = [%d,%d), source length = %d", start, end, len(test.source))
+			}
+			for demand, got := range diagnostics {
+				if len(got) != len(want) {
+					t.Fatalf("demand %d: diagnostics = %d, want %d", demand, len(got), len(want))
+				}
+				for index := range got {
+					if got[index].FixesPtr != nil || got[index].Suggestions != nil {
+						t.Errorf(
+							"demand %d diagnostic %d unexpectedly has edits: fixes=%#v suggestions=%#v",
+							demand,
+							index,
+							got[index].FixesPtr,
+							got[index].Suggestions,
+						)
+					}
+					gotIdentity, wantIdentity := got[index], want[index]
+					gotIdentity.FixesPtr, gotIdentity.Suggestions = nil, nil
+					wantIdentity.FixesPtr, wantIdentity.Suggestions = nil, nil
+					if !reflect.DeepEqual(gotIdentity, wantIdentity) {
+						t.Errorf(
+							"demand %d changed diagnostic %d:\ngot:  %#v\nwant: %#v",
+							demand,
+							index,
+							gotIdentity,
+							wantIdentity,
+						)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestNoArrayConstructorRecoveryASTSuppressedDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	sourceFile := parseNoArrayConstructorSource("/* eslint-disable no-array-constructor */ Array(")
+	if diagnostics := lintParsedNoArrayConstructor(sourceFile, rule.EditDemandAll); len(diagnostics) != 0 {
+		t.Fatalf("diagnostics = %d, want 0", len(diagnostics))
+	}
+}
+
+func TestNoArrayConstructorUnrelatedParserDiagnosticKeepsSafeEdit(t *testing.T) {
+	t.Parallel()
+
+	sourceFile := parseNoArrayConstructorSource("Array();\nconst = 1;")
+	if len(sourceFile.Diagnostics()) == 0 {
+		t.Fatal("fixture has no unrelated parser diagnostic")
+	}
+	diagnostics := lintParsedNoArrayConstructor(sourceFile, rule.EditDemandAutofix)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+	}
+	fixes := diagnostics[0].Fixes()
+	if len(fixes) != 1 || fixes[0].Text != "[]" || fixes[0].Range != diagnostics[0].Range {
+		t.Fatalf("fixes = %#v, want one [] replacement", fixes)
+	}
+}
+
+func TestNoArrayConstructorJavaScriptSyntaxDiagnosticPreventsEdit(t *testing.T) {
+	t.Parallel()
+
+	source := "Array(a as number, b);"
+	sourceFile := parseNoArrayConstructorSourceWithKind("recovered.js", source, core.ScriptKindJS)
+	if len(sourceFile.Diagnostics()) != 0 || len(sourceFile.JSDiagnostics()) == 0 {
+		t.Fatalf(
+			"parser diagnostics = %d, JavaScript syntax diagnostics = %d; want only JavaScript syntax diagnostics",
+			len(sourceFile.Diagnostics()),
+			len(sourceFile.JSDiagnostics()),
+		)
+	}
+	diagnostics := lintParsedNoArrayConstructor(sourceFile, rule.EditDemandAll)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+	}
+	if diagnostics[0].FixesPtr != nil || diagnostics[0].Suggestions != nil {
+		t.Fatalf(
+			"recovered JavaScript call unexpectedly has edits: fixes=%#v suggestions=%#v",
+			diagnostics[0].FixesPtr,
+			diagnostics[0].Suggestions,
+		)
+	}
+}
+
+func TestNoArrayConstructorJSDocDiagnosticKeepsPreservingEdit(t *testing.T) {
+	t.Parallel()
+
+	source := "Array(/** @param { */ function () {}, b);"
+	sourceFile := parseNoArrayConstructorSourceWithKind("malformed-jsdoc.js", source, core.ScriptKindJS)
+	if len(sourceFile.Diagnostics()) != 0 || len(sourceFile.JSDiagnostics()) != 0 {
+		t.Fatalf(
+			"parser diagnostics = %d, JavaScript syntax diagnostics = %d; want neither",
+			len(sourceFile.Diagnostics()),
+			len(sourceFile.JSDiagnostics()),
+		)
+	}
+	jsdocDiagnostics := sourceFile.JSDocDiagnostics()
+	callRange := core.NewTextRange(0, len(source)-1)
+	if len(jsdocDiagnostics) == 0 || !diagnosticTouchesRange(jsdocDiagnostics, callRange) {
+		t.Fatalf("JSDoc diagnostics = %#v, want one touching the call", jsdocDiagnostics)
+	}
+
+	diagnostics := lintParsedNoArrayConstructor(sourceFile, rule.EditDemandAutofix)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+	}
+	fixes := diagnostics[0].Fixes()
+	if len(fixes) != 1 || fixes[0].Text != "[/** @param { */ function () {}, b]" || fixes[0].Range != diagnostics[0].Range {
+		t.Fatalf("fixes = %#v, want one source-preserving array-literal replacement", fixes)
+	}
+}
+
+func parseNoArrayConstructorSource(source string) *ast.SourceFile {
+	return parseNoArrayConstructorSourceWithKind("recovery.ts", source, core.ScriptKindTS)
+}
+
+func parseNoArrayConstructorSourceWithKind(fileName string, source string, scriptKind core.ScriptKind) *ast.SourceFile {
+	path := "/no-array-constructor-" + fileName
+	return parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: path,
+		Path:     tspath.Path(path),
+	}, source, scriptKind)
+}
+
+func lintParsedNoArrayConstructor(sourceFile *ast.SourceFile, demand rule.EditDemand) []rule.RuleDiagnostic {
+	comments := rule.NewCommentStore(sourceFile)
+	var diagnostics []rule.RuleDiagnostic
+	ctx := rule.RuleContext{
+		SourceFile:     sourceFile,
+		Comments:       comments,
+		DisableManager: rule.NewDisableManager(sourceFile, comments),
+	}.WithDiagnosticConsumer(NoArrayConstructorRule.Name, rule.SeverityError, rule.DiagnosticConsumer{
+		Demand: demand,
+		Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	})
+	listeners := NoArrayConstructorRule.Run(ctx, nil)
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if listener := listeners[node.Kind]; listener != nil {
+			listener(node)
+		}
+		return node.ForEachChild(visit)
+	}
+	sourceFile.AsNode().ForEachChild(visit)
+	return diagnostics
 }
 
 func lintNoArrayConstructorWithDemand(
