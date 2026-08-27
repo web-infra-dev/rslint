@@ -35,6 +35,10 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `foo((bar));`, Options: deny("bar")},
 			{Code: `new (foo)();`, Options: deny("foo")},
 			{Code: `new foo((bar));`, Options: deny("bar")},
+			{Code: `(((foo)))();`, Options: deny("foo")},
+			{Code: `call((((bar))));`, Options: deny("bar")},
+			{Code: `((foo))?.();`, Options: deny("foo")},
+			{Code: `call?.(((bar)));`, Options: deny("bar")},
 
 			// ---- Dimension 4: parenthesized receiver and parenthesized assignment target ----
 			{Code: `(foo).bar`, Options: deny("bar")},
@@ -95,14 +99,23 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `({ x: { a: obj.b }.c } = d);`, Options: deny("b")},
 			{Code: `({ a: { ...obj.b }.c } = d);`, Options: deny("b")},
 			{Code: `[foo.bar]! = source;`, Options: deny("bar")},
+			{Code: `({x: foo.bar})! = source;`, Options: deny("bar")},
+			{Code: `[foo.bar!] = source;`, Options: deny("bar")},
 
 			// JSDoc syntax is comment-only upstream, including declarations that tsgo
 			// synthesizes into a script's global symbol table.
 			{Code: `/** @type {Foo} */ let x;`, FileName: "jsdoc-type.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo")},
 			{Code: `/** @typedef {number} Number */ Number;`, FileName: "jsdoc-global.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Number")},
+			{Code: `/** @param {Foo} value */ function f(value) {}`, FileName: "jsdoc-param.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo")},
+			{Code: `/** @template Foo */ function f(x) {}`, FileName: "jsdoc-template.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo")},
+			{Code: `/** @typedef {Foo.Bar} Baz */ let x;`, FileName: "jsdoc-qualified.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo", "Bar", "Baz")},
+			{Code: `/** @typedef {number} Array */ Array;`, FileName: "jsdoc-array.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Array")},
+			{Code: `/** @typedef {number} Promise */ function f() { Promise; }`, FileName: "jsdoc-promise.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Promise")},
+			{Code: `/** @import {Array} from "x" */ Array;`, FileName: "jsdoc-import.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Array")},
 
 			// CommonJS wrapper globals have no authored definitions upstream.
 			{Code: `exports.foo = 1;`, FileName: "wrapper.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("exports")},
+			{Code: `module.foo; require.resolve; global.foo;`, FileName: "wrapper-globals.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("module", "require", "global")},
 
 			// Parentheses around a dynamic import's options object, or around a nested
 			// attribute value, still leave their keys import attributes.
@@ -116,6 +129,32 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `const x = <a:b />;`, Options: deny("a", "b"), Tsx: true},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Parentheses are transparent only while they directly wrap a call/new
+			// child. A member or TypeScript assertion between the identifier and the
+			// call remains visible upstream; dynamic import is not a CallExpression.
+			{Code: `(foo).bar();`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 2)}},
+			{Code: `call((foo).bar);`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 7)}},
+			{Code: `import(((foo)));`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 10)}},
+			{Code: `call((bar as any));`, Options: deny("bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("bar", 1, 7)}},
+
+			// A non-null wrapper around the pattern/member keeps a property read-only;
+			// one inside the receiver does not stop the member itself being a target.
+			{Code: `[foo.bar]! = source;`, Options: deny("foo", "bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 2)}},
+			{Code: `({x: foo.bar})! = source;`, Options: deny("foo", "bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 6)}},
+			{Code: `[foo!.bar] = source;`, Options: deny("foo", "bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 2), restricted("bar", 1, 7)}},
+			{Code: `[foo.bar!] = source;`, Options: deny("foo", "bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 2)}},
+
+			// Filtering JSDoc syntax must not hide the real declaration that follows
+			// it, nor an authored declaration carrying a JSDoc tag.
+			{Code: `/** @type {Foo} */ let Foo;`, FileName: "jsdoc-authored.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("Foo", 1, 24)}},
+			{Code: `/** @enum {number} */ const Number = {x: 1}; Number;`, FileName: "jsdoc-enum.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 29), restricted("Number", 1, 46)}},
+
+			// `__filename` and `__dirname` are not globals in ESLint's CommonJS
+			// environment, while authored declarations still shadow its real globals.
+			{Code: `__filename; __dirname;`, FileName: "wrapper-paths.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("__filename", "__dirname"), Errors: []rule_tester.InvalidTestCaseError{restricted("__filename", 1, 1), restricted("__dirname", 1, 13)}},
+			{Code: `arguments;`, FileName: "wrapper-arguments.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("arguments"), Errors: []rule_tester.InvalidTestCaseError{restricted("arguments", 1, 1)}},
+			{Code: `const module = {}; module.foo;`, FileName: "authored-module.cjs", TSConfig: "tsconfig.allow-js.json", Options: deny("module"), Errors: []rule_tester.InvalidTestCaseError{restricted("module", 1, 7), restricted("module", 1, 20)}},
+
 			// ---- Dimension 4: parenthesized receiver and parenthesized assignment target ----
 			{Code: `(foo).bar = 1`, Options: deny("bar", "foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 2), restricted("bar", 1, 7)}},
 			{Code: `((foo)).bar = 1`, Options: deny("bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("bar", 1, 9)}},
