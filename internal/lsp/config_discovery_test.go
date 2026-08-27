@@ -365,7 +365,7 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 		t.Fatalf("filesystem-path catalog was not committed: %+v", s.jsConfigs)
 	}
 	fileURI := documentURIFromPath(filepath.Join(root, "src", "index.ts"))
-	if got := s.pluginConfigKeyForURI(fileURI); got != root {
+	if got, ok := s.nearestJSConfigKey(fileURI); !ok || got != root {
 		t.Fatalf("plugin configKey = %q, want exact catalog path %q", got, root)
 	}
 	registered, ok := s.ruleCatalog.Lookup(pluginRuleName)

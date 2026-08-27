@@ -311,6 +311,7 @@ export const EditorTabs = ({
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     codeEditorRef.current = editor;
 
@@ -395,6 +396,7 @@ export const EditorTabs = ({
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     rslintEditorRef.current = editor;
 
@@ -417,6 +419,7 @@ export const EditorTabs = ({
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     tsconfigEditorRef.current = editor;
 
