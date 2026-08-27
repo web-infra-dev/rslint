@@ -125,9 +125,18 @@ func (compiled *ModuleSettings) IsInternalSpecifier(specifier string) bool {
 	return compiled != nil && compiled.internalRegex != nil && compiled.internalRegex.TestOrTimeout(specifier)
 }
 
+// IsNodeBuiltinSpecifier reports whether the complete written specifier is a
+// Node.js builtin. TypeScript-aware ESLint resolvers perform this exact check
+// before filesystem resolution, so an installed package or paths mapping with
+// the same name cannot shadow the builtin.
+func IsNodeBuiltinSpecifier(specifier string) bool {
+	return specifier != "" && core.NodeCoreModules()[specifier]
+}
+
 // IsCoreModuleSpecifier reports whether the specifier's package root is a
 // Node.js builtin or is listed by `import/core-modules`. Resolution remains a
-// caller concern because a resolved project module can override this lexical
+// caller concern for non-exact builtin subpath specifiers and configured core
+// modules, because a resolved project module can override their lexical
 // classification.
 func (compiled *ModuleSettings) IsCoreModuleSpecifier(specifier string) bool {
 	if specifier == "" {
