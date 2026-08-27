@@ -80,6 +80,9 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: `interface S { readonly [Symbol.iterator]: string[] } function f(value: S) {}`},
 		// Mapped types without key remapping or a modifier inherit the source property.
 		{Code: `interface S { readonly item: string } type M<T> = { [K in keyof T]: T[K] }; function f(value: M<S>) {}`},
+		// Identity and conditional filtering name types also preserve source modifiers.
+		{Code: `interface S { readonly x: string } type M<T> = { [K in keyof T as K]: T[K] }; function f(value: M<S>) {}`},
+		{Code: `interface S { readonly x: string; readonly y: string } type M<T> = { [K in keyof T as K extends "x" ? K : never]: T[K] }; function f(value: M<S>) {}`},
 		// Explicit +readonly applies after key remapping and to unique-symbol keys.
 		{Code: "interface S { item: string } type M<T> = { +readonly [K in keyof T as `get${Capitalize<K & string>}`]: T[K] }; function f(value: M<S>) {}"},
 		{Code: `declare const tag: unique symbol; interface S { [tag]: string[] } type M<T> = { +readonly [K in keyof T]: T[K] }; function f(value: M<S>) {}`},
@@ -139,6 +142,8 @@ func TestPreferReadonlyParameterTypesExtras(t *testing.T) {
 		{Code: "interface S { readonly item: string } type M<T> = { [K in keyof T as `get${Capitalize<K & string>}`]: T[K] }; function f(value: M<S>) {}", Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(122, 133)}},
 		// Explicit mapped modifiers also apply to well-known symbol properties.
 		{Code: `interface S { readonly [Symbol.iterator]: string } type M<T> = { -readonly [K in keyof T]: T[K] }; function f(value: M<S>) {}`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(111, 122)}},
+		// Decorators belong to ts-go's Parameter range but not the ESTree parameter range.
+		{Code: `class Consumer { method(@dec value: string[]) {} }`, Errors: []rule_tester.InvalidTestCaseError{extraReadonlyError(30, 45)}},
 		// Locks in allowlist provenance: a file type does not match a lib specifier.
 		{Code: `interface Local { x: string } function f(value: Local) {}`, Options: map[string]any{"allow": []any{map[string]any{"from": "lib", "name": "Local"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "shouldBeReadonly", Message: "Parameter should be a read only type.", Line: 1, Column: 42, EndLine: 1, EndColumn: 54}}},
 		// ---- Real-user: #8013 mutable Set remains rejected beside ReadonlySet ----

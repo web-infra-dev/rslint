@@ -82,11 +82,13 @@ func checkParameter(ctx rule.RuleContext, param *ast.Node, opts PreferReadonlyPa
 		TreatMethodsAsReadonly: opts.TreatMethodsAsReadonly,
 	}, ctx.Program())
 	if !readonly && !typescriptutil.IsTypeBrandedLiteralLike(ctx.TypeChecker, paramType) {
-		start := param.Pos()
-		if ast.IsParameterPropertyDeclaration(param, param.Parent) {
-			start = paramDecl.Name().Pos()
+		// ESTree excludes parameter decorators and TSParameterProperty modifiers
+		// from the reported parameter node, but keeps a RestElement's `...`.
+		startNode := paramDecl.Name()
+		if paramDecl.DotDotDotToken != nil {
+			startNode = paramDecl.DotDotDotToken
 		}
-		start = scanner.SkipTrivia(ctx.SourceFile.Text(), start)
+		start := scanner.SkipTrivia(ctx.SourceFile.Text(), startNode.Pos())
 		ctx.ReportRange(core.NewTextRange(start, param.End()), buildShouldBeReadonlyMessage())
 	}
 }

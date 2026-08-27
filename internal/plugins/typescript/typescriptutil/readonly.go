@@ -268,8 +268,8 @@ func isPropertyReadonly(typeChecker *checker.Checker, t *checker.Type, name stri
 	// Mapped types can synthesize transient property symbols whose declarations
 	// point back to the original (mutable) member. Read the mapped declaration's
 	// readonly modifier before falling back to those declarations. As upstream
-	// does, apply explicit modifiers to every key spelling and do not inherit a
-	// source property's modifier when the mapped type remaps its keys.
+	// does, apply explicit modifiers to every key spelling and inherit a source
+	// property's modifier only when the name type filters rather than remaps.
 	if checker.Type_objectFlags(t)&checker.ObjectFlagsMapped != 0 {
 		if symbol := checker.Type_symbol(t); symbol != nil && len(symbol.Declarations) > 0 {
 			declaration := symbol.Declarations[0]
@@ -279,7 +279,10 @@ func isPropertyReadonly(typeChecker *checker.Checker, t *checker.Type, name stri
 				if readonlyToken != nil {
 					return readonlyToken.Kind != ast.KindMinusToken
 				}
-				if mapped.NameType != nil {
+				nameType := checker.Checker_getNameTypeFromMappedType(typeChecker, t)
+				typeParameter := checker.Checker_getTypeParameterFromMappedType(typeChecker, t)
+				if nameType != nil && (typeParameter == nil ||
+					!checker.Checker_isTypeAssignableTo(typeChecker, nameType, typeParameter)) {
 					return false
 				}
 			}
