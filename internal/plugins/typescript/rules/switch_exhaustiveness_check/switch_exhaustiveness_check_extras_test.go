@@ -447,12 +447,11 @@ func testSwitchExhaustivenessCheckEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      sourceProgram,
-			File:         sourceFile.FileName(),
-			HasTypeInfo:  true,
-			ExcludePaths: []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			Program:     sourceProgram,
+			File:        sourceFile.FileName(),
+			HasTypeInfo: true,
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:             SwitchExhaustivenessCheckRule.Name,
 					Severity:         rule.SeverityError,
 					RequiresTypeInfo: SwitchExhaustivenessCheckRule.RequiresTypeInfo,

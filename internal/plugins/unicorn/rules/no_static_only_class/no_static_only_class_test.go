@@ -725,12 +725,11 @@ func TestNoStaticOnlyClassEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			HasTypeInfo:  true,
-			ExcludePaths: []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			Program:     lintprogram.NewFromCompiler(program),
+			File:        sourceFile.FileName(),
+			HasTypeInfo: true,
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     no_static_only_class.NoStaticOnlyClassRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

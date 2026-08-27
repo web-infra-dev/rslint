@@ -446,6 +446,10 @@ func (queue *reportQueue) add(node *ast.Node, msg rule.RuleMessage, fixes func()
 	queue.reports = append(queue.reports, pendingReport{node: node, msg: msg, fixes: fixes})
 }
 
+func (queue *reportQueue) grow(count int) {
+	queue.reports = slices.Grow(queue.reports, count)
+}
+
 func (queue *reportQueue) flush(ctx rule.RuleContext) {
 	if len(queue.reports) > 1 {
 		slices.SortStableFunc(queue.reports, func(left, right pendingReport) int {
@@ -592,10 +596,14 @@ func (classifier *importClassifier) classify(name string, specifier *ast.Node) s
 	if tspath.IsRootedDiskPath(name) {
 		return "absolute"
 	}
+	if import_utils.IsNodeBuiltinSpecifier(name) {
+		return "builtin"
+	}
 
 	// Relative spellings have a fixed public group and normally need no module
-	// resolution. A deliberately configured core-module name is the exception:
-	// a successful resolution suppresses builtin classification.
+	// resolution. A non-exact builtin subpath or deliberately configured
+	// core-module name is the exception: a successful resolution suppresses
+	// builtin classification.
 	builtinCandidate := classifier.settings.IsCoreModuleSpecifier(name)
 	if !builtinCandidate {
 		if relativeType, ok := relativeImportType(name); ok {
@@ -754,21 +762,8 @@ func findOutOfOrder(imports []*importEntry) []*importEntry {
 	return out
 }
 
-// reverseRanks duplicates the slice and negates every rank, making the normal
-// forward scan equivalent to scanning the original sequence from the end.
-func reverseRanks(in []*importEntry) []*importEntry {
-	out := make([]*importEntry, len(in))
-	for i, v := range in {
-		dup := *v
-		dup.rank = -v.rank
-		out[len(in)-1-i] = &dup
-	}
-	return out
-}
-
-// countReverseOutOfOrder counts what findOutOfOrder(reverseRanks(imports))
-// would return without allocating the reversed entries. The actual reversed
-// slice is needed only when that direction produces fewer diagnostics.
+// countReverseOutOfOrder counts the entries that a scan from the end would
+// report, without allocating a reversed copy of every import.
 func countReverseOutOfOrder(imports []*importEntry) int {
 	if len(imports) == 0 {
 		return 0
@@ -787,33 +782,41 @@ func countReverseOutOfOrder(imports []*importEntry) int {
 	return count
 }
 
+// findReverseOutOfOrder returns the reverse-scan violations in source order.
+// Its capacity is exact because the selection pass already counted them.
+func findReverseOutOfOrder(imports []*importEntry, count int) []*importEntry {
+	minSeen := imports[len(imports)-1].rank
+	out := make([]*importEntry, 0, count)
+	for i := len(imports) - 1; i >= 0; i-- {
+		entry := imports[i]
+		if entry.rank > minSeen {
+			out = append(out, entry)
+		}
+		if entry.rank < minSeen {
+			minSeen = entry.rank
+		}
+	}
+	slices.Reverse(out)
+	return out
+}
+
 func makeOutOfOrderReports(reports *reportQueue, imported []*importEntry, source *sourceInfo) {
 	out := findOutOfOrder(imported)
 	if len(out) == 0 {
 		return
 	}
-	if countReverseOutOfOrder(imported) < len(out) {
-		rev := reverseRanks(imported)
-		revOut := findOutOfOrder(rev)
-		// Use the reversed list (with negated ranks) as the search space — the
-		// `found = imp.rank > X` predicate works against negated ranks too.
-		// The entries in `rev` carry the same node identity as the originals,
-		// so report positions still come from the original AST.
-		reportOutOfOrder(reports, rev, revOut, "after", source, true)
+	reverseCount := countReverseOutOfOrder(imported)
+	if reverseCount < len(out) {
+		reports.grow(reverseCount)
+		reportReverseOutOfOrder(reports, imported, findReverseOutOfOrder(imported, reverseCount), source)
 		return
 	}
-	reportOutOfOrder(reports, imported, out, "before", source, false)
+	reports.grow(len(out))
+	reportOutOfOrder(reports, imported, out, "before", source)
 }
 
-func reportOutOfOrder(reports *reportQueue, imported []*importEntry, outOfOrder []*importEntry, order string, source *sourceInfo, restoreSourceOrder bool) {
-	ordered := outOfOrder
-	if restoreSourceOrder && len(outOfOrder) > 1 {
-		ordered = append([]*importEntry(nil), outOfOrder...)
-		sort.SliceStable(ordered, func(i, j int) bool {
-			return ast.CompareNodePositions(ordered[i].node, ordered[j].node) < 0
-		})
-	}
-	for _, imp := range ordered {
+func reportOutOfOrder(reports *reportQueue, imported []*importEntry, outOfOrder []*importEntry, order string, source *sourceInfo) {
+	for _, imp := range outOfOrder {
 		var found *importEntry
 		for _, ii := range imported {
 			if ii.rank > imp.rank {
@@ -825,6 +828,21 @@ func reportOutOfOrder(reports *reportQueue, imported []*importEntry, outOfOrder 
 			continue
 		}
 		makeOutOfOrderReport(reports, found, imp, order, source)
+	}
+}
+
+func reportReverseOutOfOrder(reports *reportQueue, imported []*importEntry, outOfOrder []*importEntry, source *sourceInfo) {
+	for _, imp := range outOfOrder {
+		var found *importEntry
+		for i := len(imported) - 1; i >= 0; i-- {
+			if imported[i].rank < imp.rank {
+				found = imported[i]
+				break
+			}
+		}
+		if found != nil {
+			makeOutOfOrderReport(reports, found, imp, "after", source)
+		}
 	}
 }
 
@@ -1551,32 +1569,23 @@ func makeNamedOrderReport(reports *reportQueue, named []*namedEntry, opts option
 		mutateRanksToAlphabetize(imps, opts.alphabetize)
 	}
 
-	// Out-of-order detection (named flavour). When the reverse direction
-	// yields fewer reports we use the reversed (negated-rank) list as the
-	// search space, so the `found.rank > imp.rank` predicate still picks the
-	// right partner.
+	// Out-of-order detection (named flavour).
 	out := findOutOfOrder(imps)
 	if len(out) == 0 {
 		return
 	}
-	if countReverseOutOfOrder(imps) < len(out) {
-		rev := reverseRanks(imps)
-		revOut := findOutOfOrder(rev)
-		reportNamedOutOfOrder(reports, rev, revOut, "after", source, true)
+	reverseCount := countReverseOutOfOrder(imps)
+	if reverseCount < len(out) {
+		reports.grow(reverseCount)
+		reportNamedReverseOutOfOrder(reports, imps, findReverseOutOfOrder(imps, reverseCount), source)
 		return
 	}
-	reportNamedOutOfOrder(reports, imps, out, "before", source, false)
+	reports.grow(len(out))
+	reportNamedOutOfOrder(reports, imps, out, "before", source)
 }
 
-func reportNamedOutOfOrder(reports *reportQueue, all []*importEntry, outOfOrder []*importEntry, order string, source *sourceInfo, restoreSourceOrder bool) {
-	ordered := outOfOrder
-	if restoreSourceOrder && len(outOfOrder) > 1 {
-		ordered = append([]*importEntry(nil), outOfOrder...)
-		sort.SliceStable(ordered, func(i, j int) bool {
-			return ordered[i].node.Pos() < ordered[j].node.Pos()
-		})
-	}
-	for _, imp := range ordered {
+func reportNamedOutOfOrder(reports *reportQueue, all []*importEntry, outOfOrder []*importEntry, order string, source *sourceInfo) {
+	for _, imp := range outOfOrder {
 		var found *importEntry
 		for _, ii := range all {
 			if ii.rank > imp.rank {
@@ -1587,25 +1596,42 @@ func reportNamedOutOfOrder(reports *reportQueue, all []*importEntry, outOfOrder 
 		if found == nil {
 			continue
 		}
-		first := found
-		second := imp
-		disambiguateDisplayNames(first, second)
-		firstDisplay := first.displayName
-		secondDisplay := second.displayName
-		msg := rule.RuleMessage{
-			Id: "order",
-			Description: fmt.Sprintf(
-				"`%s` %s should occur %s %s of `%s`",
-				secondDisplay, makeImportDescription(second),
-				order,
-				makeImportDescription(first),
-				firstDisplay,
-			),
-		}
-		reports.add(second.node, msg, func() []rule.RuleFix {
-			return buildNamedSwapFix(source.file, source.text, first, second, order)
-		})
+		makeNamedOutOfOrderReport(reports, found, imp, order, source)
 	}
+}
+
+func reportNamedReverseOutOfOrder(reports *reportQueue, all []*importEntry, outOfOrder []*importEntry, source *sourceInfo) {
+	for _, imp := range outOfOrder {
+		var found *importEntry
+		for i := len(all) - 1; i >= 0; i-- {
+			if all[i].rank < imp.rank {
+				found = all[i]
+				break
+			}
+		}
+		if found != nil {
+			makeNamedOutOfOrderReport(reports, found, imp, "after", source)
+		}
+	}
+}
+
+func makeNamedOutOfOrderReport(reports *reportQueue, first, second *importEntry, order string, source *sourceInfo) {
+	disambiguateDisplayNames(first, second)
+	firstDisplay := first.displayName
+	secondDisplay := second.displayName
+	msg := rule.RuleMessage{
+		Id: "order",
+		Description: fmt.Sprintf(
+			"`%s` %s should occur %s %s of `%s`",
+			secondDisplay, makeImportDescription(second),
+			order,
+			makeImportDescription(first),
+			firstDisplay,
+		),
+	}
+	reports.add(second.node, msg, func() []rule.RuleFix {
+		return buildNamedSwapFix(source.file, source.text, first, second, order)
+	})
 }
 
 func buildNamedSwapFix(sourceFile *ast.SourceFile, sourceText string, first, second *importEntry, order string) []rule.RuleFix {

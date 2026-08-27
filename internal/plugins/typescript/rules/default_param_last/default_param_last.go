@@ -3,6 +3,7 @@ package default_param_last
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // DefaultParamLastRule enforces default parameters to be last
@@ -19,7 +20,7 @@ var shouldBeLastMessage = rule.RuleMessage{
 
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	checkDefaultParamLast := func(node *ast.Node) {
-		params := node.Parameters()
+		params := utils.ESTreeParameters(node)
 		if len(params) < 2 {
 			return
 		}
@@ -35,7 +36,11 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			if param.DotDotDotToken != nil {
 				continue
 			}
-			if param.Initializer == nil && param.QuestionToken == nil {
+			questionToken := param.QuestionToken
+			if utils.IsJSDocSyntaxNode(questionToken) {
+				questionToken = nil
+			}
+			if param.Initializer == nil && questionToken == nil {
 				hasSeenPlainParam = true
 				continue
 			}

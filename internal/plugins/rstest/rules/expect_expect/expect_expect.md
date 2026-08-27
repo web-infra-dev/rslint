@@ -2,94 +2,43 @@
 
 ## Rule Details
 
-Enforce that every Rstest test registration contains at least one assertion. A
-test with no assertion can pass without verifying anything, hiding the fact that
-its intent was never checked.
+Requires every Rstest `test` or `it` callback to contain an assertion. This prevents tests from passing after exercising code without verifying its result.
 
-Examples of incorrect code:
+By default, both `expect` and Chai's `assert` count as assertions. `test.todo` and `it.todo` are exempt because they intentionally have no callback; globals, imports, aliases, parameterized tests, fixtures, and Playwright integrations are recognized.
 
-```ts
-test("does nothing", () => {
-  doSomething();
-});
-
-it("empty", () => {});
-```
-
-Examples of correct code:
+## Incorrect
 
 ```ts
-test("asserts", () => {
-  expect(value).toBe(1);
+test('creates a user', async () => {
+  await createUser({ name: 'Ada' });
 });
-
-it("uses assert", () => {
-  assert.equal(value, 1);
-});
-
-it("in a promise callback", () => {
-  return loadUser().then((user) => {
-    expect(user).toBeDefined();
-  });
-});
-
-it("named callback", run);
-function run() {
-  expect(value).toBe(1);
-}
-
-const checkValue = () => {
-  expect(value).toBe(1);
-};
-test("variable callback", checkValue);
 ```
 
-`test.todo` / `it.todo` have no callback and are exempt:
+## Correct
 
 ```ts
-test.todo("later");
-```
+test('creates a user', async () => {
+  const user = await createUser({ name: 'Ada' });
 
-The rule recognizes Rstest test registrations from globals, `@rstest/core`
-imports and aliases, `require`, namespace access, `import.meta.rstest`,
-`test.extend(...)`, `.each` / `.for`, and `@rstest/playwright`. `describe` and
-lifecycle hooks are not test registrations and are never required to assert.
-Named function declarations and variable functions are resolved independently
-of whether they appear before or after the test registration.
+  expect(user.name).toBe('Ada');
+});
+```
 
 ## Options
 
 ```json
 {
   "rstest/expect-expect": [
-    "warn",
+    "error",
     {
-      "assertFunctionNames": ["expect", "assert"],
-      "additionalTestBlockFunctions": []
+      "assertFunctionNames": ["expect", "assert", "assertUser"],
+      "additionalTestBlockFunctions": ["scenario"]
     }
   ]
 }
 ```
 
-### `assertFunctionNames`
-
-Names of functions treated as assertions. Defaults to `["expect", "assert"]`,
-matching the two assertion entry points Rstest exposes as globals. Names support
-wildcards: `request.*.expect`, `request.**.expect`, `expect*`.
-
-Rstest's own `expect` counts whatever the callee looks like, so these names only
-need to cover assertion helpers the rule cannot resolve — a wrapper of your own,
-or a third-party assertion library. `context.expect(...)`, `rstest.expect(...)`,
-an aliased `import { expect as check }` and `import.meta.rstest.expect(...)` are
-all recognized without configuration.
-
-The list replaces the default rather than extending it, so name `assert` again if
-you still want it. Naming your own helpers cannot switch Rstest's `expect` off
-though — it is recognized whether or not the list mentions it, unlike in
-`eslint-plugin-jest`, where dropping `expect` from the list stops it counting.
-
-### `additionalTestBlockFunctions`
-
-Additional function names to treat as test blocks.
-
-The rule provides no automatic fix.
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `assertFunctionNames` | `string[]` | `["expect", "assert"]` | Function names or patterns treated as assertions. Setting it replaces the default list. |
+| `additionalTestBlockFunctions` | `string[]` | `[]` | Additional functions whose callbacks are treated as test blocks. |

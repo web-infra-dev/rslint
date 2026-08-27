@@ -3,9 +3,8 @@ package linter
 import (
 	"context"
 	"errors"
-	"os"
+	"fmt"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/web-infra-dev/rslint/internal/program"
@@ -15,12 +14,12 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
 var (
-	errNilProgram     = errors.New("linter: Program must not be nil")
-	errInvalidProgram = errors.New("linter: Program must be created by internal/program")
+	errNilProgram                    = errors.New("linter: Program must not be nil")
+	errInvalidProgram                = errors.New("linter: Program must be created by internal/program")
+	errTypeCheckOnlyProgramsWithPlan = errors.New("linter: TypeCheckOnlyPrograms must be nil when LintPlan is provided")
 )
 
 func validateProgram(sourceProgram *program.Program) error {
@@ -40,66 +39,6 @@ func validatePrograms(sourcePrograms []*program.Program) error {
 		}
 	}
 	return nil
-}
-
-// isFileAllowed checks if fileName matches any path in allowFiles.
-// It first tries fast string equality, then falls back to os.SameFile
-// (using pre-computed FileInfo) to handle symlinks (e.g. /var vs /private/var on macOS).
-func isFileAllowed(fileName string, allowFiles []string, allowFileInfos []os.FileInfo) bool {
-	for _, filePath := range allowFiles {
-		if filePath == fileName {
-			return true
-		}
-	}
-	// Fallback: compare by inode to handle directory symlinks
-	fileInfo, err := os.Stat(fileName)
-	if err != nil {
-		return false
-	}
-	for _, info := range allowFileInfos {
-		if os.SameFile(fileInfo, info) {
-			return true
-		}
-	}
-	return false
-}
-
-// precomputeAllowFileInfos collects os.FileInfo for each allowFile once,
-// so that isFileAllowed can use os.SameFile without repeated os.Stat calls.
-// Files that do not exist are silently skipped.
-func precomputeAllowFileInfos(allowFiles []string) []os.FileInfo {
-	infos := make([]os.FileInfo, 0, len(allowFiles))
-	for _, f := range allowFiles {
-		if info, err := os.Stat(f); err == nil {
-			infos = append(infos, info)
-		}
-	}
-	return infos
-}
-
-// isDirAllowed checks if fileName is inside any directory in allowDirs.
-// Uses tspath.StartsWithDirectory to correctly handle src/ vs src-other/.
-func isDirAllowed(fileName string, allowDirs []string) bool {
-	for _, dirPath := range allowDirs {
-		if tspath.StartsWithDirectory(fileName, dirPath, true) {
-			return true
-		}
-	}
-	return false
-}
-
-// programPlanOptions contains only rule-plan construction policy. Execution
-// never reads it after a programLintPlan has frozen file identity, rules, and
-// checker eligibility.
-type programPlanOptions struct {
-	Program         *program.Program
-	Scope           FileScope
-	ExcludePaths    []string
-	FileFilter      FileFilter
-	TargetFiles     []string
-	HasTargetFiles  bool
-	SkipSyntaxCheck bool
-	GetRulesForFile RuleHandler
 }
 
 // programRunOptions contains the run-scoped sinks and scheduling knobs that do
@@ -164,9 +103,8 @@ func (r *listenerRegistry) reset() {
 	r.activeKinds = r.activeKinds[:0]
 }
 
-// runLintRulesInProgram lints files in a single Program. Files are filtered
-// through ExcludePaths, Scope (Files+Dirs), and FileFilter before rule
-// execution. Pass FileFilter=nil to disable that layer.
+// runLintRulesInProgram executes the files and rules already frozen for one
+// Program. It does not perform target discovery, filtering, or rule resolution.
 //
 // Unless SingleThreaded is set, files are linted in parallel shards — one
 // task per pool checker, each task owning its checker exclusively and
@@ -187,7 +125,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 
 	result := programLintResult{lintedFileCount: int32(len(filesToLint))}
 
-	// Early-out: if every file in this program was filtered, do not pay the
+	// Early-out: if this Program has no selected lint targets, do not pay the
 	// cost of acquiring a TypeChecker (which forces program binding and is
 	// non-trivial when the checker hasn't been created yet).
 	if result.lintedFileCount == 0 {
@@ -310,6 +248,13 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		var childVisitor ast.Visitor
 		var patternVisitor func(node *ast.Node)
 		patternVisitor = func(node *ast.Node) {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+				patternVisitor(expression)
+				return
+			}
+			if utils.IsJSDocSyntaxNode(node) {
+				return
+			}
 			runListeners(node.Kind, node)
 			kind := rule.ListenerOnAllowPattern(node.Kind)
 			runListeners(kind, node)
@@ -343,6 +288,13 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			runListeners(rule.ListenerOnExit(node.Kind), node)
 		}
 		childVisitor = func(node *ast.Node) bool {
+			if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+				childVisitor(expression)
+				return false
+			}
+			if utils.IsJSDocSyntaxNode(node) {
+				return false
+			}
 			runListeners(node.Kind, node)
 
 			switch node.Kind {
@@ -496,7 +448,7 @@ func filterNativeRules(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 	return nativeRules
 }
 
-func shouldSkipRulesForSyntax(opts programPlanOptions, file *ast.SourceFile, ctx context.Context) bool {
+func shouldSkipRulesForSyntax(opts programRulePlanOptions, file *ast.SourceFile, ctx context.Context) bool {
 	if opts.SkipSyntaxCheck {
 		return false
 	}
@@ -507,46 +459,46 @@ func shouldSkipRulesForSyntax(opts programPlanOptions, file *ast.SourceFile, ctx
 // parallel, then optionally collects program-level type-check diagnostics
 // aligned with `tsc --noEmit` semantics.
 //
-// Phase 1 — lint rules: each program is processed via
-// runLintRulesInProgram, with files filtered through opts.ExcludePaths,
-// opts.Scope, opts.PerProgramFilter and, in legacy scan mode, the program's
-// own owned-file set. When opts.TargetFiles is non-nil, Phase 1 uses that exact
-// per-Program target plan instead of scanning Program roots.
+// Phase 1 — lint rules: each Program is processed through the exact immutable
+// file/rule projection in opts.LintPlan.
 // Within a program, files are linted in parallel shards (one per pool
 // checker); diagnostics therefore arrive in nondeterministic cross-file
 // order and callers that print them should impose an explicit order.
-// When opts.GetRulesForFile is nil, Phase 1 is skipped entirely — no work
-// group is created and no per-program goroutines are spawned. This is how
-// callers run a pure type-check pass (--type-check-only) without paying
-// lint-side setup cost.
-// When opts.PreparedPlan is present, Phase 1 consumes its stable per-Program
-// files and resolved rules without repeating target collection or invoking
-// GetRulesForFile. CLI/API hosts use this to share one plan with optional
-// third-party plugin dispatch; other callers retain the direct path.
+// When opts.LintPlan is nil, Phase 1 is skipped entirely — no work group is
+// created and no per-Program goroutines are spawned. This is how callers run a
+// pure type-check pass (--type-check-only) without paying lint-side setup cost.
 //
 // Phase 2 — type-check (skipped when opts.TypeCheck is false): the linter asks
 // each Program whether it can supply program-wide diagnostics and schedules
 // only that capability. Capable Programs aggregate diagnostics through
 // collectNoEmitDiagnostics, a helper that
 // mirrors compiler.GetDiagnosticsOfAnyProgram(file=nil) but enforces
-// `tsc --noEmit` semantics regardless of whether the user's tsconfig
-// sets noEmit. Type-check is NOT constrained by Scope / PerProgramFilter
-// / ExcludePaths — it covers the full program just like tsc.
+// `tsc --noEmit` semantics regardless of whether the user's tsconfig sets
+// noEmit. Type-check is not constrained by the lint plan; it covers the full
+// Program just like tsc.
 //
 // See RunLinterOptions for each field's zero-value semantics.
 func RunLinter(opts RunLinterOptions) (*LintResult, error) {
-	if opts.ExcludePaths == nil {
-		opts.ExcludePaths = utils.ExcludePaths
-	}
 	if !opts.Consumer.Demand.IsValid() {
 		return nil, errors.New("linter: invalid native edit demand")
 	}
+	if opts.LintPlan != nil && opts.TypeCheckOnlyPrograms != nil {
+		return nil, errTypeCheckOnlyProgramsWithPlan
+	}
 	consumer := normalizeDiagnosticConsumer(opts.Consumer)
-	// Reject an invalid source generation before either phase can report
-	// diagnostics. In particular, type-check-only runs skip Phase 1 entirely,
-	// so validation cannot live inside the lint-rule branch.
-	if opts.GetRulesForFile != nil || opts.TypeCheck {
-		if err := validatePrograms(opts.Programs); err != nil {
+	var sourcePrograms []*program.Program
+	if opts.LintPlan != nil {
+		for _, programPlan := range opts.LintPlan.programs {
+			if err := validateProgram(programPlan.program); err != nil {
+				return nil, err
+			}
+		}
+		if opts.TypeCheck {
+			sourcePrograms = opts.LintPlan.sourcePrograms()
+		}
+	} else if opts.TypeCheck {
+		sourcePrograms = opts.TypeCheckOnlyPrograms
+		if err := validatePrograms(sourcePrograms); err != nil {
 			return nil, err
 		}
 	}
@@ -554,35 +506,19 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	executedRules := make(map[string]struct{})
 	var lintedFileCount int32
 
-	// Phase 1: lint rules per program (parallel). Skipped when no rule
-	// handler was supplied — see doc above.
-	if opts.GetRulesForFile != nil {
-		plan := opts.PreparedPlan
-		if plan == nil {
-			var err error
-			plan, err = PrepareLintPlan(opts)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			if len(plan.programs) != len(opts.Programs) {
-				return nil, errors.New("linter: prepared lint plan does not match Programs")
-			}
-			for programIndex, programPlan := range plan.programs {
-				if programPlan.program != opts.Programs[programIndex] {
-					return nil, errors.New("linter: prepared lint plan does not match Programs")
-				}
-			}
-		}
+	// Phase 1: lint rules per Program (parallel). Skipped when no plan was
+	// supplied — see doc above.
+	if opts.LintPlan != nil {
+		plan := opts.LintPlan
 		runOpts := programRunOptions{
 			Cwd:                  opts.Cwd,
 			CollectExecutedRules: true,
 			SingleThreaded:       opts.SingleThreaded,
 			Timing:               opts.Timing,
 		}
-		programResults := make([]programLintResult, len(opts.Programs))
+		programResults := make([]programLintResult, len(plan.programs))
 		wg := core.NewWorkGroup(opts.SingleThreaded)
-		for i := range opts.Programs {
+		for i := range plan.programs {
 			programIndex := i
 			wg.Queue(func() {
 				programResults[programIndex] = runLintRulesInProgram(&plan.programs[programIndex], runOpts, consumer)
@@ -603,7 +539,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	// Phase 2: program-level type-check (tsc-aligned).
 	if opts.TypeCheck {
 		runTypeCheckAcrossPrograms(typeCheckRequest{
-			Programs:       opts.Programs,
+			Programs:       sourcePrograms,
 			SingleThreaded: opts.SingleThreaded,
 			OnDiagnostic:   consumer.Report,
 		})
@@ -615,110 +551,12 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	}, nil
 }
 
-// collectFilesToLint applies the ExcludePaths / Scope / FileFilter layers to a
-// program's source files. PrepareLintPlan retains this exact result when native
-// execution and a host-side consumer need to share the same file/rule plan.
-func collectFilesToLint(opts programPlanOptions) []*ast.SourceFile {
-	if opts.HasTargetFiles {
-		return collectExactFilesToLint(opts)
-	}
-	var allowFileInfos []os.FileInfo
-	if opts.Scope.Files != nil {
-		allowFileInfos = precomputeAllowFileInfos(opts.Scope.Files)
-	}
-	files := opts.Program.SourceFiles()
-	for fileIndex, file := range files {
-		if filePassesLintProjection(opts, file, allowFileInfos) {
-			continue
-		}
-		// Program owns an immutable source slice. Allocate only when selection
-		// changes its execution projection; in-place compaction would corrupt the
-		// full universe used by cross-file rules.
-		filesToLint := make([]*ast.SourceFile, 0, len(files)-1)
-		filesToLint = append(filesToLint, files[:fileIndex]...)
-		for _, remaining := range files[fileIndex+1:] {
-			if filePassesLintProjection(opts, remaining, allowFileInfos) {
-				filesToLint = append(filesToLint, remaining)
-			}
-		}
-		return filesToLint
-	}
-	return files
-}
-
-func filePassesLintProjection(opts programPlanOptions, file *ast.SourceFile, allowFileInfos []os.FileInfo) bool {
-	p := string(file.Path())
-	for _, skipPattern := range opts.ExcludePaths {
-		if strings.Contains(p, skipPattern) {
-			return false
-		}
-	}
-	// Scope dimensions use OR semantics when either one is present.
-	if opts.Scope.Files != nil || opts.Scope.Dirs != nil {
-		fileAllowed := opts.Scope.Files != nil && isFileAllowed(file.FileName(), opts.Scope.Files, allowFileInfos)
-		dirAllowed := opts.Scope.Dirs != nil && isDirAllowed(file.FileName(), opts.Scope.Dirs)
-		if !fileAllowed && !dirAllowed {
-			return false
-		}
-	}
-	return opts.FileFilter == nil || opts.FileFilter(file.FileName())
-}
-
-func collectExactFilesToLint(opts programPlanOptions) []*ast.SourceFile {
-	// Exact target plans commonly select a Program's complete universe in the
-	// same stable order. Preserve the Program-owned slice when selection makes
-	// no change, avoiding a map and pointer-slice allocation without inspecting
-	// how the Program was constructed.
-	files := opts.Program.SourceFiles()
-	if opts.FileFilter == nil && len(opts.TargetFiles) == len(files) {
-		exact := true
-		for fileIndex, target := range opts.TargetFiles {
-			file := opts.Program.GetSourceFile(target)
-			if file != files[fileIndex] || !filePassesExactProjection(opts, file) {
-				exact = false
-				break
-			}
-		}
-		if exact {
-			return files
-		}
-	}
-
-	var filesToLint []*ast.SourceFile
-	seen := make(map[string]struct{}, len(opts.TargetFiles))
-	for _, target := range opts.TargetFiles {
-		file := opts.Program.GetSourceFile(target)
-		if file == nil {
-			continue
-		}
-		fileName := file.FileName()
-		if _, ok := seen[fileName]; ok {
-			continue
-		}
-		seen[fileName] = struct{}{}
-		if !filePassesExactProjection(opts, file) {
-			continue
-		}
-		filesToLint = append(filesToLint, file)
-	}
-	return filesToLint
-}
-
-func filePassesExactProjection(opts programPlanOptions, file *ast.SourceFile) bool {
-	for _, skipPattern := range opts.ExcludePaths {
-		if strings.Contains(string(file.Path()), skipPattern) {
-			return false
-		}
-	}
-	return opts.FileFilter == nil || opts.FileFilter(file.FileName())
-}
-
-// LintSingleFile runs lint rules against a single file in a single program.
-// The caller owns syntactic diagnostics; this pass does not run type-check.
+// LintSingleFile runs lint rules against one already selected file in one
+// Program. The caller owns target selection and syntactic diagnostics; this
+// pass does not apply path exclusions or run type-check. A non-empty request
+// whose File is absent from Program violates the exact-file contract and
+// panics.
 func LintSingleFile(opts LintSingleFileOptions) {
-	if opts.ExcludePaths == nil {
-		opts.ExcludePaths = utils.ExcludePaths
-	}
 	if !opts.Consumer.Demand.IsValid() {
 		panic("linter: invalid native edit demand")
 	}
@@ -727,20 +565,24 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	if getRulesForFile == nil {
 		return
 	}
+	if err := validateProgram(opts.Program); err != nil {
+		panic(err)
+	}
+	file := opts.Program.GetSourceFile(opts.File)
+	if file == nil {
+		panic(fmt.Errorf("%w: %q", errTargetNotInProgram, opts.File))
+	}
 	if !opts.HasTypeInfo {
 		base := getRulesForFile
 		getRulesForFile = func(file *ast.SourceFile) []rule.ConfiguredRule {
 			return rule.FilterNonTypeAwareRules(base(file))
 		}
 	}
-	plan, err := prepareProgramLintPlan(programPlanOptions{
+	plan, err := prepareProgramLintPlanForFiles(programRulePlanOptions{
 		Program:         opts.Program,
-		ExcludePaths:    opts.ExcludePaths,
-		TargetFiles:     []string{opts.File},
-		HasTargetFiles:  true,
 		SkipSyntaxCheck: true,
 		GetRulesForFile: getRulesForFile,
-	})
+	}, []*ast.SourceFile{file})
 	if err != nil {
 		panic(err)
 	}
@@ -761,39 +603,3 @@ func normalizeDiagnosticConsumer(consumer rule.DiagnosticConsumer) rule.Diagnost
 }
 
 func discardDiagnostic(rule.RuleDiagnostic) {}
-
-// composeOwnedFilter combines a caller-supplied filter with the program's
-// owned-file restriction. Either component may be nil.
-func composeOwnedFilter(extra FileFilter, owned map[string]struct{}) FileFilter {
-	if extra == nil && owned == nil {
-		return nil
-	}
-	return func(name string) bool {
-		if extra != nil && !extra(name) {
-			return false
-		}
-		if owned != nil {
-			if _, ok := owned[name]; !ok {
-				return false
-			}
-		}
-		return true
-	}
-}
-
-// buildOwnedFileSet returns a set of file names that this Program directly owns
-// through its root-file contract.
-// Files in GetSourceFiles() but NOT in this set were pulled in through import
-// resolution or project references — they belong to other programs.
-// Returns nil for programs with no root files (should not happen in practice).
-func buildOwnedFileSet(sourceProgram *program.Program) map[string]struct{} {
-	fileNames := sourceProgram.RootFileNames()
-	if len(fileNames) == 0 {
-		return nil
-	}
-	owned := make(map[string]struct{}, len(fileNames))
-	for _, fn := range fileNames {
-		owned[fn] = struct{}{}
-	}
-	return owned
-}

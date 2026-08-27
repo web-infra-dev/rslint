@@ -125,12 +125,13 @@ func isAllowedEmptyFunction(node *ast.Node, opts noEmptyFunctionOptions) bool {
 	if opts.allow[kind] {
 		return true
 	}
+	modifierFlags := utils.ESTreeModifierFlags(node)
 
 	if kind == "constructors" {
-		if ast.HasSyntacticModifier(node, ast.ModifierFlagsPrivate) && opts.allow["privateConstructors"] {
+		if modifierFlags&ast.ModifierFlagsPrivate != 0 && opts.allow["privateConstructors"] {
 			return true
 		}
-		if ast.HasSyntacticModifier(node, ast.ModifierFlagsProtected) && opts.allow["protectedConstructors"] {
+		if modifierFlags&ast.ModifierFlagsProtected != 0 && opts.allow["protectedConstructors"] {
 			return true
 		}
 		if hasParameterProperty(node) {
@@ -142,7 +143,7 @@ func isAllowedEmptyFunction(node *ast.Node, opts noEmptyFunctionOptions) bool {
 		if ast.HasDecorators(node) && opts.allow["decoratedFunctions"] {
 			return true
 		}
-		if ast.HasSyntacticModifier(node, ast.ModifierFlagsOverride) && opts.allow["overrideMethods"] {
+		if modifierFlags&ast.ModifierFlagsOverride != 0 && opts.allow["overrideMethods"] {
 			return true
 		}
 	}
@@ -270,12 +271,7 @@ func emptyFunctionDisplayName(node *ast.Node) string {
 }
 
 func parentSkippingParens(node *ast.Node) *ast.Node {
-	if node == nil || node.Parent == nil {
-		return nil
-	}
-	// tsgo keeps ParenthesizedExpression nodes that ESLint does not expose
-	// here, so recover the property/class-field container around `(fn)`.
-	return ast.WalkUpParenthesizedExpressions(node.Parent)
+	return utils.ESTreeParent(node)
 }
 
 func isClassMemberFunction(node *ast.Node) bool {
