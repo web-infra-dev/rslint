@@ -19,27 +19,8 @@ func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) rule.Confi
 	return rule.ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
 }
 
-func TestDispatchEslintPluginRulesAsyncPublishesAfterCompletionObserver(t *testing.T) {
+func TestDispatchEslintPluginRulesAsyncPublishesStructuredOutcome(t *testing.T) {
 	dispatchError := errors.New("transport closed")
-	observerStarted := make(chan EslintPluginDispatchOutcome, 1)
-	releaseObserver := make(chan struct{})
-	defer func() {
-		select {
-		case <-releaseObserver:
-		default:
-			close(releaseObserver)
-		}
-	}()
-	receiveOutcome := func(name string, ch <-chan EslintPluginDispatchOutcome) EslintPluginDispatchOutcome {
-		t.Helper()
-		select {
-		case outcome := <-ch:
-			return outcome
-		case <-time.After(5 * time.Second):
-			t.Fatalf("timed out waiting for %s", name)
-			return EslintPluginDispatchOutcome{}
-		}
-	}
 	outcomeCh := DispatchEslintPluginRulesAsync(
 		context.Background(),
 		func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
@@ -56,23 +37,14 @@ func TestDispatchEslintPluginRulesAsyncPublishesAfterCompletionObserver(t *testi
 		false,
 		SuggestionsModeOff,
 		nil,
-		func(outcome EslintPluginDispatchOutcome) {
-			observerStarted <- outcome
-			<-releaseObserver
-		},
 	)
 
-	observed := receiveOutcome("completion observer", observerStarted)
-	if !errors.Is(observed.DispatchError, dispatchError) {
-		t.Fatalf("observer error = %v, want %v", observed.DispatchError, dispatchError)
-	}
+	var outcome EslintPluginDispatchOutcome
 	select {
-	case <-outcomeCh:
-		t.Fatal("outcome was published before the completion observer returned")
-	default:
+	case outcome = <-outcomeCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for async plugin outcome")
 	}
-	close(releaseObserver)
-	outcome := receiveOutcome("published outcome", outcomeCh)
 	if !errors.Is(outcome.DispatchError, dispatchError) {
 		t.Fatalf("published error = %v, want %v", outcome.DispatchError, dispatchError)
 	}
@@ -782,8 +754,8 @@ func TestDispatchEslintPlugin_MultipleRulesPerFile(t *testing.T) {
 // TestDispatchEslintPlugin_DeadlineExceededSurfaces pins that when a batch's
 // dispatch fails with context.DeadlineExceeded (the LSP fixAll timeout firing),
 // DispatchEslintPluginRules surfaces an error for which errors.Is(err,
-// context.DeadlineExceeded) holds — so lintPluginRulesSync's timeout branch
-// recognizes it — while the other (completed) batches still emit their
+// context.DeadlineExceeded) holds — so an integration's timeout policy can
+// recognize it — while the other (completed) batches still emit their
 // diagnostics. (No mutex on the emitted map on purpose: onDiagnostic stays
 // single-threaded, so -race catches a regression that emits concurrently.)
 func TestDispatchEslintPlugin_DeadlineExceededSurfaces(t *testing.T) {
@@ -1079,6 +1051,48 @@ func TestDispatchEslintPluginRulesWithOutcomePreservesCancellation(t *testing.T)
 	}
 	if len(outcome.Diagnostics) != 0 {
 		t.Errorf("cancellation diagnostics = %v, want none", outcome.Diagnostics)
+	}
+}
+
+func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T) {
+	text := "const value = 1;"
+	files := []EslintPluginFileInput{
+		{
+			Path:  "/repo/present.ts",
+			Text:  &text,
+			Rules: []rule.ConfiguredRule{pluginRule("external/configured", nil, rule.SeverityWarning)},
+		},
+		{
+			Path:  "/repo/missing.ts",
+			Text:  &text,
+			Rules: []rule.ConfiguredRule{pluginRule("external/configured", nil, rule.SeverityWarning)},
+		},
+	}
+	outcome := DispatchEslintPluginRulesWithOutcome(
+		context.Background(),
+		func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+				FilePath: "/repo/present.ts",
+				Diagnostics: []EslintPluginDiagnostic{{
+					RuleName: "external/unconfigured",
+					Message:  "unexpected diagnostic",
+				}},
+			}}}, nil
+		},
+		files,
+		false,
+		SuggestionsModeOff,
+		nil,
+	)
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 1 {
+		t.Fatalf("outcome = %+v, want one usable diagnostic and no dispatch error", outcome)
+	}
+	want := []EslintPluginProtocolNotice{
+		{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/present.ts", RuleName: "external/unconfigured"},
+		{Kind: EslintPluginMissingFileResult, FilePath: "/repo/missing.ts"},
+	}
+	if !reflect.DeepEqual(outcome.Notices, want) {
+		t.Fatalf("notices = %+v, want %+v", outcome.Notices, want)
 	}
 }
 

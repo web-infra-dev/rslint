@@ -199,7 +199,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		start := nodeStartSkippingDecorators(sourceFile, node)
+		start := NodeTextRangeSkippingDecorators(sourceFile, node)
 		// Start scanning for the parameters `(` after any decorator factory
 		// (e.g. `@dec()`) and after the method name. Nameless constructors
 		// fall back to the first token after the decorators.
@@ -217,7 +217,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	case ast.KindArrowFunction:
 		if holdsFunctionValue(parent) {
-			start := nodeStartSkippingDecorators(sourceFile, parent)
+			start := NodeTextRangeSkippingDecorators(sourceFile, parent)
 			return start.WithEnd(openingParenOfParamsPos(sourceFile, node))
 		}
 		af := node.AsArrowFunction()
@@ -226,7 +226,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	case ast.KindFunctionExpression:
 		if holdsFunctionValue(parent) {
-			start := nodeStartSkippingDecorators(sourceFile, parent)
+			start := NodeTextRangeSkippingDecorators(sourceFile, parent)
 			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 				return start.WithEnd(parenPos)
 			}
@@ -874,11 +874,10 @@ func UpperCaseFirstASCII(s string) string {
 	return s
 }
 
-// nodeStartSkippingDecorators returns a TextRange whose start is the first
+// NodeTextRangeSkippingDecorators returns a TextRange whose start is the first
 // non-decorator token of the node. This matches ESLint's
-// getFunctionHeadLoc, which excludes leading decorators on MethodDefinition
-// and PropertyDefinition from the reported function head range.
-func nodeStartSkippingDecorators(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+// node ranges, which exclude leading decorators.
+func NodeTextRangeSkippingDecorators(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	fallback := TrimNodeTextRange(sourceFile, node)
 	mods := node.Modifiers()
 	if mods == nil || len(mods.Nodes) == 0 {
