@@ -148,6 +148,10 @@ func TestYodaExtras(t *testing.T) {
 			{Code: `if (0 <= a[1e20] && a['100000000000000000000'] < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 			{Code: `if (0 <= a[1e21] && a['1e+21'] < 1) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 
+			// ---- Bug fix: explicit-radix numeric range bounds must recover the raw
+			// token before applying JavaScript Number rounding ----
+			{Code: `if (0x10000000000000801 <= x && x < 18446744073709552000) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+
 			// ---- A sign is allowed before a decimal StringToBigInt input ----
 			{Code: `if ('+1' <= x && x < 2n) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 		},

@@ -453,6 +453,24 @@ func TestYodaUpstream(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 24}},
 			},
 			{
+				Code:    `function *foo() { yield(1) < \u0061 }`,
+				Output:  []string{`function *foo() { yield \u0061 > (1) }`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 24}},
+			},
+			{
+				Code:    `function foo() { return(1) < \u0061 }`,
+				Output:  []string{`function foo() { return \u0061 > (1) }`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 24}},
+			},
+			{
+				Code:    `function foo() { throw(1) < \u0061 }`,
+				Output:  []string{`function foo() { throw \u0061 > (1) }`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 23}},
+			},
+			{
 				Code:    `function *foo() { yield((1)) < a }`,
 				Output:  []string{`function *foo() { yield a > ((1)) }`},
 				Options: "never",

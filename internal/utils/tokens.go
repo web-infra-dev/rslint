@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"sort"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -15,6 +16,8 @@ type SourceToken struct {
 	Start, End int
 	Text       string
 }
+
+var sourceTokenIndexKey = ast.NewSourceFileDataKey[[]SourceToken]()
 
 // Range returns the token's source span.
 func (t SourceToken) Range() core.TextRange {
@@ -71,7 +74,16 @@ func TokenAtOrAfter(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
 // not after pos. Reading the parsed tree preserves lexical context across
 // templates and recognizes regular-expression literals as single tokens.
 func TokenBeforePosition(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
-	return PreviousTokenBefore(sourceFile, sourceFile.AsNode(), pos)
+	tokens := ast.GetOrComputeSourceFileData(sourceFile, sourceTokenIndexKey, func(sourceFile *ast.SourceFile) []SourceToken {
+		return TokensOfNode(sourceFile, sourceFile.AsNode())
+	})
+	index := sort.Search(len(tokens), func(index int) bool {
+		return tokens[index].End > pos
+	})
+	if index == 0 {
+		return SourceToken{}, false
+	}
+	return tokens[index-1], true
 }
 
 // PreviousTokenBefore returns the last token in node whose end is not after pos.
@@ -130,6 +142,9 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 	if scanner.IsIdentifierPart(leftRune) && scanner.IsIdentifierPart(rightRune) {
 		return false
 	}
+	if scanner.IsIdentifierPart(leftRune) && startsWithEscapedIdentifier(right) {
+		return false
+	}
 	if (leftRune == '+' && rightRune == '+') || (leftRune == '-' && rightRune == '-') {
 		return false
 	}
@@ -137,6 +152,15 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 		return false
 	}
 	return true
+}
+
+func startsWithEscapedIdentifier(text string) bool {
+	if text == "" || text[0] != '\\' {
+		return false
+	}
+	s := scanner.NewScanner()
+	s.SetText(text)
+	return s.Scan() == ast.KindIdentifier && s.TokenStart() == 0
 }
 
 // IsSameLine reports whether two positions are on the same ECMAScript line.

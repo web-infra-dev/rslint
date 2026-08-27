@@ -267,7 +267,7 @@ func normalizedLiteralValue(node *ast.Node) (literalValue, bool) {
 	node = ast.SkipParentheses(node)
 	switch node.Kind {
 	case ast.KindNumericLiteral:
-		return numericValue(node.AsNumericLiteral().Text, false)
+		return numericLiteralValue(node, false)
 	case ast.KindBigIntLiteral:
 		return bigintValue(node.AsBigIntLiteral().Text, false)
 	case ast.KindStringLiteral:
@@ -296,12 +296,20 @@ func normalizedLiteralValue(node *ast.Node) (literalValue, bool) {
 		operand := ast.SkipParentheses(unary.Operand)
 		switch operand.Kind {
 		case ast.KindNumericLiteral:
-			return numericValue(operand.AsNumericLiteral().Text, true)
+			return numericLiteralValue(operand, true)
 		case ast.KindBigIntLiteral:
 			return bigintValue(operand.AsBigIntLiteral().Text, true)
 		}
 	}
 	return literalValue{}, false
+}
+
+func numericLiteralValue(node *ast.Node, negate bool) (literalValue, bool) {
+	text, ok := utils.GetStaticExpressionValue(node)
+	if !ok {
+		return literalValue{}, false
+	}
+	return numericValue(text, negate)
 }
 
 func numericValue(text string, negate bool) (literalValue, bool) {
