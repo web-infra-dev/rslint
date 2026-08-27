@@ -564,7 +564,9 @@ func reportLetPlusIfProblem(ctx rule.RuleContext, p *letPlusIfProblem) {
 		declEnd := utils.TrimNodeTextRange(ctx.SourceFile, p.declStmt).End()
 		ifEnd := utils.TrimNodeTextRange(ctx.SourceFile, p.ifNode).End()
 		dropText := ";"
-		if next, ok := utils.TokenAtOrAfter(ctx.SourceFile, ifEnd); ok {
+		if previous, ok := utils.TokenBeforePosition(ctx.SourceFile, declEnd); ok && previous.Kind == ast.KindSemicolonToken {
+			dropText = ""
+		} else if next, ok := utils.TokenAtOrAfter(ctx.SourceFile, ifEnd); ok {
 			if !unicornNeedsSemicolonBefore(next.Text) {
 				dropText = ""
 			}
@@ -919,52 +921,37 @@ func buildMerge(ctx rule.RuleContext, consequent, alternate *ast.Node, staticStr
 	if isMergeableAssignmentExpression(consequent, alternate, staticStrings) {
 		c := consequent.AsBinaryExpression()
 		a := alternate.AsBinaryExpression()
-		// The merge's `before` and the consequent/alternate operands need to
-		// be aligned with what upstream's `consequent.left` exposes. For a
-		// chain like `$0 |= $1 ^= $2 &= … = _STOP_ = … = 1`, tsgo parses
-		// the outermost operator as `|=`, but the upstream test expects the
-		// LHS to be the entire chain and the operator to be the first `=`
-		// that follows it. Walk down the right side of the chain to the
-		// first `=` (or any plain assignment operator) and use its LHS
-		// and right operand instead.
 		leftText := getParenthesizedText(ctx, c.Left)
 		rightNode := c.Right
+		alternateNode := a.Right
 		opNode := c.OperatorToken
-		cur := c
-		for cur.Right != nil && cur.Right.Kind == ast.KindBinaryExpression {
-			rb := cur.Right.AsBinaryExpression()
-			if rb.OperatorToken == nil {
-				break
+		// Compound assignment chains use the first nested plain assignment as
+		// the shared outer operation. Plain `x = y = value` must not enter
+		// this path: its inner assignments belong to the conditional arms.
+		if c.OperatorToken.Kind != ast.KindEqualsToken {
+			cur := c
+			for cur.Right != nil && cur.Right.Kind == ast.KindBinaryExpression {
+				rb := cur.Right.AsBinaryExpression()
+				if rb.OperatorToken == nil || !isAssignmentOperatorKind(rb.OperatorToken.Kind) {
+					break
+				}
+				if rb.OperatorToken.Kind == ast.KindEqualsToken {
+					outerStart := utils.TrimNodeTextRange(ctx.SourceFile, c.AsNode()).Pos()
+					equalsPos := utils.TrimNodeTextRange(ctx.SourceFile, rb.OperatorToken).Pos()
+					leftText = strings.TrimRight(ctx.SourceFile.Text()[outerStart:equalsPos], " \t")
+					rightNode = rb.Right
+					alternateNode = findMatchingRight(a, rb.OperatorToken)
+					opNode = rb.OperatorToken
+					break
+				}
+				cur = rb
 			}
-			if !isAssignmentOperatorKind(rb.OperatorToken.Kind) {
-				break
-			}
-			// If the operator is `=` (plain assignment), that's our target:
-			// the chain above it becomes the new LHS and the right operand
-			// becomes the new consequent. Compound operators (`|=`, `^=`,
-			// `&=`, etc.) keep walking down because the chain continues.
-			if rb.OperatorToken.Kind == ast.KindEqualsToken {
-				// Use the source text from the start of the outermost
-				// assignment to the position of this `=` operator, so
-				// the chain's compound assignment operators (which are
-				// right-nested under the `|=` in tsgo's parse) are
-				// included in the LHS prefix. Trim any trailing
-				// whitespace so the operator separator below doesn't
-				// produce a double space.
-				outerStart := utils.TrimNodeTextRange(ctx.SourceFile, c.AsNode()).Pos()
-				equalsPos := utils.TrimNodeTextRange(ctx.SourceFile, rb.OperatorToken).Pos()
-				leftText = strings.TrimRight(ctx.SourceFile.Text()[outerStart:equalsPos], " \t")
-				rightNode = rb.Right
-				opNode = rb.OperatorToken
-				break
-			}
-			cur = rb
 		}
 		return mergeResult{
 			before:     leftText + " " + operatorText(opNode) + " ",
 			after:      ";",
 			consequent: rightNode,
-			alternate:  findMatchingRight(a, opNode),
+			alternate:  alternateNode,
 		}, true
 	}
 

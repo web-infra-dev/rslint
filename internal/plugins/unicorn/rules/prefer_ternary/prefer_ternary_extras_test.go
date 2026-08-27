@@ -141,6 +141,19 @@ if (t) { x = next; }`},
 }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `if (t) x = y = a; else x = z = b;`,
+				Output:   []string{`x = t ? (y = a) : (z = b);`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code: `let x = a; if (t) { x = b; } (foo)();`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "prefer-ternary",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "prefer-ternary/suggestion", Output: "const x = t ? b : a; (foo)();"}},
+				}},
+			},
 			// Parentheses around a conditional operand must suppress the merge.
 			// These deferred-member parameter defaults and constructor bodies are
 			// not evaluated when their object/class is created, so they may move.
