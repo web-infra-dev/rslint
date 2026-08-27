@@ -444,18 +444,7 @@ func buildFlippedText(sf *ast.SourceFile, node *ast.Node) string {
 	flippedOperator := scanner.TokenToString(flipOperatorKind(bin.OperatorToken.Kind))
 
 	flipped := rightText + textBeforeOperator + flippedOperator + textAfterOperator + leftText
-	flipped = utils.SafeReplacementText(sf, node, flipped)
-	if bin.Left.Kind == ast.KindRegularExpressionLiteral {
-		nodeRange := utils.TrimNodeTextRange(sf, node)
-		if after, ok := utils.TokenAtOrAfter(sf, nodeRange.End()); ok &&
-			after.Start == nodeRange.End() &&
-			(after.Kind == ast.KindInKeyword || after.Kind == ast.KindInstanceOfKeyword ||
-				after.Kind == ast.KindAsKeyword || after.Kind == ast.KindSatisfiesKeyword) &&
-			flipped[len(flipped)-1] != ' ' {
-			flipped += " "
-		}
-	}
-	return flipped
+	return utils.SafeReplacementText(sf, node, flipped)
 }
 
 // YodaRule requires or disallows "Yoda" conditions.

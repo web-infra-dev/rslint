@@ -70,6 +70,7 @@ func TestYodaExtras(t *testing.T) {
 			// spelled ----
 			{Code: `if (0 < 1 && 1 < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 			{Code: `if (0 < 1 && 0x1 < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
+			{Code: `if (0 < 0x10000000000000801 && 18446744073709552000 < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 			{Code: `if (0 < 'a' && "a" < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 			{Code: `if (0 < 1n && 1n < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
 			{Code: `if (0 < true && true < x) {}`, Options: []any{"never", map[string]any{"exceptRange": true}}},
@@ -269,6 +270,48 @@ func TestYodaExtras(t *testing.T) {
 				Code:    `/a/ < (x)satisfies number`,
 				Output:  []string{`(x) > /a/ satisfies number`},
 				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `1. > x++instanceof C`,
+				Output:  []string{`x++ < 1. instanceof C`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `1. > f()in obj`,
+				Output:  []string{`f() < 1. in obj`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `1. > (x)as number`,
+				Output:  []string{`(x) < 1. as number`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `1. > (x)satisfies number`,
+				Output:  []string{`(x) < 1. satisfies number`},
+				Options: "never",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `function f(){return(x) < /a/}`,
+				Output:  []string{`function f(){return /a/ > (x)}`},
+				Options: "always",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `function *f(){yield(x) < /a/}`,
+				Output:  []string{`function *f(){yield /a/ > (x)}`},
+				Options: "always",
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
+			},
+			{
+				Code:    `function f(){throw(x) < /a/}`,
+				Output:  []string{`function f(){throw /a/ > (x)}`},
+				Options: "always",
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected"}},
 			},
 

@@ -38,6 +38,19 @@ func TestRegExpLiteralStringValueCanonicalizesFlags(t *testing.T) {
 	}
 }
 
+func TestIsSameReferenceNumericLiteralUsesJavaScriptValue(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, `0x10000000000000801; 18446744073709552000;`, core.ScriptKindTS)
+
+	left := findNodeWithText(t, sourceFile, `0x10000000000000801`)
+	right := findNodeWithText(t, sourceFile, `18446744073709552000`)
+	if !IsSameReference(left, right, false) {
+		t.Fatal("IsSameReference() = false, want equal JavaScript Number values")
+	}
+}
+
 func TestIsESTreeLiteralKind(t *testing.T) {
 	literals := []ast.Kind{
 		ast.KindStringLiteral,

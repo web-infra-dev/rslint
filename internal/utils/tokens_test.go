@@ -64,3 +64,17 @@ func TestTokenBeforePositionAfterInterpolatedTemplate(t *testing.T) {
 		t.Fatalf("TokenBeforePosition() = %#v, %v, want the yield keyword", token, ok)
 	}
 }
+
+func TestCanTokenTextsBeAdjacentFixBoundaries(t *testing.T) {
+	for _, tt := range []struct {
+		left, right string
+	}{
+		{left: "return", right: "/a/"},
+		{left: "/a/", right: "instanceof"},
+		{left: "1.", right: "satisfies"},
+	} {
+		if CanTokenTextsBeAdjacent(tt.left, tt.right) {
+			t.Errorf("CanTokenTextsBeAdjacent(%q, %q) = true, want false", tt.left, tt.right)
+		}
+	}
+}

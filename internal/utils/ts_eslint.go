@@ -2002,7 +2002,9 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 	case ast.KindStringLiteral:
 		return left.AsStringLiteral().Text == right.AsStringLiteral().Text
 	case ast.KindNumericLiteral:
-		return NormalizeNumericLiteral(left.AsNumericLiteral().Text) == NormalizeNumericLiteral(right.AsNumericLiteral().Text)
+		leftValue, leftOK := GetStaticExpressionValue(left)
+		rightValue, rightOK := GetStaticExpressionValue(right)
+		return leftOK && rightOK && leftValue == rightValue
 	case ast.KindBigIntLiteral:
 		return NormalizeBigIntLiteral(left.AsBigIntLiteral().Text) == NormalizeBigIntLiteral(right.AsBigIntLiteral().Text)
 	case ast.KindRegularExpressionLiteral:

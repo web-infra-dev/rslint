@@ -145,6 +145,15 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 	if scanner.IsIdentifierPart(leftRune) && startsWithEscapedIdentifier(right) {
 		return false
 	}
+	// Keep a regexp delimiter distinct from a word-like token, and keep a
+	// trailing decimal point from swallowing the following word operator.
+	// These boundaries occur when fixes move regexp and `1.` literals next to
+	// statement keywords or operators such as `in`, `as`, and `satisfies`.
+	if (scanner.IsIdentifierPart(leftRune) && rightRune == '/') ||
+		(leftRune == '/' && scanner.IsIdentifierPart(rightRune)) ||
+		(leftRune == '.' && scanner.IsIdentifierPart(rightRune)) {
+		return false
+	}
 	if (leftRune == '+' && rightRune == '+') || (leftRune == '-' && rightRune == '-') {
 		return false
 	}
