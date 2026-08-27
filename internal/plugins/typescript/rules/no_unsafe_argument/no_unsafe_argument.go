@@ -63,26 +63,29 @@ func newFunctionSignature(
 
 	for i, param := range parameters {
 		t := typeChecker.GetTypeOfSymbolAtLocation(param, node)
+		constrainedType := checker.Checker_getBaseConstraintOfType(typeChecker, t)
+		if constrainedType == nil {
+			constrainedType = t
+		}
 
 		if len(param.Declarations) != 0 {
 			decl := param.Declarations[0]
 			if utils.IsRestParameterDeclaration(decl) {
-				// is a rest param
-				if checker.Checker_isArrayType(typeChecker, t) {
-					restT = restType{
-						Type:  checker.Checker_getTypeArguments(typeChecker, t)[0],
-						Index: i,
-						Kind:  restTypeKindArray,
-					}
-				} else if checker.IsTupleType(t) {
+				if checker.IsTupleType(constrainedType) {
 					restT = restType{
 						Index:         i,
 						Kind:          restTypeKindTuple,
-						TypeArguments: checker.Checker_getTypeArguments(typeChecker, t),
+						TypeArguments: checker.Checker_getTypeArguments(typeChecker, constrainedType),
+					}
+				} else if elementType := utils.GetNumberIndexType(typeChecker, constrainedType); elementType != nil {
+					restT = restType{
+						Type:  elementType,
+						Index: i,
+						Kind:  restTypeKindArray,
 					}
 				} else {
 					restT = restType{
-						Type:  t,
+						Type:  constrainedType,
 						Index: i,
 						Kind:  restTypeKindOther,
 					}

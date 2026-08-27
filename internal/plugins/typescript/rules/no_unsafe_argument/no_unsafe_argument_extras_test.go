@@ -369,6 +369,23 @@ optional();
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				// Locks in upstream FunctionSignature.create(): classify a generic rest parameter through its array constraint.
+				Code: `
+declare function acceptStrings<T extends string[]>(...values: T): void;
+function forward<T extends string[]>(value: any): void {
+  acceptStrings<T>(value);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    20,
+					EndLine:   4,
+					EndColumn: 25,
+				}},
+			},
+			{
 				// A non-array iterable still spreads its element type into the rest parameter.
 				Code: `
 declare function acceptStrings(...values: string[]): void;
