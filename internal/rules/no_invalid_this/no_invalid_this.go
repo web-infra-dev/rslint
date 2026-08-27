@@ -476,6 +476,9 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceF
 	if hasThisTagInLeadingComments(fn, comments, sf) {
 		return true
 	}
+	if fn.Kind == ast.KindFunctionDeclaration && hasThisTagAfterExportModifiers(fn, comments, sf) {
+		return true
+	}
 	if fn.Kind != ast.KindFunctionExpression {
 		return false
 	}
@@ -513,6 +516,41 @@ func hasJSDocThisTag(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceF
 		}
 		current = parent
 		parent = current.Parent
+	}
+	return false
+}
+
+// hasThisTagAfterExportModifiers handles exported declarations, whose ts-go
+// range begins at `export` while ESTree's declaration starts after the export
+// modifiers. Comments in that gap belong to the function upstream.
+func hasThisTagAfterExportModifiers(fn *ast.Node, comments []*ast.CommentRange, sf *ast.SourceFile) bool {
+	s := scanner.GetScannerForSourceFile(sf, fn.Pos())
+	exportModifierEnd := -1
+	for s.Token() != ast.KindEndOfFile && s.TokenStart() < fn.End() {
+		switch s.Token() {
+		case ast.KindExportKeyword, ast.KindDefaultKeyword:
+			exportModifierEnd = s.TokenEnd()
+		default:
+			if exportModifierEnd < 0 {
+				return false
+			}
+			declarationStart := s.TokenStart()
+			text := sf.Text()
+			pos := exportModifierEnd
+			idx := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= pos })
+			for i := idx; i < len(comments) && comments[i].Pos() < declarationStart; i++ {
+				comment := comments[i]
+				if !ecmascript.IsBlank(text[pos:comment.Pos()]) {
+					return false
+				}
+				if matchesThisTagPattern(stripCommentMarkers(text[comment.Pos():comment.End()], comment.Kind)) {
+					return true
+				}
+				pos = comment.End()
+			}
+			return false
+		}
+		s.Scan()
 	}
 	return false
 }

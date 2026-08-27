@@ -461,6 +461,8 @@ function setup() {
 			// ---- Shared source-type, JSDoc, callback, and field parity regressions ----
 			{Code: `export {}; this; function f(){ this; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 			{Code: `/* @thisX */ function g(){ this; }`},
+			{Code: `export /* @this */ function foo(){ this; }`},
+			{Code: `export default /* @this */ function foo(){ this; }`},
 			{Code: "/** \u00a0@this */ function g(){ this; }"},
 			{Code: "/** \ufeff@this */ function g(){ this; }"},
 			{Code: `/** @this */ const x = [function(){ this; }];`},

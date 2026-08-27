@@ -334,6 +334,8 @@ class BufferedLog {
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
 			},
 			{Code: `export {}; function f(){ /* @thisX */ function g(){ this; } }`},
+			{Code: `export /* @this */ function foo(){ this; }`},
+			{Code: `export default /* @this */ function foo(){ this; }`},
 			{Code: "export {}; function f(){ /** \u00a0@this */ function g(){ this; } }"},
 			{Code: "export {}; function f(){ /** \ufeff@this */ function g(){ this; } }"},
 			{Code: `export {}; /** @this */ const x = [function(){ this; }];`},
