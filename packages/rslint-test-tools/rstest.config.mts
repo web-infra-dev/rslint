@@ -594,6 +594,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/consistent-rstest-namespace.test.ts',
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
     './tests/rstest/rules/no-alias-methods.test.ts',

@@ -1,6 +1,7 @@
 package rstest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/consistent_rstest_namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/max_expects"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_alias_methods"
@@ -31,6 +32,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		consistent_rstest_namespace.ConsistentRstestNamespaceRule,
 		expect_expect.ExpectExpectRule,
 		max_expects.MaxExpectsRule,
 		no_alias_methods.NoAliasMethodsRule,
