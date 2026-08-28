@@ -597,9 +597,9 @@ func reportLetPlusIfProblem(ctx rule.RuleContext, p *letPlusIfProblem) {
 // parentheses, a `new` inside a binary expression) are still caught.
 // ArrowFunction, FunctionExpression, FunctionDeclaration, and
 // method/accessor bodies short-circuit to false: their bodies do not run
-// until invoked. The method/accessor case still walks the immediately
-// evaluated name (computed keys) and parameter initializers, so an effect
-// inside a computed key or default value is still surfaced.
+// until invoked. The method/accessor case still walks immediately evaluated
+// metadata such as decorators and computed names, while skipping parameters
+// and body.
 func hasSideEffect(node *ast.Node) bool {
 	if node == nil {
 		return false
