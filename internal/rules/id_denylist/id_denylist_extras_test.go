@@ -281,6 +281,12 @@ function foo(a: any) {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTes
 				Errors:          []rule_tester.InvalidTestCaseError{restricted("Promise", 1, 11)},
 			},
 			{
+				Code:            "namespace Number {} Number;",
+				Options:         deny("Number"),
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors:          []rule_tester.InvalidTestCaseError{restricted("Number", 1, 11), restricted("Number", 1, 21)},
+			},
+			{
 				Code:            "namespace Promise.Inner {} Promise;",
 				Options:         deny("Promise"),
 				LanguageOptions: rule.LanguageOptions{SourceType: "script"},

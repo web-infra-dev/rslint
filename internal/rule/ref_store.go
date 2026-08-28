@@ -842,7 +842,9 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
 	if ast.IsExpressionNode(n) {
-		return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
+		// A namespace declaration can be referenced as a value expression
+		// (`namespace N {}; N`), even when it contains no value member.
+		return ast.SymbolFlagsValue | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
 	// Leftmost qualifier of a non-expression entity name (`A` in `let x: A.B`)
 	// names a namespace. Expression and typeof chains were handled above.

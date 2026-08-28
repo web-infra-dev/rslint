@@ -994,6 +994,14 @@ func TestRefStoreGlobalReferenceProgramScopeSemantics(t *testing.T) {
 			want:       true,
 		},
 		{
+			name:       "namespace module declaration binds value reference",
+			fileName:   "/file.ts",
+			scriptKind: core.ScriptKindTS,
+			sourceType: "module",
+			source:     "namespace Promise {} Promise;",
+			want:       false,
+		},
+		{
 			name:       "dotted namespace leaves built-in global uncontrollable",
 			fileName:   "/file.ts",
 			scriptKind: core.ScriptKindTS,
