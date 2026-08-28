@@ -641,7 +641,7 @@ func TestEslintPluginWire_RoundTrip(t *testing.T) {
 			Settings:        map[string]any{"foo": "bar"},
 		}},
 		Rules:           map[string]EslintPluginRuleConfig{"p/r": {Options: []any{"opt"}}},
-		Fix:             true,
+		CollectFixes:    true,
 		SuggestionsMode: "eager",
 	}
 	data, err := json.Marshal(req)
@@ -652,10 +652,13 @@ func TestEslintPluginWire_RoundTrip(t *testing.T) {
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal request: %v", err)
 	}
-	for _, k := range []string{"files", "rules", "fix", "suggestionsMode"} {
+	for _, k := range []string{"files", "rules", "collectFixes", "suggestionsMode"} {
 		if _, ok := got[k]; !ok {
 			t.Errorf("request JSON missing top-level key %q", k)
 		}
+	}
+	if _, ok := got["fix"]; ok {
+		t.Error(`request JSON unexpectedly contains obsolete key "fix"`)
 	}
 	f0 := got["files"].([]any)[0].(map[string]any)
 	for _, k := range []string{"path", "text", "configKey", "languageOptions", "settings"} {

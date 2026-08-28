@@ -338,6 +338,20 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 		},
 		// Assignment targets are diagnosed without an unsafe optional-chain suggestion.
 		{
+			Code: `x!.y = value;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noNonNull",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 3,
+				},
+			},
+		},
+		// Match upstream's direct-assignee check: an inner member expression in
+		// a longer assignment target still receives the suggestion.
+		{
 			Code: `x!.y.z = value;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -346,6 +360,43 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 					Column:    1,
 					EndLine:   1,
 					EndColumn: 3,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "suggestOptionalChain",
+							Output:    `x?.y.z = value;`,
+						},
+					},
+				},
+			},
+		},
+		// Upstream direct-assignee regression cases.
+		{
+			Code: `document.querySelector('input')!.files = new FileList();`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noNonNull",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 33,
+				},
+			},
+		},
+		{
+			Code: `hoge.files = document.querySelector('input')!.files;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noNonNull",
+					Line:      1,
+					Column:    14,
+					EndLine:   1,
+					EndColumn: 46,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "suggestOptionalChain",
+							Output:    `hoge.files = document.querySelector('input')?.files;`,
+						},
+					},
 				},
 			},
 		},
@@ -443,7 +494,7 @@ property!.value;
 optional!?.value;
 element![key];
 callback!();
-target!.value.deep = replacement;`
+target!.value = replacement;`
 
 	diagnosticsOnly := runNoNonNullAssertionWithDemand(t, code, rule.EditDemandNone)
 	autofixDemand := runNoNonNullAssertionWithDemand(t, code, rule.EditDemandAutofix)
@@ -479,7 +530,7 @@ target!.value.deep = replacement;`
 		sourceTexts  []string
 		replacements []string
 	}{
-		{index: 1, sourceTexts: []string{"!", "."}, replacements: []string{"", "?."}},
+		{index: 1, sourceTexts: []string{"!"}, replacements: []string{"?"}},
 		{index: 2, sourceTexts: []string{"!"}, replacements: []string{""}},
 		{index: 3, sourceTexts: []string{"!"}, replacements: []string{"?."}},
 		{index: 4, sourceTexts: []string{"!"}, replacements: []string{"?."}},
@@ -507,6 +558,51 @@ target!.value.deep = replacement;`
 				)
 			}
 		}
+	}
+}
+
+func TestNoNonNullAssertionAssigneeParity(t *testing.T) {
+	tests := []struct {
+		name           string
+		code           string
+		wantSuggestion bool
+	}{
+		{name: "direct assignment", code: `target!.value = replacement;`},
+		{name: "compound assignment", code: `target![key] += replacement;`},
+		{name: "logical assignment", code: `target!.value &&= replacement;`},
+		{name: "delete", code: `delete target!.value;`},
+		{name: "postfix update", code: `target!.value++;`},
+		{name: "prefix update", code: `--target![key];`},
+		{name: "array destructuring", code: `([target!.value] = source);`},
+		{name: "array rest destructuring", code: `([...target!.value] = source);`},
+		{name: "object rest destructuring", code: `({...target!.value} = source);`},
+		{name: "object destructuring", code: `({ value: target!.value } = source);`},
+		{name: "as expression", code: `(target!.value as number)++;`},
+		{name: "type assertion", code: `(<number>target!.value)++;`},
+		{name: "satisfies expression", code: `(target!.value satisfies number)++;`},
+		{name: "parenthesized expression", code: `(target!.value)++;`},
+		{name: "nested property assignment", code: `target!.value.deep = replacement;`, wantSuggestion: true},
+		{name: "nested element assignment", code: `target![key].deep = replacement;`, wantSuggestion: true},
+		{name: "array assignment pattern", code: `([target!.value = fallback] = source);`, wantSuggestion: true},
+		{name: "object assignment pattern", code: `({ value: target!.value = fallback } = source);`, wantSuggestion: true},
+		{name: "right hand side", code: `replacement = target!.value;`, wantSuggestion: true},
+		{name: "array value", code: `[target!.value];`, wantSuggestion: true},
+		{name: "array spread value", code: `[...target!.value];`, wantSuggestion: true},
+		{name: "object value", code: `({ value: target!.value });`, wantSuggestion: true},
+		{name: "object spread value", code: `({...target!.value});`, wantSuggestion: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			diagnostics := runNoNonNullAssertionWithDemand(t, test.code, rule.EditDemandSuggestion)
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics = %d, want 1: %#v", len(diagnostics), diagnostics)
+			}
+			hasSuggestion := diagnostics[0].Suggestions != nil && len(*diagnostics[0].Suggestions) > 0
+			if hasSuggestion != test.wantSuggestion {
+				t.Fatalf("suggestion presence = %t, want %t: %#v", hasSuggestion, test.wantSuggestion, diagnostics[0].Suggestions)
+			}
+		})
 	}
 }
 

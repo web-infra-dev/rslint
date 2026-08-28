@@ -73,7 +73,11 @@ function unknownSuggestIdMsg(
 // from the loc/node-range branches.
 const NODE = { type: 'Identifier', range: [0, 3] as [number, number] } as never;
 
-function build(descriptor: unknown, messages: Record<string, string>) {
+function build(
+  descriptor: unknown,
+  messages: Record<string, string>,
+  suggestionsMode: 'off' | 'eager' = 'off',
+) {
   return buildDiagnostic({
     ruleName: 'test/rule',
     // descriptor is an `unknown` test input projected onto the typed
@@ -83,7 +87,7 @@ function build(descriptor: unknown, messages: Record<string, string>) {
     messages,
     fixer: makeFixer(),
     collectFixes: false,
-    suggestionsMode: 'off',
+    suggestionsMode,
   });
 }
 
@@ -292,6 +296,43 @@ describe('#2 suggest[] validation matches ESLint validateSuggestions', () => {
     expect(diag).not.toBeNull();
     expect(diag!.suggestions).toHaveLength(1);
     expect(diag!.suggestions![0].desc).toBe('inline desc');
+  });
+
+  test('eager mode omits a suggestion whose fixer produces no edit', () => {
+    const diag = build(
+      {
+        node: NODE,
+        message: 'm',
+        suggest: [{ messageId: 'real', fix: () => null }],
+      },
+      messages,
+      'eager',
+    );
+    expect(diag).not.toBeNull();
+    expect(diag!.suggestions).toBeUndefined();
+  });
+
+  test('eager mode retains a suggestion with a materialized edit', () => {
+    const diag = build(
+      {
+        node: NODE,
+        message: 'm',
+        suggest: [
+          {
+            messageId: 'real',
+            fix: (fixer: ReturnType<typeof makeFixer>) =>
+              fixer.replaceTextRange([0, 3], 'bar'),
+          },
+        ],
+      },
+      messages,
+      'eager',
+    );
+    expect(diag).not.toBeNull();
+    expect(diag!.suggestions).toHaveLength(1);
+    expect(diag!.suggestions![0].fixes).toEqual([
+      { range: [0, 3], text: 'bar' },
+    ]);
   });
 });
 

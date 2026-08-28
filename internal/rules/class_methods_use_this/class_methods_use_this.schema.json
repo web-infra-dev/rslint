@@ -1,0 +1,28 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "exceptMethods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enforceForClassFields": {
+          "type": "boolean"
+        },
+        "ignoreOverrideMethods": {
+          "type": "boolean"
+        },
+        "ignoreClassesWithImplements": {
+          "enum": ["all", "public-fields"]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

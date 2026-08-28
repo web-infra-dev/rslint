@@ -618,8 +618,9 @@ Important behavior differences by integration:
 - **LSP quick fix**: returns direct text edits for one diagnostic
 - **LSP fix-all**: materializes isolated speculative generations for repeated
   core-owned memory rounds, then returns one whole-document replacement edit
-- **LSP normal diagnostics and API**: request all native edits because fixes and
-  suggestions are response metadata even when they are not immediately applied
+- **LSP normal diagnostics and API**: request all native and third-party plugin
+  edits because fixes and suggestions are response metadata even when they are
+  not immediately applied
 - **LSP speculative fix-all passes**: request native autofixes only
 - **API**: `lint({ fix: true })` selects the same linter-owned ten-round autofix
   lifecycle as CLI and requests a complete final observation. Diagnostics,
@@ -1458,7 +1459,7 @@ JSON config supports only bundled plugin names because it cannot represent live 
 ### Integration Points
 
 - **Language Server**: `internal/lsp` exposes diagnostics and code actions
-- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `2.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
+- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 
@@ -1560,19 +1561,30 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **TypeScript Boundary**: All TypeScript integration goes through typescript-go
 - **No Circular Dependencies**: Enforced by Go module system
 
-### Key Interfaces
+### Lint Path Ownership
 
-- **Config + Rule Catalog → Configured Rules**: map each merged config shape and explicitly supplied immutable catalog into one `RuleEnvironment` plus enabled `ConfiguredRule` descriptors that share it
-- **Config → Target Planning**: config owns authored path spaces and matching policy; target planning owns walking, owner routing, explicit-file outcomes, and the stable lint-target plan. The dependency is one-way from `internal/config/target` to `internal/config`
-- **Target Plan → Program Loader**: the loader consumes the immutable target plan, owns configured project construction and target-to-Program binding, and cannot widen or reinterpret the plan
-- **Program Loader → Integrations**: CLI/API receive one ordered rslint Program sequence plus parallel target/path projections and never select or inspect a Program backend; LSP wraps its session-owned Programs directly
-- **Program Targets → Lint Plan**: `PrepareLintPlan` accepts only the exact target projection already bound to those Programs and resolves rules once; it cannot scan Program roots, discover or exclude files, or reinterpret target ownership, and it rejects a target missing from its bound Program
-- **Lint Plan → Execution**: `RunLinter` consumes the immutable plan as the sole Program authority plus execution-only concerns. It cannot recollect targets or re-resolve rules; a nil plan means no lint phase, and only that planless type-check-only path supplies Programs separately
-- **Programs → Linter**: immutable rslint `program.Program` instances are the only source-universe authority; private adapter identity is unobservable, while per-file checker and program-wide diagnostic availability are queried as capabilities rather than inferred from construction
-- **Rules → RuleContext**: rules receive one rslint Program and the checker actually granted to that file. Module graphs and other shared structures derive from Program rather than adding parallel context authority
-- **Integrations → Linter / Inspector**:
-  - CLI/API/LSP use the linter
-  - Playground inspection uses the inspector
+The production lint path is a one-way handoff:
+
+```
+Config / discovery
+  → frozen targets and config ownership
+  → Program generation and exact target binding
+  → prepared LintPlan
+  → RunPipeline
+  → integration projection and optional terminal commit
+```
+
+Downstream stages may validate or project an upstream decision, but do not
+repeat it under a second source of truth.
+
+- **Targets and config**: target selection and config ownership are frozen before Program binding (`target.Plan` for CLI/API and a document snapshot for LSP). Later stages do not add lint targets, rediscover configs, or reassign owners
+- **Program generation**: each published `program.Program` is one logically immutable source, module-resolution, filesystem, and optional-checker generation. CLI/API build it through `internal/program/loader`; LSP adapts its session or isolated overlay without exposing the private backend
+- **Lint plan**: `PrepareLintPlan` accepts only files already bound to those Programs and freezes each file's rules, shared environment, and checker eligibility. Execution does not scan Program roots or resolve config and rules again
+- **Pipeline**: `RunPipeline` is the production orchestration boundary. CLI, API, and LSP choose a complete request and provide generation, plugin transport, presentation, or commit adapters; raw preparation, native lint, plugin dispatch, and fix stages are not product integration APIs
+- **Autofix**: fix rounds advance only pipeline-owned in-memory snapshots. Integrations receive the final in-memory delta for the operation, and optional persistence is one terminal commit rather than a series of intermediate writes
+- **Rules**: `RuleContext` exposes the bound Program and only the checker granted to that file. Shared structures such as module graphs derive from the Program generation rather than becoming a second authority
+
+Playground inspection is a separate read-only path through `internal/inspector`.
 
 ## 15. Data Flow (Textual Diagram)
 
@@ -1614,7 +1626,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │  Match Config Shape -> Reuse/Merge Immutable Config and Enabled Rules        │
 │            │                                                                 │
 │            ▼                                                                 │
-│  Prepared Lint Plan (Exact Targets + Rules + Checker Eligibility)            │
+│  RunPipeline: Prepared Lint Plan (Exact Targets + Rules + Checker Grant)     │
 │            │                                                                 │
 │            ▼                                                                 │
 │  Run Rule Initializers -> Register Listeners                                 │
@@ -1653,7 +1665,10 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │  internal/lsp + ts-go project.Session                                        │
 │     │                                                                        │
 │     ▼                                                                        │
-│  LintSingleFile on session Program (per-file LSP path)                       │
+│  Frozen Document Snapshot + Session / Overlay Program Generation             │
+│     │                                                                        │
+│     ▼                                                                        │
+│  RunPipeline (Progressive Diagnostics or In-Memory Fix All)                  │
 │     │                                                                        │
 │     ▼                                                                        │
 │  LSP Diagnostics / Quick Fix / Fix All                                       │
