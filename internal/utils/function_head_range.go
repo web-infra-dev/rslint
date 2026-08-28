@@ -23,9 +23,9 @@ func NewFunctionHeadRangeLocator(sourceFile *ast.SourceFile) *FunctionHeadRangeL
 // Range returns the report range for node's function head.
 func (l *FunctionHeadRangeLocator) Range(node *ast.Node) core.TextRange {
 	// GetFunctionHeadLoc has to reproduce SourceCode.getTokenBefore() for a
-	// single-parameter field arrow. Its general implementation scans from the
-	// start of the source file, which becomes quadratic when a rule reports many
-	// such fields. The owning field gives us a narrow, local token boundary.
+	// single-parameter field arrow. Its general implementation lazily builds a
+	// token index for the whole file; the owning field gives rules that only
+	// need these report ranges a narrower, local token boundary.
 	if loc, ok := l.singleParameterFieldArrowHeadRange(node); ok {
 		return loc
 	}
@@ -35,7 +35,7 @@ func (l *FunctionHeadRangeLocator) Range(node *ast.Node) core.TextRange {
 	switch {
 	case isFunctionHeadMember(node):
 	case node.Kind == ast.KindArrowFunction || node.Kind == ast.KindFunctionExpression:
-		owner := ast.WalkUpParenthesizedExpressions(node.Parent)
+		owner := ESTreeParent(node)
 		if owner == nil || owner.Kind != ast.KindPropertyDeclaration ||
 			ast.HasSyntacticModifier(owner, ast.ModifierFlagsAccessor) {
 			return loc
@@ -60,7 +60,7 @@ func (l *FunctionHeadRangeLocator) singleParameterFieldArrowHeadRange(node *ast.
 		return core.TextRange{}, false
 	}
 
-	owner := ast.WalkUpParenthesizedExpressions(node.Parent)
+	owner := ESTreeParent(node)
 	if owner == nil {
 		return core.TextRange{}, false
 	}
@@ -73,14 +73,18 @@ func (l *FunctionHeadRangeLocator) singleParameterFieldArrowHeadRange(node *ast.
 	default:
 		return core.TextRange{}, false
 	}
+	initializer := owner.Initializer()
+	if initializer == nil ||
+		(initializer != node && ESTreeRuntimeExpression(initializer) != node) {
+		return core.TextRange{}, false
+	}
 
 	parameterStart := TrimNodeTextRange(l.sourceFile, arrow.Parameters.Nodes[0]).Pos()
-	scanStart := TrimNodeTextRange(l.sourceFile, node).Pos()
-	if parent := node.Parent; parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		// A parenless arrow can itself be wrapped: `field = (value => {})`.
-		// ESLint sees no wrapper node, so that `(` is the token before `value`.
-		scanStart = TrimNodeTextRange(l.sourceFile, parent).Pos()
-	}
+	// Start at the owning property's initializer. This is the narrowest source
+	// boundary that includes every ESTree-elided parenthesis and JSDoc cast
+	// around the arrow, so the scan still observes a `(` immediately before a
+	// single parameter without falling back to a file-wide token lookup.
+	scanStart := TrimNodeTextRange(l.sourceFile, initializer).Pos()
 
 	end := parameterStart
 	var previousKind ast.Kind
@@ -89,8 +93,7 @@ func (l *FunctionHeadRangeLocator) singleParameterFieldArrowHeadRange(node *ast.
 	if l.tokens == nil {
 		l.tokens = scanner.NewScanner()
 	}
-	// Reuse one scanner per file: constructing one for every report would trade
-	// the quadratic scan for avoidable per-diagnostic allocations.
+	// Reuse one scanner per file to avoid per-diagnostic allocations.
 	l.tokens.SetText(l.sourceFile.Text())
 	l.tokens.SetLanguageVariant(l.sourceFile.LanguageVariant)
 	l.tokens.ResetTokenState(scanStart)

@@ -112,6 +112,10 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 			// ---- Dimension 4: class-field function wrappers ----
 			{Code: `class C { foo = (() => { this.value; }); }`},
 			{Code: `class C { foo = (function () { this.value; }); }`},
+			// Authored TypeScript wrappers remain visible in ESTree and therefore
+			// keep the function from being a direct class-field value.
+			{Code: `class C { foo = ((() => {}) as unknown); }`},
+			{Code: `class C { foo = ((() => {}) satisfies unknown); }`},
 
 			// ---- Real-user: eslint/eslint#17976 — explicit override opt-out ----
 			{
@@ -161,19 +165,118 @@ func TestClassMethodsUseThisExtras(t *testing.T) {
 				Code:     `class A { field = /** @type {() => void} */ (() => {}); }`,
 				FileName: "jsdoc-cast-arrow.js",
 				TSConfig: "tsconfig.allow-js.json",
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis"}},
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 46,
+				)},
 			},
 			{
 				Code:     `class A { field = /** @type {() => void} */ (function () {}); }`,
 				FileName: "jsdoc-cast-function.js",
 				TSConfig: "tsconfig.allow-js.json",
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis"}},
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 55,
+				)},
 			},
 			{
 				Code:     `class A { field = /** @satisfies {() => void} */ (() => {}); }`,
 				FileName: "jsdoc-satisfies-arrow.js",
 				TSConfig: "tsconfig.allow-js.json",
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis"}},
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 51,
+				)},
+			},
+			{
+				Code:     `class A { #field = /** @type {Function} */ (async () => {}); }`,
+				FileName: "jsdoc-private-async-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class private async method #field.",
+					1, 11, 1, 51,
+				)},
+			},
+			{
+				Code:     `class A { field = /** @type {Function} */ (/** @satisfies {Function} */ (() => {})); }`,
+				FileName: "nested-jsdoc-casts.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 74,
+				)},
+			},
+			{
+				Code:     `class A { field = /** @type {(value: unknown) => void} */ (value => {}); }`,
+				FileName: "jsdoc-single-param-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 59,
+				)},
+			},
+			{
+				Code:     `class A { field = /** @satisfies {(value: unknown) => void} */ (value => {}); }`,
+				FileName: "jsdoc-satisfies-single-param-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 64,
+				)},
+			},
+			{
+				Code:     `class A { field = /** @type {(value: unknown) => void} */ ((value => {})); }`,
+				FileName: "jsdoc-parenthesized-single-param-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 60,
+				)},
+			},
+			{
+				Code:     `class A { field = /** @type {(value: unknown) => Promise<void>} */ (async value => {}); }`,
+				FileName: "jsdoc-async-single-param-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class async method 'field'.",
+					1, 11, 1, 75,
+				)},
+			},
+			{
+				Code:     `class A { @dec field = /** @type {Function} */ (value => {}); }`,
+				FileName: "decorated-jsdoc-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 48,
+				)},
+			},
+			{
+				Code:     `class A { @dec field = /** @type {Function} */ (() => {}); }`,
+				FileName: "decorated-jsdoc-zero-param-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 49,
+				)},
+			},
+			{
+				Code:     `class A { @dec field = /** @type {Function} */ (function () {}); }`,
+				FileName: "decorated-jsdoc-function-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class method 'field'.",
+					1, 11, 1, 58,
+				)},
+			},
+			{
+				Code:     `class A { accessor field = /** @type {Function} */ (value => {}); }`,
+				FileName: "jsdoc-auto-accessor.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{missingThisAt(
+					"Expected 'this' to be used by class arrow function.",
+					1, 59, 1, 61,
+				)},
 			},
 
 			// Abstract properties do not create a frame, but the following
