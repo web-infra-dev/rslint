@@ -322,7 +322,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-structured-clone': 'error', // not implemented
     // 'unicorn/prefer-switch': 'error', // not implemented
     // 'unicorn/prefer-temporal': 'off', // not implemented
-    // 'unicorn/prefer-ternary': 'error', // not implemented
+    'unicorn/prefer-ternary': 'error',
     // 'unicorn/prefer-then-catch': 'error', // not implemented
     // 'unicorn/prefer-toggle-attribute': 'error', // not implemented
     // 'unicorn/prefer-top-level-await': 'error', // not implemented
