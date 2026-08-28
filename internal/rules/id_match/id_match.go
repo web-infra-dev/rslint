@@ -78,9 +78,10 @@ func parseOptions(options []any) idMatchOptions {
 }
 
 type idMatch struct {
-	ctx     rule.RuleContext
-	opts    idMatchOptions
-	pattern *esregexp.RegExp
+	ctx                rule.RuleContext
+	opts               idMatchOptions
+	pattern            *esregexp.RegExp
+	defaultTypeGlobals map[string]bool
 }
 
 func messageNotMatch(name, pattern string) rule.RuleMessage {
@@ -357,7 +358,7 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 	// tsconfig owns and stays quiet in one a tsconfig does. This list is the
 	// type-capable global scope typescript-eslint seeds, which is where its
 	// own scope model finds these names.
-	if rule.IsDefaultTypeScriptTypeGlobal(name) && !r.isDeclaredInFile(node, name) {
+	if r.isDefaultTypeGlobal(name) && !r.isDeclaredInFile(node, name) {
 		return true
 	}
 	symbol := r.ctx.Refs.Resolve(node)
@@ -366,6 +367,26 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 		return false
 	}
 	return !utils.IsSymbolDeclaredInFile(symbol, r.ctx.SourceFile)
+}
+
+// isDefaultTypeGlobal reports whether name belongs to the active TypeScript
+// default libraries. Source-only Programs have no checker from which to read
+// configured libraries, so they retain typescript-eslint's default catalog;
+// compiler-backed Programs derive the set from their actual `lib` / `noLib`
+// configuration instead.
+func (r *idMatch) isDefaultTypeGlobal(name string) bool {
+	if !rule.IsDefaultTypeScriptTypeGlobal(name) {
+		return false
+	}
+	program := r.ctx.Program()
+	if program == nil || r.ctx.TypeChecker == nil {
+		return true
+	}
+	if r.defaultTypeGlobals == nil {
+		r.defaultTypeGlobals = make(map[string]bool)
+		utils.AddDefaultLibraryTypeGlobalNames(r.defaultTypeGlobals, program, r.ctx.TypeChecker)
+	}
+	return r.defaultTypeGlobals[name]
 }
 
 // isTypeGlobalReference reports whether node is a reference that can resolve
