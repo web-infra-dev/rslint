@@ -1,7 +1,7 @@
 // TestThrowNewErrorUpstream migrates the valid/invalid suite from upstream
 // test/throw-new-error.js 1:1. Position assertions cover line/column for every
-// invalid case. TypeScript-only cases (decorator syntax) and rslint-specific
-// lock-in cases live in throw_new_error_extras_test.go.
+// invalid case. rslint-specific lock-in cases live in
+// throw_new_error_extras_test.go.
 package throw_new_error_test
 
 import (
@@ -57,6 +57,20 @@ func TestThrowNewErrorUpstream(t *testing.T) {
 			// https://github.com/sindresorhus/eslint-plugin-unicorn/issues/2654
 			// `Data.TaggedError` is a factory, not a constructor.
 			{Code: `class QueryError extends Data.TaggedError('QueryError') {}`},
+			validIn("file.ts", `function RegisterServiceError() {
+	return function <T extends new (...arguments_: any[]) => Error>(constructor: T) {
+		return constructor;
+	};
+}
+
+@RegisterServiceError()
+export class SomeError extends Error {}`),
+			validIn("file.ts", `@decorators.RegisterServiceError()
+export class SomeError extends Error {}`),
+			validIn("file.ts", `class Service {
+	@OnQueueError()
+	handle() {}
+}`),
 		},
 		[]rule_tester.InvalidTestCase{
 			invalid(`throw Error()`, `Error()`),
@@ -92,8 +106,20 @@ func TestThrowNewErrorUpstream(t *testing.T) {
 				"function foo() {\n\treturn[globalThis][0].Error('message');\n}",
 				`[globalThis][0].Error('message')`,
 			),
+			invalidIn("file.ts", `@Decorator(Error())
+export class SomeError extends Error {}`, `Error()`),
 		},
 	)
+}
+
+func validIn(fileName string, code string) rule_tester.ValidTestCase {
+	return rule_tester.ValidTestCase{Code: code, FileName: fileName}
+}
+
+func invalidIn(fileName string, code string, target string) rule_tester.InvalidTestCase {
+	testCase := invalid(code, target)
+	testCase.FileName = fileName
+	return testCase
 }
 
 // invalid reports the position of the single call expression named by target.

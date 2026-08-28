@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const messageID = "throw-new-error"
@@ -54,18 +55,17 @@ var ThrowNewErrorRule = rule.Rule{
 					return
 				}
 
-				// A decorator call is not a construction site.
-				if node.Parent != nil && node.Parent.Kind == ast.KindDecorator {
+				// A decorator call is not a construction site. Skip syntax that
+				// tsgo preserves or synthesizes but ESTree does not expose.
+				parent := utils.ESTreeParent(node)
+				if parent != nil && parent.Kind == ast.KindDecorator {
 					return
 				}
 
-				// ESTree unwraps parentheses transparently; tsgo keeps
-				// ParenthesizedExpression nodes, so the callee has to be
-				// unwrapped before it is classified. Only parentheses are
-				// skipped, not TS assertions, so that a callee such as
-				// `(Error as any)` stays unreported exactly as upstream
-				// leaves it.
-				callee := ast.SkipParentheses(call.Expression)
+				// ESTree omits parentheses and JavaScript JSDoc casts. Authored
+				// TypeScript assertions remain intact, so a callee such as
+				// `(Error as any)` stays unreported exactly as upstream leaves it.
+				callee := utils.ESTreeRuntimeExpression(call.Expression)
 				if callee == nil {
 					return
 				}
@@ -74,7 +74,7 @@ var ThrowNewErrorRule = rule.Rule{
 				// The optional-chain flag stops at a parenthesis — `(a?.b).c`
 				// ends the chain — but upstream's hasOptionalChainElement keeps
 				// walking through it and skips the call either way.
-				if hasOptionalChainElement(callee) {
+				if unicornutil.HasOptionalChainElement(callee) {
 					return
 				}
 
@@ -90,49 +90,6 @@ var ThrowNewErrorRule = rule.Rule{
 			},
 		}
 	},
-}
-
-// hasOptionalChainElement reports whether any link of the callee chain is
-// optional, mirroring upstream's helper of the same name.
-//
-// `new` cannot be applied to an optional-chained call, so `Error?.()`,
-// `lib?.Error()`, `lib?.foo.Error()` and `(lib?.mod).Error()` are all left
-// alone.
-func hasOptionalChainElement(node *ast.Node) bool {
-	for current := node; current != nil; {
-		if ast.IsOptionalChain(current) {
-			return true
-		}
-		switch current.Kind {
-		case ast.KindCallExpression:
-			call := current.AsCallExpression()
-			if call == nil {
-				return false
-			}
-			current = ast.SkipParentheses(call.Expression)
-		case ast.KindPropertyAccessExpression:
-			access := current.AsPropertyAccessExpression()
-			if access == nil {
-				return false
-			}
-			current = ast.SkipParentheses(access.Expression)
-		case ast.KindElementAccessExpression:
-			access := current.AsElementAccessExpression()
-			if access == nil {
-				return false
-			}
-			current = ast.SkipParentheses(access.Expression)
-		case ast.KindNonNullExpression:
-			nonNull := current.AsNonNullExpression()
-			if nonNull == nil {
-				return false
-			}
-			current = ast.SkipParentheses(nonNull.Expression)
-		default:
-			return false
-		}
-	}
-	return false
 }
 
 // isCustomErrorCallee reports whether callee names an error constructor: a bare
