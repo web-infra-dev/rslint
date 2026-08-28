@@ -618,8 +618,9 @@ Important behavior differences by integration:
 - **LSP quick fix**: returns direct text edits for one diagnostic
 - **LSP fix-all**: materializes isolated speculative generations for repeated
   core-owned memory rounds, then returns one whole-document replacement edit
-- **LSP normal diagnostics and API**: request all native edits because fixes and
-  suggestions are response metadata even when they are not immediately applied
+- **LSP normal diagnostics and API**: request all native and third-party plugin
+  edits because fixes and suggestions are response metadata even when they are
+  not immediately applied
 - **LSP speculative fix-all passes**: request native autofixes only
 - **API**: `lint({ fix: true })` selects the same linter-owned ten-round autofix
   lifecycle as CLI and requests a complete final observation. Diagnostics,
@@ -1458,7 +1459,7 @@ JSON config supports only bundled plugin names because it cannot represent live 
 ### Integration Points
 
 - **Language Server**: `internal/lsp` exposes diagnostics and code actions
-- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `2.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
+- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 
