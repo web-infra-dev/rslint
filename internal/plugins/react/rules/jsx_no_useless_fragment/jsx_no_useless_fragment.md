@@ -8,7 +8,9 @@ child, or if it is the child of an HTML element, and is not a
 
 Both fragment spellings are checked: the `<>…</>` shorthand and the long form
 named by the `react` / `fragment` shared settings (`<Fragment>` and
-`<React.Fragment>` by default).
+`<React.Fragment>` by default). A `@jsx` annotation in the file — such as
+`/** @jsx Preact.h */` — renames the object half of the long form for that file
+and takes precedence over `settings.react.pragma`.
 
 Examples of **incorrect** code for this rule:
 

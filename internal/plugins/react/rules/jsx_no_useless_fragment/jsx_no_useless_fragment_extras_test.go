@@ -71,6 +71,22 @@ func TestJsxNoUselessFragmentExtras(t *testing.T) {
 		{Code: `<>{foo()}</>`, Tsx: true},
 		{Code: `<>{foo.bar()}</>`, Tsx: true},
 
+		// ---- Dimension 4: the `@jsx` annotation renames the pragma ----
+		// Upstream's pragmaUtil reads the annotation before `settings.react`,
+		// so under a Preact pragma `<React.Fragment>` is an ordinary component
+		// and must not be reported.
+		{Code: "/** @jsx Preact.h */\n<React.Fragment>{value}</React.Fragment>;", Tsx: true},
+		// An annotation that is not a valid identifier falls back to `React`,
+		// matching upstream's warn-and-default path, so the configured pragma
+		// is ignored once any annotation is present.
+		{Code: "/** @jsx Foo-Bar */\n<Preact.Fragment>{value}</Preact.Fragment>;", Tsx: true, Settings: fragmentSettings("Preact", "")},
+		// `@jsxFrag` is not `@jsx`: upstream's `/@jsx\s+/` needs whitespace
+		// straight after the marker, and the fragment pragma is settings-only.
+		{Code: "/** @jsxFrag Preact.Fragment */\n<Preact.Fragment>{value}</Preact.Fragment>;", Tsx: true},
+		// The annotation is read from comments, not from arbitrary source
+		// text, so a string literal cannot rename the pragma.
+		{Code: "const marker = '@jsx Preact.h';\n<Preact.Fragment>{value}</Preact.Fragment>;", Tsx: true},
+
 		// ---- Nesting / traversal boundaries ----
 		// A fragment whose parent is another fragment is never a child of an
 		// HTML element, and two children keep it useful.
@@ -133,6 +149,73 @@ func TestJsxNoUselessFragmentExtras(t *testing.T) {
 				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
 			},
 		},
+		// ---- Dimension 4: a dynamic import is not a call expression ----
+		// ESTree models `import("x")` as an ImportExpression, so upstream's
+		// call-expression exemption does not apply; tsgo parses it as a
+		// KindCallExpression with an ImportKeyword callee.
+		{
+			Code: `<>{import("x")}</>`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+			},
+		},
+
+		// ---- Dimension 4: JSX spread children are not expression containers ----
+		// ESTree gives `{...value}` its own JSXSpreadChild type, which none of
+		// upstream's `type === 'JSXExpressionContainer'` tests match. So the
+		// fragment is reported, the call-expression exemption does not apply
+		// to `{...make()}`, and — because canFix's non-space-curly guard also
+		// skips it — the fix is emitted.
+		{
+			Code:   `const a = <>{...value}</>;`,
+			Tsx:    true,
+			Output: []string{`const a = {...value};`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 11},
+			},
+		},
+		{
+			Code:   `const a = <>{...make()}</>;`,
+			Tsx:    true,
+			Output: []string{`const a = {...make()};`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 11},
+			},
+		},
+		// `allowExpressions` covers `{expr}` only, so a spread child is still
+		// reported with the option on.
+		{
+			Code:    `const a = <>{...value}</>;`,
+			Tsx:     true,
+			Options: allowExpressions,
+			Output:  []string{`const a = {...value};`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 11},
+			},
+		},
+
+		// ---- Dimension 4: the `@jsx` annotation renames the pragma ----
+		// The mirror of the valid case above: the annotated pragma's fragment
+		// is the one that gets reported.
+		{
+			Code: "/** @jsx Preact.h */\n<Preact.Fragment>{value}</Preact.Fragment>;",
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 2, Column: 1},
+			},
+		},
+		// A line comment carries the annotation just as well, and it wins over
+		// `settings.react.pragma`.
+		{
+			Code:     "// @jsx Preact.h\n<Preact.Fragment>{value}</Preact.Fragment>;",
+			Tsx:      true,
+			Settings: fragmentSettings("Other", ""),
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 2, Column: 1},
+			},
+		},
+
 		// ---- Dimension 4: TS-only expression wrappers ----
 		// ESTree models these as TSAsExpression / TSNonNullExpression /
 		// TSSatisfiesExpression — none of them is a CallExpression, so the

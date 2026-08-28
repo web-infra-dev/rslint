@@ -23,7 +23,7 @@ var JsxNoUselessFragmentRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		allowExpressions := parseAllowExpressions(options)
-		reactPragma := reactutil.GetReactPragma(ctx.Settings)
+		reactPragma := reactutil.GetReactPragmaFromContext(ctx)
 		fragmentPragma := reactutil.GetReactFragmentPragma(ctx.Settings)
 		sourceText := ctx.SourceFile.Text()
 
@@ -75,7 +75,7 @@ var JsxNoUselessFragmentRule = rule.Rule{
 
 		isFragmentWithSingleExpression := func(node *ast.Node) bool {
 			kept := nonPaddingChildren(node)
-			return len(kept) == 1 && kept[0].Kind == ast.KindJsxExpression
+			return len(kept) == 1 && isExpressionContainer(kept[0])
 		}
 
 		isChildOfHtmlElement := func(node *ast.Node) bool {
@@ -104,7 +104,7 @@ var JsxNoUselessFragmentRule = rule.Rule{
 			if node.Kind == ast.KindJsxText {
 				return !ecmascript.IsBlank(rawText(node))
 			}
-			return node.Kind == ast.KindJsxExpression
+			return isExpressionContainer(node)
 		}
 
 		canFix := func(node *ast.Node) bool {
@@ -231,13 +231,29 @@ func parseAllowExpressions(options []any) bool {
 	return allow
 }
 
+// isExpressionContainer reports whether a JSX child is an ESTree
+// JSXExpressionContainer — `{expr}`. tsgo parses a JSX spread child
+// (`{...expr}`) into the same KindJsxExpression, distinguished only by
+// DotDotDotToken, whereas ESTree gives it a separate JSXSpreadChild type that
+// upstream's `type === 'JSXExpressionContainer'` tests all reject. Every
+// container-specific check therefore has to exclude the spread form.
+func isExpressionContainer(node *ast.Node) bool {
+	return node != nil &&
+		node.Kind == ast.KindJsxExpression &&
+		node.AsJsxExpression().DotDotDotToken == nil
+}
+
 // containsCallExpression mirrors upstream's helper: a JSX expression container
 // whose expression is a plain CallExpression. Parentheses are transparent
-// because ESTree has no ParenthesizedExpression node, while an optional call
-// (`{foo?.()}`) is NOT a match — ESTree wraps it in a ChainExpression, which
-// upstream's `type === 'CallExpression'` check rejects.
+// because ESTree has no ParenthesizedExpression node, while three call-shaped
+// forms are NOT matches, because ESTree gives each of them its own node type
+// that upstream's `type === 'CallExpression'` check rejects:
+// an optional call (`{foo?.()}`, a ChainExpression), a dynamic import
+// (`{import("x")}`, an ImportExpression), and a spread child (`{...make()}`,
+// a JSXSpreadChild). tsgo collapses the first two into KindCallExpression and
+// the third into KindJsxExpression, so each needs an explicit exclusion.
 func containsCallExpression(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindJsxExpression {
+	if !isExpressionContainer(node) {
 		return false
 	}
 	// `{}` — an empty JSX expression container — has no expression at all.
@@ -248,7 +264,9 @@ func containsCallExpression(node *ast.Node) bool {
 	if expression == nil {
 		return false
 	}
-	return expression.Kind == ast.KindCallExpression && !ast.IsOptionalChain(expression)
+	return expression.Kind == ast.KindCallExpression &&
+		!ast.IsOptionalChain(expression) &&
+		!ast.IsImportCall(expression)
 }
 
 // isFragmentWithOnlyTextAndIsNotChild mirrors upstream: a fragment like

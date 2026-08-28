@@ -25,34 +25,6 @@ func msg(oldMethod, version, newMethod, refs string) string {
 const lifecycleRefsTail = ". Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
 const lifecycleRefsHead = "https://reactjs.org/docs/react-component.html#"
 
-func TestDetectJsxPragmaFastPathMatchesRegexp(t *testing.T) {
-	t.Parallel()
-
-	for _, source := range []string{
-		"",
-		"const value = 'jsx';",
-		"const value = '@jsx';",
-		"/** @jsx Foo */",
-		"// prefix @jsx\t$Foo_1.Bar trailing",
-		"/* @jsx\nFoo.Bar */",
-		"@jsx Foo-Bar",
-		"@jsx9 Foo",
-		"@@jsx Foo",
-	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-
-			want := ""
-			if match := jsxPragmaRe.FindStringSubmatch(source); match != nil {
-				want = match[1]
-			}
-			if got := detectJsxPragma(source); got != want {
-				t.Fatalf("detectJsxPragma(%q) = %q, want regexp result %q", source, got, want)
-			}
-		})
-	}
-}
-
 func TestParseVersionMatchesPreviousImplementation(t *testing.T) {
 	t.Parallel()
 

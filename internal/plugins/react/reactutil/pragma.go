@@ -3,7 +3,11 @@ package reactutil
 import (
 	"regexp"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -127,4 +131,151 @@ func ReactVersionLessThan(settings map[string]interface{}, major, minor, patch i
 		return b < minor
 	}
 	return c < patch
+}
+
+// GetReactPragmaFromContext mirrors eslint-plugin-react's
+// `pragmaUtil.getFromContext`, which resolves the React pragma from the file
+// itself before consulting configuration: the first comment carrying a
+// `@jsx <name>` annotation wins over `settings.react.pragma`, and only the
+// head of a dotted annotation counts (`@jsx Preact.h` yields `Preact`).
+// A name that is not a valid JavaScript identifier falls back to
+// DefaultReactPragma, matching upstream's warn-and-default path.
+//
+// Rules that classify JSX by pragma (`<React.Fragment>`, `React.createElement`,
+// deprecated `React.*` members) must go through this rather than
+// GetReactPragma, or a classic-runtime file compiled with a non-React pragma
+// both misses its own fragments and reports React's as if they were the
+// configured ones. GetReactPragma remains correct for the settings-only
+// lookups upstream performs the same way, such as `getFragmentFromContext`.
+func GetReactPragmaFromContext(ctx rule.RuleContext) string {
+	if annotated, found := jsxAnnotationPragma(ctx); found {
+		if isJavaScriptIdentifier(annotated) {
+			return annotated
+		}
+		return DefaultReactPragma
+	}
+	pragma := GetReactPragma(ctx.Settings)
+	if !isJavaScriptIdentifier(pragma) {
+		return DefaultReactPragma
+	}
+	return pragma
+}
+
+// jsxAnnotationPragma returns the head of the first `@jsx <name>` annotation
+// found in a comment, and whether any annotation was present at all. The
+// caller needs both: upstream stops looking at `settings.react.pragma` as soon
+// as an annotation exists, even one it later rejects as a non-identifier.
+func jsxAnnotationPragma(ctx rule.RuleContext) (string, bool) {
+	if ctx.SourceFile == nil {
+		return "", false
+	}
+	text := ctx.SourceFile.Text()
+	// Most files carry no classic-runtime pragma; keep the comment scan off
+	// the hot path for them.
+	if !strings.Contains(text, "@jsx") {
+		return "", false
+	}
+
+	for _, comment := range ctx.Comments.All() {
+		name, found := jsxAnnotationInComment(commentValue(text, comment))
+		if found {
+			// Upstream reads `matches[1].split('.')[0]`.
+			if dot := strings.IndexByte(name, '.'); dot >= 0 {
+				name = name[:dot]
+			}
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// jsxAnnotationInComment ports `/@jsx\s+([^\s]+)/` over one comment body.
+// It is hand-rolled rather than compiled because the character class is
+// JavaScript's `\s` — which covers more than Go's RE2 `\s` — and the pattern
+// is applied to the source under lint.
+func jsxAnnotationInComment(value string) (string, bool) {
+	const marker = "@jsx"
+	for offset := 0; ; {
+		index := strings.Index(value[offset:], marker)
+		if index < 0 {
+			return "", false
+		}
+		afterMarker := offset + index + len(marker)
+		nameStart := ecmascript.SkipLeadingWhitespace(value, afterMarker, len(value))
+		// `\s+` demands at least one whitespace character, so `@jsxFrag Foo`
+		// is not a `@jsx` annotation.
+		if nameStart > afterMarker {
+			// `[^\s]+` demands at least one character.
+			if nameEnd := skipNonWhitespace(value, nameStart); nameEnd > nameStart {
+				return value[nameStart:nameEnd], true
+			}
+		}
+		offset = afterMarker
+	}
+}
+
+// skipNonWhitespace returns the index one past the run of non-whitespace
+// characters starting at `start` — the reverse of
+// ecmascript.SkipLeadingWhitespace, over the same JavaScript `\s` definition.
+func skipNonWhitespace(text string, start int) int {
+	position := start
+	for position < len(text) {
+		if text[position] < 0x80 {
+			if ecmascript.IsTriviaWhitespaceByte(text[position]) {
+				return position
+			}
+			position++
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(text[position:])
+		if size == 0 || ecmascript.IsTriviaWhitespaceRune(r) {
+			return position
+		}
+		position += size
+	}
+	return position
+}
+
+// commentValue returns a comment's body without its delimiters, matching what
+// ESLint exposes as `comment.value` — upstream matches the annotation against
+// that, so a trailing `*/` must not become part of the captured name.
+func commentValue(text string, comment *ast.CommentRange) string {
+	if comment.Pos() < 0 || comment.End() > len(text) {
+		return ""
+	}
+	switch comment.Kind {
+	case ast.KindSingleLineCommentTrivia:
+		if comment.End() <= comment.Pos()+2 {
+			return ""
+		}
+		return text[comment.Pos()+2 : comment.End()]
+	case ast.KindMultiLineCommentTrivia:
+		if comment.End() <= comment.Pos()+4 {
+			return ""
+		}
+		return text[comment.Pos()+2 : comment.End()-2]
+	default:
+		return ""
+	}
+}
+
+// isJavaScriptIdentifier ports upstream's
+// `/^[_$a-zA-Z][_$a-zA-Z0-9]*$/` guard. Like upstream it is deliberately
+// ASCII-only and does not reject reserved words.
+func isJavaScriptIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i := range len(name) {
+		c := name[i]
+		isLetter := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$'
+		if isLetter {
+			continue
+		}
+		if i > 0 && c >= '0' && c <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }
