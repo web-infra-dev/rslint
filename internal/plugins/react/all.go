@@ -77,6 +77,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_leaked_render"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_literals"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_script_url"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_useless_fragment"
 )
 
 func GetAllRules() []rule.Rule {
@@ -155,5 +156,6 @@ func GetAllRules() []rule.Rule {
 		jsx_no_leaked_render.JsxNoLeakedRenderRule,
 		jsx_no_literals.JsxNoLiteralsRule,
 		jsx_no_script_url.JsxNoScriptUrlRule,
+		jsx_no_useless_fragment.JsxNoUselessFragmentRule,
 	}
 }
