@@ -34,6 +34,13 @@ func TestIdMatchExtrasTypescript(t *testing.T) {
 				Code:    `interface X extends Partial<Record<string, string>> {}`,
 				Options: []any{`^(X|string)$`},
 			},
+			// TypeScript-ESLint seeds `Disposable` as a default global even in a
+			// project with no standard libraries.
+			{
+				Code:     `type X = Disposable;`,
+				Options:  []any{`^X$`},
+				TSConfig: "tsconfig.noLib.json",
+			},
 			// ---- `as const` names no declaration ----
 			{
 				Code:    `const x = 1 as const;`,
@@ -65,25 +72,6 @@ func TestIdMatchExtrasTypescript(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
-			// `Disposable` is present in the default ESNext catalog but absent
-			// from both an ES5-only project and a noLib project, so it remains an
-			// authored identifier for id-match in either configuration.
-			{
-				Code:     `type X = Disposable;`,
-				Options:  []any{`^X$`},
-				TSConfig: "tsconfig.es5.json",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "notMatch", Line: 1, Column: 10, EndLine: 1, EndColumn: 20,
-				}},
-			},
-			{
-				Code:     `type X = Disposable;`,
-				Options:  []any{`^X$`},
-				TSConfig: "tsconfig.noLib.json",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "notMatch", Line: 1, Column: 10, EndLine: 1, EndColumn: 20,
-				}},
-			},
 			// ---- A class constructor is checked like any other name ----
 			{
 				Code:    `class foo { constructor() {} }`,
