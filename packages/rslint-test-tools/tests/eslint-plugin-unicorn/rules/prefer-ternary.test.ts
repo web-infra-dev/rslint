@@ -46,7 +46,7 @@ ruleTester.run('prefer-ternary', null as never, {
     `let {a} = obj; if (test) { a = b; }`,
     `let x = condition ? a : b; if (test) { x = c; }`,
     `let x = a; if (test) { x = b; doSomething(); }`,
-  ],
+  ].map((code) => ({ code })),
   invalid: [
     // Return statement → ternary.
     {
