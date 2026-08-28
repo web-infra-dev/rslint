@@ -29,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_number_to_fixed_digits_argument"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/throw_new_error"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -62,5 +63,6 @@ func GetAllRules() []rule.Rule {
 		prefer_ternary.PreferTernaryRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
 		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,
+		throw_new_error.ThrowNewErrorRule,
 	}
 }
