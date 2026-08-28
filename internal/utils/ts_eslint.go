@@ -686,9 +686,10 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 		return strings.Join(append(tokens, "method", "'constructor'"), " ")
 	}
 
-	// ESTree does not expose parentheses as nodes, so a function value wrapped
-	// only in parentheses still has the surrounding property as its parent.
-	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	// ESTree exposes neither parentheses nor wrappers synthesized from JSDoc
+	// casts, so a function wrapped only in those nodes still has the surrounding
+	// property as its parent.
+	parent := ESTreeParent(node)
 	if parent == nil {
 		return "function"
 	}
@@ -804,7 +805,8 @@ func isCoreClassFieldInitializer(node *ast.Node, parent *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
 		initializer := parent.AsPropertyDeclaration().Initializer
-		return initializer != nil && ast.SkipParentheses(initializer) == node
+		return initializer != nil &&
+			(initializer == node || ESTreeRuntimeExpression(initializer) == node)
 	}
 	return false
 }
