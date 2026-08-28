@@ -352,7 +352,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/switch-case-break-position': 'error', // not implemented
     // 'unicorn/template-indent': 'error', // not implemented
     // 'unicorn/text-encoding-identifier-case': 'error', // not implemented
-    // 'unicorn/throw-new-error': 'error', // not implemented
+    'unicorn/throw-new-error': 'error',
     // 'unicorn/try-complexity': 'off', // not implemented
   },
 };
