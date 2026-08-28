@@ -148,6 +148,24 @@ if (t) { x = next; }`},
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
 			},
 			{
+				Code:     `if (t) x += y = a; else x += z = b;`,
+				Output:   []string{`x += t ? (y = a) : (z = b);`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     `if (t) x += y = a; else x += y = b;`,
+				Output:   []string{`x += y = t ? a : b;`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
+				Code:     `if (t) x += y = a; else x += y += b;`,
+				Output:   []string{`x += t ? (y = a) : (y += b);`},
+				FileName: "file.js",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ternary"}},
+			},
+			{
 				Code: `let x = a; if (t) { x = b; } (foo)();`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId:   "prefer-ternary",

@@ -921,37 +921,24 @@ func buildMerge(ctx rule.RuleContext, consequent, alternate *ast.Node, staticStr
 	if isMergeableAssignmentExpression(consequent, alternate, staticStrings) {
 		c := consequent.AsBinaryExpression()
 		a := alternate.AsBinaryExpression()
-		leftText := getParenthesizedText(ctx, c.Left)
-		rightNode := c.Right
-		alternateNode := a.Right
-		opNode := c.OperatorToken
-		// Compound assignment chains use the first nested plain assignment as
-		// the shared outer operation. Plain `x = y = value` must not enter
-		// this path: its inner assignments belong to the conditional arms.
-		if c.OperatorToken.Kind != ast.KindEqualsToken {
-			cur := c
-			for cur.Right != nil && cur.Right.Kind == ast.KindBinaryExpression {
-				rb := cur.Right.AsBinaryExpression()
-				if rb.OperatorToken == nil || !isAssignmentOperatorKind(rb.OperatorToken.Kind) {
-					break
-				}
-				if rb.OperatorToken.Kind == ast.KindEqualsToken {
-					outerStart := utils.TrimNodeTextRange(ctx.SourceFile, c.AsNode()).Pos()
-					equalsPos := utils.TrimNodeTextRange(ctx.SourceFile, rb.OperatorToken).Pos()
-					leftText = strings.TrimRight(ctx.SourceFile.Text()[outerStart:equalsPos], " \t")
-					rightNode = rb.Right
-					alternateNode = findMatchingRight(a, rb.OperatorToken)
-					opNode = rb.OperatorToken
-					break
-				}
-				cur = rb
-			}
+		selectedC, selectedA := c, a
+		for selectedC.Right != nil && selectedA.Right != nil &&
+			isMergeableAssignmentExpression(selectedC.Right, selectedA.Right, staticStrings) {
+			selectedC = selectedC.Right.AsBinaryExpression()
+			selectedA = selectedA.Right.AsBinaryExpression()
+		}
+
+		leftText := getParenthesizedText(ctx, selectedC.Left)
+		if selectedC != c {
+			start := utils.TrimNodeTextRange(ctx.SourceFile, c.AsNode()).Pos()
+			opPos := utils.TrimNodeTextRange(ctx.SourceFile, selectedC.OperatorToken).Pos()
+			leftText = strings.TrimRight(ctx.SourceFile.Text()[start:opPos], " \t")
 		}
 		return mergeResult{
-			before:     leftText + " " + operatorText(opNode) + " ",
+			before:     leftText + " " + operatorText(selectedC.OperatorToken) + " ",
 			after:      ";",
-			consequent: rightNode,
-			alternate:  alternateNode,
+			consequent: selectedC.Right,
+			alternate:  selectedA.Right,
 		}, true
 	}
 
@@ -982,27 +969,6 @@ func isAssignmentOperatorKind(kind ast.Kind) bool {
 		return true
 	}
 	return false
-}
-
-// findMatchingRight walks down the right side of `start` following the same
-// chain shape used for the consequent, returning the right operand at the
-// matching depth.
-func findMatchingRight(start *ast.BinaryExpression, op *ast.Node) *ast.Node {
-	cur := start
-	for cur.Right != nil && cur.Right.Kind == ast.KindBinaryExpression {
-		rb := cur.Right.AsBinaryExpression()
-		if rb.OperatorToken == nil {
-			break
-		}
-		if !isAssignmentOperatorKind(rb.OperatorToken.Kind) {
-			break
-		}
-		if rb.OperatorToken.Kind == op.Kind {
-			return rb.Right
-		}
-		cur = rb
-	}
-	return cur.Right
 }
 
 // what upstream reads off the `consequent.operator` field. tsgo keeps the
