@@ -202,6 +202,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 	"github.com/web-infra-dev/rslint/internal/rules/vars_on_top"
+	"github.com/web-infra-dev/rslint/internal/rules/yoda"
 )
 
 var allRuleCatalog = sync.OnceValue(func() *rule.Catalog {
@@ -420,5 +421,6 @@ func coreRules() []rule.Rule {
 		sort_imports.SortImportsRule,
 		sort_keys.SortKeysRule,
 		sort_vars.SortVarsRule,
+		yoda.YodaRule,
 	}
 }

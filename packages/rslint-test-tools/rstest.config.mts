@@ -537,6 +537,7 @@ export default defineConfig({
     './tests/eslint/rules/sort-keys.test.ts',
     './tests/eslint/rules/sort-imports.test.ts',
     './tests/eslint/rules/sort-vars.test.ts',
+    './tests/eslint/rules/yoda.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
