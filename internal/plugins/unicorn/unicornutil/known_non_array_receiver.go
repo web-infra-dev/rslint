@@ -2,10 +2,10 @@ package unicornutil
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // directlyReportableReceiverTypes is the set of ESTree node kinds that
@@ -63,7 +63,7 @@ func isSourceOnlyFile(ctx rule.RuleContext) bool {
 	if name == "" {
 		return true
 	}
-	ext := strings.ToLower(filepath.Ext(name))
+	ext := ecmascript.StringToLowerCase(filepath.Ext(name))
 	return ext != ".ts" && ext != ".tsx" && ext != ".mts" && ext != ".cts"
 }
 
