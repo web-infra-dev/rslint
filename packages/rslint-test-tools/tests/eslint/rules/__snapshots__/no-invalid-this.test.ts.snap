@@ -1,0 +1,313 @@
+// Rstest Snapshot v1
+
+exports[`no-invalid-this > invalid 1`] = `
+{
+  "code": "export {}; console.log(this);",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 2`] = `
+{
+  "code": ""use strict"; function foo() { console.log(this); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 3`] = `
+{
+  "code": ""use strict"; function foo() { console.log(this); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 4`] = `
+{
+  "code": ""use strict"; function Foo() { console.log(this); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 5`] = `
+{
+  "code": ""use strict"; (function() { console.log(this); })();",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 6`] = `
+{
+  "code": ""use strict"; class A { foo() { return function() { console.log(this); }; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 65,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 7`] = `
+{
+  "code": ""use strict"; var foo = function() { console.log(this); }.bind(null);",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 8`] = `
+{
+  "code": ""use strict"; (function() { console.log(this); }).call(undefined);",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 9`] = `
+{
+  "code": ""use strict"; foo.forEach(function() { console.log(this); });",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 10`] = `
+{
+  "code": ""use strict"; /** @returns {void} */ function foo() { console.log(this); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 11`] = `
+{
+  "code": "class C { static { function foo() { this.x; } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 12`] = `
+{
+  "code": ""use strict"; interface SomeType { prop: string; } function foo() { this.prop; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

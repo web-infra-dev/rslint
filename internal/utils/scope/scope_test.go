@@ -66,12 +66,78 @@ function outer() {
 	assertDeclares(t, m.Scopes[0], "outer", DefFunctionName)
 	// `var` lands in the function scope even though it is written in a block.
 	assertDeclares(t, m.Scopes[1], "hoisted", DefVariable)
+	if got := len(m.Scopes[1].Declarations("hoisted")); got != 1 {
+		t.Fatalf("function scope has %d definitions of hoisted, want 1", got)
+	}
 	assertDeclares(t, m.Scopes[2], "blockOnly", DefVariable)
 	if len(m.Scopes[2].Declarations("hoisted")) != 0 {
 		t.Error("var declaration should not also live in the block scope")
 	}
 	if m.Scopes[2].VariableScope() != m.Scopes[1] {
 		t.Error("block scope's variable scope should be the enclosing function")
+	}
+}
+
+func TestBuildHoistsFunctionsThroughScopeLessStatements(t *testing.T) {
+	m := build(t, `
+function outer() {
+  if (condition) function fromIf() {}
+  label: function fromLabel() {}
+  while (condition) function fromWhile() {}
+  do function fromDo() {} while (condition);
+  for (; condition;) function fromFor() {}
+  for (let index = 0; condition;) function inFor() {}
+  if (condition) { function blockOnly() {} }
+}
+`)
+	outer := m.Scopes[1]
+	for _, name := range []string{"fromIf", "fromLabel", "fromWhile", "fromDo", "fromFor"} {
+		assertDeclares(t, outer, name, DefFunctionName)
+	}
+	if len(outer.Declarations("inFor")) != 0 {
+		t.Error("a let-initialized for loop should keep its function binding in the loop scope")
+	}
+	if len(outer.Declarations("blockOnly")) != 0 {
+		t.Error("a braced body should keep its function binding in the block scope")
+	}
+
+	var forScope, blockScope *Scope
+	for _, candidate := range m.Scopes {
+		if candidate.Block == nil {
+			continue
+		}
+		switch candidate.Block.Kind {
+		case ast.KindForStatement:
+			if len(candidate.Declarations("inFor")) != 0 {
+				forScope = candidate
+			}
+		case ast.KindBlock:
+			if len(candidate.Declarations("blockOnly")) != 0 {
+				blockScope = candidate
+			}
+		}
+	}
+	if forScope == nil {
+		t.Error("let-initialized loop scope does not declare inFor")
+	}
+	if blockScope == nil {
+		t.Error("braced block scope does not declare blockOnly")
+	}
+}
+
+func TestBuildDottedNamespaceSegmentsDoNotDeclareVariables(t *testing.T) {
+	m := build(t, `
+let A = [];
+namespace A.B { export const value = 1; }
+`)
+	declarations := m.Global.Declarations("A")
+	if len(declarations) != 1 || declarations[0].Kind != DefVariable {
+		t.Fatalf("global A definitions = %#v, want only the variable", declarations)
+	}
+	for _, candidate := range m.Scopes {
+		if len(candidate.Declarations("B")) != 0 {
+			t.Fatalf("scope %v unexpectedly declares dotted namespace segment B", candidate.Kind)
+		}
 	}
 }
 

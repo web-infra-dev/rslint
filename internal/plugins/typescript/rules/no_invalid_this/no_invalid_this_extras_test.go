@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -152,31 +153,13 @@ var obj = {
   },
 };
     `},
-			// ---- Wrapper-bug lock-in: `this` in computed key of class field is masked ----
-			// Upstream wrapper pushes `valid=true` on `PropertyDefinition` /
-			// `AccessorProperty` entry, which fires BEFORE the computed key
-			// is visited. The wrapper's `ThisExpression` listener then
-			// short-circuits and never delegates to baseRule, so the
-			// otherwise-valid report at top-level is silently masked. rslint
-			// reproduces this behavior verbatim for byte-level alignment with
-			// `@typescript-eslint/no-invalid-this`. A separate Layer-3 test
-			// (the method/accessor counterpart above) confirms that
-			// non-field computed keys still report correctly.
-			{Code: `
-class A {
-  [this.foo] = 1;
-}
-    `},
-			{Code: `
-class A {
-  accessor [this.foo] = 1;
-}
-    `},
 			// ---- Wrapper-bug lock-in: `this` in decorator on a field is masked ----
 			// PropertyDefinition / AccessorProperty push happens on entry,
 			// so decorators on these (visited after entry) see the field's
-			// frame and the report is silently swallowed. Methods don't
-			// share this masking (see Layer-3 method-decorator tests).
+			// frame and the report is silently swallowed — the
+			// `FieldFrameScopedToValue: false` policy point.
+			// Methods don't share this masking (see Layer-3
+			// method-decorator tests), and ESLint core reports here.
 			{Code: `
 class A {
   @deco(this)
@@ -187,6 +170,41 @@ class A {
 class A {
   @deco(this)
   accessor foo = 1;
+}
+    `},
+			// ---- Wrapper-bug lock-in: `this` in a computed key of a field is masked ----
+			// The same entry push covers the key, which ESTree visits after
+			// the `PropertyDefinition` / `AccessorProperty` node itself.
+			// Method-likes don't share the masking (see the computed
+			// method/accessor key cases below), and ESLint core reports here.
+			{Code: `
+class A {
+  [this.foo] = 1;
+}
+    `},
+			{Code: `
+class A {
+  accessor [this.foo] = 1;
+}
+    `},
+			// A computed key doesn't defer the field's push the way it does
+			// for a method-like, so a decorator on such a field is masked too.
+			{Code: `
+class A {
+  @deco(this)
+  [bar] = 1;
+}
+    `},
+			// ---- Wrapper-bug lock-in: masking also covers members nested inside a field decorator ----
+			// The field frame is on top for everything the decorator
+			// contains, so the walk stops at the field instead of peeking
+			// out to `outer` — same policy point as the two cases above.
+			{Code: `
+function outer() {
+  class C {
+    @deco(class I { [this]() {} })
+    x = 1;
+  }
 }
     `},
 			// ---- Lock-in: `this` in decorator of a computed-key method nested in another method ----
@@ -439,6 +457,39 @@ function setup() {
   this.timeout(100);
 }
     `},
+
+			// ---- Shared source-type, JSDoc, callback, and field parity regressions ----
+			{Code: `export {}; this; function f(){ this; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `/* @thisX */ function g(){ this; }`},
+			{Code: `export /* @this */ function foo(){ this; }`},
+			{Code: `export default /* @this */ function foo(){ this; }`},
+			{Code: `/** @this */ export function foo(){ this; }`},
+			{Code: `/** @this */ export default function foo(){ this; }`},
+			{Code: `/** @this */ export /* other */ function foo(){ this; }`},
+			{Code: `/* other */ /** @this */ export function foo(){ this; }`},
+			{Code: `export /* other */ /* @this */ function foo(){ this; }`},
+			{Code: `export /* @this */ /* other */ function foo(){ this; }`},
+			{Code: `export /* @this */ async function foo(){ this; }`},
+			{Code: "/** \u00a0@this */ function g(){ this; }"},
+			{Code: "/** \ufeff@this */ function g(){ this; }"},
+			{Code: `/** @this */ const x = [function(){ this; }];`},
+			{Code: `/** @this */ const x = !function(){ this; };`},
+			{Code: `/** @this */ const [x = function(){ this; }] = [];`},
+			{Code: `Uint8Array.from([], function () { this; }, obj);`},
+			{Code: `BigInt64Array['from']([], function () { this; }, obj);`},
+			{Code: `class C { accessor x = function(){ this; } }`},
+			{Code: `/** @this */ foo(function(){ this; } as any);`},
+			{Code: `/** @this */ foo(function(){ this; } satisfies Function);`},
+			{Code: `/** @this */ foo(function(){ this; }!);`},
+			{Code: `const outer = /** @this */ function(){ return function(){ this; }; };`},
+			{Code: `const o = { /** @this */ p: [function(){ this; }] };`},
+			{Code: `const outer = /** @this */ () => function(){ this; };`},
+			{Code: `const { /** @this */ p = [function(){ this; }] } = obj;`},
+			{Code: `class C { /** @this */ x = [function(){ this; }]; }`},
+			// The wrapper scopes its field frame to the complete member, so type
+			// annotations remain masked just like decorators and computed keys.
+			{Code: `class C { x: typeof this; }`},
+			{Code: `class C { accessor x: typeof this = 1; }`},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -584,21 +635,6 @@ class A {
 }
       `,
 				Errors: unexpected(3, 15),
-			},
-			// ---- Branch lock-in: auto-accessor with function-expression initializer ----
-			// ESLint's walker has no `AccessorProperty` case, so a function
-			// inside `accessor x = function(){}` falls through to default
-			// (default-bound, `this` is invalid). Regular fields stay valid
-			// because the walker DOES recognize `PropertyDefinition`.
-			{
-				Code: `
-class A {
-  accessor foo = function () {
-    this;
-  };
-}
-      `,
-				Errors: unexpected(4, 5),
 			},
 			// ---- Dimension 4: free function nested inside a method body ----
 			// Locks in that the method's frame doesn't shadow the inner
@@ -804,6 +840,114 @@ var func = function bar() {
 };
       `,
 				Errors: unexpected(3, 3),
+			},
+
+			// ---- A member nested inside a method decorator doesn't restore the decorated member's frame ----
+			// `I`'s computed key is evaluated while the decorator runs, in
+			// `outer`'s scope; its own frame is deferred, so the walk passes
+			// through it and still peeks past `C.foo`.
+			{
+				Code: `
+function outer() {
+  class C {
+    @deco(class I { [this]() {} })
+    foo() {}
+  }
+}
+      `,
+				Errors: unexpected(4, 22),
+			},
+			// ---- Each nested decorator hop peeks past its own member ----
+			{
+				Code: `
+function outer() {
+  class C {
+    @deco(class I { @deco2(class J { [this]() {} }) bar() {} })
+    foo() {}
+  }
+}
+      `,
+				Errors: unexpected(4, 39),
+			},
+
+			// ---- Shared source-type, JSDoc, strictness, and state regressions ----
+			{
+				Code:            `this; function f(){ this; }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedThis", Line: 1, Column: 1},
+					{MessageId: "unexpectedThis", Line: 1, Column: 21},
+				},
+			},
+			{Code: `/* @this */ const x = [function(){ this; }];`, Errors: unexpected(1, 36)},
+			{Code: `/* @this */ export function foo(){ this; }`, Errors: unexpected(1, 36)},
+			{Code: "// @this\nexport function foo(){ this; }", Errors: unexpected(2, 24)},
+			{Code: `/* @this */ export default function foo(){ this; }`, Errors: unexpected(1, 44)},
+			{Code: "// @this\nexport default function foo(){ this; }", Errors: unexpected(2, 32)},
+			{Code: "/** @this */\n\nexport function foo(){ this; }", Errors: unexpected(3, 24)},
+			{Code: "/** @this */\n/* other */\nexport function foo(){ this; }", Errors: unexpected(3, 24)},
+			{Code: `export /* @this */ default function foo(){ this; }`, Errors: unexpected(1, 44)},
+			{Code: `export async /* @this */ function foo(){ this; }`, Errors: unexpected(1, 42)},
+			{Code: "/** @this */\n\nconst x = [function(){ this; }];", Errors: unexpected(3, 24)},
+			{Code: `function outer() { class C { @dec((@d(this) class I {})) m(){} } }`, Errors: unexpected(1, 39)},
+			{Code: `enum E { X = (function(){ this; }, 1) }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: unexpected(1, 27)},
+			{Code: `class C { @dec(function(){ this; }) m(){} }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: unexpected(1, 28)},
+			{Code: `/** @this */ function outer(){ return function(){ this; }; }`, Errors: unexpected(1, 51)},
+			{Code: `foo(/** @this */ (function(){ this; } as any));`, Errors: unexpected(1, 31)},
+			{Code: `foo(/** @this */ (function(){ this; } satisfies Function));`, Errors: unexpected(1, 31)},
+			{Code: `type T = typeof this;`, Errors: unexpected(1, 17)},
+			{Code: `type T = typeof this.x;`, Errors: unexpected(1, 17)},
+			// Bodyless TypeScript declarations have no ESTree function listener,
+			// so their type-query `this` remains in the enclosing module frame.
+			{Code: `function F(x: typeof this): void;`, Errors: unexpected(1, 22)},
+			{Code: `function f(this: typeof this): void;`, Errors: unexpected(1, 25)},
+			{Code: `/** @this */ function f(x: typeof this): void;`, Errors: unexpected(1, 35)},
+			{Code: `declare function F(x: typeof this): void;`, Errors: unexpected(1, 30)},
+			{Code: `abstract class C { abstract m(x: typeof this): void; }`, Errors: unexpected(1, 41)},
+			{Code: `abstract class C { abstract get value(): typeof this; }`, Errors: unexpected(1, 49)},
+			{Code: `class C { [key](x: typeof this): void; }`, Errors: unexpected(1, 27)},
+			{Code: `abstract class C { abstract x: typeof this; }`, Errors: unexpected(1, 39)},
+			{
+				Code:            `function f(x: number){ 'use strict'; this; }`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+				Errors:          unexpected(1, 38),
+			},
+			// Deliberate divergence: the upstream wrapper leaks the accessor-value
+			// frame, while rslint balances it at member exit.
+			{Code: `class C { accessor x = 1; } this;`, Errors: unexpected(1, 29)},
+		},
+	)
+}
+
+func TestNoInvalidThisES3JavaScriptDirectives(t *testing.T) {
+	unexpected := func(line, col int) []rule_tester.InvalidTestCaseError {
+		return []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedThis", Line: line, Column: col}}
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.allow-js.json",
+		t,
+		&NoInvalidThisRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `"use\x20strict"; function f(){ this; }`,
+				FileName:        "escaped-es3.js",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `"use strict"; function f(){ this; }`,
+				FileName:        "double-quoted-es3.js",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+				Errors:          unexpected(1, 29),
+			},
+			{
+				Code:            `function outer(){ 'use strict'; function f(){ this; } }`,
+				FileName:        "ancestor-es3.js",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+				Errors:          unexpected(1, 47),
 			},
 		},
 	)

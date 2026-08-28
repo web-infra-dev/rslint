@@ -12,6 +12,7 @@ ruleTester.run('no-empty', {
     'function foo() {}',
     'var foo = function() {}',
     'var foo = () => {}',
+    'class C { static {} }',
     'if (foo) { /* comment */ }',
     'while (foo) { /* comment */ }',
     'try { foo() } catch (e) { /* comment */ }',
@@ -45,7 +46,15 @@ ruleTester.run('no-empty', {
     },
     {
       code: 'switch (foo) {}',
-      errors: [{ messageId: 'unexpected' }],
+      errors: [
+        {
+          messageId: 'unexpected',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
   ],
 });
