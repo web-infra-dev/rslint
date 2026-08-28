@@ -698,3 +698,83 @@ function outer() {
 		},
 	)
 }
+
+func TestNoInvalidThisParityRegressions(t *testing.T) {
+	unexpected := func(line, col int) []rule_tester.InvalidTestCaseError {
+		return []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedThis", Line: line, Column: col}}
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.allow-js.json",
+		t,
+		&NoInvalidThisRule,
+		[]rule_tester.ValidTestCase{
+			// ---- Dimension 4: JSX tag names are JSXIdentifier upstream ----
+			{Code: `<this />`, FileName: "jsx-tag.tsx"},
+			{Code: `<this.Widget></this.Widget>`, FileName: "jsx-member.tsx"},
+			{Code: `<this.Widget.Deep />`, FileName: "jsx-nested-member.tsx"},
+			// ---- Raw directive spelling: cooked lookalikes are not directives ----
+			{Code: `"use\x20strict"; function f(){ this; }`, FileName: "escaped-space.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `'use str\x69ct'; function f(){ this; }`, FileName: "escaped-letter.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `function outer(){ "use\u0020strict"; function f(){ this; } }`, FileName: "escaped-ancestor.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: "\"use\\\n strict\"; function f(){ this; }", FileName: "continued-directive.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// ---- JSDoc anchors: ESTree retains the ExpressionStatement range ----
+			{Code: `"use strict"; /** @this */ (x + function(){ this; });`, FileName: "parenthesized-statement.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `"use strict"; /** @this */ (((x + function(){ this; })));`, FileName: "nested-parenthesized-statement.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// The same overload shape is valid when its enclosing decorator is
+			// evaluated in a sloppy script.
+			{Code: `class O { @dec((()=>{ function f(x: typeof this): void; function f(x:any){} })()) m(){} }`, FileName: "decorated-overload-script.ts", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// A bodyless declaration inside a real method inherits the method frame.
+			{Code: `class C { m(){ function f(x: typeof this): void; } }`, FileName: "overload-in-method.ts"},
+		},
+		[]rule_tester.InvalidTestCase{
+			// JSX expressions remain ordinary ThisExpression nodes upstream.
+			{Code: `<X>{this}</X>`, FileName: "jsx-expression.tsx", Errors: unexpected(1, 5)},
+			{Code: `<this.Widget>{this}</this.Widget>`, FileName: "jsx-tag-and-expression.tsx", Errors: unexpected(1, 15)},
+			// Exact single-quoted directives remain active after raw-text matching.
+			{Code: `'use strict'; function f(){ this; }`, FileName: "single-quoted.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: unexpected(1, 29)},
+			// Parenthesizing the statement must not make a nested call argument own
+			// the statement's JSDoc.
+			{Code: `"use strict"; /** @this */ (foo(function(){this;}));`, FileName: "jsdoc-call-boundary.js", LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Errors: unexpected(1, 44)},
+			// Bodyless declarations never push a frame, so nested frame lookup must
+			// continue through them to the decorator's enclosing module context.
+			{Code: `class O { @dec((()=>{ function f(x: typeof this): void; function f(x:any){} })()) m(){} }`, FileName: "decorated-overload.ts", Errors: unexpected(1, 44)},
+			{Code: `class O { @dec((()=>{ abstract class A { abstract m(x: typeof this): void; } })()) m(){} }`, FileName: "decorated-abstract.ts", Errors: unexpected(1, 63)},
+			{Code: `export {}; function outer(){ function f(x: typeof this): void; }`, FileName: "overload-in-strict-function.ts", Errors: unexpected(1, 51)},
+		},
+	)
+}
+
+func BenchmarkNoInvalidThisStrictDetection(b *testing.B) {
+	cases := []struct {
+		name string
+		code string
+		want bool
+	}{
+		{name: "exact-directive", code: `"use strict"; function f(){ this; }`, want: true},
+		{name: "escaped-lookalike", code: `"use\x20strict"; function f(){ this; }`, want: false},
+		{name: "no-directive", code: `void 0; function f(){ this; }`, want: false},
+	}
+	help := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	for _, test := range cases {
+		b.Run(test.name, func(b *testing.B) {
+			_, sourceFile, err := help.CreateTestProgram(test.code, test.name+".ts", "tsconfig.json")
+			if err != nil {
+				b.Fatal(err)
+			}
+			statements := sourceFile.AsNode().Statements()
+			if len(statements) != 2 {
+				b.Fatalf("statements = %d, want 2", len(statements))
+			}
+			fn := statements[1]
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				if got := isStrictFunction(fn, sourceFile, 2026, false, false); got != test.want {
+					b.Fatalf("isStrictFunction() = %t, want %t", got, test.want)
+				}
+			}
+		})
+	}
+}

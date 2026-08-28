@@ -918,3 +918,37 @@ function outer() {
 		},
 	)
 }
+
+func TestNoInvalidThisES3JavaScriptDirectives(t *testing.T) {
+	unexpected := func(line, col int) []rule_tester.InvalidTestCaseError {
+		return []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedThis", Line: line, Column: col}}
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.allow-js.json",
+		t,
+		&NoInvalidThisRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:            `"use\x20strict"; function f(){ this; }`,
+				FileName:        "escaped-es3.js",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `"use strict"; function f(){ this; }`,
+				FileName:        "double-quoted-es3.js",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+				Errors:          unexpected(1, 29),
+			},
+			{
+				Code:            `function outer(){ 'use strict'; function f(){ this; } }`,
+				FileName:        "ancestor-es3.js",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"},
+				Errors:          unexpected(1, 47),
+			},
+		},
+	)
+}

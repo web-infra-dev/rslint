@@ -43,7 +43,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Production rslint contexts already carry an effective source type.
 		ctx.LanguageOptions.SourceType = "module"
 	}
-	engineOptions := no_invalid_this_core.CoreEngineOptions(ctx, opts)
+	engineOptions := no_invalid_this_core.TypeScriptEngineOptions(ctx, opts)
 	engineOptions.FieldFrameScopedToValue = false
 	return no_invalid_this_core.BuildListeners(ctx, engineOptions)
 }
