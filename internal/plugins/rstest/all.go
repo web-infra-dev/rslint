@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
@@ -51,6 +52,7 @@ func GetAllRules() []rule.Rule {
 		prefer_each.PreferEachRule,
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
+		prefer_import_in_mock.PreferImportInMockRule,
 		prefer_todo.PreferTodoRule,
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
 		valid_expect.ValidExpectRule,
