@@ -10,23 +10,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// transparentWrappers are the expression wrappers Rstest's mock transform
-// never sees. TypeScript's type-only syntax — `as`, `satisfies`, `!` — is
-// erased before the transform runs, and the transform reads through
-// parentheses, so `(rs as any).mock('./dep')`, `rs!.mock('./dep')` and
-// `(rs.mock)(('./dep'))` are all rewritten exactly like the bare form.
-const transparentWrappers = ast.OEKParentheses |
-	ast.OEKTypeAssertions |
-	ast.OEKNonNullAssertions |
-	ast.OEKSatisfies
-
-// unwrap descends past the wrappers the transform cannot see.
-func unwrap(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	return ast.SkipOuterExpressions(node, transparentWrappers)
-}
+// Rstest's mock transform sees neither parentheses nor TypeScript's type-only
+// syntax: `as`, `satisfies` and `!` are erased before it runs, and it reads
+// through parentheses. So `(rs as any).mock('./dep')`, `rs!.mock('./dep')` and
+// `(rs.mock)(('./dep'))` are rewritten exactly like the bare form, and every
+// receiver, callee and argument here is read through
+// utils.SkipAssertionsAndParens.
 
 //go:embed prefer_import_in_mock.schema.json
 var schemaJSON []byte
@@ -167,7 +156,7 @@ func mockPathArgument(node *ast.Node) (*ast.Node, *ast.Node) {
 
 	// A template literal path is rejected by Rstest's build even without a
 	// substitution, so only a quoted string reaches this far.
-	path := unwrap(arguments[0])
+	path := utils.SkipAssertionsAndParens(arguments[0])
 	if path == nil || path.Kind != ast.KindStringLiteral {
 		return nil, nil
 	}
@@ -190,13 +179,19 @@ func commentBetween(ctx rule.RuleContext, outer core.TextRange, inner core.TextR
 // and throws, or is lifted out of an expression that no longer parses without
 // it. The wrappers the transform cannot see do not change the position.
 func isTransformablePosition(node *ast.Node) bool {
-	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		if ast.IsOuterExpression(parent, transparentWrappers) {
-			continue
+	// Climb while the parent is only a wrapper around what we came from, so
+	// `(rs.mock('./dep'));` is judged by the statement, not by the parentheses.
+	outermost := node
+	for {
+		parent := outermost.Parent
+		if parent == nil {
+			return false
 		}
-		return parent.Kind == ast.KindExpressionStatement
+		if utils.SkipAssertionsAndParens(parent) != outermost {
+			return parent.Kind == ast.KindExpressionStatement
+		}
+		outermost = parent
 	}
-	return false
 }
 
 // isMockCallee reports whether expression is `rs.mock`, `rs.doMock`, or the
@@ -204,7 +199,7 @@ func isTransformablePosition(node *ast.Node) bool {
 // unwrapped around both the callee and the receiver; an optional chain and a
 // computed member are not rewritten by the transform, so they are rejected.
 func isMockCallee(expression *ast.Node) bool {
-	callee := unwrap(expression)
+	callee := utils.SkipAssertionsAndParens(expression)
 	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
@@ -218,7 +213,7 @@ func isMockCallee(expression *ast.Node) bool {
 		return false
 	}
 
-	receiver := unwrap(access.Expression)
+	receiver := utils.SkipAssertionsAndParens(access.Expression)
 	return receiver != nil &&
 		receiver.Kind == ast.KindIdentifier &&
 		utilityNames[receiver.Text()]
