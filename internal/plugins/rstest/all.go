@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_title"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/warn_todo"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -56,5 +57,6 @@ func GetAllRules() []rule.Rule {
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
 		valid_title.ValidTitleRule,
+		warn_todo.WarnTodoRule,
 	}
 }
