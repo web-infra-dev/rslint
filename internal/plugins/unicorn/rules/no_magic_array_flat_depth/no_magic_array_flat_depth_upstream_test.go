@@ -55,6 +55,23 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			jsValid(`Boolean(0).flat(2)`),
 			jsValid(`BigInt(1).flat(2)`),
 
+			// Globals whose call results are folded by upstream's static
+			// evaluator to a known non-array value. Lock in so the helper
+			// continues to handle them and doesn't over-report.
+			jsValid(`Math.abs(-2).flat(2)`),
+			jsValid(`Math.max(1, 2).flat(2)`),
+			jsValid(`Array.isArray([]).flat(2)`),
+			jsValid(`parseInt("2", 10).flat(2)`),
+			jsValid(`parseFloat("2").flat(2)`),
+			jsValid(`Object().flat(2)`),
+			// String.fromCharCode is folded by the shared static evaluator.
+			jsValid(`String.fromCharCode(65).flat(2)`),
+			// Optional-member access on a global receiver still resolves.
+			jsValid(`Math?.abs(-2).flat(2)`),
+			jsValid(`Math?.max(1, 2)?.flat(2)`),
+			// Parenthesized form must not defeat the static resolution.
+			jsValid(`(Number(1)).flat(2)`),
+
 			// ---- depth is 1 (the default) ----
 			jsValid(`array.flat(1)`),
 			jsValid(`array.flat(1.0)`),
@@ -183,6 +200,44 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			},
 			{
 				Code:     `Symbol().flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+
+			// Local bindings where upstream keeps the source-only
+			// "unknown" classification: `let` / `var` / destructuring
+			// don't follow the `const IDENT = EXPR` resolution path, and
+			// `const IDENT = Math.PI` is still unknown because Math.PI
+			// itself is a MemberExpression. Lock in that rslint matches.
+			{
+				Code:     `let value = 1; value.flat(2);`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `var value = 1; value.flat(2);`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `const {value = 1} = {}; value.flat(2);`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `const value = Math.PI; value.flat(2);`,
 				FileName: "file.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: messageID,

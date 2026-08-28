@@ -48,22 +48,18 @@ func isDirectlyReportableReceiver(node *ast.Node) bool {
 }
 
 // isSourceOnlyUnknownShape reports whether node is a shape that upstream's
-// `getTypeFromStaticValue` classifies as "unknown" without a resolvable
-// static value. For these shapes upstream reports the rule rather than
-// skipping, even when the type checker would have a definitive answer
-// (because a `TypeChecker` typically has global type information that
-// over-classifies a source-only file's bare `undefined` / `NaN` /
-// `Math.PI` / `Symbol()` as a known non-array).
+// `getTypeFromStaticValue` / `getTypeFromVariable` classify as "unknown"
+// without a resolvable static value. For these shapes upstream reports the
+// rule rather than skipping, even when the type checker would have a
+// definitive answer (because a `TypeChecker` typically has global type
+// information that over-classifies a source-only file's bare `undefined` /
+// `NaN` / `Math.PI` / `Symbol()` as a known non-array).
 //
-// The Identifier branch checks `ctx.Refs`: a local binding resolves to a
-// `const` array declaration and the outer `IsKnownNonIndexedCollection` will
-// correctly return false. A global identifier that fails to resolve gets
-// the upstream-style "unknown" treatment here so the rule fires. The
+// The Identifier branch checks `ctx.Refs`: a non-`const` binding or a
+// `const IDENT = MEMBER` initializer recursively fall through to
+// "unknown" exactly the way upstream's `getTypeFromVariable` does. The
 // MemberExpression and unresolved CallExpression branches follow the
-// upstream source-only rule directly, since the static evaluator rarely
-// resolves a member chain or constructor-style call to a known array
-// shape and the type checker would over-classify built-in members like
-// `Math.PI` or `Symbol()`.
+// upstream source-only rule directly.
 func isSourceOnlyUnknownShape(ctx rule.RuleContext, node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -73,61 +69,182 @@ func isSourceOnlyUnknownShape(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 	if ast.IsIdentifier(node) {
-		if ctx.Refs == nil {
-			return true
-		}
-		if ctx.Refs.ResolveInFile(node) == nil {
-			return true
-		}
-		return false
+		return isSourceOnlyUnknownIdentifier(ctx, node)
 	}
 	if ast.IsAccessExpression(node) {
 		return true
 	}
 	if ast.IsCallExpression(node) {
-		// `Number(1)` / `String("x")` / `Boolean(0)` / `BigInt(1)` /
-		// `Symbol()` — these constructor calls are folded by upstream's
-		// static evaluator into a known non-array value. The rslint static
-		// evaluator only handles method calls (e.g. `String.fromCharCode`,
-		// `Array.of`), not bare constructor calls, so replicate the upstream
-		// shape here: a bare Identifier callee that is a non-array
-		// constructor resolves to a known non-array value, and the rule
-		// legitimately skips. `Symbol()` returns a unique Symbol each call
-		// and therefore does NOT resolve — keep reporting it.
-		if isNonArrayConstructorCall(ctx, node) {
-			return false
-		}
-		// For unknown call results like `Symbol()`, upstream reports; match
-		// that by treating the unresolvable case as source-only unknown.
-		return true
+		return isSourceOnlyUnknownCall(ctx, node)
 	}
 	return false
 }
 
-// isNonArrayConstructorCall reports whether node is a bare constructor call
-// (`Number(1)`, `String("x")`, `Boolean(0)`, `BigInt(1)`) that upstream's
-// static evaluator folds to a known non-array value. `Symbol()` is excluded
-// because every call returns a unique Symbol and the static evaluator cannot
-// fold it.
-func isNonArrayConstructorCall(ctx rule.RuleContext, node *ast.Node) bool {
+// isSourceOnlyUnknownIdentifier mirrors upstream's `getTypeFromVariable`
+// path: only `const IDENT = EXPR` resolves the binding to EXPR's type.
+// Anything else (no binding, `let`, `var`, destructuring patterns,
+// non-ident binding) stays "unknown" for source-only purposes.
+func isSourceOnlyUnknownIdentifier(ctx rule.RuleContext, idNode *ast.Node) bool {
+	if ctx.Refs == nil {
+		return true
+	}
+	symbol := ctx.Refs.ResolveInFile(idNode)
+	if symbol == nil {
+		return true
+	}
+	if len(symbol.Declarations) != 1 {
+		return true
+	}
+	declaration := symbol.Declarations[0]
+	if declaration == nil {
+		return true
+	}
+	// Type annotation, if present, would let the type checker resolve the
+	// binding definitively; defer to the outer IsKnownNonIndexedCollection
+	// path by reporting "not source-only unknown" here.
+	if arrayBindingTypeAnnotation(declaration) != nil {
+		return false
+	}
+	if !ast.IsVariableDeclaration(declaration) {
+		return true
+	}
+	variable := declaration.AsVariableDeclaration()
+	if variable == nil {
+		return true
+	}
+	declarationList := declaration.Parent
+	if declarationList == nil || !ast.IsVariableDeclarationList(declarationList) {
+		return true
+	}
+	if declarationList.Flags&ast.NodeFlagsConst == 0 {
+		return true
+	}
+	if !ast.IsIdentifier(variable.Name()) {
+		// Destructuring binding like `const {value = 1} = {};` — the
+		// binding name is a pattern, not an Identifier. Upstream keeps this
+		// "unknown".
+		return true
+	}
+	if variable.Initializer == nil {
+		return true
+	}
+	// `const value = EXPR` — recurse into EXPR to mirror upstream's
+	// `getTypeFromVariable` recursive call to `getType(init, ...)`. If EXPR
+	// is itself an Identifier or MemberExpression, upstream classifies it
+	// as "unknown" and so do we.
+	initializer := variable.Initializer
+	if ast.IsIdentifier(initializer) || ast.IsAccessExpression(initializer) {
+		return true
+	}
+	// For other initializer shapes (call expressions, literals, etc.),
+	// fall through to the type checker / static evaluator via
+	// IsKnownNonIndexedCollection, which can correctly handle
+	// `const value = Number(1)`, `const value = [1, 2]`, etc.
+	return false
+}
+
+// isSourceOnlyUnknownCall handles CallExpression receivers. Upstream
+// resolves a number of common builtin call patterns to a known non-array
+// value via its static evaluator; the rslint evaluator only handles a
+// subset, so we replicate the upstream shape explicitly here. Calls that
+// don't match any known pattern are treated as source-only unknown and
+// reported — matching upstream's behavior for `Symbol()`, which returns a
+// unique Symbol each call and therefore cannot be folded.
+func isSourceOnlyUnknownCall(ctx rule.RuleContext, node *ast.Node) bool {
 	call := node.AsCallExpression()
 	if call == nil {
 		return false
 	}
 	callee := ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions)
-	if callee == nil || !ast.IsIdentifier(callee) {
-		return false
+	if callee == nil {
+		return true
 	}
-	// If the identifier shadows a local binding, defer to the
-	// type-checker / reference resolver path so the user's declaration wins.
+	if ast.IsIdentifier(callee) {
+		return isSourceOnlyUnknownIdentifierCall(ctx, node, callee)
+	}
+	if ast.IsAccessExpression(callee) {
+		return isSourceOnlyUnknownMemberCall(ctx, node, callee)
+	}
+	// Other callee shapes (IIFEs, optional call chains, …): upstream
+	// leaves them unknown.
+	return true
+}
+
+// isSourceOnlyUnknownIdentifierCall handles calls of the form
+// `FUNC(args)` where `FUNC` is a bare Identifier. The rslint static
+// evaluator does not fold these, but the shape is enough to decide:
+// globals the user can't shadow (`parseInt`, `parseFloat`, `Object`, …)
+// and the four coercion constructors return a known non-array value.
+// `Symbol()` is excluded because every call returns a unique Symbol.
+func isSourceOnlyUnknownIdentifierCall(ctx rule.RuleContext, call *ast.Node, callee *ast.Node) bool {
+	// If the callee resolves to a local binding, the user's declaration
+	// wins; fall through to IsKnownNonIndexedCollection.
 	if ctx.Refs != nil && ctx.Refs.ResolveInFile(callee) != nil {
 		return false
 	}
 	switch callee.AsIdentifier().Text {
-	case "Number", "String", "Boolean", "BigInt":
+	case "Number", "String", "Boolean", "BigInt",
+		"parseInt", "parseFloat", "Object":
+		return false
+	}
+	return true
+}
+
+// isSourceOnlyUnknownMemberCall handles calls of the form
+// `RECEIVER.METHOD(args)`. `String.fromCharCode` is already handled by the
+// static evaluator; the rest of the upstream-resolved set (Math.abs,
+// Math.max, Array.isArray, …) is too large to enumerate, so we use a
+// receiver-name heuristic. A receiver that is a known global with a
+// method that returns a primitive resolves to a known non-array value
+// and the rule legitimately skips.
+func isSourceOnlyUnknownMemberCall(ctx rule.RuleContext, call *ast.Node, callee *ast.Node) bool {
+	// First let the shared static evaluator take a swing: it knows how to
+	// fold `String.fromCharCode`, `Array.of`, and a few string methods.
+	// Anything it resolves falls through to IsKnownNonIndexedCollection.
+	staticEvaluator := arrayReceiverStaticEvaluator(ctx)
+	if _, known := staticEvaluator.EvalArrayValue(call); known {
+		// Resolved to a known value: let the outer
+		// IsKnownNonIndexedCollection path decide.
+		return false
+	}
+	receiver := accessExpressionObject(callee)
+	if receiver == nil {
 		return true
 	}
-	return false
+	if !ast.IsIdentifier(receiver) {
+		// Nested member access like `Foo.Bar.baz()`; upstream can't
+		// statically resolve these.
+		return true
+	}
+	// If the receiver resolves to a local binding, the user's
+	// declaration wins; fall through.
+	if ctx.Refs != nil && ctx.Refs.ResolveInFile(receiver) != nil {
+		return false
+	}
+	// Known global receivers that return non-array values for any
+	// well-known method call. `Symbol` is excluded because Symbol values
+	// cannot be folded.
+	switch receiver.AsIdentifier().Text {
+	case "Math", "Number", "String", "Boolean", "BigInt", "Array", "Object", "JSON":
+		return false
+	}
+	return true
+}
+
+// accessExpressionObject returns the object of a PropertyAccessExpression
+// or ElementAccessExpression, with parentheses stripped. Returns nil for
+// other access shapes.
+func accessExpressionObject(callee *ast.Node) *ast.Node {
+	if callee == nil {
+		return nil
+	}
+	if ast.IsPropertyAccessExpression(callee) {
+		return ast.SkipParentheses(callee.AsPropertyAccessExpression().Expression)
+	}
+	if ast.IsElementAccessExpression(callee) {
+		return ast.SkipParentheses(callee.AsElementAccessExpression().Expression)
+	}
+	return nil
 }
 
 // ShouldSkipKnownNonArrayReceiver mirrors the upstream helper of the same
@@ -145,13 +262,82 @@ func ShouldSkipKnownNonArrayReceiver(ctx rule.RuleContext, node *ast.Node) bool 
 	if isDirectlyReportableReceiver(node) {
 		return false
 	}
-	// Source-only JS: identifiers without a local binding (e.g. `undefined`,
-	// `NaN`) and bare member expressions are "unknown" in upstream's
-	// classification. Skipping the type checker for these avoids
-	// over-classifying them via global type info that the user's source
-	// doesn't actually carry.
+	// Calls that the source-only path recognizes as folding to a known
+	// non-array value skip the rule, mirroring upstream's static
+	// evaluator. The type checker would over-classify or under-classify
+	// these in source-only files, so we short-circuit here.
+	if ast.IsCallExpression(node) {
+		if isNonArrayResolvingCall(ctx, node) {
+			return true
+		}
+	}
+	// Source-only JS: identifiers without a local binding, identifiers
+	// bound via `let`/`var`/destructuring, bare member expressions, and
+	// call expressions the static evaluator cannot fold are "unknown" in
+	// upstream's classification. Skipping the type checker for these
+	// avoids over-classifying them via global type info that the user's
+	// source doesn't actually carry.
 	if isSourceOnlyUnknownShape(ctx, node) {
 		return false
 	}
 	return IsKnownNonIndexedCollection(ctx, node)
+}
+
+// isNonArrayResolvingCall reports whether node is a CallExpression that
+// upstream's static evaluator folds to a known non-array value, including
+// the four coercion constructors (`Number`, `String`, `Boolean`, `BigInt`),
+// the `parseInt` / `parseFloat` / `Object` global functions, and the
+// well-known global method receivers (`Math.*`, `Array.isArray`, etc.).
+// `Symbol()` is excluded because every call returns a unique Symbol and
+// the static evaluator cannot fold it.
+func isNonArrayResolvingCall(ctx rule.RuleContext, node *ast.Node) bool {
+	call := node.AsCallExpression()
+	if call == nil {
+		return false
+	}
+	callee := ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions)
+	if callee == nil {
+		return false
+	}
+	if ast.IsIdentifier(callee) {
+		// If the callee resolves to a local binding, the user's
+		// declaration wins; fall through to IsKnownNonIndexedCollection.
+		if ctx.Refs != nil && ctx.Refs.ResolveInFile(callee) != nil {
+			return false
+		}
+		switch callee.AsIdentifier().Text {
+		case "Number", "String", "Boolean", "BigInt",
+			"parseInt", "parseFloat", "Object":
+			return true
+		}
+		return false
+	}
+	if ast.IsAccessExpression(callee) {
+		// First let the shared static evaluator take a swing: it knows
+		// how to fold `String.fromCharCode`, `Array.of`, and a few
+		// string methods.
+		staticEvaluator := arrayReceiverStaticEvaluator(ctx)
+		if _, known := staticEvaluator.EvalArrayValue(node); known {
+			// Resolved: let the outer IsKnownNonIndexedCollection path
+			// decide.
+			return false
+		}
+		receiver := accessExpressionObject(callee)
+		if receiver == nil || !ast.IsIdentifier(receiver) {
+			return false
+		}
+		// If the receiver resolves to a local binding, the user's
+		// declaration wins; fall through.
+		if ctx.Refs != nil && ctx.Refs.ResolveInFile(receiver) != nil {
+			return false
+		}
+		// Known global receivers that return non-array values for any
+		// well-known method call. `Symbol` is excluded because Symbol
+		// values cannot be folded.
+		switch receiver.AsIdentifier().Text {
+		case "Math", "Number", "String", "Boolean", "BigInt", "Array", "Object", "JSON":
+			return true
+		}
+	}
+	return false
 }
