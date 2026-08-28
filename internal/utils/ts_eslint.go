@@ -482,23 +482,20 @@ func needsPrecedingSemicolonAfterIdentifierOrKeyword(prevKind ast.Kind, prevNode
 // ever adding a redundant character rather than producing wrong output.
 func NeedsPrecedingSemicolon(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	nodeStart := TrimNodeTextRange(sourceFile, node).Pos()
-
-	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
-	prevKind := ast.KindUnknown
-	prevStart := -1
-	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < nodeStart {
-		prevKind = scan.Token()
-		prevStart = scan.TokenStart()
-		scan.Scan()
-	}
-	if prevKind == ast.KindUnknown || scan.TokenStart() != nodeStart || !scan.HasPrecedingLineBreak() {
+	current, ok := TokenAtOrAfter(sourceFile, nodeStart)
+	if !ok || current.Start != nodeStart {
 		return false
 	}
+	previous, ok := TokenBeforePosition(sourceFile, nodeStart)
+	if !ok || !ecmascript.ContainsLineTerminator(sourceFile.Text(), previous.End, nodeStart) {
+		return false
+	}
+	prevKind := previous.Kind
 	if needsPrecedingSemicolonExemptPunctuator(prevKind) {
 		return false
 	}
 
-	prevNode := ast.GetNodeAtPosition(sourceFile, prevStart, false)
+	prevNode := ast.GetNodeAtPosition(sourceFile, previous.Start, false)
 	if prevNode == nil {
 		return true
 	}
