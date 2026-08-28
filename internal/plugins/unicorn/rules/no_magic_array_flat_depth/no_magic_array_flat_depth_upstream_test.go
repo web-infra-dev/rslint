@@ -54,23 +54,13 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			jsValid(`String("x").flat(2)`),
 			jsValid(`Boolean(0).flat(2)`),
 			jsValid(`BigInt(1).flat(2)`),
-
-			// Globals whose call results are folded by upstream's static
-			// evaluator to a known non-array value. Lock in so the helper
-			// continues to handle them and doesn't over-report.
-			jsValid(`Math.abs(-2).flat(2)`),
-			jsValid(`Math.max(1, 2).flat(2)`),
-			jsValid(`Array.isArray([]).flat(2)`),
-			jsValid(`parseInt("2", 10).flat(2)`),
-			jsValid(`parseFloat("2").flat(2)`),
-			jsValid(`Object().flat(2)`),
-			// String.fromCharCode is folded by the shared static evaluator.
-			jsValid(`String.fromCharCode(65).flat(2)`),
-			// Optional-member access on a global receiver still resolves.
-			jsValid(`Math?.abs(-2).flat(2)`),
-			jsValid(`Math?.max(1, 2)?.flat(2)`),
-			// Parenthesized form must not defeat the static resolution.
+			// Parenthesized form of a coercion constructor must still
+			// be skipped.
 			jsValid(`(Number(1)).flat(2)`),
+
+			// `String.fromCharCode` is folded by the shared static
+			// evaluator to a string value, so the rule skips it.
+			jsValid(`String.fromCharCode(65).flat(2)`),
 
 			// ---- depth is 1 (the default) ----
 			jsValid(`array.flat(1)`),
@@ -238,6 +228,91 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			},
 			{
 				Code:     `const value = Math.PI; value.flat(2);`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+
+			// Source-only unknown receivers: calls the rslint static
+			// evaluator cannot fold. The rslint type checker would
+			// over-classify their return type as a known non-array
+			// primitive, so the source-only path bypasses it.
+			{
+				Code:     `Math.abs(-2).flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Math.max(1, 2).flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Math.random().flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Array.from([1]).flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Object.keys({a: 1}).flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `JSON.parse("[]").flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Array.isArray([]).flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `parseInt("2", 10).flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `parseFloat("2").flat(2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+			{
+				Code:     `Object().flat(2)`,
 				FileName: "file.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: messageID,
