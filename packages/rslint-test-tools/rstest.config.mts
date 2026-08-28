@@ -454,6 +454,7 @@ export default defineConfig({
     './tests/eslint/rules/no-empty-character-class.test.ts',
     './tests/eslint/rules/no-fallthrough.test.ts',
     './tests/eslint/rules/no-invalid-regexp.test.ts',
+    './tests/eslint/rules/no-invalid-this.test.ts',
     './tests/eslint/rules/no-misleading-character-class.test.ts',
     './tests/eslint/rules/no-regex-spaces.test.ts',
     './tests/eslint/rules/no-redeclare.test.ts',
