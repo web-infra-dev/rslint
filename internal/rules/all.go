@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/block_scoped_var"
 	"github.com/web-infra-dev/rslint/internal/rules/capitalized_comments"
+	"github.com/web-infra-dev/rslint/internal/rules/class_methods_use_this"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_this"
@@ -238,6 +239,7 @@ func coreRules() []rule.Rule {
 		arrow_body_style.ArrowBodyStyleRule,
 		block_scoped_var.BlockScopedVarRule,
 		capitalized_comments.CapitalizedCommentsRule,
+		class_methods_use_this.ClassMethodsUseThisRule,
 		complexity.ComplexityRule,
 		consistent_return.ConsistentReturnRule,
 		consistent_this.ConsistentThisRule,

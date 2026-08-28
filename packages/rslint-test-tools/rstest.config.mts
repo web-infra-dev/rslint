@@ -72,6 +72,7 @@ export default defineConfig({
     './tests/eslint/rules/arrow-body-style.test.ts',
     './tests/eslint/rules/block-scoped-var.test.ts',
     './tests/eslint/rules/capitalized-comments.test.ts',
+    './tests/eslint/rules/class-methods-use-this.test.ts',
     './tests/eslint/rules/curly.test.ts',
     './tests/eslint/rules/default-case.test.ts',
     './tests/eslint/rules/dot-notation.test.ts',
