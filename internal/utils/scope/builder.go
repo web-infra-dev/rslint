@@ -121,7 +121,7 @@ func (b *builder) hoistStatement(stmt *ast.Node, s *Scope, blockScope bool) {
 		// a namespace called `global`. Ambient `declare module 'str' { ... }`
 		// uses a string-literal name and doesn't bind a variable either —
 		// addNamedDecl skips that one automatically.
-		if !ast.IsGlobalScopeAugmentation(stmt) {
+		if !ast.IsGlobalScopeAugmentation(stmt) && !utils.IsQualifiedNamespaceSegment(stmt) {
 			b.addNamedDecl(stmt, s, DefNamespaceName, true)
 		}
 	case ast.KindImportDeclaration:
@@ -143,6 +143,7 @@ func (b *builder) hoistStatement(stmt *ast.Node, s *Scope, blockScope bool) {
 			b.collectVariableDeclarations(fs.Initializer, s, false)
 		}
 	}
+	b.hoistFunctionsThroughScopeLessStatement(stmt, s)
 
 	if blockScope {
 		return
@@ -163,6 +164,63 @@ func (b *builder) hoistStatement(stmt *ast.Node, s *Scope, blockScope bool) {
 			return false
 		})
 	}
+}
+
+// hoistFunctionsThroughScopeLessStatement adds function declarations nested
+// under statements that create no lexical scope of their own. TSESTree puts
+// those declarations in the nearest scope that already exists. A braced body
+// stops the walk because visitBlock gives it its own scope; a for loop with a
+// let/const initializer similarly owns a scope and is handled by visitFor*.
+func (b *builder) hoistFunctionsThroughScopeLessStatement(stmt *ast.Node, s *Scope) {
+	if stmt == nil {
+		return
+	}
+	switch stmt.Kind {
+	case ast.KindIfStatement:
+		ifStmt := stmt.AsIfStatement()
+		if ifStmt != nil {
+			b.hoistScopeLessFunction(ifStmt.ThenStatement, s)
+			b.hoistScopeLessFunction(ifStmt.ElseStatement, s)
+		}
+	case ast.KindLabeledStatement:
+		if labeled := stmt.AsLabeledStatement(); labeled != nil {
+			b.hoistScopeLessFunction(labeled.Statement, s)
+		}
+	case ast.KindWhileStatement:
+		if whileStmt := stmt.AsWhileStatement(); whileStmt != nil {
+			b.hoistScopeLessFunction(whileStmt.Statement, s)
+		}
+	case ast.KindDoStatement:
+		if doStmt := stmt.AsDoStatement(); doStmt != nil {
+			b.hoistScopeLessFunction(doStmt.Statement, s)
+		}
+	case ast.KindForStatement:
+		forStmt := stmt.AsForStatement()
+		if forStmt != nil && !hasBlockScopedForInitializer(forStmt.Initializer) {
+			b.hoistScopeLessFunction(forStmt.Statement, s)
+		}
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		forInOrOf := stmt.AsForInOrOfStatement()
+		if forInOrOf != nil && !hasBlockScopedForInitializer(forInOrOf.Initializer) {
+			b.hoistScopeLessFunction(forInOrOf.Statement, s)
+		}
+	}
+}
+
+func hasBlockScopedForInitializer(initializer *ast.Node) bool {
+	return initializer != nil && initializer.Kind == ast.KindVariableDeclarationList &&
+		!utils.IsVarKeyword(initializer)
+}
+
+func (b *builder) hoistScopeLessFunction(stmt *ast.Node, s *Scope) {
+	if stmt == nil {
+		return
+	}
+	if stmt.Kind == ast.KindFunctionDeclaration {
+		b.addNamedDecl(stmt, s, DefFunctionName, true)
+		return
+	}
+	b.hoistFunctionsThroughScopeLessStatement(stmt, s)
 }
 
 // hoistVarOnly walks a subtree and only hoists `var` declarations (into the
@@ -990,15 +1048,8 @@ func (b *builder) visitBlock(block *ast.Node, outer *Scope) {
 	for _, stmt := range blk.Statements.Nodes {
 		b.hoistStatement(stmt, s, true)
 	}
-	// `var` hoists up to the enclosing variable scope.
-	varHost := s.VariableScope()
-	if varHost == nil {
-		varHost = s
-	}
-	for _, stmt := range blk.Statements.Nodes {
-		b.hoistVarOnly(stmt, varHost)
-	}
-	// Recurse.
+	// Vars were already collected by the enclosing variable scope's first
+	// pass. Recurse without adding them a second time.
 	for _, stmt := range blk.Statements.Nodes {
 		b.visitStatement(stmt, s)
 	}
@@ -1030,6 +1081,9 @@ func (b *builder) visitForStatement(stmt *ast.Node, outer *Scope) {
 		return
 	}
 	body := b.forInitScope(stmt, fs.Initializer, outer)
+	if body != outer {
+		b.hoistScopeLessFunction(fs.Statement, body)
+	}
 	if fs.Condition != nil {
 		b.visitExpression(fs.Condition, body)
 	}
@@ -1047,6 +1101,9 @@ func (b *builder) visitForInOrOf(stmt *ast.Node, outer *Scope) {
 		return
 	}
 	body := b.forInitScope(stmt, fs.Initializer, outer)
+	if body != outer {
+		b.hoistScopeLessFunction(fs.Statement, body)
+	}
 	// The iterated expression is evaluated while a `let`/`const` loop binding is
 	// still in its temporal dead zone, so it resolves against the loop scope —
 	// eslint-scope models this with a throwaway TDZ scope around the right-hand
@@ -1092,13 +1149,6 @@ func (b *builder) visitCatch(node *ast.Node, outer *Scope) {
 			for _, stmt := range blk.Statements.Nodes {
 				b.hoistStatement(stmt, bodyScope, true)
 			}
-			varHost := bodyScope.VariableScope()
-			if varHost == nil {
-				varHost = bodyScope
-			}
-			for _, stmt := range blk.Statements.Nodes {
-				b.hoistVarOnly(stmt, varHost)
-			}
 			for _, stmt := range blk.Statements.Nodes {
 				b.visitStatement(stmt, bodyScope)
 			}
@@ -1129,24 +1179,8 @@ func (b *builder) visitSwitchCases(sw *ast.SwitchStatement, outer *Scope) {
 			b.hoistStatement(s, switchScope, true)
 		}
 	}
-	// Vars hoist to enclosing var scope.
-	varHost := switchScope.VariableScope()
-	if varHost == nil {
-		varHost = switchScope
-	}
-	for _, clause := range cb.Clauses.Nodes {
-		if clause == nil {
-			continue
-		}
-		c := clause.AsCaseOrDefaultClause()
-		if c == nil || c.Statements == nil {
-			continue
-		}
-		for _, s := range c.Statements.Nodes {
-			b.hoistVarOnly(s, varHost)
-		}
-	}
-	// Recurse into statements.
+	// Vars were already collected by the enclosing variable scope's first
+	// pass. Recurse into statements without duplicating their definitions.
 	for _, clause := range cb.Clauses.Nodes {
 		if clause == nil {
 			continue

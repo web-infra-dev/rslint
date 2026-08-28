@@ -136,6 +136,12 @@ func NewGlobals(
 	}
 }
 
+// EffectiveECMAVersion returns the normalized ECMAScript edition selected for
+// this file. The zero-value Globals selects the moving latest edition.
+func (g Globals) EffectiveECMAVersion() int {
+	return g.languageOptions.EffectiveECMAVersion()
+}
+
 // LanguageAccess returns the globals implicitly supplied by the selected
 // ECMAScript edition and resolved language defaults. The resolved defaults
 // compose after edition globals, matching ESLint's default config.

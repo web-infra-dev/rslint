@@ -32,6 +32,25 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 	}
 }
 
+func TestRegExpLiteralStringValueCanonicalizesFlags(t *testing.T) {
+	if got := RegExpLiteralStringValue(`/a/mi`); got != `/a/im` {
+		t.Fatalf("RegExpLiteralStringValue() = %q, want %q", got, `/a/im`)
+	}
+}
+
+func TestIsSameReferenceNumericLiteralUsesJavaScriptValue(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, `0x10000000000000801; 18446744073709552000;`, core.ScriptKindTS)
+
+	left := findNodeWithText(t, sourceFile, `0x10000000000000801`)
+	right := findNodeWithText(t, sourceFile, `18446744073709552000`)
+	if !IsSameReference(left, right, false) {
+		t.Fatal("IsSameReference() = false, want equal JavaScript Number values")
+	}
+}
+
 func TestIsESTreeLiteralKind(t *testing.T) {
 	literals := []ast.Kind{
 		ast.KindStringLiteral,
@@ -148,7 +167,9 @@ func TestAccessExpressionStaticName(t *testing.T) {
 		"object[\"property\"];\n" +
 		"object[(\"property\")];\n" +
 		"object[\"property\" as const];\n" +
-		"object[dynamic];\n"
+		"object[/a/mi];\n" +
+		"object[dynamic];\n" +
+		"class C { #private = 0; method() { this.#private; } }\n"
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
 		Path:     "/test.ts",
@@ -164,7 +185,9 @@ func TestAccessExpressionStaticName(t *testing.T) {
 		{name: "static string element", text: `object["property"]`, want: "property", wantOkay: true},
 		{name: "parenthesized element key", text: `object[("property")]`, want: "property", wantOkay: true},
 		{name: "asserted element key", text: `object["property" as const]`, want: "property", wantOkay: true},
+		{name: "regexp element key", text: `object[/a/mi]`, want: "/a/im", wantOkay: true},
 		{name: "dynamic element key", text: `object[dynamic]`, wantOkay: false},
+		{name: "private property", text: `this.#private`, wantOkay: false},
 	}
 	for _, tt := range tests {
 		node := findNodeWithText(t, sourceFile, tt.text)

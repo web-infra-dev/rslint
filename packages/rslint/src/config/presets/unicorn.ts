@@ -60,7 +60,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-accidental-bitwise-operator': 'error', // not implemented
     // 'unicorn/no-anonymous-default-export': 'error', // not implemented
     // 'unicorn/no-array-callback-reference': 'error', // not implemented
-    // 'unicorn/no-array-concat-in-loop': 'error', // not implemented
+    'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
     // 'unicorn/no-array-from-fill': 'error', // not implemented
     // 'unicorn/no-array-front-mutation': 'off', // not implemented
@@ -95,7 +95,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-duplicate-set-values': 'error', // not implemented
     // 'unicorn/no-empty-file': 'error', // not implemented
     // 'unicorn/no-error-property-assignment': 'error', // not implemented
-    // 'unicorn/no-exports-in-scripts': 'error', // not implemented
+    'unicorn/no-exports-in-scripts': 'error',
     // 'unicorn/no-for-each': 'error', // not implemented
     // 'unicorn/no-for-loop': 'error', // not implemented
     // 'unicorn/no-global-object-property-assignment': 'error', // not implemented
@@ -115,7 +115,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-late-event-control': 'error', // not implemented
     // 'unicorn/no-lonely-if': 'error', // not implemented
     // 'unicorn/no-loop-iterable-mutation': 'error', // not implemented
-    // 'unicorn/no-magic-array-flat-depth': 'error', // not implemented
+    'unicorn/no-magic-array-flat-depth': 'error',
     // 'unicorn/no-manually-wrapped-comments': 'off', // not implemented
     // 'unicorn/no-mismatched-map-key': 'error', // not implemented
     // 'unicorn/no-misrefactored-assignment': 'error', // not implemented
@@ -322,7 +322,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-structured-clone': 'error', // not implemented
     // 'unicorn/prefer-switch': 'error', // not implemented
     // 'unicorn/prefer-temporal': 'off', // not implemented
-    // 'unicorn/prefer-ternary': 'error', // not implemented
+    'unicorn/prefer-ternary': 'error',
     // 'unicorn/prefer-then-catch': 'error', // not implemented
     // 'unicorn/prefer-toggle-attribute': 'error', // not implemented
     // 'unicorn/prefer-top-level-await': 'error', // not implemented
@@ -352,7 +352,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/switch-case-break-position': 'error', // not implemented
     // 'unicorn/template-indent': 'error', // not implemented
     // 'unicorn/text-encoding-identifier-case': 'error', // not implemented
-    // 'unicorn/throw-new-error': 'error', // not implemented
+    'unicorn/throw-new-error': 'error',
     // 'unicorn/try-complexity': 'off', // not implemented
   },
 };

@@ -1,0 +1,22 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["always", "never"]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "exceptRange": {
+          "type": "boolean"
+        },
+        "onlyEquality": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}

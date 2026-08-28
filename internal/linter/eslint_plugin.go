@@ -42,15 +42,16 @@ type EslintPluginLintRequest struct {
 	Generation      string                            `json:"generation,omitempty"`
 	Files           []EslintPluginLintFile            `json:"files"`
 	Rules           map[string]EslintPluginRuleConfig `json:"rules"`
-	Fix             bool                              `json:"fix"`
+	CollectFixes    bool                              `json:"collectFixes"`
 	SuggestionsMode string                            `json:"suggestionsMode"`
 	CollectTiming   bool                              `json:"collectTiming,omitempty"`
 }
 
 // SuggestionsMode values for EslintPluginLintRequest.SuggestionsMode — the wire
 // contract the Node worker interprets. "eager" materializes each suggestion's
-// fix (the CLI/LSP --fix path applies them like fixes); "off" records only the
-// suggestion descriptors without running their fixers.
+// fix for consumers such as Node API and LSP code actions; suggestions are never
+// applied by the autofix pipeline. "off" records only their descriptors without
+// running their fixers.
 const (
 	SuggestionsModeOff   = "off"
 	SuggestionsModeEager = "eager"
@@ -256,7 +257,7 @@ func DispatchEslintPluginRules(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,
 	files []EslintPluginFileInput,
-	fix bool,
+	collectFixes bool,
 	suggestionsMode string,
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
@@ -265,7 +266,7 @@ func DispatchEslintPluginRules(
 		ctx,
 		dispatch,
 		files,
-		fix,
+		collectFixes,
 		suggestionsMode,
 		timing,
 		onDiagnostic,
@@ -277,7 +278,7 @@ func dispatchEslintPluginRules(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,
 	files []EslintPluginFileInput,
-	fix bool,
+	collectFixes bool,
 	suggestionsMode string,
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
@@ -302,7 +303,7 @@ func dispatchEslintPluginRules(
 				ctx,
 				dispatch,
 				batch,
-				fix,
+				collectFixes,
 				suggestionsMode,
 				timing,
 				func(d rule.RuleDiagnostic) { batchDiags[i] = append(batchDiags[i], d) },
@@ -379,7 +380,7 @@ func DispatchEslintPluginRulesAsync(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,
 	inputs []EslintPluginFileInput,
-	fix bool,
+	collectFixes bool,
 	suggestionsMode string,
 	timing *TimingCollector,
 ) <-chan EslintPluginDispatchOutcome {
@@ -389,7 +390,7 @@ func DispatchEslintPluginRulesAsync(
 			ctx,
 			dispatch,
 			inputs,
-			fix,
+			collectFixes,
 			suggestionsMode,
 			timing,
 		)
@@ -405,7 +406,7 @@ func DispatchEslintPluginRulesWithOutcome(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,
 	inputs []EslintPluginFileInput,
-	fix bool,
+	collectFixes bool,
 	suggestionsMode string,
 	timing *TimingCollector,
 ) EslintPluginDispatchOutcome {
@@ -414,7 +415,7 @@ func DispatchEslintPluginRulesWithOutcome(
 		ctx,
 		dispatch,
 		inputs,
-		fix,
+		collectFixes,
 		suggestionsMode,
 		timing,
 		func(diagnostic rule.RuleDiagnostic) {
@@ -450,7 +451,7 @@ func dispatchOneBatch(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,
 	batch []EslintPluginFileInput,
-	fix bool,
+	collectFixes bool,
 	suggestionsMode string,
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
@@ -461,7 +462,7 @@ func dispatchOneBatch(
 			err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
 		}
 	}()
-	req := buildEslintPluginRequest(batch, fix, suggestionsMode, timing != nil)
+	req := buildEslintPluginRequest(batch, collectFixes, suggestionsMode, timing != nil)
 	res, dispatchErr := dispatch(ctx, req)
 	if dispatchErr != nil {
 		return dispatchErr
@@ -538,7 +539,7 @@ func eslintPluginBatchKey(f EslintPluginFileInput) string {
 	return string(b)
 }
 
-func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestionsMode string, collectTiming bool) EslintPluginLintRequest {
+func buildEslintPluginRequest(batch []EslintPluginFileInput, collectFixes bool, suggestionsMode string, collectTiming bool) EslintPluginLintRequest {
 	rules := map[string]EslintPluginRuleConfig{}
 	for _, r := range batch[0].Rules {
 		rules[r.Name] = EslintPluginRuleConfig{Options: r.Options}
@@ -556,7 +557,7 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestio
 	return EslintPluginLintRequest{
 		Files:           wireFiles,
 		Rules:           rules,
-		Fix:             fix,
+		CollectFixes:    collectFixes,
 		SuggestionsMode: suggestionsMode,
 		CollectTiming:   collectTiming,
 	}
