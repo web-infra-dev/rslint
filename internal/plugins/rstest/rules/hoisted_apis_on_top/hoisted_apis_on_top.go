@@ -5,14 +5,10 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
-
-// hoistedFactory is the one hoisted API that produces a value. Every other
-// hoisted API returns undefined, which is what lets the value-position
-// suggestion below leave `undefined` behind.
-const hoistedFactory = "hoisted"
 
 // hoistedAPIs maps each module-mock API Rstest lifts to the top of the module
 // onto the counterpart that runs where it is written, or "" when the API has
@@ -27,7 +23,7 @@ var hoistedAPIs = map[string]string{
 	"mockRequire":   "doMockRequire",
 	"unmock":        "doUnmock",
 	"unmockRequire": "doUnmockRequire",
-	hoistedFactory:  "",
+	"hoisted":       "",
 }
 
 // namespaceNames are the two spellings of the utilities object the rewrite
@@ -60,30 +56,41 @@ var HoistedApisOnTopRule = rule.Rule{
 	Name:   "rstest/hoisted-apis-on-top",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// The insertion point is the end of the last import in the file, which
-		// can sit after the call being reported. It is resolved once, on the
-		// first suggestion that is actually materialized.
-		insertPos := -1
-		insertResolved := false
+		// Both of these are needed only to materialize a move suggestion, and
+		// the insertion point in particular depends on imports that can sit
+		// after the call being reported. They are resolved once, on the first
+		// suggestion that is actually built.
+		insertPos, insertResolved := 0, false
 		insertionPoint := func() int {
 			if !insertResolved {
-				insertPos = lastImportEnd(ctx.SourceFile)
+				insertPos = topLevelInsertionPoint(ctx.SourceFile)
 				insertResolved = true
 			}
 			return insertPos
+		}
+		var topLevelNames map[string]bool
+		topLevelBindings := func() map[string]bool {
+			if topLevelNames == nil {
+				topLevelNames = topLevelBindingNames(ctx.SourceFile)
+			}
+			return topLevelNames
 		}
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				accessor, namespace, api, ok := hoistedAPICall(node)
-				if !ok || isWrittenAtTopLevel(node, api) {
+				if !ok {
+					return
+				}
+				position, lifted := liftedCallPosition(node)
+				if !lifted || isWrittenAtTopLevel(position) {
 					return
 				}
 
 				ctx.ReportNodeWithDeferredSuggestions(node, hoistedApisOnTopMessage, func() []rule.RuleSuggestion {
 					suggestions := make([]rule.RuleSuggestion, 0, 2)
 
-					if fixes := moveToTopFixes(ctx, node, api, insertionPoint()); fixes != nil {
+					if fixes := moveToTopFixes(ctx, position, insertionPoint(), topLevelBindings); fixes != nil {
 						suggestions = append(suggestions, rule.RuleSuggestion{
 							Message:  suggestMoveHoistedApiToTopMessage,
 							FixesArr: fixes,
@@ -122,25 +129,31 @@ func useNonHoistedAPIMessage(namespace, api, replacement string) rule.RuleMessag
 	}
 }
 
-// hoistedAPICall reports whether node is a call the Rstest build lifts, and
-// returns the API's name node, the receiver's name, and the API's name.
+// hoistedAPICall reports whether node names a module-mock API the Rstest build
+// lifts, and returns the API's name node, the receiver's name, and the API's
+// name.
 //
-// The shapes accepted here are the ones the rewrite accepts. The receiver may
-// carry parentheses and TypeScript wrappers — `(rs).mock()`, `rs!.mock()`,
-// `(rs as any).mock()`, `(rs satisfies RstestUtilities).mock()` are all lifted,
-// because those are erased before the module-mock rewrite runs. The API name
-// must be written as a plain dotted member: `rs['mock']()` and a call reached
-// through `import.meta.rstest` are left as ordinary runtime calls and throw,
-// and so is anything on an optional chain, so none of them are reported here.
+// Parentheses and TypeScript wrappers are transparent on both sides of the
+// callee, because TypeScript erases them before the module-mock rewrite runs:
+// `(rs).mock()`, `rs!.mock()`, `(rs as any).mock()`, `(rs.mock)()` and
+// `(rs.mock as any)()` are all rewritten. The API itself must be written as a
+// plain dotted member off a plain identifier: `rs['mock']()` and a call reached
+// through `import.meta.rstest` are left as ordinary runtime calls that throw,
+// and so is anything on an optional chain.
 func hoistedAPICall(node *ast.Node) (*ast.Node, string, string, bool) {
 	call := node.AsCallExpression()
-	if call == nil || call.Expression == nil ||
-		call.Expression.Kind != ast.KindPropertyAccessExpression ||
-		ast.IsOptionalChain(node) || ast.IsOptionalChain(call.Expression) {
+	if call == nil || ast.IsOptionalChain(node) {
 		return nil, "", "", false
 	}
 
-	access := call.Expression.AsPropertyAccessExpression()
+	callee := utils.SkipAssertionsAndParens(call.Expression)
+	if callee == nil ||
+		callee.Kind != ast.KindPropertyAccessExpression ||
+		ast.IsOptionalChain(callee) {
+		return nil, "", "", false
+	}
+
+	access := callee.AsPropertyAccessExpression()
 	accessor := access.Name()
 	if accessor == nil || accessor.Kind != ast.KindIdentifier {
 		return nil, "", "", false
@@ -162,144 +175,307 @@ func hoistedAPICall(node *ast.Node) (*ast.Node, string, string, bool) {
 	return accessor, namespace, api, true
 }
 
-// isWrittenAtTopLevel reports whether the call is already written where it
-// runs: as a statement of the file itself.
-//
-// `hoisted` is also accepted as the initializer of a top-level variable, with
-// or without an `await`, because that is the shape the API is designed for —
-// its return value is what the rest of the file uses. The other hoisted APIs
-// evaluate to undefined, so a top-level statement is the only shape that reads
-// as intended.
-func isWrittenAtTopLevel(call *ast.Node, api string) bool {
-	outer := utils.OutermostParenthesizedExpression(call)
-	parent := outer.Parent
-
-	if api == hoistedFactory {
-		if parent != nil && parent.Kind == ast.KindAwaitExpression {
-			outer = utils.OutermostParenthesizedExpression(parent)
-			parent = outer.Parent
-		}
-		if parent != nil && parent.Kind == ast.KindVariableDeclaration {
-			statement := variableStatementOf(parent)
-			return statement != nil &&
-				statement.Parent != nil &&
-				statement.Parent.Kind == ast.KindSourceFile
-		}
-	}
-
-	return parent != nil &&
-		parent.Kind == ast.KindExpressionStatement &&
-		parent.Parent != nil &&
-		parent.Parent.Kind == ast.KindSourceFile
+// liftedPosition is where a lifted call is written, as the rewrite sees it:
+// exactly one of statement and declaration is set.
+type liftedPosition struct {
+	statement   *ast.Node
+	declaration *ast.Node
 }
 
-// moveToTopFixes builds the edits that lift the call to where it actually runs,
-// or nil when the call cannot be lifted without changing what the surrounding
-// expression evaluates to.
+// liftedCallPosition reports whether the Rstest build actually lifts this call,
+// and where it is written.
 //
-// Three shapes are handled, and the third is why the first two are separate:
+// Only two positions are rewritten, at any nesting depth: the whole expression
+// of an expression statement, and the whole initializer of a variable
+// declaration, the latter optionally behind an `await`. Anywhere else — an
+// argument, an object property, an arrow's expression body, an operand of `&&`,
+// the right-hand side of an assignment, an `await` in statement position — the
+// call is left alone and throws where it is written. Reporting those would
+// describe a lift that does not happen, and the move suggestion would rewrite
+// working-or-not code on a false premise.
 //
-//   - A statement of its own becomes an empty statement. Deleting the statement
-//     outright would leave `if (condition)` without a body when it was written
-//     without braces, so `;` takes its place.
-//   - `hoisted` bound by a single-declarator variable statement moves whole.
-//     The Rstest build lifts only the call, so the binding is assigned when its
-//     block runs while the factory has already executed; moving the declaration
-//     with the call is what makes the file read the way it runs.
-//   - Any other position of a void API leaves `undefined`, which is exactly
-//     what the call evaluated to.
-//
-// `hoisted` in any other position produces no edit: its value is used, and no
-// text can stand in for it.
-func moveToTopFixes(ctx rule.RuleContext, call *ast.Node, api string, insertPos int) []rule.RuleFix {
-	outer := utils.OutermostParenthesizedExpression(call)
+// Parentheses and TypeScript wrappers around the call are transparent here for
+// the same reason they are around the callee: `rs.mock('./m') as unknown;` and
+// `const v = (await rs.hoisted(f)) as number` are both rewritten.
+func liftedCallPosition(call *ast.Node) (liftedPosition, bool) {
+	outer := skipTransparentAncestors(call)
+	parent := outer.Parent
+	if parent == nil {
+		return liftedPosition{}, false
+	}
 
-	if parent := outer.Parent; parent != nil && parent.Kind == ast.KindExpressionStatement {
+	if parent.Kind == ast.KindExpressionStatement {
+		if parent.AsExpressionStatement().Expression != outer {
+			return liftedPosition{}, false
+		}
+		return liftedPosition{statement: parent}, true
+	}
+
+	// `await rs.mock('./m');` in statement position is NOT rewritten, so the
+	// `await` is only followed on the way to a variable declaration.
+	if parent.Kind == ast.KindAwaitExpression {
+		if parent.AsAwaitExpression().Expression != outer {
+			return liftedPosition{}, false
+		}
+		outer = skipTransparentAncestors(parent)
+		parent = outer.Parent
+		if parent == nil {
+			return liftedPosition{}, false
+		}
+	}
+
+	if parent.Kind == ast.KindVariableDeclaration &&
+		parent.AsVariableDeclaration().Initializer == outer {
+		return liftedPosition{declaration: parent}, true
+	}
+	return liftedPosition{}, false
+}
+
+// skipTransparentAncestors walks out of the parentheses and TypeScript wrappers
+// that enclose node, stopping at the first ancestor that is neither.
+func skipTransparentAncestors(node *ast.Node) *ast.Node {
+	for node != nil && node.Parent != nil {
+		parent := node.Parent
+		var inner *ast.Node
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			inner = parent.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			inner = parent.AsAsExpression().Expression
+		case ast.KindSatisfiesExpression:
+			inner = parent.AsSatisfiesExpression().Expression
+		case ast.KindNonNullExpression:
+			inner = parent.AsNonNullExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			inner = parent.AsTypeAssertion().Expression
+		default:
+			return node
+		}
+		if inner != node {
+			return node
+		}
+		node = parent
+	}
+	return node
+}
+
+// isWrittenAtTopLevel reports whether the lifted call is already written where
+// it runs: in a statement of the file itself.
+func isWrittenAtTopLevel(position liftedPosition) bool {
+	statement := position.statement
+	if statement == nil {
+		statement = variableStatementOf(position.declaration)
+	}
+	return statement != nil &&
+		statement.Parent != nil &&
+		statement.Parent.Kind == ast.KindSourceFile
+}
+
+// moveToTopFixes builds the edits that lift the statement to where it actually
+// runs, or nil when it cannot travel.
+//
+// An expression statement becomes an empty statement rather than being deleted,
+// so an `if` written without braces keeps a body. A declaration moves whole,
+// because the build lifts only the call and leaves the binding behind: the
+// binding would otherwise be assigned when its block runs while the factory had
+// already executed. It is withheld when the declaration cannot travel alone — a
+// second declarator in the same statement, or a `for` header, which is not a
+// statement of its own — and when a name it binds already exists at the top
+// level, where re-declaring it would not parse.
+func moveToTopFixes(
+	ctx rule.RuleContext,
+	position liftedPosition,
+	insertPos int,
+	topLevelBindings func() map[string]bool,
+) []rule.RuleFix {
+	if position.statement != nil {
+		text := terminated(utils.TrimmedNodeText(ctx.SourceFile, position.statement))
 		return append(
-			insertAtTop(utils.TrimmedNodeText(ctx.SourceFile, call)+";", insertPos),
-			rule.RuleFixReplace(ctx.SourceFile, parent, ";"),
+			insertAtTop(ctx.SourceFile, text, insertPos),
+			rule.RuleFixReplace(ctx.SourceFile, position.statement, ";"),
 		)
 	}
 
-	if api == hoistedFactory {
-		statement := movableVariableStatement(outer)
-		if statement == nil {
-			return nil
-		}
-		text := utils.TrimmedNodeText(ctx.SourceFile, statement)
-		if !strings.HasSuffix(text, ";") {
-			text += ";"
-		}
-		return append(
-			insertAtTop(text, insertPos),
-			rule.RuleFixRemove(ctx.SourceFile, statement),
-		)
+	statement := movableVariableStatement(position.declaration, topLevelBindings)
+	if statement == nil {
+		return nil
 	}
-
+	text := terminated(utils.TrimmedNodeText(ctx.SourceFile, statement))
 	return append(
-		insertAtTop(utils.TrimmedNodeText(ctx.SourceFile, call)+";", insertPos),
-		rule.RuleFixReplace(ctx.SourceFile, call, "undefined"),
+		insertAtTop(ctx.SourceFile, text, insertPos),
+		rule.RuleFixRemove(ctx.SourceFile, statement),
 	)
 }
 
-// insertAtTop places one complete statement after the file's last import, or at
-// the very start of a file that has none.
-func insertAtTop(statement string, insertPos int) []rule.RuleFix {
-	if insertPos < 0 {
-		return []rule.RuleFix{
-			rule.RuleFixReplaceRange(core.NewTextRange(0, 0), statement+"\n"),
-		}
+func terminated(statement string) string {
+	if strings.HasSuffix(statement, ";") {
+		return statement
+	}
+	return statement + ";"
+}
+
+// insertAtTop places one complete statement on a line of its own at insertPos,
+// which is already past anything that has to stay first.
+func insertAtTop(sourceFile *ast.SourceFile, statement string, insertPos int) []rule.RuleFix {
+	text := "\n" + statement
+	if insertPos == 0 || sourceFile.Text()[insertPos-1] == '\n' {
+		text = statement + "\n"
 	}
 	return []rule.RuleFix{
-		rule.RuleFixReplaceRange(core.NewTextRange(insertPos, insertPos), "\n"+statement),
+		rule.RuleFixReplaceRange(core.NewTextRange(insertPos, insertPos), text),
 	}
 }
 
-// lastImportEnd returns the end of the file's last import declaration, or -1
-// when the file has none. An import written below the reported call still
-// counts: the lifted call belongs above every import, so the last one in the
+// topLevelInsertionPoint returns the offset a lifted statement can be written
+// at: after the shebang, after the directive prologue, and after the file's last
+// import declaration, whichever comes last. Zero means the very start of the
+// file.
+//
+// A shebang has to stay on line one, and a directive only counts as one while it
+// is still part of the prologue, so writing before either would change what the
+// file means. An import written below the reported call still moves the point
+// down: the lifted statement belongs above every import, so the last one in the
 // file is the boundary.
-func lastImportEnd(sourceFile *ast.SourceFile) int {
-	end := -1
-	if sourceFile == nil || sourceFile.Statements == nil {
-		return end
+func topLevelInsertionPoint(sourceFile *ast.SourceFile) int {
+	if sourceFile == nil {
+		return 0
 	}
+	pos := len(scanner.GetShebang(sourceFile.Text()))
+	if sourceFile.Statements == nil {
+		return pos
+	}
+
+	inPrologue := true
 	for _, statement := range sourceFile.Statements.Nodes {
 		switch statement.Kind {
 		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			end = statement.End()
+			pos = statement.End()
+			inPrologue = false
+		case ast.KindExpressionStatement:
+			if inPrologue && isDirective(statement) {
+				pos = statement.End()
+				continue
+			}
+			inPrologue = false
+		default:
+			inPrologue = false
 		}
 	}
-	return end
+	return pos
+}
+
+// isDirective reports whether a statement is a bare string expression, the shape
+// a directive prologue entry takes. Parentheses around the string disqualify it,
+// exactly as they do at runtime.
+func isDirective(statement *ast.Node) bool {
+	expression := statement.AsExpressionStatement().Expression
+	return expression != nil && expression.Kind == ast.KindStringLiteral
+}
+
+// topLevelBindingNames collects every name the top level of the file already
+// declares, in any declaration space, so a moved declaration can be checked
+// against it.
+func topLevelBindingNames(sourceFile *ast.SourceFile) map[string]bool {
+	names := map[string]bool{}
+	if sourceFile == nil || sourceFile.Statements == nil {
+		return names
+	}
+
+	add := func(node *ast.Node) {
+		utils.CollectBindingNames(node, func(_ *ast.Node, name string) {
+			names[name] = true
+		})
+	}
+
+	for _, statement := range sourceFile.Statements.Nodes {
+		switch statement.Kind {
+		case ast.KindVariableStatement:
+			list := statement.AsVariableStatement().DeclarationList
+			if list == nil || list.AsVariableDeclarationList().Declarations == nil {
+				continue
+			}
+			for _, declaration := range list.AsVariableDeclarationList().Declarations.Nodes {
+				add(declaration.Name())
+			}
+		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
+			addImportedNames(statement, names)
+		default:
+			if name := statement.Name(); name != nil {
+				add(name)
+			}
+		}
+	}
+	return names
+}
+
+func addImportedNames(statement *ast.Node, names map[string]bool) {
+	clause := statement.AsImportDeclaration().ImportClause
+	if clause == nil {
+		return
+	}
+	if name := clause.Name(); name != nil && name.Kind == ast.KindIdentifier {
+		names[name.AsIdentifier().Text] = true
+	}
+	bindings := clause.AsImportClause().NamedBindings
+	if bindings == nil {
+		return
+	}
+	switch bindings.Kind {
+	case ast.KindNamespaceImport:
+		if name := bindings.Name(); name != nil && name.Kind == ast.KindIdentifier {
+			names[name.AsIdentifier().Text] = true
+		}
+	case ast.KindNamedImports:
+		elements := bindings.AsNamedImports().Elements
+		if elements == nil {
+			return
+		}
+		for _, element := range elements.Nodes {
+			if name := element.Name(); name != nil && name.Kind == ast.KindIdentifier {
+				names[name.AsIdentifier().Text] = true
+			}
+		}
+	}
 }
 
 // movableVariableStatement returns the variable statement that can move along
-// with initializer, or nil when the binding cannot travel with it: a second
-// declarator in the same statement would move too, and a declaration list that
-// belongs to a `for` header has no statement of its own.
-func movableVariableStatement(initializer *ast.Node) *ast.Node {
-	node := initializer
-	if node.Parent != nil && node.Parent.Kind == ast.KindAwaitExpression {
-		node = utils.OutermostParenthesizedExpression(node.Parent)
+// with declaration, or nil when it cannot travel: a second declarator in the
+// same statement would move too, a declaration list that belongs to a `for`
+// header has no statement of its own, and a name the top level already declares
+// would collide.
+func movableVariableStatement(declaration *ast.Node, topLevelBindings func() map[string]bool) *ast.Node {
+	list := declaration.Parent
+	if list == nil || list.Kind != ast.KindVariableDeclarationList {
+		return nil
 	}
-
-	declaration := node.Parent
-	if declaration == nil ||
-		declaration.Kind != ast.KindVariableDeclaration ||
-		declaration.AsVariableDeclaration().Initializer != node {
+	declarations := list.AsVariableDeclarationList().Declarations
+	if declarations == nil || len(declarations.Nodes) != 1 {
+		return nil
+	}
+	statement := variableStatementOf(declaration)
+	if statement == nil {
 		return nil
 	}
 
-	list := declaration.Parent.AsVariableDeclarationList()
-	if list == nil || list.Declarations == nil || len(list.Declarations.Nodes) != 1 {
+	taken := topLevelBindings()
+	collides := false
+	utils.CollectBindingNames(declaration.Name(), func(_ *ast.Node, name string) {
+		if taken[name] {
+			collides = true
+		}
+	})
+	if collides {
 		return nil
 	}
-	return variableStatementOf(declaration)
+	return statement
 }
 
 // variableStatementOf returns the statement a variable declaration belongs to,
 // or nil when the declaration list is a `for` header rather than a statement.
 func variableStatementOf(declaration *ast.Node) *ast.Node {
+	if declaration == nil {
+		return nil
+	}
 	list := declaration.Parent
 	if list == nil || list.Kind != ast.KindVariableDeclarationList {
 		return nil

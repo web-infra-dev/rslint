@@ -1,10 +1,13 @@
 // TestHoistedApisOnTopExtras locks in branches and edge shapes that the
 // upstream test suite doesn't exercise: the full set of module-mock APIs Rstest
-// lifts and the non-hoisted counterparts it offers for them, the receiver and
-// property shapes the Rstest build does and does not rewrite, the top-level
-// shapes accepted for a value-producing call, and every position where the move
-// suggestion is withheld while the diagnostic stands. Each case carries an
-// inline comment pointing at the branch, Dimension 4 row, or tsgo AST quirk it
+// lifts and the non-hoisted counterparts it offers for them, the receiver,
+// callee and call-position shapes the Rstest build does and does not rewrite,
+// the top-level shapes accepted for a value-producing call, and every position
+// where the move suggestion is withheld while the diagnostic stands. The
+// positive and negative shapes here were each confirmed by running them under
+// Rstest with @rspack/core@2.1.10, since the rewrite lives in the Rust
+// RstestPlugin rather than in readable source. Each case carries an inline
+// comment pointing at the branch, Dimension 4 row, or tsgo AST quirk it
 // covers.
 package hoisted_apis_on_top
 
@@ -74,9 +77,6 @@ func TestHoistedApisOnTopExtras(t *testing.T) {
 			{Code: `if (c) { rs[apiName]('./a'); }`},
 			// A call reached through import.meta.rstest is not rewritten.
 			{Code: `if (c) { import.meta.rstest.rs.mock('./a'); }`},
-			// The callee itself is parenthesized rather than the receiver.
-			{Code: `if (c) { (rs.mock)('./a'); }`},
-
 			// Locks in hoistedAPIs: the non-hoisted counterparts run where they
 			// are written, so they belong in a runtime location.
 			{Code: `if (c) { rs.doMock('./a'); }`},
@@ -123,6 +123,34 @@ func TestHoistedApisOnTopExtras(t *testing.T) {
 			{Code: `(rs).mock('./a');`},
 			{Code: `rs!.mock('./a');`},
 			{Code: `(rs as any).mock('./a');`},
+
+			// Locks in liftedCallPosition: only the whole expression of an
+			// expression statement and the whole initializer of a variable
+			// declaration are rewritten. Everywhere else the call is left alone
+			// and throws where it is written, so it is not this rule's subject.
+			{Code: `if (c) { c && rs.mock('./a'); }`},
+			{Code: `const run = () => rs.unmock('./a');`},
+			{Code: `if (c) { register(rs.hoisted(() => 1)); }`},
+			{Code: `const shared = { value: rs.hoisted(() => 1) };`},
+			{Code: `if (c) { shared = rs.hoisted(() => 1); }`},
+			{Code: `function setup() { return rs.mock('./a'); }`},
+			{Code: `if (c) { rs.mock('./a')(); }`},
+			// An `await` is followed only on the way to a declaration: in
+			// statement position it stops the rewrite.
+			{Code: `await rs.mock('./a');`},
+			{Code: `if (c) { await rs.mock('./a'); }`},
+
+			// Locks in skipTransparentAncestors: a wrapper around the complete
+			// call is transparent to the rewrite, so these are top-level shapes.
+			{Code: `rs.mock('./a') as unknown;`},
+			{Code: `rs.mock('./a')!;`},
+			{Code: `const value = rs.hoisted(() => 1) as number;`},
+			{Code: `const value = rs.hoisted(() => 1) satisfies number;`},
+			{Code: `const value = (await rs.hoisted(async () => 1)) as number;`},
+
+			// A declaration initializer is a rewritten position, so binding the
+			// undefined a module operation returns is still written at the top.
+			{Code: `const done = rs.mock('./a');`},
 
 			// ---- Dimension 4: empty argument list / empty file ----
 			{Code: `rs.mock();`},
@@ -266,8 +294,8 @@ if (c) {
 }`),
 			),
 
-			// Locks in moveToTopFixes arm 2: a value-producing call bound by a
-			// single-declarator statement moves with its binding. Lifting only
+			// Locks in moveToTopFixes: a call bound by a single-declarator
+			// statement moves with its binding. Lifting only
 			// the call would leave the binding assigned when its block runs
 			// while the factory has already executed.
 			reported(
@@ -305,47 +333,9 @@ if (c) {
 				`for (const shared = rs.hoisted(() => 1); ; ) {}`,
 				1, 21, 40,
 			),
-			// Locks in moveToTopFixes: a value-producing call whose value is
-			// consumed by a surrounding expression has no text to stand in for
-			// it, so only the diagnostic is reported.
-			reported(
-				`if (c) { register(rs.hoisted(() => 1)); }`,
-				1, 19, 38,
-			),
-			reported(
-				`const shared = { value: rs.hoisted(() => 1) };`,
-				1, 25, 44,
-			),
-
-			// Locks in moveToTopFixes arm 3: the other hoisted APIs evaluate to
-			// undefined, so `undefined` is an exact stand-in wherever their
-			// value is consumed — including at the top of the file, where a
-			// binding is still not the shape these APIs are written in.
-			reported(
-				`const done = rs.mock('./a');`,
-				1, 14, 28,
-				moveSuggestion(`rs.mock('./a');
-const done = undefined;`),
-				nonHoistedSuggestion(`const done = rs.doMock('./a');`),
-			),
-			reported(
-				`const run = () => rs.unmock('./a');`,
-				1, 19, 35,
-				moveSuggestion(`rs.unmock('./a');
-const run = () => undefined;`),
-				nonHoistedSuggestion(`const run = () => rs.doUnmock('./a');`),
-			),
-			reported(
-				`if (c) { c && rs.mock('./a'); }`,
-				1, 15, 29,
-				moveSuggestion(`rs.mock('./a');
-if (c) { c && undefined; }`),
-				nonHoistedSuggestion(`if (c) { c && rs.doMock('./a'); }`),
-			),
-
-			// Locks in moveToTopFixes arm 1: an `if` written without braces
-			// keeps a body, because the statement becomes an empty statement
-			// rather than being deleted.
+			// Locks in moveToTopFixes: an `if` written without braces keeps a
+			// body, because the statement becomes an empty statement rather
+			// than being deleted.
 			reported(
 				`if (c) rs.mock('./a')`,
 				1, 8, 22,
@@ -373,6 +363,105 @@ class Suite {
   static {
     rs.doMock('./a');
   }
+}`),
+			),
+
+			// Locks in hoistedAPICall: a wrapper around the callee is
+			// transparent to the rewrite too, not only one around the receiver.
+			reported(
+				`if (c) { (rs.mock)('./a'); }`,
+				1, 10, 26,
+				moveSuggestion(`(rs.mock)('./a');
+if (c) { ; }`),
+				nonHoistedSuggestion(`if (c) { (rs.doMock)('./a'); }`),
+			),
+			reported(
+				`if (c) { (rs.mock as any)('./a'); }`,
+				1, 10, 33,
+				moveSuggestion(`(rs.mock as any)('./a');
+if (c) { ; }`),
+				nonHoistedSuggestion(`if (c) { (rs.doMock as any)('./a'); }`),
+			),
+
+			// Locks in skipTransparentAncestors: a wrapper around the complete
+			// call does not take it out of a rewritten position, and the whole
+			// statement is what moves.
+			reported(
+				`if (c) { rs.mock('./a') as unknown; }`,
+				1, 10, 24,
+				moveSuggestion(`rs.mock('./a') as unknown;
+if (c) { ; }`),
+				nonHoistedSuggestion(`if (c) { rs.doMock('./a') as unknown; }`),
+			),
+			reported(
+				`if (c) {
+  const v = rs.hoisted(() => 1) as number;
+}`,
+				2, 13, 32,
+				moveSuggestion(`const v = rs.hoisted(() => 1) as number;
+if (c) {
+  
+}`),
+			),
+
+			// ---- Dimension 4: nesting / traversal boundaries ----
+			// Depth is irrelevant: a statement inside a function body is a
+			// rewritten position like any other.
+			reported(
+				`function setup() { rs.mock('./a'); }`,
+				1, 20, 34,
+				moveSuggestion(`rs.mock('./a');
+function setup() { ; }`),
+				nonHoistedSuggestion(`function setup() { rs.doMock('./a'); }`),
+			),
+
+			// Locks in movableVariableStatement: moving the declaration would
+			// re-declare a name the top level already binds, so the move is
+			// withheld and the diagnostic stands alone.
+			reported(
+				`const shared = 2;
+if (c) {
+  const shared = rs.hoisted(() => 1);
+}`,
+				3, 18, 37,
+			),
+			// The same guard covers a name bound by an import.
+			reported(
+				`import { shared } from './shared';
+if (c) {
+  const shared = rs.hoisted(() => 1);
+}`,
+				3, 18, 37,
+			),
+
+			// Locks in topLevelInsertionPoint: a shebang has to stay on line
+			// one, so the statement is written after it rather than at offset 0.
+			reported(
+				`#!/usr/bin/env node
+if (c) rs.mock('./a')`,
+				2, 8, 22,
+				moveSuggestion(`#!/usr/bin/env node
+rs.mock('./a');
+if (c) ;`),
+				nonHoistedSuggestion(`#!/usr/bin/env node
+if (c) rs.doMock('./a')`),
+			),
+			// And a directive only counts as one while it is still first, so the
+			// statement is written after the prologue.
+			reported(
+				`'use strict';
+if (c) {
+  rs.mock('./a');
+}`,
+				3, 3, 17,
+				moveSuggestion(`'use strict';
+rs.mock('./a');
+if (c) {
+  ;
+}`),
+				nonHoistedSuggestion(`'use strict';
+if (c) {
+  rs.doMock('./a');
 }`),
 			),
 
