@@ -203,6 +203,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-no-script-url.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-target-blank.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-undef.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-useless-fragment.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
