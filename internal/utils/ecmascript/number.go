@@ -121,8 +121,9 @@ func StringToNumber(value string) (float64, bool) {
 		return 0, false
 	}
 	if err != nil {
-		// Decimal overflow is a valid infinity. Other parse failures are NaN.
-		if errors.Is(err, strconv.ErrRange) && math.IsInf(number, 0) {
+		// Decimal overflow and underflow are valid infinities and zeroes.
+		// Other parse failures are NaN.
+		if errors.Is(err, strconv.ErrRange) {
 			return number, true
 		}
 		return 0, false

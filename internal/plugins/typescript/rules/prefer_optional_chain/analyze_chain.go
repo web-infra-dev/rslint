@@ -628,6 +628,7 @@ func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast
 
 	// Build the output with ?. inserted at appropriate positions
 	var sb strings.Builder
+	sb.Grow(len(ca.getNodeText(lastOperand.ComparedNode)) + len(parts))
 
 	// Merge ?. and ! annotations from guards into the output.
 	// tsgo's AST QuestionDotToken flags may be on the wrong operand's nodes,
@@ -685,10 +686,13 @@ func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast
 
 	// Write each accessor, inserting ?. where needed
 	for i := 1; i < len(parts); i++ {
-		// Use ?. from new insertions or from guard source text
-		// (preserving existing ?. from the original code)
-		useOptional := partFlags[i]&chainPartFlagInsertedOptional != 0 ||
-			i <= deepestGuardPartIdx && partFlags[i]&chainPartFlagPreservedOptional != 0
+		// Keep optional accesses carried by guard operands through the guarded
+		// prefix. Beyond that prefix, the target operand owns the syntax. This
+		// deliberately ignores target-only ?. tokens inside the guarded prefix,
+		// matching upstream's "randomly placed optional chain tokens" cases.
+		guardOptional := i <= deepestGuardPartIdx && partFlags[i]&chainPartFlagPreservedOptional != 0
+		targetOptional := i > deepestGuardPartIdx && parts[i].isAlreadyOptional
+		useOptional := partFlags[i]&chainPartFlagInsertedOptional != 0 || guardOptional || targetOptional
 
 		// Check NonNull from guard (skip position 0 if base is already NonNull)
 		hasNonNull := false
@@ -936,8 +940,7 @@ func chainDepth(node *ast.Node) int {
 }
 
 func needsParensAsBase(node *ast.Node) bool {
-	n := skipDownwards(node)
-	return ast.IsAwaitExpression(n)
+	return ast.GetExpressionPrecedence(skipDownwards(node)) < ast.OperatorPrecedenceMember
 }
 
 // needsParensForOptionalBase checks if an expression needs parentheses when

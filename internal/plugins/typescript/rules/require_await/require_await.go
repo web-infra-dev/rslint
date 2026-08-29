@@ -230,98 +230,87 @@ func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordI
 
 func shouldReplaceAsyncWithSemicolon(sourceFile *ast.SourceFile, node *ast.Node, asyncInfo asyncKeywordInfo) bool {
 	nextToken, ok := utils.TokenAtOrAfter(sourceFile, asyncInfo.tokenRange.End())
-	if !ok {
+	if !ok || (nextToken.Kind != ast.KindOpenBracketToken && nextToken.Kind != ast.KindOpenParenToken) {
 		return false
 	}
 
-	if nextToken.Kind == ast.KindOpenParenToken &&
-		utils.IsStartOfExpressionStatement(sourceFile, node) &&
-		utils.NeedsPrecedingSemicolon(sourceFile, node) {
-		return true
+	if node.Kind == ast.KindMethodDeclaration {
+		return utils.NeedsClassMemberLeadingSemicolon(
+			sourceFile,
+			ast.GetContainingClass(node),
+			node,
+			nextToken,
+			utils.ClassMemberLeadingSemicolonOptions{IncludePropertiesWithoutInitializers: true},
+		)
+	}
+	return utils.IsStartOfExpressionStatement(sourceFile, node) &&
+		utils.NeedsPrecedingSemicolon(sourceFile, node)
+}
+
+func appendReturnTypeSuggestionFixes(sourceFile *ast.SourceFile, node *ast.Node, isGenerator bool, fixes []rule.RuleFix) []rule.RuleFix {
+	returnType := node.Type()
+	if returnType == nil {
+		return fixes
+	}
+	returnType = ast.SkipTypeParentheses(returnType)
+	if returnType.Kind != ast.KindTypeReference {
+		return fixes
 	}
 
-	if node.Kind != ast.KindMethodDeclaration {
-		return false
+	typeReference := returnType.AsTypeReferenceNode()
+	typeName := typeReference.TypeName
+	if typeName == nil || typeName.Kind != ast.KindIdentifier {
+		return fixes
 	}
-	return utils.NeedsClassMemberLeadingSemicolon(
-		sourceFile,
-		ast.GetContainingClass(node),
-		node,
-		nextToken,
-		utils.ClassMemberLeadingSemicolonOptions{},
+
+	typeNameText := typeName.AsIdentifier().Text
+	if isGenerator {
+		if typeNameText == "AsyncGenerator" {
+			fixes = append(fixes, rule.RuleFixReplace(sourceFile, typeName, "Generator"))
+		}
+		return fixes
+	}
+	if typeNameText != "Promise" || typeReference.TypeArguments == nil {
+		return fixes
+	}
+
+	typeNameRange := utils.TrimNodeTextRange(sourceFile, typeName)
+	returnTypeRange := utils.TrimNodeTextRange(sourceFile, returnType)
+	openAngleEnd := typeReference.TypeArguments.Pos()
+	closeAngleStart := returnTypeRange.End() - 1
+	text := sourceFile.Text()
+	if openAngleEnd <= typeNameRange.End() ||
+		openAngleEnd > len(text) ||
+		text[openAngleEnd-1] != '<' ||
+		closeAngleStart < openAngleEnd ||
+		closeAngleStart >= len(text) ||
+		text[closeAngleStart] != '>' {
+		return fixes
+	}
+
+	return append(
+		fixes,
+		rule.RuleFixRemoveRange(core.NewTextRange(closeAngleStart, closeAngleStart+1)),
+		rule.RuleFixRemoveRange(core.NewTextRange(typeNameRange.Pos(), openAngleEnd)),
 	)
 }
 
-func typeReferenceNamed(node *ast.Node, name string) (*ast.TypeReferenceNode, bool) {
-	node = ast.SkipTypeParentheses(node)
-	if node == nil || node.Kind != ast.KindTypeReference {
-		return nil, false
-	}
-	reference := node.AsTypeReferenceNode()
-	if reference == nil || reference.TypeName == nil || reference.TypeName.Kind != ast.KindIdentifier {
-		return nil, false
-	}
-	return reference, reference.TypeName.AsIdentifier().Text == name
-}
-
-func returnTypeSuggestionFixes(sourceFile *ast.SourceFile, node *ast.Node, isGenerator bool) []rule.RuleFix {
-	returnType := node.Type()
-	if returnType == nil {
+func buildRemoveAsyncSuggestion(sourceFile *ast.SourceFile, node *ast.Node, isGenerator bool) []rule.RuleSuggestion {
+	asyncInfo, ok := findAsyncKeyword(sourceFile, node)
+	if !ok {
 		return nil
 	}
 
-	if isGenerator {
-		if reference, ok := typeReferenceNamed(returnType, "AsyncGenerator"); ok {
-			return []rule.RuleFix{
-				rule.RuleFixReplaceRange(utils.TrimNodeTextRange(sourceFile, reference.TypeName), "Generator"),
-			}
-		}
-		return nil
+	replacement := ""
+	if shouldReplaceAsyncWithSemicolon(sourceFile, node, asyncInfo) {
+		replacement = ";"
 	}
-
-	reference, ok := typeReferenceNamed(returnType, "Promise")
-	if !ok || reference.TypeArguments == nil || len(reference.TypeArguments.Nodes) == 0 {
-		return nil
-	}
-	openAngle, hasOpenAngle := utils.TokenAtOrAfter(sourceFile, reference.TypeName.End())
-	returnTypeRange := utils.TrimNodeTextRange(sourceFile, ast.SkipTypeParentheses(returnType))
-	closeAngle, hasCloseAngle := utils.TokenBeforePosition(sourceFile, returnTypeRange.End())
-	if !hasOpenAngle || openAngle.Kind != ast.KindLessThanToken ||
-		!hasCloseAngle || closeAngle.Kind != ast.KindGreaterThanToken {
-		return nil
-	}
-
-	return []rule.RuleFix{
-		rule.RuleFixRemoveRange(closeAngle.Range()),
-		rule.RuleFixRemoveRange(core.NewTextRange(
-			utils.TrimNodeTextRange(sourceFile, reference.TypeName).Pos(),
-			openAngle.End,
-		)),
-	}
-}
-
-func reportMissingAwait(ctx rule.RuleContext, node *ast.Node, isGenerator bool) {
-	reportRange := utils.GetFunctionHeadLoc(ctx.SourceFile, node)
-	message := buildMissingAwaitMessage(node)
-	ctx.ReportRangeWithDeferredSuggestions(reportRange, message, func() []rule.RuleSuggestion {
-		asyncInfo, ok := findAsyncKeyword(ctx.SourceFile, node)
-		if !ok {
-			return nil
-		}
-
-		replacement := ""
-		if shouldReplaceAsyncWithSemicolon(ctx.SourceFile, node, asyncInfo) {
-			replacement = ";"
-		}
-		fixes := []rule.RuleFix{
-			rule.RuleFixReplaceRange(asyncInfo.removeRange, replacement),
-		}
-		fixes = append(fixes, returnTypeSuggestionFixes(ctx.SourceFile, node, isGenerator)...)
-		return []rule.RuleSuggestion{{
-			Message:  buildRemoveAsyncMessage(),
-			FixesArr: fixes,
-		}}
-	})
+	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(asyncInfo.removeRange, replacement)}
+	fixes = appendReturnTypeSuggestionFixes(sourceFile, node, isGenerator, fixes)
+	return []rule.RuleSuggestion{{
+		Message:  buildRemoveAsyncMessage(),
+		FixesArr: fixes,
+	}}
 }
 
 type scopeInfo struct {
@@ -433,10 +422,13 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 		exitFunction := func(node *ast.Node) {
 			scope := &scopes[len(scopes)-1]
 			if scope.functionFlags&ast.FunctionFlagsAsync != 0 && !scope.hasAwait && (scope.functionFlags&ast.FunctionFlagsGenerator == 0 || !scope.isAsyncYield) {
-				reportMissingAwait(
-					ctx,
-					node,
-					scope.functionFlags&ast.FunctionFlagsGenerator != 0,
+				isGenerator := scope.functionFlags&ast.FunctionFlagsGenerator != 0
+				ctx.ReportRangeWithDeferredSuggestions(
+					utils.GetFunctionHeadLoc(ctx.SourceFile, node),
+					buildMissingAwaitMessage(node),
+					func() []rule.RuleSuggestion {
+						return buildRemoveAsyncSuggestion(ctx.SourceFile, node, isGenerator)
+					},
 				)
 			}
 
