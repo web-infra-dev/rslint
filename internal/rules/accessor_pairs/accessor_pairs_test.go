@@ -23,6 +23,25 @@ func TestAccessorPairsRule(t *testing.T) {
 		t,
 		&AccessorPairsRule,
 		[]rule_tester.ValidTestCase{
+			// Espree decodes JavaScript identifier/private-identifier token values,
+			// so escaped spellings still complete the same accessor pair.
+			{
+				Code:     `var o = { get [foo]() {}, set [\u0066oo](value) {} };`,
+				FileName: "accessor-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  bothOpts,
+			},
+			{
+				Code:     `class C { get #foo() {} set #\u0066oo(value) {} }`,
+				FileName: "accessor-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  classBoth,
+			},
+			// TypeScript parser tokens retain raw spelling. Identical raw escapes
+			// still pair even though escaped and unescaped spellings do not.
+			{Code: `var o = { get [\u0066oo]() {}, set [\u0066oo](value) {} };`, Options: bothOpts},
+			{Code: `class C { get #\u0066oo() {} set #\u0066oo(value) {} }`, Options: classBoth},
+
 			// Destructuring — not object literals semantically, not flagged
 			{Code: `var { get: foo } = bar; ({ set: foo } = bar);`, Options: bothOpts},
 			{Code: `var { set } = foo; ({ get } = foo);`, Options: bothOpts},
@@ -272,7 +291,6 @@ func TestAccessorPairsRule(t *testing.T) {
 
 			// `[/a/]` and string `'/a/'` both normalize to static name "/a/".
 			{Code: `var o = { get '/a/'() {}, set [/a/](v) {} };`, Options: bothOpts},
-
 		},
 		[]rule_tester.InvalidTestCase{
 			// Default — setter without getter
@@ -766,6 +784,48 @@ func TestAccessorPairsRule(t *testing.T) {
 					{MessageId: "missingSetterInType"},
 				},
 			},
+			// TypeScript token values keep escaped identifiers raw, so these are
+			// two incomplete pairs rather than one complete pair.
+			{
+				Code:    `interface I { get [foo](): string; set [\u0066oo](value: string); }`,
+				Options: tsGetAlso,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSetterInType"},
+					{MessageId: "missingGetterInType"},
+				},
+			},
+			{
+				Code:    `class C { get #foo() {} set #\u0066oo(value) {} }`,
+				Options: classBoth,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSetterInClass"},
+					{MessageId: "missingGetterInClass"},
+				},
+			},
+			// TSMethodSignature reports end at the first real opening paren in
+			// the signature, even when that token belongs to its computed key.
+			{
+				Code:    `interface I { set [('a')](value: string); }`,
+				Options: tsOnly,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingGetterInType",
+					Line:      1,
+					Column:    15,
+					EndLine:   1,
+					EndColumn: 20,
+				}},
+			},
+			{
+				Code:    `type T = { get [foo()](): string; };`,
+				Options: tsGetAlso,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingSetterInType",
+					Line:      1,
+					Column:    12,
+					EndLine:   1,
+					EndColumn: 20,
+				}},
+			},
 
 			// ---- Structural mismatches (computed keys) ----
 
@@ -899,7 +959,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			// Spread in descriptor: treated syntactically, only named properties are
 			// considered — so {...d, set: ...} still counts as "set without get".
 			{
-				Code:    `Object.defineProperty(o, 'k', {...d, set: function(v) {}});`,
+				Code: `Object.defineProperty(o, 'k', {...d, set: function(v) {}});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInPropertyDescriptor"},
 				},
@@ -915,7 +975,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			// Parenthesized Object.defineProperties callee with optional chain.
 			{
-				Code:    `(Object?.defineProperties)(obj, {foo: {set: function(v){}}});`,
+				Code: `(Object?.defineProperties)(obj, {foo: {set: function(v){}}});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInPropertyDescriptor"},
 				},

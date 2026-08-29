@@ -439,6 +439,27 @@ func ESTreeParent(node *ast.Node) *ast.Node {
 	return nil
 }
 
+// ESTreeMembers removes empty class elements, which tsgo exposes as
+// SemicolonClassElement nodes but ESTree omits from ClassBody.body. The common
+// no-semicolon path returns the AST-owned slice without allocating; filtering
+// clones into a separate backing array so callers cannot rewrite that list.
+func ESTreeMembers(members []*ast.Node) []*ast.Node {
+	for index, member := range members {
+		if member.Kind != ast.KindSemicolonClassElement {
+			continue
+		}
+		filtered := make([]*ast.Node, 0, len(members)-1)
+		filtered = append(filtered, members[:index]...)
+		for _, remaining := range members[index+1:] {
+			if remaining.Kind != ast.KindSemicolonClassElement {
+				filtered = append(filtered, remaining)
+			}
+		}
+		return filtered
+	}
+	return members
+}
+
 // ESTreeParameters returns only parameters authored in source. tsgo prepends
 // a reparsed `this` parameter for JSDoc @this, but ESTree keeps the tag solely
 // as a comment.

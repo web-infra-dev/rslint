@@ -155,6 +155,23 @@ box[0 as keyof number[]] = box[0 as readonly number[]] + y;`,
 (box as { value: keyof /* lhs */ number[] }).value += y;`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 2, Column: 1}},
 			},
+			// Escapes do not change a TypeScript type identifier's meaning. This
+			// fixer safety check deliberately keeps decoded-identifier semantics,
+			// even though token-oriented rules observe raw TS parser values.
+			{
+				Code: `declare let box: any, y: any;
+(box as { value: Foo }).value = (box as { value: \u0046oo }).value + y;`,
+				Output: []string{`declare let box: any, y: any;
+(box as { value: Foo }).value += y;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 2, Column: 1}},
+			},
+			{
+				Code: `declare let box: any, y: any;
+(box as { value: \u0046oo }).value = (box as { value: \u0046oo }).value + y;`,
+				Output: []string{`declare let box: any, y: any;
+(box as { value: \u0046oo }).value += y;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "replaced", Line: 2, Column: 1}},
+			},
 			// ---- ... including when the mismatch is nested in the receiver of
 			// a member access rather than at the top level ----
 			{

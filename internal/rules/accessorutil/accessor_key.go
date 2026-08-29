@@ -15,7 +15,7 @@ const (
 
 // Key preserves ESLint's three accessor-key equivalence classes. Static names
 // compare by their normalized property name, private names only compare with
-// private names, and dynamic computed names compare by their token streams.
+// private names, and private/dynamic names compare by their token streams.
 type Key struct {
 	Kind KeyKind
 	Text string
@@ -28,7 +28,7 @@ func MakeKey(node *ast.Node) Key {
 		return Key{Kind: KeyDynamic}
 	}
 	if nameNode.Kind == ast.KindPrivateIdentifier {
-		return Key{Kind: KeyPrivate, Text: nameNode.AsPrivateIdentifier().Text}
+		return Key{Kind: KeyPrivate, Expr: nameNode}
 	}
 	if name, ok := utils.GetStaticPropertyName(nameNode); ok {
 		return Key{Kind: KeyStatic, Text: name}
@@ -45,19 +45,19 @@ func KeysEqual(sourceFile *ast.SourceFile, left Key, right Key) bool {
 		return false
 	}
 	switch left.Kind {
-	case KeyStatic, KeyPrivate:
+	case KeyStatic:
 		return left.Text == right.Text
-	case KeyDynamic:
-		return computedKeysEqual(sourceFile, left.Expr, right.Expr)
+	case KeyPrivate, KeyDynamic:
+		return tokenKeysEqual(sourceFile, left.Expr, right.Expr)
 	default:
 		return false
 	}
 }
 
-// computedKeysEqual mirrors ESLint's token-list comparison. HasSameTokens
+// tokenKeysEqual mirrors ESLint's token-list comparison. HasSameTokens
 // removes only transparent outer parentheses, preserves nested parentheses,
 // and compares punctuation and operators that tsgo does not expose as child
 // nodes.
-func computedKeysEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.Node) bool {
+func tokenKeysEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.Node) bool {
 	return utils.HasSameTokens(sourceFile, left, right)
 }
