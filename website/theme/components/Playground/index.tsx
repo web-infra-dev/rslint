@@ -1,3 +1,4 @@
+import { useHead } from '@rspress/core/runtime';
 import React, { useEffect, useState } from 'react';
 
 type PlaygroundComponent = React.ComponentType;
@@ -11,6 +12,8 @@ Open this page in a browser to use the editor and result panels.
 `;
 
 const Playground: React.FC = () => {
+  useHead({ title: 'Playground - Rslint' });
+
   if (import.meta.env.SSG_MD) {
     return PLAYGROUND_SSG_MARKDOWN;
   }

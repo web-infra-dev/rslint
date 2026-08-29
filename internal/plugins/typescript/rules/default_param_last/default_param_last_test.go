@@ -9,6 +9,11 @@ import (
 
 func TestDefaultParamLastRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &DefaultParamLastRule, []rule_tester.ValidTestCase{
+		{
+			Code:     "/** @param {number} [a] */\nfunction f(a, b) {}",
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+		},
 		// Valid: no parameters
 		{Code: `function f() {}`},
 
@@ -47,6 +52,11 @@ func TestDefaultParamLastRule(t *testing.T) {
 		// Valid: constructors
 		{Code: `class A { constructor(a: number, b = 0) {} }`},
 		{Code: `class A { constructor(a: number, b?: number) {} }`},
+
+		// Valid: bodyless declarations are outside the upstream listeners
+		{Code: `declare function f(a?: number, b: number): void;`},
+		{Code: `abstract class A { abstract method(a?: number, b: number): void; }`},
+		{Code: `class A { constructor(a?: number, b: number); constructor(b: number) {} }`},
 
 		// Valid: parameter properties
 		{Code: `class A { constructor(public a: number, public b = 0) {} }`},
@@ -125,9 +135,9 @@ func TestDefaultParamLastRule(t *testing.T) {
 
 		// Invalid: method
 		{
-			Code: `class A { method(a = 0, b: number) {} }`,
+			Code: `class A { method(@first @second a?: number, b: number) {} }`,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "shouldBeLast"},
+				{MessageId: "shouldBeLast", Line: 1, Column: 33, EndLine: 1, EndColumn: 43},
 			},
 		},
 

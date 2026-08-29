@@ -1,7 +1,9 @@
 // TestClassMethodsUseThisUpstream migrates the full valid/invalid suite from
 // upstream typescript-eslint's
-//   packages/eslint-plugin/tests/rules/class-methods-use-this/class-methods-use-this.test.ts
-//   packages/eslint-plugin/tests/rules/class-methods-use-this/class-methods-use-this-core.test.ts
+//
+//	packages/eslint-plugin/tests/rules/class-methods-use-this/class-methods-use-this.test.ts
+//	packages/eslint-plugin/tests/rules/class-methods-use-this/class-methods-use-this-core.test.ts
+//
 // 1:1. Position assertions cover line/column for every invalid case (the
 // upstream typescript-eslint suite only asserts messageId on most cases,
 // so this layer adds line/column to satisfy the rslint requirement that
@@ -399,6 +401,20 @@ class Foo {
 		},
 
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:     "class Example {\n  /** @override */\n  method() {}\n}",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  objectOption(map[string]interface{}{"ignoreOverrideMethods": true}),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis", Line: 3, Column: 3}},
+			},
+			{
+				Code:     "/** @implements {Contract} */\nclass Example {\n  method() {}\n}",
+				FileName: "file.mjs",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  objectOption(map[string]interface{}{"ignoreClassesThatImplementAnInterface": true}),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "missingThis", Line: 3, Column: 3}},
+			},
 			// ============================================================
 			// typescript-eslint specific: ignoreClassesThatImplementAnInterface / ignoreOverrideMethods
 			// ============================================================

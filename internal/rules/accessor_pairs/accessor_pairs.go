@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/accessorutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -54,140 +54,13 @@ const (
 	containerType
 )
 
-// keyKind distinguishes how an accessor's key is compared. A static key never
-// matches a private or dynamic key even when their textual forms coincide —
-// mirroring ESLint's three-way split between `getStaticPropertyName`, the
-// single-token list of a `PrivateIdentifier`, and the token-list comparison
-// of an arbitrary computed expression.
-type keyKind int
-
-const (
-	keyStatic  keyKind = iota // identifier / string / numeric / bigint / computed-with-literal
-	keyPrivate                // `#name` — distinct equivalence class from string `'#name'`
-	keyDynamic                // non-static computed expression — compared structurally
-)
-
-type accessorKey struct {
-	kind keyKind
-	// For keyStatic: the normalized name (e.g. `"100"` for `1e2`, `"a"` for `'a'`).
-	// For keyPrivate: the private-identifier text (already includes `#`).
-	// Unused for keyDynamic.
-	text string
-	// For keyDynamic: the computed expression, already unwrapped with
-	// [ast.SkipParentheses]. nil for keyStatic / keyPrivate.
-	expr *ast.Node
-}
-
+// accessorGroup keeps the accessors belonging to one shared key. The key
+// helper preserves ESLint's distinct static, private, and dynamic classes.
 type accessorGroup struct {
-	key      accessorKey
+	key      accessorutil.Key
 	isStatic bool
 	getters  []*ast.Node
 	setters  []*ast.Node
-}
-
-// makeKey derives a comparable key for an accessor.
-//   - Static-resolvable names (identifier, string / numeric / bigint literal,
-//     or a computed expression whose value is one of those literals) collapse
-//     into `keyStatic` and are compared by their normalized text — so
-//     `a`, `'a'`, `['a']`, and “ [`a`] “ all group together, and `1e2`
-//     matches `100` / `'100'` / `['100']`.
-//   - `PrivateIdentifier` keys (`#a`) form their own `keyPrivate` class,
-//     separate from a string key `'#a'`.
-//   - Everything else is `keyDynamic`, compared structurally via
-//     [utils.AreNodesStructurallyEqual] — so `[a + b]` and `[a+b]` match
-//     (whitespace is not part of the AST) while `[a + b]` and `[a - b]` do
-//     not, and `[a.b]` and `[a?.b]` do not.
-func makeKey(node *ast.Node) accessorKey {
-	nameNode := node.Name()
-	if nameNode == nil {
-		return accessorKey{kind: keyDynamic}
-	}
-	if nameNode.Kind == ast.KindPrivateIdentifier {
-		return accessorKey{kind: keyPrivate, text: nameNode.AsPrivateIdentifier().Text}
-	}
-	if name, ok := utils.GetStaticPropertyName(nameNode); ok {
-		return accessorKey{kind: keyStatic, text: name}
-	}
-	expr := nameNode
-	if nameNode.Kind == ast.KindComputedPropertyName {
-		expr = nameNode.AsComputedPropertyName().Expression
-	}
-	return accessorKey{kind: keyDynamic, expr: ast.SkipParentheses(expr)}
-}
-
-func keysEqual(sf *ast.SourceFile, a, b accessorKey) bool {
-	if a.kind != b.kind {
-		return false
-	}
-	switch a.kind {
-	case keyStatic, keyPrivate:
-		return a.text == b.text
-	case keyDynamic:
-		return computedKeysEqual(sf, a.expr, b.expr)
-	}
-	return false
-}
-
-// computedKeysEqual reports whether two computed-key expressions are
-// structurally equivalent, mirroring ESLint's token-level comparison
-// (`sourceCode.getTokens(node.key)` with `areEqualTokenLists`). Unlike
-// the general-purpose [utils.AreNodesStructurallyEqual] — which treats
-// `0x1` and `1` as the same number — this walker goes through
-// [scanner.GetSourceTextOfNodeFromSourceFile] for numeric and bigint
-// literals so their raw source form is compared, keeping parity with
-// ESLint even when tsgo's parser normalizes literal texts.
-//
-// Parentheses are transparent at every level (matching ESLint, whose
-// ESTree parser elides parens entirely). All other kinds compare by
-// their Kind plus, for leaves, the text stored on the AST node; for
-// composite nodes, by the ordered list of non-nil children returned
-// from [ast.Node.ForEachChild].
-func computedKeysEqual(sf *ast.SourceFile, a, b *ast.Node) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	a = ast.SkipParentheses(a)
-	b = ast.SkipParentheses(b)
-	if a == nil || b == nil {
-		return a == b
-	}
-	if a.Kind != b.Kind {
-		return false
-	}
-	switch a.Kind {
-	case ast.KindIdentifier:
-		return a.AsIdentifier().Text == b.AsIdentifier().Text
-	case ast.KindPrivateIdentifier:
-		return a.AsPrivateIdentifier().Text == b.AsPrivateIdentifier().Text
-	case ast.KindStringLiteral:
-		return a.AsStringLiteral().Text == b.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return a.AsNoSubstitutionTemplateLiteral().Text == b.AsNoSubstitutionTemplateLiteral().Text
-	case ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail,
-		ast.KindRegularExpressionLiteral:
-		return a.Text() == b.Text()
-	case ast.KindNumericLiteral, ast.KindBigIntLiteral:
-		return scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
-			scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
-	}
-	var aKids, bKids []*ast.Node
-	a.ForEachChild(func(c *ast.Node) bool {
-		aKids = append(aKids, c)
-		return false
-	})
-	b.ForEachChild(func(c *ast.Node) bool {
-		bKids = append(bKids, c)
-		return false
-	})
-	if len(aKids) != len(bKids) {
-		return false
-	}
-	for i := range aKids {
-		if !computedKeysEqual(sf, aKids[i], bKids[i]) {
-			return false
-		}
-	}
-	return true
 }
 
 // checkList examines accessors in a list and reports any that lack a pair.
@@ -203,11 +76,11 @@ func checkList(ctx rule.RuleContext, members []*ast.Node, opts Options, kind con
 		if !isGetter && !isSetter {
 			continue
 		}
-		key := makeKey(m)
+		key := accessorutil.MakeKey(m)
 		isStatic := distinguishStatic && ast.IsStatic(m)
 		var group *accessorGroup
 		for _, g := range groups {
-			if g.isStatic == isStatic && keysEqual(ctx.SourceFile, g.key, key) {
+			if g.isStatic == isStatic && accessorutil.KeysEqual(ctx.SourceFile, g.key, key) {
 				group = g
 				break
 			}

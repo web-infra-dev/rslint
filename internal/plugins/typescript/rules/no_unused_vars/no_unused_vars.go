@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -2013,13 +2014,6 @@ func scanJsxNodes(sourceFile *ast.Node, ac *analysisContext) {
 	walk(sourceFile)
 }
 
-func jsxRootName(factory string) string {
-	if dot := strings.IndexByte(factory, '.'); dot >= 0 {
-		return factory[:dot]
-	}
-	return factory
-}
-
 // implicitJSXReference returns the JSX node that consumes an imported factory.
 // TypeScript produces no identifier reference for this implicit use, so it is
 // layered on top of ctx.Refs only for matching import declarations.
@@ -2039,11 +2033,11 @@ func implicitJSXReference(
 
 	factoryName := "React"
 	if opts.JsxFactory != "" {
-		factoryName = jsxRootName(opts.JsxFactory)
+		factoryName = typescriptutil.JSXFactoryRoot(opts.JsxFactory)
 	}
 	isFactory := name == factoryName
 	isFragmentFactory := opts.JsxFragmentFactory != "" &&
-		name == jsxRootName(opts.JsxFragmentFactory)
+		name == typescriptutil.JSXFactoryRoot(opts.JsxFragmentFactory)
 	if !isFactory && !isFragmentFactory {
 		return nil
 	}

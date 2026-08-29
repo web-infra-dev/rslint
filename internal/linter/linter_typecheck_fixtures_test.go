@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -108,7 +107,7 @@ func TestFixture_NodeModulesDts_SkipLibCheckTrue_Suppresses(t *testing.T) {
 // Negative pair-control: same fixture, default skipLibCheck (unspecified).
 // Default-off means errors must be reported — proves the suppression in the
 // previous test is caused by skipLibCheck:true and not by some other
-// implicit filter (e.g. ExcludePaths suppressing node_modules).
+// implicit lint-target filter suppressing node_modules.
 func TestFixture_NodeModulesDts_SkipLibCheckUnspecified_ReportsError(t *testing.T) {
 	dir := t.TempDir()
 	writeNodeModulesFooFixture(t, dir, nil)
@@ -198,10 +197,9 @@ func TestFixture_ProjectReferences_FileReportedExactlyOnce(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(progA, progB),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(progA, progB),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {

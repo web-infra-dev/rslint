@@ -185,6 +185,7 @@ func documentLintSnapshotForTest(
 		ruleCatalog:           ruleCatalog,
 		typeScriptConfigPaths: typeScriptConfigPaths,
 		usesJavaScriptConfig:  usesJavaScriptConfig,
+		pluginGeneration:      s.eslintPluginConfigGeneration,
 	}
 }
 
@@ -1764,7 +1765,7 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
 			File:    file,
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 				targetPath := sourceFile.FileName()
 				return configuredRulesForLSPTest(
 					cfg,
@@ -2006,10 +2007,10 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	if opened := s.session.Snapshot().ProjectCollection.ConfiguredProject(secondConfigID); opened != nil {
 		t.Fatal("lint-only custom tsconfig must not be added to the Session's permanent API-open project set")
 	}
-	if _, err := s.defaultFixAllNativeLint(
+	if _, err := speculativePipelineResultForTest(
+		s,
 		ctx,
 		toURI(sourcePath),
-		1,
 		"export const value = 2;\n",
 		documentLintSnapshotForTest(
 			s,
@@ -2149,7 +2150,7 @@ func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
 	uri := documentURIFromPath(filePath)
 	s.documents[uri] = malformed
 
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		malformed,
@@ -2161,21 +2162,21 @@ func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run lint: %v", err)
 	}
-	if !result.HasSyntaxErrors {
+	if !result.Observation.Native.HasTargetSyntaxErrors {
 		t.Fatal("malformed file was not marked as having syntax errors")
 	}
-	if len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS") {
-		t.Fatalf("expected a TypeScript syntax diagnostic, got %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) == 0 || !strings.HasPrefix(result.Observation.Native.Diagnostics[0].RuleName, "TypeScript(TS") {
+		t.Fatalf("expected a TypeScript syntax diagnostic, got %+v", result.Observation.Native.Diagnostics)
 	}
-	if result.Diagnostics[0].Origin != rule.DiagnosticOriginTypeScript {
-		t.Fatalf("TypeScript syntax diagnostic has wrong origin: %+v", result.Diagnostics[0])
+	if result.Observation.Native.Diagnostics[0].Origin != rule.DiagnosticOriginTypeScript {
+		t.Fatalf("TypeScript syntax diagnostic has wrong origin: %+v", result.Observation.Native.Diagnostics[0])
 	}
-	for _, diagnostic := range result.Diagnostics {
+	for _, diagnostic := range result.Observation.Native.Diagnostics {
 		if diagnostic.RuleName == "no-debugger" {
-			t.Fatalf("rules ran for malformed file: %+v", result.Diagnostics)
+			t.Fatalf("rules ran for malformed file: %+v", result.Observation.Native.Diagnostics)
 		}
 	}
-	s.diagnostics[uri] = result.Diagnostics
+	s.diagnostics[uri] = result.Observation.Native.Diagnostics
 	response, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
 		Range: lsproto.Range{
@@ -2220,7 +2221,7 @@ func TestRunConfiguredLintForContent_ZeroRuleTargetsReportSyntaxErrors(t *testin
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result, err := s.runConfiguredLintForContent(
+			result, err := configuredSpeculativePipelineResultForTest(s,
 				uri,
 				context.Background(),
 				malformed,
@@ -2232,12 +2233,12 @@ func TestRunConfiguredLintForContent_ZeroRuleTargetsReportSyntaxErrors(t *testin
 			if err != nil {
 				t.Fatalf("run lint: %v", err)
 			}
-			if !result.HasSyntaxErrors || len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS") {
+			if !result.Observation.Native.HasTargetSyntaxErrors || len(result.Observation.Native.Diagnostics) == 0 || !strings.HasPrefix(result.Observation.Native.Diagnostics[0].RuleName, "TypeScript(TS") {
 				t.Fatalf("zero-rule target did not report its syntax error: %+v", result)
 			}
-			for _, diagnostic := range result.Diagnostics {
+			for _, diagnostic := range result.Observation.Native.Diagnostics {
 				if diagnostic.RuleName == "no-debugger" {
-					t.Fatalf("a rule ran outside its files selector: %+v", result.Diagnostics)
+					t.Fatalf("a rule ran outside its files selector: %+v", result.Observation.Native.Diagnostics)
 				}
 			}
 		})
@@ -2262,9 +2263,9 @@ func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
 	return fs.FS.Realpath(filePath)
 }
 
-func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
+func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRealpath(t *testing.T) {
 	root := t.TempDir()
-	realRoot := filepath.Join(root, "real-workspace")
+	realRoot := filepath.Join(root, "node_modules", "real-workspace")
 	aliasRoot := filepath.Join(root, "alias-workspace")
 	realFile := filepath.Join(realRoot, "src", "index.ts")
 	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
@@ -2303,7 +2304,7 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 	}
 
 	const fixedContent = "debugger;\n"
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		fixedContent,
@@ -2318,8 +2319,8 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("canonical program read stale disk content: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("canonical program read stale disk content: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2348,7 +2349,7 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
 	uri := documentURIFromPath(aliasFile)
 	s.documents[uri] = source
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		source,
@@ -2363,8 +2364,8 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 	if err != nil {
 		t.Fatalf("run lint through symlinked root: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("symlinked config path lost scoped rules: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("symlinked config path lost scoped rules: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2399,7 +2400,7 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(aliasRoot) {
 		t.Fatalf("physical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
 	}
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		fileURI,
 		context.Background(),
 		source,
@@ -2411,15 +2412,15 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("physical file lost aliased files selector: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("physical file lost aliased files selector: %+v", result.Observation.Native.Diagnostics)
 	}
 
 	if err := os.WriteFile(filepath.Join(realRoot, ".gitignore"), []byte("src/index.ts\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	effective, configCwd, isJSConfig := s.getLintConfigForURI(fileURI)
-	result, err = s.runConfiguredLintForContent(
+	result, err = configuredSpeculativePipelineResultForTest(s,
 		fileURI,
 		context.Background(),
 		source,
@@ -2431,8 +2432,8 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent with .gitignore failed: %v", err)
 	}
-	if len(result.Diagnostics) != 0 {
-		t.Fatalf("physical file did not inherit aliased config .gitignore: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 0 {
+		t.Fatalf("physical file did not inherit aliased config .gitignore: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2469,7 +2470,7 @@ func TestConfigCatalog_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(root) {
 		t.Fatalf("lexical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
 	}
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		fileURI,
 		context.Background(),
 		source,
@@ -2481,15 +2482,15 @@ func TestConfigCatalog_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	ruleNames := make(map[string]struct{}, len(result.Diagnostics))
-	for _, diagnostic := range result.Diagnostics {
+	ruleNames := make(map[string]struct{}, len(result.Observation.Native.Diagnostics))
+	for _, diagnostic := range result.Observation.Native.Diagnostics {
 		ruleNames[diagnostic.RuleName] = struct{}{}
 	}
 	if _, ok := ruleNames["no-console"]; !ok {
-		t.Fatalf("lexical owner rule missing: %+v", result.Diagnostics)
+		t.Fatalf("lexical owner rule missing: %+v", result.Observation.Native.Diagnostics)
 	}
 	if _, ok := ruleNames["no-debugger"]; ok {
-		t.Fatalf("physical config replaced lexical owner: %+v", result.Diagnostics)
+		t.Fatalf("physical config replaced lexical owner: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2531,7 +2532,7 @@ func TestConfiguredLintPreservesTargetIdentityAcrossAuthoredConfigBases(t *testi
 	s.fs = osvfs.FS()
 	uri := documentURIFromPath(aliasFile)
 	s.documents[uri] = source
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		source,
@@ -2543,16 +2544,16 @@ func TestConfiguredLintPreservesTargetIdentityAcrossAuthoredConfigBases(t *testi
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	diagnosticsByRule := make(map[string]rule.RuleDiagnostic, len(result.Diagnostics))
-	for _, diagnostic := range result.Diagnostics {
+	diagnosticsByRule := make(map[string]rule.RuleDiagnostic, len(result.Observation.Native.Diagnostics))
+	for _, diagnostic := range result.Observation.Native.Diagnostics {
 		diagnosticsByRule[diagnostic.RuleName] = diagnostic
 	}
 	if _, ok := diagnosticsByRule["no-debugger"]; !ok {
-		t.Fatalf("config-directory rule did not match the shared target: %+v", result.Diagnostics)
+		t.Fatalf("config-directory rule did not match the shared target: %+v", result.Observation.Native.Diagnostics)
 	}
 	noVar, ok := diagnosticsByRule["no-var"]
 	if !ok {
-		t.Fatalf("workspace-authored rule lost the lexical symlink target: %+v", result.Diagnostics)
+		t.Fatalf("workspace-authored rule lost the lexical symlink target: %+v", result.Observation.Native.Diagnostics)
 	}
 	if len(noVar.Fixes()) == 0 {
 		t.Fatalf("workspace-authored fix was not preserved: %+v", noVar)
@@ -2602,7 +2603,7 @@ func TestConfiguredLintExternalConfigPreservesGitignoreTargetIdentity(t *testing
 	s.fs = osvfs.FS()
 	uri := documentURIFromPath(aliasFile)
 	s.documents[uri] = source
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		source,
@@ -2614,8 +2615,8 @@ func TestConfiguredLintExternalConfigPreservesGitignoreTargetIdentity(t *testing
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	if len(result.Diagnostics) != 0 {
-		t.Fatalf("external-config Git ignore lost the lexical symlink target: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 0 {
+		t.Fatalf("external-config Git ignore lost the lexical symlink target: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2635,7 +2636,7 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	uri := documentURIFromPath(filePath)
 	s.documents[uri] = source
-	got := s.computeFixAllContent(
+	got := runSpeculativeFixAllForTest(t, s,
 		context.Background(),
 		uri,
 		source,
@@ -2674,14 +2675,14 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 		Files: []string{"**/*.ts"},
 		Rules: config.Rules{"no-var": "error"},
 	}}
-	result, err := s.runConfiguredLintForContent(uri, context.Background(), source, cfg, configDir, true, nil)
+	result, err := configuredSpeculativePipelineResultForTest(s, uri, context.Background(), source, cfg, configDir, true, nil)
 	if err != nil {
 		t.Fatalf("lint without tsconfig: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-var" {
-		t.Fatalf("lint without tsconfig lost native diagnostics: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-var" {
+		t.Fatalf("lint without tsconfig lost native diagnostics: %+v", result.Observation.Native.Diagnostics)
 	}
-	got := s.computeFixAllContent(
+	got := runSpeculativeFixAllForTest(t, s,
 		context.Background(),
 		uri,
 		source,
@@ -2738,7 +2739,7 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 	}
 }
 
-// runLintWithSession must early-return for files matching the config's
+// documentGenerationProvider must early-return for files matching the config's
 // `ignores` patterns, WITHOUT touching the session. This test proves the
 // guard semantically (not just by coincidence of a no-op session):
 //
@@ -2753,6 +2754,8 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	ctx := context.Background()
 	cwd := "/project"
+	s := newTestServer()
+	s.cwd = cwd
 	cfg := config.RslintConfig{
 		// Global ignores entry: hides everything under lib/.
 		{Ignores: []string{"lib/**"}},
@@ -2769,13 +2772,11 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 			}
 		}()
 
-		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil, nil)
+		result, err := configuredDocumentPipelineResultForTest(s, ctx, ignoredURI, cfg, cwd, false, nil)
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
-		if diags == nil {
-			t.Fatal("expected non-nil empty slice (LSP protocol expects [], not null)")
-		}
+		diags := result.Observation.Native.Diagnostics
 		if len(diags) != 0 {
 			t.Errorf("expected 0 diagnostics for ignored file, got %d: %+v", len(diags), diags)
 		}
@@ -2792,12 +2793,14 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
 			}
 		}()
-		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
+		_, _ = configuredDocumentPipelineResultForTest(s, ctx, normalURI, cfg, cwd, false, nil)
 	})
 }
 
 func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) {
 	cfg := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	s := newTestServer()
+	s.cwd = "/project"
 	for _, uri := range []lsproto.DocumentUri{
 		"file:///project/node_modules/pkg/index.ts",
 		"file:///project/.git/hooks/pre-commit.ts",
@@ -2809,12 +2812,13 @@ func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) 
 				}
 			}()
 
-			diagnostics, err := runLintWithSession(uri, nil, context.Background(), cfg, "/project", false, nil, nil)
+			result, err := configuredDocumentPipelineResultForTest(s, context.Background(), uri, cfg, "/project", false, nil)
 			if err != nil {
-				t.Fatalf("runLintWithSession returned an error: %v", err)
+				t.Fatalf("document pipeline returned an error: %v", err)
 			}
-			if diagnostics == nil || len(diagnostics) != 0 {
-				t.Fatalf("default-excluded file diagnostics = %+v, want a non-nil empty slice", diagnostics)
+			diagnostics := result.Observation.Native.Diagnostics
+			if len(diagnostics) != 0 {
+				t.Fatalf("default-excluded file diagnostics = %+v, want empty", diagnostics)
 			}
 		})
 	}
@@ -2974,7 +2978,7 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			s.jsonConfig = test.config
 			uri := documentURIFromPath(target)
 			effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-			result, err := s.runConfiguredLintForContent(
+			result, err := configuredSpeculativePipelineResultForTest(s,
 				uri,
 				context.Background(),
 				malformed,
@@ -2986,10 +2990,10 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			if err != nil {
 				t.Fatalf("run lint: %v", err)
 			}
-			gotLinted := result.HasSyntaxErrors && len(result.Diagnostics) > 0 &&
-				strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS")
+			gotLinted := result.Observation.Native.HasTargetSyntaxErrors && len(result.Observation.Native.Diagnostics) > 0 &&
+				strings.HasPrefix(result.Observation.Native.Diagnostics[0].RuleName, "TypeScript(TS")
 			if gotLinted != test.wantLinted {
-				t.Fatalf("linted=%v, want %v: diagnostics=%+v", gotLinted, test.wantLinted, result.Diagnostics)
+				t.Fatalf("linted=%v, want %v: diagnostics=%+v", gotLinted, test.wantLinted, result.Observation.Native.Diagnostics)
 			}
 		})
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -425,7 +426,7 @@ func (state *ruleState) checkCallExpression(node *ast.Node) {
 
 	// An optional chain (`Array?.()` or `Intl?.DateTimeFormat()`) can't be
 	// rewritten to a `new` expression, which cannot itself be optional.
-	if hasOptionalChain(node) || hasOptionalChain(call.Expression) {
+	if call.QuestionDotToken != nil || unicornutil.HasOptionalChainElement(call.Expression) {
 		return
 	}
 
@@ -1167,32 +1168,6 @@ func (state *ruleState) isLocalNonAliasIdentifier(node *ast.Node) bool {
 	}
 
 	return utils.IsShadowed(node, name)
-}
-
-func hasOptionalChain(node *ast.Node) bool {
-	node = utils.SkipAssertionsAndParens(node)
-	if node == nil {
-		return false
-	}
-	if ast.IsOptionalChain(node) {
-		return true
-	}
-	switch node.Kind {
-	case ast.KindCallExpression:
-		call := node.AsCallExpression()
-		return call != nil && hasOptionalChain(call.Expression)
-	case ast.KindPropertyAccessExpression:
-		access := node.AsPropertyAccessExpression()
-		return access != nil && hasOptionalChain(access.Expression)
-	case ast.KindElementAccessExpression:
-		access := node.AsElementAccessExpression()
-		return access != nil && hasOptionalChain(access.Expression)
-	case ast.KindNonNullExpression:
-		expression := node.AsNonNullExpression()
-		return expression != nil && hasOptionalChain(expression.Expression)
-	default:
-		return false
-	}
 }
 
 func isStrictObjectComparison(node *ast.Node) bool {
