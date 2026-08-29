@@ -32,7 +32,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// Resolve the working directory WITHOUT os.Chdir: this is a long-lived,
 	// reused --api process, so mutating the process-global cwd would leak
 	// across requests (and race a future concurrent mode). Everything
-	// downstream (resolveRequestPath / config loader / CreateCompilerHost /
+	// downstream (resolveRequestPath / config resolution / CreateCompilerHost /
 	// CreateProgram) takes this directory explicitly, so a local var suffices.
 	currentDirectory := req.WorkingDirectory
 	if currentDirectory == "" {
