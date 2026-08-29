@@ -46,8 +46,8 @@ func enumLiteralMatchesStaticValue(
 		return enumStringOK && staticStringOK && enumString == staticString
 	}
 	if utils.IsTypeFlagSet(enumLiteral, checker.TypeFlagsNumberLiteral) {
-		_, staticNumberOK := staticValue.(staticNumber)
-		return staticNumberOK && checker.ValueToString(literalValue) == staticValueText
+		staticNumber, staticNumberOK := staticValue.(staticNumber)
+		return staticNumberOK && !staticNumber.IsNaN() && checker.ValueToString(literalValue) == staticValueText
 	}
 	return false
 }

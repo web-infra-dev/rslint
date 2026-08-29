@@ -2,6 +2,7 @@ package utils
 
 import (
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -430,6 +431,11 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 	}
 
 	switch binary.OperatorToken.Kind {
+	case ast.KindCommaToken:
+		// A sequence expression evaluates to its final operand. This mirrors
+		// eslint-utils getStaticValue for the expression shapes that consume the
+		// result rather than its side effects.
+		return staticEvaluator.evalValue(binary.Right)
 	case ast.KindEqualsToken:
 		result := staticEvaluator.evalValue(binary.Right)
 		if result.ok && staticValueIsAggregate(result.value) {
@@ -817,6 +823,11 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 	if !object.ok {
 		return staticEvalResult{}
 	}
+	if key == "length" {
+		if text, ok := staticValueAsString(object.value); ok {
+			return staticEvalResult{value: staticNumberValue(len(utf16.Encode([]rune(text)))), ok: true}
+		}
+	}
 	return staticMemberValue(object.value, key)
 }
 
@@ -1126,6 +1137,8 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 	}
 
 	switch method {
+	case "indexOf":
+		return staticStringIndexOf(text, arguments)
 	case "toUpperCase":
 		return staticEvalResult{value: ecmascript.StringToUpperCase(text), ok: true}
 	case "toLowerCase":
@@ -1143,6 +1156,37 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 	}
 
 	return staticEvalResult{}
+}
+
+func staticStringIndexOf(text string, arguments []any) staticEvalResult {
+	if len(arguments) == 0 {
+		return staticEvalResult{}
+	}
+	needle, ok := staticValueToString(arguments[0])
+	if !ok {
+		return staticEvalResult{}
+	}
+
+	start := 0
+	if len(arguments) > 1 {
+		number, ok := staticValueToNumber(arguments[1])
+		if !ok {
+			return staticEvalResult{}
+		}
+		if !math.IsNaN(number) {
+			start = int(math.Trunc(number))
+		}
+	}
+
+	textUnits := utf16.Encode([]rune(text))
+	needleUnits := utf16.Encode([]rune(needle))
+	start = min(max(start, 0), len(textUnits))
+	for i := start; i+len(needleUnits) <= len(textUnits); i++ {
+		if slices.Equal(textUnits[i:i+len(needleUnits)], needleUnits) {
+			return staticEvalResult{value: staticNumberValue(i), ok: true}
+		}
+	}
+	return staticEvalResult{value: staticNumberValue(-1), ok: true}
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalCallArguments(node *ast.Node) ([]any, bool) {

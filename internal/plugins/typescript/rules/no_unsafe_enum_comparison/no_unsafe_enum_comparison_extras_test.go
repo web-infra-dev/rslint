@@ -56,6 +56,88 @@ declare const num: Num;
 			}},
 		},
 		{
+			// Sequence expressions fold to their final value, while preserving
+			// their outer parentheses in the replacement.
+			Code: `
+enum Num {
+  A = 2,
+}
+declare const num: Num;
+num === (1, 2);
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceValueWithEnum",
+					Output: `
+enum Num {
+  A = 2,
+}
+declare const num: Num;
+num === (Num.A);
+`,
+				}},
+			}},
+		},
+		{
+			Code: `
+enum Num {
+  A = 2,
+}
+declare const num: Num;
+num === 'ab'.length;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceValueWithEnum",
+					Output: `
+enum Num {
+  A = 2,
+}
+declare const num: Num;
+num === Num.A;
+`,
+				}},
+			}},
+		},
+		{
+			Code: `
+enum Num {
+  A = 1,
+}
+declare const num: Num;
+num === 'ab'.indexOf('b');
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "replaceValueWithEnum",
+					Output: `
+enum Num {
+  A = 1,
+}
+declare const num: Num;
+num === Num.A;
+`,
+				}},
+			}},
+		},
+		{
+			// NaN is not equal to itself, so a textual NaN match must not offer
+			// an enum replacement suggestion.
+			Code: `
+enum Num {
+  A = 0 / 0,
+}
+declare const num: Num;
+num === 0 / 0;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
 			Code: `
 enum ComputedKey {
   ['test-key' /* with comment */] = 1,
