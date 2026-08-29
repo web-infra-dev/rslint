@@ -79,6 +79,7 @@ export default defineConfig({
     './tests/eslint/rules/func-name-matching.test.ts',
     './tests/eslint/rules/func-names.test.ts',
     './tests/eslint/rules/func-style.test.ts',
+    './tests/eslint/rules/grouped-accessor-pairs.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',
     './tests/eslint/rules/no-continue.test.ts',

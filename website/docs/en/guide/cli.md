@@ -11,7 +11,7 @@ rslint [options] [files/directories...]
 | Flag                  | Description                                                                                    |
 | --------------------- | ---------------------------------------------------------------------------------------------- |
 | `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
-| `-c, --config <path>` | Specify which config file to use                                                               |
+| `-c, --config <path>` | Specify which JS/TS module config file to use                                                  |
 | `--fix`               | Automatically fix problems                                                                     |
 | `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
 | `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |

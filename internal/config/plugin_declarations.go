@@ -1,8 +1,8 @@
 package config
 
-// bundledPluginDeclaration maps the names accepted in JSON configuration to
-// the namespace used by that bundled plugin's rules. It contains no rule
-// implementations; callers supply those through a rule catalog.
+// bundledPluginDeclaration maps accepted string declarations to the namespace
+// used by that bundled plugin's rules. It contains no rule implementations;
+// callers supply those through a rule catalog.
 type bundledPluginDeclaration struct {
 	ruleNamespace    string
 	declarationNames []string

@@ -386,7 +386,7 @@ export const EditorTabs = ({
     });
   }, []);
 
-  // Create rslint.json editor
+  // Create the serialized config editor used by the low-level API.
   useEffect(() => {
     if (!rslintContainerRef.current) return;
 
@@ -438,7 +438,7 @@ export const EditorTabs = ({
 
   const tabs: { key: EditorTabType; label: string }[] = [
     { key: 'code', label: 'Code' },
-    { key: 'rslint', label: 'rslint.json' },
+    { key: 'rslint', label: 'Config (JSON)' },
     { key: 'tsconfig', label: 'tsconfig' },
   ];
 

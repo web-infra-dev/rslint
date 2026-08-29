@@ -46,13 +46,13 @@ Both `lintFiles` and `lintText` return ESLint-shaped `LintResult[]` values.
 const rslint = new Rslint(options);
 ```
 
-| Option               | Type                                        | Default         | Description                                                                                                                                          |
-| -------------------- | ------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cwd`                | `string`                                    | `process.cwd()` | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                          |
-| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —               | Extra config appended after the selected config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`                            |
-| `overrideConfigFile` | `string \| true \| null`                    | `null`          | A config path disables discovery and uses its own directory as its config path base; `true` uses only the override; otherwise configs are discovered |
-| `fix`                | `boolean`                                   | `false`         | Applies auto-fixes and includes changed source in `result.output`                                                                                    |
-| `virtualFiles`       | `Record<string, string>`                    | —               | In-memory path-to-content overlay for project inputs; unresolved reads may still fall back to disk                                                   |
+| Option               | Type                                        | Default         | Description                                                                                                                                                       |
+| -------------------- | ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                | `string`                                    | `process.cwd()` | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                                       |
+| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —               | Extra config appended after the selected config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`                                         |
+| `overrideConfigFile` | `string \| true \| null`                    | `null`          | A JS/TS config module path disables discovery and uses its own directory as its config path base; `true` uses only the override; otherwise configs are discovered |
+| `fix`                | `boolean`                                   | `false`         | Applies auto-fixes and includes changed source in `result.output`                                                                                                 |
+| `virtualFiles`       | `Record<string, string>`                    | —               | In-memory path-to-content overlay for project inputs; unresolved reads may still fall back to disk                                                                |
 
 With automatic discovery, Go selects each file's nearest config and owns ignore and target-admission semantics. The JavaScript host evaluates and normalizes the JS or TS config modules selected for that run.
 

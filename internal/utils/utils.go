@@ -540,7 +540,7 @@ func CoerceIntegral(v any) (int, bool) {
 
 // ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,
 // extracting only the string elements. Returns nil if the input is nil, not an array,
-// or contains no strings. Useful for parsing rule options from JSON config.
+// or contains no strings. Useful for parsing serialized rule options.
 func ToStringSlice(val interface{}) []string {
 	if val == nil {
 		return nil

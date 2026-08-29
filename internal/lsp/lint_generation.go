@@ -233,13 +233,9 @@ func pluginFileConfigForLintSnapshot(snapshot documentLintSnapshot) *linter.Esli
 	if !snapshot.configResolved || snapshot.resolvedConfig.MergedConfig == nil {
 		return nil
 	}
-	configKey := ""
-	if snapshot.usesJavaScriptConfig {
-		configKey = snapshot.target.ConfigDirectory
-	}
 	languageOptions, settings := config.PluginMergedMaps(snapshot.resolvedConfig.MergedConfig)
 	return &linter.EslintPluginFileConfig{
-		ConfigKey:       configKey,
+		ConfigKey:       snapshot.configKey,
 		LanguageOptions: languageOptions,
 		Settings:        settings,
 	}

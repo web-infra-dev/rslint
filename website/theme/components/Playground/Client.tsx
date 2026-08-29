@@ -83,7 +83,7 @@ const Playground: React.FC = () => {
       }
 
       // The JavaScript API takes the config object directly (Go no longer reads
-      // /rslint.json from the VFS). configDirectory is the memfs root where
+      // a config file from the VFS). configDirectory is the memfs root where
       // tsconfig.json lives, so the config's relative `project` resolves.
       // rules (with their options) travel inside the config entries; there is
       // no separate ruleOptions surface.

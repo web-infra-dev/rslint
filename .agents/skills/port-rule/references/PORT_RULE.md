@@ -709,7 +709,7 @@ Assert that diagnostic count, message, and range are identical in all four modes
 2. **Check Configuration**:
    - **Reference**: Use `packages/rslint-test-tools/tests/eslint-plugin-jsx-a11y` as the template (ESM flat-config format).
    - **Required Files**:
-     - `rslint.config.mjs` (Configuration for the linter — JSON `rslint.json` is legacy and the loader auto-migrates it to JS/TS; do NOT create new `rslint.json` files)
+     - `rslint.config.mjs` (Configuration for the linter — JSON `rslint.json` is legacy and `rslint --init` can migrate it to JS/TS; do NOT create new `rslint.json` files)
      - `tsconfig.files.json` (TS Config for file-based tests)
      - `tsconfig.virtual.json` (TS Config for virtual/code-based tests)
    - **Plugin Configuration**: In `rslint.config.mjs`, set the `plugins` field (use the short plugin name, matching how rules are addressed in tests):

@@ -58,7 +58,7 @@ var NoMagicArrayFlatDepthRule = rule.Rule{
 				// of context upstream wants to preserve. Upstream checks
 				// `commentsExistBetween(openingParenthesisToken, closingParenthesisToken)`,
 				// which covers both sides of the depth argument.
-				if hasCommentBetweenParens(ctx, call.Call, depth) {
+				if hasCommentBetweenParens(ctx, call.Call) {
 					return
 				}
 
@@ -84,27 +84,45 @@ func isNumericLiteral(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindNumericLiteral
 }
 
-// hasCommentBetweenParens reports whether any comment lives in the source
-// span from the end of the callee (right after `flat`, i.e. the position of
-// the opening `(`) up to the end of the call expression. Mirrors upstream's
-// `sourceCode.commentsExistBetween(openingParenthesisToken, closingParenthesisToken)`.
-func hasCommentBetweenParens(ctx rule.RuleContext, call *ast.Node, depth *ast.Node) bool {
-	callee := call.AsCallExpression().Expression
-	if callee == nil {
+// hasCommentBetweenParens mirrors commentsExistBetween on the call's actual
+// parentheses. A comment between the callee and `(` is outside that range.
+func hasCommentBetweenParens(ctx rule.RuleContext, call *ast.Node) bool {
+	callExpression := call.AsCallExpression()
+	if callExpression == nil || callExpression.Arguments == nil {
 		return false
 	}
-	openParenPos := utils.TrimNodeTextRange(ctx.SourceFile, callee).End()
-	callEnd := utils.TrimNodeTextRange(ctx.SourceFile, call).End()
-	depthStart := utils.TrimNodeTextRange(ctx.SourceFile, depth).Pos()
-	if openParenPos >= callEnd {
+	callEnd := call.End()
+	argumentsStart := callExpression.Arguments.Pos()
+	text := ctx.SourceFile.Text()
+	if argumentsStart > 0 && callEnd > argumentsStart && callEnd <= len(text) &&
+		text[argumentsStart-1] == '(' && text[callEnd-1] == ')' {
+		// The listener has already proved this call has one numeric-literal
+		// argument (possibly parenthesized). A comment delimiter is therefore
+		// unambiguous here; no string, regexp, or second expression can contain it.
+		return mayContainCommentDelimiter(text, argumentsStart, callEnd-1)
+	}
+
+	comments := ctx.Comments.All()
+	if len(comments) == 0 {
 		return false
 	}
-	// Avoid wasting a comment scan on the trivial case where the depth is the
-	// only thing in the parens.
-	if depthStart == openParenPos+1 || depthStart == openParenPos+2 {
-		// depth is immediately after `(`, optionally with whitespace.
-		depthEnd := depth.End()
-		return utils.HasCommentInSpan(ctx.Comments.All(), depthEnd, callEnd)
+	callEnd = utils.TrimNodeTextRange(ctx.SourceFile, call).End()
+	opening, ok := utils.TokenBeforePosition(ctx.SourceFile, callExpression.Arguments.Pos())
+	if !ok || opening.Kind != ast.KindOpenParenToken {
+		return false
 	}
-	return utils.HasCommentInSpan(ctx.Comments.All(), openParenPos, callEnd)
+	closing, ok := utils.TokenBeforePosition(ctx.SourceFile, callEnd)
+	if !ok || closing.Kind != ast.KindCloseParenToken {
+		return false
+	}
+	return utils.HasCommentInSpan(comments, opening.End, closing.Start)
+}
+
+func mayContainCommentDelimiter(text string, start, end int) bool {
+	for index := start; index+1 < end; index++ {
+		if text[index] == '/' && (text[index+1] == '/' || text[index+1] == '*') {
+			return true
+		}
+	}
+	return false
 }

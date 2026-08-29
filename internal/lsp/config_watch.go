@@ -15,9 +15,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
-	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 const gitignoreWatcherID project.WatcherID = "rslint-gitignore-policy"
@@ -91,62 +89,6 @@ func fileURIFromPath(filePath string) lsproto.URI {
 	return lsproto.URI((&url.URL{Scheme: "file", Path: uriPath}).String())
 }
 
-// reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
-// The LSP reuses projects already loaded by project service and builds a
-// session-external ts-go Program for a declared custom project. Resolving
-// project paths here preserves declaration order and ensures type-aware rules
-// run only when the governing config's first containing project supplies type
-// information.
-func (s *Server) reloadConfig() error {
-	loader := config.NewConfigLoader(s.fs, s.cwd, rules.All())
-	rslintConfig, _, err := loader.LoadRslintConfig(s.rslintConfigPath)
-	if err != nil {
-		return fmt.Errorf("could not load rslint config: %w", err)
-	}
-	paths, err := s.resolveTsConfigPaths(rslintConfig, s.cwd)
-	if err != nil {
-		return fmt.Errorf("could not resolve tsconfig paths for %q: %w", s.rslintConfigPath, err)
-	}
-	ownerIndex, fileConfigResolver, err := prepareJSONConfigEvaluation(
-		rslintConfig,
-		s.cwd,
-		s.fs,
-	)
-	if err != nil {
-		return fmt.Errorf("could not prepare JSON config evaluation: %w", err)
-	}
-	s.jsonConfig = rslintConfig
-	s.jsonConfigOwnerIndex = ownerIndex
-	s.jsonFileConfigResolver = fileConfigResolver
-	s.tsConfigPaths = paths
-	s.invalidateLintProjectCaches()
-	return nil
-}
-
-func prepareJSONConfigEvaluation(
-	entries config.RslintConfig,
-	configDirectory string,
-	fsys vfs.FS,
-) (*target.OwnerIndex, *config.FileConfigResolver, error) {
-	configDirectory = tspath.NormalizePath(configDirectory)
-	ownerIndex := target.NewOwnerIndex(
-		map[string]config.RslintConfig{configDirectory: entries},
-		fsys,
-	)
-	resolver, err := config.NewFileConfigResolverWithPathSpaces(
-		entries,
-		configDirectory,
-		fsys,
-		ownerIndex.PathSpaces(),
-		rules.All(),
-		false,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	return ownerIndex, resolver, nil
-}
-
 func (s *Server) invalidateLintProjectCaches() {
 	if s.lintPrograms != nil {
 		s.lintPrograms.Invalidate()
@@ -189,16 +131,11 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	if s.session != nil {
 		s.session.DidChangeWatchedFiles(ctx, params.Changes)
 	}
-	// Check for config file changes that affect rslint.
-	needsConfigReload := false
 	needsTypeInfoRebuild := false
 	needsIgnoreRefresh := false
 	needsAncestorJSConfigRefresh := false
 	for _, change := range params.Changes {
 		uri := string(change.Uri)
-		if isRslintConfigURI(uri) {
-			needsConfigReload = true
-		}
 		if isTsConfigURI(uri) {
 			needsTypeInfoRebuild = true
 		}
@@ -213,10 +150,9 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	if (needsIgnoreRefresh || needsAutomaticAncestorRefresh) && s.configDiscoveryActive {
 		// didChangeWatchedFiles and configRefresh are both blocking methods, so
 		// this direct call stays on the server's serialized dispatch loop and
-		// cannot race an extension-initiated transaction. JSON fallback is part
-		// of the candidate snapshot: never reload it directly while discovery is
-		// active, otherwise a later JS activation failure could leave half of a
-		// rejected generation live.
+		// cannot race an extension-initiated transaction. The workspace fallback
+		// is part of the candidate snapshot, so a later activation failure keeps
+		// the complete last-good generation live.
 		reason := "gitignore-change"
 		if needsAutomaticAncestorRefresh {
 			reason = "config-change"
@@ -237,23 +173,6 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		}
 		return nil
 	}
-	if s.configDiscoveryActive {
-		// The extension's direct workspace watcher is the sole owner for
-		// workspace/descendant JS configs and JSON fallback. tsgo can also report
-		// those paths through its recursive project watcher; treating that report
-		// as a second refresh would evaluate every fresh module twice. Go-owned
-		// didChange handling above is intentionally limited to .gitignore and
-		// strict-ancestor JS configs, which the extension watcher cannot cover.
-		needsConfigReload = false
-	}
-	if needsConfigReload {
-		s.reloadConfigAndRelint()
-		if needsIgnoreRefresh {
-			s.invalidateOpenDocumentDiagnostics()
-			return s.RefreshDiagnostics(ctx)
-		}
-		return nil
-	}
 	if needsTypeInfoRebuild {
 		// tsconfig changed — rebuild tsConfigPaths so type-aware rule filtering
 		// stays in sync. Session already handles the project state update and
@@ -268,11 +187,6 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	}
 
 	return nil
-}
-
-// isRslintConfigURI returns true if the URI points to an rslint config file.
-func isRslintConfigURI(uri string) bool {
-	return strings.HasSuffix(uri, "/rslint.json") || strings.HasSuffix(uri, "/rslint.jsonc")
 }
 
 func isGitignoreURI(uri string) bool {
@@ -328,24 +242,16 @@ func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) ([]st
 }
 
 // rebuildTsConfigPaths resolves parserOptions.project from the current config.
-// Called when a tsconfig or rslint config changes so that type-aware rule
-// filtering stays in sync.
+// Called when a tsconfig changes so that type-aware rule filtering stays in
+// sync. Config transactions resolve the same declarations while preparing
+// their snapshot.
 //
-// For JS/TS configs we resolve per-config directory into tsConfigPathsByConfig.
+// We resolve per-config directory into tsConfigPathsByConfig.
 // A config whose parserOptions.project is empty and has no auto-detected
 // tsconfig resolves to nil. Files governed by that config have no type info,
 // without affecting files governed by other configs. A nested template or
 // fixture config without a tsconfig must not change sibling config behavior.
 func (s *Server) rebuildTsConfigPaths() error {
-	var tsConfigPaths []string
-	if s.rslintConfigPath != "" {
-		var err error
-		tsConfigPaths, err = s.resolveTsConfigPaths(s.jsonConfig, s.cwd)
-		if err != nil {
-			return fmt.Errorf("resolve tsconfig paths for %q: %w", s.rslintConfigPath, err)
-		}
-	}
-
 	var byConfig map[string][]string
 	if len(s.jsConfigs) > 0 {
 		byConfig = make(map[string][]string, len(s.jsConfigs))
@@ -358,61 +264,7 @@ func (s *Server) rebuildTsConfigPaths() error {
 		}
 	}
 
-	s.tsConfigPaths = tsConfigPaths
 	s.tsConfigPathsByConfig = byConfig
 	s.invalidateLintProjectCaches()
 	return nil
-}
-
-// reloadConfigAndRelint re-discovers and reloads the rslint JSON config, then
-// re-lints all open documents. The JSON config remains a live fallback for
-// files that have no JS/TS config ancestor, so it must stay current even while
-// one or more JS/TS configs are active.
-func (s *Server) reloadConfigAndRelint() {
-	log.Printf("Reloading rslint config...")
-
-	configPath, found := findRslintConfig(s.fs, s.cwd)
-	if !found {
-		log.Printf("rslint config file no longer exists, clearing config")
-		emptyConfig := config.RslintConfig{}
-		ownerIndex, fileConfigResolver, err := prepareJSONConfigEvaluation(
-			emptyConfig,
-			s.cwd,
-			s.fs,
-		)
-		if err != nil {
-			log.Printf("Error clearing rslint config: %v", err)
-			return
-		}
-		s.jsonConfig = emptyConfig
-		s.jsonConfigOwnerIndex = ownerIndex
-		s.jsonFileConfigResolver = fileConfigResolver
-		s.rslintConfigPath = ""
-		s.tsConfigPaths = nil
-		s.invalidateLintProjectCaches()
-	} else {
-		previousPath := s.rslintConfigPath
-		s.rslintConfigPath = configPath
-		if err := s.reloadConfig(); err != nil {
-			s.rslintConfigPath = previousPath
-			log.Printf("Error reloading rslint config: %v", err)
-			return
-		}
-	}
-
-	for uri := range s.documents {
-		s.pushDiagnostics(uri)
-	}
-}
-func findRslintConfig(fs vfs.FS, workingDir string) (string, bool) {
-	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
-
-	// Strategy 1: Try in the working directory
-	for _, configName := range defaultConfigs {
-		configPath := filepath.Join(workingDir, configName)
-		if fs.FileExists(configPath) {
-			return configPath, true
-		}
-	}
-	return "", false
 }

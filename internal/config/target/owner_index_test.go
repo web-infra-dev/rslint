@@ -139,7 +139,6 @@ func TestOwnerIndexFreezesOwnerAndAuthoredBaseTogether(t *testing.T) {
 		fs,
 		resolver.PathSpaces(),
 		rules.All(),
-		false,
 	)
 	if err != nil {
 		t.Fatal(err)
