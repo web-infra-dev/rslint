@@ -321,11 +321,22 @@ func IsStrictCompilerOptionEnabled(
 // @param node The node whose tokens should be visited
 // @param callback Is called for every token contained in `node`
 func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *ast.SourceFile) {
+	forEachToken(node, func(token *ast.Node) bool {
+		callback(token)
+		return false
+	}, sourceFile)
+}
+
+// forEachToken is the short-circuiting core used when a caller only needs the
+// first matching token. Returning true from callback stops the traversal.
+func forEachToken(node *ast.Node, callback func(token *ast.Node) bool, sourceFile *ast.SourceFile) bool {
 	queue := make([]*ast.Node, 0)
 
 	for {
 		if ast.IsTokenKind(node.Kind) {
-			callback(node)
+			if callback(node) {
+				return true
+			}
 		} else {
 			children := GetChildren(node, sourceFile)
 			for i := len(children) - 1; i >= 0; i-- {
@@ -334,7 +345,7 @@ func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *as
 		}
 
 		if len(queue) == 0 {
-			break
+			return false
 		}
 
 		node = queue[len(queue)-1]

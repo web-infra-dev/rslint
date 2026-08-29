@@ -36,9 +36,11 @@ func parseOptions(options []any) Options {
 }
 
 type accessorGroup struct {
-	key     accessorutil.Key
-	getters []int
-	setters []int
+	key         accessorutil.Key
+	getterIndex int
+	setterIndex int
+	getterCount int
+	setterCount int
 }
 
 func accessorName(node *ast.Node) string {
@@ -89,18 +91,24 @@ func checkList(ctx rule.RuleContext, headLocator *utils.FunctionHeadRangeLocator
 			groupIndex = len(groups) - 1
 		}
 		if member.Kind == ast.KindGetAccessor {
-			groups[groupIndex].getters = append(groups[groupIndex].getters, index)
+			if groups[groupIndex].getterCount == 0 {
+				groups[groupIndex].getterIndex = index
+			}
+			groups[groupIndex].getterCount++
 		} else {
-			groups[groupIndex].setters = append(groups[groupIndex].setters, index)
+			if groups[groupIndex].setterCount == 0 {
+				groups[groupIndex].setterIndex = index
+			}
+			groups[groupIndex].setterCount++
 		}
 	}
 
 	for _, group := range groups {
-		if len(group.getters) != 1 || len(group.setters) != 1 {
+		if group.getterCount != 1 || group.setterCount != 1 {
 			continue
 		}
-		getterIndex := group.getters[0]
-		setterIndex := group.setters[0]
+		getterIndex := group.getterIndex
+		setterIndex := group.setterIndex
 		formerIndex, latterIndex := getterIndex, setterIndex
 		if setterIndex < getterIndex {
 			formerIndex, latterIndex = setterIndex, getterIndex
@@ -125,19 +133,6 @@ func typeAccessor(member *ast.Node) bool {
 	return member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor
 }
 
-// ESTree does not include empty class elements (`;`) in ClassBody.body, while
-// tsgo exposes them as SemicolonClassElement nodes. Remove them before using
-// member indexes to decide whether two accessors are adjacent.
-func estreeClassMembers(members []*ast.Node) []*ast.Node {
-	filtered := make([]*ast.Node, 0, len(members))
-	for _, member := range members {
-		if member.Kind != ast.KindSemicolonClassElement {
-			filtered = append(filtered, member)
-		}
-	}
-	return filtered
-}
-
 var GroupedAccessorPairsRule = rule.Rule{
 	Name:   "grouped-accessor-pairs",
 	Schema: rule.NewSchema(schemaJSON),
@@ -152,7 +147,7 @@ var GroupedAccessorPairsRule = rule.Rule{
 				}
 			},
 			ast.KindClassDeclaration: func(node *ast.Node) {
-				members := estreeClassMembers(node.Members())
+				members := utils.ESTreeMembers(node.Members())
 				checkList(ctx, headLocator, members, opts, func(member *ast.Node) bool {
 					return concreteAccessor(member) && !ast.IsStatic(member)
 				})

@@ -17,6 +17,21 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 		t,
 		&GroupedAccessorPairsRule,
 		[]rule_tester.ValidTestCase{
+			// TypeScript parser tokens retain escaped identifier spelling for
+			// computed and private keys, unlike Espree's decoded JS tokens.
+			{Code: `({ get [foo](){}, middle: true, set [\u0066oo](value){} })`},
+			{Code: `class C { #foo; get [this.#foo](){} middle(){} set [this.#\u0066oo](value){} }`},
+			{Code: `class C { get #foo(){} middle(){} set #\u0066oo(value){} }`},
+			{Code: `class C { get #\u0066oo(){} middle(){} set #\u{66}oo(value){} }`},
+			{
+				Code:    `declare const foo: unique symbol; interface I { get [foo](): string; middle: true; set [\u0066oo](value: string); }`,
+				Options: []any{"anyOrder", map[string]any{"enforceForTSTypes": true}},
+			},
+			{
+				Code:     `({ get [<div>&amp;</div>](){}, middle: true, set [<div>&</div>](value){} })`,
+				FileName: "grouped-token.tsx",
+			},
+
 			// ---- Dimension 4: receiver/expression wrappers ----
 			// Parentheses around the complete dynamic key are transparent.
 			{Code: `({ get [(key)](){}, set [key](value){} })`},
@@ -79,15 +94,46 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 			{Code: `interface I { get a(): string; middle: true; set a(value: string); }`, Options: []any{"anyOrder", map[string]any{"enforceForTSTypes": false}}},
 		},
 		[]rule_tester.InvalidTestCase{
-			// Identifier tokens compare by their decoded value, so an escaped
-			// spelling still names the same dynamic accessor key.
+			// Espree exposes decoded Identifier/PrivateIdentifier token values.
 			{
-				Code:   `({ get [foo](){}, middle: true, set [\u0066oo](value){} })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+				Code:     `({ get [foo](){}, middle: true, set [\u0066oo](value){} })`,
+				FileName: "grouped-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
 			},
 			{
-				Code:   `class C { #foo; get [this.#foo](){} middle(){} set [this.#\u0066oo](value){} }`,
+				Code:     `class C { #foo; get [this.#foo](){} middle(){} set [this.#\u0066oo](value){} }`,
+				FileName: "grouped-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+			},
+			{
+				Code:     `class C { get #foo(){} middle(){} set #\u0066oo(value){} }`,
+				FileName: "grouped-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+			},
+			// Identical raw TypeScript private spellings still form a pair.
+			{
+				Code:   `class C { get #\u0066oo(){} middle(){} set #\u0066oo(value){} }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+			},
+			// Non-computed property names remain statically decoded in TypeScript.
+			{
+				Code:   `class C { get foo(){} middle(){} set \u0066oo(value){} }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+			},
+			// JSX uses Espree's decoded JSXText token value; TSX retains raw text.
+			{
+				Code:     `({ get [<div>&amp;</div>](){}, middle: true, set [<div>&</div>](value){} })`,
+				FileName: "grouped-token.jsx",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+			},
+			{
+				Code:     `({ get [<div>&amp;</div>](){}, middle: true, set [<div>&amp;</div>](value){} })`,
+				FileName: "grouped-token.tsx",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
 			},
 			// Empty class elements do not take precedence over an order violation.
 			{
@@ -191,6 +237,30 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "notGrouped",
 					Message:   "Accessor pair getter 'null' and setter 'null' should be grouped.",
+				}},
+			},
+			// For TSMethodSignature, upstream ends the function head at the first
+			// real opening-paren token, including one inside a computed key.
+			{
+				Code:    `interface I { get ['a'](): string; middle: true; set [('a')](value: string); }`,
+				Options: []any{"anyOrder", map[string]any{"enforceForTSTypes": true}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "notGrouped",
+					Line:      1,
+					Column:    50,
+					EndLine:   1,
+					EndColumn: 55,
+				}},
+			},
+			{
+				Code:    `interface I { get [('a')](): string; set [('a')](value: string); }`,
+				Options: []any{"setBeforeGet", map[string]any{"enforceForTSTypes": true}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "invalidOrder",
+					Line:      1,
+					Column:    38,
+					EndLine:   1,
+					EndColumn: 43,
 				}},
 			},
 		},
