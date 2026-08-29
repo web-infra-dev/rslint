@@ -85,6 +85,12 @@ export default function test(a: unknown) { return a; }
 			// — the common "allowTypeAnnotation" use case in real codebases ----
 			{Code: "export const Button: React.FC<Props> = (props) => { return null; };", Options: []any{"declaration", map[string]any{"allowTypeAnnotation": true}}},
 
+			// ---- JSX: a `this` expression in a JSX child is traversed in the
+			// enclosing arrow's frame, so ESLint preserves the arrow rather than
+			// requiring a declaration. A nested callback's `this` has its own
+			// frame and does not exempt the component arrow (tested below) ----
+			{Code: "const Component = () => <div>{this.value}</div>;", Tsx: true, Options: []any{"declaration"}},
+
 			// ---- Dimension 2 nesting: unlike a method/getter/setter/
 			// constructor, a class static block is its own dedicated ESTree
 			// node (StaticBlock), never a FunctionExpression — so upstream's
@@ -245,6 +251,24 @@ export default function test(a: unknown) { return a; }
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "declaration", Line: 1, Column: 14, EndLine: 1, EndColumn: 67},
 				},
+			},
+			{
+				Code:    "const Component = () => <div />;",
+				Tsx:     true,
+				Options: []any{"declaration"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "declaration"}},
+			},
+			{
+				Code:    "const Component = () => <div onClick={() => this.handle()} />;",
+				Tsx:     true,
+				Options: []any{"declaration"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "declaration"}},
+			},
+			{
+				Code:    "function Component() { return <div />; }",
+				Tsx:     true,
+				Options: []any{"expression"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expression"}},
 			},
 
 			// ---- Dimension 2 nesting: ESTree has no MethodDefinition/Property-
