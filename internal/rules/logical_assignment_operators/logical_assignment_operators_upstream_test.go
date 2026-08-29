@@ -9,7 +9,7 @@ import (
 
 // TestLogicalAssignmentOperatorsUpstream migrates the full valid/invalid suite
 // from upstream tests/lib/rules/logical-assignment-operators.js (eslint
-// v10.8.1) 1:1. Position assertions cover line/column for every invalid case.
+// v10.9.1) 1:1. Position assertions cover line/column for every invalid case.
 // rslint-specific lock-in cases live in
 // logical_assignment_operators_extras_test.go.
 func TestLogicalAssignmentOperatorsUpstream(t *testing.T) {

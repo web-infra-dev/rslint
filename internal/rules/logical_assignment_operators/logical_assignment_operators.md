@@ -90,4 +90,4 @@ A TypeScript assertion makes the two sides count as different values, so `a = a!
 ## Original Documentation
 
 - [ESLint: logical-assignment-operators](https://eslint.org/docs/latest/rules/logical-assignment-operators)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/logical-assignment-operators.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/logical-assignment-operators.js)

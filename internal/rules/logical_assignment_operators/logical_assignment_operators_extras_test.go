@@ -56,6 +56,14 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 			{Code: `[a = a || b] = array`},
 			{Code: `({ x: { a = a || b } } = object)`},
 			{Code: `for ([a = a || b] of arrays) {}`},
+			{Code: `[...[a = a || b]] = array`},
+			{Code: `[...[...[a = a && b]]] = array`},
+			{Code: `({ x: [...[a = a ?? b]] } = object)`},
+			{Code: `[...{ x: a = a || b }] = array`},
+			{Code: `for ([...[a = a || b]] of arrays) {}`},
+			{Code: `for ([...[a = a || b]] in objects) {}`},
+			{Code: `for ({ x: a = a || b } of objects) {}`},
+			{Code: `for ({ x: a = a || b } in objects) {}`},
 			// ---- Dimension 4: options coverage ----
 			{Options: []any{`always`, map[string]any{`enforceForIfStatements`: false}}, Code: `if (a) a = b`},
 			{Options: []any{`always`}, Code: `if (a) a = b`},
@@ -552,6 +560,34 @@ a ??= b`},
 				},
 			},
 			{
+				Code:   `[...[x = a || (a = b)]] = arr;`,
+				Output: []string{`[...[x = (a ||= b)]] = arr;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `logical`, Message: `Logical expression can be replaced with an assignment (||=).`, Line: 1, Column: 10, EndLine: 1, EndColumn: 22},
+				},
+			},
+			{
+				Code:   `[...[x = (a = a || b)]] = arr;`,
+				Output: []string{`[...[x = (a ||= b)]] = arr;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `assignment`, Message: `Assignment (=) can be replaced with operator assignment (||=).`, Line: 1, Column: 11, EndLine: 1, EndColumn: 21},
+				},
+			},
+			{
+				Code:   `[object[a = a || b] = value] = array;`,
+				Output: []string{`[object[a ||= b] = value] = array;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `assignment`, Message: `Assignment (=) can be replaced with operator assignment (||=).`, Line: 1, Column: 9, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:   `({ [a = a || b]: value } = object);`,
+				Output: []string{`({ [a ||= b]: value } = object);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `assignment`, Message: `Assignment (=) can be replaced with operator assignment (||=).`, Line: 1, Column: 5, EndLine: 1, EndColumn: 15},
+				},
+			},
+			{
 				Code:   `[a || (a = 0)]`,
 				Output: []string{`[(a ||= 0)]`},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -774,6 +810,18 @@ this.a &&= b`},
 				},
 			},
 			{
+				Code:            `"use\x20strict"; with (object) a = a || b`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: `assignment`, Message: `Assignment (=) can be replaced with operator assignment (||=).`, Line: 1, Column: 32, EndLine: 1, EndColumn: 42,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: `useLogicalOperator`, Output: `"use\x20strict"; with (object) a ||= b`},
+						},
+					},
+				},
+			},
+			{
 				Code:   `with (object) { a || (a = b) }`,
 				Output: []string{`with (object) { a ||= b }`},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -809,6 +857,27 @@ this.a &&= b`},
 							{MessageId: `separate`, Output: `with (object) { a = a || b }`},
 						},
 					},
+				},
+			},
+			{
+				Code:            `"use\x20strict"; with (object) a ||= b`,
+				Options:         []any{`never`},
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: `unexpected`, Message: `Unexpected logical operator assignment (||=) shorthand.`, Line: 1, Column: 32, EndLine: 1, EndColumn: 39,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: `separate`, Output: `"use\x20strict"; with (object) a = a || b`},
+						},
+					},
+				},
+			},
+			{
+				Code:    "\"use strict\";\nwith (object) { a ||= b }",
+				Options: []any{`never`},
+				Output:  []string{"\"use strict\";\nwith (object) { a = a || b }"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `unexpected`, Message: `Unexpected logical operator assignment (||=) shorthand.`, Line: 2, Column: 17, EndLine: 2, EndColumn: 24},
 				},
 			},
 			// ---- Real-user: eslint#19672 (if-statement autofix kept as an autofix) ----
