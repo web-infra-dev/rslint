@@ -278,6 +278,17 @@ func TestNoDeprecatedRule(t *testing.T) {
 			}},
 		},
 
+		// ---- Regression: `@jsx Foo` in a hashbang is a pragma comment ----
+		{
+			Code: "#!/usr/bin/env node @jsx Foo\nFoo.renderComponent()",
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "deprecated",
+				Message:   msg("Foo.renderComponent", "0.12.0", "Foo.render", ""),
+				Line:      2, Column: 1,
+			}},
+		},
+
 		// ---- Upstream #4: `this.transferPropsTo()` ----
 		{
 			Code: `this.transferPropsTo()`,

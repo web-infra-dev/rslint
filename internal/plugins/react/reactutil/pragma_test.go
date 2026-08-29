@@ -1,6 +1,13 @@
 package reactutil
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/rule"
+)
 
 // TestJsxAnnotationInComment pins the port of upstream pragmaUtil's
 // `/@jsx\s+([^\s]+)/` to the cases where a compiled RE2 pattern would answer
@@ -67,6 +74,74 @@ func TestIsJavaScriptIdentifier(t *testing.T) {
 
 			if got := isJavaScriptIdentifier(testCase.name); got != testCase.want {
 				t.Fatalf("isJavaScriptIdentifier(%q) = %v, want %v", testCase.name, got, testCase.want)
+			}
+		})
+	}
+}
+
+// TestGetReactPragmaFromContextCommentAnnotations covers annotation ordering
+// across tsgo's separately stored hashbang and ordinary comment ranges.
+func TestGetReactPragmaFromContextCommentAnnotations(t *testing.T) {
+	t.Parallel()
+
+	settingsPragma := func(pragma string) map[string]interface{} {
+		return map[string]interface{}{
+			"react": map[string]interface{}{"pragma": pragma},
+		}
+	}
+	for _, testCase := range []struct {
+		name     string
+		source   string
+		settings map[string]interface{}
+		want     string
+	}{
+		{
+			name:   "hashbang annotation",
+			source: "#!/usr/bin/env node @jsx Foo\nvalue;",
+			want:   "Foo",
+		},
+		{
+			name:   "dotted hashbang annotation",
+			source: "#!/usr/bin/env node @jsx this.h\nvalue;",
+			want:   "this",
+		},
+		{
+			name:     "hashbang wins over comments and settings",
+			source:   "#!/usr/bin/env node @jsx Foo\n/* @jsx Bar */\nvalue;",
+			settings: settingsPragma("Baz"),
+			want:     "Foo",
+		},
+		{
+			name:     "invalid hashbang annotation still wins",
+			source:   "#!/usr/bin/env node @jsx Foo-Bar\n/* @jsx Bar */\nvalue;",
+			settings: settingsPragma("Baz"),
+			want:     DefaultReactPragma,
+		},
+		{
+			name:   "non-matching hashbang falls through to comment",
+			source: "#!/usr/bin/env node @jsxFrag Foo.Fragment\n/* @jsx Bar */\nvalue;",
+			want:   "Bar",
+		},
+		{
+			name:   "unterminated block annotation",
+			source: "/* @jsx Foo",
+			want:   "Foo",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/pragma.tsx",
+				Path:     "/pragma.tsx",
+			}, testCase.source, core.ScriptKindTSX)
+			ctx := rule.RuleContext{
+				SourceFile: sourceFile,
+				Comments:   rule.NewCommentStore(sourceFile),
+				Settings:   testCase.settings,
+			}
+			if got := GetReactPragmaFromContext(ctx); got != testCase.want {
+				t.Fatalf("GetReactPragmaFromContext() = %q, want %q", got, testCase.want)
 			}
 		})
 	}

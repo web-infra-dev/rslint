@@ -445,7 +445,7 @@ func TestJsxNoUselessFragmentEditDemand(t *testing.T) {
 
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	program, sourceFile, err := helper.CreateTestProgram(
-		"const a = <><div /></>;\nconst b = <><span /></>;",
+		"const a = <><div /></>;\nconst b = <><span /></>;\nconst c = <this><><A/><B/></></this>;",
 		"edit-demand.tsx",
 		"tsconfig.json",
 	)
@@ -477,8 +477,8 @@ func TestJsxNoUselessFragmentEditDemand(t *testing.T) {
 				},
 			},
 		})
-		if len(diagnostics) != 2 {
-			t.Fatalf("demand %d: diagnostics = %d, want 2", demand, len(diagnostics))
+		if len(diagnostics) != 3 {
+			t.Fatalf("demand %d: diagnostics = %d, want 3", demand, len(diagnostics))
 		}
 		return diagnostics
 	}

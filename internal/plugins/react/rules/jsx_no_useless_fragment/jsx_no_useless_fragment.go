@@ -50,32 +50,27 @@ var JsxNoUselessFragmentRule = rule.Rule{
 			return ecmascript.IsBlank(raw) && strings.Contains(raw, "\n")
 		}
 
-		nonPaddingChildren := func(node *ast.Node) []*ast.Node {
+		// nonPaddingChildSummary returns the first relevant child and a count
+		// capped at two. Every downstream question distinguishes only zero, one,
+		// or multiple children, so retaining a slice would allocate for each
+		// visited fragment with children without carrying extra information.
+		nonPaddingChildSummary := func(node *ast.Node) (int, *ast.Node) {
 			children := reactutil.GetJsxChildren(node)
-			kept := make([]*ast.Node, 0, len(children))
+			var first *ast.Node
+			count := 0
 			for _, child := range children {
-				if !isPaddingSpaces(child) {
-					kept = append(kept, child)
+				if isPaddingSpaces(child) {
+					continue
+				}
+				if count == 0 {
+					first = child
+				}
+				count++
+				if count == 2 {
+					break
 				}
 			}
-			return kept
-		}
-
-		hasLessThanTwoChildren := func(node *ast.Node) bool {
-			kept := nonPaddingChildren(node)
-			if len(kept) >= 2 {
-				return false
-			}
-			var first *ast.Node
-			if len(kept) == 1 {
-				first = kept[0]
-			}
-			return !containsCallExpression(first)
-		}
-
-		isFragmentWithSingleExpression := func(node *ast.Node) bool {
-			kept := nonPaddingChildren(node)
-			return len(kept) == 1 && isExpressionContainer(kept[0])
+			return count, first
 		}
 
 		isChildOfHtmlElement := func(node *ast.Node) bool {
@@ -84,10 +79,20 @@ var JsxNoUselessFragmentRule = rule.Rule{
 				return false
 			}
 			tagName := reactutil.GetJsxTagName(parent.AsJsxElement().OpeningElement)
-			if tagName == nil || tagName.Kind != ast.KindIdentifier {
+			if tagName == nil {
 				return false
 			}
-			return isAllLowercaseLetters(tagName.AsIdentifier().Text)
+			var name string
+			switch tagName.Kind {
+			case ast.KindIdentifier:
+				name = tagName.AsIdentifier().Text
+			case ast.KindThisKeyword:
+				// ESTree represents the legal `<this>` tag as JSXIdentifier("this").
+				name = "this"
+			default:
+				return false
+			}
+			return isAllLowercaseLetters(name)
 		}
 
 		isChildOfComponentElement := func(node *ast.Node) bool {
@@ -184,8 +189,12 @@ var JsxNoUselessFragmentRule = rule.Rule{
 				return
 			}
 
-			allowedSingleExpression := allowExpressions && isFragmentWithSingleExpression(node)
-			if hasLessThanTwoChildren(node) &&
+			nonPaddingChildCount, firstNonPaddingChild := nonPaddingChildSummary(node)
+			allowedSingleExpression := allowExpressions &&
+				nonPaddingChildCount == 1 &&
+				isExpressionContainer(firstNonPaddingChild)
+			if nonPaddingChildCount < 2 &&
+				!containsCallExpression(firstNonPaddingChild) &&
 				!isFragmentWithOnlyTextAndIsNotChild(node) &&
 				!allowedSingleExpression {
 				ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{
