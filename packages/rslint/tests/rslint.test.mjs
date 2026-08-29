@@ -2004,6 +2004,30 @@ module.exports = config;`
     }
   });
 
+  test('low-level --api accepts a JSON config payload', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-config-'));
+    const filePath = path.join(tmp, 'api-json-config.ts');
+    // A malformed legacy file beside the request must be irrelevant: `config`
+    // is a JSON wire payload, not a request to discover or read a JSON file.
+    await writeFile(path.join(tmp, 'rslint.json'), '{ not valid JSON');
+    try {
+      const response = await lint({
+        config: [{ rules: { 'no-debugger': 'error' } }],
+        configDirectory: tmp,
+        workingDirectory: tmp,
+        files: [filePath],
+        fileContents: { [filePath]: 'debugger;\n' },
+      });
+
+      expect(response.errorCount).toBe(1);
+      expect(response.ruleCount).toBe(1);
+      expect(response.diagnostics).toHaveLength(1);
+      expect(response.diagnostics[0].ruleName).toBe('no-debugger');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   test('cross-layer oracle: low-level lint() and Rslint.lintText agree field-by-field', async () => {
     const code = 'let a: Array<string> = [];';
     const cfg = [
