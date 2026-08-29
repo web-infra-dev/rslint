@@ -53,7 +53,7 @@ export default defineConfig([
 With this config, a `rslint.config.ts` inside `e2e/` or any `fixtures/` directory is not used by a root directory traversal. An explicitly named file is still resolved from its nearest config.
 
 :::tip
-Only **global ignore entries** (entries containing only `ignores`) block directory target discovery. Entry-level ignores do not affect config discovery. See [`ignores`](/config/ignoring-files) for the distinction.
+Only **global ignore entries** (entries containing `ignores` plus optional `name` or `basePath`, with no configuration fields) block directory target discovery. Entry-level ignores do not affect config discovery. See [`ignores`](/config/ignoring-files) for the distinction.
 :::
 
 You can specify a config file explicitly, which overrides automatic discovery:
@@ -62,7 +62,39 @@ You can specify a config file explicitly, which overrides automatic discovery:
 rslint --config path/to/rslint.config.ts .
 ```
 
-Relative `files`, `ignores`, and `languageOptions.parserOptions.project` patterns are resolved from the config file's directory, whether the config is discovered automatically or supplied with `--config`.
+## Path resolution and `basePath`
+
+`basePath` is a directory path, not a glob. It scopes one flat-config entry to that directory. The entry's `files`, `ignores`, and explicit `languageOptions.parserOptions.project` paths resolve from the resulting directory. It changes only that starting directory; `files` and `ignores` keep exactly the same glob syntax and matching behavior as entries without `basePath`.
+
+```ts
+{
+  basePath: 'packages/app',
+  files: ['src/**/*.ts'],
+  ignores: ['src/generated/**'],
+  languageOptions: {
+    parserOptions: { project: ['./tsconfig.json'] },
+  },
+}
+```
+
+The base used to resolve `basePath` depends on how the config was selected:
+
+| Config entry source                                                | `basePath` resolves from    | Relative paths when `basePath` is absent           |
+| ------------------------------------------------------------------ | --------------------------- | -------------------------------------------------- |
+| Automatically discovered config module                             | Config module directory     | Config module directory                            |
+| Explicit `--config`, API `overrideConfigFile`, or fixed LSP config | Invocation/workspace cwd    | Config module directory (existing Rslint behavior) |
+| API inline `overrideConfig` in automatic-discovery mode            | Discovered config directory | API `cwd`                                          |
+| API inline `overrideConfig` with an explicit config or no config   | API `cwd`                   | API `cwd`                                          |
+
+An inline override therefore uses the discovered module directory for
+`basePath` in automatic mode, and API `cwd` with an explicit config or
+`overrideConfigFile: true`. This is how ESLint appends `overrideConfig` to the
+selected ConfigArray. Relative fields in an inline entry without `basePath`
+keep Rslint's existing API-`cwd` behavior.
+
+The explicit-config rule matches ESLint: if `/project` invokes `--config /configs/rslint.config.ts`, then `basePath: 'app'` means `/project/app`, not `/configs/app`. An empty string is valid and still scopes the entry. Invalid values are rejected when the config loads, even if the entry matches no target.
+
+`basePath` does not change the config owner, scan root, or `.gitignore` collection root. See [`.gitignore` integration](/config/ignoring-files#gitignore-integration).
 
 To generate a default config, run:
 
@@ -103,7 +135,7 @@ See the [Configuration overview](/config/) for every available option and [Rules
 
 When multiple config entries match a file, they are merged in array order:
 
-1. **Global ignores** — entries containing only `ignores` remove files from the target set
+1. **Global ignores** — entries containing `ignores` plus optional `name` or `basePath`, with no configuration fields, remove files from the target set
 2. **Selector union** — the implicit default baseline and effective explicit `files` entries decide whether the config selects the file
 3. **Files matching** — entries whose explicit `files` patterns don't match are skipped; entries without `files` cascade across the selector union
 4. **Entry-level ignores** — matching entries do not select or configure the file, but cannot remove a target selected elsewhere

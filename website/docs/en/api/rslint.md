@@ -46,15 +46,17 @@ Both `lintFiles` and `lintText` return ESLint-shaped `LintResult[]` values.
 const rslint = new Rslint(options);
 ```
 
-| Option               | Type                                        | Default         | Description                                                                                                                                                       |
-| -------------------- | ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cwd`                | `string`                                    | `process.cwd()` | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                                       |
-| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —               | Extra config appended after the selected config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`                                         |
-| `overrideConfigFile` | `string \| true \| null`                    | `null`          | A JS/TS config module path disables discovery and uses its own directory as its config path base; `true` uses only the override; otherwise configs are discovered |
-| `fix`                | `boolean`                                   | `false`         | Applies auto-fixes and includes changed source in `result.output`                                                                                                 |
-| `virtualFiles`       | `Record<string, string>`                    | —               | In-memory path-to-content overlay for project inputs; unresolved reads may still fall back to disk                                                                |
+| Option               | Type                                        | Default         | Description                                                                                                                                                                      |
+| -------------------- | ------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                | `string`                                    | `process.cwd()` | Working directory for targets and discovery; also the authored base of relative fields in inline entries without `basePath`                                                      |
+| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —               | Extra config appended after the selected config; `basePath` inherits the selected ConfigArray base, while entries without it retain Rslint's existing `cwd`-relative behavior    |
+| `overrideConfigFile` | `string \| true \| null`                    | `null`          | A module path disables discovery. Its `basePath` resolves from `cwd`; entries without `basePath` retain Rslint's module-directory behavior. `true` uses only the inline override |
+| `fix`                | `boolean`                                   | `false`         | Applies auto-fixes and includes changed source in `result.output`                                                                                                                |
+| `virtualFiles`       | `Record<string, string>`                    | —               | In-memory path-to-content overlay for project inputs; unresolved reads may still fall back to disk                                                                               |
 
 With automatic discovery, Go selects each file's nearest config and owns ignore and target-admission semantics. The JavaScript host evaluates and normalizes the JS or TS config modules selected for that run.
+
+See [Path resolution and `basePath`](/config/configuration-file#path-resolution-and-basepath) for automatic, explicit-file, and inline-override behavior.
 
 :::warning
 Object-form community plugins are not supported in `overrideConfig`, because a plugin worker cannot re-import an in-memory plugin object. Put community plugin declarations in a JS or TS config file. Array-form built-in plugins work in `overrideConfig`.
@@ -139,7 +141,7 @@ const [result] = await rslint.lintText(
 
 `virtualFiles` is an overlay, not a filesystem sandbox. Rslint can still read from disk for `.gitignore`, module resolution, and files absent from the map.
 
-Use relative `virtualFiles` keys and relative paths inside the tsconfig and `parserOptions.project`; they are resolved against `cwd` consistently across operating systems. Prefer an explicit tsconfig `files` list because a broad `include` glob is expanded against the real filesystem.
+Use relative paths for portability. `virtualFiles` keys always resolve against `cwd`; `parserOptions.project` resolves from the config entry's effective base; paths inside a tsconfig resolve from that tsconfig's directory. In the override-only example above all three directories are `cwd`. Prefer an explicit tsconfig `files` list because a broad `include` glob is expanded against the real filesystem from the tsconfig's directory.
 
 TypeScript project data is only necessary for rules that require type information. A configuration containing only syntax-based rules does not need a tsconfig or `parserOptions.project`.
 

@@ -82,7 +82,7 @@ export function normalizeOutput(output: string, tempDir: string): string {
     '<TEMPDIR>',
   );
   result = result.replace(
-    /in [\d.]+m?s using \d+ threads?/g,
+    /in (?:\d+h)?(?:\d+m)?[\d.]+(?:ms|s) using \d+ threads?/g,
     'in <TIME> using <N> thread(s)',
   );
   return result;

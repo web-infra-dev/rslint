@@ -45,7 +45,7 @@ class FakeResolver implements RuntimeCoreResolver {
       packageDirectory: `/core/${identity}`,
       version: identity,
       binaryPath: `/core/${identity}/rslint`,
-      protocolVersion: 2,
+      protocolVersion: 3,
     } as CoreInstallation;
     return {
       key: `${workspaceFolder.uri}\0${identity}`,

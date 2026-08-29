@@ -42,4 +42,4 @@ File selection is independent of a tsconfig's `include`. A file in tsconfig but 
 Selected files not covered by a tsconfig declared by their governing config automatically receive a reduced rule set: only rules that do not require type information run. To enable type-aware rules, add the file to one of that config's tsconfigs. See [`languageOptions.parserOptions.project`](/config/language-options#languageoptionsparseroptionsproject).
 :::
 
-Relative patterns in a config file are resolved from that file's directory. Relative patterns in the JavaScript API's inline `overrideConfig` are resolved from the API `cwd`.
+When an entry has `basePath`, its `files` patterns resolve from that directory and the whole entry is inactive outside it. Without `basePath`, config-module patterns keep Rslint's existing module-directory base, while API inline `overrideConfig` patterns use the API `cwd`. See [Path resolution and `basePath`](/config/configuration-file#path-resolution-and-basepath).

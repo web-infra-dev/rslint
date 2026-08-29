@@ -28,7 +28,9 @@ rslint --type-check .         # lint + type-check
 rslint --type-check-only .    # type-check only
 ```
 
-When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. Set `project: []` to disable that fallback explicitly. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
+When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. An explicit `project: []` disables that fallback for the governing config. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
+
+An entry's `basePath` becomes the anchor for its explicit project literals or globs. It does not move the implicit governing-directory `tsconfig.json` fallback or change Rslint's existing owner-wide project collection. Program-wide type checking still builds every explicit project declaration in the effective config catalog; `files`, `ignores`, `.gitignore`, and CLI target scope do not reduce that Program's TypeScript diagnostics.
 
 ## What gets type-checked
 

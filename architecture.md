@@ -685,6 +685,7 @@ Each entry in the config array supports:
 
 | Field             | Type                                       | Description                                                                          |
 | ----------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `basePath`        | `string`                                   | Entry-local base for selectors, ignores, and explicit TypeScript projects            |
 | `files`           | `(string \| string[])[]`                   | Non-empty selector list; top-level selectors are ORed and nested selectors are ANDed |
 | `ignores`         | `string[]`                                 | Glob patterns excluded by this entry                                                 |
 | `languageOptions` | `object`                                   | `ecmaVersion`, globals, and parser options such as project settings                  |
@@ -947,12 +948,20 @@ single `internal/linter` pipeline, not independently stateful services.
 
 An explicit JS/TS `--config` or API `overrideConfigFile` bypasses automatic
 candidate selection and loads the exact module. Its directory remains the
-authored base for relative config content, while the invocation cwd remains the
+config owner and the existing base for entries that omit `basePath`; the
+invocation cwd anchors an explicitly authored `basePath` and remains the
 implicit scan and response-path root. The exact config path is never gated by `.gitignore`;
 only after it loads does a fixed-owner frontier freeze the invocation-scoped
 Git projection used to filter lint targets. That frontier never probes or
 activates nested config candidates. Automatic candidates instead use Git
 directory reachability while selecting ownership.
+
+Config loading resolves each authored `basePath` into the entry's existing
+internal path-origin model. The existing files/ignores matcher and explicit
+project-path resolver consume that effective directory; target planning,
+program loading, and LSP do not interpret `basePath`. Automatic configs resolve
+it from the module directory, while an explicitly selected config resolves it
+from the invocation cwd. `.gitignore` collection roots remain unchanged.
 
 No-candidate behavior is surface-specific. CLI reports that no rslint config
 was found and points to `rslint --init`. Native API discovery performs no
@@ -973,7 +982,7 @@ file lookup. The only disk JSONC parser for rslint configuration belongs to the
 
 Config merging follows flat-config-style semantics in `GetConfigForFile()`:
 
-1. entries containing only `ignores` and an optional `name` form the global-ignore set
+1. entries containing `ignores` plus optional `name` or `basePath`, and no configuration fields, form the global-ignore set
 2. the implicit default extension baseline plus effective explicit `files` selectors defines the config selector union; an entry's `ignores` prevents its selector from extending that union, top-level selectors are ORed, nested patterns are ANDed, and an explicit `files: []` is invalid
 3. entries without `files` cascade across that selector union, while entry-level `ignores` prevent only that entry from contributing configuration to an otherwise selected file
 4. later rule values override earlier values; a severity-only override retains earlier rule options
@@ -1010,17 +1019,12 @@ rules instead of independently reconstructing hierarchy on the Node side.
 
 Configuration meaning and invocation scope are separate inputs. For one
 invocation-wide config, `ConfigDirectory` is the config file's directory and is
-the authored base used by `files`, `ignores`, and `parserOptions.project`;
-`ScanRoot` is the invocation working directory used by implicit/no-argument
-target discovery and the default `.gitignore` collection scope. Supplying an external config therefore does not scan
-the config directory unless the user also targets it, and does not rebase the
-config's relative patterns onto the invocation cwd. A composed config entry may
-retain a different authored base (the native API's inline `overrideConfig` is
-the current case), so matching resolves every entry from its own origin before
-merging the matched shape, and project declarations resolve from that same
-origin before they reach the Program loader. Automatic config catalogs already
-encode one owner directory per config and do not use the invocation-wide
-`ScanRoot` to infer ownership.
+the authored base used by entries without `basePath`; `ScanRoot` is the
+invocation working directory used by implicit/no-argument target discovery and
+the default `.gitignore` collection scope. A composed config entry may retain a
+different authored base, and an entry with `basePath` receives its resolved
+effective base during config loading. Automatic config catalogs already encode
+one owner directory per config and do not use `ScanRoot` to infer ownership.
 
 `target.Request` is the lint-target boundary shared by CLI/API target
 selection. Explicit files and recursive directories form one union; omitted
@@ -1435,7 +1439,7 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 ### Integration Points
 
 - **Language Server**: `internal/lsp` exposes diagnostics and code actions
-- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
+- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.1.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 
