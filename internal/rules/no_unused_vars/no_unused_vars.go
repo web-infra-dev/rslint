@@ -1247,6 +1247,47 @@ func removeNodeRange(sourceFile *ast.SourceFile, node *ast.Node) rule.RuleFix {
 	return rule.RuleFixRemoveRange(utils.TrimNodeTextRange(sourceFile, node))
 }
 
+// isClosingBraceOfBlock mirrors ESLint's distinction between a closing brace
+// that ends a statement-level block (where ASI makes adjacency safe) and one
+// that ends an expression (where removing the declaration between it and the
+// next token could change the parse).
+func isClosingBraceOfBlock(sourceFile *ast.SourceFile, token utils.SourceToken) bool {
+	if sourceFile == nil || token.Kind != ast.KindCloseBraceToken {
+		return false
+	}
+
+	// GetNodeAtPosition normally returns the innermost construct owning the
+	// brace. Walk outward defensively, but consider only constructs ending at
+	// this exact brace so an enclosing block cannot make an object/function
+	// expression brace look safe.
+	for node := ast.GetNodeAtPosition(sourceFile, token.Start, false); node != nil; node = node.Parent {
+		if node.End() != token.End {
+			continue
+		}
+		switch node.Kind {
+		case ast.KindBlock:
+			return node.Parent != nil &&
+				node.Parent.Kind != ast.KindFunctionExpression && node.Parent.Kind != ast.KindArrowFunction
+		case ast.KindClassDeclaration, ast.KindSwitchStatement:
+			return true
+		case ast.KindClassExpression, ast.KindObjectLiteralExpression:
+			return false
+		}
+	}
+	return false
+}
+
+func isDeclarationNotSafeToRemove(
+	sourceFile *ast.SourceFile,
+	next utils.SourceToken,
+	previous utils.SourceToken,
+	hasPrevious bool,
+) bool {
+	return next.Kind == ast.KindStringLiteral ||
+		(hasPrevious && previous.Kind != ast.KindSemicolonToken && previous.Kind != ast.KindOpenBraceToken &&
+			!isClosingBraceOfBlock(sourceFile, previous))
+}
+
 func isSingleStatementBody(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
@@ -1299,6 +1340,15 @@ func fixVariableDeclaration(ctx rule.RuleContext, declaration *ast.Node, ac *ana
 	declarationRange := utils.TrimNodeTextRange(ctx.SourceFile, declaration)
 	if len(declarations) > 1 {
 		if before, ok := tokenBefore(ac.tokens, declarationRange.Pos(), 0); ok && before.Text == "," {
+			if declaration == declarations[len(declarations)-1] {
+				after, hasAfter := tokenAfter(ac.tokens, declarationRange.End(), 0)
+				if hasAfter && after.Kind != ast.KindSemicolonToken {
+					lastRemaining, hasLastRemaining := tokenBefore(ac.tokens, declarationRange.Pos(), 1)
+					if isDeclarationNotSafeToRemove(ctx.SourceFile, after, lastRemaining, hasLastRemaining) {
+						return rule.RuleFix{}, false
+					}
+				}
+			}
 			return rule.RuleFixRemoveRange(core.NewTextRange(before.Start, declarationRange.End())), true
 		}
 		if after, ok := tokenAfter(ac.tokens, declarationRange.End(), 0); ok && after.Text == "," {
@@ -1318,12 +1368,26 @@ func fixVariableDeclaration(ctx rule.RuleContext, declaration *ast.Node, ac *ana
 	next, hasNext := tokenAfter(ac.tokens, statementRange.End(), 0)
 	if hasNext {
 		previous, hasPrevious := tokenBefore(ac.tokens, statementRange.Pos(), 0)
-		if next.Kind == ast.KindStringLiteral ||
-			(hasPrevious && previous.Text != ";" && previous.Text != "{") {
+		if isDeclarationNotSafeToRemove(ctx.SourceFile, next, previous, hasPrevious) {
 			return rule.RuleFix{}, false
 		}
 	}
 	return rule.RuleFixRemoveRange(statementRange), true
+}
+
+func fixFunctionOrClassDeclaration(ctx rule.RuleContext, declaration *ast.Node, ac *analysisContext) (rule.RuleFix, bool) {
+	if declaration == nil {
+		return rule.RuleFix{}, false
+	}
+	ac.ensureTokens(ctx.SourceFile)
+	declarationRange := utils.TrimNodeTextRange(ctx.SourceFile, declaration)
+	if next, hasNext := tokenAfter(ac.tokens, declarationRange.End(), 0); hasNext {
+		previous, hasPrevious := tokenBefore(ac.tokens, declarationRange.Pos(), 0)
+		if isDeclarationNotSafeToRemove(ctx.SourceFile, next, previous, hasPrevious) {
+			return rule.RuleFix{}, false
+		}
+	}
+	return rule.RuleFixRemoveRange(declarationRange), true
 }
 
 func fixFunctionParameter(ctx rule.RuleContext, parameter *ast.Node, ac *analysisContext) (rule.RuleFix, bool) {
@@ -1531,10 +1595,10 @@ func getCoreRemoveSuggestion(ctx rule.RuleContext, nameNode *ast.Node, definitio
 			// itself as ESLint's removal range, not the whole declaration.
 			fix, ok = removeNodeRange(ctx.SourceFile, nameNode), true
 		} else {
-			fix, ok = removeNodeRange(ctx.SourceFile, definition), true
+			fix, ok = fixFunctionOrClassDeclaration(ctx, definition, ac)
 		}
 	case ast.KindClassDeclaration:
-		fix, ok = removeNodeRange(ctx.SourceFile, definition), true
+		fix, ok = fixFunctionOrClassDeclaration(ctx, definition, ac)
 	case ast.KindTypeParameter, ast.KindEnumMember:
 		ac.ensureTokens(ctx.SourceFile)
 		fix, ok = fixCommaSeparatedName(ctx, nameNode, ac), true

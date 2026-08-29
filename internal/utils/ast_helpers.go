@@ -404,6 +404,9 @@ func IsJSDocTypeCastWrapper(node *ast.Node) bool {
 func ESTreeRuntimeExpression(node *ast.Node) *ast.Node {
 	for node != nil {
 		node = ast.SkipParentheses(node)
+		if node.Kind != ast.KindAsExpression && node.Kind != ast.KindSatisfiesExpression {
+			return node
+		}
 		expression := JSDocTypeCastExpression(node)
 		if expression == nil {
 			return node
@@ -420,11 +423,20 @@ func ESTreeParent(node *ast.Node) *ast.Node {
 		return nil
 	}
 	parent := node.Parent
-	for parent != nil &&
-		(parent.Kind == ast.KindParenthesizedExpression || IsJSDocTypeCastWrapper(parent)) {
-		parent = parent.Parent
+	for parent != nil {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			parent = parent.Parent
+		case ast.KindAsExpression, ast.KindSatisfiesExpression:
+			if !IsJSDocTypeCastWrapper(parent) {
+				return parent
+			}
+			parent = parent.Parent
+		default:
+			return parent
+		}
 	}
-	return parent
+	return nil
 }
 
 // ESTreeParameters returns only parameters authored in source. tsgo prepends

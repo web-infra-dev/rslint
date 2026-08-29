@@ -482,23 +482,20 @@ func needsPrecedingSemicolonAfterIdentifierOrKeyword(prevKind ast.Kind, prevNode
 // ever adding a redundant character rather than producing wrong output.
 func NeedsPrecedingSemicolon(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	nodeStart := TrimNodeTextRange(sourceFile, node).Pos()
-
-	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
-	prevKind := ast.KindUnknown
-	prevStart := -1
-	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < nodeStart {
-		prevKind = scan.Token()
-		prevStart = scan.TokenStart()
-		scan.Scan()
-	}
-	if prevKind == ast.KindUnknown || scan.TokenStart() != nodeStart || !scan.HasPrecedingLineBreak() {
+	current, ok := TokenAtOrAfter(sourceFile, nodeStart)
+	if !ok || current.Start != nodeStart {
 		return false
 	}
+	previous, ok := TokenBeforePosition(sourceFile, nodeStart)
+	if !ok || !ecmascript.ContainsLineTerminator(sourceFile.Text(), previous.End, nodeStart) {
+		return false
+	}
+	prevKind := previous.Kind
 	if needsPrecedingSemicolonExemptPunctuator(prevKind) {
 		return false
 	}
 
-	prevNode := ast.GetNodeAtPosition(sourceFile, prevStart, false)
+	prevNode := ast.GetNodeAtPosition(sourceFile, previous.Start, false)
 	if prevNode == nil {
 		return true
 	}
@@ -689,9 +686,10 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 		return strings.Join(append(tokens, "method", "'constructor'"), " ")
 	}
 
-	// ESTree does not expose parentheses as nodes, so a function value wrapped
-	// only in parentheses still has the surrounding property as its parent.
-	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	// ESTree exposes neither parentheses nor wrappers synthesized from JSDoc
+	// casts, so a function wrapped only in those nodes still has the surrounding
+	// property as its parent.
+	parent := ESTreeParent(node)
 	if parent == nil {
 		return "function"
 	}
@@ -807,7 +805,8 @@ func isCoreClassFieldInitializer(node *ast.Node, parent *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
 		initializer := parent.AsPropertyDeclaration().Initializer
-		return initializer != nil && ast.SkipParentheses(initializer) == node
+		return initializer != nil &&
+			(initializer == node || ESTreeRuntimeExpression(initializer) == node)
 	}
 	return false
 }
@@ -1701,7 +1700,7 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 		case ast.KindFalseKeyword:
 			return "false", true
 		case ast.KindRegularExpressionLiteral:
-			return expr.AsRegularExpressionLiteral().Text, true
+			return RegExpLiteralStringValue(expr.AsRegularExpressionLiteral().Text), true
 		}
 		return "", false
 	default:
@@ -1795,10 +1794,11 @@ func radixDigitValue(ch byte) int {
 // behavior. For example, "0x1" -> "1", "1.0" -> "1", "1e2" -> "100",
 // "1e-7" -> "1e-7", and "1e21" -> "1e+21".
 func NormalizeNumericLiteral(text string) string {
-	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
-	// Use big.Int to handle arbitrary precision, then convert to float64
-	// to match JavaScript's String(Number(...)) behavior.
-	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
+	// ParseFloat doesn't handle JS hex (0x), octal (0o) or binary (0b)
+	// prefixes — it only reads hexadecimal floats, which require a `p`
+	// exponent. Use big.Int to handle arbitrary precision, then convert to
+	// float64 to match JavaScript's String(Number(...)) behavior.
+	if len(text) > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X' || text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
 		if n, ok := new(big.Int).SetString(text, 0); ok {
 			f, _ := new(big.Float).SetInt(n).Float64()
 			return ecmascript.NumberToString(f)
@@ -1845,8 +1845,8 @@ func NormalizeBigIntLiteral(text string) string {
 //     recovering explicit-radix source tokens when needed for exact JavaScript
 //     rounding above 2^53
 //   - NoSubstitutionTemplateLiteral: returns the template text
-//   - RegularExpressionLiteral: returns the source text (e.g. /foo/g),
-//     matching JavaScript's implicit toString coercion when used as a property key
+//   - RegularExpressionLiteral: returns RegExp.prototype.toString's canonical
+//     value (e.g. /foo/mi becomes /foo/im) for property-key coercion
 //   - NullKeyword / TrueKeyword / FalseKeyword: return "null" / "true" / "false"
 //   - BigIntLiteral: returns the normalized decimal string (e.g. "1n" → "1")
 //
@@ -1866,7 +1866,7 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindRegularExpressionLiteral:
-		return node.AsRegularExpressionLiteral().Text, true
+		return RegExpLiteralStringValue(node.AsRegularExpressionLiteral().Text), true
 	case ast.KindNullKeyword:
 		return "null", true
 	case ast.KindTrueKeyword:
@@ -2001,7 +2001,9 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 	case ast.KindStringLiteral:
 		return left.AsStringLiteral().Text == right.AsStringLiteral().Text
 	case ast.KindNumericLiteral:
-		return NormalizeNumericLiteral(left.AsNumericLiteral().Text) == NormalizeNumericLiteral(right.AsNumericLiteral().Text)
+		leftValue, leftOK := GetStaticExpressionValue(left)
+		rightValue, rightOK := GetStaticExpressionValue(right)
+		return leftOK && rightOK && leftValue == rightValue
 	case ast.KindBigIntLiteral:
 		return NormalizeBigIntLiteral(left.AsBigIntLiteral().Text) == NormalizeBigIntLiteral(right.AsBigIntLiteral().Text)
 	case ast.KindRegularExpressionLiteral:
@@ -2014,11 +2016,17 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 // (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
 // Element access arguments are unwrapped through parentheses and TS assertions
 // because ESTree-based helpers treat those wrappers as transparent.
+//
+// A private name has no static name: ESLint's getStaticPropertyName accepts a
+// dotted key only when it is an `Identifier`, and ESTree gives `#x` its own
+// `PrivateIdentifier` type, so upstream falls through to its string-value
+// branch and answers null. That keeps `obj.#x` and `obj['#x']` in separate
+// equivalence classes, as the language does.
 func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
-		if name != nil {
+		if name != nil && name.Kind != ast.KindPrivateIdentifier {
 			return name.Text(), true
 		}
 	case ast.KindElementAccessExpression:

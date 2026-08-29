@@ -1,0 +1,4808 @@
+// Rstest Snapshot v1
+
+exports[`logical-assignment-operators > invalid 1`] = `
+{
+  "code": "a = a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 2`] = `
+{
+  "code": "a = a && b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (&&=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 3`] = `
+{
+  "code": "a = a ?? b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 4`] = `
+{
+  "code": "foo = foo || bar",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 5`] = `
+{
+  "code": "a = a || fn()",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 6`] = `
+{
+  "code": "a = a || b && c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 7`] = `
+{
+  "code": "a = a || (b || c)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 8`] = `
+{
+  "code": "a = a || (b ? c : d)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 9`] = `
+{
+  "code": "/* before */ a = a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 10`] = `
+{
+  "code": "a = a || b // after",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 11`] = `
+{
+  "code": "a /* between */ = a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 12`] = `
+{
+  "code": "a = /** @type */ a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 13`] = `
+{
+  "code": "a = a || /* between */ b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 14`] = `
+{
+  "code": "(a) = a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 15`] = `
+{
+  "code": "a = (a) || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 16`] = `
+{
+  "code": "a = a || (b)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 17`] = `
+{
+  "code": "a = a || ((b))",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 18`] = `
+{
+  "code": "(a = a || b)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 19`] = `
+{
+  "code": "a = a || (f(), b)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 20`] = `
+{
+  "code": "a.b = a.b ?? c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 21`] = `
+{
+  "code": "a.b.c = a.b.c ?? d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 22`] = `
+{
+  "code": "a[b] = a[b] ?? c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 23`] = `
+{
+  "code": "a['b'] = a['b'] ?? c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 24`] = `
+{
+  "code": "a.b = a['b'] ?? c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 25`] = `
+{
+  "code": "a['b'] = a.b ?? c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 26`] = `
+{
+  "code": "this.prop = this.prop ?? {}",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 27`] = `
+{
+  "code": "with (object) a = a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 28`] = `
+{
+  "code": "with (object) { a = a || b }",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 29`] = `
+{
+  "code": "with (object) { if (condition) a = a || b }",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 30`] = `
+{
+  "code": "with (a = a || b) {}",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 31`] = `
+{
+  "code": "with (object) {} a = a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 32`] = `
+{
+  "code": "a = a || b; with (object) {}",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 33`] = `
+{
+  "code": "if (condition) a = a || b",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 34`] = `
+{
+  "code": "with (object) {
+  "use strict";
+   a = a || b
+}",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 35`] = `
+{
+  "code": "fn(a = a || b)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 36`] = `
+{
+  "code": "fn((a = a || b))",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 37`] = `
+{
+  "code": "(a = a || b) ? c : d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 38`] = `
+{
+  "code": "a = b = b || c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 39`] = `
+{
+  "code": "a || (a = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 40`] = `
+{
+  "code": "a && (a = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (&&=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 41`] = `
+{
+  "code": "a ?? (a = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (??=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 42`] = `
+{
+  "code": "foo ?? (foo = bar)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (??=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 43`] = `
+{
+  "code": "a || (a = 0)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 44`] = `
+{
+  "code": "a || (a = fn())",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 45`] = `
+{
+  "code": "a || (a = (b || c))",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 46`] = `
+{
+  "code": "(a) || (a = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 47`] = `
+{
+  "code": "a || ((a) = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 48`] = `
+{
+  "code": "a || (a = (b))",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 49`] = `
+{
+  "code": "a || ((a = b))",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 50`] = `
+{
+  "code": "a || (((a = b)))",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 51`] = `
+{
+  "code": "a || ( ( a = b ) )",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 52`] = `
+{
+  "code": "/* before */ a || (a = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 53`] = `
+{
+  "code": "a || (a = b) // after",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 54`] = `
+{
+  "code": "a /* between */ || (a = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 55`] = `
+{
+  "code": "a || /* between */ (a = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 56`] = `
+{
+  "code": "a.b || (a.b = c)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 57`] = `
+{
+  "code": "class Class { #prop; constructor() { this.#prop || (this.#prop = value) } }",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 58`] = `
+{
+  "code": "a['b'] || (a['b'] = c)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 59`] = `
+{
+  "code": "a[0] || (a[0] = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 60`] = `
+{
+  "code": "a[this] || (a[this] = b)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 61`] = `
+{
+  "code": "foo.bar || (foo.bar = baz)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 62`] = `
+{
+  "code": "a.b.c || (a.b.c = d)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 63`] = `
+{
+  "code": "a[b.c] || (a[b.c] = d)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 64`] = `
+{
+  "code": "a[b?.c] || (a[b?.c] = d)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 65`] = `
+{
+  "code": "with (object) a.b || (a.b = c)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 66`] = `
+{
+  "code": "a = a.b || (a.b = {})",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 67`] = `
+{
+  "code": "a || (a = 0) || b",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 68`] = `
+{
+  "code": "(a || (a = 0)) || b",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 69`] = `
+{
+  "code": "a || (b || (b = 0))",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 70`] = `
+{
+  "code": "a = b || (b = c)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 71`] = `
+{
+  "code": "a || (a = 0) ? b : c",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 72`] = `
+{
+  "code": "fn(a || (a = 0))",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 73`] = `
+{
+  "code": "if (a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 74`] = `
+{
+  "code": "if (Boolean(a)) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 75`] = `
+{
+  "code": "if (!!a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 76`] = `
+{
+  "code": "if (!a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ||=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 77`] = `
+{
+  "code": "if (!Boolean(a)) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ||=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 78`] = `
+{
+  "code": "if (a == undefined) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 79`] = `
+{
+  "code": "if (a == null) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 80`] = `
+{
+  "code": "if (a === null || a === undefined) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 81`] = `
+{
+  "code": "if (a === undefined || a === null) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 82`] = `
+{
+  "code": "if (a === null || a === void 0) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 83`] = `
+{
+  "code": "if (a === void 0 || a === null) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 84`] = `
+{
+  "code": "if (a) { a = b; }",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 85`] = `
+{
+  "code": "{ const undefined = 0; }
+if (a == undefined) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 86`] = `
+{
+  "code": "if (a == undefined) a = b
+{ const undefined = 0; }",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 87`] = `
+{
+  "code": "if (null == a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 88`] = `
+{
+  "code": "if (undefined == a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 89`] = `
+{
+  "code": "if (undefined === a || a === null) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 90`] = `
+{
+  "code": "if (a === undefined || null === a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 91`] = `
+{
+  "code": "if (undefined === a || null === a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 92`] = `
+{
+  "code": "if (null === a || a === undefined) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 93`] = `
+{
+  "code": "if (a === null || undefined === a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 94`] = `
+{
+  "code": "if (null === a || undefined === a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 95`] = `
+{
+  "code": "if ((a)) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 96`] = `
+{
+  "code": "if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 97`] = `
+{
+  "code": "if (a) a = (b)",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 98`] = `
+{
+  "code": "if (a) (a = b)",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 99`] = `
+{
+  "code": ";if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 100`] = `
+{
+  "code": "{ if (a) (a) = b }",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 101`] = `
+{
+  "code": "fn();if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 102`] = `
+{
+  "code": "fn()
+if (a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 103`] = `
+{
+  "code": "id
+if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 104`] = `
+{
+  "code": "object.prop
+if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 105`] = `
+{
+  "code": "object[computed]
+if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 106`] = `
+{
+  "code": "fn()
+if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 107`] = `
+{
+  "code": "if (a) a = b; fn();",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 108`] = `
+{
+  "code": "if (a) { a = b }",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 109`] = `
+{
+  "code": "if (a) { a = b; }
+fn();",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 110`] = `
+{
+  "code": "if (a) { a = b }
+fn();",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 111`] = `
+{
+  "code": "if (a) { a = b } fn();",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 112`] = `
+{
+  "code": "if (a) { a = b
+} fn();",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 113`] = `
+{
+  "code": "if (a) a  =  b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 114`] = `
+{
+  "code": "if (a)
+ a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 115`] = `
+{
+  "code": "if (a) {
+ a = b; 
+}",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 116`] = `
+{
+  "code": "/* before */ if (a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 117`] = `
+{
+  "code": "if (a) a = b /* after */",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 118`] = `
+{
+  "code": "if (a) /* between */ a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 119`] = `
+{
+  "code": "if (a) a = /* between */ b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 120`] = `
+{
+  "code": "if (a.b) a.b = c",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 121`] = `
+{
+  "code": "if (a[b]) a[b] = c",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 122`] = `
+{
+  "code": "if (a['b']) a['b'] = c",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 123`] = `
+{
+  "code": "if (this.prop) this.prop = value",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 124`] = `
+{
+  "code": "(class extends SuperClass { method() { if (super.prop) super.prop = value } })",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 125`] = `
+{
+  "code": "with (object) if (a) a = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 126`] = `
+{
+  "code": "if (a.b === undefined || a.b === null) a.b = c",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator ??=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 127`] = `
+{
+  "code": "if (a.b.c) a.b.c = d",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 128`] = `
+{
+  "code": "if (a.b.c.d) a.b.c.d = e",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 129`] = `
+{
+  "code": "if (a[b].c) a[b].c = d",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 130`] = `
+{
+  "code": "with (object) if (a.b) a.b = c",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 131`] = `
+{
+  "code": "if (unrelated) {} else if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 132`] = `
+{
+  "code": "if (a) {} else if (b) {} else if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 133`] = `
+{
+  "code": "if (unrelated) {} else
+if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 134`] = `
+{
+  "code": "if (unrelated) {
+}
+else if (a) {
+a = b;
+}",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 135`] = `
+{
+  "code": "if (unrelated) statement; else if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 136`] = `
+{
+  "code": "if (unrelated) id
+else if (a) (a) = b",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 137`] = `
+{
+  "code": "if (unrelated) {} else if (a) a = b; else if (c) c = d",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 138`] = `
+{
+  "code": "if (unrelated) { /* body */ } else if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 139`] = `
+{
+  "code": "if (unrelated) {} /* before else */ else if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 140`] = `
+{
+  "code": "if (unrelated) {} else // Line
+if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 141`] = `
+{
+  "code": "if (unrelated) {} else /* Block */ if (a) a = b;",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 142`] = `
+{
+  "code": "if (array) array = array.filter(predicate)",
+  "diagnostics": [
+    {
+      "message": "'if' statement can be replaced with a logical operator assignment with operator &&=.",
+      "messageId": "if",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 143`] = `
+{
+  "code": "a ||= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 144`] = `
+{
+  "code": "a &&= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (&&=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 145`] = `
+{
+  "code": "a ??= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (??=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 146`] = `
+{
+  "code": "foo ||= bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 147`] = `
+{
+  "code": "a.b ||= c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 148`] = `
+{
+  "code": "a[b] ||= c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 149`] = `
+{
+  "code": "a['b'] ||= c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 150`] = `
+{
+  "code": "this.prop ||= 0",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 151`] = `
+{
+  "code": "with (object) a ||= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 152`] = `
+{
+  "code": "(a) ||= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 153`] = `
+{
+  "code": "a ||= (b)",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 154`] = `
+{
+  "code": "(a ||= b)",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 155`] = `
+{
+  "code": "/* before */ a ||= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 156`] = `
+{
+  "code": "a ||= b // after",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 157`] = `
+{
+  "code": "a /* before */ ||= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 158`] = `
+{
+  "code": "a ||= /* after */ b",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 159`] = `
+{
+  "code": "a ||= b && c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 160`] = `
+{
+  "code": "a &&= b || c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (&&=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 161`] = `
+{
+  "code": "a ||= b || c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 162`] = `
+{
+  "code": "a &&= b && c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (&&=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 163`] = `
+{
+  "code": "a ??= b || c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (??=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 164`] = `
+{
+  "code": "a ??= b && c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (??=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 165`] = `
+{
+  "code": "a ??= b ?? c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (??=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 166`] = `
+{
+  "code": "a ??= (b || c)",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (??=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 167`] = `
+{
+  "code": "a ??= b + c",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (??=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 168`] = `
+{
+  "code": "a ||= b as number;",
+  "diagnostics": [
+    {
+      "message": "Unexpected logical operator assignment (||=) shorthand.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 169`] = `
+{
+  "code": "a.b.c || (a.b.c = d as number)",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 170`] = `
+{
+  "code": "a.b.c || (a.b.c = (d as number))",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 171`] = `
+{
+  "code": "(a.b.c || (a.b.c = d)) as number",
+  "diagnostics": [
+    {
+      "message": "Logical expression can be replaced with an assignment (||=).",
+      "messageId": "logical",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 172`] = `
+{
+  "code": "a = a || b || c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 173`] = `
+{
+  "code": "a = a && b && c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (&&=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 174`] = `
+{
+  "code": "a = a ?? b ?? c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 175`] = `
+{
+  "code": "a = a || b && c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 176`] = `
+{
+  "code": "a = a || b || c || d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 177`] = `
+{
+  "code": "a = a && b && c && d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (&&=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 178`] = `
+{
+  "code": "a = a ?? b ?? c ?? d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (??=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 179`] = `
+{
+  "code": "a = a || b || c && d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 180`] = `
+{
+  "code": "a = a || b && c || d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 181`] = `
+{
+  "code": "a = (a) || b || c",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 182`] = `
+{
+  "code": "a = a || (b || c) || d",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 183`] = `
+{
+  "code": "a = (a || b || c)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`logical-assignment-operators > invalid 184`] = `
+{
+  "code": "a = ((a) || (b || c) || d)",
+  "diagnostics": [
+    {
+      "message": "Assignment (=) can be replaced with operator assignment (||=).",
+      "messageId": "assignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "logical-assignment-operators",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

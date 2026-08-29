@@ -47,4 +47,4 @@ function foo() {}
 ## Original Documentation
 
 - [ESLint: no-empty](https://eslint.org/docs/latest/rules/no-empty)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-empty.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-empty.js)
