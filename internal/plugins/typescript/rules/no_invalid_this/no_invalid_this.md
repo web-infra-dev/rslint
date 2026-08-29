@@ -27,13 +27,6 @@ And this rule allows `this` keywords in functions below:
 
 Otherwise, this rule warns on `this` keywords. It also reports `this` at the top level.
 
-## Differences from ESLint
-
-Top-level `this` is always reported, independently of
-`languageOptions.sourceType`; setting it to `'script'` or `'commonjs'` does not
-change that behavior. The
-`parserOptions.ecmaFeatures.globalReturn` option is also not supported.
-
 Examples of **incorrect** code for this rule:
 
 ```typescript
@@ -196,6 +189,16 @@ class Foo {
   }
 }
 ```
+
+## Differences from ESLint
+
+The `parserOptions.ecmaFeatures.globalReturn` option is not supported.
+
+Unlike `@typescript-eslint/no-invalid-this` 8.67.0, rslint does not preserve
+the core rule's accessor-initializer validity frame after an initialized
+auto-accessor has finished. Upstream accidentally leaves that frame active and
+can suppress diagnostics in later code, such as the top-level `this` in
+`class C { accessor x = 1; } this;`; rslint reports the later `this` normally.
 
 ## When Not To Use It
 

@@ -251,43 +251,29 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 	if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
 		return false
 	}
-	parent := node.Parent
-	if parent == nil {
+	// GetAssignmentTarget follows only assignment-target edges. In particular,
+	// it crosses nested array/object patterns and rest elements, but stops at a
+	// computed key or at the right-hand side of another default. That is the
+	// same boundary ESTree uses when deciding whether this `=` is represented
+	// as an AssignmentPattern rather than an AssignmentExpression.
+	if node.Parent == nil {
 		return false
 	}
-	switch parent.Kind {
-	case ast.KindArrayLiteralExpression:
-		return isArrayOrObjectDestructuringAssignmentPattern(parent)
-	case ast.KindPropertyAssignment:
-		assignment := parent.AsPropertyAssignment()
-		return assignment != nil &&
-			assignment.Initializer == node &&
-			isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
-	case ast.KindSpreadElement:
-		return isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
-	}
-	return false
-}
-
-func isArrayOrObjectDestructuringAssignmentPattern(node *ast.Node) bool {
-	if node == nil || (node.Kind != ast.KindArrayLiteralExpression && node.Kind != ast.KindObjectLiteralExpression) {
+	target := ast.GetAssignmentTarget(node)
+	if target == nil {
 		return false
 	}
-	parent := node.Parent
-	if parent == nil {
+	if ast.IsDestructuringAssignment(target) {
+		return true
+	}
+	if !ast.IsForInOrOfStatement(target) {
 		return false
 	}
-	if parent.Kind == ast.KindBinaryExpression {
-		binary := parent.AsBinaryExpression()
-		return binary != nil && binary.OperatorToken != nil &&
-			binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Left == node
+	statement := target.AsForInOrOfStatement()
+	if statement == nil || statement.Initializer == nil {
+		return false
 	}
-	if parent.Kind == ast.KindForInStatement || parent.Kind == ast.KindForOfStatement {
-		statement := parent.AsForInOrOfStatement()
-		return statement != nil && statement.Initializer == node
-	}
-	if parent.Kind == ast.KindPropertyAssignment {
-		return isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
-	}
-	return isArrayOrObjectDestructuringAssignmentPattern(parent)
+	initializer := ast.SkipParentheses(statement.Initializer)
+	return initializer != nil &&
+		(initializer.Kind == ast.KindArrayLiteralExpression || initializer.Kind == ast.KindObjectLiteralExpression)
 }

@@ -60,8 +60,8 @@ export interface EslintPluginLintRequest {
     configKey?: string;
   }>;
   rules?: Record<string, { options?: readonly unknown[] }>;
-  /** Collect autofixes (driven by Go's `--fix`). */
-  fix?: boolean;
+  /** Materialize each diagnostic's autofix payload without applying it. */
+  collectFixes: boolean;
   suggestionsMode?: 'off' | 'eager';
   /** Collect per-rule execution times (driven by Go's `--timing`). */
   collectTiming?: boolean;
@@ -107,9 +107,7 @@ export function buildPluginLintTasks(
       { options: v.options ?? [], meta: undefined },
     ]),
   );
-  // `fix` is the wire-level name (mirrors Go's `EslintPluginLintRequest.Fix`);
-  // the worker's per-task field stays `collectFixes`.
-  const collectFixes = input.fix ?? false;
+  const { collectFixes } = input;
   const suggestionsMode: 'off' | 'eager' = input.suggestionsMode ?? 'off';
   const collectTiming = input.collectTiming ?? false;
 

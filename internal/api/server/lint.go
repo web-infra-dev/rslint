@@ -439,10 +439,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	demand := linter.ArtifactDemand{
 		Native:      rule.EditDemandAll,
+		Plugin:      rule.EditDemandAll,
 		LintedFiles: true,
-	}
-	if req.Fix {
-		demand.Plugin = rule.EditDemandAll
 	}
 	policy := linter.ObservationPolicy{
 		Demand:        demand,
