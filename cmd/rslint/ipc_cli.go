@@ -19,8 +19,8 @@
 // Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
 // wait `init` (or signal) → redirect stdout through `output` frames →
 // dispatch on intent (--help / --init / lint) → run the shared
-// handleLintCommand (using either a typed Go-discovered catalog or the
-// native JSON/JSONC loader) → drain output, send `shutdown`, exit.
+// handleLintCommand with a typed Go-discovered catalog → drain output, send
+// `shutdown`, exit.
 //
 // Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
 // disconnect, init/transport error) · 130 interrupted.
@@ -81,8 +81,8 @@ type initPayload struct {
 	Format           string   `json:"format,omitempty"`
 	FixMode          bool     `json:"fixMode,omitempty"`
 
-	// ConfigDiscovery asks Go to own JS/TS config discovery. It is ignored for
-	// help/init and disabled for the native JSON/JSONC configuration path.
+	// ConfigDiscovery asks Go to own config discovery. Every lint invocation
+	// supplies it; help and init intentionally bypass discovery.
 	ConfigDiscovery *configDiscoveryPayload `json:"configDiscovery,omitempty"`
 }
 
@@ -315,9 +315,14 @@ func runCLI(args []string) int {
 
 	// The host sends only discovery intent. Go scans the reachable staged
 	// frontier, asks Node to evaluate exact candidates, and converts the final
-	// catalog into the shared lint pipeline input. Help/init and an
-	// explicit JSON --config do not need the JavaScript module host.
-	if !help && !baseArgs.Init && payload.ConfigDiscovery != nil {
+	// catalog into the shared lint pipeline input. Every lint invocation uses
+	// this path; --init is the only configuration operation that bypasses it.
+	if !help && !baseArgs.Init {
+		if payload.ConfigDiscovery == nil {
+			fmt.Fprintln(os.Stderr, "error: CLI host did not provide config discovery intent")
+			_ = ch.Close()
+			return 2
+		}
 		if err := discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch); err != nil {
 			// Discovery now includes the potentially long Go walk and reverse
 			// Node loads. A signal can cancel either before the mirror goroutine
@@ -515,6 +520,9 @@ func discoverCLIConfigCatalog(
 		return err
 	}
 	printConfigDiscoveryFailures(catalog.Failures)
+	if !catalog.Explicit && len(catalog.Configs) == 0 {
+		return errors.New("no rslint config found; run `rslint --init` to create one")
+	}
 	args.ConfigCatalog = catalog
 	return nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -153,7 +154,9 @@ func TestHandleFixAllCodeAction_GitignoredFile(t *testing.T) {
 	s.cwd = dir
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	s.session = &project.Session{}
-	s.jsonConfig = config.RslintConfig{{Rules: config.Rules{"no-var": "error"}}}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		tspath.NormalizePath(dir): {{Rules: config.Rules{"no-var": "error"}}},
+	})
 	uri := documentURIFromPath(target)
 	s.documents[uri] = "var value = 1;\n"
 

@@ -19,6 +19,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 )
@@ -306,7 +307,7 @@ func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
 		"workingDirectory": dir,
 		"format":           "stylish",
 		"configDiscovery":  map[string]any{},
-	}, false)
+	}, nil, false)
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2; output=%q", code, output)
 	}
@@ -343,16 +344,17 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	}
 	writeFixture("tsconfig.json", `{"compilerOptions":{"strict":true},"include":["**/*.ts"]}`)
 	writeFixture("index.ts", "// @ts-ignore\nconst a = 1;\n")
-	writeFixture("rslint.json", `[{
-  "files": ["**/*.ts"],
-  "rules": {"@typescript-eslint/ban-ts-comment": "error"},
-  "plugins": ["@typescript-eslint"]
-}]`)
+	writeFixture("rslint.config.mjs", "export default [];\n")
 
 	code, text := runCLIInitForTest(t, map[string]any{
 		"workingDirectory": dir,
 		"runtime":          map[string]any{"stdoutIsTTY": tty},
-	}, true)
+		"configDiscovery":  map[string]any{},
+	}, config.RslintConfig{{
+		Files:   []string{"**/*.ts"},
+		Rules:   config.Rules{"@typescript-eslint/ban-ts-comment": "error"},
+		Plugins: []string{"@typescript-eslint"},
+	}}, true)
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1 (one lint error)", code)
 	}
@@ -383,8 +385,8 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 		t.Fatalf("write lint target: %v", err)
 	}
 	if err := os.WriteFile(
-		filepath.Join(realDir, "rslint.jsonc"),
-		[]byte("[{\n  // Resolve this config through both physical and alias cwd spellings.\n  \"files\": [\"**/*.ts\"],\n  \"rules\": {\"no-debugger\": \"error\"}\n}]\n"),
+		filepath.Join(realDir, "rslint.config.mjs"),
+		[]byte("export default [];\n"),
 		0o644,
 	); err != nil {
 		t.Fatalf("write lint config: %v", err)
@@ -405,7 +407,12 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			t.Setenv("NO_COLOR", "1")
 			code, text := runCLIInitForTest(t, map[string]any{
 				"workingDirectory": test.workingDirectory,
-			}, true)
+				"files":            []string{filepath.Join(test.workingDirectory, "index.ts")},
+				"configDiscovery":  map[string]any{},
+			}, config.RslintConfig{{
+				Files: []string{"**/*.ts"},
+				Rules: config.Rules{"no-debugger": "error"},
+			}}, true)
 			if code != 1 {
 				t.Fatalf("exit code = %d, want 1; output: %q", code, text)
 			}
@@ -450,7 +457,11 @@ type cliTestPeerResult struct {
 // here would be incorrect because its Go-side notification and request
 // handlers intentionally run in independent goroutines and may overtake one
 // another.
-func serveCLITestPeer(fromCLI io.Reader, toCLI io.Writer) cliTestPeerResult {
+func serveCLITestPeer(
+	fromCLI io.Reader,
+	toCLI io.Writer,
+	loadedConfig config.RslintConfig,
+) cliTestPeerResult {
 	reader := bufio.NewReader(fromCLI)
 	var output bytes.Buffer
 	result := cliTestPeerResult{}
@@ -509,6 +520,49 @@ func serveCLITestPeer(fromCLI io.Reader, toCLI io.Writer) cliTestPeerResult {
 			}
 			output.WriteString(notification.Text)
 
+		case msg.ID > 0 && msg.Kind == kindLoadConfigs:
+			var request discovery.ConfigLoadBatchRequest
+			if err := msg.Decode(&request); err != nil {
+				recordError(fmt.Errorf("decode loadConfigs request: %w", err))
+				continue
+			}
+			results := make([]discovery.ConfigLoadResult, len(request.Candidates))
+			for index, candidate := range request.Candidates {
+				results[index] = discovery.ConfigLoadResult{
+					ID:      candidate.ID,
+					Status:  "loaded",
+					Entries: loadedConfig,
+				}
+			}
+			response, err := ipc.NewMessage(ipc.KindResponse, msg.ID, discovery.ConfigLoadBatchResponse{
+				TransactionID: request.TransactionID,
+				Results:       results,
+			})
+			if err != nil {
+				recordError(fmt.Errorf("build loadConfigs response: %w", err))
+				continue
+			}
+			if err := ipc.WriteFrame(toCLI, response); err != nil {
+				recordError(fmt.Errorf("write loadConfigs response: %w", err))
+			}
+
+		case msg.ID > 0 && msg.Kind == kindActivateConfigs:
+			var request discovery.ConfigActivationRequest
+			if err := msg.Decode(&request); err != nil {
+				recordError(fmt.Errorf("decode activateConfigs request: %w", err))
+				continue
+			}
+			response, err := ipc.NewMessage(ipc.KindResponse, msg.ID, discovery.ConfigActivationResponse{
+				TransactionID: request.TransactionID,
+			})
+			if err != nil {
+				recordError(fmt.Errorf("build activateConfigs response: %w", err))
+				continue
+			}
+			if err := ipc.WriteFrame(toCLI, response); err != nil {
+				recordError(fmt.Errorf("write activateConfigs response: %w", err))
+			}
+
 		case msg.ID > 0 && msg.Kind == kindShutdown:
 			result.shutdownRequests++
 			if shutdownSeen {
@@ -546,7 +600,12 @@ func serveCLITestPeer(fromCLI io.Reader, toCLI io.Writer) cliTestPeerResult {
 	}
 }
 
-func runCLIInitForTest(t *testing.T, payload any, wantShutdown bool) (int, string) {
+func runCLIInitForTest(
+	t *testing.T,
+	payload any,
+	loadedConfig config.RslintConfig,
+	wantShutdown bool,
+) (int, string) {
 	t.Helper()
 
 	// runCLI binds its IPC channel to the os.Stdin/os.Stdout globals and
@@ -578,7 +637,7 @@ func runCLIInitForTest(t *testing.T, payload any, wantShutdown bool) (int, strin
 
 	peerDone := make(chan cliTestPeerResult, 1)
 	go func() {
-		peerDone <- serveCLITestPeer(stdoutR, stdinW)
+		peerDone <- serveCLITestPeer(stdoutR, stdinW, loadedConfig)
 	}()
 
 	codeCh := make(chan int, 1)

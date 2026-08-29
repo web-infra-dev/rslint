@@ -12,7 +12,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -61,44 +60,6 @@ func resolveStartTime(startTimeMs int64) time.Time {
 	return time.Now()
 }
 
-// loadGitignoreAndProjects overlaps two independent CLI preparation steps for
-// the single-config JSON path. Program construction itself belongs to the
-// loader; this small scheduling decision remains command orchestration.
-func loadGitignoreAndProjects(
-	config rslintconfig.RslintConfig,
-	configDirectory string,
-	gitignoreRoot string,
-	targetFiles []string,
-	targetDirectories []string,
-	singleThreaded bool,
-	session *loader.Session,
-) (rslintconfig.RslintConfig, loader.ProjectSet, error) {
-	var (
-		configWithIgnores rslintconfig.RslintConfig
-		projects          loader.ProjectSet
-		programErr        error
-	)
-	work := core.NewWorkGroup(singleThreaded)
-	work.Queue(func() {
-		configWithIgnores = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-			config,
-			configDirectory,
-			gitignoreRoot,
-			session.FS(),
-			targetFiles,
-			targetDirectories,
-		)
-	})
-	work.Queue(func() {
-		projects, programErr = session.BuildProject(configDirectory, config, singleThreaded)
-	})
-	work.RunAndWait()
-	if programErr != nil {
-		return config, loader.ProjectSet{}, programErr
-	}
-	return configWithIgnores, projects, nil
-}
-
 // handleLintCommand handles one CLI invocation: it prepares command-owned
 // config/targets/Programs, delegates lint execution to linter.RunPipeline, and
 // projects the result to the selected output format.
@@ -106,9 +67,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Unpack into locals so the command body below stays focused — only the
 	// flag-parse front matter lives in parseLintFlags.
 	init := args.Init
-	config := args.Config
 	configCatalog := args.ConfigCatalog
-	usesJSConfig := configCatalog != nil && (configCatalog.Explicit || len(configCatalog.Configs) > 0)
 	fix := args.Fix
 	typeCheck := args.TypeCheck
 	typeCheckOnly := args.TypeCheckOnly
@@ -198,6 +157,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 		return 0
 	}
+	if configCatalog == nil {
+		fmt.Fprintln(os.Stderr, "error: config discovery did not produce a catalog")
+		return 1
+	}
+	if !configCatalog.Explicit && len(configCatalog.Configs) == 0 {
+		fmt.Fprintln(os.Stderr, "error: no rslint config found; run `rslint --init` to create one")
+		return 1
+	}
 
 	// Only the production disk-backed CLI shares its initial source medium with
 	// the Node plugin host. Injected VFS implementations must send exact text.
@@ -214,16 +181,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	programSession := loader.NewSession(fs)
 	fs = programSession.FS()
 
-	var eslintPlugins []rslintconfig.EslintPluginEntry
-	if usesJSConfig {
-		eslintPlugins = configCatalog.EslintPlugins
-	}
+	eslintPlugins := configCatalog.EslintPlugins
 	ruleCatalog, shadowedPluginRules := rules.All().ForESLintPlugins(eslintPlugins)
 	reportShadowedPluginRules(shadowedPluginRules)
 	var rslintConfig rslintconfig.RslintConfig
 
-	// configMap holds per-directory configs for automatically discovered JS/TS
-	// configs. Explicit JS/TS and JSON/JSONC configs use rslintConfig instead.
+	// configMap holds per-directory configs for automatically discovered
+	// configs. An explicit config uses rslintConfig instead.
 	var configMap map[string]rslintconfig.RslintConfig
 
 	var configTargetScopes map[string]target.OwnerScope
@@ -234,68 +198,38 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	var projectSet loader.ProjectSet
 	buildAllPrograms := typeCheck || typeCheckOnly
 
-	if usesJSConfig {
-		configDirectories := configCatalog.ConfigDirectories()
-		if configCatalog.Explicit {
-			if len(configDirectories) != 1 {
-				fmt.Fprintf(os.Stderr, "error: explicit config catalog contains %d configs, want exactly one\n", len(configDirectories))
-				return 1
+	configDirectories := configCatalog.ConfigDirectories()
+	if configCatalog.Explicit {
+		if len(configDirectories) != 1 {
+			fmt.Fprintf(os.Stderr, "error: explicit config catalog contains %d configs, want exactly one\n", len(configDirectories))
+			return 1
+		}
+		currentDirectory = configDirectories[0]
+		rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
+		if buildAllPrograms {
+			projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	} else {
+		configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
+		configTargetScopes = make(map[string]target.OwnerScope, len(configCatalog.Scopes))
+		for _, configDir := range configDirectories {
+			configMap[configDir] = slices.Clone(configCatalog.Configs[configDir])
+			if scope, ok := configCatalog.Scopes[configDir]; ok {
+				scope.ExplicitFiles = slices.Clone(scope.ExplicitFiles)
+				configTargetScopes[configDir] = scope
 			}
-			currentDirectory = configDirectories[0]
-			rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
-			if buildAllPrograms {
-				projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-			}
+		}
+
+		if buildAllPrograms {
+			projectSet, err = programSession.BuildProjects(configMap, singleThreaded)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return 1
 			}
-		} else {
-			configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
-			configTargetScopes = make(map[string]target.OwnerScope, len(configCatalog.Scopes))
-			for _, configDir := range configDirectories {
-				configMap[configDir] = slices.Clone(configCatalog.Configs[configDir])
-				if scope, ok := configCatalog.Scopes[configDir]; ok {
-					scope.ExplicitFiles = slices.Clone(scope.ExplicitFiles)
-					configTargetScopes[configDir] = scope
-				}
-			}
-
-			if buildAllPrograms {
-				projectSet, err = programSession.BuildProjects(configMap, singleThreaded)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error: %v\n", err)
-					return 1
-				}
-			}
-		}
-	} else {
-		// Load configuration from file (JSON config path, isJSConfig stays false)
-		loader := rslintconfig.NewConfigLoader(fs, currentDirectory, rules.All())
-		rslintConfig, currentDirectory, err = loader.LoadRslintConfiguration(config)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
-		}
-		if typeCheckOnly {
-			projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-		} else if buildAllPrograms {
-			rslintConfig, projectSet, err = loadGitignoreAndProjects(
-				rslintConfig, currentDirectory, workingDirectory, allowFiles, allowDirs, singleThreaded, programSession,
-			)
-		} else {
-			rslintConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
-				rslintConfig,
-				currentDirectory,
-				workingDirectory,
-				fs,
-				allowFiles,
-				allowDirs,
-			)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
 		}
 	}
 
@@ -455,7 +389,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				Config:                              rslintConfig,
 				ConfigDirectory:                     currentDirectory,
 				Catalog:                             ruleCatalog,
-				EnforcePlugins:                      usesJSConfig,
 				TargetsBySourcePath:                 binding.LintTargetBySourcePath,
 				SourceMappingsIncludeCanonicalPaths: true,
 				PathSpaces:                          targetPlan.PathSpaces(),

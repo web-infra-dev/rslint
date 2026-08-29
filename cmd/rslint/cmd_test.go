@@ -788,12 +788,16 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 	}
 	write("index.ts", "export const value: number = 1;\n")
 	write("tsconfig.json", `{"files":["index.ts"]}`)
-	configPath := write("rslint.json", `[
-  {"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}}}
-]`)
+	configEntries := rslintconfig.RslintConfig{{
+		LanguageOptions: &rslintconfig.LanguageOptions{
+			ParserOptions: &rslintconfig.ParserOptions{
+				Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+			},
+		},
+	}}
 
 	code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
-		Config:         configPath,
+		ConfigCatalog:  explicitConfigCatalogForTest(directory, configEntries),
 		TypeCheck:      true,
 		TypeCheckOnly:  true,
 		Format:         "jsonline",
@@ -865,13 +869,6 @@ func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(
-		filepath.Join(dir, "rslint.json"),
-		[]byte(`[{"rules":{"no-debugger":"error"}}]`),
-		0o644,
-	); err != nil {
-		t.Fatal(err)
-	}
 	configDir := tspath.NormalizePath(dir)
 
 	t.Run("explicit empty export remains a JS config", func(t *testing.T) {
@@ -886,11 +883,11 @@ func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 			SingleThreaded: true,
 		})
 		if code != 0 || strings.Contains(stdout, "no-debugger") {
-			t.Fatalf("explicit empty JS config fell back to rslint.json: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			t.Fatalf("explicit empty config did not remain authoritative: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 		}
 	})
 
-	t.Run("empty automatic catalog uses JSON fallback", func(t *testing.T) {
+	t.Run("empty automatic catalog reports missing config", func(t *testing.T) {
 		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 			ConfigCatalog:  &discovery.ConfigCatalog{Configs: map[string]rslintconfig.RslintConfig{}},
 			AllowFiles:     []string{target},
@@ -898,12 +895,12 @@ func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 			NoColor:        true,
 			SingleThreaded: true,
 		})
-		if code != 1 || !strings.Contains(stdout, "no-debugger") {
-			t.Fatalf("empty automatic catalog did not use rslint.json: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		if code != 1 || stdout != "" || !strings.Contains(stderr, "no rslint config found") {
+			t.Fatalf("empty automatic catalog did not report missing config: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 		}
 	})
 
-	t.Run("malformed explicit catalog cannot fall back to JSON", func(t *testing.T) {
+	t.Run("malformed explicit catalog fails its invariant", func(t *testing.T) {
 		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 			ConfigCatalog:  &discovery.ConfigCatalog{Explicit: true},
 			AllowFiles:     []string{target},
@@ -980,7 +977,6 @@ func TestHandleLintCommandDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testi
 		}
 	}
 	for path, content := range map[string]string{
-		filepath.Join(dir, "rslint.jsonc"):            `[{"rules":{"no-debugger":"error"}}]`,
 		filepath.Join(dir, ".gitignore"):              "root.generated.js\n",
 		filepath.Join(selectedDir, ".gitignore"):      "local.generated.js\n",
 		filepath.Join(selectedDir, "index.js"):        "debugger;\n",
@@ -993,9 +989,17 @@ func TestHandleLintCommandDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testi
 		}
 	}
 	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
+	entries := rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		dir,
+		dir,
+		spy,
+		nil,
+		[]string{tspath.NormalizePath(selectedDir)},
+	)
 
 	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		Config:         filepath.Join(dir, "rslint.jsonc"),
+		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
 		FS:             spy,
 		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
 		Format:         "jsonline",
@@ -1008,12 +1012,12 @@ func TestHandleLintCommandDirectoryTargetSkipsUnrelatedGitignoreSubtree(t *testi
 	unrelatedDir = tspath.NormalizePath(unrelatedDir)
 	for _, accessed := range spy.accessedDirs {
 		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
-			t.Fatalf("JSON directory target entered unrelated directory %q", accessed)
+			t.Fatalf("directory target entered unrelated directory %q", accessed)
 		}
 	}
 }
 
-func TestHandleLintCommandExplicitJSONDirectoryTargetUsesInvocationCWD(t *testing.T) {
+func TestHandleLintCommandExplicitConfigDirectoryTargetUsesInvocationCWD(t *testing.T) {
 	repositoryRoot := t.TempDir()
 	cwd := filepath.Join(repositoryRoot, "packages", "app")
 	selectedDir := filepath.Join(cwd, "selected")
@@ -1024,9 +1028,6 @@ func TestHandleLintCommandExplicitJSONDirectoryTargetUsesInvocationCWD(t *testin
 		}
 	}
 	for path, content := range map[string]string{
-		filepath.Join(repositoryRoot, "rslint.jsonc"): `[{
-			"rules": {"no-debugger": "error"}
-		}]`,
 		filepath.Join(repositoryRoot, ".gitignore"): "packages/app/selected/index.js\n",
 		filepath.Join(cwd, ".gitignore"):            "cwd.generated.js\n",
 		filepath.Join(selectedDir, ".gitignore"):    "local.generated.js\n",
@@ -1039,9 +1040,17 @@ func TestHandleLintCommandExplicitJSONDirectoryTargetUsesInvocationCWD(t *testin
 		}
 	}
 	spy := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
+	entries := rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		repositoryRoot,
+		cwd,
+		spy,
+		nil,
+		[]string{tspath.NormalizePath(selectedDir)},
+	)
 
 	code, stdout, stderr := runLintCommandForTest(t, cwd, lintArgs{
-		Config:         filepath.Join(repositoryRoot, "rslint.jsonc"),
+		ConfigCatalog:  explicitConfigCatalogForTest(repositoryRoot, entries),
 		FS:             spy,
 		AllowDirs:      []string{tspath.NormalizePath(selectedDir)},
 		Format:         "jsonline",
@@ -1056,17 +1065,17 @@ func TestHandleLintCommandExplicitJSONDirectoryTargetUsesInvocationCWD(t *testin
 		tspath.NormalizePath(filepath.Join(selectedDir, ".gitignore")),
 	}
 	if !slices.Equal(spy.gitignoreReads, wantGitignoreReads) {
-		t.Fatalf("explicit JSON CWD-rooted Git reads = %v, want %v", spy.gitignoreReads, wantGitignoreReads)
+		t.Fatalf("explicit config CWD-rooted Git reads = %v, want %v", spy.gitignoreReads, wantGitignoreReads)
 	}
 	unrelatedDir = tspath.NormalizePath(unrelatedDir)
 	for _, accessed := range spy.accessedDirs {
 		if accessed == unrelatedDir || tspath.StartsWithDirectory(accessed, unrelatedDir, true) {
-			t.Fatalf("explicit JSON target entered unrelated directory %q", accessed)
+			t.Fatalf("explicit config target entered unrelated directory %q", accessed)
 		}
 	}
 }
 
-func TestHandleLintCommandExplicitJSONKeepsDirectoryGitScopesIndependent(t *testing.T) {
+func TestHandleLintCommandExplicitConfigKeepsDirectoryGitScopesIndependent(t *testing.T) {
 	root := t.TempDir()
 	invocationDir := filepath.Join(root, "invocation")
 	configDir := filepath.Join(root, "config")
@@ -1078,9 +1087,6 @@ func TestHandleLintCommandExplicitJSONKeepsDirectoryGitScopesIndependent(t *test
 		}
 	}
 	paths := map[string]string{
-		filepath.Join(configDir, "rslint.jsonc"): `[{
-			"rules": {"no-debugger": "error"}
-		}]`,
 		filepath.Join(firstDir, ".gitignore"):  "ignored.js\n",
 		filepath.Join(firstDir, "ignored.js"):  "debugger;\n",
 		filepath.Join(firstDir, "visible.js"):  "debugger;\n",
@@ -1094,16 +1100,25 @@ func TestHandleLintCommandExplicitJSONKeepsDirectoryGitScopesIndependent(t *test
 		}
 	}
 
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	entries := rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
+		rslintconfig.RslintConfig{{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		configDir,
+		invocationDir,
+		fsys,
+		nil,
+		[]string{tspath.NormalizePath(firstDir), tspath.NormalizePath(secondDir)},
+	)
 	code, stdout, stderr := runLintCommandForTest(t, invocationDir, lintArgs{
-		Config:         filepath.Join(configDir, "rslint.jsonc"),
-		FS:             bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		ConfigCatalog:  explicitConfigCatalogForTest(configDir, entries),
+		FS:             fsys,
 		AllowDirs:      []string{tspath.NormalizePath(firstDir), tspath.NormalizePath(secondDir)},
 		Format:         "jsonline",
 		NoColor:        true,
 		SingleThreaded: true,
 	})
 	if code != 1 {
-		t.Fatalf("multi-directory JSON lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		t.Fatalf("multi-directory lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	outputPath := func(path string) string {
 		relative, err := filepath.Rel(invocationDir, path)
@@ -1716,16 +1731,17 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 
 func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "rslint.json")
 	target := filepath.Join(dir, "ignored.ts")
-	if err := os.WriteFile(configPath, []byte(`[
-		{"ignores":["ignored.ts"]},
+	entries := rslintconfig.RslintConfig{
+		{Ignores: []string{"ignored.ts"}},
 		{
-			"languageOptions":{"parserOptions":{"project":["./missing.json"]}},
-			"rules":{"no-debugger":"error"}
-		}
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
+			LanguageOptions: &rslintconfig.LanguageOptions{
+				ParserOptions: &rslintconfig.ParserOptions{
+					Project: rslintconfig.ProjectPaths{"./missing.json"},
+				},
+			},
+			Rules: rslintconfig.Rules{"no-debugger": "error"},
+		},
 	}
 	// Deliberately malformed fixture: a global ignore removes it before Program
 	// creation and syntax diagnostics, rather than treating parse failure as an
@@ -1735,7 +1751,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 	}
 
 	code, _, stderr := runLintCommandForTest(t, dir, lintArgs{
-		Config:         configPath,
+		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
 		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
 		SingleThreaded: true,
@@ -1745,7 +1761,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 	}
 
 	code, _, stderr = runLintCommandForTest(t, dir, lintArgs{
-		Config:         configPath,
+		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
 		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
 		SingleThreaded: true,
@@ -1756,7 +1772,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 	}
 }
 
-func TestCLIExplicitJSONConfigNoArgsScopesToInvocationCWD(t *testing.T) {
+func TestCLIExplicitConfigNoArgsScopesToInvocationCWD(t *testing.T) {
 	root := t.TempDir()
 	configDir := filepath.Join(root, "config")
 	workspaceDir := filepath.Join(root, "workspace")
@@ -1771,12 +1787,14 @@ func TestCLIExplicitJSONConfigNoArgsScopesToInvocationCWD(t *testing.T) {
 			t.Fatalf("write %s: %v", name, err)
 		}
 	}
-	write(configDir, "rslint.jsonc", `[{ "files": ["../workspace/*.js"], "rules": { "no-debugger": "error" } }]`)
 	write(configDir, "config-only.js", "debugger;\n")
 	write(workspaceDir, "workspace.js", "debugger;\n")
 
 	code, stdout, stderr := runLintCommandForTest(t, workspaceDir, lintArgs{
-		Config:         "../config/rslint.jsonc",
+		ConfigCatalog: explicitConfigCatalogForTest(configDir, rslintconfig.RslintConfig{{
+			Files: []string{"../workspace/*.js"},
+			Rules: rslintconfig.Rules{"no-debugger": "error"},
+		}}),
 		Format:         "jsonline",
 		NoColor:        true,
 		SingleThreaded: true,
@@ -1798,10 +1816,6 @@ func TestCLIExplicitExternalConfigSkipsDefaultExcludedWorkingDirectory(t *testin
 	if err := os.MkdirAll(workingDirectory, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	configPath := filepath.Join(root, "rslint.jsonc")
-	if err := os.WriteFile(configPath, []byte(`[{"rules":{"no-debugger":"error"}}]`), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.WriteFile(filepath.Join(workingDirectory, "index.js"), []byte("debugger;\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -1815,7 +1829,9 @@ func TestCLIExplicitExternalConfigSkipsDefaultExcludedWorkingDirectory(t *testin
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			code, stdout, stderr := runLintCommandForTest(t, workingDirectory, lintArgs{
-				Config:         configPath,
+				ConfigCatalog: explicitConfigCatalogForTest(root, rslintconfig.RslintConfig{{
+					Rules: rslintconfig.Rules{"no-debugger": "error"},
+				}}),
 				AllowDirs:      test.allowDirs,
 				Format:         "jsonline",
 				NoColor:        true,
@@ -1830,18 +1846,16 @@ func TestCLIExplicitExternalConfigSkipsDefaultExcludedWorkingDirectory(t *testin
 
 func TestCLIExplicitFileOutsideFilesCountsWithNoRules(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
-		{ "files": ["**/*.ts"], "rules": { "no-debugger": "error" } }
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
 	explicit := tspath.NormalizePath(filepath.Join(dir, "explicit.js"))
 	if err := os.WriteFile(explicit, []byte("debugger;\n"), 0o644); err != nil {
 		t.Fatalf("write explicit file: %v", err)
 	}
 
 	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		Config:         "rslint.jsonc",
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			Files: []string{"**/*.ts"},
+			Rules: rslintconfig.Rules{"no-debugger": "error"},
+		}}),
 		Format:         "default",
 		NoColor:        true,
 		SingleThreaded: true,
@@ -1863,18 +1877,16 @@ func TestCLIExplicitFileOutsideFilesCountsWithNoRules(t *testing.T) {
 
 func TestCLIExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
-		{ "files": ["**/*.ts"], "rules": { "no-debugger": "error" } }
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
 	explicit := tspath.NormalizePath(filepath.Join(dir, "explicit.js"))
 	if err := os.WriteFile(explicit, []byte("debugger;\nconst = ;\n"), 0o644); err != nil {
 		t.Fatalf("write explicit file: %v", err)
 	}
 
 	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		Config:         "rslint.jsonc",
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			Files: []string{"**/*.ts"},
+			Rules: rslintconfig.Rules{"no-debugger": "error"},
+		}}),
 		Format:         "default",
 		NoColor:        true,
 		SingleThreaded: true,
@@ -1899,18 +1911,16 @@ func TestCLIExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.
 
 func TestCLIExplicitMalformedFileWithRuleOverlayReportsSyntaxDiagnostic(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
-		{ "files": ["**/*.ts"], "rules": {} }
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
 	explicit := tspath.NormalizePath(filepath.Join(dir, "explicit.js"))
 	if err := os.WriteFile(explicit, []byte("const = ;\n"), 0o644); err != nil {
 		t.Fatalf("write explicit file: %v", err)
 	}
 
 	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		Config:         "rslint.jsonc",
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			Files: []string{"**/*.ts"},
+			Rules: rslintconfig.Rules{},
+		}}),
 		Format:         "default",
 		NoColor:        true,
 		SingleThreaded: true,

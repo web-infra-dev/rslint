@@ -702,6 +702,21 @@ module.exports = config;`
     },
   );
 
+  test('overrideConfigFile rejects a legacy JSON config before loading it', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-json-config-'));
+    const configPath = path.join(tmp, 'rslint.jsonc');
+    await writeFile(configPath, '{ intentionally malformed legacy config');
+    const rslint = new Rslint({ cwd: tmp, overrideConfigFile: configPath });
+    try {
+      await expect(
+        rslint.lintText('debugger;\n', { filePath: 'test.ts' }),
+      ).rejects.toThrow(/JS\/TS config module/);
+    } finally {
+      await rslint.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   test('lintFiles returns one result per matched file, routed correctly', async () => {
     const { mkdtemp, writeFile, mkdir, rm } = await import('node:fs/promises');
     const os = await import('node:os');

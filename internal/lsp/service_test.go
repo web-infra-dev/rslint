@@ -80,33 +80,12 @@ func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) 
 			s.fs,
 			s.jsConfigOwnerIndex.PathSpaces(),
 			s.currentRuleCatalog(),
-			true,
 		)
 		if err != nil {
 			panic(err)
 		}
 		s.jsFileConfigResolvers[configDirectory] = resolver
 	}
-}
-
-func installJSONConfigForTest(s *Server, configDirectory string, entries config.RslintConfig) {
-	s.jsonConfig = entries
-	s.jsonConfigOwnerIndex = target.NewOwnerIndex(
-		map[string]config.RslintConfig{configDirectory: entries},
-		s.fs,
-	)
-	resolver, err := config.NewFileConfigResolverWithPathSpaces(
-		entries,
-		configDirectory,
-		s.fs,
-		s.jsonConfigOwnerIndex.PathSpaces(),
-		rules.All(),
-		false,
-	)
-	if err != nil {
-		panic(err)
-	}
-	s.jsonFileConfigResolver = resolver
 }
 
 func installRuleCatalogForTest(s *Server, configs ...config.RslintConfig) {
@@ -145,16 +124,11 @@ func configuredRulesForLSPTest(
 	entries config.RslintConfig,
 	target target.File,
 	configDirectory string,
-	enforcePlugins bool,
 	hasTypeInfo bool,
 ) []rule.ConfiguredRule {
-	ruleCatalog := rules.All()
-	if enforcePlugins {
-		testServer := newTestServer()
-		installRuleCatalogForTest(testServer, entries)
-		ruleCatalog = testServer.ruleCatalog
-	}
-	rules, _ := config.NewFileConfigResolver(entries, configDirectory, ruleCatalog, enforcePlugins).
+	testServer := newTestServer()
+	installRuleCatalogForTest(testServer, entries)
+	rules, _ := config.NewFileConfigResolver(entries, configDirectory, testServer.ruleCatalog).
 		EnabledRulesForTarget(target.Path, target.CanonicalPath)
 	if !hasTypeInfo {
 		return rule.FilterNonTypeAwareRules(rules)
@@ -167,15 +141,15 @@ func documentLintSnapshotForTest(
 	uri lsproto.DocumentUri,
 	entries config.RslintConfig,
 	configDirectory string,
-	usesJavaScriptConfig bool,
+	usesConfigCatalog bool,
 	typeScriptConfigPaths []string,
 ) documentLintSnapshot {
 	ruleCatalog := rules.All()
-	if usesJavaScriptConfig {
+	if usesConfigCatalog {
 		ruleCatalog = s.currentRuleCatalog()
 	}
 	target := lspConfigTarget(uriToPath(uri), configDirectory, s.fs)
-	return documentLintSnapshot{
+	snapshot := documentLintSnapshot{
 		target: target,
 		config: entries,
 		pathSpaces: config.NewPathSpaceSnapshot(
@@ -184,9 +158,12 @@ func documentLintSnapshotForTest(
 		),
 		ruleCatalog:           ruleCatalog,
 		typeScriptConfigPaths: typeScriptConfigPaths,
-		usesJavaScriptConfig:  usesJavaScriptConfig,
 		pluginGeneration:      s.eslintPluginConfigGeneration,
 	}
+	if usesConfigCatalog {
+		snapshot.configKey = target.ConfigDirectory
+	}
+	return snapshot
 }
 
 func documentURIFromPath(filePath string) lsproto.DocumentUri {
@@ -1144,48 +1121,8 @@ func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
 	}
 }
 
-func TestGetConfigForURI_FallbackToJSON(t *testing.T) {
+func TestGetConfigForURI_EmptyRootBoundaryProtectsWorkspaceFallback(t *testing.T) {
 	s := newTestServer()
-
-	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
-	s.jsonConfig = config.RslintConfig{jsonRule}
-
-	// No JS configs — should fall back to JSON config; cwd = s.cwd
-	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
-		t.Errorf("should fall back to JSON config, got %v", cfg)
-	}
-	if cwd != s.cwd {
-		t.Errorf("fallback cwd should be s.cwd %q, got %q", s.cwd, cwd)
-	}
-}
-
-func TestGetConfigForURI_JSConfigOverridesJSON(t *testing.T) {
-	s := newTestServer()
-
-	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
-	s.jsonConfig = config.RslintConfig{jsonRule}
-
-	jsRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
-	installJSConfigsForTest(s, map[string]config.RslintConfig{
-		"/project": {jsRule},
-	})
-
-	// JS config should take priority over JSON; cwd = JS config's dir
-	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
-		t.Errorf("JS config should override JSON, got %v", cfg)
-	}
-	if cwd != "/project" {
-		t.Errorf("JS config cwd should be /project, got %q", cwd)
-	}
-}
-
-func TestGetConfigForURI_EmptyRootBoundaryProtectsJSONFallback(t *testing.T) {
-	s := newTestServer()
-	s.jsonConfig = config.RslintConfig{{
-		Rules: map[string]any{"no-debugger": "error"},
-	}}
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/project": {},
 		"/project/packages/app": {{
@@ -1205,9 +1142,8 @@ func TestGetConfigForURI_EmptyRootBoundaryProtectsJSONFallback(t *testing.T) {
 	}
 
 	outsideCfg, outsideCwd, outsideIsJS := s.getConfigForURI("file:///other/src/index.ts")
-	if len(outsideCfg) != 1 || outsideCfg[0].Rules["no-debugger"] != "error" ||
-		outsideCwd != s.cwd || outsideIsJS {
-		t.Fatalf("file outside JS boundaries must retain JSON fallback: cfg=%v cwd=%q isJS=%v", outsideCfg, outsideCwd, outsideIsJS)
+	if len(outsideCfg) != 0 || outsideCwd != s.cwd || outsideIsJS {
+		t.Fatalf("file outside config boundaries must use empty workspace fallback: cfg=%v cwd=%q isCatalog=%v", outsideCfg, outsideCwd, outsideIsJS)
 	}
 }
 
@@ -1393,31 +1329,26 @@ func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
 	// File outside the config dir should fallback
 	cfg3, _, _ := s.getConfigForURI("file:///Users/John%20Doe/other%20project/src/file.ts")
 	if len(cfg3) != 0 {
-		t.Errorf("File outside config dir should fallback to empty JSON config, got %v", cfg3)
+		t.Errorf("File outside config dir should use the empty workspace fallback, got %v", cfg3)
 	}
 }
 
-func TestGetConfigForURI_IsJSConfig(t *testing.T) {
+func TestGetConfigForURI_ReportsCatalogOwnership(t *testing.T) {
 	s := newTestServer()
-
-	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
-	s.jsonConfig = config.RslintConfig{jsonRule}
 
 	jsRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/project": {jsRule},
 	})
 
-	// JS config should return isJSConfig=true
-	_, _, isJS := s.getConfigForURI("file:///project/src/index.ts")
-	if !isJS {
-		t.Error("Expected isJSConfig=true when JS config matches")
+	_, _, catalogOwned := s.getConfigForURI("file:///project/src/index.ts")
+	if !catalogOwned {
+		t.Error("expected catalog ownership when a discovered config matches")
 	}
 
-	// File outside JS config range falls back to JSON → isJSConfig=false
-	_, _, isJS = s.getConfigForURI("file:///other/src/index.ts")
-	if isJS {
-		t.Error("Expected isJSConfig=false when falling back to JSON config")
+	_, _, catalogOwned = s.getConfigForURI("file:///other/src/index.ts")
+	if catalogOwned {
+		t.Error("expected workspace fallback outside discovered config ownership")
 	}
 }
 
@@ -1539,9 +1470,6 @@ func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 	if entry, ok := s.tsConfigPathsByConfig["/project-b"]; !ok || entry != nil {
 		t.Errorf("expected project-b entry present and nil (no tsconfig), got present=%v value=%v", ok, entry)
 	}
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected JSON fallback tsConfigPaths nil in JS-config mode, got %v", s.tsConfigPaths)
-	}
 }
 
 func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
@@ -1628,72 +1556,15 @@ func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T
 	}
 }
 
-func TestTsConfigPathsForURI_JSONFallbackRemainsTypedWithNestedJSConfig(t *testing.T) {
-	s := newTestServer()
-	s.cwd = "/workspace"
-	s.rslintConfigPath = "/workspace/rslint.json"
-	s.fs = &mockFS{files: map[string]bool{
-		"/workspace/tsconfig.json":              true,
-		"/workspace/packages/app/tsconfig.json": true,
-	}}
-	s.jsonConfig = config.RslintConfig{{
-		LanguageOptions: &config.LanguageOptions{
-			ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
-		},
-	}}
-	installJSConfigsForTest(s, map[string]config.RslintConfig{
-		"/workspace/packages/app": {{
-			LanguageOptions: &config.LanguageOptions{
-				ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
-			},
-		}},
-	})
-
-	s.rebuildTsConfigPaths()
-
-	jsonPaths := s.tsConfigPathsForURI("file:///workspace/packages/lib/src/index.ts")
-	if len(jsonPaths) != 1 || jsonPaths[0] != "/workspace/tsconfig.json" {
-		t.Fatalf("expected JSON fallback tsconfig, got %v", jsonPaths)
-	}
-	jsPaths := s.tsConfigPathsForURI("file:///workspace/packages/app/src/index.ts")
-	if len(jsPaths) != 1 || jsPaths[0] != "/workspace/packages/app/tsconfig.json" {
-		t.Fatalf("expected nested JS config tsconfig, got %v", jsPaths)
-	}
-}
-
-func TestReloadJSONFallbackWhileJSConfigIsActive(t *testing.T) {
-	dir := t.TempDir()
-	jsonConfigPath := filepath.Join(dir, "rslint.json")
-	if err := os.WriteFile(jsonConfigPath, []byte(`[{"rules":{"no-debugger":"error"}}]`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	s := newTestServer()
-	s.cwd = dir
-	s.fs = osvfs.FS()
-	installJSConfigsForTest(s, map[string]config.RslintConfig{
-		"/other": {{Rules: config.Rules{"no-console": "error"}}},
-	})
-	s.reloadConfigAndRelint()
-
-	if s.rslintConfigPath != jsonConfigPath {
-		t.Fatalf("expected JSON fallback path %q, got %q", jsonConfigPath, s.rslintConfigPath)
-	}
-	cfg, _, isJS := s.getConfigForURI("file:///workspace/src/index.ts")
-	if isJS || len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
-		t.Fatalf("expected refreshed JSON fallback while JS config remains active, got isJS=%v config=%v", isJS, cfg)
-	}
-}
-
 func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 
-	// No jsConfigs, no rslintConfigPath
+	// No discovered configs.
 	s.rebuildTsConfigPaths()
 
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths nil when no config, got %v", s.tsConfigPaths)
+	if s.tsConfigPathsByConfig != nil {
+		t.Errorf("expected no project map when no config, got %v", s.tsConfigPathsByConfig)
 	}
 }
 
@@ -1777,7 +1648,6 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 						ConfigDirectory: dir,
 					},
 					dir,
-					false,
 					true,
 				)
 			},
@@ -2719,12 +2589,12 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 		},
 		ConfigDirectory: "/project",
 	}
-	withoutTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true, false)
+	withoutTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", false)
 	if len(withoutTypeInfo) != 1 || withoutTypeInfo[0].Name != "no-debugger" {
 		t.Fatalf("expected only non-type-aware native rule without tsconfig, got %+v", withoutTypeInfo)
 	}
 
-	withTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true, true)
+	withTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true)
 	if len(withTypeInfo) != 2 {
 		t.Fatalf("expected both native rules with type info, got %+v", withTypeInfo)
 	}
@@ -2975,7 +2845,9 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			s := newTestServer()
 			s.cwd = configDir
 			s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			s.jsonConfig = test.config
+			installJSConfigsForTest(s, map[string]config.RslintConfig{
+				tspath.NormalizePath(configDir): test.config,
+			})
 			uri := documentURIFromPath(target)
 			effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
 			result, err := configuredSpeculativePipelineResultForTest(s,

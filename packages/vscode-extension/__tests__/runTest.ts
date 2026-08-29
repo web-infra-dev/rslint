@@ -11,6 +11,7 @@ interface TestSuite {
   tests: string;
   workspaceEntry?: string;
   workspaceFolders?: string[];
+  moduleConfigFromJSON?: { source: string; target: string };
 }
 
 const workspaceMarkerFile = '.rslint-vscode-test-sandbox.json';
@@ -74,6 +75,18 @@ async function runIsolatedSuite(
       force: false,
       errorOnExist: true,
     });
+    if (suite.moduleConfigFromJSON) {
+      const source = resolveSandboxEntry(
+        workspaceCopy,
+        suite.moduleConfigFromJSON.source,
+      );
+      const target = resolveSandboxEntry(
+        workspaceCopy,
+        suite.moduleConfigFromJSON.target,
+      );
+      const entries = await fs.promises.readFile(source, 'utf8');
+      await fs.promises.writeFile(target, `export default ${entries};\n`);
+    }
     const expectedWorkspaceFolders = await Promise.all(
       (suite.workspaceFolders ?? ['.']).map((folder) =>
         fs.promises.realpath(resolveSandboxEntry(workspaceCopy, folder)),
@@ -187,9 +200,13 @@ async function main(): Promise<void> {
   const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
   const suites: TestSuite[] = [
     {
-      name: 'JSON config tests',
+      name: 'Core config tests',
       workspace: resolveFixture('fixtures'),
       tests: path.resolve(__dirname, './suite'),
+      moduleConfigFromJSON: {
+        source: 'rslint.json',
+        target: 'rslint.config.mjs',
+      },
     },
     {
       name: 'JS config tests',

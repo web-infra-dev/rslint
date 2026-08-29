@@ -22,7 +22,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 // textOnlySourceFile is a minimal ast.SourceFileLike (Text + ECMALineMap) — the
@@ -720,10 +719,13 @@ func TestPreparedPluginInputRespectsGitignore(t *testing.T) {
 	s := newTestServer()
 	s.cwd = dir
 	s.fs = osvfs.FS()
-	s.jsonConfig = config.RslintConfig{{
+	effectiveConfig := config.RslintConfig{{
 		Plugins: []string{"tpgitignore"},
 		Rules:   config.Rules{"tpgitignore/no-foo": "error"},
 	}}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		tspath.NormalizePath(dir): effectiveConfig,
+	})
 	uri := documentURIFromPath(target)
 	s.documents[uri] = "foo();\n"
 	if _, ok := pluginRequestForProductionPassTest(t, s, uri, s.documents[uri], s.documentLintSnapshot(uri)); ok {
@@ -765,7 +767,7 @@ func TestPreparedPluginInputUsesEffectiveJSConfigSnapshot(t *testing.T) {
 	}
 }
 
-func TestDocumentLintSnapshotKeepsObjectPluginCatalogInsideJSOwner(t *testing.T) {
+func TestDocumentLintSnapshotKeepsPluginRulesInsideDeclaredOwner(t *testing.T) {
 	root := t.TempDir()
 	nested := filepath.Join(root, "nested")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -783,58 +785,41 @@ func TestDocumentLintSnapshotKeepsObjectPluginCatalogInsideJSOwner(t *testing.T)
 	s.cwd = root
 	s.fs = osvfs.FS()
 	s.configSnapshotIncludesGitignore = true
-	jsonOwnerDirectory := tspath.NormalizePath(root)
-	jsOwnerDirectory := tspath.NormalizePath(nested)
-	jsonConfig := config.RslintConfig{{Rules: config.Rules{
+	rootOwnerDirectory := tspath.NormalizePath(root)
+	nestedOwnerDirectory := tspath.NormalizePath(nested)
+	rootConfig := config.RslintConfig{{Rules: config.Rules{
 		"community/check": "error",
 		"no-debugger":     "error",
 	}}}
-	jsConfig := config.RslintConfig{{
+	nestedConfig := config.RslintConfig{{
 		Plugins: []string{"community"},
 		Rules:   config.Rules{"community/check": "error"},
 	}}
-	s.ruleCatalog, _ = rules.All().ForESLintPlugins([]rule.ESLintPluginMetadata{{
-		Prefix:    "community",
-		RuleNames: []string{"check"},
-	}})
-	installJSONConfigForTest(s, jsonOwnerDirectory, jsonConfig)
-	s.jsConfigs = map[string]config.RslintConfig{jsOwnerDirectory: jsConfig}
-	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
-	jsResolver, err := config.NewFileConfigResolverWithPathSpaces(
-		jsConfig,
-		jsOwnerDirectory,
-		s.fs,
-		s.jsConfigOwnerIndex.PathSpaces(),
-		s.ruleCatalog,
-		true,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.jsFileConfigResolvers = map[string]*config.FileConfigResolver{
-		jsOwnerDirectory: jsResolver,
-	}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		rootOwnerDirectory:   rootConfig,
+		nestedOwnerDirectory: nestedConfig,
+	})
 
 	rootURI := documentURIFromPath(rootFile)
 	s.documents[rootURI] = "debugger;\n"
 	rootSnapshot := s.documentLintSnapshot(rootURI)
-	if rootSnapshot.usesJavaScriptConfig {
-		t.Fatal("root file unexpectedly selected the nested JS config")
+	if rootSnapshot.configKey != rootOwnerDirectory {
+		t.Fatalf("root config key = %q, want %q", rootSnapshot.configKey, rootOwnerDirectory)
 	}
-	if rootSnapshot.ruleCatalog != rules.All() {
-		t.Fatal("JSON fallback did not retain the pure Go rule catalog")
+	if pluginRule, ok := rootSnapshot.ruleCatalog.Lookup("community/check"); !ok || !pluginRule.IsEslintPluginRule {
+		t.Fatalf("catalog generation lost its object-plugin rule: %+v", pluginRule)
 	}
 	if len(rootSnapshot.resolvedConfig.EnabledRules) != 1 ||
 		rootSnapshot.resolvedConfig.EnabledRules[0].Name != "no-debugger" {
-		t.Fatalf("JSON fallback resolved object-plugin rules: %+v", rootSnapshot.resolvedConfig.EnabledRules)
+		t.Fatalf("owner without a plugin declaration resolved plugin rules: %+v", rootSnapshot.resolvedConfig.EnabledRules)
 	}
 	if _, ok := pluginRequestForProductionPassTest(t, s, rootURI, s.documents[rootURI], rootSnapshot); ok {
-		t.Fatal("JSON fallback produced an object-plugin request")
+		t.Fatal("owner without a plugin declaration produced an object-plugin request")
 	}
 
 	nestedSnapshot := s.documentLintSnapshot(documentURIFromPath(nestedFile))
-	if !nestedSnapshot.usesJavaScriptConfig {
-		t.Fatal("nested file did not select its JS config")
+	if nestedSnapshot.configKey != nestedOwnerDirectory {
+		t.Fatalf("nested config key = %q, want %q", nestedSnapshot.configKey, nestedOwnerDirectory)
 	}
 	if pluginRule, ok := nestedSnapshot.ruleCatalog.Lookup("community/check"); !ok || !pluginRule.IsEslintPluginRule {
 		t.Fatalf("JS owner lost its object-plugin rule: %+v", pluginRule)
@@ -1089,7 +1074,7 @@ func TestDocumentLintSnapshotCollectsGitignoreFromFrozenTarget(t *testing.T) {
 	s := newTestServer()
 	s.cwd = "/alias"
 	s.fs = fsys
-	s.jsonConfig = config.RslintConfig{{}}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{"/alias": {{}}})
 
 	snapshot := s.documentLintSnapshot(uri)
 	if snapshot.target.CanonicalPath != "/owner-a/source.ts" {
@@ -1112,10 +1097,12 @@ func TestDocumentLintSnapshotFreezesBootstrapConfigEvaluation(t *testing.T) {
 	s := newTestServer()
 	s.cwd = configPath
 	s.fs = fsys
-	s.jsonConfig = config.RslintConfig{{
+	effectiveConfig := config.RslintConfig{{
 		Files: []string{"src/*.ts"},
 		Rules: config.Rules{"no-debugger": "error"},
 	}}
+	s.jsConfigs = map[string]config.RslintConfig{configPath: effectiveConfig}
+	installRuleCatalogForTest(s, effectiveConfig)
 
 	snapshot := s.documentLintSnapshot(uri)
 	if snapshot.target.CanonicalPath != "/owner-a/src/index.ts" ||
@@ -1138,9 +1125,9 @@ func TestNativeFixPassUsesFrozenTargetOverlay(t *testing.T) {
 	s.cwd = "/alias"
 	s.fs = fsys
 	s.configSnapshotIncludesGitignore = true
-	installJSONConfigForTest(s, "/alias", config.RslintConfig{{
-		Rules: config.Rules{"no-debugger": "error"},
-	}})
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		"/alias": {{Rules: config.Rules{"no-debugger": "error"}}},
+	})
 	const content = "debugger;\n"
 	s.documents[uri] = content
 	snapshot := s.documentLintSnapshot(uri)

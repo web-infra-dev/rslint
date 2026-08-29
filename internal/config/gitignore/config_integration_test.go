@@ -667,12 +667,12 @@ func TestConfigWithGitignore_ParentIgnoreIsNotInherited(t *testing.T) {
 
 func TestConfigWithGitignore_ParentAnchoredOutsideConfigDoesNotApply(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                 "/dist/\n",
-		"dist/root-build.js":         "x",
-		"packages/app/dist/app.js":   "x",
-		"packages/app/src/index.js":  "x",
-		"packages/app/rslint.jsonc":  "[]",
-		"packages/other/dist/app.js": "x",
+		".gitignore":                     "/dist/\n",
+		"dist/root-build.js":             "x",
+		"packages/app/dist/app.js":       "x",
+		"packages/app/src/index.js":      "x",
+		"packages/app/rslint.config.mjs": "export default [];\n",
+		"packages/other/dist/app.js":     "x",
 	})
 	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
 	globs := collectGitignoreGlobsForTest(appDir, osvfs.FS(), nil)

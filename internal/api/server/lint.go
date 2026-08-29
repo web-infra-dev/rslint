@@ -259,8 +259,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			}
 		} else {
 			// No JS candidate is a valid API state: lint with override entries (or
-			// syntax-only with an empty config) rather than falling back to the CLI's
-			// rslint.json lookup.
+			// syntax-only with an empty config).
 			rslintConfig = overrideConfig
 			configDirectory = currentDirectory
 		}
@@ -374,7 +373,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			Config:                              rslintConfig,
 			ConfigDirectory:                     configDirectory,
 			Catalog:                             ruleCatalog,
-			EnforcePlugins:                      true,
 			TargetsBySourcePath:                 binding.LintTargetBySourcePath,
 			SourceMappingsIncludeCanonicalPaths: true,
 			PathSpaces:                          targetPlan.PathSpaces(),
