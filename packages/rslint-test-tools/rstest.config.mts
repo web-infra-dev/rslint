@@ -72,6 +72,7 @@ export default defineConfig({
     './tests/eslint/rules/arrow-body-style.test.ts',
     './tests/eslint/rules/block-scoped-var.test.ts',
     './tests/eslint/rules/capitalized-comments.test.ts',
+    './tests/eslint/rules/class-methods-use-this.test.ts',
     './tests/eslint/rules/curly.test.ts',
     './tests/eslint/rules/default-case.test.ts',
     './tests/eslint/rules/dot-notation.test.ts',
@@ -109,6 +110,7 @@ export default defineConfig({
 
     './tests/eslint/rules/default-case-last.test.ts',
     './tests/eslint/rules/default-param-last.test.ts',
+    './tests/eslint/rules/logical-assignment-operators.test.ts',
     './tests/eslint/rules/no-extend-native.test.ts',
     './tests/eslint/rules/no-extra-bind.test.ts',
     './tests/eslint/rules/no-extra-label.test.ts',
@@ -202,6 +204,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-no-script-url.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-target-blank.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-undef.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-useless-fragment.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
@@ -454,6 +457,7 @@ export default defineConfig({
     './tests/eslint/rules/no-empty-character-class.test.ts',
     './tests/eslint/rules/no-fallthrough.test.ts',
     './tests/eslint/rules/no-invalid-regexp.test.ts',
+    './tests/eslint/rules/no-invalid-this.test.ts',
     './tests/eslint/rules/no-misleading-character-class.test.ts',
     './tests/eslint/rules/no-regex-spaces.test.ts',
     './tests/eslint/rules/no-redeclare.test.ts',
@@ -537,6 +541,7 @@ export default defineConfig({
     './tests/eslint/rules/sort-keys.test.ts',
     './tests/eslint/rules/sort-imports.test.ts',
     './tests/eslint/rules/sort-vars.test.ts',
+    './tests/eslint/rules/yoda.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
@@ -592,6 +597,7 @@ export default defineConfig({
 
     // rstest
     './tests/rstest/rules/expect-expect.test.ts',
+    './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
     './tests/rstest/rules/no-alias-methods.test.ts',
     './tests/rstest/rules/no-commented-out-tests.test.ts',
@@ -611,11 +617,14 @@ export default defineConfig({
     './tests/rstest/rules/prefer-each.test.ts',
     './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
+    './tests/rstest/rules/prefer-import-in-mock.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
+    './tests/rstest/rules/require-test-timeout.test.ts',
     './tests/rstest/rules/valid-expect-in-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
+    './tests/rstest/rules/warn-todo.test.ts',
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
@@ -638,12 +647,14 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-array-concat-in-loop.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-fill-with-reference-type.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-exports-in-scripts.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-fetch-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-magic-array-flat-depth.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-nested-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-thenable.test.ts',
@@ -657,8 +668,10 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',
+    './tests/eslint-plugin-unicorn/rules/throw-new-error.test.ts',
 
     './tests/eslint/rules/no-shadow-restricted-names.test.ts',
   ],

@@ -534,7 +534,7 @@ func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meanin
 	if s == nil || location == nil || name == "" {
 		return false
 	}
-	if s.sourceFile != nil && ast.IsGlobalSourceFile(s.sourceFile.AsNode()) &&
+	if s.sourceFile != nil && !s.HasNonGlobalProgramScope() &&
 		hasAuthoredDeclaration(s.sourceFile.Locals[name]) {
 		return false
 	}
