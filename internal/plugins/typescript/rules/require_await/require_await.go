@@ -228,9 +228,9 @@ func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordI
 	return asyncKeywordInfo{}, false
 }
 
-func shouldReplaceAsyncWithSemicolon(sourceFile *ast.SourceFile, node *ast.Node, asyncInfo asyncKeywordInfo) bool {
+func needsLeadingSemicolon(sourceFile *ast.SourceFile, node *ast.Node, asyncInfo asyncKeywordInfo) bool {
 	nextToken, ok := utils.TokenAtOrAfter(sourceFile, asyncInfo.tokenRange.End())
-	if !ok || (nextToken.Kind != ast.KindOpenBracketToken && nextToken.Kind != ast.KindOpenParenToken) {
+	if !ok {
 		return false
 	}
 
@@ -243,7 +243,8 @@ func shouldReplaceAsyncWithSemicolon(sourceFile *ast.SourceFile, node *ast.Node,
 			utils.ClassMemberLeadingSemicolonOptions{IncludePropertiesWithoutInitializers: true},
 		)
 	}
-	return utils.IsStartOfExpressionStatement(sourceFile, node) &&
+	return (nextToken.Kind == ast.KindOpenBracketToken || nextToken.Kind == ast.KindOpenParenToken) &&
+		utils.IsStartOfExpressionStatement(sourceFile, node) &&
 		utils.NeedsPrecedingSemicolon(sourceFile, node)
 }
 
@@ -302,10 +303,15 @@ func buildRemoveAsyncSuggestion(sourceFile *ast.SourceFile, node *ast.Node, isGe
 	}
 
 	replacement := ""
-	if shouldReplaceAsyncWithSemicolon(sourceFile, node, asyncInfo) {
+	if node.Kind != ast.KindMethodDeclaration && needsLeadingSemicolon(sourceFile, node, asyncInfo) {
 		replacement = ";"
 	}
 	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(asyncInfo.removeRange, replacement)}
+	if node.Kind == ast.KindMethodDeclaration && needsLeadingSemicolon(sourceFile, node, asyncInfo) {
+		// Decorators and modifiers precede the async token, so the semicolon
+		// must be inserted before the entire member.
+		fixes = append(fixes, rule.RuleFixInsertBefore(sourceFile, node, ";"))
+	}
 	fixes = appendReturnTypeSuggestionFixes(sourceFile, node, isGenerator, fixes)
 	return []rule.RuleSuggestion{{
 		Message:  buildRemoveAsyncMessage(),

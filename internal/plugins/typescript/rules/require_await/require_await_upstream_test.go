@@ -1144,7 +1144,7 @@ for await (let num of asyncIterable) {
 					MessageId: "removeAsync",
 					Output: `class A {
   a
-  [b]() { return 0; }
+  ;[b]() { return 0; }
 }`,
 				}},
 			}},
