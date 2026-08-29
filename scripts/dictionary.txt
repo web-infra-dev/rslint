@@ -63,6 +63,7 @@ bivariance
 bizz
 bleh
 Blis
+blockignore
 bmatcuk
 bodyless
 braillelabel
@@ -89,7 +90,9 @@ Cbar
 cdylib
 centralising
 CHARCLASS
+cerialize
 checkerpool
+Citi
 classnames
 CLASSSET
 clazz
@@ -167,6 +170,7 @@ esmodule
 espree
 esregexp
 estree
+esutils
 eszett
 Ethi
 exclam
@@ -269,6 +273,8 @@ Isnt
 jakebailey
 jiti
 Jpan
+Jscs
+jscs
 jsnum
 jsonc
 jsonline
@@ -299,6 +305,7 @@ Lingui
 lingui
 lintable
 lintedfile
+lintpipeline
 lintprogram
 listitem
 litera
@@ -339,11 +346,13 @@ mmap
 mobx
 Modns
 modns
+moofoo
 morestack
 mousein
 mouseout
 mousemove
 msvc
+Mtavruli
 multibyte
 multifile
 multilines
@@ -422,6 +431,7 @@ pagefooter
 pageheader
 pagelist
 parenless
+parenthesization
 parsecache
 pendings
 perr
@@ -611,6 +621,8 @@ txtar
 txtarfs
 typeparam
 typescriptutil
+Über
+über
 unaliased
 unbnound
 uncast
@@ -666,6 +678,7 @@ vitest
 vname
 Värde
 walltime
+Warang
 wasi
 wasmer
 wasmfs

@@ -7,321 +7,104 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
-	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func newBaseLintConfigResolver(opts lintConfigResolverOptions) *lintConfigResolver {
-	opts.RuleCatalog = rules.All()
-	configMap := opts.ConfigMap
-	if configMap == nil {
-		configMap = map[string]rslintconfig.RslintConfig{
-			opts.CurrentDirectory: opts.Config,
+func newPluginLintResolverForTest(options configLint.ResolverOptions) *configLint.Resolver {
+	options.Catalog = rules.All()
+	configs := options.ConfigsByOwner
+	if configs == nil {
+		configs = map[string]rslintconfig.RslintConfig{
+			options.ConfigDirectory: options.Config,
 		}
 	}
-	opts.PathSpaces = rslintconfig.NewPathSpaceSnapshot(configMap, opts.FS)
-	return newLintConfigResolver(opts)
+	options.PathSpaces = rslintconfig.NewPathSpaceSnapshot(configs, options.FS)
+	return configLint.NewResolver(options)
 }
 
-func TestLintConfigResolverRequiresRuleCatalog(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected nil rule catalog to panic")
-		}
-	}()
-	newLintConfigResolver(lintConfigResolverOptions{})
-}
-
-func TestLintConfigResolverRequiresPathSpaceSnapshot(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected nil path-space snapshot to panic")
-		}
-	}()
-	newLintConfigResolver(lintConfigResolverOptions{RuleCatalog: rules.All()})
-}
-
-// TestPluginConfigResolver_UsesGoOwnedCatalogKey proves the routing identity is
-// the same normalized key Go published in its typed discovery catalog. Node
-// treats that key as opaque when activating the matching plugin host.
-func TestPluginConfigResolver_UsesGoOwnedCatalogKey(t *testing.T) {
-	configDir := tspath.NormalizePath(`C:\proj`)
+func TestPluginConfigResolverUsesOwnerAsRoutingKey(t *testing.T) {
+	configDirectory := tspath.NormalizePath(`C:\proj`)
+	sourcePath := configDirectory + "/src/a.ts"
 	configMap := map[string]rslintconfig.RslintConfig{
-		configDir: {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+		configDirectory: {{
+			Settings: rslintconfig.Settings{"owner": "go"},
+			Rules:    rslintconfig.Rules{"no-debugger": "error"},
+		}},
 	}
-	sourcePath := configDir + "/src/a.ts"
-	r := pluginConfigResolver{
-		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{
-			ConfigMap: configMap,
-			LintTargetBySourcePath: map[string]target.File{
-				sourcePath: {PathIdentity: rslintconfig.PathIdentity{Path: sourcePath,
-					CanonicalPath: sourcePath}, ConfigDirectory: configDir,
-				},
+	resolver := eslintPluginConfigResolver{
+		lintResolver: newPluginLintResolverForTest(configLint.ResolverOptions{
+			ConfigsByOwner: configMap,
+			TargetsBySourcePath: map[string]target.File{
+				sourcePath: pluginTargetForTest(sourcePath, configDirectory),
 			},
 		}),
 	}
-	wireKey, merged := r.resolve(sourcePath)
-	if wireKey != configDir {
-		t.Errorf("wire configKey = %q, want Go-owned catalog key %q", wireKey, configDir)
+
+	resolved := resolver.resolve(sourcePath)
+	if resolved.ConfigKey != configDirectory {
+		t.Errorf("routing key = %q, want owner %q", resolved.ConfigKey, configDirectory)
 	}
-	if merged == nil {
-		t.Fatal("expected a merged config for the matched file")
+	if resolved.Settings["owner"] != "go" {
+		t.Errorf("settings = %v, want the resolved owner config", resolved.Settings)
+	}
+}
+
+func TestPluginConfigResolverPreservesResolutionModes(t *testing.T) {
+	configMap := map[string]rslintconfig.RslintConfig{
+		"/repo": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
 	}
 
-	// With no low-level API routing override, the owner key is used directly.
-	posix := pluginConfigResolver{
-		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{
-			ConfigMap: map[string]rslintconfig.RslintConfig{"/posix/proj": configMap[configDir]},
-			LintTargetBySourcePath: map[string]target.File{
-				"/posix/proj/a.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "/posix/proj/a.ts",
-					CanonicalPath: "/posix/proj/a.ts"}, ConfigDirectory: "/posix/proj",
-				},
-			},
+	multi := eslintPluginConfigResolver{
+		lintResolver: newPluginLintResolverForTest(configLint.ResolverOptions{
+			ConfigsByOwner: configMap,
 		}),
 	}
-	if wk, m := posix.resolve("/posix/proj/a.ts"); wk != "/posix/proj" || m == nil {
-		t.Errorf("POSIX fallback: wireKey=%q merged-nil=%v, want /posix/proj + non-nil", wk, m == nil)
-	}
-}
-
-func pluginInput() []linter.EslintPluginFileInput {
-	return []linter.EslintPluginFileInput{
-		{Path: "/proj/a.ts", ConfigKey: "/proj", Rules: []linter.ConfiguredRule{
-			{Name: "uc/x", Severity: rule.SeverityError, IsEslintPluginRule: true},
-		}},
-	}
-}
-
-// TestDispatchPluginLintAsync_DispatchErrorSurfacesDiagnostic pins U1: a total
-// dispatch failure (the whole plugin-lint phase never ran) must surface one
-// error diagnostic so the CLI exit code reflects it, not a stderr-only false
-// green.
-func TestDispatchPluginLintAsync_DispatchErrorSurfacesDiagnostic(t *testing.T) {
-	failing := func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-		return nil, errors.New("WorkerPool: closed")
-	}
-	diags := <-dispatchPluginLintAsync(context.Background(), failing, pluginInput(), false, "off", nil)
-	if len(diags) != 1 {
-		t.Fatalf("dispatch failure should surface 1 diagnostic, got %d", len(diags))
-	}
-	if diags[0].RuleName != "rslint/plugin-lint-error" || diags[0].Severity != rule.SeverityError {
-		t.Errorf("want rslint/plugin-lint-error/SeverityError, got %q/%v", diags[0].RuleName, diags[0].Severity)
-	}
-	if diags[0].FilePath != "/proj/a.ts" {
-		t.Errorf("diagnostic should anchor to the first input file, got %q", diags[0].FilePath)
-	}
-	if !strings.Contains(diags[0].Message.Description, "WorkerPool: closed") {
-		t.Errorf("message should include the dispatch error, got %q", diags[0].Message.Description)
-	}
-}
-
-// TestDispatchPluginLintAsync_CanceledNoDiagnostic verifies context.Canceled is
-// a cooperative drop (editor/CLI aborted), NOT a false green, so it must not add
-// an error diagnostic.
-func TestDispatchPluginLintAsync_CanceledNoDiagnostic(t *testing.T) {
-	canceled := func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-		return nil, context.Canceled
-	}
-	if diags := <-dispatchPluginLintAsync(context.Background(), canceled, pluginInput(), false, "off", nil); len(diags) != 0 {
-		t.Errorf("context.Canceled should yield 0 diagnostics, got %d", len(diags))
-	}
-}
-
-// TestDispatchPluginLintAsync_NoInputsNoDiagnostic verifies the empty/no-op
-// paths contribute nothing.
-func TestDispatchPluginLintAsync_NoInputsNoDiagnostic(t *testing.T) {
-	dispatch := func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-		t.Fatal("dispatch must not be called with no inputs")
-		return nil, errors.New("unreachable")
-	}
-	if diags := <-dispatchPluginLintAsync(context.Background(), dispatch, nil, false, "off", nil); len(diags) != 0 {
-		t.Errorf("no inputs should yield 0 diagnostics, got %d", len(diags))
-	}
-}
-
-// TestPluginConfigResolver_Branches covers resolve()'s non-match and
-// single-config (configMap==nil) fallback branches.
-func TestPluginConfigResolver_Branches(t *testing.T) {
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/proj": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
+	if got := multi.resolve("/elsewhere/a.ts"); got.ConfigKey != "" || got.LanguageOptions != nil || got.Settings != nil {
+		t.Errorf("unbound multi-config source = %+v, want empty projection", got)
 	}
 
-	// Multi-config, file under no config -> ("", nil).
-	r := pluginConfigResolver{
-		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{ConfigMap: configMap}),
-	}
-	if wk, m := r.resolve("/elsewhere/a.ts"); wk != "" || m != nil {
-		t.Errorf("no-match -> (\"\",nil), got (%q, nil=%v)", wk, m == nil)
-	}
-
-	// Single-config (configMap==nil): wireKey is currentDirectory; merged from rslintConfig.
-	single := pluginConfigResolver{
-		lintResolver: newBaseLintConfigResolver(lintConfigResolverOptions{
-			Config:           configMap["/proj"],
-			CurrentDirectory: "/proj",
+	single := eslintPluginConfigResolver{
+		lintResolver: newPluginLintResolverForTest(configLint.ResolverOptions{
+			Config:          configMap["/repo"],
+			ConfigDirectory: "/repo",
 		}),
 	}
-	if wk, m := single.resolve("/proj/a.ts"); wk != "/proj" || m == nil {
-		t.Errorf("single-config -> (currentDirectory, merged), got (%q, nil=%v)", wk, m == nil)
+	if got := single.resolve("/repo/a.ts").ConfigKey; got != "/repo" {
+		t.Errorf("single-config routing key = %q, want /repo", got)
 	}
 }
 
-func TestLintConfigResolver_UsesOnlyBoundTargetOwnership(t *testing.T) {
-
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/repo": {{
-			Files: []string{"**/*.ts"},
-			Rules: rslintconfig.Rules{"no-console": "error"},
-		}},
-		"/repo/packages/app": {{
-			Files: []string{"**/*.ts"},
-			Rules: rslintconfig.Rules{
-				"@typescript-eslint/require-await": "error",
-				"no-debugger":                      "error",
-			},
-		}},
-	}
-	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap: configMap,
-		LintTargetBySourcePath: map[string]target.File{
-			"/repo/packages/app/src/gap.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "/repo/packages/app/src/gap.ts",
-				CanonicalPath: "/repo/packages/app/src/gap.ts"}, ConfigDirectory: "/repo/packages/app",
-			},
-			"/repo/packages/app/src/typed.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "/repo/packages/app/src/typed.ts",
-				CanonicalPath: "/repo/packages/app/src/typed.ts"}, ConfigDirectory: "/repo/packages/app",
-			},
-			"/repo/root.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "/repo/root.ts",
-				CanonicalPath: "/repo/root.ts"}, ConfigDirectory: "/repo",
-			},
+func TestReportEslintPluginDispatchOutcome(t *testing.T) {
+	var stderr strings.Builder
+	writeEslintPluginDispatchOutcome(&stderr, linter.EslintPluginDispatchOutcome{
+		Notices: []linter.EslintPluginProtocolNotice{
+			{Kind: linter.EslintPluginMissingFileResult, FilePath: "/repo/a.ts"},
+			{Kind: linter.EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/b.ts", RuleName: "plugin/extra"},
 		},
+		DispatchError: errors.New("transport closed"),
 	})
-
-	gapRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/packages/app/src/gap.ts"))
-	if !gapRules["@typescript-eslint/require-await"] || !gapRules["no-debugger"] {
-		t.Fatal("expected config resolution to return both nearest app rules")
-	}
-	if gapRules["no-console"] {
-		t.Fatal("did not expect parent config rule for file owned by nearest app config")
+	if want := "rslint: plugin-lint returned no result for \"/repo/a.ts\"\n" +
+		"rslint: plugin diagnostic for unconfigured rule \"plugin/extra\" in \"/repo/b.ts\"\n" +
+		"rslint: eslint-plugin lint error: transport closed\n"; stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 	}
 
-	typedRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/packages/app/src/typed.ts"))
-	if !typedRules["@typescript-eslint/require-await"] || !typedRules["no-debugger"] {
-		t.Fatalf("expected typed app file to keep both app rules, got %v", typedRules)
-	}
-
-	rootRules := configuredRuleNameSet(resolver.EnabledRulesForFile("/repo/root.ts"))
-	if !rootRules["no-console"] || rootRules["no-debugger"] {
-		t.Fatalf("expected root file to use root config only, got %v", rootRules)
-	}
-
-	if rules := resolver.EnabledRulesForFile("/outside/a.ts"); len(rules) != 0 {
-		t.Fatalf("expected file outside every config to have no rules, got %v", rules)
-	}
-}
-
-func TestLintConfigResolver_UsesBoundOwnerForAliasedSource(t *testing.T) {
-
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/repo": {{
-			Files: []string{"packages/app/*.ts"},
-			Rules: rslintconfig.Rules{"no-console": "error"},
-		}},
-		"/repo/packages/app": {{
-			Rules: rslintconfig.Rules{"no-debugger": "error"},
-		}},
-	}
-	sourcePath := "/repo/packages/app/a.ts"
-	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap: configMap,
-		LintTargetBySourcePath: map[string]target.File{
-			sourcePath: {PathIdentity: rslintconfig.PathIdentity{Path: sourcePath,
-				CanonicalPath: sourcePath}, ConfigDirectory: "/repo",
-			},
-		},
+	stderr.Reset()
+	writeEslintPluginDispatchOutcome(&stderr, linter.EslintPluginDispatchOutcome{
+		DispatchError: context.Canceled,
 	})
-
-	rules := configuredRuleNameSet(resolver.EnabledRulesForFile(sourcePath))
-	if !rules["no-console"] || rules["no-debugger"] {
-		t.Fatalf("expected the binding's root owner to win over source-path inference, got %v", rules)
+	if stderr.Len() != 0 {
+		t.Fatalf("cancellation stderr = %q, want none", stderr.String())
 	}
 }
 
-func TestLintConfigResolver_UsesBoundTargetForRulesAndGlobals(t *testing.T) {
-
-	cfg := rslintconfig.RslintConfig{{
-		Files: []string{"src/**/*.ts"},
-		LanguageOptions: &rslintconfig.LanguageOptions{Raw: map[string]any{
-			"globals": map[string]any{
-				"aliasedGlobal": "readonly",
-			},
-		}},
-		Rules: rslintconfig.Rules{"no-console": "error"},
-	}}
-	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
-		Config:           cfg,
-		CurrentDirectory: "/repo",
-		LintTargetBySourcePath: map[string]target.File{
-			"/outside/real-a.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "/repo/src/a.ts",
-				CanonicalPath: "/outside/real-a.ts"}, ConfigDirectory: "/repo",
-			},
-		},
-	})
-
-	rules := resolver.EnabledRulesForFile("/outside/real-a.ts")
-	if len(rules) != 1 || rules[0].Name != "no-console" {
-		t.Fatalf("expected aliased source path to use config path rules, got %v", configuredRuleNameSet(rules))
+func pluginTargetForTest(path string, configDirectory string) target.File {
+	return target.File{
+		PathIdentity:    rslintconfig.PathIdentity{Path: path, CanonicalPath: path},
+		ConfigDirectory: configDirectory,
 	}
-	if access := rules[0].Environment.Globals["aliasedGlobal"]; access != utils.GlobalAccessReadonly {
-		t.Fatalf("expected aliased source path to carry globals from config path, got %v", access)
-	}
-	if resolver.ConfigForFile("/outside/real-a.ts") == nil {
-		t.Fatalf("expected aliased source path to resolve merged config")
-	}
-}
-
-type caseInsensitiveResolverFS struct {
-	vfs.FS
-}
-
-func (f *caseInsensitiveResolverFS) UseCaseSensitiveFileNames() bool { return false }
-func (f *caseInsensitiveResolverFS) Realpath(filePath string) string {
-	return strings.ToLower(tspath.NormalizePath(filePath))
-}
-
-func TestLintConfigResolver_SourceMappingsUseCanonicalFilesystemIdentity(t *testing.T) {
-	fsys := &caseInsensitiveResolverFS{FS: osvfs.FS()}
-	sourcePath := "c:/repo/src/a.ts"
-	resolver := newBaseLintConfigResolver(lintConfigResolverOptions{
-		ConfigMap: map[string]rslintconfig.RslintConfig{
-			"C:/Repo": {{
-				Files: []string{"src/**/*.ts"},
-				Rules: rslintconfig.Rules{"no-console": "error"},
-			}},
-		},
-		LintTargetBySourcePath: map[string]target.File{
-			"C:/REPO/SRC/A.ts": {PathIdentity: rslintconfig.PathIdentity{Path: "c:/repo/src/a.ts",
-				CanonicalPath: "c:/repo/src/a.ts"}, ConfigDirectory: "c:/repo",
-			},
-		},
-		FS: fsys,
-	})
-
-	rules := resolver.EnabledRulesForFile(sourcePath)
-	if len(rules) != 1 || rules[0].Name != "no-console" {
-		t.Fatalf("expected case-equivalent source mapping to retain config rules, got %v", configuredRuleNameSet(rules))
-	}
-}
-
-func configuredRuleNameSet(rules []linter.ConfiguredRule) map[string]bool {
-	names := make(map[string]bool, len(rules))
-	for _, r := range rules {
-		names[r.Name] = true
-	}
-	return names
 }

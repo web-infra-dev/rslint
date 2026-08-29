@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/binder"
 )
 
 // IsInStrictMode checks whether a node is in strict mode code.
@@ -52,16 +53,16 @@ func IsInStrictMode(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	return false
 }
 
-// HasUseStrictDirective checks if a block or source file starts with a "use strict" directive.
+// HasUseStrictDirective checks if a source-backed block or source file starts
+// with an exact "use strict" directive. Escaped lookalikes do not enable strict
+// mode, even when their decoded string value is "use strict".
 func HasUseStrictDirective(block *ast.Node) bool {
-	for _, stmt := range block.Statements() {
-		if !ast.IsPrologueDirective(stmt) {
-			break
-		}
-		expr := stmt.Expression()
-		if expr != nil && expr.Text() == "use strict" {
-			return true
-		}
+	if block == nil {
+		return false
 	}
-	return false
+	sourceFile := ast.GetSourceFileOfNode(block)
+	if sourceFile == nil {
+		return false
+	}
+	return binder.FindUseStrictPrologue(sourceFile, block.Statements()) != nil
 }

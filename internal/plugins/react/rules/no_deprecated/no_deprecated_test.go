@@ -25,34 +25,6 @@ func msg(oldMethod, version, newMethod, refs string) string {
 const lifecycleRefsTail = ". Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
 const lifecycleRefsHead = "https://reactjs.org/docs/react-component.html#"
 
-func TestDetectJsxPragmaFastPathMatchesRegexp(t *testing.T) {
-	t.Parallel()
-
-	for _, source := range []string{
-		"",
-		"const value = 'jsx';",
-		"const value = '@jsx';",
-		"/** @jsx Foo */",
-		"// prefix @jsx\t$Foo_1.Bar trailing",
-		"/* @jsx\nFoo.Bar */",
-		"@jsx Foo-Bar",
-		"@jsx9 Foo",
-		"@@jsx Foo",
-	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-
-			want := ""
-			if match := jsxPragmaRe.FindStringSubmatch(source); match != nil {
-				want = match[1]
-			}
-			if got := detectJsxPragma(source); got != want {
-				t.Fatalf("detectJsxPragma(%q) = %q, want regexp result %q", source, got, want)
-			}
-		})
-	}
-}
-
 func TestParseVersionMatchesPreviousImplementation(t *testing.T) {
 	t.Parallel()
 
@@ -303,6 +275,17 @@ func TestNoDeprecatedRule(t *testing.T) {
 				MessageId: "deprecated",
 				Message:   msg("Foo.renderComponent", "0.12.0", "Foo.render", ""),
 				Line:      1, Column: 17,
+			}},
+		},
+
+		// ---- Regression: `@jsx Foo` in a hashbang is a pragma comment ----
+		{
+			Code: "#!/usr/bin/env node @jsx Foo\nFoo.renderComponent()",
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "deprecated",
+				Message:   msg("Foo.renderComponent", "0.12.0", "Foo.render", ""),
+				Line:      2, Column: 1,
 			}},
 		},
 

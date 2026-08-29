@@ -1754,22 +1754,27 @@ func TestDestructuringAssignmentEditDemand(t *testing.T) {
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
 			var diagnostics []rule.RuleDiagnostic
-			_, err := linter.RunLinter(linter.RunLinterOptions{
-				Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-				SingleThreaded: true,
-				Scope:          linter.FileScope{Files: []string{sourceFile.FileName()}},
-				ExcludePaths:   []string{},
-				GetRulesForFile: func(_ *ast.SourceFile) []linter.ConfiguredRule {
-					return []linter.ConfiguredRule{
-						{
-							Name:     "test",
-							Severity: rule.SeverityError,
-							Run: func(ctx rule.RuleContext) rule.RuleListeners {
-								return DestructuringAssignmentRule.Run(ctx, options)
-							},
+			programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+			lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+				Programs:         programs,
+				TargetsByProgram: [][]string{{sourceFile.FileName()}},
+				SingleThreaded:   true,
+				GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
+						Name:     "test",
+						Severity: rule.SeverityError,
+						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							return DestructuringAssignmentRule.Run(ctx, options)
 						},
-					}
+					}}
 				},
+			})
+			if err != nil {
+				t.Fatalf("PrepareLintPlan: %v", err)
+			}
+			_, err = linter.RunLinter(linter.RunLinterOptions{
+				SingleThreaded: true,
+				LintPlan:       lintPlan,
 				Consumer: rule.DiagnosticConsumer{
 					Demand: testCase.demand,
 					Report: func(diagnostic rule.RuleDiagnostic) {

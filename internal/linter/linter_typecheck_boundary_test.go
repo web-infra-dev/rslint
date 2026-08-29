@@ -84,10 +84,9 @@ func TestBoundary_DefaultLibsCleanAcrossPrograms(t *testing.T) {
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(progs...),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(progs...),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {
@@ -287,10 +286,9 @@ func TestBoundary_DiagnosticsStableUnderParallelism(t *testing.T) {
 		var mu sync.Mutex
 		var diags []rule.RuleDiagnostic
 		_, err := RunLinter(RunLinterOptions{
-			Programs:        wrapTestPrograms(programs...),
-			SingleThreaded:  false,
-			GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-			TypeCheck:       true,
+			TypeCheckOnlyPrograms: wrapTestPrograms(programs...),
+			SingleThreaded:        false,
+			TypeCheck:             true,
 			Consumer: rule.DiagnosticConsumer{
 				Report: func(d rule.RuleDiagnostic) {
 					if !strings.HasPrefix(d.RuleName, "TypeScript(") {
@@ -377,10 +375,9 @@ func TestBoundary_NoSourceLocationDiagnosticsDropped(t *testing.T) {
 
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				got = append(got, d)

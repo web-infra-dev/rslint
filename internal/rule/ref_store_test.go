@@ -18,12 +18,17 @@ import (
 // RefStore for direct inspection.
 func newBoundRefStore(t *testing.T, fileName string, scriptKind core.ScriptKind, source string) (*ast.SourceFile, *RefStore) {
 	t.Helper()
+	return newBoundRefStoreWithLanguageOptions(t, fileName, scriptKind, source, LanguageOptions{})
+}
+
+func newBoundRefStoreWithLanguageOptions(t *testing.T, fileName string, scriptKind core.ScriptKind, source string, languageOptions LanguageOptions) (*ast.SourceFile, *RefStore) {
+	t.Helper()
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: fileName,
 		Path:     tspath.Path(fileName),
 	}, source, scriptKind)
 	binder.BindSourceFile(sourceFile)
-	_, refsInit, _ := ResolveLanguageDefaults(fileName, LanguageOptions{})
+	_, refsInit, _ := ResolveLanguageDefaults(fileName, languageOptions)
 	return sourceFile, NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
 }
 
@@ -89,6 +94,57 @@ func TestRefStoreScriptFileGlobals(t *testing.T) {
 	got := refs.References(sym)
 	if len(got) != 1 || got[0] != useIdent {
 		t.Fatalf("References = %v, want [%v] (the `x++` use)", got, useIdent)
+	}
+}
+
+func TestRefStoreGlobalReferenceUsesEffectiveProgramScope(t *testing.T) {
+	t.Parallel()
+
+	valueMeaning := ast.SymbolFlagsValue | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	tests := []struct {
+		name       string
+		source     string
+		sourceType string
+		want       bool
+	}{
+		{
+			name:       "script type declaration joins global scope",
+			source:     "type Boolean = string; Boolean(value);",
+			sourceType: "script",
+			want:       false,
+		},
+		{
+			name:       "module type declaration has no value meaning",
+			source:     "type Boolean = string; Boolean(value);",
+			sourceType: "module",
+			want:       true,
+		},
+		{
+			name:       "module namespace declaration has value meaning",
+			source:     "namespace Boolean {} Boolean(value);",
+			sourceType: "module",
+			want:       false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			sourceFile, refs := newBoundRefStoreWithLanguageOptions(
+				t,
+				"/effective-program-scope.ts",
+				core.ScriptKindTS,
+				test.source,
+				LanguageOptions{SourceType: test.sourceType},
+			)
+			occurrences := identifiers(sourceFile.AsNode(), "Boolean")
+			if len(occurrences) != 2 {
+				t.Fatalf("found %d Boolean identifiers, want 2", len(occurrences))
+			}
+			if got := refs.IsGlobalNameReference(occurrences[1], "Boolean", valueMeaning); got != test.want {
+				t.Errorf("IsGlobalNameReference(Boolean) = %v, want %v", got, test.want)
+			}
+		})
 	}
 }
 

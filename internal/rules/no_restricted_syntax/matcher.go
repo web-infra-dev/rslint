@@ -618,6 +618,12 @@ func hasMatching(node *ast.Node, sel selector, mc *matchContext) bool {
 		matched := false
 		var visitDirect func(child *ast.Node) bool
 		visitDirect = func(child *ast.Node) bool {
+			if expression := utils.JSDocTypeCastExpression(child); expression != nil {
+				return visitDirect(expression)
+			}
+			if utils.IsJSDocSyntaxNode(child) {
+				return false
+			}
 			if isTransparentEstreeContainer(child) {
 				child.ForEachChild(visitDirect)
 				return matched
@@ -635,25 +641,23 @@ func hasMatching(node *ast.Node, sel selector, mc *matchContext) bool {
 }
 
 func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext) bool {
-	if matchesInScope(sel, node, mc, node) {
-		return true
-	}
 	found := false
 	var visit func(n *ast.Node) bool
 	visit = func(n *ast.Node) bool {
 		if found {
 			return true
 		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			if isTransparentEstreeContainer(child) {
-				return visit(child)
-			}
-			if matchesInScope(sel, child, mc, node) {
-				found = true
-				return true
-			}
-			return visit(child)
-		})
+		if expression := utils.JSDocTypeCastExpression(n); expression != nil {
+			return visit(expression)
+		}
+		if utils.IsJSDocSyntaxNode(n) {
+			return false
+		}
+		if !isTransparentEstreeContainer(n) && matchesInScope(sel, n, mc, node) {
+			found = true
+			return true
+		}
+		n.ForEachChild(visit)
 		return found
 	}
 	visit(node)
@@ -1120,7 +1124,14 @@ func unwrapExpression(node *ast.Node) *ast.Node {
 }
 
 func unwrapEstreeNode(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
+	for node != nil {
+		if expression := utils.JSDocTypeCastExpression(node); expression != nil {
+			node = expression
+			continue
+		}
+		if node.Kind != ast.KindParenthesizedExpression {
+			break
+		}
 		node = node.AsParenthesizedExpression().Expression
 	}
 	return node
@@ -1145,6 +1156,10 @@ func estreeParent(node *ast.Node) *ast.Node {
 	}
 	parent := node.Parent
 	for parent != nil {
+		if utils.IsJSDocTypeCastWrapper(parent) {
+			parent = parent.Parent
+			continue
+		}
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression, ast.KindImportAttributes:
 			// These are tsgo parser nodes without corresponding ESTree nodes.
@@ -2182,7 +2197,7 @@ func readParamsAttr(node *ast.Node) (interface{}, bool) {
 	if !isFunctionLikeForParams(node) {
 		return nil, false
 	}
-	params := node.Parameters()
+	params := utils.ESTreeParameters(node)
 	// Treat nil and empty as the same — `[params.length=0]` should
 	// match a function-like with no parameters regardless of whether
 	// the underlying NodeList was allocated.

@@ -1,7 +1,15 @@
-import { useState, useRef, useEffect, useImperativeHandle, Ref } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useImperativeHandle,
+  Ref,
+  ReactNode,
+} from 'react';
 import * as monaco from 'monaco-editor';
 import { jsonDefaults } from 'monaco-editor/languages/features/json/register';
-import { type Diagnostic } from '@rslint/wasm';
+import { type Diagnostic } from '@rslint/core/service';
+import { useDark } from '@rspress/core/runtime';
 import { Button } from '@components/ui/button';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
@@ -44,6 +52,7 @@ interface EditorTabsProps {
   onChange: (value: string) => void;
   onSelectionChange?: (start: number, end: number) => void;
   onConfigChange?: () => void;
+  toolbarEnd?: ReactNode;
 }
 
 const DEFAULT_RSLINT_CONFIG = `[
@@ -88,8 +97,11 @@ export const EditorTabs = ({
   onChange,
   onSelectionChange,
   onConfigChange,
+  toolbarEnd,
 }: EditorTabsProps) => {
   const [activeTab, setActiveTab] = useState<EditorTabType>('code');
+  const isDark = useDark();
+  const editorTheme = isDark ? 'vs-dark' : 'vs';
 
   const codeEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(
     null,
@@ -296,8 +308,10 @@ export const EditorTabs = ({
     const editor = monaco.editor.create(codeContainerRef.current, {
       value: getInitialCode(),
       language: 'typescript',
+      theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     codeEditorRef.current = editor;
 
@@ -379,8 +393,10 @@ export const EditorTabs = ({
     const editor = monaco.editor.create(rslintContainerRef.current, {
       value: DEFAULT_RSLINT_CONFIG,
       language: 'json',
+      theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     rslintEditorRef.current = editor;
 
@@ -400,8 +416,10 @@ export const EditorTabs = ({
     const editor = monaco.editor.create(tsconfigContainerRef.current, {
       value: DEFAULT_TSCONFIG,
       language: 'json',
+      theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     tsconfigEditorRef.current = editor;
 
@@ -414,6 +432,10 @@ export const EditorTabs = ({
     };
   }, []);
 
+  useEffect(() => {
+    monaco.editor.setTheme(editorTheme);
+  }, [editorTheme]);
+
   const tabs: { key: EditorTabType; label: string }[] = [
     { key: 'code', label: 'Code' },
     { key: 'rslint', label: 'rslint.json' },
@@ -422,20 +444,22 @@ export const EditorTabs = ({
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="flex items-center gap-2 bg-gray-50 p-2 flex-shrink-0">
-        {tabs.map((tab) => (
-          <Button
-            key={tab.key}
-            type="button"
-            variant={activeTab === tab.key ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTab(tab.key)}
-            aria-pressed={activeTab === tab.key}
-            className="dark:text-accent dark:border-muted/20"
-          >
-            {tab.label}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-2 bg-[var(--rp-c-bg-soft)] p-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.key}
+              type="button"
+              variant={activeTab === tab.key ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        {toolbarEnd}
       </div>
       <div className="flex-1 relative overflow-visible">
         <div
