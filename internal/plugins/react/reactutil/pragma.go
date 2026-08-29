@@ -6,8 +6,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -176,17 +177,33 @@ func jsxAnnotationPragma(ctx rule.RuleContext) (string, bool) {
 		return "", false
 	}
 
+	// ESLint's SourceCode#getAllComments exposes the hashbang as its first
+	// comment. tsgo keeps it separate from ordinary comment ranges, so inspect
+	// it first to preserve both inclusion and source-order precedence.
+	if shebang := scanner.GetShebang(text); shebang != "" {
+		if name, found := jsxPragmaFromCommentValue(shebang[2:]); found {
+			return name, true
+		}
+	}
+
 	for _, comment := range ctx.Comments.All() {
-		name, found := jsxAnnotationInComment(commentValue(text, comment))
-		if found {
-			// Upstream reads `matches[1].split('.')[0]`.
-			if dot := strings.IndexByte(name, '.'); dot >= 0 {
-				name = name[:dot]
-			}
+		if name, found := jsxPragmaFromCommentValue(utils.CommentValue(text, comment)); found {
 			return name, true
 		}
 	}
 	return "", false
+}
+
+func jsxPragmaFromCommentValue(value string) (string, bool) {
+	name, found := jsxAnnotationInComment(value)
+	if !found {
+		return "", false
+	}
+	// Upstream reads `matches[1].split('.')[0]`.
+	if dot := strings.IndexByte(name, '.'); dot >= 0 {
+		name = name[:dot]
+	}
+	return name, true
 }
 
 // jsxAnnotationInComment ports `/@jsx\s+([^\s]+)/` over one comment body.
@@ -234,29 +251,6 @@ func skipNonWhitespace(text string, start int) int {
 		position += size
 	}
 	return position
-}
-
-// commentValue returns a comment's body without its delimiters, matching what
-// ESLint exposes as `comment.value` — upstream matches the annotation against
-// that, so a trailing `*/` must not become part of the captured name.
-func commentValue(text string, comment *ast.CommentRange) string {
-	if comment.Pos() < 0 || comment.End() > len(text) {
-		return ""
-	}
-	switch comment.Kind {
-	case ast.KindSingleLineCommentTrivia:
-		if comment.End() <= comment.Pos()+2 {
-			return ""
-		}
-		return text[comment.Pos()+2 : comment.End()]
-	case ast.KindMultiLineCommentTrivia:
-		if comment.End() <= comment.Pos()+4 {
-			return ""
-		}
-		return text[comment.Pos()+2 : comment.End()-2]
-	default:
-		return ""
-	}
 }
 
 // isJavaScriptIdentifier ports upstream's

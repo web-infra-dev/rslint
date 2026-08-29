@@ -360,9 +360,13 @@ func IsFragmentTag(element *ast.Node, reactPragma, fragmentPragma string) bool {
 		return false
 	}
 
-	// <Fragment>
-	if tagName.Kind == ast.KindIdentifier {
+	// <Fragment>. tsgo preserves the otherwise JSXIdentifier-shaped `this`
+	// tag as a ThisKeyword, so it needs the same name comparison here.
+	switch tagName.Kind {
+	case ast.KindIdentifier:
 		return tagName.AsIdentifier().Text == fragmentPragma
+	case ast.KindThisKeyword:
+		return fragmentPragma == "this"
 	}
 
 	// <React.Fragment> — only a single-level member access qualifies, matching
@@ -372,10 +376,16 @@ func IsFragmentTag(element *ast.Node, reactPragma, fragmentPragma string) bool {
 		access := tagName.AsPropertyAccessExpression()
 		object := access.Expression
 		property := access.Name()
-		return object != nil && object.Kind == ast.KindIdentifier &&
-			object.AsIdentifier().Text == reactPragma &&
-			property != nil && property.Kind == ast.KindIdentifier &&
-			property.AsIdentifier().Text == fragmentPragma
+		if property == nil || property.Kind != ast.KindIdentifier ||
+			property.AsIdentifier().Text != fragmentPragma || object == nil {
+			return false
+		}
+		switch object.Kind {
+		case ast.KindIdentifier:
+			return object.AsIdentifier().Text == reactPragma
+		case ast.KindThisKeyword:
+			return reactPragma == "this"
+		}
 	}
 
 	return false
