@@ -11,6 +11,9 @@ interface TestSuite {
   tests: string;
   workspaceEntry?: string;
   workspaceFolders?: string[];
+  // Keep the module outside the shared API fixture's lintable source set, then
+  // copy it only into this suite's private workspace.
+  configModule?: { source: string; target: string };
 }
 
 const workspaceMarkerFile = '.rslint-vscode-test-sandbox.json';
@@ -74,6 +77,13 @@ async function runIsolatedSuite(
       force: false,
       errorOnExist: true,
     });
+    if (suite.configModule) {
+      const target = resolveSandboxEntry(
+        workspaceCopy,
+        suite.configModule.target,
+      );
+      await fs.promises.copyFile(suite.configModule.source, target);
+    }
     const expectedWorkspaceFolders = await Promise.all(
       (suite.workspaceFolders ?? ['.']).map((folder) =>
         fs.promises.realpath(resolveSandboxEntry(workspaceCopy, folder)),
@@ -190,6 +200,13 @@ async function main(): Promise<void> {
       name: 'Core config tests',
       workspace: resolveFixture('fixtures'),
       tests: path.resolve(__dirname, './suite'),
+      configModule: {
+        source: path.resolve(
+          testsSourceDir,
+          'fixtures-core-config/rslint.config.mjs',
+        ),
+        target: 'rslint.config.mjs',
+      },
     },
     {
       name: 'JS config tests',
