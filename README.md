@@ -29,10 +29,7 @@ Powered by [TypeScript's native compiler](https://devblogs.microsoft.com/typescr
 
 ## ✅ Current Status
 
-> [!NOTE]
-> Rslint is currently in an experimental phase but is under active development.
-
-Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), building upon the innovative proof-of-concept work by [@auvred](https://github.com/auvred). We decided to continue development as tsgolint has no current plans for continued development ([reference](https://x.com/bradzacher/status/1943475629376282998)).
+Rslint provides built-in support for high-performance 500+ rules, all implemented natively. It fully supports all rules and presets from [`@eslint/js`](https://www.npmjs.com/package/@eslint/js) and [typescript-eslint](https://typescript-eslint.io/). It is also compatible with ESLint flat config and most ESLint plugins, making it easier to adopt in existing ESLint projects.
 
 ## 🚀 Getting Started
 
