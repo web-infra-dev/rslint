@@ -178,6 +178,13 @@ func isGlobalRegExpCallee(ctx rule.RuleContext, callee *ast.Node, eval *utils.St
 		if callee.AsIdentifier().Text != "RegExp" || utils.IsShadowed(callee, "RegExp") {
 			return false
 		}
+		if symbol := ctx.Refs.Resolve(callee); symbol != nil {
+			for _, reference := range ctx.Refs.References(symbol) {
+				if utils.IsWriteReference(reference) {
+					return false
+				}
+			}
+		}
 		return ctx.Globals.Access("RegExp").IsDeclared()
 	case ast.KindPropertyAccessExpression:
 		access := callee.AsPropertyAccessExpression()
@@ -200,10 +207,21 @@ func isGlobalRegExpCallee(ctx rule.RuleContext, callee *ast.Node, eval *utils.St
 		return isKnownGlobalObject(ctx, access.Expression)
 	case ast.KindBinaryExpression:
 		binary := callee.AsBinaryExpression()
-		if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindCommaToken {
+		if binary == nil || binary.OperatorToken == nil {
 			return false
 		}
-		return isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Right), eval)
+		switch binary.OperatorToken.Kind {
+		case ast.KindCommaToken:
+			return isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Right), eval)
+		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+			return isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Left), eval) ||
+				isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Right), eval)
+		}
+	case ast.KindConditionalExpression:
+		conditional := callee.AsConditionalExpression()
+		return conditional != nil &&
+			(isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(conditional.WhenTrue), eval) ||
+				isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(conditional.WhenFalse), eval))
 	}
 
 	return false
@@ -211,7 +229,16 @@ func isGlobalRegExpCallee(ctx rule.RuleContext, callee *ast.Node, eval *utils.St
 
 func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
-	if node == nil || node.Kind != ast.KindIdentifier {
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindBinaryExpression {
+		binary := node.AsBinaryExpression()
+		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken {
+			return isKnownGlobalObject(ctx, binary.Right)
+		}
+	}
+	if node.Kind != ast.KindIdentifier {
 		return false
 	}
 	name := node.AsIdentifier().Text

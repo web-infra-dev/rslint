@@ -31,6 +31,7 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		{`\xZZ(a)`, u},
 		{`\u(a)`, u},
 		{`\u{}(a)`, u},
+		{`\u{110000}(a)`, u},
 		{`\uZZZZ(a)`, u},
 		{`\p(a)`, u},
 		{`\k(a)`, u},
@@ -71,6 +72,11 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		// Character-class ranges must be ordered by their character value.
 		{`(a)[z-a]`, RegexFlags{}},
 		{`(a)[\u007a-a]`, u},
+		{`(a)[a-\d]`, u},
+
+		// Once a named capture exists, `\k<...>` is a named backreference even
+		// outside u/v mode and must resolve.
+		{`(?<x>a)\k<y>(b)`, RegexFlags{}},
 
 		// Assertions can't be quantified. Annex B exempts lookahead; u/v doesn't.
 		{`^*(a)`, RegexFlags{}},
@@ -148,6 +154,10 @@ func TestRegexCapturingGroups_Accepts(t *testing.T) {
 		{`(?<\uD835\uDC9C>a)\k<𝒜>(b)`, u, []RegexCapturingGroup{
 			{Start: 0, End: 18, Name: `\uD835\uDC9C`},
 			{Start: 26, End: 29},
+		}},
+		{`(?<\u{61}>a)(b)`, u, []RegexCapturingGroup{
+			{Start: 0, End: 12, Name: `\u{61}`},
+			{Start: 12, End: 15},
 		}},
 
 		// The escapes u/v does spell out.

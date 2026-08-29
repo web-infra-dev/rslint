@@ -41,6 +41,9 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
 			},
 			{Code: "let RegExp; new RegExp('(a)');"},
+			// ReferenceTracker ignores every global RegExp use when the global has
+			// been reassigned anywhere in the file.
+			{Code: "RegExp = custom; RegExp('(a)' + '');"},
 
 			// ---- Config `/* global RegExp: off */` / `languageOptions.globals` un-declares the builtin ----
 			{Code: "new RegExp('(a)');", Globals: map[string]any{"RegExp": "off"}},
@@ -95,6 +98,23 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			// invalid case below.
 		},
 		[]rule_tester.InvalidTestCase{
+			// ReferenceTracker follows conditional/logical pass-through values and
+			// global-object aliases wrapped in a comma expression. Concatenated
+			// patterns intentionally have no source-mapped suggestions.
+			{
+				Code:   "(true ? RegExp : other)('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   "(RegExp || other)('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:            "(0, globalThis).RegExp('(a)' + '');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+
 			// ---- ReferenceTracker-compatible callee expression forms ----
 			{
 				Code:            "globalThis['Reg' + 'Exp']('(a)');",

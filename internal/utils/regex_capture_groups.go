@@ -38,6 +38,13 @@ func RegexCapturingGroups(pattern string, flags RegexFlags) (groups []RegexCaptu
 	if !IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
 		elements, _, parsed := ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
 		if !parsed {
+			// The shared parser intentionally leaves some Annex B legacy forms
+			// unsupported (for example `[\\c]` without u/v). In strict Unicode
+			// modes, though, a failure denotes a malformed class and must reject
+			// the entire pattern.
+			if flags.UV() {
+				classesValid = false
+			}
 			return
 		}
 		for _, element := range elements {
@@ -57,18 +64,24 @@ func RegexCapturingGroups(pattern string, flags RegexFlags) (groups []RegexCaptu
 	if pos != len(pattern) {
 		return nil, false
 	}
-	if flags.UV() && !unicodeBackrefsResolve(pattern, flags, groups) {
+	if !regexBackrefsResolve(pattern, flags, groups) {
 		return nil, false
 	}
 	return groups, true
 }
 
-// unicodeBackrefsResolve reports whether every backreference in an already
-// well-formed u/v-mode pattern points at a group that exists. Outside u/v the
-// check doesn't apply: a numeric escape with no matching group falls back to an
-// octal or identity escape, and `\k` isn't a backreference at all unless the
-// pattern has named groups.
-func unicodeBackrefsResolve(pattern string, flags RegexFlags, groups []RegexCapturingGroup) bool {
+// regexBackrefsResolve reports whether every backreference in an already
+// well-formed pattern points at a group that exists. Numeric backreferences
+// require u/v mode. In legacy mode, named references are required only when a
+// named capture exists; otherwise `\k` is an identity escape.
+func regexBackrefsResolve(pattern string, flags RegexFlags, groups []RegexCapturingGroup) bool {
+	hasNamedGroup := false
+	for _, group := range groups {
+		if group.Name != "" {
+			hasNamedGroup = true
+			break
+		}
+	}
 	for i := 0; i < len(pattern); {
 		switch pattern[i] {
 		case '[':
@@ -82,8 +95,17 @@ func unicodeBackrefsResolve(pattern string, flags RegexFlags, groups []RegexCapt
 			if !ok {
 				return false
 			}
+			if !flags.UV() && hasNamedGroup && i+3 < len(pattern) && pattern[i+1] == 'k' && pattern[i+2] == '<' {
+				if closeRel := strings.IndexByte(pattern[i+3:], '>'); closeRel > 0 {
+					if !hasGroupNamed(groups, pattern[i+3:i+3+closeRel]) {
+						return false
+					}
+					i += closeRel + 4
+					continue
+				}
+			}
 			switch next := pattern[i+1]; {
-			case next >= '1' && next <= '9':
+			case flags.UV() && next >= '1' && next <= '9':
 				n := 0
 				for _, digit := range []byte(pattern[i+1 : i+step]) {
 					n = n*10 + int(digit-'0')
@@ -91,7 +113,7 @@ func unicodeBackrefsResolve(pattern string, flags RegexFlags, groups []RegexCapt
 						return false
 					}
 				}
-			case next == 'k':
+			case flags.UV() && next == 'k':
 				// skipPatternLevelEscape only accepts `\k` as `\k<name>`.
 				if !hasGroupNamed(groups, pattern[i+3:i+step-1]) {
 					return false
@@ -348,7 +370,10 @@ func skipUnicodePatternEscape(pattern string, i int) (int, bool) {
 				n++
 			}
 			if n > 1 && n < len(rest) && rest[n] == '}' {
-				return 3 + n, true
+				value, err := strconv.ParseUint(rest[1:n], 16, 32)
+				if err == nil && value <= utf8.MaxRune {
+					return 3 + n, true
+				}
 			}
 			break
 		}
@@ -519,22 +544,19 @@ func isRegexGroupName(name string) bool {
 	if name == "" {
 		return false
 	}
-	for i := 0; i < len(name); {
-		c := name[i]
+	normalized, ok := normalizeRegexGroupName(name)
+	if !ok || normalized == "" {
+		return false
+	}
+	for i := 0; i < len(normalized); {
+		c := normalized[i]
 		switch {
 		case c >= utf8.RuneSelf:
-			_, w := utf8.DecodeRuneInString(name[i:])
+			_, w := utf8.DecodeRuneInString(normalized[i:])
 			if w == 0 {
 				return false
 			}
 			i += w
-			continue
-		case c == '\\':
-			// A `\u` escape spells the code point out; its value isn't checked.
-			if i+1 >= len(name) || name[i+1] != 'u' {
-				return false
-			}
-			i += 2
 			continue
 		case isASCIILetter(c), c == '$', c == '_':
 		case isRegexDigit(c):
