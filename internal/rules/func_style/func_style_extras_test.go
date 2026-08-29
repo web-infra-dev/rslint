@@ -120,6 +120,8 @@ export default function test(a: unknown) { return a; }
 			{Code: "var foo = () => class { [this.k]() {} };", Options: []any{"declaration"}},
 			{Code: "var foo = () => ({ get [this.k]() { return 1; } });", Options: []any{"declaration"}},
 			{Code: "class A { m() { var foo = () => class { @this.dec n() {} }; } }", Options: []any{"declaration"}},
+			{Code: "var foo = () => class { @(this.factory()) n() {} };", Options: []any{"declaration"}},
+			{Code: "var foo = () => class { @this.dec field = 1; };", Options: []any{"declaration"}},
 
 			// ---- A class decorator is not member metadata: ESTree keeps it on
 			// the ClassDeclaration, which is not a frame either, so it stays
@@ -365,6 +367,16 @@ export default function test(a: unknown) { return a; }
 				Options: []any{"declaration"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "declaration", Line: 1, Column: 5, EndLine: 1, EndColumn: 50},
+				},
+			},
+			// ---- A nested arrow in member-decorator metadata gets its own
+			// lexical-this frame. Its `this` must not leak into the outer arrow,
+			// which ESLint still reports ----
+			{
+				Code:    "var foo = () => class { @(() => this.dec) n() {} };",
+				Options: []any{"declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "declaration"},
 				},
 			},
 
