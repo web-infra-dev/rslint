@@ -29,7 +29,7 @@ Powered by [TypeScript's native compiler](https://devblogs.microsoft.com/typescr
 
 ## ✅ Current Status
 
-Rslint provides built-in support for high-performance 500+ rules, all implemented natively. It fully supports all rules and presets from [`@eslint/js`](https://www.npmjs.com/package/@eslint/js) and [typescript-eslint](https://typescript-eslint.io/). It is also compatible with ESLint flat config and most ESLint plugins, making it easier to adopt in existing ESLint projects.
+Rslint provides built-in support for 500+ high-performance rules, all implemented natively, including all [typescript-eslint](https://typescript-eslint.io/) rules and nearly all rules from [`@eslint/js`](https://www.npmjs.com/package/@eslint/js). It is also compatible with ESLint flat config and most ESLint plugins, making it easier to adopt in existing ESLint projects.
 
 ## 🚀 Getting Started
 
