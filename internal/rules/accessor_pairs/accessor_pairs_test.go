@@ -59,6 +59,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			{Code: `var o = { get a() {}, set 'a'(foo) {} };`, Options: bothOpts},
 			{Code: `var o = { get ['abc']() {}, set ['abc'](foo) {} };`, Options: bothOpts},
 			{Code: `var o = { get [1e2]() {}, set 100(foo) {} };`, Options: bothOpts},
+			{Code: `var o = { get [/a/mi]() {}, set [/a/im](foo) {} };`, Options: bothOpts},
 			{Code: "var o = { get abc() {}, set [`abc`](foo) {} };", Options: bothOpts},
 			{Code: `var o = { get ['123']() {}, set 123(foo) {} };`, Options: bothOpts},
 
@@ -186,9 +187,8 @@ func TestAccessorPairsRule(t *testing.T) {
 			{Code: `var o = { get [f ( a , b )]() {}, set [f(a,b)](foo) {} };`, Options: bothOpts},
 			// Comments inside the key are skipped too.
 			{Code: `var o = { get [/*x*/ a /*y*/ + b]() {}, set [a + b](foo) {} };`, Options: bothOpts},
-			// Nested parens at every level.
+			// Parentheses around the complete key are transparent.
 			{Code: `var o = { get [((a + b))]() {}, set [a + b](foo) {} };`, Options: bothOpts},
-			{Code: `var o = { get [(a) + (b)]() {}, set [a + b](foo) {} };`, Options: bothOpts},
 			// Property / element access with same static name.
 			{Code: `var o = { get [a.b]() {}, set [a.b](foo) {} };`, Options: bothOpts},
 			{Code: `var o = { get [a[0]]() {}, set [a[0]](foo) {} };`, Options: bothOpts},
@@ -1520,6 +1520,15 @@ func TestAccessorPairsRule(t *testing.T) {
 			{
 				Code: `var o = { set [a + b](foo) {} };`, Options: bothOpts,
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingGetterInObjectLiteral", Message: "Getter is not present for setter."},
+				},
+			},
+			// Parentheses nested inside the key remain in ESLint's token list, so
+			// these are two unpaired dynamic accessors.
+			{
+				Code: `var o = { get [(a) + (b)]() {}, set [a + b](foo) {} };`, Options: bothOpts,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingSetterInObjectLiteral", Message: "Setter is not present for getter."},
 					{MessageId: "missingGetterInObjectLiteral", Message: "Getter is not present for setter."},
 				},
 			},

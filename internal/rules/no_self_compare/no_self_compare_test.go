@@ -105,6 +105,12 @@ func TestNoSelfCompareRule(t *testing.T) {
 				},
 			},
 			{
+				Code: `class C { #foo; compare() { return this.#foo === this.#\u0066oo; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "comparingToSelf"},
+				},
+			},
+			{
 				Code: `if (x > x) { }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "comparingToSelf", Line: 1, Column: 5, EndLine: 1, EndColumn: 10},

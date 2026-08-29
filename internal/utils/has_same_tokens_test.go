@@ -56,7 +56,10 @@ func TestHasSameTokens(t *testing.T) {
 	}{
 		// ---- Basic equality / inequality ----
 		{"identifier equal", `x === x`, true},
+		{"identifier escape equal", `foo === \u0066oo`, true},
 		{"identifier differ", `x === y`, false},
+		{"private identifier escape equal", `this.#foo === this.#\u0066oo`, true},
+		{"private identifier differ", `this.#foo === this.#bar`, false},
 		{"numeric equal", `1 === 1`, true},
 		{"numeric differ", `1 === 2`, false},
 		{"string equal", `'a' === 'a'`, true},
@@ -231,7 +234,7 @@ func TestHasSameTokensFullAudit(t *testing.T) {
 		{`0b1 === 1`, false, "binary vs decimal"},
 		{`0o7 === 7`, false, "octal vs decimal"},
 		{`1_000 === 1000`, false, "underscore separator visible"},
-		{`foo === \u0066oo`, false, "unicode escape vs plain"},
+		{`foo === \u0066oo`, true, "identifier token value decodes unicode escapes"},
 
 		// Null / undefined
 		{`null === null`, true, "null keyword self"},
