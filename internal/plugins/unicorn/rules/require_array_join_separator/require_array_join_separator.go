@@ -15,33 +15,6 @@ var missingSeparatorMessage = rule.RuleMessage{
 	Description: "Missing the separator argument.",
 }
 
-func directCallParenthesesRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRange, core.TextRange, bool) {
-	call := node.AsCallExpression()
-	if call == nil || call.Expression == nil {
-		return core.TextRange{}, core.TextRange{}, false
-	}
-
-	scanStart := call.Expression.End()
-	if call.TypeArguments != nil && len(call.TypeArguments.Nodes) > 0 {
-		scanStart = call.TypeArguments.End()
-	}
-
-	s := scanner.GetScannerForSourceFile(sourceFile, scanStart)
-	for s.Token() != ast.KindOpenParenToken && s.TokenStart() < node.End() {
-		s.Scan()
-	}
-	if s.Token() != ast.KindOpenParenToken {
-		return core.TextRange{}, core.TextRange{}, false
-	}
-	opening := s.TokenRange()
-	s.Scan()
-	if s.Token() != ast.KindCloseParenToken || s.TokenEnd() != node.End() {
-		return core.TextRange{}, core.TextRange{}, false
-	}
-
-	return opening, s.TokenRange(), true
-}
-
 func prototypeCallSuffix(sourceFile *ast.SourceFile, node *ast.Node, argument *ast.Node) (core.TextRange, int, ast.Kind, bool) {
 	if argument == nil {
 		return core.TextRange{}, 0, ast.KindUnknown, false
@@ -118,7 +91,7 @@ var RequireArrayJoinSeparatorRule = rule.Rule{
 						return
 					}
 				} else {
-					opening, directClosing, ok := directCallParenthesesRange(ctx.SourceFile, node)
+					opening, directClosing, ok := unicornutil.CallExpressionParenthesesRange(ctx.SourceFile, node)
 					if !ok {
 						return
 					}

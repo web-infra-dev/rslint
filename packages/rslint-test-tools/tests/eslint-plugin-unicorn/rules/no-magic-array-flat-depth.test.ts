@@ -35,11 +35,29 @@ ruleTester.run('no-magic-array-flat-depth', null as never, {
     valid('array.flat?.(2)'),
     valid('array.notFlat(2)'),
     valid('flat(2)'),
+
+    // Statically known non-array receivers.
+    valid('Math.abs(-2).flat(2)'),
+    valid('Array.isArray([]).flat(2)'),
+    valid("parseInt('2', 10).flat(2)"),
+    valid('Number(1).flat(2)'),
+    valid('const value = 1; value.flat(2)'),
   ],
   invalid: [
     invalid('array.flat(2)'),
     invalid('array?.flat(2)'),
     invalid('array.flat(99,)'),
     invalid('array.flat(0b10,)'),
+
+    // Known arrays, unknown/throwing coercions, and source-only recursion.
+    invalid('Array.of(1).flat(2)'),
+    invalid('Object.freeze([]).flat(2)'),
+    invalid('Number(value).flat(2)'),
+    invalid('BigInt().flat(2)'),
+    invalid('const value = Math.PI; value.flat(2)'),
+    invalid('(flag ? Math.PI : 1).flat(2)'),
+
+    // A comment before the real opening parenthesis is outside the arguments.
+    invalid('array.flat /* explanation */ (2)'),
   ],
 });

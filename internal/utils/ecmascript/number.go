@@ -64,6 +64,141 @@ func NumberToString(value float64) string {
 	return sign + digits[:1] + "." + digits[1:] + "e" + exponentText
 }
 
+// NumberToExponential implements Number.prototype.toExponential's finite
+// number formatting. A negative fractionDigits value requests the shortest
+// round-tripping representation used when the argument is omitted.
+func NumberToExponential(value float64, fractionDigits int) string {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return NumberToString(value)
+	}
+	sign := ""
+	if value < 0 {
+		sign = "-"
+		value = -value
+	} else if value == 0 {
+		// JavaScript suppresses the sign of negative zero in decimal formats.
+		value = 0
+	}
+	if fractionDigits < 0 {
+		scientific := strconv.FormatFloat(value, 'e', -1, 64)
+		exponentMarker := strings.LastIndexByte(scientific, 'e')
+		exponent, _ := strconv.Atoi(scientific[exponentMarker+1:])
+		return sign + scientific[:exponentMarker] + "e" + signedDecimalExponent(exponent)
+	}
+	digits, exponent := roundedSignificantDecimal(value, fractionDigits+1)
+	mantissa := digits[:1]
+	if fractionDigits > 0 {
+		mantissa += "." + digits[1:]
+	}
+	return sign + mantissa + "e" + signedDecimalExponent(exponent)
+}
+
+// NumberToPrecision implements Number.prototype.toPrecision's finite number
+// formatting for precisions in the ECMAScript range [1, 100].
+func NumberToPrecision(value float64, precision int) string {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return NumberToString(value)
+	}
+	sign := ""
+	if value < 0 {
+		sign = "-"
+		value = -value
+	}
+	if value == 0 {
+		if precision == 1 {
+			return "0"
+		}
+		return "0." + strings.Repeat("0", precision-1)
+	}
+
+	digits, exponent := roundedSignificantDecimal(value, precision)
+	if exponent < -6 || exponent >= precision {
+		if len(digits) == 1 {
+			return sign + digits + "e" + signedDecimalExponent(exponent)
+		}
+		return sign + digits[:1] + "." + digits[1:] + "e" + signedDecimalExponent(exponent)
+	}
+
+	decimalPosition := exponent + 1
+	switch {
+	case decimalPosition <= 0:
+		return sign + "0." + strings.Repeat("0", -decimalPosition) + digits
+	case decimalPosition >= len(digits):
+		return sign + digits + strings.Repeat("0", decimalPosition-len(digits))
+	default:
+		return sign + digits[:decimalPosition] + "." + digits[decimalPosition:]
+	}
+}
+
+// roundedSignificantDecimal implements the finite, positive-number rounding
+// step shared by ECMAScript's ToRawPrecision and ToRawExponential operations.
+// The specification chooses the larger decimal integer on an exact tie; Go's
+// strconv fixed-precision formatting uses ties-to-even and therefore cannot be
+// used for values such as 1.25 at two significant digits.
+func roundedSignificantDecimal(value float64, precision int) (digits string, exponent int) {
+	if value == 0 {
+		return strings.Repeat("0", precision), 0
+	}
+	rational := new(big.Rat).SetFloat64(value)
+	numerator := new(big.Int).Set(rational.Num())
+	denominator := new(big.Int).Set(rational.Denom())
+	scientific := strconv.FormatFloat(value, 'e', -1, 64)
+	exponentMarker := strings.LastIndexByte(scientific, 'e')
+	exponent, _ = strconv.Atoi(scientific[exponentMarker+1:])
+	// The shortest round-tripping decimal can cross a power-of-ten boundary
+	// (for example, float64(1e-7) is slightly smaller than exact 1e-7). Correct
+	// the estimate against the exact binary rational before scaling.
+	for compareRationalToPowerOfTen(numerator, denominator, exponent) < 0 {
+		exponent--
+	}
+	for compareRationalToPowerOfTen(numerator, denominator, exponent+1) >= 0 {
+		exponent++
+	}
+	scale := precision - 1 - exponent
+	if scale >= 0 {
+		numerator.Mul(numerator, decimalPowerOfTen(scale))
+	} else {
+		denominator.Mul(denominator, decimalPowerOfTen(-scale))
+	}
+
+	remainder := new(big.Int)
+	rounded := new(big.Int)
+	rounded.QuoRem(numerator, denominator, remainder)
+	if remainder.Lsh(remainder, 1).Cmp(denominator) >= 0 {
+		rounded.Add(rounded, big.NewInt(1))
+	}
+	digits = rounded.String()
+	if len(digits) > precision {
+		rounded.Quo(rounded, big.NewInt(10))
+		digits = rounded.String()
+		exponent++
+	}
+	if len(digits) < precision {
+		digits = strings.Repeat("0", precision-len(digits)) + digits
+	}
+	return digits, exponent
+}
+
+func decimalPowerOfTen(exponent int) *big.Int {
+	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
+}
+
+func compareRationalToPowerOfTen(numerator, denominator *big.Int, exponent int) int {
+	if exponent >= 0 {
+		right := new(big.Int).Mul(denominator, decimalPowerOfTen(exponent))
+		return numerator.Cmp(right)
+	}
+	left := new(big.Int).Mul(numerator, decimalPowerOfTen(-exponent))
+	return left.Cmp(denominator)
+}
+
+func signedDecimalExponent(exponent int) string {
+	if exponent >= 0 {
+		return "+" + strconv.Itoa(exponent)
+	}
+	return strconv.Itoa(exponent)
+}
+
 // StringToNumber applies JavaScript's StringToNumber operation. The boolean is
 // false exactly when JavaScript would produce NaN; infinities and signed zero
 // are valid results.

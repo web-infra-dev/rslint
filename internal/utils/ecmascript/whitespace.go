@@ -81,6 +81,18 @@ func StringTrim(s string) string {
 	return strings.TrimFunc(s, IsWhiteSpaceOrLineTerminator)
 }
 
+// StringTrimStart trims the leading edge the way
+// String.prototype.trimStart does.
+func StringTrimStart(s string) string {
+	return strings.TrimLeftFunc(s, IsWhiteSpaceOrLineTerminator)
+}
+
+// StringTrimEnd trims the trailing edge the way String.prototype.trimEnd
+// does.
+func StringTrimEnd(s string) string {
+	return strings.TrimRightFunc(s, IsWhiteSpaceOrLineTerminator)
+}
+
 // IsBlank reports whether s holds nothing but whitespace, which is what
 // JavaScript's `s.trim() === ""` asks.
 func IsBlank(s string) bool {

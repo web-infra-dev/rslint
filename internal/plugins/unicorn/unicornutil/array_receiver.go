@@ -68,23 +68,84 @@ var typedArrayNames = []string{
 }
 
 type arrayReceiverStaticEvaluatorFileCacheKey struct{}
+type sourceOnlyArrayReceiverStaticEvaluatorFileCacheKey struct{}
+type sourceOnlyArrayReceiverClassificationFileCacheKey struct{}
+
+type sourceOnlyArrayReceiverClassificationCache struct {
+	symbols map[*ast.Symbol]sourceOnlyArrayReceiverClassificationEntry
+}
+
+type sourceOnlyArrayReceiverClassificationEntry struct {
+	class           arrayClass
+	additionalDepth int
+	terminal        bool
+}
+
+type arrayReceiverClassifier struct {
+	ctx                  rule.RuleContext
+	targetNames          *utils.Set[string]
+	nonTargetNames       *utils.Set[string]
+	staticEvaluator      *utils.StaticStringEvaluator
+	allowTypeInformation bool
+	sourceOnlySemantics  bool
+	recursionDepth       int
+	recursionPeak        int
+	recursionExhausted   bool
+	sourceOnlyCache      *sourceOnlyArrayReceiverClassificationCache
+}
+
+const maxSourceOnlyArrayReceiverDepth = 1 << 10
 
 // classifyArrayReceiver mirrors the syntactic short-circuits of unicorn's
 // getType (array literals, Array()/new Array()/Array.from/Array.of), then falls
 // back to a type-checker classification analogous to getTypeScriptType.
 func classifyArrayReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
-	return classifyArrayReceiverInner(ctx, node, targetNames, nonTargetNames, map[*ast.Symbol]bool{})
+	classifier := arrayReceiverClassifier{
+		ctx:                  ctx,
+		targetNames:          targetNames,
+		nonTargetNames:       nonTargetNames,
+		staticEvaluator:      arrayReceiverStaticEvaluator(ctx),
+		allowTypeInformation: true,
+	}
+	return classifier.classify(node, map[*ast.Symbol]bool{})
 }
 
-func classifyArrayReceiverInner(
-	ctx rule.RuleContext,
-	node *ast.Node,
-	targetNames, nonTargetNames *utils.Set[string],
-	visitedSymbols map[*ast.Symbol]bool,
-) arrayClass {
+func classifySourceOnlyIndexedCollectionReceiver(ctx rule.RuleContext, node *ast.Node) arrayClass {
+	classifier := arrayReceiverClassifier{
+		ctx:                 ctx,
+		targetNames:         indexedCollectionTargets,
+		nonTargetNames:      keyedCollectionNames,
+		staticEvaluator:     sourceOnlyArrayReceiverStaticEvaluator(ctx),
+		sourceOnlySemantics: true,
+		sourceOnlyCache:     sourceOnlyArrayReceiverClassificationCacheForFile(ctx),
+	}
+	return classifier.classify(node, map[*ast.Symbol]bool{})
+}
+
+func (classifier *arrayReceiverClassifier) classify(node *ast.Node, visitedSymbols map[*ast.Symbol]bool) arrayClass {
+	if classifier.sourceOnlySemantics {
+		if classifier.recursionExhausted {
+			return arrayClassUnknown
+		}
+		if classifier.recursionDepth >= maxSourceOnlyArrayReceiverDepth {
+			// Treat exhaustion as terminal for this receiver. Otherwise an outer
+			// conditional can retry a shorter suffix with the static evaluator
+			// while unwinding and effectively segment an unbounded chain.
+			classifier.recursionExhausted = true
+			return arrayClassUnknown
+		}
+		classifier.recursionDepth++
+		classifier.recursionPeak = max(classifier.recursionPeak, classifier.recursionDepth)
+		defer func() { classifier.recursionDepth-- }()
+	}
 	if node == nil {
 		return arrayClassUnknown
 	}
+	parenthesizedOptionalAccess := classifier.sourceOnlySemantics && node.Kind == ast.KindParenthesizedExpression &&
+		func() bool {
+			inner := ast.SkipParentheses(node)
+			return inner != nil && ast.IsAccessExpression(inner) && ast.IsOptionalChain(inner)
+		}()
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return arrayClassUnknown
@@ -94,62 +155,82 @@ func classifyArrayReceiverInner(
 	// expression itself. Assertions are different: an informative annotation
 	// wins, while any / unknown falls through to the wrapped expression.
 	if node.Kind == ast.KindSatisfiesExpression {
-		return classifyArrayReceiverInner(
-			ctx, node.AsSatisfiesExpression().Expression, targetNames, nonTargetNames, visitedSymbols,
-		)
+		return classifier.classify(node.AsSatisfiesExpression().Expression, visitedSymbols)
 	}
 	if node.Kind == ast.KindAsExpression || node.Kind == ast.KindTypeAssertionExpression {
-		if class := classifyArrayTypeNode(ctx, node.Type(), targetNames, nonTargetNames, map[*ast.Symbol]bool{}); class != arrayClassUnknown {
+		if class := classifyArrayTypeNode(
+			classifier.ctx, node.Type(), classifier.targetNames, classifier.nonTargetNames, map[*ast.Symbol]bool{},
+		); class != arrayClassUnknown {
 			return class
 		}
-		return classifyArrayReceiverInner(ctx, node.Expression(), targetNames, nonTargetNames, visitedSymbols)
+		return classifier.classify(node.Expression(), visitedSymbols)
 	}
 	if node.Kind == ast.KindNonNullExpression {
-		return classifyArrayReceiverInner(ctx, node.Expression(), targetNames, nonTargetNames, visitedSymbols)
+		return classifier.classify(node.Expression(), visitedSymbols)
+	}
+	// An array literal is a target even when one of its elements cannot be
+	// folded. Taking this shape shortcut before static evaluation also avoids
+	// rebuilding deeply nested literal aliases just to rediscover the outer
+	// array kind.
+	if classifier.sourceOnlySemantics && node.Kind == ast.KindArrayLiteralExpression {
+		return arrayClassTarget
 	}
 
 	if ast.IsIdentifier(node) {
-		if class := classifyArrayIdentifier(ctx, node, targetNames, nonTargetNames, visitedSymbols); class != arrayClassUnknown {
+		if class := classifier.classifyIdentifier(node, visitedSymbols); class != arrayClassUnknown {
 			return class
+		}
+		if classifier.recursionExhausted {
+			return arrayClassUnknown
 		}
 	}
 	if node.Kind == ast.KindConditionalExpression {
 		conditional := node.AsConditionalExpression()
-		return combineArrayClassesUnion([]arrayClass{
-			classifyArrayReceiverInner(ctx, conditional.WhenTrue, targetNames, nonTargetNames, visitedSymbols),
-			classifyArrayReceiverInner(ctx, conditional.WhenFalse, targetNames, nonTargetNames, visitedSymbols),
+		class := combineArrayClassesUnion([]arrayClass{
+			classifier.classify(conditional.WhenTrue, visitedSymbols),
+			classifier.classify(conditional.WhenFalse, visitedSymbols),
 		})
+		if classifier.recursionExhausted {
+			return arrayClassUnknown
+		}
+		if !classifier.sourceOnlySemantics || class != arrayClassUnknown {
+			return class
+		}
 	}
 	if ast.IsBinaryExpression(node) &&
 		node.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
-		return classifyArrayReceiverInner(
-			ctx, node.AsBinaryExpression().Right, targetNames, nonTargetNames, visitedSymbols,
-		)
+		class := classifier.classify(node.AsBinaryExpression().Right, visitedSymbols)
+		if classifier.recursionExhausted {
+			return arrayClassUnknown
+		}
+		if !classifier.sourceOnlySemantics || class != arrayClassUnknown {
+			return class
+		}
 	}
-
 	// getStaticValue runs before Unicorn's syntactic target/non-target checks.
-	// Identifier and member expressions are intentionally excluded even when
-	// eslint-utils can fold them; upstream keeps those shapes unknown.
-	if !ast.IsIdentifier(node) && !ast.IsAccessExpression(node) {
-		staticEvaluator := arrayReceiverStaticEvaluator(ctx)
-		if isArray, known := staticEvaluator.EvalArrayValue(node); known {
+	// A known array member is still a target; a known non-array member stays
+	// unknown, matching upstream's getStaticType special case.
+	if !ast.IsIdentifier(node) && (classifier.sourceOnlySemantics || !ast.IsAccessExpression(node)) {
+		if isArray, known := classifier.staticEvaluator.EvalArrayValue(node); known {
 			if isArray {
 				return arrayClassTarget
 			}
-			return arrayClassNonTarget
+			if !classifier.sourceOnlySemantics || !ast.IsAccessExpression(node) || parenthesizedOptionalAccess {
+				return arrayClassNonTarget
+			}
 		}
 	}
 
 	if isSyntacticArrayNode(node) {
 		return arrayClassTarget
 	}
-	if isSyntacticTargetConstructor(node, targetNames) {
+	if isSyntacticTargetConstructor(node, classifier.targetNames) {
 		return arrayClassTarget
 	}
 
-	if ctx.TypeChecker != nil {
-		t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
-		if class := classifyArrayType(ctx, t, targetNames); class != arrayClassUnknown {
+	if classifier.allowTypeInformation && classifier.ctx.TypeChecker != nil {
+		t := utils.GetConstrainedTypeAtLocation(classifier.ctx.TypeChecker, node)
+		if class := classifyArrayType(classifier.ctx, t, classifier.targetNames); class != arrayClassUnknown {
 			return class
 		}
 	}
@@ -168,17 +249,90 @@ func arrayReceiverStaticEvaluator(ctx rule.RuleContext) *utils.StaticStringEvalu
 	})
 }
 
-func classifyArrayIdentifier(
+func sourceOnlyArrayReceiverStaticEvaluator(ctx rule.RuleContext) *utils.StaticStringEvaluator {
+	return rule.CachedByFile(ctx, sourceOnlyArrayReceiverStaticEvaluatorFileCacheKey{}, func() *utils.StaticStringEvaluator {
+		return utils.NewStaticStringEvaluatorForSourceOnlyStaticValue(
+			ctx.SourceFile, sourceOnlyStaticReferenceResolver{refs: ctx.Refs, globals: ctx.Globals},
+		)
+	})
+}
+
+func sourceOnlyArrayReceiverClassificationCacheForFile(
 	ctx rule.RuleContext,
+) *sourceOnlyArrayReceiverClassificationCache {
+	return rule.CachedByFile(ctx, sourceOnlyArrayReceiverClassificationFileCacheKey{}, func() *sourceOnlyArrayReceiverClassificationCache {
+		return &sourceOnlyArrayReceiverClassificationCache{
+			symbols: map[*ast.Symbol]sourceOnlyArrayReceiverClassificationEntry{},
+		}
+	})
+}
+
+type sourceOnlyStaticReferenceResolver struct {
+	refs    *rule.RefStore
+	globals rule.Globals
+}
+
+func (resolver sourceOnlyStaticReferenceResolver) Resolve(node *ast.Node) *ast.Symbol {
+	if resolver.refs == nil {
+		return nil
+	}
+	return resolver.refs.ResolveInFile(node)
+}
+
+func (resolver sourceOnlyStaticReferenceResolver) IsUnshadowedGlobal(node *ast.Node, name string) bool {
+	return resolver.refs != nil && node != nil && ast.IsIdentifier(node) &&
+		node.AsIdentifier().Text == name && resolver.globals.Access(name).IsDeclared() &&
+		!resolver.refs.IsDefinedInFile(node)
+}
+
+func (classifier *arrayReceiverClassifier) classifyIdentifier(
 	idNode *ast.Node,
-	targetNames, nonTargetNames *utils.Set[string],
 	visitedSymbols map[*ast.Symbol]bool,
-) arrayClass {
-	if ctx.Refs == nil || idNode == nil {
+) (class arrayClass) {
+	if classifier.ctx.Refs == nil || idNode == nil {
 		return arrayClassUnknown
 	}
-	symbol := ctx.Refs.ResolveInFile(idNode)
-	if symbol == nil || visitedSymbols[symbol] || len(symbol.Declarations) != 1 {
+	symbol := classifier.ctx.Refs.ResolveInFile(idNode)
+	if symbol == nil {
+		return arrayClassUnknown
+	}
+	if visitedSymbols[symbol] {
+		return arrayClassUnknown
+	}
+	memoizeClassification := classifier.sourceOnlySemantics && classifier.sourceOnlyCache != nil
+	if memoizeClassification {
+		if cached, exists := classifier.sourceOnlyCache.symbols[symbol]; exists {
+			if class, replay := classifier.replaySourceOnlyClassification(cached); replay {
+				return class
+			}
+		}
+		startDepth := classifier.recursionDepth
+		previousPeak := classifier.recursionPeak
+		classifier.recursionPeak = startDepth
+		defer func() {
+			localPeak := classifier.recursionPeak
+			classifier.recursionPeak = max(previousPeak, localPeak)
+			// Unknown is a stable, conservative result for an immutable symbol
+			// too. Publishing only after the initializer has been classified keeps
+			// cycles out of the lookup path, while memoizing unknown prevents a
+			// shared conditional dependency from expanding exponentially.
+			entry := sourceOnlyArrayReceiverClassificationEntry{
+				class:           class,
+				additionalDepth: localPeak - startDepth,
+			}
+			if classifier.recursionExhausted {
+				// The rejected next node proves that this symbol needs at least one
+				// level beyond the observed peak. Deeper contexts can replay the
+				// terminal unknown in O(1); shallower contexts recompute and replace
+				// it with either an exact result or a stronger lower bound.
+				entry.class = arrayClassUnknown
+				entry.additionalDepth++
+				entry.terminal = true
+			}
+			classifier.sourceOnlyCache.symbols[symbol] = entry
+		}()
+	}
+	if len(symbol.Declarations) != 1 {
 		return arrayClassUnknown
 	}
 	visitedSymbols[symbol] = true
@@ -189,7 +343,9 @@ func classifyArrayIdentifier(
 		return arrayClassUnknown
 	}
 	if annotation := arrayBindingTypeAnnotation(declaration); annotation != nil {
-		if class := classifyArrayTypeNode(ctx, annotation, targetNames, nonTargetNames, map[*ast.Symbol]bool{}); class != arrayClassUnknown {
+		if class := classifyArrayTypeNode(
+			classifier.ctx, annotation, classifier.targetNames, classifier.nonTargetNames, map[*ast.Symbol]bool{},
+		); class != arrayClassUnknown {
 			return class
 		}
 	}
@@ -199,11 +355,32 @@ func classifyArrayIdentifier(
 	declarationList := declaration.Parent
 	variable := declaration.AsVariableDeclaration()
 	if declarationList == nil || !ast.IsVariableDeclarationList(declarationList) ||
-		declarationList.Flags&ast.NodeFlagsConst == 0 || variable.Name() == nil ||
+		declarationList.Flags&ast.NodeFlagsConst == 0 ||
+		classifier.sourceOnlySemantics && (ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList)) ||
+		variable.Name() == nil ||
 		!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
 		return arrayClassUnknown
 	}
-	return classifyArrayReceiverInner(ctx, variable.Initializer, targetNames, nonTargetNames, visitedSymbols)
+	return classifier.classify(variable.Initializer, visitedSymbols)
+}
+
+func (classifier *arrayReceiverClassifier) replaySourceOnlyClassification(
+	entry sourceOnlyArrayReceiverClassificationEntry,
+) (arrayClass, bool) {
+	projectedDepth := classifier.recursionDepth + entry.additionalDepth
+	if projectedDepth > maxSourceOnlyArrayReceiverDepth {
+		// Recreate the terminal state and peak that produced this conservative
+		// result. Otherwise an outer symbol can store an undersized lower bound,
+		// or a conditional/comma expression can bypass the guard via static eval.
+		classifier.recursionPeak = max(classifier.recursionPeak, maxSourceOnlyArrayReceiverDepth)
+		classifier.recursionExhausted = true
+		return arrayClassUnknown, true
+	}
+	if entry.terminal {
+		return arrayClassUnknown, false
+	}
+	classifier.recursionPeak = max(classifier.recursionPeak, projectedDepth)
+	return entry.class, true
 }
 
 // arrayBindingTypeAnnotation mirrors definition.name?.typeAnnotation in

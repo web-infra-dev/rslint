@@ -2,6 +2,7 @@ package ecmascript
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -51,6 +52,54 @@ func TestNumberToString(t *testing.T) {
 				t.Errorf("NumberToString(%v) = %q, want %q", test.value, got, test.want)
 			}
 		})
+	}
+}
+
+func TestNumberToExponential(t *testing.T) {
+	tests := []struct {
+		value          float64
+		fractionDigits int
+		want           string
+	}{
+		{value: math.Copysign(0, -1), fractionDigits: -1, want: "0e+0"},
+		{value: 0, fractionDigits: 2, want: "0.00e+0"},
+		{value: math.Copysign(0, -1), fractionDigits: 2, want: "0.00e+0"},
+		{value: 1.5, fractionDigits: 0, want: "2e+0"},
+		{value: 1.25, fractionDigits: 1, want: "1.3e+0"},
+		{value: 2.25, fractionDigits: 1, want: "2.3e+0"},
+		{value: -1.25, fractionDigits: 1, want: "-1.3e+0"},
+		{value: 1.5, fractionDigits: 2, want: "1.50e+0"},
+		{value: 1e-7, fractionDigits: 20, want: "9.99999999999999954748e-8"},
+		{value: math.MaxFloat64, fractionDigits: 20, want: "1.79769313486231570815e+308"},
+	}
+	for _, test := range tests {
+		if got := NumberToExponential(test.value, test.fractionDigits); got != test.want {
+			t.Errorf("NumberToExponential(%v, %d) = %q, want %q", test.value, test.fractionDigits, got, test.want)
+		}
+	}
+}
+
+func TestNumberToPrecision(t *testing.T) {
+	tests := []struct {
+		value     float64
+		precision int
+		want      string
+	}{
+		{value: math.Copysign(0, -1), precision: 2, want: "0.0"},
+		{value: 1.5, precision: 1, want: "2"},
+		{value: 1.25, precision: 2, want: "1.3"},
+		{value: 2.25, precision: 2, want: "2.3"},
+		{value: 0.125, precision: 2, want: "0.13"},
+		{value: -1.25, precision: 2, want: "-1.3"},
+		{value: 1.5, precision: 20, want: "1.5000000000000000000"},
+		{value: 1e-7, precision: 20, want: "9.9999999999999995475e-8"},
+		{value: 1e21, precision: 100, want: "1000000000000000000000." + strings.Repeat("0", 78)},
+		{value: math.MaxFloat64, precision: 20, want: "1.7976931348623157081e+308"},
+	}
+	for _, test := range tests {
+		if got := NumberToPrecision(test.value, test.precision); got != test.want {
+			t.Errorf("NumberToPrecision(%v, %d) = %q, want %q", test.value, test.precision, got, test.want)
+		}
 	}
 }
 

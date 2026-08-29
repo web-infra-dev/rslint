@@ -1,6 +1,8 @@
 package no_magic_array_flat_depth
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -53,12 +55,12 @@ var NoMagicArrayFlatDepthRule = rule.Rule{
 					return
 				}
 
-				// Skip if any comment sits between the callee end (= the `(`) and
-				// the closing paren — a commented explanation is exactly the kind
+				// Skip if any comment sits between the call's actual parentheses —
+				// a commented explanation is exactly the kind
 				// of context upstream wants to preserve. Upstream checks
 				// `commentsExistBetween(openingParenthesisToken, closingParenthesisToken)`,
 				// which covers both sides of the depth argument.
-				if hasCommentBetweenParens(ctx, call.Call, depth) {
+				if hasCommentBetweenParens(ctx, call.Call) {
 					return
 				}
 
@@ -84,27 +86,22 @@ func isNumericLiteral(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindNumericLiteral
 }
 
-// hasCommentBetweenParens reports whether any comment lives in the source
-// span from the end of the callee (right after `flat`, i.e. the position of
-// the opening `(`) up to the end of the call expression. Mirrors upstream's
+// hasCommentBetweenParens reports whether any comment lives between the
+// call's actual opening and closing parenthesis tokens. Mirrors upstream's
 // `sourceCode.commentsExistBetween(openingParenthesisToken, closingParenthesisToken)`.
-func hasCommentBetweenParens(ctx rule.RuleContext, call *ast.Node, depth *ast.Node) bool {
-	callee := call.AsCallExpression().Expression
-	if callee == nil {
+func hasCommentBetweenParens(ctx rule.RuleContext, call *ast.Node) bool {
+	opening, closing, ok := unicornutil.CallExpressionParenthesesRange(ctx.SourceFile, call)
+	if !ok {
 		return false
 	}
-	openParenPos := utils.TrimNodeTextRange(ctx.SourceFile, callee).End()
-	callEnd := utils.TrimNodeTextRange(ctx.SourceFile, call).End()
-	depthStart := utils.TrimNodeTextRange(ctx.SourceFile, depth).Pos()
-	if openParenPos >= callEnd {
+	start, end := opening.End(), closing.Pos()
+	if start >= end {
 		return false
 	}
-	// Avoid wasting a comment scan on the trivial case where the depth is the
-	// only thing in the parens.
-	if depthStart == openParenPos+1 || depthStart == openParenPos+2 {
-		// depth is immediately after `(`, optionally with whitespace.
-		depthEnd := depth.End()
-		return utils.HasCommentInSpan(ctx.Comments.All(), depthEnd, callEnd)
-	}
-	return utils.HasCommentInSpan(ctx.Comments.All(), openParenPos, callEnd)
+	span := ctx.SourceFile.Text()[start:end]
+	// The listener has already proved that the sole argument, after removing
+	// parentheses, is a numeric literal. Consequently this span can contain
+	// only that literal, parentheses, separators, and trivia; a comment opener
+	// cannot belong to a string, template, regular expression, or division.
+	return strings.Contains(span, "//") || strings.Contains(span, "/*")
 }

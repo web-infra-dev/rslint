@@ -49,23 +49,21 @@ func depthInvalid(code string) rule_tester.InvalidTestCase {
 // findDepthLiteral returns the byte offset and length of the numeric
 // argument passed to the only `.flat(` call in `code`. The upstream test
 // cases always use a single literal depth (no expressions), so a simple scan
-// for the first numeric-literal-shaped token after the last `.flat(` opener
+// for the first numeric-literal-shaped token after the last `.flat` call
 // is enough.
 func findDepthLiteral(code string) (int, int) {
-	// Locate the call's opening paren — `.flat(` — and search after it.
-	openIdx := strings.LastIndex(code, ".flat(")
-	if openIdx < 0 {
-		// Optional-member form: `?.flat(`.
-		openIdx = strings.LastIndex(code, "?.flat(")
-		if openIdx < 0 {
-			return -1, 0
-		}
-		openIdx++ // skip the leading `?` and use `.flat(`.
+	flatIndex := strings.LastIndex(code, ".flat")
+	if flatIndex < 0 {
+		return -1, 0
 	}
-	after := openIdx + len(".flat(")
-	// Skip whitespace.
+	openOffset := strings.IndexByte(code[flatIndex+len(".flat"):], '(')
+	if openOffset < 0 {
+		return -1, 0
+	}
+	after := flatIndex + len(".flat") + openOffset + 1
+	// Skip whitespace and parentheses around the depth literal.
 	i := after
-	for i < len(code) && (code[i] == ' ' || code[i] == '\t') {
+	for i < len(code) && (code[i] == ' ' || code[i] == '\t' || code[i] == '\n' || code[i] == '(') {
 		i++
 	}
 	if i >= len(code) {

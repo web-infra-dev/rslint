@@ -25,6 +25,34 @@ func StringCodeUnits(s string) []uint16 {
 	return units
 }
 
+// StringFromCodeUnits writes UTF-16 code units in the WTF-8 representation
+// used by compiler string values. Valid surrogate pairs become their scalar
+// value, while a lone surrogate keeps the three bytes that identify that
+// exact JavaScript code unit.
+func StringFromCodeUnits(units []uint16) string {
+	var builder strings.Builder
+	builder.Grow(len(units))
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
+		if unit >= 0xD800 && unit <= 0xDBFF && index+1 < len(units) {
+			next := units[index+1]
+			if next >= 0xDC00 && next <= 0xDFFF {
+				builder.WriteRune(utf16.DecodeRune(rune(unit), rune(next)))
+				index++
+				continue
+			}
+		}
+		if unit >= 0xD800 && unit <= 0xDFFF {
+			builder.WriteByte(0xE0 | byte(unit>>12))
+			builder.WriteByte(0x80 | byte(unit>>6&0x3F))
+			builder.WriteByte(0x80 | byte(unit&0x3F))
+			continue
+		}
+		builder.WriteRune(rune(unit))
+	}
+	return builder.String()
+}
+
 // StringCodeUnitCount reports s's length in the UTF-16 code units counted by
 // JavaScript String#length. Unlike core.UTF16Len, it also preserves lone
 // surrogates in the WTF-8 form used by compiler string values.
