@@ -85,6 +85,10 @@ func TestGroupedAccessorPairsExtras(t *testing.T) {
 				Code:   `({ get [foo](){}, middle: true, set [\u0066oo](value){} })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
 			},
+			{
+				Code:   `class C { #foo; get [this.#foo](){} middle(){} set [this.#\u0066oo](value){} }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGrouped"}},
+			},
 			// Empty class elements do not take precedence over an order violation.
 			{
 				Code:    `class C { set name(value){} ; get name(){} }`,

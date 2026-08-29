@@ -2614,6 +2614,12 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 		switch a.Kind {
 		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
 			return sameTokensInRange(sf, a.Pos(), a.End(), b.Pos(), b.End())
+		case ast.KindIdentifier:
+			// ESLint exposes the decoded token value, so escaped and unescaped
+			// spellings of the same identifier compare equal.
+			return a.AsIdentifier().Text == b.AsIdentifier().Text
+		case ast.KindPrivateIdentifier:
+			return a.AsPrivateIdentifier().Text == b.AsPrivateIdentifier().Text
 		}
 		return scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
 			scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)

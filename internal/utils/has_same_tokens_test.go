@@ -58,6 +58,8 @@ func TestHasSameTokens(t *testing.T) {
 		{"identifier equal", `x === x`, true},
 		{"identifier escape equal", `foo === \u0066oo`, true},
 		{"identifier differ", `x === y`, false},
+		{"private identifier escape equal", `this.#foo === this.#\u0066oo`, true},
+		{"private identifier differ", `this.#foo === this.#bar`, false},
 		{"numeric equal", `1 === 1`, true},
 		{"numeric differ", `1 === 2`, false},
 		{"string equal", `'a' === 'a'`, true},
