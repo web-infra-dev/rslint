@@ -204,12 +204,17 @@ func (tracker *regexpCallTracker) trackAssignmentTarget(node *ast.Node, value re
 			return
 		}
 		for _, propertyNode := range node.AsObjectLiteralExpression().Properties.Nodes {
-			if propertyNode.Kind != ast.KindPropertyAssignment {
-				continue
-			}
-			property := propertyNode.AsPropertyAssignment()
-			if name, ok := tracker.staticPropertyName(property.Name()); ok && name == "RegExp" {
-				tracker.trackAssignmentTarget(property.Initializer, regexpTraceConstructor)
+			switch propertyNode.Kind {
+			case ast.KindPropertyAssignment:
+				property := propertyNode.AsPropertyAssignment()
+				if name, ok := tracker.staticPropertyName(property.Name()); ok && name == "RegExp" {
+					tracker.trackAssignmentTarget(property.Initializer, regexpTraceConstructor)
+				}
+			case ast.KindShorthandPropertyAssignment:
+				property := propertyNode.AsShorthandPropertyAssignment()
+				if name, ok := tracker.staticPropertyName(property.Name()); ok && name == "RegExp" {
+					tracker.trackAssignmentTarget(property.Name(), regexpTraceConstructor)
+				}
 			}
 		}
 	case ast.KindBinaryExpression:
@@ -221,15 +226,15 @@ func (tracker *regexpCallTracker) trackAssignmentTarget(node *ast.Node, value re
 }
 
 func (tracker *regexpCallTracker) trackIdentifier(identifier *ast.Node, value regexpTraceValue) {
-	if symbol := regexpBindingSymbol(identifier); symbol != nil {
-		tracker.trackVariable(symbol, value)
-		return
-	}
 	if tracker.ctx.Refs != nil {
 		if symbol := tracker.ctx.Refs.Resolve(identifier); utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
 			return
 		}
+	}
+	if symbol := regexpBindingSymbol(identifier); symbol != nil {
+		tracker.trackVariable(symbol, value)
+		return
 	}
 	name := identifier.AsIdentifier().Text
 	if tracker.ctx.Globals.Access(name).IsDeclared() && tracker.isGlobalReference(identifier, name) {

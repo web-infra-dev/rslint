@@ -79,6 +79,15 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 					},
 				},
 			},
+			// Assignment-pattern shorthand carries globalThis.RegExp into the
+			// existing local binding just like an explicit property assignment.
+			{
+				Code: "let RegExp; ({RegExp} = globalThis); RegExp('x')",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `let RegExp; ({RegExp} = globalThis); RegExp('x', "u")`}},
+				}},
+			},
 			{
 				Code: "function fake() {} (fake, RegExp)('foo')",
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -438,6 +447,16 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 					{MessageId: "requireUFlag"},
 				},
 			},
+			// Invalid named captures still require the flag but cannot receive an
+			// unsafe suggestion that would make the pattern a syntax error.
+			{
+				Code:   `new RegExp("(?<a>x)(?<a>y)")`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
+			{
+				Code:   `new RegExp("(?<1>x)")`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
 			// ---- Dimension 4: parenthesized flags argument — ESTree has no
 			// parenthesis node, so the fix rewrites the literal inside ----
 			{
@@ -487,12 +506,11 @@ func TestRequireUnicodeRegexpSourceOnlyConstantFlags(t *testing.T) {
 
 	var diagnostics []rule.RuleDiagnostic
 	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:      sourceProgram,
-		File:         sourceFile.FileName(),
-		HasTypeInfo:  false,
-		ExcludePaths: []string{},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		Program:     sourceProgram,
+		File:        sourceFile.FileName(),
+		HasTypeInfo: false,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     RequireUnicodeRegexpRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -539,12 +557,11 @@ func TestRequireUnicodeRegexpEditDemand(t *testing.T) {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			HasTypeInfo:  true,
-			ExcludePaths: []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			Program:     lintprogram.NewFromCompiler(program),
+			File:        sourceFile.FileName(),
+			HasTypeInfo: true,
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     RequireUnicodeRegexpRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

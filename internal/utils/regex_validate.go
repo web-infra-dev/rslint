@@ -1,10 +1,12 @@
 package utils
 
 import (
-	"slices"
+	"strconv"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/microsoft/typescript-go/shim/scanner"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -399,7 +401,8 @@ func classSetElement(pattern string, i, last int, flags RegexFlags) (classSetEle
 // u/v flag such a `\k` reads as the literal characters `k<name>`; with it, an
 // unresolved reference is a SyntaxError.
 func hasUnresolvedNamedBackreferenceForUFlag(pattern string) bool {
-	var names, refs []string
+	names := make(map[string]struct{})
+	var refs []string
 	for i := 0; i < len(pattern); {
 		if pattern[i] == '[' {
 			end, ok := ClassEnd(pattern, i, RegexFlags{Unicode: true})
@@ -429,21 +432,104 @@ func hasUnresolvedNamedBackreferenceForUFlag(pattern string) bool {
 		if strings.HasPrefix(pattern[i:], "(?<") && i+3 < len(pattern) &&
 			pattern[i+3] != '=' && pattern[i+3] != '!' {
 			name, next, ok := readAngleName(pattern, i+2)
-			if !ok {
-				return false
+			normalized, valid := normalizeRegexCaptureName(name)
+			if !ok || !valid {
+				return true
 			}
-			names = append(names, name)
+			if _, duplicate := names[normalized]; duplicate {
+				return true
+			}
+			names[normalized] = struct{}{}
 			i = next
 			continue
 		}
 		i++
 	}
 	for _, ref := range refs {
-		if !slices.Contains(names, ref) {
+		normalized, valid := normalizeRegexCaptureName(ref)
+		if !valid {
+			return true
+		}
+		if _, exists := names[normalized]; !exists {
 			return true
 		}
 	}
 	return false
+}
+
+// normalizeRegexCaptureName validates the IdentifierName grammar used by
+// named captures and returns its decoded value so escaped and literal spellings
+// compare alike.
+func normalizeRegexCaptureName(name string) (string, bool) {
+	if name == "" {
+		return "", false
+	}
+	var result strings.Builder
+	for i := 0; i < len(name); {
+		if name[i] != '\\' {
+			r, width := utf8.DecodeRuneInString(name[i:])
+			if r == utf8.RuneError && width == 1 {
+				return "", false
+			}
+			result.WriteRune(r)
+			i += width
+			continue
+		}
+		value, width, ok := decodeRegexCaptureNameEscape(name, i)
+		if !ok {
+			return "", false
+		}
+		if value >= 0xD800 && value <= 0xDBFF {
+			next, nextWidth, ok := decodeRegexCaptureNameEscape(name, i+width)
+			if !ok || next < 0xDC00 || next > 0xDFFF {
+				return "", false
+			}
+			result.WriteRune(utf16.DecodeRune(rune(value), rune(next)))
+			width += nextWidth
+		} else {
+			if value >= 0xDC00 && value <= 0xDFFF {
+				return "", false
+			}
+			result.WriteRune(rune(value))
+		}
+		i += width
+	}
+	normalized := result.String()
+	for i, r := range normalized {
+		if (i == 0 && !scanner.IsIdentifierStart(r)) || (i != 0 && !scanner.IsIdentifierPart(r)) {
+			return "", false
+		}
+	}
+	return normalized, true
+}
+
+func decodeRegexCaptureNameEscape(name string, start int) (uint32, int, bool) {
+	if start+2 >= len(name) || name[start] != '\\' || name[start+1] != 'u' {
+		return 0, 0, false
+	}
+	if name[start+2] == '{' {
+		closeRel := strings.IndexByte(name[start+3:], '}')
+		if closeRel < 1 {
+			return 0, 0, false
+		}
+		digits := name[start+3 : start+3+closeRel]
+		if len(digits) > 6 || !allHexStr(digits) {
+			return 0, 0, false
+		}
+		value, err := strconv.ParseUint(digits, 16, 32)
+		if err != nil || value > utf8.MaxRune {
+			return 0, 0, false
+		}
+		return uint32(value), closeRel + 4, true
+	}
+	if start+6 > len(name) || !allHexStr(name[start+2:start+6]) {
+		return 0, 0, false
+	}
+	value, err := strconv.ParseUint(name[start+2:start+6], 16, 16)
+	if err != nil {
+		return 0, 0, false
+	}
+	return uint32(value), 6, true
 }
 
 // readAngleName reads a `<name>` starting at pattern[start], returning the
