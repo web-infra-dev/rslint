@@ -160,6 +160,43 @@ function forward<T extends readonly any[]>(values: T): void {
 					EndColumn: 26,
 				}},
 			},
+			{
+				// The ES5 fallback must retrieve an index type from each array
+				// union rather than requiring the whole type to be an array.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+declare const values: string[] | any[];
+
+acceptStrings(...values);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      5,
+					Column:    15,
+					EndLine:   5,
+					EndColumn: 24,
+				}},
+			},
+			{
+				// Generic array-union constraints take the same fallback after the
+				// checker resolves their base constraint.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+
+function forward<T extends string[] | any[]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      5,
+					Column:    17,
+					EndLine:   5,
+					EndColumn: 26,
+				}},
+			},
 		},
 	)
 }

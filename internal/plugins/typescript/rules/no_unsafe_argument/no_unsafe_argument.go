@@ -268,9 +268,10 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 							if constrainedType == nil {
 								constrainedType = spreadArgType
 							}
-							if checker.Checker_isArrayType(ctx.TypeChecker, constrainedType) || checker.IsTupleType(constrainedType) {
-								spreadElementType = utils.GetNumberIndexType(ctx.TypeChecker, constrainedType)
-							}
+							// GetNumberIndexType returns nil for non-indexable types. Do not
+							// require a single array or tuple here: an array union also has
+							// a numeric index type.
+							spreadElementType = utils.GetNumberIndexType(ctx.TypeChecker, constrainedType)
 						}
 						// Match upstream's argument alignment for an indeterminate-length
 						// spread: inspect the current parameter without advancing the real
