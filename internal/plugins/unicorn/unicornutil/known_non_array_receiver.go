@@ -90,99 +90,19 @@ func isSourceOnlyFile(ctx rule.RuleContext) bool {
 // checker) for `.ts` inputs where type annotations make the classification
 // defensible.
 func ShouldSkipKnownNonArrayReceiver(ctx rule.RuleContext, node *ast.Node) bool {
-	if isDirectlyReportableReceiver(node) {
-		return false
-	}
-
-	// Coercion constructors: the only CallExpression callees upstream's
-	// `getStaticValueForControlFlow` reliably folds to a known non-array
-	// value (a number, string, boolean, or bigint). `Symbol()` is
-	// deliberately excluded because every call returns a unique Symbol
-	// and cannot be folded.
-	if isNonArrayCoercionConstructorCall(ctx, node) {
-		return true
-	}
-
-	// For CallExpression, the shared static evaluator folds a handful
-	// of cases like `String.fromCharCode(65)` and `Array.of(...)`. If
-	// it resolves to a non-array value, trust that result.
-	if isSourceOnlyFile(ctx) && ast.IsCallExpression(node) {
-		staticEvaluator := arrayReceiverStaticEvaluator(ctx)
-		if _, known := staticEvaluator.EvalArrayValue(node); known {
-			return true
-		}
-	}
-
-	// Source-only path: trust upstream's "unknown" classification for
-	// identifier / member / call receivers. We deliberately skip the
-	// shared static evaluator for those shapes because it folds
-	// identifiers like `undefined` to a known non-array value that the
-	// upstream parser does NOT fold.
+	directNode := node
 	if isSourceOnlyFile(ctx) {
-		if isShapeUpstreamUnknown(node) {
-			return false
-		}
+		// tsgo materializes a JSDoc cast in JavaScript as an assertion wrapper;
+		// ESTree leaves the visible expression as the receiver node.
+		directNode = ast.SkipOuterExpressions(node, ast.OEKAll)
 	}
-
+	if isDirectlyReportableReceiver(directNode) {
+		return false
+	}
+	if isSourceOnlyFile(ctx) {
+		return classifySourceOnlyArrayReceiver(
+			ctx, node, indexedCollectionTargets, keyedCollectionNames,
+		) == arrayClassNonTarget
+	}
 	return IsKnownNonIndexedCollection(ctx, node)
-}
-
-// isShapeUpstreamUnknown reports whether node is one of the shapes
-// upstream's parser leaves "unknown" for source-only files. The shared
-// rslint static evaluator would also fold these (e.g. `undefined` →
-// Undefined), but the upstream parser does not, so the rule fires.
-func isShapeUpstreamUnknown(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return false
-	}
-	// Strip type annotations / assertions / non-null so a TS-only
-	// expression like `(x as number)` is treated by its underlying shape.
-	node = ast.SkipOuterExpressions(node, ast.OEKAll)
-	if node == nil {
-		return false
-	}
-	if ast.IsIdentifier(node) {
-		return true
-	}
-	if ast.IsAccessExpression(node) {
-		return true
-	}
-	if ast.IsCallExpression(node) {
-		return true
-	}
-	return false
-}
-
-// isNonArrayCoercionConstructorCall reports whether node is a bare call
-// to one of the four coercion constructors whose result is statically
-// known to be a non-array primitive: `Number(...)`, `String(...)`,
-// `Boolean(...)`, `BigInt(...)`. Upstream's
-// `getStaticValueForControlFlow` folds these to a primitive value; the
-// rslint static evaluator does not, so we mirror the upstream shape here.
-//
-// `Symbol()` is excluded: every call returns a unique Symbol and the
-// static evaluator cannot fold it. `parseInt` / `parseFloat` / `Object()`
-// are also excluded for the same reason — they aren't on the upstream
-// `staticGlobalProperties` allowlist, and the rslint type checker would
-// over-classify their return type for `.mjs` inputs.
-func isNonArrayCoercionConstructorCall(ctx rule.RuleContext, node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if !ast.IsCallExpression(node) {
-		return false
-	}
-	callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, ast.OEKParentheses|ast.OEKAssertions)
-	if !ast.IsIdentifier(callee) {
-		return false
-	}
-	// If the callee resolves to a local binding, the user's declaration
-	// wins; fall through to IsKnownNonIndexedCollection.
-	if ctx.Refs != nil && ctx.Refs.ResolveInFile(callee) != nil {
-		return false
-	}
-	switch callee.AsIdentifier().Text {
-	case "Number", "String", "Boolean", "BigInt":
-		return true
-	}
-	return false
 }
