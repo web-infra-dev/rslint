@@ -51,6 +51,132 @@ func TestIsSameReferenceNumericLiteralUsesJavaScriptValue(t *testing.T) {
 	}
 }
 
+func TestIsDefaultValueInDestructuringAssignment(t *testing.T) {
+	t.Parallel()
+
+	if IsDefaultValueInDestructuringAssignment(nil) {
+		t.Fatal("IsDefaultValueInDestructuringAssignment(nil) = true, want false")
+	}
+
+	tests := []struct {
+		name     string
+		code     string
+		nodeText string
+		want     bool
+	}{
+		{
+			name:     "direct array default",
+			code:     `[a = a || b] = array`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "array default inside rest pattern",
+			code:     `[...[a = a || b]] = array`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "array default inside nested rest patterns",
+			code:     `[...[...[a = a || b]]] = array`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "nested object and array default",
+			code:     `({ x: [...[a = a || b]] } = object)`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "array rest containing object pattern",
+			code:     `[...{ x: a = a || b }] = array`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "object shorthand default is not a binary expression",
+			code:     `({ a = a || b } = object)`,
+			nodeText: `a = a || b`,
+			want:     false,
+		},
+		{
+			name:     "for-of rest pattern",
+			code:     `for ([...[a = a || b]] of arrays) {}`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "for-in rest pattern",
+			code:     `for ([...[a = a || b]] in objects) {}`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "for-of object pattern",
+			code:     `for ({ x: a = a || b } of objects) {}`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "for-in object pattern",
+			code:     `for ({ x: a = a || b } in objects) {}`,
+			nodeText: `a = a || b`,
+			want:     true,
+		},
+		{
+			name:     "ordinary assignment",
+			code:     `a = a || b`,
+			nodeText: `a = a || b`,
+			want:     false,
+		},
+		{
+			name:     "compound assignment",
+			code:     `[a += a || b] = array`,
+			nodeText: `a += a || b`,
+			want:     false,
+		},
+		{
+			name:     "assignment in default right-hand side",
+			code:     `[x = (a = a || b)] = array`,
+			nodeText: `a = a || b`,
+			want:     false,
+		},
+		{
+			name:     "assignment in computed element",
+			code:     `[object[a = a || b] = value] = array`,
+			nodeText: `a = a || b`,
+			want:     false,
+		},
+		{
+			name:     "assignment in computed property",
+			code:     `({ [a = a || b]: value } = object)`,
+			nodeText: `a = a || b`,
+			want:     false,
+		},
+		{
+			name:     "array expression rather than assignment target",
+			code:     `consume([a = a || b])`,
+			nodeText: `a = a || b`,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, tt.code, core.ScriptKindTS)
+			node := findNodeWithText(t, sourceFile, tt.nodeText)
+			if got := IsDefaultValueInDestructuringAssignment(node); got != tt.want {
+				t.Errorf("IsDefaultValueInDestructuringAssignment(%q) = %v, want %v", tt.nodeText, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsESTreeLiteralKind(t *testing.T) {
 	literals := []ast.Kind{
 		ast.KindStringLiteral,
