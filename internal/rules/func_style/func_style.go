@@ -63,7 +63,8 @@ var FuncStyleRule = rule.Rule{
 			if declarator == nil || declarator.Kind != ast.KindVariableDeclaration {
 				return
 			}
-			if opts.allowTypeAnnotation && declarator.AsVariableDeclaration().Type != nil {
+			if declType := declarator.AsVariableDeclaration().Type; opts.allowTypeAnnotation &&
+				declType != nil && !utils.IsJSDocSyntaxNode(declType) {
 				return
 			}
 			isNamed := isNamedExportedDeclarator(declarator)

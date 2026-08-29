@@ -91,6 +91,11 @@ export default function test(a: unknown) { return a; }
 			// frame and does not exempt the component arrow (tested below) ----
 			{Code: "const Component = () => <div>{this.value}</div>;", Tsx: true, Options: []any{"declaration"}},
 
+			// ---- JSDoc's transparent type cast does not change an arrow's
+			// lexical `this` behavior: the cast is ignored, but the arrow is
+			// still exempt because its body references `this` ----
+			{Code: "const foo = /** @type {Function} */ (() => this.value);", FileName: "jsdoc-this.js", TSConfig: "tsconfig.allow-js.json", Options: []any{"declaration"}},
+
 			// ---- Dimension 2 nesting: unlike a method/getter/setter/
 			// constructor, a class static block is its own dedicated ESTree
 			// node (StaticBlock), never a FunctionExpression — so upstream's
@@ -173,6 +178,30 @@ export default function test(a: unknown) { return a; }
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "declaration"},
 				},
+			},
+			{
+				Code:     "const foo = /** @type {Function} */ (function () { return 1; });",
+				FileName: "jsdoc-function-cast.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{"declaration"},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "declaration"}},
+			},
+			{
+				Code:     "const foo = /** @type {Function} */ () => 1;",
+				FileName: "jsdoc-direct-cast.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{"declaration"},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "declaration"}},
+			},
+			// ---- A JSDoc type attached to the declaration is a comment in
+			// ESTree, not a TypeScript type annotation. It is therefore still
+			// checked even with allowTypeAnnotation enabled ----
+			{
+				Code:     "/** @type {() => number} */ const foo = () => 1;",
+				FileName: "jsdoc-declaration.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{"declaration", map[string]any{"allowTypeAnnotation": true}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "declaration"}},
 			},
 
 			// ---- Dimension 2 nesting: a `for` loop's own VariableDeclarator
