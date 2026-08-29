@@ -1,0 +1,183 @@
+// Rstest Snapshot v1
+
+exports[`grouped-accessor-pairs > invalid 1`] = `
+{
+  "code": "({ get a(){}, middle: true, set a(value){} })",
+  "diagnostics": [
+    {
+      "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+      "messageId": "notGrouped",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "grouped-accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`grouped-accessor-pairs > invalid 2`] = `
+{
+  "code": "class A { get a(){} middle(){} set a(value){} }",
+  "diagnostics": [
+    {
+      "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+      "messageId": "notGrouped",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "grouped-accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`grouped-accessor-pairs > invalid 3`] = `
+{
+  "code": "class A { static get #a(){} middle(){} static set #a(value){} }",
+  "diagnostics": [
+    {
+      "message": "Accessor pair static private getter #a and static private setter #a should be grouped.",
+      "messageId": "notGrouped",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "grouped-accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`grouped-accessor-pairs > invalid 4`] = `
+{
+  "code": "({ set a(value){}, get a(){} })",
+  "diagnostics": [
+    {
+      "message": "Expected getter 'a' to be before setter 'a'.",
+      "messageId": "invalidOrder",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "grouped-accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`grouped-accessor-pairs > invalid 5`] = `
+{
+  "code": "class A { static get a(){} static set a(value){} }",
+  "diagnostics": [
+    {
+      "message": "Expected static setter 'a' to be before static getter 'a'.",
+      "messageId": "invalidOrder",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "grouped-accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`grouped-accessor-pairs > invalid 6`] = `
+{
+  "code": "interface I { get a(): string; between: true; set a(value: string); }",
+  "diagnostics": [
+    {
+      "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+      "messageId": "notGrouped",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "grouped-accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`grouped-accessor-pairs > invalid 7`] = `
+{
+  "code": "type T = { get a(): string; set a(value: string); };",
+  "diagnostics": [
+    {
+      "message": "Expected setter 'a' to be before getter 'a'.",
+      "messageId": "invalidOrder",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "grouped-accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

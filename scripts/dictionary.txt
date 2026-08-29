@@ -2,6 +2,7 @@
 aavascript
 abce
 accesskey
+accessorutil
 accum
 acdfg
 acefg
@@ -90,6 +91,7 @@ Cbar
 cdylib
 centralising
 CHARCLASS
+cerialize
 checkerpool
 Citi
 classnames
@@ -140,6 +142,8 @@ destabilising
 destructures
 desugars
 desync
+dgimsuy
+dgimsuvy
 dialytika
 dirxml
 disqualifier
@@ -169,6 +173,7 @@ esmodule
 espree
 esregexp
 estree
+esutils
 eszett
 Ethi
 exclam
@@ -308,6 +313,7 @@ Lingui
 lingui
 lintable
 lintedfile
+lintpipeline
 lintprogram
 listitem
 litera
@@ -348,6 +354,7 @@ mmap
 mobx
 Modns
 modns
+moofoo
 morestack
 mousein
 mouseout

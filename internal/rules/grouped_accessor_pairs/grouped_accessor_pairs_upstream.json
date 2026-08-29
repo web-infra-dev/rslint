@@ -1,0 +1,1269 @@
+{
+  "upstream": {
+    "rule": "grouped-accessor-pairs",
+    "eslintVersion": "10.9.1",
+    "eslintCommit": "5c8c2417b9ff462f2dc4e54a062c59135b45b845"
+  },
+  "valid": [
+    {
+      "code": "({})"
+    },
+    {
+      "code": "({ a })"
+    },
+    {
+      "code": "({ a(){}, b(){}, a(){} })"
+    },
+    {
+      "code": "({ a: 1, b: 2 })"
+    },
+    {
+      "code": "({ a, ...b, c: 1 })"
+    },
+    {
+      "code": "({ a, b, ...a })"
+    },
+    {
+      "code": "({ a: 1, [b]: 2, a: 3, [b]: 4 })"
+    },
+    {
+      "code": "({ a: function get(){}, b, a: function set(foo){} })"
+    },
+    {
+      "code": "({ get(){}, a, set(){} })"
+    },
+    {
+      "code": "class A {}"
+    },
+    {
+      "code": "(class { a(){} })"
+    },
+    {
+      "code": "class A { a(){} [b](){} a(){} [b](){} }"
+    },
+    {
+      "code": "(class { a(){} b(){} static a(){} static b(){} })"
+    },
+    {
+      "code": "class A { get(){} a(){} set(){} }"
+    },
+    {
+      "code": "({ get a(){} })"
+    },
+    {
+      "code": "({ set a(foo){} })"
+    },
+    {
+      "code": "({ a: 1, get b(){}, c, ...d })"
+    },
+    {
+      "code": "({ get a(){}, get b(){}, set c(foo){}, set d(foo){} })"
+    },
+    {
+      "code": "({ get a(){}, b: 1, set c(foo){} })"
+    },
+    {
+      "code": "({ set a(foo){}, b: 1, a: 2 })"
+    },
+    {
+      "code": "({ get a(){}, b: 1, a })"
+    },
+    {
+      "code": "({ set a(foo){}, b: 1, a(){} })"
+    },
+    {
+      "code": "({ get a(){}, b: 1, set [a](foo){} })"
+    },
+    {
+      "code": "({ set a(foo){}, b: 1, get 'a '(){} })"
+    },
+    {
+      "code": "({ get a(){}, b: 1, ...a })"
+    },
+    {
+      "code": "({ set a(foo){}, b: 1 }, { get a(){} })"
+    },
+    {
+      "code": "({ get a(){}, b: 1, ...{ set a(foo){} } })"
+    },
+    {
+      "code": "({ set a(foo){}, get b(){} })",
+      "options": ["getBeforeSet"]
+    },
+    {
+      "code": "({ get a(){}, set b(foo){} })",
+      "options": ["setBeforeGet"]
+    },
+    {
+      "code": "class A { get a(){} }"
+    },
+    {
+      "code": "(class { set a(foo){} })"
+    },
+    {
+      "code": "class A { static set a(foo){} }"
+    },
+    {
+      "code": "(class { static get a(){} })"
+    },
+    {
+      "code": "class A { a(){} set b(foo){} c(){} }"
+    },
+    {
+      "code": "(class { a(){} get b(){} c(){} })"
+    },
+    {
+      "code": "class A { get a(){} static get b(){} set c(foo){} static set d(bar){} }"
+    },
+    {
+      "code": "(class { get a(){} b(){} a(foo){} })"
+    },
+    {
+      "code": "class A { static set a(foo){} b(){} static a(){} }"
+    },
+    {
+      "code": "(class { get a(){} static b(){} set [a](foo){} })"
+    },
+    {
+      "code": "class A { static set a(foo){} b(){} static get ' a'(){} }"
+    },
+    {
+      "code": "(class { set a(foo){} b(){} static get a(){} })"
+    },
+    {
+      "code": "class A { static set a(foo){} b(){} get a(){} }"
+    },
+    {
+      "code": "(class { get a(){} }, class { b(){} set a(foo){} })"
+    },
+    {
+      "code": "({ get a(){}, set a(foo){} })"
+    },
+    {
+      "code": "({ a: 1, set b(foo){}, get b(){}, c: 2 })"
+    },
+    {
+      "code": "({ get a(){}, set a(foo){}, set b(bar){}, get b(){} })"
+    },
+    {
+      "code": "({ get [a](){}, set [a](foo){} })"
+    },
+    {
+      "code": "({ set a(foo){}, get 'a'(){} })"
+    },
+    {
+      "code": "({ a: 1, b: 2, get a(){}, set a(foo){}, c: 3, a: 4 })"
+    },
+    {
+      "code": "({ get a(){}, set a(foo){}, set b(bar){} })"
+    },
+    {
+      "code": "({ get a(){}, get b(){}, set b(bar){} })"
+    },
+    {
+      "code": "class A { get a(){} set a(foo){} }"
+    },
+    {
+      "code": "(class { set a(foo){} get a(){} })"
+    },
+    {
+      "code": "class A { static set a(foo){} static get a(){} }"
+    },
+    {
+      "code": "(class { static get a(){} static set a(foo){} })"
+    },
+    {
+      "code": "class A { a(){} set b(foo){} get b(){} c(){} get d(){} set d(bar){} }"
+    },
+    {
+      "code": "(class { set a(foo){} get a(){} get b(){} set b(bar){} })"
+    },
+    {
+      "code": "class A { static set [a](foo){} static get [a](){} }"
+    },
+    {
+      "code": "(class { get a(){} set [`a`](foo){} })"
+    },
+    {
+      "code": "class A { static get a(){} static set a(foo){} set a(bar){} static get a(){} }"
+    },
+    {
+      "code": "(class { static get a(){} get a(){} set a(foo){} })"
+    },
+    {
+      "code": "({ get a(){}, set a(foo){} })",
+      "options": ["anyOrder"]
+    },
+    {
+      "code": "({ set a(foo){}, get a(){} })",
+      "options": ["anyOrder"]
+    },
+    {
+      "code": "({ get a(){}, set a(foo){} })",
+      "options": ["getBeforeSet"]
+    },
+    {
+      "code": "({ set a(foo){}, get a(){} })",
+      "options": ["setBeforeGet"]
+    },
+    {
+      "code": "class A { get a(){} set a(foo){} }",
+      "options": ["anyOrder"]
+    },
+    {
+      "code": "(class { set a(foo){} get a(){} })",
+      "options": ["anyOrder"]
+    },
+    {
+      "code": "class A { get a(){} set a(foo){} }",
+      "options": ["getBeforeSet"]
+    },
+    {
+      "code": "(class { static set a(foo){} static get a(){} })",
+      "options": ["setBeforeGet"]
+    },
+    {
+      "code": "({ get a(){}, b: 1, get a(){} })"
+    },
+    {
+      "code": "({ set a(foo){}, b: 1, set a(foo){} })"
+    },
+    {
+      "code": "({ get a(){}, b: 1, set a(foo){}, c: 2, get a(){} })"
+    },
+    {
+      "code": "({ set a(foo){}, b: 1, set 'a'(bar){}, c: 2, get a(){} })"
+    },
+    {
+      "code": "class A { get [a](){} b(){} get [a](){} c(){} set [a](foo){} }"
+    },
+    {
+      "code": "(class { static set a(foo){} b(){} static get a(){} static c(){} static set a(bar){} })"
+    },
+    {
+      "code": "class A { get '#abc'(){} b(){} set #abc(foo){} }"
+    },
+    {
+      "code": "class A { get #abc(){} b(){} set '#abc'(foo){} }"
+    },
+    {
+      "code": "class A { set '#abc'(foo){} get #abc(){} }",
+      "options": ["getBeforeSet"]
+    },
+    {
+      "code": "class A { set #abc(foo){} get '#abc'(){} }",
+      "options": ["getBeforeSet"]
+    },
+    {
+      "code": "interface I { get prop(): any, between: true, set prop(value: any): void }"
+    },
+    {
+      "code": "type T = { get prop(): any, between: true, set prop(value: any): void }"
+    },
+    {
+      "code": "interface I { get prop(): any, set prop(value: any): void }",
+      "options": [
+        "anyOrder",
+        {
+          "enforceForTSTypes": true
+        }
+      ]
+    },
+    {
+      "code": "interface I { set prop(value: any): void, get prop(): any }",
+      "options": [
+        "anyOrder",
+        {
+          "enforceForTSTypes": true
+        }
+      ]
+    },
+    {
+      "code": "interface I { get a(): any, between: true, set b(value: any): void }",
+      "options": [
+        "anyOrder",
+        {
+          "enforceForTSTypes": true
+        }
+      ]
+    },
+    {
+      "code": "interface I { before: true, get prop(): any, set prop(value: any): void, after: true }",
+      "options": [
+        "getBeforeSet",
+        {
+          "enforceForTSTypes": true
+        }
+      ]
+    },
+    {
+      "code": "interface I { set prop(value: any): void, get prop(): any }",
+      "options": [
+        "setBeforeGet",
+        {
+          "enforceForTSTypes": true
+        }
+      ]
+    },
+    {
+      "code": "type T = { get prop(): any, set prop(value: any): void }",
+      "options": [
+        "anyOrder",
+        {
+          "enforceForTSTypes": true
+        }
+      ]
+    },
+    {
+      "code": "type T = { set prop(value: any): void, get prop(): any }",
+      "options": [
+        "setBeforeGet",
+        {
+          "enforceForTSTypes": true
+        }
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "code": "({ get a(){}, b:1, set a(foo){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 25
+        }
+      ]
+    },
+    {
+      "code": "({ set 'abc'(foo){}, b:1, get 'abc'(){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'abc' and getter 'abc' should be grouped.",
+          "line": 1,
+          "column": 27,
+          "endLine": 1,
+          "endColumn": 36
+        }
+      ]
+    },
+    {
+      "code": "({ get [a](){}, b:1, set [a](foo){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter and setter should be grouped.",
+          "line": 1,
+          "column": 22,
+          "endLine": 1,
+          "endColumn": 29
+        }
+      ]
+    },
+    {
+      "code": "class A { get abc(){} b(){} set abc(foo){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'abc' and setter 'abc' should be grouped.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 36
+        }
+      ]
+    },
+    {
+      "code": "(class { set abc(foo){} b(){} get abc(){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'abc' and getter 'abc' should be grouped.",
+          "line": 1,
+          "column": 31,
+          "endLine": 1,
+          "endColumn": 38
+        }
+      ]
+    },
+    {
+      "code": "class A { static set a(foo){} b(){} static get a(){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair static setter 'a' and static getter 'a' should be grouped.",
+          "line": 1,
+          "column": 37,
+          "endLine": 1,
+          "endColumn": 49
+        }
+      ]
+    },
+    {
+      "code": "(class { static get 123(){} b(){} static set 123(foo){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair static getter '123' and static setter '123' should be grouped.",
+          "line": 1,
+          "column": 35,
+          "endLine": 1,
+          "endColumn": 49
+        }
+      ]
+    },
+    {
+      "code": "class A { static get [a](){} b(){} static set [a](foo){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair static getter and static setter should be grouped.",
+          "line": 1,
+          "column": 36,
+          "endLine": 1,
+          "endColumn": 50
+        }
+      ]
+    },
+    {
+      "code": "class A { get '#abc'(){} b(){} set '#abc'(foo){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter '#abc' and setter '#abc' should be grouped.",
+          "line": 1,
+          "column": 32,
+          "endLine": 1,
+          "endColumn": 42
+        }
+      ]
+    },
+    {
+      "code": "class A { get #abc(){} b(){} set #abc(foo){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair private getter #abc and private setter #abc should be grouped.",
+          "line": 1,
+          "column": 30,
+          "endLine": 1,
+          "endColumn": 38
+        }
+      ]
+    },
+    {
+      "code": "({ set a(foo){}, get a(){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'a' to be before setter 'a'.",
+          "line": 1,
+          "column": 18,
+          "endLine": 1,
+          "endColumn": 23
+        }
+      ]
+    },
+    {
+      "code": "({ get 123(){}, set 123(foo){} })",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected setter '123' to be before getter '123'.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 24
+        }
+      ]
+    },
+    {
+      "code": "({ get [a](){}, set [a](foo){} })",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected setter to be before getter.",
+          "line": 1,
+          "column": 17,
+          "endLine": 1,
+          "endColumn": 24
+        }
+      ]
+    },
+    {
+      "code": "class A { set abc(foo){} get abc(){} }",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'abc' to be before setter 'abc'.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 33
+        }
+      ]
+    },
+    {
+      "code": "(class { get [`abc`](){} set [`abc`](foo){} })",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected setter 'abc' to be before getter 'abc'.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 37
+        }
+      ]
+    },
+    {
+      "code": "class A { static get a(){} static set a(foo){} }",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected static setter 'a' to be before static getter 'a'.",
+          "line": 1,
+          "column": 28,
+          "endLine": 1,
+          "endColumn": 40
+        }
+      ]
+    },
+    {
+      "code": "(class { static set 'abc'(foo){} static get 'abc'(){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected static getter 'abc' to be before static setter 'abc'.",
+          "line": 1,
+          "column": 34,
+          "endLine": 1,
+          "endColumn": 50
+        }
+      ]
+    },
+    {
+      "code": "class A { static set [abc](foo){} static get [abc](){} }",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected static getter to be before static setter.",
+          "line": 1,
+          "column": 35,
+          "endLine": 1,
+          "endColumn": 51
+        }
+      ]
+    },
+    {
+      "code": "class A { set '#abc'(foo){} get '#abc'(){} }",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter '#abc' to be before setter '#abc'.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 39
+        }
+      ]
+    },
+    {
+      "code": "class A { set #abc(foo){} get #abc(){} }",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected private getter #abc to be before private setter #abc.",
+          "line": 1,
+          "column": 27,
+          "endLine": 1,
+          "endColumn": 35
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, b: 1, set a(foo){} })",
+      "options": ["anyOrder"],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 26
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, b: 1, set a(foo){} })",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 26
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, b: 1, set a(foo){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 26
+        }
+      ]
+    },
+    {
+      "code": "class A { set a(foo){} b(){} get a(){} }",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'a' and getter 'a' should be grouped.",
+          "line": 1,
+          "column": 30,
+          "endLine": 1,
+          "endColumn": 35
+        }
+      ]
+    },
+    {
+      "code": "(class { static set a(foo){} b(){} static get a(){} })",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair static setter 'a' and static getter 'a' should be grouped.",
+          "line": 1,
+          "column": 36,
+          "endLine": 1,
+          "endColumn": 48
+        }
+      ]
+    },
+    {
+      "code": "({ get 'abc'(){}, d(){}, set 'abc'(foo){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'abc' and setter 'abc' should be grouped.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 35
+        }
+      ]
+    },
+    {
+      "code": "({ set ''(foo){}, get [''](){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter '' to be before setter ''.",
+          "line": 1,
+          "column": 19,
+          "endLine": 1,
+          "endColumn": 27
+        }
+      ]
+    },
+    {
+      "code": "class A { set abc(foo){} get 'abc'(){} }",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'abc' to be before setter 'abc'.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 35
+        }
+      ]
+    },
+    {
+      "code": "(class { set [`abc`](foo){} get abc(){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'abc' to be before setter 'abc'.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 36
+        }
+      ]
+    },
+    {
+      "code": "({ set ['abc'](foo){}, get [`abc`](){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'abc' to be before setter 'abc'.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 35
+        }
+      ]
+    },
+    {
+      "code": "({ set 123(foo){}, get [123](){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter '123' to be before setter '123'.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 29
+        }
+      ]
+    },
+    {
+      "code": "class A { static set '123'(foo){} static get 123(){} }",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected static getter '123' to be before static setter '123'.",
+          "line": 1,
+          "column": 35,
+          "endLine": 1,
+          "endColumn": 49
+        }
+      ]
+    },
+    {
+      "code": "(class { set [a+b](foo){} get [a+b](){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter to be before setter.",
+          "line": 1,
+          "column": 27,
+          "endLine": 1,
+          "endColumn": 36
+        }
+      ]
+    },
+    {
+      "code": "({ set [f(a)](foo){}, get [f(a)](){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter to be before setter.",
+          "line": 1,
+          "column": 23,
+          "endLine": 1,
+          "endColumn": 33
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, b: 1, set a(foo){}, set c(foo){}, d(){}, get c(){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 26
+        },
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'c' and getter 'c' should be grouped.",
+          "line": 1,
+          "column": 56,
+          "endLine": 1,
+          "endColumn": 61
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, set b(foo){}, set a(bar){}, get b(){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 34
+        },
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'b' and getter 'b' should be grouped.",
+          "line": 1,
+          "column": 43,
+          "endLine": 1,
+          "endColumn": 48
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, set [a](foo){}, set a(bar){}, get [a](){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 31,
+          "endLine": 1,
+          "endColumn": 36
+        },
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter and getter should be grouped.",
+          "line": 1,
+          "column": 45,
+          "endLine": 1,
+          "endColumn": 52
+        }
+      ]
+    },
+    {
+      "code": "({ a(){}, set b(foo){}, ...c, get b(){}, set c(bar){}, get c(){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'b' and getter 'b' should be grouped.",
+          "line": 1,
+          "column": 31,
+          "endLine": 1,
+          "endColumn": 36
+        },
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'c' to be before setter 'c'.",
+          "line": 1,
+          "column": 56,
+          "endLine": 1,
+          "endColumn": 61
+        }
+      ]
+    },
+    {
+      "code": "({ set [a](foo){}, get [a](){}, set [-a](bar){}, get [-a](){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter to be before setter.",
+          "line": 1,
+          "column": 20,
+          "endLine": 1,
+          "endColumn": 27
+        },
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter to be before setter.",
+          "line": 1,
+          "column": 50,
+          "endLine": 1,
+          "endColumn": 58
+        }
+      ]
+    },
+    {
+      "code": "class A { get a(){} constructor (){} set a(foo){} get b(){} static c(){} set b(bar){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 38,
+          "endLine": 1,
+          "endColumn": 43
+        },
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'b' and setter 'b' should be grouped.",
+          "line": 1,
+          "column": 74,
+          "endLine": 1,
+          "endColumn": 79
+        }
+      ]
+    },
+    {
+      "code": "(class { set a(foo){} static get a(){} get a(){} static set a(bar){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'a' and getter 'a' should be grouped.",
+          "line": 1,
+          "column": 40,
+          "endLine": 1,
+          "endColumn": 45
+        },
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair static getter 'a' and static setter 'a' should be grouped.",
+          "line": 1,
+          "column": 50,
+          "endLine": 1,
+          "endColumn": 62
+        }
+      ]
+    },
+    {
+      "code": "class A { get a(){} set a(foo){} static get b(){} static set b(bar){} }",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected setter 'a' to be before getter 'a'.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 26
+        },
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected static setter 'b' to be before static getter 'b'.",
+          "line": 1,
+          "column": 51,
+          "endLine": 1,
+          "endColumn": 63
+        }
+      ]
+    },
+    {
+      "code": "(class { set [a+b](foo){} get [a-b](){} get [a+b](){} set [a-b](bar){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter and getter should be grouped.",
+          "line": 1,
+          "column": 41,
+          "endLine": 1,
+          "endColumn": 50
+        },
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter and setter should be grouped.",
+          "line": 1,
+          "column": 55,
+          "endLine": 1,
+          "endColumn": 64
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, set a(foo){}, get b(){}, c: function(){}, set b(bar){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'b' and setter 'b' should be grouped.",
+          "line": 1,
+          "column": 57,
+          "endLine": 1,
+          "endColumn": 62
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, get b(){}, set a(foo){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 31
+        }
+      ]
+    },
+    {
+      "code": "({ set a(foo){}, get [a](){}, get a(){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter 'a' and getter 'a' should be grouped.",
+          "line": 1,
+          "column": 31,
+          "endLine": 1,
+          "endColumn": 36
+        }
+      ]
+    },
+    {
+      "code": "({ set [a](foo){}, set a(bar){}, get [a](){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair setter and getter should be grouped.",
+          "line": 1,
+          "column": 34,
+          "endLine": 1,
+          "endColumn": 41
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, set a(foo){}, set b(bar){}, get b(){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'b' to be before setter 'b'.",
+          "line": 1,
+          "column": 43,
+          "endLine": 1,
+          "endColumn": 48
+        }
+      ]
+    },
+    {
+      "code": "class A { get a(){} static set b(foo){} static get b(){} set a(foo){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 58,
+          "endLine": 1,
+          "endColumn": 63
+        }
+      ]
+    },
+    {
+      "code": "(class { static get a(){} set a(foo){} static set a(bar){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair static getter 'a' and static setter 'a' should be grouped.",
+          "line": 1,
+          "column": 40,
+          "endLine": 1,
+          "endColumn": 52
+        }
+      ]
+    },
+    {
+      "code": "class A { set a(foo){} get a(){} static get a(){} static set a(bar){} }",
+      "options": ["setBeforeGet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected static setter 'a' to be before static getter 'a'.",
+          "line": 1,
+          "column": 51,
+          "endLine": 1,
+          "endColumn": 63
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){}, a: 1, set a(foo){} })",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 21,
+          "endLine": 1,
+          "endColumn": 26
+        }
+      ]
+    },
+    {
+      "code": "({ a(){}, set a(foo){}, get a(){} })",
+      "options": ["getBeforeSet"],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'a' to be before setter 'a'.",
+          "line": 1,
+          "column": 25,
+          "endLine": 1,
+          "endColumn": 30
+        }
+      ]
+    },
+    {
+      "code": "class A { get a(){} a(){} set a(foo){} }",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 27,
+          "endLine": 1,
+          "endColumn": 32
+        }
+      ]
+    },
+    {
+      "code": "class A { get a(){} a; set a(foo){} }",
+      "languageOptions": {
+        "ecmaVersion": 2022
+      },
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 24,
+          "endLine": 1,
+          "endColumn": 29
+        }
+      ]
+    },
+    {
+      "code": "({ get a(){},\n    b: 1,\n    set a(foo){}\n})",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 3,
+          "column": 5,
+          "endLine": 3,
+          "endColumn": 10
+        }
+      ]
+    },
+    {
+      "code": "class A { static set a(foo){} b(){} static get \n a(){}\n}",
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair static setter 'a' and static getter 'a' should be grouped.",
+          "line": 1,
+          "column": 37,
+          "endLine": 2,
+          "endColumn": 3
+        }
+      ]
+    },
+    {
+      "code": "interface I { get a(): any, between: true, set a(value: any): void }",
+      "options": [
+        "anyOrder",
+        {
+          "enforceForTSTypes": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 44,
+          "endLine": 1,
+          "endColumn": 49
+        }
+      ]
+    },
+    {
+      "code": "interface I { get a(): any, set a(value: any): void }",
+      "options": [
+        "setBeforeGet",
+        {
+          "enforceForTSTypes": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected setter 'a' to be before getter 'a'.",
+          "line": 1,
+          "column": 29,
+          "endLine": 1,
+          "endColumn": 34
+        }
+      ]
+    },
+    {
+      "code": "interface I { set a(value: any): void, get a(): any }",
+      "options": [
+        "getBeforeSet",
+        {
+          "enforceForTSTypes": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected getter 'a' to be before setter 'a'.",
+          "line": 1,
+          "column": 40,
+          "endLine": 1,
+          "endColumn": 45
+        }
+      ]
+    },
+    {
+      "code": "type T = { get a(): any, between: true, set a(value: any): void }",
+      "options": [
+        "anyOrder",
+        {
+          "enforceForTSTypes": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "notGrouped",
+          "message": "Accessor pair getter 'a' and setter 'a' should be grouped.",
+          "line": 1,
+          "column": 41,
+          "endLine": 1,
+          "endColumn": 46
+        }
+      ]
+    },
+    {
+      "code": "type T = { get a(): any, set a(value: any): void }",
+      "options": [
+        "setBeforeGet",
+        {
+          "enforceForTSTypes": true
+        }
+      ],
+      "errors": [
+        {
+          "messageId": "invalidOrder",
+          "message": "Expected setter 'a' to be before getter 'a'.",
+          "line": 1,
+          "column": 26,
+          "endLine": 1,
+          "endColumn": 31
+        }
+      ]
+    }
+  ]
+}

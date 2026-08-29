@@ -10,39 +10,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// groupDiagsByFile groups a flat slice of diagnostics by their source file name.
-func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnostic {
-	m := make(map[string][]rule.RuleDiagnostic)
-	for _, d := range diags {
-		f := d.FilePath
-		m[f] = append(m[f], d)
-	}
-	return m
-}
-
-// remapDiagnosticTargetPaths keeps diagnostics in the caller's target path
-// space when a TypeScript Program represents that target by another lexical or
-// canonical source-file path. SourceFile remains unchanged because ranges and
-// fixes are defined against its text; FilePath controls display and disk writes.
-func remapDiagnosticTargetPaths(
-	diags []rule.RuleDiagnostic,
-	lintTargetBySourcePath map[string]target.File,
-	filesystems ...vfs.FS,
-) {
-	if len(lintTargetBySourcePath) == 0 {
-		return
-	}
-	var fsys vfs.FS
-	if len(filesystems) > 0 {
-		fsys = filesystems[0]
-	}
-	for i := range diags {
-		if lintTarget, ok := target.LookupSourceTarget(lintTargetBySourcePath, diags[i].FilePath, fsys); ok {
-			diags[i].FilePath = lintTarget.Path
-		}
-	}
-}
-
 type typeScriptDiagnosticDedupeKey struct {
 	path     string
 	ruleName string
@@ -205,8 +172,8 @@ func collectAllowFileWarnings(
 //
 // Any type-check mode (`--type-check` or `--type-check-only`) must NOT take
 // the short-circuit: Phase 2 runs program-wide and is not gated by the CLI
-// Scope/PerProgramFilter that drives lintedFileCount, so lintedFileCount==0
-// is a normal state in which Phase 2 may still have produced diagnostics.
+// lint-target plan that drives lintedFileCount, so lintedFileCount==0 is a
+// normal state in which Phase 2 may still have produced diagnostics.
 // Short-circuiting there would silently drop type errors that the user
 // explicitly asked for — see website/docs/en/guide/type-checking.md.
 func shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted bool, lintedFileCount int32) bool {

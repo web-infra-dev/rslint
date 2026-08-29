@@ -8,8 +8,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func checkerProbeRule(checkerWasNil *bool) []ConfiguredRule {
-	return []ConfiguredRule{{
+func checkerProbeRule(checkerWasNil *bool) []rule.ConfiguredRule {
+	return []rule.ConfiguredRule{{
 		Name:     "checker-probe",
 		Severity: rule.SeverityWarning,
 		Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -25,12 +25,18 @@ func runProgramCapabilityProbe(
 	rules RuleHandler,
 ) *LintResult {
 	t.Helper()
+	programs := []*lintprogram.Program{sourceProgram}
+	targets := sourceProgram.RootFileNames()
+	lintPlan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{targets},
+		SingleThreaded:   true,
+		GetRulesForFile:  rules,
+	})
 	result, err := RunLinter(RunLinterOptions{
-		Programs:        []*lintprogram.Program{sourceProgram},
-		SingleThreaded:  true,
-		ExcludePaths:    []string{},
-		GetRulesForFile: rules,
-		Consumer:        rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer:       rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
 	})
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
@@ -43,7 +49,7 @@ func TestCompilerCapableProgramProvidesTypeChecker(t *testing.T) {
 		"a.ts": "const x = 1;",
 	})
 	var checkerWasNil bool
-	runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []ConfiguredRule {
+	runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []rule.ConfiguredRule {
 		return checkerProbeRule(&checkerWasNil)
 	})
 	if checkerWasNil {
@@ -61,7 +67,7 @@ func TestSourceOnlyProgramWithholdsTypeChecker(t *testing.T) {
 	}
 	sourceOnly := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{file})
 	var checkerWasNil bool
-	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []ConfiguredRule {
+	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []rule.ConfiguredRule {
 		return checkerProbeRule(&checkerWasNil)
 	})
 	if !checkerWasNil || result.LintedFileCount != 1 {
@@ -79,8 +85,8 @@ func TestSourceOnlyProgramFiltersTypeAwareRule(t *testing.T) {
 	}
 	sourceOnly := mustSourceOnlyTestProgram(t, raw, []*ast.SourceFile{file})
 	ruleRan := false
-	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []ConfiguredRule {
-		return []ConfiguredRule{{
+	result := runProgramCapabilityProbe(t, sourceOnly, func(*ast.SourceFile) []rule.ConfiguredRule {
+		return []rule.ConfiguredRule{{
 			Name:             "type-aware-probe",
 			Severity:         rule.SeverityWarning,
 			RequiresTypeInfo: true,
@@ -103,8 +109,8 @@ func TestCompilerCapableProgramRunsTypeAwareRule(t *testing.T) {
 		"a.ts": "const x = 1;",
 	})
 	ruleRan := false
-	result := runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []ConfiguredRule {
-		return []ConfiguredRule{{
+	result := runProgramCapabilityProbe(t, lintprogram.NewFromCompiler(raw), func(*ast.SourceFile) []rule.ConfiguredRule {
+		return []rule.ConfiguredRule{{
 			Name:             "type-aware-probe",
 			Severity:         rule.SeverityWarning,
 			RequiresTypeInfo: true,

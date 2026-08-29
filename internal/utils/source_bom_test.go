@@ -28,7 +28,7 @@ func TestSourceHasBOMFromDisk(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	utf8BOM := writeTestFile(t, dir, "utf8-bom.ts", []byte("\uFEFFlet a = 1;\n"))
+	utf8Marked := writeTestFile(t, dir, "utf8-bom.ts", []byte(BOM+"let a = 1;\n"))
 	clean := writeTestFile(t, dir, "clean.ts", []byte("let a = 1;\n"))
 	empty := writeTestFile(t, dir, "empty.ts", nil)
 	utf16LE := writeTestFile(t, dir, "utf16-le.ts", []byte{0xFF, 0xFE, 'a', 0x00})
@@ -41,7 +41,7 @@ func TestSourceHasBOMFromDisk(t *testing.T) {
 		path string
 		want bool
 	}{
-		{"utf-8 mark", utf8BOM, true},
+		{"utf-8 mark", utf8Marked, true},
 		{"no mark", clean, false},
 		{"empty file", empty, false},
 		{"utf-16 little endian mark", utf16LE, true},
@@ -61,12 +61,12 @@ func TestSourceHasBOMFromOverlay(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	markedOnDisk := writeTestFile(t, dir, "marked.ts", []byte("\uFEFFlet a = 1;\n"))
+	markedOnDisk := writeTestFile(t, dir, "marked.ts", []byte(BOM+"let a = 1;\n"))
 	cleanOnDisk := writeTestFile(t, dir, "clean.ts", []byte("let a = 1;\n"))
 
 	fs := NewOverlayVFS(osvfs.FS(), map[string]string{
 		markedOnDisk: "let a = 1;\n",
-		cleanOnDisk:  "\uFEFFlet a = 1;\n",
+		cleanOnDisk:  BOM + "let a = 1;\n",
 	})
 
 	if SourceHasBOM(fs, markedOnDisk) {
@@ -83,5 +83,48 @@ func TestSourceHasBOMFromOverlay(t *testing.T) {
 	}
 	if size := fs.Stat(cleanOnDisk).Size(); size != int64(len("let a = 1;\n")) {
 		t.Errorf("overlay Stat size = %d, want the size without the mark", size)
+	}
+}
+
+func TestRestoreSourceBOM(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	markedPath := writeTestFile(t, dir, "marked.ts", []byte(BOM+"const value = 1;"))
+	doubleMarkedPath := writeTestFile(t, dir, "double-marked.ts", []byte(BOM+BOM+"const value = 1;"))
+	cleanPath := writeTestFile(t, dir, "clean.ts", []byte("const value = 1;"))
+	fs := osvfs.FS()
+
+	for _, tt := range []struct {
+		name string
+		path string
+		text string
+		want string
+	}{
+		{
+			name: "restore stripped encoding mark",
+			path: markedPath,
+			text: "const value = 1;",
+			want: BOM + "const value = 1;",
+		},
+		{
+			name: "leave unmarked source unchanged",
+			path: cleanPath,
+			text: "const value = 1;",
+			want: "const value = 1;",
+		},
+		{
+			name: "preserve leading content mark separately",
+			path: doubleMarkedPath,
+			text: BOM + "const value = 1;",
+			want: BOM + BOM + "const value = 1;",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := RestoreSourceBOM(fs, tt.path, tt.text); got != tt.want {
+				t.Errorf("RestoreSourceBOM() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

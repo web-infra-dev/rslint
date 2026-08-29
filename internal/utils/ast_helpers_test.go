@@ -31,3 +31,25 @@ func TestOutermostParenthesizedExpression(t *testing.T) {
 		t.Fatal("nil input should return nil")
 	}
 }
+
+func TestESTreeMembers(t *testing.T) {
+	t.Parallel()
+
+	first := &ast.Node{Kind: ast.KindMethodDeclaration}
+	second := &ast.Node{Kind: ast.KindPropertyDeclaration}
+	empty := &ast.Node{Kind: ast.KindSemicolonClassElement}
+
+	withoutEmpty := []*ast.Node{first, second}
+	if got := ESTreeMembers(withoutEmpty); &got[0] != &withoutEmpty[0] {
+		t.Fatal("member slice without empty elements should be returned unchanged")
+	}
+
+	withEmpty := []*ast.Node{empty, first, empty, second, empty}
+	got := ESTreeMembers(withEmpty)
+	if len(got) != 2 || got[0] != first || got[1] != second {
+		t.Fatalf("ESTreeMembers() = %v, want [%p %p]", got, first, second)
+	}
+	if len(withEmpty) != 5 || withEmpty[0] != empty || withEmpty[2] != empty || withEmpty[4] != empty {
+		t.Fatal("filtering members mutated the AST-owned input slice")
+	}
+}

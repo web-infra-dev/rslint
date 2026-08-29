@@ -420,10 +420,6 @@ func LineContentEnd(text string, nextLineStart int) int {
 	return nextLineStart
 }
 
-// ExcludePaths contains path substrings that should be excluded from linting.
-// Used by RunLinterInProgram to skip files during program source file iteration.
-var ExcludePaths = []string{"/node_modules/", "bundled:"}
-
 // DefaultExcludeDirNames contains directory names that are always excluded
 // from file scanning. This is the single source of truth for default directory
 // exclusions used by lint-target discovery and source-only Program roots.
@@ -458,6 +454,16 @@ func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
 		return text[1:], ""
 	}
 	return text[1 : lastSlash+1], text[lastSlash+2:]
+}
+
+// RegExpLiteralStringValue returns the value produced by
+// RegExp.prototype.toString for a regular-expression literal. JavaScript emits
+// flags in canonical order even when the source authored them differently.
+func RegExpLiteralStringValue(text string) string {
+	pattern, flags := ExtractRegexPatternAndFlags(text)
+	canonicalFlags := []byte(flags)
+	slices.Sort(canonicalFlags)
+	return "/" + pattern + "/" + string(canonicalFlags)
 }
 
 // ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape:
@@ -534,7 +540,7 @@ func CoerceIntegral(v any) (int, bool) {
 
 // ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,
 // extracting only the string elements. Returns nil if the input is nil, not an array,
-// or contains no strings. Useful for parsing rule options from JSON config.
+// or contains no strings. Useful for parsing serialized rule options.
 func ToStringSlice(val interface{}) []string {
 	if val == nil {
 		return nil

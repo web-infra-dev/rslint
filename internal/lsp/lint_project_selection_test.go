@@ -221,7 +221,7 @@ func TestRunConfiguredLintForContentDirectRootSkipsEarlierImportProgram(t *testi
 	uri := documentURIFromPath(targetPath)
 	server.documents[uri] = targetContent
 
-	if _, err := server.runConfiguredLintForContent(
+	if _, err := configuredSpeculativePipelineResultForTest(server,
 		uri,
 		context.Background(),
 		targetContent,

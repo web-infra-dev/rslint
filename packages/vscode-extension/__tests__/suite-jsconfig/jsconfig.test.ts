@@ -65,8 +65,7 @@ suite('rslint JS config support', function () {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
-    // Wait specifically for JS config diagnostics. The startup snapshot may
-    // publish JSON fallback results before JS config activation commits.
+    // Wait specifically for module-config diagnostics.
     const diagnostics = await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
@@ -80,13 +79,12 @@ suite('rslint JS config support', function () {
     );
   });
 
-  test('JS config should take priority over JSON config', async () => {
+  test('JS config should ignore a colocated legacy JSON config', async () => {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
-    // Wait specifically for JS config diagnostics (no-unsafe-member-access).
-    // JSON config may load first with no-explicit-any, but the committed JS
-    // config catalog should override it.
+    // The legacy JSON fixture enables no-explicit-any; only the committed
+    // module catalog should contribute diagnostics.
     const diagnostics = await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
@@ -97,7 +95,7 @@ suite('rslint JS config support', function () {
     );
     assert.ok(
       !diagnostics.some((d) => d.message.includes('no-explicit-any')),
-      'Should NOT see no-explicit-any because JS config takes priority over JSON',
+      'Should NOT see no-explicit-any from the ignored legacy JSON config',
     );
   });
 

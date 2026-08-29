@@ -52,3 +52,18 @@ func TestIsValidRegexLiteral(t *testing.T) {
 		})
 	}
 }
+
+func TestCanonicalizeRegExpLiteral(t *testing.T) {
+	for _, test := range []struct {
+		literal string
+		want    string
+	}{
+		{literal: `/a/mi`, want: `/a/im`},
+		{literal: `/a/dgimsuy`, want: `/a/dgimsuy`},
+		{literal: `/a/-`, want: `/a/-`},
+	} {
+		if got := CanonicalizeRegExpLiteral(test.literal); got != test.want {
+			t.Errorf("CanonicalizeRegExpLiteral(%q) = %q, want %q", test.literal, got, test.want)
+		}
+	}
+}

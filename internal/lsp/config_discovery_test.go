@@ -365,7 +365,7 @@ func TestHandleConfigRefreshCommitsFilesystemPathCatalog(t *testing.T) {
 		t.Fatalf("filesystem-path catalog was not committed: %+v", s.jsConfigs)
 	}
 	fileURI := documentURIFromPath(filepath.Join(root, "src", "index.ts"))
-	if got := s.pluginConfigKeyForURI(fileURI); got != root {
+	if got, ok := s.nearestJSConfigKey(fileURI); !ok || got != root {
 		t.Fatalf("plugin configKey = %q, want exact catalog path %q", got, root)
 	}
 	registered, ok := s.ruleCatalog.Lookup(pluginRuleName)
@@ -488,15 +488,15 @@ func TestHandleConfigRefreshUsesFixedExplicitConfig(t *testing.T) {
 	if !s.configRefreshInitialized || s.configRefreshConfigPath != tspath.NormalizePath(configPath) {
 		t.Fatalf("fixed config path = %q, initialized=%t", s.configRefreshConfigPath, s.configRefreshInitialized)
 	}
-	if s.rslintConfigPath != "" || len(s.jsonConfig) != 0 {
-		t.Fatalf("explicit config retained JSON fallback: path=%q config=%+v", s.rslintConfigPath, s.jsonConfig)
+	if s.fallbackConfigOwnerIndex != nil || len(s.fallbackConfig) != 0 {
+		t.Fatalf("explicit config retained a workspace fallback: %+v", s.fallbackConfig)
 	}
 	if value, found := configRuleValue(s.jsConfigs[configDir], "no-debugger"); !found || value != "error" {
 		t.Fatalf("explicit config was not committed at its directory: %+v", s.jsConfigs)
 	}
 	entries, resolvedDirectory, isJSConfig := s.getConfigForURI(documentURIFromPath(targetPath))
 	if !isJSConfig || resolvedDirectory != configDir ||
-		config.NewFileConfigResolverWithFS(entries, resolvedDirectory, s.fs, s.currentRuleCatalog(), false).ConfigForFile(targetPath) == nil {
+		config.NewFileConfigResolverWithFS(entries, resolvedDirectory, s.fs, s.currentRuleCatalog()).ConfigForFile(targetPath) == nil {
 		t.Fatalf("explicit external config did not govern workspace target from its authored base")
 	}
 
@@ -660,8 +660,8 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	if !snapshot.configs[child].IsFileIgnored(childTarget, child) {
 		t.Fatal("child config did not collect its own .gitignore")
 	}
-	if snapshot.jsonConfig.IsFileIgnored(childTarget, root) {
-		t.Fatal("JSON fallback crossed the child JS config's .gitignore source boundary")
+	if snapshot.fallbackConfig.IsFileIgnored(childTarget, root) {
+		t.Fatal("workspace fallback crossed the child config's .gitignore source boundary")
 	}
 }
 
@@ -697,8 +697,8 @@ func TestCompleteDiscoveredConfigSnapshotBuildsOneResolverPerOwner(t *testing.T)
 			t.Fatalf("missing resolver for %q", configDirectory)
 		}
 	}
-	if completed.jsonFileConfigResolver == nil {
-		t.Fatal("automatic config generation is missing its JSON fallback resolver")
+	if completed.fallbackFileConfigResolver == nil {
+		t.Fatal("automatic config generation is missing its workspace fallback resolver")
 	}
 }
 
@@ -891,9 +891,9 @@ func TestHandleConfigRefreshInitialAllFailedCommitsUnavailableBoundaries(t *test
 		t.Fatalf("broken boundary config = %+v, isJS=%t; want empty JS boundary", entries, isJS)
 	}
 	outside := documentURIFromPath(filepath.Join(filepath.Dir(root), "outside.ts"))
-	outsideConfig, _, outsideIsJS := s.getConfigForURI(outside)
-	if value, found := configRuleValue(outsideConfig, "no-console"); outsideIsJS || !found || value != "error" {
-		t.Fatalf("JSON fallback outside broken boundary = %+v, isJS=%t", outsideConfig, outsideIsJS)
+	outsideConfig, _, outsideUsesCatalog := s.getConfigForURI(outside)
+	if outsideUsesCatalog || hasPublicConfigContent(outsideConfig) {
+		t.Fatalf("legacy JSON leaked into workspace fallback: config=%+v, usesCatalog=%t", outsideConfig, outsideUsesCatalog)
 	}
 }
 
@@ -954,7 +954,7 @@ func TestHandleConfigRefreshPartialCatalogCommitsUnavailableParentAndUsableChild
 	}
 	entries, _, isJS := s.getConfigForURI(outsideNested)
 	if !isJS || hasPublicConfigContent(entries) {
-		t.Fatalf("broken root fell through to JSON: entries=%+v isJS=%t", entries, isJS)
+		t.Fatalf("broken root fell through to workspace fallback: entries=%+v usesCatalog=%t", entries, isJS)
 	}
 	nestedFile := documentURIFromPath(filepath.Join(nested, "src", "index.ts"))
 	if s.isUnavailableConfigForURI(nestedFile) {
@@ -1244,8 +1244,8 @@ func TestHandleConfigRefreshUsesFreshFilesystemAndCommitsEmptyCatalog(t *testing
 		t.Fatal("empty JavaScript catalog was marked as a usable JavaScript last-good generation")
 	}
 
-	// A newly created broken config now establishes an unavailable JS boundary
-	// instead of preserving the empty catalog's JSON fallback.
+	// A newly created broken config now establishes an unavailable module-config
+	// boundary instead of exposing the empty catalog's workspace fallback.
 	writeConfigCandidate(t, root)
 	third := startConfigRefreshForTest(s, "config-change")
 	thirdLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)

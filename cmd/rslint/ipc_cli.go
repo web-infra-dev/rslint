@@ -19,8 +19,8 @@
 // Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
 // wait `init` (or signal) → redirect stdout through `output` frames →
 // dispatch on intent (--help / --init / lint) → run the shared
-// executeLintPipeline (using either a typed Go-discovered catalog or the
-// native JSON/JSONC loader) → drain output, send `shutdown`, exit.
+// handleLintCommand with a typed Go-discovered catalog → drain output, send
+// `shutdown`, exit.
 //
 // Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
 // disconnect, init/transport error) · 130 interrupted.
@@ -81,8 +81,8 @@ type initPayload struct {
 	Format           string   `json:"format,omitempty"`
 	FixMode          bool     `json:"fixMode,omitempty"`
 
-	// ConfigDiscovery asks Go to own JS/TS config discovery. It is ignored for
-	// help/init and disabled for the native JSON/JSONC configuration path.
+	// ConfigDiscovery asks Go to own config discovery. Every lint invocation
+	// supplies it; help and init intentionally bypass discovery.
 	ConfigDiscovery *configDiscoveryPayload `json:"configDiscovery,omitempty"`
 }
 
@@ -315,9 +315,14 @@ func runCLI(args []string) int {
 
 	// The host sends only discovery intent. Go scans the reachable staged
 	// frontier, asks Node to evaluate exact candidates, and converts the final
-	// catalog into the shared lint pipeline input. Help/init and an
-	// explicit JSON --config do not need the JavaScript module host.
-	if !help && !baseArgs.Init && payload.ConfigDiscovery != nil {
+	// catalog into the shared lint pipeline input. Every lint invocation uses
+	// this path; --init is the only configuration operation that bypasses it.
+	if !help && !baseArgs.Init {
+		if payload.ConfigDiscovery == nil {
+			fmt.Fprintln(os.Stderr, "error: CLI host did not provide config discovery intent")
+			_ = ch.Close()
+			return 2
+		}
 		if err := discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch); err != nil {
 			// Discovery now includes the potentially long Go walk and reverse
 			// Node loads. A signal can cancel either before the mirror goroutine
@@ -374,7 +379,7 @@ func runCLI(args []string) int {
 
 	// Reverse dispatcher: send each plugin-lint batch back to the Node host
 	// over the IPC channel and decode its result. Runs concurrently with the
-	// native lint pass (executeLintPipeline awaits it before output / --fix).
+	// native lint pass (handleLintCommand awaits it before output / --fix).
 	dispatch := func(reqCtx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		msg, sendErr := ch.SendRequest(reqCtx, kindPluginLint, req)
 		if sendErr != nil {
@@ -393,7 +398,7 @@ func runCLI(args []string) int {
 	var timingTable string
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
 
-	exitCode := executeLintPipeline(baseArgs, lintCtx, dispatch)
+	exitCode := handleLintCommand(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
 	stdoutFlushed := shutdownPeer(ch, state)
@@ -437,8 +442,8 @@ func shutdownPeer(ch *ipc.Channel, state *runCLIState) bool {
 // classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
 // mirroring parseLintFlags's positional handling (filepath.Abs +
 // tspath.NormalizePath) so the IPC and flag entry paths produce identical
-// FileScope downstream. An Abs failure is skipped with a stderr warning rather
-// than silently dropping the path.
+// target-planning inputs. An Abs failure is skipped with a stderr warning
+// rather than silently dropping the path.
 func classifyPaths(paths []string) (files []string, dirs []string) {
 	for _, p := range paths {
 		absPath, err := filepath.Abs(p)
@@ -515,6 +520,9 @@ func discoverCLIConfigCatalog(
 		return err
 	}
 	printConfigDiscoveryFailures(catalog.Failures)
+	if !catalog.Explicit && len(catalog.Configs) == 0 {
+		return errors.New("no rslint config found; run `rslint --init` to create one")
+	}
 	args.ConfigCatalog = catalog
 	return nil
 }

@@ -139,11 +139,13 @@ new Promise(r => 1)`,
 			{
 				Code: `interface Promise {}
 new Promise(r => 1)`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 			},
 			// Locks in upstream isPromiseExecutor() arm 5: same for a type alias.
 			{
 				Code: `type Promise = any;
 new Promise(r => 1)`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 			},
 			// Locks in upstream isPromiseExecutor() arm 5: a type-only import binds the
 			// name, so the callee is no longer the global.
@@ -248,6 +250,31 @@ new Promise(r => 1)`,
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// In a module, a top-level type-only declaration does not shadow the
+			// value-space Promise global. Script mode above retains the merged
+			// ESLint global-scope behavior.
+			{
+				Code: `interface Promise {}
+new Promise(r => 1)`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "returnsValue", Line: 2, Column: 18, EndLine: 2, EndColumn: 19,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "wrapBraces", Output: `interface Promise {}
+new Promise(r => {1})`},
+					},
+				}},
+			},
+			{
+				Code: `type Promise = any;
+new Promise(r => 1)`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "returnsValue", Line: 2, Column: 18, EndLine: 2, EndColumn: 19,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "wrapBraces", Output: `type Promise = any;
+new Promise(r => {1})`},
+					},
+				}},
+			},
 			// ---- Dimension 4: parenthesized receiver — tsgo keeps `(Promise)` as a node, ESTree flattens it ----
 			{
 				Code:    `new (Promise)(r => 1)`,
@@ -917,7 +944,6 @@ func lintNoPromiseExecutorReturnWithDemand(
 		File:            sourceFile.FileName(),
 		HasTypeInfo:     true,
 		GetRulesForFile: noPromiseExecutorReturnConfiguredRules(options),
-		ExcludePaths:    []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -928,9 +954,9 @@ func lintNoPromiseExecutorReturnWithDemand(
 	return diagnostics
 }
 
-func noPromiseExecutorReturnConfiguredRules(options []any) func(*ast.SourceFile) []linter.ConfiguredRule {
-	return func(*ast.SourceFile) []linter.ConfiguredRule {
-		return []linter.ConfiguredRule{{
+func noPromiseExecutorReturnConfiguredRules(options []any) func(*ast.SourceFile) []rule.ConfiguredRule {
+	return func(*ast.SourceFile) []rule.ConfiguredRule {
+		return []rule.ConfiguredRule{{
 			Name:     NoPromiseExecutorReturnRule.Name,
 			Severity: rule.SeverityError,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {

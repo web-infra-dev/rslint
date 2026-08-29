@@ -1,10 +1,13 @@
 package unicornutil
 
 import (
+	"math"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // IsKnownNonArray reports whether node is definitely not an Array or
@@ -68,19 +71,53 @@ var typedArrayNames = []string{
 }
 
 type arrayReceiverStaticEvaluatorFileCacheKey struct{}
+type sourceOnlyArrayReceiverCacheKey struct{}
+
+type arrayReceiverWalkState struct {
+	useTypeInformation bool
+	visiting           map[*ast.Symbol]bool
+	memo               map[*ast.Symbol]arrayClass
+	depth              int
+	steps              int
+}
+
+const (
+	maxSourceOnlyArrayReceiverDepth = 1024
+	maxSourceOnlyArrayReceiverSteps = 4096
+)
 
 // classifyArrayReceiver mirrors the syntactic short-circuits of unicorn's
 // getType (array literals, Array()/new Array()/Array.from/Array.of), then falls
 // back to a type-checker classification analogous to getTypeScriptType.
 func classifyArrayReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
-	return classifyArrayReceiverInner(ctx, node, targetNames, nonTargetNames, map[*ast.Symbol]bool{})
+	return classifyArrayReceiverInner(ctx, node, targetNames, nonTargetNames, &arrayReceiverWalkState{
+		useTypeInformation: true,
+		visiting:           map[*ast.Symbol]bool{},
+	})
+}
+
+// classifySourceOnlyArrayReceiver follows Unicorn's syntax and static-value
+// paths without letting tsgo's ambient JavaScript types turn an otherwise
+// unknown expression into a known non-array.
+func classifySourceOnlyArrayReceiver(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	targetNames, nonTargetNames *utils.Set[string],
+) arrayClass {
+	memo := rule.CachedByFile(ctx, sourceOnlyArrayReceiverCacheKey{}, func() map[*ast.Symbol]arrayClass {
+		return map[*ast.Symbol]arrayClass{}
+	})
+	return classifyArrayReceiverInner(ctx, node, targetNames, nonTargetNames, &arrayReceiverWalkState{
+		visiting: map[*ast.Symbol]bool{},
+		memo:     memo,
+	})
 }
 
 func classifyArrayReceiverInner(
 	ctx rule.RuleContext,
 	node *ast.Node,
 	targetNames, nonTargetNames *utils.Set[string],
-	visitedSymbols map[*ast.Symbol]bool,
+	state *arrayReceiverWalkState,
 ) arrayClass {
 	if node == nil {
 		return arrayClassUnknown
@@ -89,57 +126,82 @@ func classifyArrayReceiverInner(
 	if node == nil {
 		return arrayClassUnknown
 	}
+	if !state.useTypeInformation {
+		if state.depth >= maxSourceOnlyArrayReceiverDepth ||
+			state.steps >= maxSourceOnlyArrayReceiverSteps {
+			return arrayClassUnknown
+		}
+		state.depth++
+		state.steps++
+		defer func() { state.depth-- }()
+	}
 
 	// Unicorn deliberately ignores a satisfies annotation and classifies the
 	// expression itself. Assertions are different: an informative annotation
 	// wins, while any / unknown falls through to the wrapped expression.
 	if node.Kind == ast.KindSatisfiesExpression {
 		return classifyArrayReceiverInner(
-			ctx, node.AsSatisfiesExpression().Expression, targetNames, nonTargetNames, visitedSymbols,
+			ctx, node.AsSatisfiesExpression().Expression, targetNames, nonTargetNames, state,
 		)
 	}
 	if node.Kind == ast.KindAsExpression || node.Kind == ast.KindTypeAssertionExpression {
-		if class := classifyArrayTypeNode(ctx, node.Type(), targetNames, nonTargetNames, map[*ast.Symbol]bool{}); class != arrayClassUnknown {
-			return class
+		if state.useTypeInformation {
+			if class := classifyArrayTypeNode(ctx, node.Type(), targetNames, nonTargetNames, map[*ast.Symbol]bool{}); class != arrayClassUnknown {
+				return class
+			}
 		}
-		return classifyArrayReceiverInner(ctx, node.Expression(), targetNames, nonTargetNames, visitedSymbols)
+		return classifyArrayReceiverInner(ctx, node.Expression(), targetNames, nonTargetNames, state)
 	}
 	if node.Kind == ast.KindNonNullExpression {
-		return classifyArrayReceiverInner(ctx, node.Expression(), targetNames, nonTargetNames, visitedSymbols)
+		return classifyArrayReceiverInner(ctx, node.Expression(), targetNames, nonTargetNames, state)
 	}
 
 	if ast.IsIdentifier(node) {
-		if class := classifyArrayIdentifier(ctx, node, targetNames, nonTargetNames, visitedSymbols); class != arrayClassUnknown {
+		if class := classifyArrayIdentifier(ctx, node, targetNames, nonTargetNames, state); class != arrayClassUnknown {
 			return class
 		}
 	}
 	if node.Kind == ast.KindConditionalExpression {
 		conditional := node.AsConditionalExpression()
-		return combineArrayClassesUnion([]arrayClass{
-			classifyArrayReceiverInner(ctx, conditional.WhenTrue, targetNames, nonTargetNames, visitedSymbols),
-			classifyArrayReceiverInner(ctx, conditional.WhenFalse, targetNames, nonTargetNames, visitedSymbols),
+		class := combineArrayClassesUnion([]arrayClass{
+			classifyArrayReceiverInner(ctx, conditional.WhenTrue, targetNames, nonTargetNames, state),
+			classifyArrayReceiverInner(ctx, conditional.WhenFalse, targetNames, nonTargetNames, state),
 		})
+		if class != arrayClassUnknown || state.useTypeInformation {
+			return class
+		}
 	}
 	if ast.IsBinaryExpression(node) &&
 		node.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
 		return classifyArrayReceiverInner(
-			ctx, node.AsBinaryExpression().Right, targetNames, nonTargetNames, visitedSymbols,
+			ctx, node.AsBinaryExpression().Right, targetNames, nonTargetNames, state,
 		)
 	}
 
 	// getStaticValue runs before Unicorn's syntactic target/non-target checks.
 	// Identifier and member expressions are intentionally excluded even when
-	// eslint-utils can fold them; upstream keeps those shapes unknown.
-	if !ast.IsIdentifier(node) && !ast.IsAccessExpression(node) {
-		staticEvaluator := arrayReceiverStaticEvaluator(ctx)
-		if isArray, known := staticEvaluator.EvalArrayValue(node); known {
-			if isArray {
-				return arrayClassTarget
+	// eslint-utils can fold them; upstream keeps those shapes unknown. In
+	// source-only files, calls take the guarded path below so tsgo's ambient
+	// return types cannot classify arbitrary user calls.
+	if !state.useTypeInformation && ast.IsCallExpression(node) {
+		if class := classifySourceOnlyStaticCall(ctx, node); class != arrayClassUnknown {
+			return class
+		}
+	} else if !ast.IsIdentifier(node) && !ast.IsAccessExpression(node) {
+		// Keep source-only evaluation bounded. The shared evaluator is recursive;
+		// repeatedly folding the same adversarial const chain here would otherwise
+		// be both more permissive than eslint-utils and quadratic in practice.
+		if state.useTypeInformation ||
+			(!containsInvocationExpression(node) && isBoundedSourceStaticExpression(ctx, node)) {
+			staticEvaluator := arrayReceiverStaticEvaluator(ctx)
+			if isArray, known := staticEvaluator.EvalArrayValue(node); known {
+				if isArray {
+					return arrayClassTarget
+				}
+				return arrayClassNonTarget
 			}
-			return arrayClassNonTarget
 		}
 	}
-
 	if isSyntacticArrayNode(node) {
 		return arrayClassTarget
 	}
@@ -147,7 +209,7 @@ func classifyArrayReceiverInner(
 		return arrayClassTarget
 	}
 
-	if ctx.TypeChecker != nil {
+	if state.useTypeInformation && ctx.TypeChecker != nil {
 		t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
 		if class := classifyArrayType(ctx, t, targetNames); class != arrayClassUnknown {
 			return class
@@ -168,27 +230,268 @@ func arrayReceiverStaticEvaluator(ctx rule.RuleContext) *utils.StaticStringEvalu
 	})
 }
 
+const staticCallGlobalMeaning = ast.SymbolFlagsValue | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+const maxSourceStaticNodeCount = 256
+
+// classifySourceOnlyStaticCall delegates value proofs to rslint's evaluator.
+// This function only carries eslint-utils' missing policy: which built-ins may
+// be called, which argument conversions can throw, and the result category.
+func classifySourceOnlyStaticCall(
+	ctx rule.RuleContext,
+	node *ast.Node,
+) arrayClass {
+	call := node.AsCallExpression()
+	if call == nil {
+		return arrayClassUnknown
+	}
+	evaluator := arrayReceiverStaticEvaluator(ctx)
+	bounded := isBoundedSourceStaticExpression(ctx, node)
+	root, method, builtin := staticBuiltinCall(ctx, call.Expression)
+	if !bounded && !builtin {
+		return arrayClassUnknown
+	}
+	arguments := node.Arguments()
+	if !staticCallArgumentsKnown(ctx, evaluator, arguments) {
+		return arrayClassUnknown
+	}
+	if bounded {
+		if isArray, known := evaluator.EvalArrayValue(node); known {
+			if isArray {
+				return arrayClassTarget
+			}
+			return arrayClassNonTarget
+		}
+	}
+	if builtin {
+		switch {
+		case method == "" && root == "Boolean":
+			return arrayClassNonTarget
+		case method == "" && (root == "Number" || root == "String" || root == "parseFloat"):
+			if len(arguments) == 0 || canStaticallyConvertToString(evaluator, arguments[0]) {
+				return arrayClassNonTarget
+			}
+		case method == "" && root == "parseInt":
+			if (len(arguments) == 0 || canStaticallyConvertToString(evaluator, arguments[0])) &&
+				(len(arguments) < 2 || isStaticPrimitiveArgument(evaluator, arguments[1])) {
+				return arrayClassNonTarget
+			}
+		case method == "" && (root == "isFinite" || root == "isNaN"):
+			if len(arguments) == 0 || isStaticPrimitiveArgument(evaluator, arguments[0]) {
+				return arrayClassNonTarget
+			}
+		case method == "" && root == "BigInt":
+			if len(arguments) > 0 && isStaticallyValidBigIntArgument(arguments[0]) {
+				return arrayClassNonTarget
+			}
+		case method == "" && root == "Object":
+			if len(arguments) == 0 {
+				return arrayClassNonTarget
+			}
+			if isArray, known := evaluator.EvalArrayValue(arguments[0]); known {
+				if isArray {
+					return arrayClassTarget
+				}
+				return arrayClassNonTarget
+			}
+		case root == "Array" && method == "isArray":
+			return arrayClassNonTarget
+		case root == "Math" && isStaticMathMethod(method) && staticPrimitiveArguments(evaluator, arguments):
+			return arrayClassNonTarget
+		}
+	}
+	return arrayClassUnknown
+}
+
+// isBoundedSourceStaticExpression is a resource guard around the shared
+// evaluator, not a second evaluator. Built-in globals are allowed; local value
+// references stay on the recursive classifier's memoized path.
+func isBoundedSourceStaticExpression(ctx rule.RuleContext, root *ast.Node) bool {
+	stack := []*ast.Node{root}
+	for visited := 0; len(stack) > 0; visited++ {
+		if visited >= maxSourceStaticNodeCount {
+			return false
+		}
+		last := len(stack) - 1
+		node := stack[last]
+		stack = stack[:last]
+		if ast.IsIdentifier(node) && !utils.IsNonReferenceIdentifier(node) &&
+			!isUnshadowedGlobal(ctx, node) {
+			return false
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			stack = append(stack, child)
+			return false
+		})
+	}
+	return true
+}
+
+// Calls and constructions have their own source-only policies. Do not let a
+// compound expression feed a nested invocation back into the generic
+// evaluator and bypass its argument/global checks.
+func containsInvocationExpression(root *ast.Node) bool {
+	stack := []*ast.Node{root}
+	for len(stack) > 0 {
+		last := len(stack) - 1
+		node := stack[last]
+		stack = stack[:last]
+		if ast.IsCallExpression(node) || ast.IsNewExpression(node) {
+			return true
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			stack = append(stack, child)
+			return false
+		})
+	}
+	return false
+}
+
+func staticBuiltinCall(ctx rule.RuleContext, rawCallee *ast.Node) (root, method string, ok bool) {
+	callee := ast.SkipOuterExpressions(rawCallee, ast.OEKParentheses|ast.OEKAssertions)
+	if ast.IsIdentifier(callee) && isUnshadowedGlobal(ctx, callee) {
+		return callee.AsIdentifier().Text, "", true
+	}
+	if !ast.IsAccessExpression(callee) {
+		return "", "", false
+	}
+	object := ast.SkipParentheses(utils.AccessExpressionObject(callee))
+	method, ok = utils.AccessExpressionStaticName(callee)
+	if !ok || !ast.IsIdentifier(object) || !isUnshadowedGlobal(ctx, object) {
+		return "", "", false
+	}
+	return object.AsIdentifier().Text, method, true
+}
+
+func staticCallArgumentsKnown(
+	ctx rule.RuleContext,
+	evaluator *utils.StaticStringEvaluator,
+	arguments []*ast.Node,
+) bool {
+	for _, argument := range arguments {
+		if ast.IsSpreadElement(argument) {
+			return false
+		}
+		if isBigIntLiteral(argument) {
+			continue
+		}
+		if !isBoundedSourceStaticExpression(ctx, argument) {
+			return false
+		}
+		if _, known := evaluator.EvalValue(argument); !known {
+			return false
+		}
+	}
+	return true
+}
+
+func isBigIntLiteral(node *ast.Node) bool {
+	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
+	return node != nil && node.Kind == ast.KindBigIntLiteral
+}
+
+func isStaticallyValidBigIntArgument(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindBigIntLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword:
+		return true
+	case ast.KindNumericLiteral:
+		value, ok := ecmascript.StringToNumber(utils.NormalizeNumericLiteral(node.Text()))
+		return ok && !math.IsInf(value, 0) && !math.IsNaN(value) && value == math.Trunc(value)
+	}
+	return false
+}
+
+func canStaticallyConvertToString(evaluator *utils.StaticStringEvaluator, node *ast.Node) bool {
+	if isBigIntLiteral(node) {
+		return true
+	}
+	_, ok := evaluator.EvalToString(node)
+	return ok
+}
+
+func isStaticPrimitiveArgument(evaluator *utils.StaticStringEvaluator, node *ast.Node) bool {
+	value, known := evaluator.EvalValue(node)
+	if known {
+		switch value.(type) {
+		case string, bool, interface{ IsNaN() bool }:
+			return true
+		}
+	}
+	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindNullKeyword, ast.KindUndefinedKeyword, ast.KindVoidExpression:
+		return true
+	}
+	return false
+}
+
+func staticPrimitiveArguments(evaluator *utils.StaticStringEvaluator, arguments []*ast.Node) bool {
+	for _, argument := range arguments {
+		if !isStaticPrimitiveArgument(evaluator, argument) {
+			return false
+		}
+	}
+	return true
+}
+
+func isUnshadowedGlobal(ctx rule.RuleContext, identifier *ast.Node) bool {
+	name := identifier.AsIdentifier().Text
+	return ctx.Globals.Access(name).IsDeclared() && ctx.Refs != nil &&
+		ctx.Refs.IsGlobalNameReference(identifier, name, staticCallGlobalMeaning)
+}
+
+func isStaticMathMethod(name string) bool {
+	switch name {
+	case "abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh",
+		"cbrt", "ceil", "clz32", "cos", "cosh", "exp", "expm1", "floor", "fround",
+		"hypot", "imul", "log", "log10", "log1p", "log2", "max", "min",
+		"pow", "round", "sign", "sin", "sinh", "sqrt", "tan", "tanh", "trunc":
+		return true
+	}
+	return false
+}
+
 func classifyArrayIdentifier(
 	ctx rule.RuleContext,
 	idNode *ast.Node,
 	targetNames, nonTargetNames *utils.Set[string],
-	visitedSymbols map[*ast.Symbol]bool,
+	state *arrayReceiverWalkState,
 ) arrayClass {
 	if ctx.Refs == nil || idNode == nil {
 		return arrayClassUnknown
 	}
 	symbol := ctx.Refs.ResolveInFile(idNode)
-	if symbol == nil || visitedSymbols[symbol] || len(symbol.Declarations) != 1 {
+	if symbol == nil || len(symbol.Declarations) != 1 {
 		return arrayClassUnknown
 	}
-	visitedSymbols[symbol] = true
-	defer delete(visitedSymbols, symbol)
+	if state.visiting[symbol] {
+		return arrayClassUnknown
+	}
+	if !state.useTypeInformation {
+		if class, ok := state.memo[symbol]; ok {
+			return class
+		}
+	}
+	state.visiting[symbol] = true
+	defer func() {
+		delete(state.visiting, symbol)
+	}()
 
 	declaration := symbol.Declarations[0]
 	if declaration == nil {
 		return arrayClassUnknown
 	}
-	if annotation := arrayBindingTypeAnnotation(declaration); annotation != nil {
+	if state.useTypeInformation {
+		annotation := arrayBindingTypeAnnotation(declaration)
 		if class := classifyArrayTypeNode(ctx, annotation, targetNames, nonTargetNames, map[*ast.Symbol]bool{}); class != arrayClassUnknown {
 			return class
 		}
@@ -199,11 +502,16 @@ func classifyArrayIdentifier(
 	declarationList := declaration.Parent
 	variable := declaration.AsVariableDeclaration()
 	if declarationList == nil || !ast.IsVariableDeclarationList(declarationList) ||
+		(!state.useTypeInformation && (ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList))) ||
 		declarationList.Flags&ast.NodeFlagsConst == 0 || variable.Name() == nil ||
 		!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
 		return arrayClassUnknown
 	}
-	return classifyArrayReceiverInner(ctx, variable.Initializer, targetNames, nonTargetNames, visitedSymbols)
+	class := classifyArrayReceiverInner(ctx, variable.Initializer, targetNames, nonTargetNames, state)
+	if !state.useTypeInformation {
+		state.memo[symbol] = class
+	}
+	return class
 }
 
 // arrayBindingTypeAnnotation mirrors definition.name?.typeAnnotation in

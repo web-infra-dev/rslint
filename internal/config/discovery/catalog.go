@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"path"
 	"sort"
 	"sync/atomic"
 
@@ -15,12 +16,25 @@ import (
 )
 
 // AutoJSConfigFileNames is the automatic-discovery priority. Explicit config
-// paths are not restricted to these names or extensions.
+// paths are not restricted to these names, but they must use a supported
+// JavaScript or TypeScript module extension.
 var AutoJSConfigFileNames = []string{
 	"rslint.config.js",
 	"rslint.config.mjs",
 	"rslint.config.ts",
 	"rslint.config.mts",
+}
+
+// IsSupportedConfigModulePath reports whether an explicit path can be loaded
+// as a runtime configuration module. Keep this boundary in discovery so every
+// native entry point rejects legacy JSON/JSONC before invoking a host loader.
+func IsSupportedConfigModulePath(filePath string) bool {
+	switch path.Ext(tspath.NormalizePath(filePath)) {
+	case ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts":
+		return true
+	default:
+		return false
+	}
 }
 
 // DiscoveryFile is a file target that may participate in config discovery.
@@ -59,7 +73,7 @@ type ConfigDiscoveryRequest struct {
 // ExplicitConfigRequest loads one invocation-wide JS/TS config. It is a
 // separate operation from automatic discovery: absence of this request means
 // automatic discovery, while absence of config discovery at the adapter means
-// the low-level/JSON path.
+// the low-level pre-resolved config path.
 type ExplicitConfigRequest struct {
 	CWD        string
 	ConfigPath string
@@ -180,6 +194,9 @@ func DiscoverAutomatic(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoad
 func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoader, request ExplicitConfigRequest) (*ConfigCatalog, error) {
 	if request.ConfigPath == "" {
 		return nil, errors.New("explicit config discovery requires a config path")
+	}
+	if !IsSupportedConfigModulePath(request.ConfigPath) {
+		return nil, fmt.Errorf("explicit config path must name a JS/TS config module: %q", request.ConfigPath)
 	}
 	automatic := ConfigDiscoveryRequest{
 		CWD:            request.CWD,

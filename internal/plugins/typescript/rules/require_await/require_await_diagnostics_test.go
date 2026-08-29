@@ -14,7 +14,7 @@ func TestRequireAwaitDiagnosticPayloads(t *testing.T) {
 		t,
 		&RequireAwaitRule,
 		nil,
-		[]rule_tester.InvalidTestCase{
+		withSimpleRemoveAsyncSuggestions([]rule_tester.InvalidTestCase{
 			{
 				Code: `class DampingSwipe {
   protected async isSwipeHorizontalDisAllow(left: number) {
@@ -427,6 +427,6 @@ export default async function () {
 					},
 				},
 			},
-		},
+		}),
 	)
 }

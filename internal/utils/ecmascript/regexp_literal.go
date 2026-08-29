@@ -33,6 +33,31 @@ func IsValidRegexLiteral(literal string) bool {
 	return !hasError && s.TokenFlags()&ast.TokenFlagsUnterminated == 0 && s.TokenEnd() == len(literal)
 }
 
+// CanonicalizeRegExpLiteral returns the RegExp.prototype.toString spelling of
+// a regular expression literal. A literal already carries its source pattern;
+// only its flags need to be reordered to JavaScript's canonical order.
+func CanonicalizeRegExpLiteral(literal string) string {
+	if len(literal) < 2 || literal[0] != '/' {
+		return literal
+	}
+	lastSlash := strings.LastIndex(literal[1:], "/")
+	if lastSlash < 0 {
+		return literal
+	}
+	flags := literal[lastSlash+2:]
+	var canonical strings.Builder
+	canonical.Grow(len(flags))
+	for _, flag := range "dgimsuvy" {
+		if strings.ContainsRune(flags, flag) {
+			canonical.WriteRune(flag)
+		}
+	}
+	if canonical.Len() != len(flags) {
+		return literal
+	}
+	return literal[:lastSlash+2] + canonical.String()
+}
+
 func literalFlags(literal string) string {
 	if len(literal) < 2 || literal[0] != '/' {
 		return ""

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func TestGetStaticPropertyNameNumericLiteral(t *testing.T) {
@@ -23,6 +24,11 @@ func TestGetStaticPropertyNameNumericLiteral(t *testing.T) {
 			name: "binary above 2^53",
 			code: "({ 0b1000000000000000000000000000000000000000000000000001010000001: 0 })",
 			want: "1152921504606847500",
+		},
+		{
+			name: "binary matching Acorn stepwise rounding",
+			code: "({ 0b10100010000111101000011111100111101111100110100011110110000010100: 0 })",
+			want: "23363847825694777000",
 		},
 		{
 			name: "octal above 2^53",
@@ -80,6 +86,22 @@ func TestGetStaticPropertyNameDetachedNumericLiteral(t *testing.T) {
 	}
 }
 
+func TestGetStaticPropertyNameRegularExpressionLiteral(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, `({ [/a/mi]: 0 })`, core.ScriptKindTS)
+	property := findFirstNodeOfKind(t, sourceFile, ast.KindPropertyAssignment)
+	nameNode := property.Name()
+	if nameNode == nil {
+		t.Fatal("property has no name")
+	}
+	got, ok := GetStaticPropertyName(nameNode)
+	if !ok || got != "/a/im" {
+		t.Fatalf("GetStaticPropertyName() = (%q, %v), want (%q, true)", got, ok, "/a/im")
+	}
+}
+
 func TestRadixLiteralValueRejectsMalformedText(t *testing.T) {
 	for _, raw := range []string{
 		"",
@@ -98,6 +120,16 @@ func TestRadixLiteralValueRejectsMalformedText(t *testing.T) {
 				t.Fatalf("radixLiteralValue(%q) unexpectedly succeeded", raw)
 			}
 		})
+	}
+}
+
+func TestRadixLiteralValueMatchesAcornRounding(t *testing.T) {
+	value, ok := radixLiteralValue("0b10100010000111101000011111100111101111100110100011110110000010100")
+	if !ok {
+		t.Fatal("radixLiteralValue() unexpectedly failed")
+	}
+	if got, want := ecmascript.NumberToString(value), "23363847825694777000"; got != want {
+		t.Fatalf("radixLiteralValue() = %q, want %q", got, want)
 	}
 }
 
@@ -194,6 +226,68 @@ func TestGetFunctionNameWithKindCore(t *testing.T) {
 				FileName: "/test.ts",
 				Path:     "/test.ts",
 			}, tt.code, core.ScriptKindTS)
+			node := findFirstNodeOfKind(t, sourceFile, tt.kind)
+			if got := GetFunctionNameWithKindCore(node); got != tt.want {
+				t.Fatalf("GetFunctionNameWithKindCore() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetFunctionNameWithKindCoreJSDocCasts(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		kind ast.Kind
+		want string
+	}{
+		{
+			name: "class field arrow",
+			code: "class C { field = /** @type {Function} */ (() => {}) }",
+			kind: ast.KindArrowFunction,
+			want: "method 'field'",
+		},
+		{
+			name: "static private async class field arrow",
+			code: "class C { static #field = /** @type {Function} */ (async () => {}) }",
+			kind: ast.KindArrowFunction,
+			want: "static private async method #field",
+		},
+		{
+			name: "class field async generator function prefers owner name",
+			code: "class C { field = /** @type {Function} */ (async function* named() {}) }",
+			kind: ast.KindFunctionExpression,
+			want: "async generator method 'field'",
+		},
+		{
+			name: "object property arrow",
+			code: "const value = { field: /** @type {Function} */ (() => {}) };",
+			kind: ast.KindArrowFunction,
+			want: "method 'field'",
+		},
+		{
+			name: "dynamic class field falls back to function name",
+			code: "class C { [key] = /** @type {Function} */ (function named() {}) }",
+			kind: ast.KindFunctionExpression,
+			want: "method 'named'",
+		},
+		{
+			name: "nested type and satisfies casts",
+			code: "class C { field = /** @type {Function} */ (/** @satisfies {Function} */ (() => {})) }",
+			kind: ast.KindArrowFunction,
+			want: "method 'field'",
+		},
+		{
+			name: "auto accessor remains a plain arrow function",
+			code: "class C { static accessor #field = /** @type {Function} */ (async () => {}) }",
+			kind: ast.KindArrowFunction,
+			want: "async arrow function",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sourceFile := parseJSFile(t, tt.code)
 			node := findFirstNodeOfKind(t, sourceFile, tt.kind)
 			if got := GetFunctionNameWithKindCore(node); got != tt.want {
 				t.Fatalf("GetFunctionNameWithKindCore() = %q, want %q", got, tt.want)

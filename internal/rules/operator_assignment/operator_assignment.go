@@ -161,7 +161,10 @@ func hasSameTypeSyntax(sourceFile *ast.SourceFile, left, right *ast.Node) bool {
 		scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, right, false) {
 		return true
 	}
-	return utils.HasSameTokens(sourceFile, left, right)
+	// Identifier escapes do not change a TypeScript type reference's meaning.
+	// Keep that semantic equivalence here even though the TS parser exposes raw
+	// identifier spellings to token-oriented ESLint rules.
+	return utils.HasSameTokensWithDecodedIdentifiers(sourceFile, left, right)
 }
 
 // hasSameAssertionStructure reports whether two already-matched references

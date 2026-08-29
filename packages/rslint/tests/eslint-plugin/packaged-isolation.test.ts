@@ -77,7 +77,7 @@ const host = await createPluginLintHost([
 const res = await host.lint({
   files: [{ path: 'a.ts', text: 'const x = null;', configKey: cfgDir }],
   rules: { 'pkg/no-null': { options: [] } },
-  fix: false,
+  collectFixes: false,
   suggestionsMode: 'off',
 });
 await host.shutdown();

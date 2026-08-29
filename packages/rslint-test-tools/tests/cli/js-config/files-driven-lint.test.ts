@@ -259,28 +259,25 @@ describe('Files-driven lint: gap file auto-degrade', () => {
     }
   });
 
-  test('JSON config without files field should scan default lintable extensions', async () => {
+  test('config without files field should scan default lintable extensions', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': JSON.stringify({
         compilerOptions: { target: 'ES2020', module: 'ESNext', strict: true },
         include: ['src/**/*.ts'],
       }),
-      // JSON config: no files field
-      'rslint.json': JSON.stringify([
-        {
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            '@typescript-eslint/no-unsafe-member-access': 'error',
-            'no-debugger': 'error',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+          'no-debugger': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'src/index.ts': `let a: any = 1;\na.b = 2;\n`,
       // This file is NOT in tsconfig include. It should still be linted by
       // syntax-only rules because omitted files selects rslint's default
