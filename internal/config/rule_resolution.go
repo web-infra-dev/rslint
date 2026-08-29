@@ -15,7 +15,6 @@ func ResolveEnabledRules(
 	config RslintConfig,
 	filePath string,
 	cwd string,
-	enforcePlugins bool,
 ) ([]rule.ConfiguredRule, *MergedConfig) {
 	if catalog == nil {
 		panic("rule catalog is required")
@@ -24,7 +23,7 @@ func ResolveEnabledRules(
 	if mergedConfig == nil {
 		return nil, nil
 	}
-	return ConfiguredRules(catalog, mergedConfig, enforcePlugins), mergedConfig
+	return ConfiguredRules(catalog, mergedConfig), mergedConfig
 }
 
 // ConfiguredRules converts an already-resolved config into enabled rule
@@ -32,7 +31,6 @@ func ResolveEnabledRules(
 func ConfiguredRules(
 	catalog *rule.Catalog,
 	mergedConfig *MergedConfig,
-	enforcePlugins bool,
 ) []rule.ConfiguredRule {
 	if catalog == nil {
 		panic("rule catalog is required")
@@ -48,12 +46,10 @@ func ConfiguredRules(
 			continue
 		}
 
-		if enforcePlugins {
-			prefix := rule.Namespace(ruleName)
-			if prefix != "" {
-				if _, declared := mergedConfig.Plugins[prefix]; !declared {
-					continue
-				}
+		prefix := rule.Namespace(ruleName)
+		if prefix != "" {
+			if _, declared := mergedConfig.Plugins[prefix]; !declared {
+				continue
 			}
 		}
 

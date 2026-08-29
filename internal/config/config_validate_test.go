@@ -238,18 +238,18 @@ func TestValidateConfig_RuleSeverities(t *testing.T) {
 			t.Fatalf("unmarshal numeric rule severities: %v", err)
 		}
 		if err := ValidateConfig(cfg); err != nil {
-			t.Fatalf("valid JSON rule severities were rejected: %v", err)
+			t.Fatalf("valid serialized rule severities were rejected: %v", err)
 		}
 		merged := cfg.GetConfigForFile("src/app.ts", "")
 		if merged == nil {
-			t.Fatal("expected JSON config to merge")
+			t.Fatal("expected serialized config to merge")
 			return
 		}
 		for name, want := range map[string]string{
 			"numeric-off": "off", "numeric-warn": "warn", "numeric-error": "error",
 		} {
 			if got := merged.Rules[name]; got == nil || got.Level != want {
-				t.Errorf("JSON rule %q = %#v, want level %q", name, got, want)
+				t.Errorf("serialized rule %q = %#v, want level %q", name, got, want)
 			}
 		}
 		arrayRule := merged.Rules["array-numeric"]

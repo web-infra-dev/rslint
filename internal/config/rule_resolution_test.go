@@ -20,7 +20,7 @@ func TestResolveEnabledRules_FiltersByEnabledState(t *testing.T) {
 		},
 	}
 
-	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", false)
+	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
 		return
@@ -67,7 +67,7 @@ func TestResolveEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
 		},
 	}
 
-	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "dist/bundle.js", "", false)
+	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "dist/bundle.js", "")
 	if rules != nil {
 		t.Error("Expected nil rules for ignored file")
 	}
@@ -76,11 +76,11 @@ func TestResolveEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
 	}
 }
 
-// ======== Plugin enforcement tests (enforcePlugins=true, JS/TS config) ========
+// ======== Plugin declaration tests ========
 
-func TestResolveEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_BlocksUndeclaredPlugin(t *testing.T) {
 
-	// JS config: rules declared but plugin NOT declared
+	// Rules declared but plugin NOT declared.
 	config := RslintConfig{
 		{
 			Rules: Rules{
@@ -90,7 +90,7 @@ func TestResolveEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T)
 		},
 	}
 
-	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
 		return
@@ -112,9 +112,9 @@ func TestResolveEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T)
 	}
 }
 
-func TestResolveEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_AllowsDeclaredPlugin(t *testing.T) {
 
-	// JS config: rules declared AND plugin declared
+	// Rules declared AND plugin declared.
 	config := RslintConfig{
 		{
 			Plugins: []string{"@typescript-eslint"},
@@ -125,7 +125,7 @@ func TestResolveEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 		},
 	}
 
-	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, mergedConfig := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
 		return
@@ -145,7 +145,7 @@ func TestResolveEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 	}
 }
 
-func TestResolveEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_EslintPluginPrefix(t *testing.T) {
 
 	// Plugin declared with eslint-plugin- prefix
 	config := RslintConfig{
@@ -157,7 +157,7 @@ func TestResolveEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -170,7 +170,7 @@ func TestResolveEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
 	}
 }
 
-func TestResolveEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_MultiplePlugins(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -182,7 +182,7 @@ func TestResolveEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -200,35 +200,7 @@ func TestResolveEnabledRules_EnforcePlugins_MultiplePlugins(t *testing.T) {
 	}
 }
 
-func TestResolveEnabledRules_NoEnforcePlugins_AllowsAll(t *testing.T) {
-
-	// JSON config behavior: enforcePlugins=false, no plugin gating
-	config := RslintConfig{
-		{
-			Rules: Rules{
-				"@typescript-eslint/no-explicit-any": "error",
-				"no-debugger":                        "error",
-			},
-		},
-	}
-
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", false)
-
-	ruleMap := make(map[string]rule.ConfiguredRule)
-	for _, r := range rules {
-		ruleMap[r.Name] = r
-	}
-
-	// Without enforcement, plugin rules are allowed even without declaration
-	if _, ok := ruleMap["@typescript-eslint/no-explicit-any"]; !ok {
-		t.Error("Expected @typescript-eslint/no-explicit-any to be enabled (no enforcement)")
-	}
-	if _, ok := ruleMap["no-debugger"]; !ok {
-		t.Error("Expected no-debugger to be enabled")
-	}
-}
-
-func TestResolveEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_PluginFromDifferentEntry(t *testing.T) {
 
 	// Plugin declared in one entry, rule in another — both match the same file
 	config := RslintConfig{
@@ -242,7 +214,7 @@ func TestResolveEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -255,7 +227,7 @@ func TestResolveEnabledRules_EnforcePlugins_PluginFromDifferentEntry(t *testing.
 	}
 }
 
-func TestResolveEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_PluginEntryDoesNotMatchFile(t *testing.T) {
 
 	// Plugin declared in entry that doesn't match the file
 	config := RslintConfig{
@@ -271,7 +243,7 @@ func TestResolveEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testi
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -286,7 +258,7 @@ func TestResolveEnabledRules_EnforcePlugins_PluginEntryDoesNotMatchFile(t *testi
 }
 
 // Case 2: Preset-like spread + local override
-func TestResolveEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_PresetPlusOverride(t *testing.T) {
 
 	// Simulates: [...ts.configs.recommended, { rules: { override } }]
 	// Entry1 = preset (has plugins + rules), Entry2 = user override (no plugins)
@@ -307,7 +279,7 @@ func TestResolveEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -326,7 +298,7 @@ func TestResolveEnabledRules_EnforcePlugins_PresetPlusOverride(t *testing.T) {
 }
 
 // Multiple plugins declared in the same entry array
-func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_MultiplePluginsInSameEntry(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -339,7 +311,7 @@ func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testin
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -359,7 +331,7 @@ func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testin
 }
 
 // Case 4: Plugins declared in a LATER entry (reversed order from Case 3)
-func TestResolveEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_PluginInLaterEntry(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -374,7 +346,7 @@ func TestResolveEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -388,7 +360,7 @@ func TestResolveEnabledRules_EnforcePlugins_PluginInLaterEntry(t *testing.T) {
 }
 
 // Case 7 complete: Multiple plugins from different entries, both declared
-func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_MultiplePluginsBothDeclared(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -407,7 +379,7 @@ func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testi
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -424,7 +396,7 @@ func TestResolveEnabledRules_EnforcePlugins_MultiplePluginsBothDeclared(t *testi
 }
 
 // Case 9: Preset + additional plugin in separate entry
-func TestResolveEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_PresetPlusAdditionalPlugin(t *testing.T) {
 
 	// Simulates: [...ts.configs.recommended, { plugins: ['react'], rules: { react/... } }]
 	config := RslintConfig{
@@ -445,7 +417,7 @@ func TestResolveEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testin
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.tsx", "")
 
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
@@ -466,7 +438,7 @@ func TestResolveEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testin
 }
 
 // Case 10: Entry-level ignores prevent plugins from being merged
-func TestResolveEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_IgnoresPreventsPluginMerge(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -479,7 +451,7 @@ func TestResolveEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testin
 	}
 
 	// Non-ignored file: entry matches, plugin and rule both apply
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
@@ -489,7 +461,7 @@ func TestResolveEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testin
 	}
 
 	// Ignored file: entry is skipped entirely, no config returned (nil)
-	rules2, merged := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.test.ts", "", true)
+	rules2, merged := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.test.ts", "")
 	if merged != nil {
 		t.Error("Expected nil merged config for ignored file")
 	}
@@ -499,7 +471,7 @@ func TestResolveEnabledRules_EnforcePlugins_IgnoresPreventsPluginMerge(t *testin
 }
 
 // Case 10b: Ignores in one entry, plugin+rule in another → test file still gets plugin from second entry
-func TestResolveEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_IgnoresOnlyAffectsOwnEntry(t *testing.T) {
 
 	config := RslintConfig{
 		{
@@ -517,7 +489,7 @@ func TestResolveEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testin
 	}
 
 	// test.ts: entry1 ignores it (plugin not merged from entry1), entry2 matches (no plugin)
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.test.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.test.ts", "")
 	ruleMap := make(map[string]rule.ConfiguredRule)
 	for _, r := range rules {
 		ruleMap[r.Name] = r
@@ -533,7 +505,7 @@ func TestResolveEnabledRules_EnforcePlugins_IgnoresOnlyAffectsOwnEntry(t *testin
 	}
 }
 
-func TestResolveEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
+func TestResolveEnabledRules_PluginDeclarations_OffRuleNotBlocked(t *testing.T) {
 
 	// A rule set to "off" with no plugin declared should not appear in enabled rules
 	// (it shouldn't appear regardless — this tests there's no false positive)
@@ -545,7 +517,7 @@ func TestResolveEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
 		},
 	}
 
-	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "", true)
+	rules, _ := ResolveEnabledRules(baseRuleCatalog(), config, "src/app.ts", "")
 
 	for _, r := range rules {
 		if r.Name == "@typescript-eslint/no-explicit-any" {
@@ -558,6 +530,7 @@ func TestResolveEnabledRulesLeavesTypeEligibilityToLinter(t *testing.T) {
 
 	cfg := RslintConfig{
 		{
+			Plugins: []string{"@typescript-eslint"},
 			Rules: Rules{
 				"@typescript-eslint/require-await": "error", // type-aware
 				"no-console":                       "error", // not type-aware
@@ -565,7 +538,7 @@ func TestResolveEnabledRulesLeavesTypeEligibilityToLinter(t *testing.T) {
 		},
 	}
 
-	enabled, _ := ResolveEnabledRules(baseRuleCatalog(), cfg, "src/uncovered.ts", "", false)
+	enabled, _ := ResolveEnabledRules(baseRuleCatalog(), cfg, "src/uncovered.ts", "")
 	if len(enabled) != 2 {
 		t.Fatalf("Expected config resolution to return 2 rules, got %d: %v", len(enabled), ruleNames(enabled))
 	}
@@ -587,7 +560,8 @@ func TestFileConfigResolver_MatchesDirectResolution(t *testing.T) {
 
 	cfg := RslintConfig{
 		{
-			Files: []string{"src/**/*.ts"},
+			Files:   []string{"src/**/*.ts"},
+			Plugins: []string{"@typescript-eslint"},
 			LanguageOptions: &LanguageOptions{Raw: map[string]any{
 				"globals": map[string]any{
 					"readonlyGlobal": "readonly",
@@ -600,11 +574,11 @@ func TestFileConfigResolver_MatchesDirectResolution(t *testing.T) {
 			},
 		},
 	}
-	resolver := NewFileConfigResolver(cfg, "/repo", baseRuleCatalog(), false)
+	resolver := NewFileConfigResolver(cfg, "/repo", baseRuleCatalog())
 
 	filePath := "/repo/src/app.ts"
 	cachedRules, cachedMerged := resolver.EnabledRulesForFile(filePath)
-	directRules, directMerged := ResolveEnabledRules(baseRuleCatalog(), cfg, filePath, "/repo", false)
+	directRules, directMerged := ResolveEnabledRules(baseRuleCatalog(), cfg, filePath, "/repo")
 	if cachedMerged == nil || directMerged == nil {
 		t.Fatalf("expected both resolution paths to return merged config")
 	}
@@ -648,7 +622,7 @@ func TestFileConfigResolver_ConcurrentAccess(t *testing.T) {
 			},
 		},
 	}
-	resolver := NewFileConfigResolver(cfg, "/repo", baseRuleCatalog(), false)
+	resolver := NewFileConfigResolver(cfg, "/repo", baseRuleCatalog())
 	paths := []string{
 		"/repo/src/a.ts",
 		"/repo/src/b.ts",

@@ -182,16 +182,17 @@ type Server struct {
 	// generation. Document requests reuse them instead of repeatedly parsing selectors
 	// and ignore patterns on every edit.
 	jsFileConfigResolvers map[string]*config.FileConfigResolver
-	// jsonConfigOwnerIndex freezes the invocation-wide JSON config's authored
-	// path space when that config generation is loaded.
-	jsonConfigOwnerIndex   *target.OwnerIndex
-	jsonFileConfigResolver *config.FileConfigResolver
+	// fallbackConfigOwnerIndex freezes the workspace fallback's authored path
+	// space. The fallback is an empty config plus the committed .gitignore view
+	// for files outside every discovered config boundary.
+	fallbackConfigOwnerIndex   *target.OwnerIndex
+	fallbackFileConfigResolver *config.FileConfigResolver
 	// configDiscoveryActive becomes true after the first structurally valid
 	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
 	// config-scoped .gitignore watchers trigger a fresh transaction without
 	// sending reverse requests before the client installs its handlers. The
-	// extension remains the sole refresh owner for workspace/descendant JS and
-	// JSON changes.
+	// extension remains the sole refresh owner for workspace/descendant config
+	// changes.
 	configDiscoveryActive bool
 	// configRefreshInitialized records that the client has chosen this process's
 	// invocation-wide config source. configRefreshConfigPath is empty for
@@ -204,21 +205,18 @@ type Server struct {
 	// unavailable boundaries used to keep LSP alive when every JS config is
 	// broken. Refresh failures preserve only the usable JS catalog as last-good.
 	configDiscoveryHasLastGood bool
-	// configSnapshotIncludesGitignore means the current catalog already contains
-	// the .gitignore view captured during its transaction. Before the first
-	// committed snapshot, the JSON startup config still uses the live policy.
+	// configSnapshotIncludesGitignore means the current catalog and workspace
+	// fallback already contain the .gitignore view captured during their
+	// transaction. Before the first committed snapshot, fallback evaluation uses
+	// the live policy.
 	configSnapshotIncludesGitignore bool
 	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}
-	jsonConfig           config.RslintConfig // fallback JSON config (rslint.json/rslint.jsonc)
-	rslintConfigPath     string              // path to rslint.json/rslint.jsonc, empty if not found
-	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
-	// For the JSON-config path this is a single global list.
-	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
-	// which keys per-config-directory so a nested config with no tsconfig
-	// does not disable filtering for files under other configs.
-	tsConfigPaths []string
+	fallbackConfig       config.RslintConfig
+	// Configured project paths are keyed per owner so a nested config with no
+	// tsconfig does not disable filtering for files under other configs. The
+	// empty workspace fallback never supplies type information.
 	// A nil map value means the corresponding config has no type information.
 	tsConfigPathsByConfig map[string][]string
 	documents             map[lsproto.DocumentUri]string                // URI -> content
