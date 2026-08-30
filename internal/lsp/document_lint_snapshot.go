@@ -28,7 +28,7 @@ type documentLintSnapshot struct {
 	ruleCatalog           *rule.Catalog
 	configResolved        bool
 	typeScriptConfigPaths []string
-	usesJavaScriptConfig  bool
+	configKey             string
 	pluginGeneration      string
 	unavailable           bool
 }
@@ -56,7 +56,6 @@ func resolveDocumentLintSnapshotConfig(
 		fs,
 		snapshot.pathSpaces,
 		snapshot.ruleCatalog,
-		snapshot.usesJavaScriptConfig,
 	)
 	if err != nil {
 		panic(err)
@@ -132,7 +131,6 @@ type documentConfigSelection struct {
 	ruleCatalog   *rule.Catalog
 	directory     string
 	configKey     string
-	usesJSConfig  bool
 	configMissing bool
 }
 
@@ -159,7 +157,6 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 		ownerIndex *target.OwnerIndex,
 		fileConfigResolver *config.FileConfigResolver,
 		catalog *rule.Catalog,
-		enforcePlugins bool,
 	) (config.RslintConfig, config.ResolvedFileConfig, *config.PathSpaceSnapshot, bool) {
 		configDirectory = tspath.NormalizePath(configDirectory)
 		if !s.configSnapshotIncludesGitignore {
@@ -192,7 +189,6 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 				evaluationFS,
 				ownerIndex.PathSpaces(),
 				catalog,
-				enforcePlugins,
 			)
 			if err != nil {
 				panic(err)
@@ -213,7 +209,6 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 					jsOwnerIndex,
 					jsFileConfigResolvers[configKey],
 					jsRuleCatalog,
-					true,
 				)
 				return documentConfigSelection{
 					entries:       entries,
@@ -222,7 +217,6 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
-					usesJSConfig:  true,
 					configMissing: !ok,
 				}
 			}
@@ -236,7 +230,6 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 					jsOwnerIndex,
 					jsFileConfigResolvers[configKey],
 					jsRuleCatalog,
-					true,
 				)
 				return documentConfigSelection{
 					entries:       entries,
@@ -245,7 +238,6 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 					ruleCatalog:   jsRuleCatalog,
 					directory:     configKey,
 					configKey:     configKey,
-					usesJSConfig:  true,
 					configMissing: !ok,
 				}
 			}
@@ -255,12 +247,11 @@ func (s *Server) selectDocumentConfig(lintFile target.File) documentConfigSelect
 	configDirectory := tspath.NormalizePath(s.cwd)
 	goRuleCatalog := rules.All()
 	entries, resolved, pathSpaces, ok := evaluateKnownConfig(
-		s.jsonConfig,
+		s.fallbackConfig,
 		configDirectory,
-		s.jsonConfigOwnerIndex,
-		s.jsonFileConfigResolver,
+		s.fallbackConfigOwnerIndex,
+		s.fallbackFileConfigResolver,
 		goRuleCatalog,
-		false,
 	)
 	return documentConfigSelection{
 		entries:       entries,
@@ -279,8 +270,8 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
 	selection := s.selectDocumentConfig(target)
 	target.ConfigDirectory = selection.directory
-	typeScriptConfigPaths := s.tsConfigPaths
-	if selection.usesJSConfig {
+	var typeScriptConfigPaths []string
+	if selection.configKey != "" {
 		typeScriptConfigPaths = s.tsConfigPathsByConfig[selection.configKey]
 	}
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
@@ -292,9 +283,9 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		ruleCatalog:           selection.ruleCatalog,
 		configResolved:        !selection.configMissing,
 		typeScriptConfigPaths: typeScriptConfigPaths,
-		usesJavaScriptConfig:  selection.usesJSConfig,
+		configKey:             selection.configKey,
 		pluginGeneration:      s.eslintPluginConfigGeneration,
-		unavailable:           selection.usesJSConfig && unavailable,
+		unavailable:           selection.configKey != "" && unavailable,
 	}
 }
 
@@ -304,12 +295,12 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
 	selection := s.selectDocumentConfig(target)
-	return selection.entries, selection.directory, selection.usesJSConfig
+	return selection.entries, selection.directory, selection.configKey != ""
 }
 
 func (s *Server) getLintConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	snapshot := s.documentLintSnapshot(uri)
-	return snapshot.config, snapshot.target.ConfigDirectory, snapshot.usesJavaScriptConfig
+	return snapshot.config, snapshot.target.ConfigDirectory, snapshot.configKey != ""
 }
 
 func (s *Server) isUnavailableConfigForURI(uri lsproto.DocumentUri) bool {
@@ -363,5 +354,5 @@ func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
 	if configKey, ok := s.jsConfigKeyForTarget(target); ok {
 		return s.tsConfigPathsByConfig[configKey]
 	}
-	return s.tsConfigPaths
+	return nil
 }

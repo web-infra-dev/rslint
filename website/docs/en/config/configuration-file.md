@@ -1,6 +1,6 @@
 # Configuration File
 
-Rslint uses a flat config format (an array of config entries), aligned with ESLint v10. JS/TS configuration files are the recommended approach.
+Rslint uses JS/TS module configuration with a flat config array aligned with ESLint v10.
 
 ## Supported filenames
 
@@ -114,8 +114,8 @@ When multiple config entries match a file, they are merged in array order:
 
 If no entry matches a selected file, no lint rules run for it, but the file is still parsed and included in the result so parser diagnostics remain visible. This applies to default-baseline files found during directory discovery as well as explicitly requested supported files. Global ignores remove matching targets; CLI and JavaScript API runs apply `.gitignore` as an additional global ignore source.
 
-## JSON configuration (deprecated)
+## Migrating a legacy JSON configuration
 
-JSON config files (`rslint.json`, `rslint.jsonc`) are deprecated and will be removed in a future version. Run `rslint --init` to automatically migrate your JSON config to a JS/TS config. The migration preserves your custom rules and settings while deduplicating rules already covered by recommended presets.
+Rslint no longer loads `rslint.json` or `rslint.jsonc` while linting. Passing one to `--config` is rejected; automatic discovery ignores those filenames.
 
-The key difference is that JSON configs automatically enable all core rules and declared plugin rules as `"error"`. JS/TS configs only enable rules explicitly declared in presets or the [`rules`](/config/rules) field.
+Run `rslint --init` in a project that still has a legacy JSON/JSONC file to migrate it to a JS/TS module config. The migration preserves custom rules and settings while deduplicating rules already covered by recommended presets.

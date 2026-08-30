@@ -2,6 +2,7 @@
 aavascript
 abce
 accesskey
+accessorutil
 accum
 acdfg
 acefg
@@ -141,6 +142,8 @@ destabilising
 destructures
 desugars
 desync
+dgimsuy
+dgimsuvy
 dialytika
 dirxml
 disqualifier
@@ -349,6 +352,7 @@ mmap
 mobx
 Modns
 modns
+moofoo
 morestack
 mousein
 mouseout

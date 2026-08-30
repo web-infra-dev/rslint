@@ -32,7 +32,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// Resolve the working directory WITHOUT os.Chdir: this is a long-lived,
 	// reused --api process, so mutating the process-global cwd would leak
 	// across requests (and race a future concurrent mode). Everything
-	// downstream (resolveRequestPath / config loader / CreateCompilerHost /
+	// downstream (resolveRequestPath / config resolution / CreateCompilerHost /
 	// CreateProgram) takes this directory explicitly, so a local var suffices.
 	currentDirectory := req.WorkingDirectory
 	if currentDirectory == "" {
@@ -259,8 +259,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			}
 		} else {
 			// No JS candidate is a valid API state: lint with override entries (or
-			// syntax-only with an empty config) rather than falling back to the CLI's
-			// rslint.json lookup.
+			// syntax-only with an empty config).
 			rslintConfig = overrideConfig
 			configDirectory = currentDirectory
 		}
@@ -374,7 +373,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			Config:                              rslintConfig,
 			ConfigDirectory:                     configDirectory,
 			Catalog:                             ruleCatalog,
-			EnforcePlugins:                      true,
 			TargetsBySourcePath:                 binding.LintTargetBySourcePath,
 			SourceMappingsIncludeCanonicalPaths: true,
 			PathSpaces:                          targetPlan.PathSpaces(),

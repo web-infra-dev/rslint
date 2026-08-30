@@ -202,8 +202,8 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 		return fmt.Errorf("failed to read %s: %w", jsonFileName, err)
 	}
 
-	// Migration accepts legacy JSON configs that the lint-time loader now
-	// rejects, such as explicit `files: []`, and drops unsupported/empty
+	// Migration accepts legacy JSON shapes that runtime config discovery does
+	// not load, such as explicit `files: []`, and drops unsupported/empty
 	// fields while generating the JS/TS config below.
 	legacyEntries, err := parseLegacyConfigEntries(data)
 	if err != nil {

@@ -480,7 +480,6 @@ func TestNoArrayConstructorEmptyParserLibDivergence(t *testing.T) {
 		config,
 		sourceFile.FileName(),
 		root.Dir,
-		false,
 	)
 	if merged == nil || len(configuredRules) != 1 {
 		t.Fatalf("resolved rules = %d, merged config = %v; want one configured rule", len(configuredRules), merged != nil)

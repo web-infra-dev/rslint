@@ -134,7 +134,7 @@ func TestResolveConfigFilePathSpace(t *testing.T) {
 			Files: []string{"../workspace/*.ts"},
 			Rules: Rules{"rule": "error"},
 		}}
-		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, rules.All(), false).
+		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, rules.All()).
 			ConfigForFile("/real/workspace/visible.ts"); merged == nil || merged.Rules["rule"] == nil {
 			t.Fatalf("shared alias selector did not match: %#v", merged)
 		}
@@ -164,7 +164,7 @@ func TestResolveConfigFilePathSpace(t *testing.T) {
 			Files: []string{"../workspace/link.ts"},
 			Rules: Rules{"rule": "error"},
 		}}
-		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, rules.All(), false).
+		if merged := NewFileConfigResolverWithFS(entries, "/alias/config", fs, rules.All()).
 			ConfigForFile("/real/workspace/link.ts"); merged == nil || merged.Rules["rule"] == nil {
 			t.Fatalf("shared alias file-symlink selector did not match: %#v", merged)
 		}

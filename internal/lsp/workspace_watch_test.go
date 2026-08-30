@@ -12,7 +12,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -99,7 +98,6 @@ func TestWorkspaceConfigEventsDoNotDuplicateTransactionalRefresh(t *testing.T) {
 		t.Run(filepath.Base(configPath), func(t *testing.T) {
 			s, outgoing := newAncestorConfigWatchTestServer(workspace)
 			s.configDiscoveryActive = true
-			s.rslintConfigPath = "/committed/rslint.json"
 			result := startConfigWatchEvent(s, configPath, lsproto.FileChangeTypeChanged)
 			select {
 			case message := <-outgoing:
@@ -111,9 +109,6 @@ func TestWorkspaceConfigEventsDoNotDuplicateTransactionalRefresh(t *testing.T) {
 				}
 			case <-time.After(time.Second):
 				t.Fatal("workspace config event did not complete")
-			}
-			if s.rslintConfigPath != "/committed/rslint.json" {
-				t.Fatalf("workspace event directly reloaded JSON config: %q", s.rslintConfigPath)
 			}
 		})
 	}
@@ -279,22 +274,13 @@ func TestAncestorGitignoreWatcherRefreshesAncestorOwnedConfig(t *testing.T) {
 	}
 }
 
-func TestConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
+func TestConfigRefreshPreservesAtomicLastGoodOnFailure(t *testing.T) {
 	workspace := tspath.NormalizePath(t.TempDir())
 	writeConfigCandidate(t, workspace)
-	jsonPath := filepath.Join(workspace, "rslint.json")
-	if err := os.WriteFile(jsonPath, []byte(`[{"rules":{"no-console":"error"}}]`), 0o644); err != nil {
-		t.Fatal(err)
-	}
 
 	s, outgoing := newAncestorConfigWatchTestServer(workspace)
 	installLastGoodConfig(s, workspace)
 	s.configDiscoveryActive = true
-	s.jsonConfig = config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
-	s.rslintConfigPath = jsonPath
-	if err := os.WriteFile(jsonPath, []byte(`[{"rules":{"no-debugger":"error"}}]`), 0o644); err != nil {
-		t.Fatal(err)
-	}
 
 	changed := startConfigRefreshForTest(s, "config-change")
 	loadMessage := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)
@@ -307,15 +293,8 @@ func TestConfigRefreshPreservesAtomicJSONLastGoodOnJSFailure(t *testing.T) {
 		t.Fatalf("config refresh error = %v, want ErrAllConfigsFailed after preserving last-good", completed.err)
 	}
 
-	if len(s.jsonConfig) != 1 || s.jsonConfig[0].Rules["no-console"] != "error" ||
-		s.jsonConfig[0].Rules["no-debugger"] != nil {
-		t.Fatalf("rejected refresh mutated live JSON fallback: %+v", s.jsonConfig)
-	}
-	if s.rslintConfigPath != jsonPath {
-		t.Fatalf("JSON fallback path=%q, want last-good %q", s.rslintConfigPath, jsonPath)
-	}
 	if got := s.jsConfigs[workspace][0].Rules["no-console"]; got != "error" {
-		t.Fatalf("rejected refresh mutated live JS config: %+v", s.jsConfigs)
+		t.Fatalf("rejected refresh mutated live config: %+v", s.jsConfigs)
 	}
 }
 
@@ -440,75 +419,5 @@ func TestGitignoreWatchEventsInvalidateDiagnostics(t *testing.T) {
 				t.Fatal(".gitignore change did not request diagnostics refresh")
 			}
 		})
-	}
-}
-
-func TestLSPGitignoreReloadReadsFreshState(t *testing.T) {
-	dir := t.TempDir()
-	target := filepath.Join(dir, "source.ts")
-	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	gitignorePath := filepath.Join(dir, ".gitignore")
-	gitignoreURI := documentURIFromPath(gitignorePath)
-	uri := documentURIFromPath(target)
-
-	s := newTestServer()
-	s.cwd = dir
-	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	s.jsonConfig = config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
-	s.documents[uri] = "debugger;\n"
-	isIgnored := func() bool {
-		effective, cwd, _ := s.getLintConfigForURI(uri)
-		return effective.IsFileIgnored(target, cwd)
-	}
-	if isIgnored() {
-		t.Fatal("file was ignored before .gitignore existed")
-	}
-
-	if err := os.WriteFile(gitignorePath, []byte("source.ts\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
-		Changes: []*lsproto.FileEvent{{Uri: gitignoreURI, Type: lsproto.FileChangeTypeCreated}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if !isIgnored() {
-		t.Fatal("created .gitignore was not applied")
-	}
-	if err := os.WriteFile(gitignorePath, []byte("other.ts\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
-		Changes: []*lsproto.FileEvent{{Uri: gitignoreURI, Type: lsproto.FileChangeTypeChanged}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if isIgnored() {
-		t.Fatal("changed .gitignore content was not applied")
-	}
-	if err := os.WriteFile(gitignorePath, []byte("source.ts\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
-		Changes: []*lsproto.FileEvent{{Uri: gitignoreURI, Type: lsproto.FileChangeTypeChanged}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if !isIgnored() {
-		t.Fatal("second .gitignore content change was not applied")
-	}
-
-	if err := os.Remove(gitignorePath); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
-		Changes: []*lsproto.FileEvent{{Uri: gitignoreURI, Type: lsproto.FileChangeTypeDeleted}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if isIgnored() {
-		t.Fatal("deleted .gitignore remained active")
 	}
 }

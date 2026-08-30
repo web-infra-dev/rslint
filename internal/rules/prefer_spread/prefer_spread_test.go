@@ -15,6 +15,9 @@ func TestPreferSpreadRule(t *testing.T) {
 		&PreferSpreadRule,
 		// Valid cases - ported from ESLint
 		[]rule_tester.ValidTestCase{
+			// TypeScript parser tokens retain the escaped thisArg spelling.
+			{Code: `obj.foo.apply(\u006fbj, args);`},
+
 			{Code: `foo.apply(obj, args);`},
 			{Code: `obj.foo.apply(null, args);`},
 			{Code: `obj.foo.apply(otherObj, args);`},
@@ -71,6 +74,14 @@ func TestPreferSpreadRule(t *testing.T) {
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
+			// Espree decodes the escaped JavaScript Identifier token to `obj`.
+			{
+				Code:     `obj.foo.apply(\u006fbj, args);`,
+				FileName: "prefer-spread-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "preferSpread"}},
+			},
+
 			// Lock in exact message text + full reported range (the rule emits
 			// a single messageId with no modifier combinations).
 			{

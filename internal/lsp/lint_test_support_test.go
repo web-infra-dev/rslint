@@ -19,7 +19,7 @@ func configuredSpeculativePipelineResultForTest(
 	content string,
 	entries config.RslintConfig,
 	configDirectory string,
-	usesJavaScriptConfig bool,
+	usesConfigCatalog bool,
 	typeScriptConfigPaths []string,
 ) (linter.PipelineResult, error) {
 	return speculativePipelineResultForTest(
@@ -32,7 +32,7 @@ func configuredSpeculativePipelineResultForTest(
 			uri,
 			entries,
 			configDirectory,
-			usesJavaScriptConfig,
+			usesConfigCatalog,
 			typeScriptConfigPaths,
 		),
 	)
@@ -44,7 +44,7 @@ func configuredDocumentPipelineResultForTest(
 	uri lsproto.DocumentUri,
 	entries config.RslintConfig,
 	configDirectory string,
-	usesJavaScriptConfig bool,
+	usesConfigCatalog bool,
 	typeScriptConfigPaths []string,
 ) (linter.PipelineResult, error) {
 	snapshot := documentLintSnapshotForTest(
@@ -52,7 +52,7 @@ func configuredDocumentPipelineResultForTest(
 		uri,
 		entries,
 		configDirectory,
-		usesJavaScriptConfig,
+		usesConfigCatalog,
 		typeScriptConfigPaths,
 	)
 	return linter.RunPipeline(ctx, linter.NewLintRequest(

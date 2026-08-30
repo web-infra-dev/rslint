@@ -54,7 +54,7 @@ const LOCKFILE_NAMES = [
   'yarn.lock',
 ] as const;
 
-export const CONFIG_REFRESH_WATCH_GLOB = `**/{rslint.config.js,rslint.config.mjs,rslint.config.ts,rslint.config.mts,rslint.json,rslint.jsonc,${LOCKFILE_NAMES.join(',')}}`;
+export const CONFIG_REFRESH_WATCH_GLOB = `**/{rslint.config.js,rslint.config.mjs,rslint.config.ts,rslint.config.mts,${LOCKFILE_NAMES.join(',')}}`;
 
 export type ConfigRefreshReason =
   'initial' | 'config-change' | 'dependency-change';

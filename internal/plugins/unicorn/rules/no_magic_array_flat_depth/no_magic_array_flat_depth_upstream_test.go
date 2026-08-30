@@ -61,6 +61,13 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			// `String.fromCharCode` is folded by the shared static
 			// evaluator to a string value, so the rule skips it.
 			jsValid(`String.fromCharCode(65).flat(2)`),
+			jsValid(`Math.abs(-2).flat(2)`),
+			jsValid(`Math.max(1, 2).flat(2)`),
+			jsValid(`Array.isArray([]).flat(2)`),
+			jsValid(`parseInt("2", 10).flat(2)`),
+			jsValid(`parseFloat("2").flat(2)`),
+			jsValid(`Object().flat(2)`),
+			jsValid(`const value = 1; value.flat(2);`),
 
 			// ---- depth is 1 (the default) ----
 			jsValid(`array.flat(1)`),
@@ -91,6 +98,20 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			depthInvalid(`array?.flat(2)`),
 			depthInvalid(`array.flat(99,)`),
 			depthInvalid(`array.flat(0b10,)`),
+			depthInvalid(`Array.of(1).flat(2)`),
+			depthInvalid(`Object.freeze([]).flat(2)`),
+			depthInvalid(`Number(value).flat(2)`),
+			depthInvalid(`String(value).flat(2)`),
+			depthInvalid(`BigInt().flat(2)`),
+			depthInvalid(`(flag ? Math.PI : 1).flat(2)`),
+			{
+				Code:     `array.flat /* reason */ (2)`,
+				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
 
 			// A receiver that is known to be an array must still be reported.
 			{
@@ -240,22 +261,6 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			// over-classify their return type as a known non-array
 			// primitive, so the source-only path bypasses it.
 			{
-				Code:     `Math.abs(-2).flat(2)`,
-				FileName: "file.mjs",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: messageID,
-					Message:   messageString,
-				}},
-			},
-			{
-				Code:     `Math.max(1, 2).flat(2)`,
-				FileName: "file.mjs",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: messageID,
-					Message:   messageString,
-				}},
-			},
-			{
 				Code:     `Math.random().flat(2)`,
 				FileName: "file.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -281,38 +286,6 @@ func TestNoMagicArrayFlatDepthUpstream(t *testing.T) {
 			},
 			{
 				Code:     `JSON.parse("[]").flat(2)`,
-				FileName: "file.mjs",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: messageID,
-					Message:   messageString,
-				}},
-			},
-			{
-				Code:     `Array.isArray([]).flat(2)`,
-				FileName: "file.mjs",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: messageID,
-					Message:   messageString,
-				}},
-			},
-			{
-				Code:     `parseInt("2", 10).flat(2)`,
-				FileName: "file.mjs",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: messageID,
-					Message:   messageString,
-				}},
-			},
-			{
-				Code:     `parseFloat("2").flat(2)`,
-				FileName: "file.mjs",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: messageID,
-					Message:   messageString,
-				}},
-			},
-			{
-				Code:     `Object().flat(2)`,
 				FileName: "file.mjs",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: messageID,

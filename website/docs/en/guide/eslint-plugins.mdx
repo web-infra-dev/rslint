@@ -29,8 +29,8 @@ A few things to know:
   `plugins: ['@typescript-eslint']`. A community plugin is mounted as an object —
   `plugins: { example: examplePlugin }`. One entry uses one form; to use both,
   add a second config entry.
-- **JS/TS config only.** A community plugin is a live object, so it can't live in
-  a JSON config — use a `.js` / `.mjs` / `.ts` / `.mts` config.
+- **Module config required.** A community plugin is a live object, so configure
+  it in a `.js` / `.mjs` / `.ts` / `.mts` module.
 - **Pick any prefix** that doesn't clash with a
   [built-in plugin prefix](/config/plugins#built-in-plugins); rslint reports a
   clear error if it does.

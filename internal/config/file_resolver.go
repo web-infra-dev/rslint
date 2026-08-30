@@ -38,7 +38,6 @@ type configTargetCacheKey struct {
 type FileConfigResolver struct {
 	config         RslintConfig
 	catalog        *rule.Catalog
-	enforcePlugins bool
 	targetResolver *configTargetResolver
 
 	filePlans  publishOnceCache[configTargetCacheKey, *configTargetResolution]
@@ -50,9 +49,8 @@ func NewFileConfigResolver(
 	config RslintConfig,
 	cwd string,
 	catalog *rule.Catalog,
-	enforcePlugins bool,
 ) *FileConfigResolver {
-	return NewFileConfigResolverWithFS(config, cwd, nil, catalog, enforcePlugins)
+	return NewFileConfigResolverWithFS(config, cwd, nil, catalog)
 }
 
 // NewFileConfigResolverWithFS creates a resolver that keeps lexical and
@@ -62,12 +60,10 @@ func NewFileConfigResolverWithFS(
 	cwd string,
 	fsys vfs.FS,
 	catalog *rule.Catalog,
-	enforcePlugins bool,
 ) *FileConfigResolver {
 	return newFileConfigResolver(
 		config,
 		catalog,
-		enforcePlugins,
 		newConfigTargetResolver(config, cwd, fsys),
 	)
 }
@@ -81,7 +77,6 @@ func NewFileConfigResolverWithPathSpaces(
 	fsys vfs.FS,
 	pathSpaces *PathSpaceSnapshot,
 	catalog *rule.Catalog,
-	enforcePlugins bool,
 ) (*FileConfigResolver, error) {
 	matcher, err := NewTargetMatcherWithPathSpaces(
 		config,
@@ -95,7 +90,6 @@ func NewFileConfigResolverWithPathSpaces(
 	return newFileConfigResolver(
 		config,
 		catalog,
-		enforcePlugins,
 		matcher.resolver,
 	), nil
 }
@@ -103,7 +97,6 @@ func NewFileConfigResolverWithPathSpaces(
 func newFileConfigResolver(
 	config RslintConfig,
 	catalog *rule.Catalog,
-	enforcePlugins bool,
 	targetResolver *configTargetResolver,
 ) *FileConfigResolver {
 	if catalog == nil {
@@ -112,7 +105,6 @@ func newFileConfigResolver(
 	return &FileConfigResolver{
 		config:         config,
 		catalog:        catalog,
-		enforcePlugins: enforcePlugins,
 		targetResolver: targetResolver,
 	}
 }
@@ -209,7 +201,7 @@ func (r *FileConfigResolver) resolutionForTarget(
 			mergedConfig := r.config.mergeConfigEntries(decision.key)
 			return &effectiveConfigPlan{
 				mergedConfig: mergedConfig,
-				enabledRules: ConfiguredRules(r.catalog, mergedConfig, r.enforcePlugins),
+				enabledRules: ConfiguredRules(r.catalog, mergedConfig),
 			}
 		})
 		return resolution

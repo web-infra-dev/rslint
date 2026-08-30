@@ -175,10 +175,10 @@ Each `LintMessage`:
 
 [`new Rslint(options)`](/api/rslint#constructor) accepts:
 
-| Option               | Type                                        | Default     | Description                                                                                                                                      |
-| -------------------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cwd`                | `string`                                    | current cwd | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                      |
-| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —           | Extra config appended after the resolved/discovered config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`             |
-| `overrideConfigFile` | `string \| true \| null`                    | `null`      | `string`: use this config module and resolve its config-relative paths from its directory; `true`: use only `overrideConfig`; otherwise discover |
-| `fix`                | `boolean`                                   | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                    |
-| `virtualFiles`       | `Record<string, string>`                    | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                  |
+| Option               | Type                                        | Default     | Description                                                                                                                                            |
+| -------------------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cwd`                | `string`                                    | current cwd | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                            |
+| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —           | Extra config appended after the resolved/discovered config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`                   |
+| `overrideConfigFile` | `string \| true \| null`                    | `null`      | `string`: use this JS/TS config module and resolve its config-relative paths from its directory; `true`: use only `overrideConfig`; otherwise discover |
+| `fix`                | `boolean`                                   | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                          |
+| `virtualFiles`       | `Record<string, string>`                    | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                        |
