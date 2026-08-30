@@ -3,6 +3,7 @@ package output
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -15,7 +16,32 @@ import (
 )
 
 type defaultFormatter struct {
-	colors colorScheme
+	colors  colorScheme
+	outcome Outcome
+}
+
+const statusLabelWidth = 7
+
+// RenderStart writes the interactive lifecycle prefix for the default format.
+// Machine-readable formats intentionally remain diagnostics-only.
+func RenderStart(dst io.Writer, mode Mode, options Options) error {
+	if options.Format != FormatDefault {
+		return nil
+	}
+	colors := newColorScheme(options.ColorEnabled)
+	return renderStatusLine(dst, "start", colors.StartText, startMessage(mode), "")
+}
+
+// RenderAbort writes a terminal status for a run that started but could not
+// produce a complete report. Cancellation is filtered by the CLI and does not
+// enter this presentation path.
+func RenderAbort(dst io.Writer, mode Mode, startedAt time.Time, reason string, options Options) error {
+	if options.Format != FormatDefault {
+		return nil
+	}
+	colors := newColorScheme(options.ColorEnabled)
+	message := fmt.Sprintf("%s failed in %s: %s", ongoingAction(mode), formatElapsed(time.Since(startedAt)), reason)
+	return renderStatusLine(dst, "error", colors.ErrorText, message, "")
 }
 
 func (f *defaultFormatter) begin(w *bufio.Writer, _ Report, hasVisibleDiagnostics bool) error {
@@ -32,95 +58,189 @@ func (f *defaultFormatter) diagnostic(w *bufio.Writer, view diagnosticView) erro
 
 func (f *defaultFormatter) finish(w *bufio.Writer, report Report) error {
 	// Preserve the existing timing boundary: diagnostics are flushed to the
-	// real destination before the summary duration is measured.
+	// real destination before the completed-status duration is measured.
 	if err := w.Flush(); err != nil {
 		return err
 	}
 	elapsed := time.Duration(0)
 	if !report.metadata.StartedAt.IsZero() {
-		elapsed = time.Since(report.metadata.StartedAt).Round(time.Millisecond)
+		elapsed = time.Since(report.metadata.StartedAt)
 	}
-	renderSummary(w, report, elapsed, f.colors)
+	renderSummary(w, report, f.outcome, elapsed, f.colors)
 	return nil
 }
 
-func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors colorScheme) {
-	errorCountText := func(count int) string {
-		if count == 0 {
-			return colors.SuccessText("%d", count)
-		}
-		return colors.ErrorText("%d", count)
-	}
-
-	warningColor := colors.WarnText
-	if report.counts.Warnings == 0 {
-		warningColor = colors.SuccessText
-	}
-
-	var errorsSummary string
-	switch report.metadata.Mode {
-	case ModeTypeCheckOnly:
-		errorsSummary = fmt.Sprintf("%s %s",
-			errorCountText(report.counts.TypeErrors),
-			pluralize(report.counts.TypeErrors, "type error", "type errors"),
-		)
-	case ModeLintAndTypeCheck:
-		errorsSummary = fmt.Sprintf("%s %s, %s %s",
-			errorCountText(report.counts.LintErrors),
-			pluralize(report.counts.LintErrors, "lint error", "lint errors"),
-			errorCountText(report.counts.TypeErrors),
-			pluralize(report.counts.TypeErrors, "type error", "type errors"),
-		)
-	default:
-		errorsSummary = fmt.Sprintf("%s %s",
-			errorCountText(report.counts.Errors),
-			pluralize(report.counts.Errors, "error", "errors"),
-		)
-	}
-
-	if report.metadata.Mode == ModeTypeCheckOnly {
-		details := fmt.Sprintf("(type-checked %d %s in %v using %d %s)",
-			report.metadata.TypeCheckedFiles,
-			pluralize(report.metadata.TypeCheckedFiles, "file", "files"),
-			elapsed,
-			report.metadata.Threads,
-			pluralize(report.metadata.Threads, "thread", "threads"),
-		)
-		fmt.Fprintf(w, "Found %s %s\n", errorsSummary, colors.DimText("%s", details))
+func renderSummary(w *bufio.Writer, report Report, outcome Outcome, elapsed time.Duration, colors colorScheme) {
+	if outcome.Kind == OutcomePassed && report.metadata.Files == 0 && report.counts.Errors == 0 && report.counts.Warnings == 0 {
+		message := fmt.Sprintf("%s in %s", emptyMessage(report.metadata.Mode), formatElapsed(elapsed))
+		_ = renderStatusLine(w, "success", colors.SuccessText, message, "")
 		return
 	}
 
-	details := fmt.Sprintf("(linted %d %s with %d %s",
-		report.metadata.LintedFiles,
-		pluralize(report.metadata.LintedFiles, "file", "files"),
-		report.metadata.Rules,
-		pluralize(report.metadata.Rules, "rule", "rules"),
-	)
-	if report.metadata.Mode == ModeLintAndTypeCheck {
-		details += fmt.Sprintf(", type-checked %d %s",
-			report.metadata.TypeCheckedFiles,
-			pluralize(report.metadata.TypeCheckedFiles, "file", "files"),
-		)
-	}
-	details += fmt.Sprintf(" in %v using %d %s",
-		elapsed,
-		report.metadata.Threads,
-		pluralize(report.metadata.Threads, "thread", "threads"),
-	)
+	subject := completedSubject(report.metadata.Mode)
+	fixes := ""
 	if report.metadata.FixedIssues > 0 {
-		details += fmt.Sprintf(", fixed %d %s",
+		fixes = fmt.Sprintf(" after applying %d %s",
 			report.metadata.FixedIssues,
-			pluralize(report.metadata.FixedIssues, "issue", "issues"),
+			pluralize(report.metadata.FixedIssues, "fix", "fixes"),
 		)
 	}
-	details += ")"
 
-	fmt.Fprintf(w, "Found %s and %s %s %s\n",
-		errorsSummary,
-		warningColor("%d", report.counts.Warnings),
-		pluralize(report.counts.Warnings, "warning", "warnings"),
-		colors.DimText("%s", details),
+	var label, message string
+	var labelColor func(string, ...interface{}) string
+	switch outcome.Kind {
+	case OutcomeDiagnosticsFailed:
+		label = "error"
+		labelColor = colors.ErrorText
+		message = fmt.Sprintf("%s failed with %s%s in %s",
+			subject,
+			findingSummary(report),
+			fixes,
+			formatElapsed(elapsed),
+		)
+	case OutcomeWarningLimitExceeded:
+		label = "error"
+		labelColor = colors.ErrorText
+		message = fmt.Sprintf("%s failed%s in %s: %d %s exceeded the configured limit of %d",
+			subject,
+			fixes,
+			formatElapsed(elapsed),
+			report.counts.Warnings,
+			pluralize(report.counts.Warnings, "warning", "warnings"),
+			outcome.WarningLimit,
+		)
+	default:
+		label = "success"
+		labelColor = colors.SuccessText
+		warningSummary := ""
+		if report.counts.Warnings > 0 {
+			warningSummary = fmt.Sprintf(" with %d %s",
+				report.counts.Warnings,
+				pluralize(report.counts.Warnings, "warning", "warnings"),
+			)
+		}
+		message = fmt.Sprintf("%s passed%s%s in %s",
+			subject,
+			warningSummary,
+			fixes,
+			formatElapsed(elapsed),
+		)
+	}
+
+	_ = renderStatusLine(w, label, labelColor, message, colors.DimText("%s", summaryDetails(report)))
+}
+
+func renderStatusLine(
+	w io.Writer,
+	label string,
+	labelColor func(string, ...interface{}) string,
+	message string,
+	details string,
+) error {
+	padding := strings.Repeat(" ", statusLabelWidth-len(label)+1)
+	if details == "" {
+		_, err := fmt.Fprintf(w, "%s%s%s\n", labelColor("%s", label), padding, message)
+		return err
+	}
+	_, err := fmt.Fprintf(w, "%s%s%s %s\n", labelColor("%s", label), padding, message, details)
+	return err
+}
+
+func startMessage(mode Mode) string {
+	switch mode {
+	case ModeLintAndTypeCheck:
+		return "Linting and type checking..."
+	case ModeTypeCheckOnly:
+		return "Type checking..."
+	default:
+		return "Linting..."
+	}
+}
+
+func ongoingAction(mode Mode) string {
+	switch mode {
+	case ModeLintAndTypeCheck:
+		return "Linting and type checking"
+	case ModeTypeCheckOnly:
+		return "Type checking"
+	default:
+		return "Linting"
+	}
+}
+
+func completedSubject(mode Mode) string {
+	switch mode {
+	case ModeLintAndTypeCheck:
+		return "Lint and type check"
+	case ModeTypeCheckOnly:
+		return "Type check"
+	default:
+		return "Lint"
+	}
+}
+
+func emptyMessage(mode Mode) string {
+	switch mode {
+	case ModeLintAndTypeCheck:
+		return "No files to lint or type check"
+	case ModeTypeCheckOnly:
+		return "No files to type check"
+	default:
+		return "No files to lint"
+	}
+}
+
+func findingSummary(report Report) string {
+	findings := make([]string, 0, 3)
+	appendFinding := func(count int, singular, plural string) {
+		if count > 0 {
+			findings = append(findings, fmt.Sprintf("%d %s", count, pluralize(count, singular, plural)))
+		}
+	}
+
+	switch report.metadata.Mode {
+	case ModeLintAndTypeCheck:
+		appendFinding(report.counts.LintErrors, "lint error", "lint errors")
+		appendFinding(report.counts.TypeErrors, "TypeScript error", "TypeScript errors")
+	case ModeTypeCheckOnly:
+		appendFinding(report.counts.TypeErrors, "TypeScript error", "TypeScript errors")
+	default:
+		appendFinding(report.counts.Errors, "error", "errors")
+	}
+	appendFinding(report.counts.Warnings, "warning", "warnings")
+
+	switch len(findings) {
+	case 0:
+		return "no reported problems"
+	case 1:
+		return findings[0]
+	case 2:
+		return findings[0] + " and " + findings[1]
+	default:
+		return strings.Join(findings[:len(findings)-1], ", ") + ", and " + findings[len(findings)-1]
+	}
+}
+
+func summaryDetails(report Report) string {
+	details := []string{
+		fmt.Sprintf("%d %s", report.metadata.Files, pluralize(report.metadata.Files, "file", "files")),
+	}
+	if report.metadata.Mode != ModeTypeCheckOnly {
+		details = append(details,
+			fmt.Sprintf("%d %s", report.metadata.Rules, pluralize(report.metadata.Rules, "rule", "rules")),
+		)
+	}
+	details = append(details,
+		fmt.Sprintf("%d %s", report.metadata.Threads, pluralize(report.metadata.Threads, "thread", "threads")),
 	)
+	return "(" + strings.Join(details, ", ") + ")"
+}
+
+func formatElapsed(elapsed time.Duration) string {
+	if elapsed < time.Millisecond {
+		return "<1ms"
+	}
+	return elapsed.Round(time.Millisecond).String()
 }
 
 func pluralize(count int, singular, plural string) string {

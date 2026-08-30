@@ -10,8 +10,8 @@ import { runRslint, createTempDir, cleanupTempDir, TS_CONFIG } from './helpers';
 //
 // These tests guard the end-to-end CLI path (config → buildFileFilters →
 // RunLinter): config `ignores` continue to remove a file from the lint-rule
-// pass (LintedFileCount, lint-rule diagnostics) while leaving its
-// type-check diagnostics intact.
+// pass while leaving its type-check diagnostics intact. The user-visible
+// status now reports one canonical union across both phases.
 
 interface Diagnostic {
   ruleName: string;
@@ -21,18 +21,16 @@ interface Diagnostic {
 
 /**
  * Run rslint --type-check twice: once with --format jsonline for exact
- * per-file diagnostic parsing, once with the default format for the summary
- * line ("linted N files, type-checked M files"). The default format does not
- * emit structured diagnostics, and jsonline suppresses the summary, so both
- * runs are needed for precise assertions.
+ * per-file diagnostic parsing, once with the default format for its canonical
+ * file-union count. The default format does not emit structured diagnostics,
+ * and jsonline suppresses the status line, so both runs are needed.
  */
 async function lintTypeCheck(
   tempDir: string,
   extraArgs: string[] = [],
 ): Promise<{
   diagnostics: Diagnostic[];
-  lintedFileCount: number;
-  typeCheckedFileCount: number;
+  fileCount: number;
   exitCode: number;
 }> {
   const jsonRun = await runRslint(
@@ -47,9 +45,8 @@ async function lintTypeCheck(
 
   const summaryRun = await runRslint(['--type-check', ...extraArgs], tempDir);
   const combined = `${summaryRun.stdout}\n${summaryRun.stderr}`;
-  const countMatch = combined.match(/linted (\d+) files?/);
-  const typeCheckedCountMatch = combined.match(/type-checked (\d+) files?/);
-  if (!countMatch || !typeCheckedCountMatch) {
+  const countMatch = combined.match(/\((\d+) files?,/);
+  if (!countMatch) {
     throw new Error(
       `Could not parse file counts from summary output:\nSTDOUT:\n${summaryRun.stdout}\nSTDERR:\n${summaryRun.stderr}`,
     );
@@ -57,8 +54,7 @@ async function lintTypeCheck(
 
   return {
     diagnostics,
-    lintedFileCount: parseInt(countMatch[1]!, 10),
-    typeCheckedFileCount: parseInt(typeCheckedCountMatch[1]!, 10),
+    fileCount: parseInt(countMatch[1]!, 10),
     exitCode: jsonRun.exitCode,
   };
 }
@@ -80,7 +76,7 @@ function makeConfigWithIgnores(ignores: string[]): string {
 }
 
 describe('--type-check + config ignores', () => {
-  test('ignored file still produces type-check diagnostics; lint-file count excludes it', async () => {
+  test('ignored file still produces type-check diagnostics; status uses the file union', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.mjs': makeConfigWithIgnores(['ignored/**']),
@@ -110,12 +106,9 @@ describe('--type-check + config ignores', () => {
         true,
       );
 
-      // LintedFileCount counts the lint-rule pass only — ignored files do
-      // not contribute. The targets are src/bad.ts and rslint.config.mjs.
-      expect(r.lintedFileCount).toBe(2);
-      // TypeCheckedFileCount follows the tsconfig roots, so both TypeScript
-      // files contribute even though one is ignored by the lint phase.
-      expect(r.typeCheckedFileCount).toBe(2);
+      // Canonical union: src/bad.ts overlaps both phases, ignored/bad.ts is
+      // type-check-only, and the config is lint-only.
+      expect(r.fileCount).toBe(3);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -161,9 +154,9 @@ describe('--type-check + config ignores', () => {
       expect(utilDiags.length).toBeGreaterThan(0);
       expect(utilDiags.some((d) => d.ruleName.includes('TS2322'))).toBe(true);
 
-      // Lint-rule pass excludes the ignored file. caller.ts and the default
-      // .mjs target rslint.config.mjs remain.
-      expect(r.lintedFileCount).toBe(2);
+      // Canonical union: caller.ts overlaps both phases, util.ts is
+      // type-check-only, and the config is lint-only.
+      expect(r.fileCount).toBe(3);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -215,9 +208,9 @@ describe('--type-check + config ignores', () => {
       expect(childDiags.length).toBeGreaterThan(0);
       expect(childDiags.some((d) => d.ruleName.includes('TS2322'))).toBe(true);
 
-      // Lint-rule pass excludes the ignored child file. src/ok.ts and the
-      // default .mjs target rslint.config.mjs remain.
-      expect(r.lintedFileCount).toBe(2);
+      // Canonical union: src/ok.ts overlaps both phases, the child file is
+      // type-check-only, and the config is lint-only.
+      expect(r.fileCount).toBe(3);
     } finally {
       await cleanupTempDir(tempDir);
     }

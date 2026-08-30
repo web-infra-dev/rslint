@@ -32,6 +32,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -527,10 +528,10 @@ func discoverCLIConfigCatalog(
 	return nil
 }
 
-// stdoutDrainMinFlushBytes is the soft floor for batching IPC `output` frames.
-// Reads below this are buffered and combined with later reads; pending bytes
-// at or above it flush immediately. Sized to amortize a JSON frame's fixed
-// overhead over a meaningful chunk without stalling interactive runs.
+// stdoutDrainMinFlushBytes is the soft floor for batching IPC `output` frames
+// after the first frame. The first complete line flushes immediately so an
+// interactive lifecycle line is visible while the command is still running;
+// later chunks retain the existing amortized frame size.
 const stdoutDrainMinFlushBytes = 8 * 1024
 
 // drainStdoutToIPC consumes the stdout-redirect pipe and forwards bytes to the
@@ -540,10 +541,10 @@ const stdoutDrainMinFlushBytes = 8 * 1024
 //     character; string(buf[:n]) would then emit replacement bytes and the
 //     peer would see corrupted non-ASCII. We hold back any incomplete trailing
 //     sequence (1-3 bytes) and prepend it to the next read.
-//  2. Frame-count overhead. Each SendNotification is one JSON frame; for 100K+
-//     diagnostic lines that's 100K frames of CPU + syscall overhead. We
-//     coalesce up to stdoutDrainMinFlushBytes per frame; the close path always
-//     flushes the remainder.
+//  2. Latency plus frame-count overhead. The first complete line is forwarded
+//     eagerly for interactive feedback. Later reads coalesce up to
+//     stdoutDrainMinFlushBytes per frame; the close path always flushes the
+//     remainder.
 //
 // On the first SendNotification failure (peer closed its end) we flip into
 // discard mode: keep draining r so the lint pipeline's writes don't block on a
@@ -554,6 +555,7 @@ func drainStdoutToIPC(r io.Reader, ch *ipc.Channel, done chan<- struct{}) {
 	var leftover []byte // UTF-8 incomplete tail held back from last read
 	var pending []byte  // bytes ready to send, waiting for batch threshold
 	discard := false
+	sentFrame := false
 
 	flush := func() {
 		if len(pending) == 0 || discard {
@@ -576,6 +578,7 @@ func drainStdoutToIPC(r io.Reader, ch *ipc.Channel, done chan<- struct{}) {
 				"rslint: stopped forwarding stdout to peer (channel closed): %v\n", err)
 			discard = true
 		}
+		sentFrame = true
 		pending = pending[:0]
 	}
 
@@ -608,7 +611,8 @@ func drainStdoutToIPC(r io.Reader, ch *ipc.Channel, done chan<- struct{}) {
 				}
 			}
 
-			if readErr != nil || len(pending) >= stdoutDrainMinFlushBytes {
+			firstLineComplete := !sentFrame && bytes.ContainsRune(pending, '\n')
+			if readErr != nil || len(pending) >= stdoutDrainMinFlushBytes || firstLineComplete {
 				flush()
 			}
 		}

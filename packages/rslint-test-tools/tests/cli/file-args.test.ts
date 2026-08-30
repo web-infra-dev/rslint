@@ -70,7 +70,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['error.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -89,7 +89,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['clean.ts'], tempDir);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).not.toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -109,7 +109,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['a.ts', 'b.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 2 files');
+      expect(result.stdout).toContain('(2 files,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -231,7 +231,7 @@ describe('CLI File Arguments', () => {
     try {
       const result = await runRslint(['clean.ts', 'nonexistent.ts'], tempDir);
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
       // Should still warn about the missing file
       expect(result.stderr).toContain('nonexistent.ts');
       expect(result.stderr).toContain('was not found');
@@ -274,7 +274,7 @@ describe('CLI File Arguments', () => {
       // ESLint v10's no-argument directory scan.
       const result = await runRslint([], tempDir);
       expect(result.exitCode).not.toBe(0);
-      expect(result.stdout).toContain('linted 3 files');
+      expect(result.stdout).toContain('(3 files,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -310,7 +310,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['error.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -331,7 +331,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint([absPath], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -349,7 +349,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['src/error.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -370,7 +370,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint([absPath], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -388,7 +388,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['error.ts', 'nonexistent.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
       // Should warn about the nonexistent file
       expect(result.stderr).toContain('nonexistent.ts');
       expect(result.stderr).toContain('was not found');
@@ -408,7 +408,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['error.ts', 'error.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
       // Should only lint the file once even if specified twice
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -426,7 +426,7 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['src/../src/error.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -447,7 +447,7 @@ describe('CLI File Arguments', () => {
       );
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -509,6 +509,10 @@ describe('CLI File Arguments', () => {
         tempDir,
       );
       expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toContain(
+        '2 warnings exceeded the configured limit of 0',
+      );
+      expect(result.stderr).not.toContain('too many warnings');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -529,7 +533,7 @@ describe('CLI File Arguments', () => {
     try {
       const result = await runRslint(['error.js'], tempDir);
       expect(result.stdout).toContain('no-empty');
-      expect(result.stdout).toContain('linted 1 file');
+      expect(result.stdout).toContain('(1 file,');
     } finally {
       await cleanupTempDir(tempDir);
     }

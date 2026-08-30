@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
@@ -240,6 +241,88 @@ func TestDrainStdoutToIPC_DiscardsOnClosedPeer(t *testing.T) {
 	}
 }
 
+func TestDrainStdoutToIPCFlushesCompleteFirstLineBeforeEOF(t *testing.T) {
+	cli, peer := newCLIChannelPair(t)
+	received := make(chan string, 4)
+	peer.RegisterNotification(kindOutput, func(msg *ipc.Message) {
+		var notification struct {
+			Stream string `json:"stream"`
+			Text   string `json:"text"`
+		}
+		if err := msg.Decode(&notification); err != nil {
+			received <- "decode error: " + err.Error()
+			return
+		}
+		if notification.Stream != "stdout" {
+			received <- "unexpected stream: " + notification.Stream
+			return
+		}
+		received <- notification.Text
+	})
+	cli.Start()
+	peer.Start()
+
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pr.Close()
+	done := make(chan struct{})
+	go drainStdoutToIPC(pr, cli, done)
+
+	payload := []byte("start   Linting 世界...\nfollowing 世界")
+	split := bytes.Index(payload, []byte("世")) + 2
+	if _, err := pw.Write(payload[:split]); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-received:
+		t.Fatalf("incomplete first line was forwarded: %q", got)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if _, err := pw.Write(payload[split:]); err != nil {
+		t.Fatal(err)
+	}
+	var forwarded strings.Builder
+	select {
+	case frame := <-received:
+		if !utf8.ValidString(frame) {
+			t.Fatalf("first output frame is invalid UTF-8: %q", frame)
+		}
+		forwarded.WriteString(frame)
+		if !strings.HasPrefix(forwarded.String(), "start   Linting 世界...\n") {
+			t.Fatalf("first output frame does not contain the complete first line: %q", frame)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("first complete output line was buffered until EOF")
+	}
+
+	if err := pw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.After(2 * time.Second)
+	for forwarded.Len() < len(payload) {
+		select {
+		case frame := <-received:
+			if !utf8.ValidString(frame) {
+				t.Fatalf("output frame is invalid UTF-8: %q", frame)
+			}
+			forwarded.WriteString(frame)
+		case <-deadline:
+			t.Fatalf("forwarded output = %q, want %q", forwarded.String(), payload)
+		}
+	}
+	if got := forwarded.String(); got != string(payload) {
+		t.Fatalf("concatenated output = %q, want %q", got, payload)
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("drain did not finish after EOF")
+	}
+}
+
 // TestSplitAtUTF8Boundary covers the chunk-boundary cases drainStdoutToIPC
 // depends on: ASCII and complete multibyte pass through whole; a chunk ending
 // mid-character holds back the incomplete lead+continuation bytes; invalid
@@ -416,7 +499,7 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			if code != 1 {
 				t.Fatalf("exit code = %d, want 1; output: %q", code, text)
 			}
-			if !strings.Contains(text, "no-debugger") || !strings.Contains(text, "linted 1 file") {
+			if !strings.Contains(text, "no-debugger") || !strings.Contains(text, "(1 file, 1 rule,") {
 				t.Fatalf("symlinked working directory did not lint index.ts exactly once; output: %q", text)
 			}
 		})
