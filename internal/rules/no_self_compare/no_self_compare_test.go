@@ -15,6 +15,15 @@ func TestNoSelfCompareRule(t *testing.T) {
 		&NoSelfCompareRule,
 
 		[]rule_tester.ValidTestCase{
+			// @typescript-eslint/parser preserves raw identifier and JSXText token
+			// spelling, so decoded-equivalent source forms are not self-comparisons.
+			{Code: `foo === \u0066oo`},
+			{Code: `class C { #foo; compare() { return this.#foo === this.#\u0066oo; } }`},
+			{
+				Code:     `(<div>&amp;</div>) === (<div>&</div>)`,
+				FileName: "no-self-token.tsx",
+			},
+
 			// ---- Upstream ESLint suite ----
 			{Code: `if (x === y) { }`},
 			{Code: `if (1 === 2) { }`},
@@ -81,7 +90,7 @@ func TestNoSelfCompareRule(t *testing.T) {
 			{Code: `(x!) === (y!)`},
 
 			// ---- Token-form-sensitive (matches ESLint: different source tokens) ----
-			// HasSameTokens compares raw source at each leaf, so these are
+			// HasSameTokens compares literal source forms, so these are
 			// distinguished just like ESLint's token-level getTokens() would.
 			{Code: `0x1 === 1`},
 			{Code: `1n === 0x1n`},
@@ -91,6 +100,31 @@ func TestNoSelfCompareRule(t *testing.T) {
 		},
 
 		[]rule_tester.InvalidTestCase{
+			// Espree decodes JavaScript Identifier/PrivateIdentifier and JSXText
+			// token values before the rule compares them.
+			{
+				Code:     `foo === \u0066oo`,
+				FileName: "no-self-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "comparingToSelf"}},
+			},
+			{
+				Code:     `class C { #foo; compare() { return this.#foo === this.#\u0066oo; } }`,
+				FileName: "no-self-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "comparingToSelf"}},
+			},
+			{
+				Code:     `(<div>&amp;</div>) === (<div>&</div>)`,
+				FileName: "no-self-token.jsx",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "comparingToSelf"}},
+			},
+			{
+				Code:   `\u0066oo === \u0066oo`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "comparingToSelf"}},
+			},
+
 			// ---- Upstream ESLint suite ----
 			{
 				Code: `if (x === x) { }`,

@@ -843,6 +843,45 @@ class A {
 		{
 			Code: `
 class A {
+  field = value++
+  constructor() {}
+  *iterator() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = value++\n  ;\n  *iterator() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
+  field = value--
+  constructor() {}
+  in() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = value--\n  ;\n  in() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
+  field = value++
+  constructor() {}
+  instanceof() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = value++\n  ;\n  instanceof() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
   method() {}
   constructor() {}
   [0]() {}

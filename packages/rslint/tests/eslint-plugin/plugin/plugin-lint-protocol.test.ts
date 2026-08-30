@@ -9,8 +9,8 @@
  *   - emitting `configKey` on every task (empty string when absent),
  *   - firing `onUnknownConfigKey` for hosts that want a clearer log
  *     before the worker's internal-error parseError lands,
- *   - propagating the shared `rules` / `fix` / `suggestionsMode` block to
- *     every task (wire `fix` maps to the worker's `collectFixes`),
+ *   - propagating the shared `rules` / `collectFixes` / `suggestionsMode`
+ *     block to every task,
  *   - forwarding `languageOptions` / `settings` opaquely to the worker.
  */
 
@@ -30,7 +30,7 @@ function input(
   return {
     files,
     rules: opts.rules ?? { 'uc/no-null': { options: [] } },
-    fix: opts.fix,
+    collectFixes: opts.collectFixes ?? false,
     suggestionsMode: opts.suggestionsMode,
   };
 }
@@ -80,7 +80,7 @@ describe('buildPluginLintTasks', () => {
     expect(tasks[0].configKey).toBe('/nowhere');
   });
 
-  test('shared rules / fix / suggestionsMode propagate to every task', () => {
+  test('shared rules / collectFixes / suggestionsMode propagate to every task', () => {
     const tasks = buildPluginLintTasks(
       input(
         [
@@ -92,7 +92,7 @@ describe('buildPluginLintTasks', () => {
             'uc/no-null': { options: [{ checkStrictEquality: true }] },
             'uc/prefer-array-some': { options: [] },
           },
-          fix: true,
+          collectFixes: true,
           suggestionsMode: 'eager',
         },
       ),
@@ -100,7 +100,6 @@ describe('buildPluginLintTasks', () => {
     );
     expect(tasks).toHaveLength(2);
     for (const t of tasks) {
-      // wire `fix:true` maps to the worker's per-task `collectFixes`.
       expect(t.collectFixes).toBe(true);
       expect(t.suggestionsMode).toBe('eager');
       expect(Object.keys(t.rules).sort()).toEqual([
@@ -113,9 +112,9 @@ describe('buildPluginLintTasks', () => {
     }
   });
 
-  test('rules / fix / suggestionsMode defaults are sensible', () => {
+  test('rules / collectFixes / suggestionsMode defaults are sensible', () => {
     const tasks = buildPluginLintTasks(
-      { files: [{ path: '/a.ts', text: '' }] },
+      { files: [{ path: '/a.ts', text: '' }], collectFixes: false },
       { configDirSet: new Set() },
     );
     expect(tasks[0].collectFixes).toBe(false);

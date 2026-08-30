@@ -32,7 +32,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// Resolve the working directory WITHOUT os.Chdir: this is a long-lived,
 	// reused --api process, so mutating the process-global cwd would leak
 	// across requests (and race a future concurrent mode). Everything
-	// downstream (resolveRequestPath / config loader / CreateCompilerHost /
+	// downstream (resolveRequestPath / config resolution / CreateCompilerHost /
 	// CreateProgram) takes this directory explicitly, so a local var suffices.
 	currentDirectory := req.WorkingDirectory
 	if currentDirectory == "" {
@@ -259,8 +259,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			}
 		} else {
 			// No JS candidate is a valid API state: lint with override entries (or
-			// syntax-only with an empty config) rather than falling back to the CLI's
-			// rslint.json lookup.
+			// syntax-only with an empty config).
 			rslintConfig = overrideConfig
 			configDirectory = currentDirectory
 		}
@@ -374,7 +373,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			Config:                              rslintConfig,
 			ConfigDirectory:                     configDirectory,
 			Catalog:                             ruleCatalog,
-			EnforcePlugins:                      true,
 			TargetsBySourcePath:                 binding.LintTargetBySourcePath,
 			SourceMappingsIncludeCanonicalPaths: true,
 			PathSpaces:                          targetPlan.PathSpaces(),
@@ -439,10 +437,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	demand := linter.ArtifactDemand{
 		Native:      rule.EditDemandAll,
+		Plugin:      rule.EditDemandAll,
 		LintedFiles: true,
-	}
-	if req.Fix {
-		demand.Plugin = rule.EditDemandAll
 	}
 	policy := linter.ObservationPolicy{
 		Demand:        demand,
@@ -455,9 +451,8 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			provider,
 			policy,
 			linter.AutofixPolicy{
-				MaxRounds:            1,
-				VerifyAfterLastRound: false,
-				VerificationDemand:   linter.ArtifactDemand{},
+				VerifyAfterLastRound: true,
+				VerificationDemand:   demand,
 			},
 			dispatch,
 		)
@@ -500,19 +495,20 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	linter.StableSortDiagnosticsByFileAndStart(diagnostics)
 	diagnosticProjection := projectLintDiagnostics(diagnostics)
 
-	// The core applies one bounded round to request-local memory. This adapter
-	// only maps the resulting net whole-file delta into Output; the JS API keeps
-	// ownership of any later physical persistence.
+	// The core applies every bounded round to request-local memory and returns a
+	// final observation over the resulting source. This adapter maps every
+	// successfully fixed file's complete final source into Output; the JS API
+	// keeps ownership of any later physical persistence.
 	var output map[string]string
 	if req.Fix {
 		applied, ok := pipelineResult.AppliedFixes()
 		if !ok {
 			return nil, errors.New("error running linter: API fix did not return an in-memory result")
 		}
-		if len(applied.FinalChanges) > 0 {
-			output = make(map[string]string, len(applied.FinalChanges))
-			for _, change := range applied.FinalChanges {
-				output[tspath.ConvertToRelativePath(change.Path, comparePathOptions)] = change.After
+		if len(applied.FinalSources) > 0 {
+			output = make(map[string]string, len(applied.FinalSources))
+			for _, source := range applied.FinalSources {
+				output[tspath.ConvertToRelativePath(source.Path, comparePathOptions)] = source.Text
 			}
 		}
 		if len(output) == 0 {

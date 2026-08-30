@@ -887,7 +887,7 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		// Category 21: Mixed binary checks (long chains)
 		// =================================================================
 		{
-			Code: "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
+			Code:   "a &&\n  a.b != null &&\n  a.b.c !== undefined &&\n  a.b.c !== null &&\n  a.b.c.d != null &&\n  a.b.c.d.e !== null &&\n  a.b.c.d.e !== undefined &&\n  a.b.c.d.e.f != undefined &&\n  typeof a.b.c.d.e.f.g !== 'undefined' &&\n  a.b.c.d.e.f.g !== null &&\n  a.b.c.d.e.f.g.h;",
 			Output: []string{"a?.b?.c?.d?.e?.f?.g?.h;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "preferOptionalChain"},
@@ -1994,4 +1994,90 @@ func TestPreferOptionalChainSuggestionMessage(t *testing.T) {
 	if got := buildOptionalChainSuggestMessage().Description; got != want {
 		t.Fatalf("suggestion message = %q, want %q", got, want)
 	}
+}
+
+// cspell:ignore neotix
+func TestPreferOptionalChainReportedRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferOptionalChainRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code: `export {};
+declare global {
+  const neotix: { tabs?: { activateOrCreateTabByNewNotify?: () => void } };
+}
+typeof neotix === 'undefined' || !neotix?.tabs?.activateOrCreateTabByNewNotify;`,
+			},
+			{
+				Code: `export {};
+declare global {
+  const neotix: { tabs: { activateOrCreateTabByNewNotify: () => void } };
+}
+typeof neotix !== 'undefined' && neotix.tabs.activateOrCreateTabByNewNotify;`,
+			},
+		}, []rule_tester.InvalidTestCase{
+			{
+				Code:   `const ua = typeof window !== 'undefined' && (window as any).User && (window as any).User.userAgent;`,
+				Output: []string{`const ua = typeof window !== 'undefined' && (window as any).User?.userAgent;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code:   `export const isFeed = window && (window as any).User && (window as any).User.isFeedEnv;`,
+				Output: []string{`export const isFeed = window && (window as any).User?.isFeedEnv;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code:   `declare const fileInfo: { available_preview_type?: string[] } | null; if (!fileInfo || !fileInfo.available_preview_type?.length) {}`,
+				Output: []string{`declare const fileInfo: { available_preview_type?: string[] } | null; if (!fileInfo?.available_preview_type?.length) {}`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code:   `(window as any).flow && (window as any).flow.biz.util.hideLoading();`,
+				Output: []string{`(window as any).flow?.biz.util.hideLoading();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code: `(window as any)._DocsBridge &&
+  (window as any)._DocsBridge.prompt('message');`,
+				Output: []string{`(window as any)._DocsBridge?.prompt('message');`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code:   `declare const foo: unknown; (foo as any).bar && (foo as any).bar.baz;`,
+				Output: []string{`declare const foo: unknown; (foo as any).bar?.baz;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code:   `declare const root: { child?: { leaf?: number } } | null; !root || !root.child?.leaf;`,
+				Output: []string{`declare const root: { child?: { leaf?: number } } | null; !root?.child?.leaf;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code:   `declare const root: { child?: Record<string, number> } | null; !root || !root.child?.['leaf'];`,
+				Output: []string{`declare const root: { child?: Record<string, number> } | null; !root?.child?.['leaf'];`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code:   `declare const root: { child?: () => number } | null; !root || !root.child?.();`,
+				Output: []string{`declare const root: { child?: () => number } | null; !root?.child?.();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+			},
+			{
+				Code: `export {};
+declare global { const neotix: { tabs: number } }
+function read(neotix?: { tabs: number }) {
+  return typeof neotix !== 'undefined' && neotix.tabs;
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferOptionalChain",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "optionalChainSuggest",
+						Output: `export {};
+declare global { const neotix: { tabs: number } }
+function read(neotix?: { tabs: number }) {
+  return neotix?.tabs;
+}`,
+					}},
+				}},
+			},
+		})
 }

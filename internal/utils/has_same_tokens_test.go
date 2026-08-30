@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"gotest.tools/v3/assert"
@@ -20,7 +22,20 @@ func parseBinaryOperands(t *testing.T, code string) (*ast.SourceFile, *ast.Node,
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
 	assert.NilError(t, err, "couldn't create program for code: "+code)
 	sourceFile := program.GetSourceFile(filePath)
+	return findBinaryOperands(t, sourceFile, code)
+}
 
+func parseBinaryOperandsForKind(t *testing.T, code string, scriptKind core.ScriptKind) (*ast.SourceFile, *ast.Node, *ast.Node) {
+	t.Helper()
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/file",
+		Path:     "/file",
+	}, code, scriptKind)
+	return findBinaryOperands(t, sourceFile, code)
+}
+
+func findBinaryOperands(t *testing.T, sourceFile *ast.SourceFile, code string) (*ast.SourceFile, *ast.Node, *ast.Node) {
+	t.Helper()
 	var bin *ast.Node
 	var find func(node *ast.Node) bool
 	find = func(node *ast.Node) bool {
@@ -56,7 +71,10 @@ func TestHasSameTokens(t *testing.T) {
 	}{
 		// ---- Basic equality / inequality ----
 		{"identifier equal", `x === x`, true},
+		{"identifier escape differs in TypeScript tokens", `foo === \u0066oo`, false},
 		{"identifier differ", `x === y`, false},
+		{"private identifier escape differs in TypeScript tokens", `this.#foo === this.#\u0066oo`, false},
+		{"private identifier differ", `this.#foo === this.#bar`, false},
 		{"numeric equal", `1 === 1`, true},
 		{"numeric differ", `1 === 2`, false},
 		{"string equal", `'a' === 'a'`, true},
@@ -180,6 +198,76 @@ func TestHasSameTokens(t *testing.T) {
 	}
 }
 
+func TestHasSameTokensParserDialect(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		code       string
+		scriptKind core.ScriptKind
+		want       bool
+	}{
+		{name: "JavaScript identifier is decoded", code: `foo === \u0066oo`, scriptKind: core.ScriptKindJS, want: true},
+		{name: "JSX identifier is decoded", code: `foo === \u0066oo`, scriptKind: core.ScriptKindJSX, want: true},
+		{name: "TypeScript identifier stays raw", code: `foo === \u0066oo`, scriptKind: core.ScriptKindTS, want: false},
+		{name: "TSX identifier stays raw", code: `foo === \u0066oo`, scriptKind: core.ScriptKindTSX, want: false},
+		{name: "same TypeScript escape stays equal", code: `\u0066oo === \u0066oo`, scriptKind: core.ScriptKindTS, want: true},
+		{name: "different TypeScript escapes with equal width differ", code: `\u0066oo === f\u006Fo`, scriptKind: core.ScriptKindTS, want: false},
+		{name: "different JavaScript escapes decode equally", code: `\u0066oo === f\u006Fo`, scriptKind: core.ScriptKindJS, want: true},
+		{name: "JavaScript private identifier is decoded", code: `this.#foo === this.#\u0066oo`, scriptKind: core.ScriptKindJS, want: true},
+		{name: "TypeScript private identifier stays raw", code: `this.#foo === this.#\u0066oo`, scriptKind: core.ScriptKindTS, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sourceFile, left, right := parseBinaryOperandsForKind(t, tt.code, tt.scriptKind)
+			if got := HasSameTokens(sourceFile, left, right); got != tt.want {
+				t.Errorf("HasSameTokens(%q) = %v, want %v", tt.code, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHasSameTokensWithDecodedIdentifiers(t *testing.T) {
+	t.Parallel()
+
+	sourceFile, left, right := parseBinaryOperandsForKind(t, `Foo === \u0046oo`, core.ScriptKindTS)
+	if !HasSameTokensWithDecodedIdentifiers(sourceFile, left, right) {
+		t.Fatal("decoded-identifier comparison treated equivalent TypeScript identifier escapes as different")
+	}
+}
+
+func TestHasSameTokensJSXTextParserDialect(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		code       string
+		scriptKind core.ScriptKind
+		want       bool
+	}{
+		{name: "JSX decodes named entity", code: `(<div>&amp;</div>) === (<div>&</div>)`, scriptKind: core.ScriptKindJSX, want: true},
+		{name: "TSX preserves named entity", code: `(<div>&amp;</div>) === (<div>&</div>)`, scriptKind: core.ScriptKindTSX, want: false},
+		{name: "JSX folds source CRLF", code: "(<div>a\r\nb</div>) === (<div>a\nb</div>)", scriptKind: core.ScriptKindJSX, want: true},
+		{name: "TSX preserves source CRLF", code: "(<div>a\r\nb</div>) === (<div>a\nb</div>)", scriptKind: core.ScriptKindTSX, want: false},
+		{name: "JSX text kinds share one token type", code: `(<div>&#32;</div>) === (<div> </div>)`, scriptKind: core.ScriptKindJSX, want: true},
+		{name: "TSX text kinds retain raw values", code: `(<div>&#32;</div>) === (<div> </div>)`, scriptKind: core.ScriptKindTSX, want: false},
+		{name: "JSX compares surrogate pairs as code units", code: `(<div>&#xD83D;&#xDCA9;</div>) === (<div>💩</div>)`, scriptKind: core.ScriptKindJSX, want: true},
+		{name: "TSX keeps surrogate entities raw", code: `(<div>&#xD83D;&#xDCA9;</div>) === (<div>💩</div>)`, scriptKind: core.ScriptKindTSX, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sourceFile, left, right := parseBinaryOperandsForKind(t, tt.code, tt.scriptKind)
+			if got := HasSameTokens(sourceFile, left, right); got != tt.want {
+				t.Errorf("HasSameTokens(%q) = %v, want %v", tt.code, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestHasSameTokensFullAudit is a systematic sweep of every class of
 // divergence I can think of between tsgo's AST structure and ESLint's
 // token-level view. Any regression here indicates either a newly-found
@@ -231,7 +319,7 @@ func TestHasSameTokensFullAudit(t *testing.T) {
 		{`0b1 === 1`, false, "binary vs decimal"},
 		{`0o7 === 7`, false, "octal vs decimal"},
 		{`1_000 === 1000`, false, "underscore separator visible"},
-		{`foo === \u0066oo`, false, "unicode escape vs plain"},
+		{`foo === \u0066oo`, false, "TypeScript identifier token value preserves unicode escapes"},
 
 		// Null / undefined
 		{`null === null`, true, "null keyword self"},

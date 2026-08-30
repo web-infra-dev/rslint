@@ -94,7 +94,9 @@ const [result] = await rslint.lintText(
 
 ## Auto-fixing
 
-Pass `fix: true`. A result whose file a fix changed then carries an `output` string — the full fixed source; results with no applied fix have no `output`.
+Pass `fix: true`. A result whose file received at least one applied fix carries an `output` string — the full final source, even if later fixes restored the input; results with no applied fix have no `output`.
+
+Rslint repeats linting and fixing until no fix is produced, a fix cycle restores the input, or ten writable rounds have run. `messages` and all diagnostic counts describe the final source in `output`, so successfully fixed findings are no longer reported. If the round limit leaves a fixable finding, its `message.fix` range also targets that final source.
 
 **Write fixes to disk** with the static [`Rslint.outputFixes`](/api/rslint#outputfixes):
 
@@ -154,7 +156,7 @@ Both methods resolve to `LintResult[]`:
 | `warningCount`        | `number`        | Number of warning-severity messages                                 |
 | `fixableErrorCount`   | `number`        | Errors that have an auto-fix                                        |
 | `fixableWarningCount` | `number`        | Warnings that have an auto-fix                                      |
-| `output`              | `string?`       | Fixed source — present only when `fix: true` changed the file       |
+| `output`              | `string?`       | Final source — present when `fix: true` applied at least one fix    |
 
 Each `LintMessage`:
 
@@ -173,10 +175,10 @@ Each `LintMessage`:
 
 [`new Rslint(options)`](/api/rslint#constructor) accepts:
 
-| Option               | Type                                        | Default     | Description                                                                                                                                      |
-| -------------------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cwd`                | `string`                                    | current cwd | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                      |
-| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —           | Extra config appended after the resolved/discovered config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`             |
-| `overrideConfigFile` | `string \| true \| null`                    | `null`      | `string`: use this config module and resolve its config-relative paths from its directory; `true`: use only `overrideConfig`; otherwise discover |
-| `fix`                | `boolean`                                   | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                    |
-| `virtualFiles`       | `Record<string, string>`                    | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                  |
+| Option               | Type                                        | Default     | Description                                                                                                                                            |
+| -------------------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cwd`                | `string`                                    | current cwd | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                            |
+| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —           | Extra config appended after the resolved/discovered config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`                   |
+| `overrideConfigFile` | `string \| true \| null`                    | `null`      | `string`: use this JS/TS config module and resolve its config-relative paths from its directory; `true`: use only `overrideConfig`; otherwise discover |
+| `fix`                | `boolean`                                   | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                          |
+| `virtualFiles`       | `Record<string, string>`                    | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                        |

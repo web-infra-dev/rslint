@@ -116,23 +116,11 @@ describe('CLI JS config integration', () => {
     }
   });
 
-  test('should prefer JS config over JSON config', async () => {
+  test('should ignore a malformed legacy JSON config beside a module config', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'test.ts': 'let a: any = 10;\na.b = 20;\n',
-      'rslint.json': JSON.stringify([
-        {
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
-          },
-          rules: { '@typescript-eslint/no-explicit-any': 'error' },
-          plugins: ['@typescript-eslint'],
-        },
-      ]),
+      'rslint.json': '{ intentionally malformed legacy config',
       'rslint.config.js': jsConfig({
         rules: {
           '@typescript-eslint/no-unsafe-member-access': 'error',
@@ -144,6 +132,8 @@ describe('CLI JS config integration', () => {
       const result = await runRslint(['--format', 'jsonline'], tempDir);
       expect(result.stdout).toContain('no-unsafe-member-access');
       expect(result.stdout).not.toContain('no-explicit-any');
+      expect(result.stderr).not.toContain('error parsing');
+      expect(result.stderr).not.toContain('JSON configuration is deprecated');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -361,30 +351,21 @@ describe('CLI JS config error handling', () => {
   });
 });
 
-describe('JSON config regression', () => {
-  test('JSON config should allow plugin rules without plugins declaration', async () => {
+describe('Legacy JSON config handling', () => {
+  test('should not discover or parse a legacy JSON config', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'test.ts': 'const x: any = 1;\n',
-      // JSON config: explicit rule WITHOUT plugins declaration
-      // Should still work (JSON config has no plugin enforcement)
-      'rslint.json': JSON.stringify([
-        {
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
-          },
-          rules: { '@typescript-eslint/no-explicit-any': 'error' },
-        },
-      ]),
+      'rslint.json': '{ intentionally malformed legacy config',
     });
     try {
       const result = await runRslint(['--format', 'jsonline'], tempDir);
-      // JSON config has no plugin gate — rule should fire even without plugins
-      expect(result.stdout).toContain('no-explicit-any');
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).not.toContain('no-explicit-any');
+      expect(result.stderr).toContain('no rslint config found');
+      expect(result.stderr).toContain('rslint --init');
+      expect(result.stderr).not.toContain('error parsing');
+      expect(result.stderr).not.toContain('JSON configuration is deprecated');
     } finally {
       await cleanupTempDir(tempDir);
     }

@@ -88,8 +88,14 @@ type AppliedFixResult struct {
 	Last         ObservationResult
 	Rounds       []FixRoundResult
 	FinalChanges []FileChange
-	// Verified means Last observes the same text represented by FinalChanges.
-	// It does not promise that another fix round would produce no edits.
+	// FinalSources contains the complete final text for every path to which at
+	// least one fix was applied in a successful round. Unlike FinalChanges, it
+	// retains paths whose fixes restored the initial text so in-memory consumers
+	// can still report that fixes were applied.
+	FinalSources []SourceFileSnapshot
+	// Verified means Last observes the final in-memory source represented by
+	// FinalSources (and its net delta in FinalChanges). It does not promise that
+	// another fix round would produce no edits.
 	Verified       bool
 	Committed      bool
 	CommittedPaths []string
@@ -102,6 +108,7 @@ type fixResult struct {
 	initial        ObservationResult
 	rounds         []FixRoundResult
 	finalChanges   []FileChange
+	finalSources   []SourceFileSnapshot
 	verified       bool
 	committed      bool
 	committedPaths []string
@@ -116,6 +123,7 @@ func (r fixResult) applied(last ObservationResult) (AppliedFixResult, bool) {
 		Last:           last,
 		Rounds:         cloneFixRounds(r.rounds),
 		FinalChanges:   cloneFileChanges(r.finalChanges),
+		FinalSources:   cloneSourceFileSnapshots(r.finalSources),
 		Verified:       r.verified,
 		Committed:      r.committed,
 		CommittedPaths: append([]string(nil), r.committedPaths...),
@@ -177,6 +185,10 @@ func clonePluginOutcome(outcome EslintPluginDispatchOutcome) EslintPluginDispatc
 
 func cloneFileChanges(changes []FileChange) []FileChange {
 	return append([]FileChange(nil), changes...)
+}
+
+func cloneSourceFileSnapshots(files []SourceFileSnapshot) []SourceFileSnapshot {
+	return append([]SourceFileSnapshot(nil), files...)
 }
 
 func cloneFixRounds(rounds []FixRoundResult) []FixRoundResult {

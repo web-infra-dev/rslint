@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -153,7 +154,9 @@ func TestHandleFixAllCodeAction_GitignoredFile(t *testing.T) {
 	s.cwd = dir
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	s.session = &project.Session{}
-	s.jsonConfig = config.RslintConfig{{Rules: config.Rules{"no-var": "error"}}}
+	installJSConfigsForTest(s, map[string]config.RslintConfig{
+		tspath.NormalizePath(dir): {{Rules: config.Rules{"no-var": "error"}}},
+	})
 	uri := documentURIFromPath(target)
 	s.documents[uri] = "var value = 1;\n"
 
@@ -547,13 +550,5 @@ func TestHandleFixAllCodeAction_DocumentNotInMap(t *testing.T) {
 	// Session is nil, so it returns empty without panicking
 	if resp.CommandOrCodeActionArray == nil || len(*resp.CommandOrCodeActionArray) != 0 {
 		t.Error("expected empty code actions for document not in map")
-	}
-}
-
-// ======== maxFixRounds constant test ========
-
-func TestMaxFixRounds_IsReasonable(t *testing.T) {
-	if maxFixRounds < 1 || maxFixRounds > 100 {
-		t.Errorf("maxFixRounds = %d, should be between 1 and 100", maxFixRounds)
 	}
 }

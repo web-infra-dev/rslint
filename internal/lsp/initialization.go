@@ -108,15 +108,5 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		s.lintPrograms = newLintProgramStore(s)
 	}
 
-	// Load the JSON config used before the first JS/TS catalog transaction and
-	// as fallback for files outside every discovered JS/TS config boundary.
-	rslintConfigPath, configFound := findRslintConfig(s.fs, s.cwd)
-	if configFound {
-		s.rslintConfigPath = rslintConfigPath
-		if err := s.reloadConfig(); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
