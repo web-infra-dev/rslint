@@ -3,7 +3,7 @@
   "items": [
     {
       "type": "string",
-      "format": "regex"
+      "format": "regex-u"
     },
     {
       "type": "object",

@@ -227,11 +227,6 @@ func TestIdMatchExtrasBranches(t *testing.T) {
 				Code: `var noOptionsAtAll = 1;
 var __weird_$name = 2;`,
 			},
-			// ---- Locks in the rule's own guard: a pattern only the `u` flag rejects checks nothing ----
-			{
-				Code:    `var __foo = 1;`,
-				Options: []any{`\p`},
-			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Locks in upstream Identifier() arm 1: a shadowed global is not left alone ----
@@ -1024,4 +1019,10 @@ Object.keys(x);`,
 			},
 		},
 	)
+}
+
+func TestIdMatchUnicodePatternSchema(t *testing.T) {
+	if err := IdMatchRule.Schema.Validate([]any{`\p`}); err == nil {
+		t.Error("expected a pattern invalid under the u flag to fail schema validation")
+	}
 }
