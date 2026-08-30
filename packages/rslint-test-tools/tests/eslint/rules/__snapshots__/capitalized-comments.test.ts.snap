@@ -1,0 +1,1672 @@
+// Rstest Snapshot v1
+
+exports[`capitalized-comments > invalid 1`] = `
+{
+  "code": "//lowercase",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 2`] = `
+{
+  "code": "// lowercase",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 3`] = `
+{
+  "code": "/*lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 4`] = `
+{
+  "code": "/* lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 5`] = `
+{
+  "code": "/** lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 6`] = `
+{
+  "code": "/*
+lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 7`] = `
+{
+  "code": "/**
+lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 8`] = `
+{
+  "code": "//über",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 9`] = `
+{
+  "code": "//π",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 10`] = `
+{
+  "code": "/* lowercase
+Second line need not be lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 11`] = `
+{
+  "code": "// ꮳꮃꭹ",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 12`] = `
+{
+  "code": "/* 𐳡𐳡𐳡 */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 13`] = `
+{
+  "code": "//lowercase",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 14`] = `
+{
+  "code": "// lowercase",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 15`] = `
+{
+  "code": "/*lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 16`] = `
+{
+  "code": "/* lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 17`] = `
+{
+  "code": "/** lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 18`] = `
+{
+  "code": "/**
+lowercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 19`] = `
+{
+  "code": "//über",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 20`] = `
+{
+  "code": "//π",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 21`] = `
+{
+  "code": "/* lowercase
+second line need not be uppercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 22`] = `
+{
+  "code": "//Uppercase",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 23`] = `
+{
+  "code": "// Uppercase",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 24`] = `
+{
+  "code": "/*Uppercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 25`] = `
+{
+  "code": "/* Uppercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 26`] = `
+{
+  "code": "/*
+Uppercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 27`] = `
+{
+  "code": "//Über",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 28`] = `
+{
+  "code": "//Π",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 29`] = `
+{
+  "code": "/* Uppercase
+second line need not be uppercase */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 30`] = `
+{
+  "code": "// Გ",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 31`] = `
+{
+  "code": "// 𑢢",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 32`] = `
+{
+  "code": "//* jscs: enable",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 33`] = `
+{
+  "code": "//* jscs:disable",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 34`] = `
+{
+  "code": "//* eslint-disable-line",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 35`] = `
+{
+  "code": "//* eslint-disable-next-line",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 36`] = `
+{
+  "code": "/*
+ * eslint semi:off */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 37`] = `
+{
+  "code": "/*
+ * eslint-env node */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 38`] = `
+{
+  "code": "/*
+ *  istanbul ignore next */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 39`] = `
+{
+  "code": "/*
+ *  jshint asi:true */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 40`] = `
+{
+  "code": "/*
+ *  jscs: enable */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 41`] = `
+{
+  "code": "/*
+ *  global var1, var2 */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 42`] = `
+{
+  "code": "/*
+ *  global var1:true, var2 */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 43`] = `
+{
+  "code": "/*
+ *  globals var1, var2 */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 44`] = `
+{
+  "code": "/*
+ *  globals var1:true, var2 */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 45`] = `
+{
+  "code": "/*
+ *  exported myVar */",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 46`] = `
+{
+  "code": "foo(/* invalid */a);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 47`] = `
+{
+  "code": "foo(/* invalid */a);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 48`] = `
+{
+  "code": "foo(a, // not an inline comment
+b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 49`] = `
+{
+  "code": "foo(a, /* not an inline comment */
+b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 50`] = `
+{
+  "code": "foo(a,
+/* not an inline comment */b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 51`] = `
+{
+  "code": "foo(a,
+/* not an inline comment */
+b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 52`] = `
+{
+  "code": "foo(a, // Not an inline comment
+b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 53`] = `
+{
+  "code": "foo(a, /* Not an inline comment */
+b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 54`] = `
+{
+  "code": "foo(a,
+/* Not an inline comment */b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 55`] = `
+{
+  "code": "foo(a,
+/* Not an inline comment */
+b);",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 56`] = `
+{
+  "code": "// not matching",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 57`] = `
+{
+  "code": "// Not matching",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 58`] = `
+{
+  "code": "// This comment is valid since it is capitalized,
+// and this one is valid since it follows a valid one,
+foo();
+// this comment is now invalid.",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 59`] = `
+{
+  "code": "// this comment is invalid since it is not capitalized,
+// but this one is ignored since it is consecutive.",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 60`] = `
+{
+  "code": "// This comment is invalid since it is not capitalized,
+// But this one is ignored since it is consecutive.",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 61`] = `
+{
+  "code": "// This comment is valid since it is capitalized,
+// but this one is invalid even if it follows a valid one.",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 62`] = `
+{
+  "code": "// should fail. https://github.com",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with a lowercase character.",
+      "messageId": "unexpectedLowercaseComment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`capitalized-comments > invalid 63`] = `
+{
+  "code": "// Should fail. https://github.com",
+  "diagnostics": [
+    {
+      "message": "Comments should not begin with an uppercase character.",
+      "messageId": "unexpectedUppercaseComment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "capitalized-comments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -9,6 +9,7 @@ package typescriptutil
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // IsFunction reports whether a node is FunctionDeclaration, FunctionExpression
@@ -21,19 +22,18 @@ func IsFunction(node *ast.Node) bool {
 	return ast.IsFunctionDeclaration(node) || ast.IsFunctionExpressionOrArrowFunction(node)
 }
 
-// IsTypeAssertion reports whether a node is `x as T` or `<T>x`.
+// IsTypeAssertion reports whether a node is an authored `x as T` or `<T>x`.
+// Wrappers synthesized from JSDoc casts are transparent in ESTree.
 func IsTypeAssertion(node *ast.Node) bool {
-	return ast.IsAsExpression(node) || ast.IsTypeAssertion(node)
+	return !utils.IsJSDocTypeCastWrapper(node) &&
+		(ast.IsAsExpression(node) || ast.IsTypeAssertion(node))
 }
 
-// GetEffectiveParent returns the first meaningful parent, skipping
-// ParenthesizedExpressions. tsgo preserves parens that ESLint strips, so this
-// bridges the gap when walking from a function to its containing context.
+// GetEffectiveParent returns the first meaningful ESTree parent, skipping
+// ParenthesizedExpressions and wrappers synthesized from JSDoc casts. tsgo
+// preserves both around the runtime expression that ESLint exposes directly.
 func GetEffectiveParent(node *ast.Node) *ast.Node {
-	if node == nil || node.Parent == nil {
-		return nil
-	}
-	return ast.WalkUpParenthesizedExpressions(node.Parent)
+	return utils.ESTreeParent(node)
 }
 
 // IsVariableDeclaratorWithTypeAnnotation reports whether a node is a
@@ -43,7 +43,7 @@ func IsVariableDeclaratorWithTypeAnnotation(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindVariableDeclaration {
 		return false
 	}
-	return node.AsVariableDeclaration().Type != nil
+	return utils.ESTreeType(node) != nil
 }
 
 // IsPropertyDefinitionWithTypeAnnotation reports whether a node is a
@@ -52,7 +52,7 @@ func IsPropertyDefinitionWithTypeAnnotation(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindPropertyDeclaration {
 		return false
 	}
-	return node.AsPropertyDeclaration().Type != nil
+	return utils.ESTreeType(node) != nil
 }
 
 // IsDefaultFunctionParameterWithTypeAnnotation reports whether a node is a
@@ -62,8 +62,7 @@ func IsDefaultFunctionParameterWithTypeAnnotation(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindParameter {
 		return false
 	}
-	param := node.AsParameterDeclaration()
-	return param.Type != nil && param.Initializer != nil
+	return utils.ESTreeType(node) != nil && node.AsParameterDeclaration().Initializer != nil
 }
 
 // IsFunctionArgument reports whether `parent` is a CallExpression and
@@ -72,7 +71,7 @@ func IsFunctionArgument(parent *ast.Node, funcNode *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return false
 	}
-	callee := ast.SkipParentheses(parent.AsCallExpression().Expression)
+	callee := utils.ESTreeRuntimeExpression(parent.AsCallExpression().Expression)
 	return callee != funcNode
 }
 
@@ -199,7 +198,7 @@ func DoesImmediatelyReturnFunctionExpression(node *ast.Node, returns []*ast.Node
 	if node.Kind == ast.KindArrowFunction {
 		af := node.AsArrowFunction()
 		if af.Body != nil && af.Body.Kind != ast.KindBlock {
-			return IsFunction(ast.SkipParentheses(af.Body))
+			return IsFunction(utils.ESTreeRuntimeExpression(af.Body))
 		}
 	}
 	if len(returns) == 0 {
@@ -207,7 +206,7 @@ func DoesImmediatelyReturnFunctionExpression(node *ast.Node, returns []*ast.Node
 	}
 	for _, ret := range returns {
 		arg := ret.Expression()
-		if arg == nil || !IsFunction(ast.SkipParentheses(arg)) {
+		if arg == nil || !IsFunction(utils.ESTreeRuntimeExpression(arg)) {
 			return false
 		}
 	}
@@ -221,12 +220,7 @@ func AncestorHasReturnType(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	ancestor := node.Parent
-	// tsgo preserves ParenthesizedExpression that ESLint strips — peel them
-	// before checking the "is this a return value?" gate.
-	for ancestor != nil && ancestor.Kind == ast.KindParenthesizedExpression {
-		ancestor = ancestor.Parent
-	}
+	ancestor := GetEffectiveParent(node)
 
 	// ESLint's model: `if (ancestor.type === Property) ancestor = ancestor.value;`
 	// `Property.value` for `arrowFn: () => 'test'` is the ArrowFunction itself.
@@ -234,7 +228,7 @@ func AncestorHasReturnType(node *ast.Node) bool {
 	if ancestor != nil && ancestor.Kind == ast.KindPropertyAssignment {
 		pa := ancestor.AsPropertyAssignment()
 		if pa.Initializer != nil {
-			ancestor = ast.SkipParentheses(pa.Initializer)
+			ancestor = utils.ESTreeRuntimeExpression(pa.Initializer)
 		}
 	}
 
@@ -254,13 +248,13 @@ func AncestorHasReturnType(node *ast.Node) bool {
 			// In tsgo, methods and getters are their own node types (not
 			// FunctionExpression inside MethodDefinition like ESLint). Check
 			// their return type the same way.
-			if ancestor.Type() != nil {
+			if utils.ESTreeType(ancestor) != nil {
 				return true
 			}
 		case ast.KindVariableDeclaration:
-			return ancestor.AsVariableDeclaration().Type != nil
+			return utils.ESTreeType(ancestor) != nil
 		case ast.KindPropertyDeclaration:
-			return ancestor.AsPropertyDeclaration().Type != nil
+			return utils.ESTreeType(ancestor) != nil
 		case ast.KindExpressionStatement:
 			return false
 		}

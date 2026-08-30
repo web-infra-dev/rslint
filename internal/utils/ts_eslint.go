@@ -193,13 +193,24 @@ func GetForStatementHeadLoc(
  * - `export default function() {}` → `function`
  */
 func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	// ESTree exposes no node for parentheses, so a parenthesized function
-	// value still has the property that holds it as its parent.
-	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	// ESTree exposes neither parentheses nor hosted JSDoc cast wrappers, so the
+	// function value still has the property that holds it as its parent.
+	parent := ESTreeParent(node)
 
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		start := nodeStartSkippingDecorators(sourceFile, node)
+		start := NodeTextRangeSkippingDecorators(sourceFile, node)
+		// @typescript-eslint represents accessors directly owned by an
+		// interface or type literal as TSMethodSignature nodes. Its function-head
+		// helper searches the complete signature for the first real `(` token, so
+		// a parenthesized or call-expression computed key can end the range before
+		// the parameter list. Use the parsed token tree here: a raw scanner would
+		// misread `(` inside a regular-expression literal as punctuation.
+		if isTypeAccessorSignature(node) {
+			if parenPos := findFirstParsedOpenParenStart(sourceFile, node, start.Pos()); parenPos >= 0 {
+				return start.WithEnd(parenPos)
+			}
+		}
 		// Start scanning for the parameters `(` after any decorator factory
 		// (e.g. `@dec()`) and after the method name. Nameless constructors
 		// fall back to the first token after the decorators.
@@ -217,7 +228,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	case ast.KindArrowFunction:
 		if holdsFunctionValue(parent) {
-			start := nodeStartSkippingDecorators(sourceFile, parent)
+			start := NodeTextRangeSkippingDecorators(sourceFile, parent)
 			return start.WithEnd(openingParenOfParamsPos(sourceFile, node))
 		}
 		af := node.AsArrowFunction()
@@ -226,7 +237,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	case ast.KindFunctionExpression:
 		if holdsFunctionValue(parent) {
-			start := nodeStartSkippingDecorators(sourceFile, parent)
+			start := NodeTextRangeSkippingDecorators(sourceFile, parent)
 			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 				return start.WithEnd(parenPos)
 			}
@@ -482,23 +493,20 @@ func needsPrecedingSemicolonAfterIdentifierOrKeyword(prevKind ast.Kind, prevNode
 // ever adding a redundant character rather than producing wrong output.
 func NeedsPrecedingSemicolon(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	nodeStart := TrimNodeTextRange(sourceFile, node).Pos()
-
-	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
-	prevKind := ast.KindUnknown
-	prevStart := -1
-	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < nodeStart {
-		prevKind = scan.Token()
-		prevStart = scan.TokenStart()
-		scan.Scan()
-	}
-	if prevKind == ast.KindUnknown || scan.TokenStart() != nodeStart || !scan.HasPrecedingLineBreak() {
+	current, ok := TokenAtOrAfter(sourceFile, nodeStart)
+	if !ok || current.Start != nodeStart {
 		return false
 	}
+	previous, ok := TokenBeforePosition(sourceFile, nodeStart)
+	if !ok || !ecmascript.ContainsLineTerminator(sourceFile.Text(), previous.End, nodeStart) {
+		return false
+	}
+	prevKind := previous.Kind
 	if needsPrecedingSemicolonExemptPunctuator(prevKind) {
 		return false
 	}
 
-	prevNode := ast.GetNodeAtPosition(sourceFile, prevStart, false)
+	prevNode := ast.GetNodeAtPosition(sourceFile, previous.Start, false)
 	if prevNode == nil {
 		return true
 	}
@@ -547,7 +555,7 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	isAsync := flags&ast.FunctionFlagsAsync != 0
 	isGenerator := flags&ast.FunctionFlagsGenerator != 0
 
-	parent := node.Parent
+	parent := ESTreeParent(node)
 	isStatic, isPrivate := false, false
 	// Direct class member (MethodDeclaration / GetAccessor / SetAccessor):
 	// modifiers and private-key live on the function-like node itself.
@@ -689,9 +697,10 @@ func GetFunctionNameWithKindCore(node *ast.Node) string {
 		return strings.Join(append(tokens, "method", "'constructor'"), " ")
 	}
 
-	// ESTree does not expose parentheses as nodes, so a function value wrapped
-	// only in parentheses still has the surrounding property as its parent.
-	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+	// ESTree exposes neither parentheses nor wrappers synthesized from JSDoc
+	// casts, so a function wrapped only in those nodes still has the surrounding
+	// property as its parent.
+	parent := ESTreeParent(node)
 	if parent == nil {
 		return "function"
 	}
@@ -807,7 +816,8 @@ func isCoreClassFieldInitializer(node *ast.Node, parent *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
 		initializer := parent.AsPropertyDeclaration().Initializer
-		return initializer != nil && ast.SkipParentheses(initializer) == node
+		return initializer != nil &&
+			(initializer == node || ESTreeRuntimeExpression(initializer) == node)
 	}
 	return false
 }
@@ -827,7 +837,7 @@ func getFunctionDisplayName(node *ast.Node) string {
 			return s
 		}
 	}
-	parent := node.Parent
+	parent := ESTreeParent(node)
 	if parent == nil {
 		return ""
 	}
@@ -874,11 +884,10 @@ func UpperCaseFirstASCII(s string) string {
 	return s
 }
 
-// nodeStartSkippingDecorators returns a TextRange whose start is the first
+// NodeTextRangeSkippingDecorators returns a TextRange whose start is the first
 // non-decorator token of the node. This matches ESLint's
-// getFunctionHeadLoc, which excludes leading decorators on MethodDefinition
-// and PropertyDefinition from the reported function head range.
-func nodeStartSkippingDecorators(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+// node ranges, which exclude leading decorators.
+func NodeTextRangeSkippingDecorators(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	fallback := TrimNodeTextRange(sourceFile, node)
 	mods := node.Modifiers()
 	if mods == nil || len(mods.Nodes) == 0 {
@@ -956,6 +965,36 @@ func findOpenParenPosFrom(sourceFile *ast.SourceFile, start int, end int) int {
 		s.Scan()
 	}
 	return -1
+}
+
+func isTypeAccessorSignature(node *ast.Node) bool {
+	if node.Kind != ast.KindGetAccessor && node.Kind != ast.KindSetAccessor {
+		return false
+	}
+	parent := node.Parent
+	return parent != nil &&
+		(parent.Kind == ast.KindInterfaceDeclaration || parent.Kind == ast.KindTypeLiteral)
+}
+
+// findFirstParsedOpenParenStart walks parser-owned children in source order. The
+// parsed tree preserves lexical context for regular expressions and templates,
+// unlike scanning an arbitrary source range from scratch.
+func findFirstParsedOpenParenStart(sourceFile *ast.SourceFile, node *ast.Node, minimum int) int {
+	sourceText := sourceFile.Text()
+	parenPos := -1
+	forEachToken(node, func(token *ast.Node) bool {
+		if token.Kind != ast.KindOpenParenToken || ast.NodeIsMissing(token) || token.Flags&ast.NodeFlagsSynthesized != 0 {
+			return false
+		}
+		trimmed := TrimNodeTextRange(sourceFile, token)
+		if trimmed.Pos() < minimum || trimmed.Pos() >= trimmed.End() ||
+			trimmed.End() > len(sourceText) || sourceText[trimmed.Pos()] != '(' {
+			return false
+		}
+		parenPos = trimmed.Pos()
+		return true
+	}, sourceFile)
+	return parenPos
 }
 
 // findFunctionKeywordPos returns the start position of the function head,
@@ -1702,7 +1741,7 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 		case ast.KindFalseKeyword:
 			return "false", true
 		case ast.KindRegularExpressionLiteral:
-			return expr.AsRegularExpressionLiteral().Text, true
+			return RegExpLiteralStringValue(expr.AsRegularExpressionLiteral().Text), true
 		}
 		return "", false
 	default:
@@ -1733,9 +1772,11 @@ func numericLiteralPropertyName(node *ast.Node) string {
 	return NormalizeNumericLiteral(literal.Text)
 }
 
-// radixLiteralValue accumulates an explicit binary, octal, or hexadecimal
-// literal into a float64 one source digit at a time. Numeric separators do not
-// contribute to the value.
+// radixLiteralValue mirrors Acorn's readInt for an explicit binary, octal, or
+// hexadecimal literal. The multiplication and addition stay in separate
+// statements because JavaScript rounds each Number operation independently;
+// combining them permits a fused multiply-add with a different result.
+// Numeric separators do not contribute to the value.
 func radixLiteralValue(raw string) (float64, bool) {
 	if len(raw) < 3 || raw[0] != '0' {
 		return 0, false
@@ -1768,7 +1809,8 @@ func radixLiteralValue(raw string) (float64, bool) {
 		if digit < 0 || digit >= radix {
 			return 0, false
 		}
-		value = value*float64(radix) + float64(digit)
+		value *= float64(radix)
+		value += float64(digit)
 		digits++
 		previousSeparator = false
 	}
@@ -1789,13 +1831,15 @@ func radixDigitValue(ch byte) int {
 }
 
 // NormalizeNumericLiteral parses a numeric literal text and returns its
-// ECMAScript Number string representation.
-// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100", "1e-7" -> "1e-7"
+// ECMAScript Number string representation, matching ESLint's String(node.value)
+// behavior. For example, "0x1" -> "1", "1.0" -> "1", "1e2" -> "100",
+// "1e-7" -> "1e-7", and "1e21" -> "1e+21".
 func NormalizeNumericLiteral(text string) string {
-	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
-	// Use big.Int to handle arbitrary precision, then convert to float64
-	// to match JavaScript's String(Number(...)) behavior.
-	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
+	// ParseFloat doesn't handle JS hex (0x), octal (0o) or binary (0b)
+	// prefixes — it only reads hexadecimal floats, which require a `p`
+	// exponent. Use big.Int to handle arbitrary precision, then convert to
+	// float64 to match JavaScript's String(Number(...)) behavior.
+	if len(text) > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X' || text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
 		if n, ok := new(big.Int).SetString(text, 0); ok {
 			f, _ := new(big.Float).SetInt(n).Float64()
 			return ecmascript.NumberToString(f)
@@ -1838,10 +1882,12 @@ func NormalizeBigIntLiteral(text string) string {
 //
 // Supported node kinds:
 //   - StringLiteral: returns the string value
-//   - NumericLiteral: returns the normalized numeric string (e.g. "0x1" → "1")
+//   - NumericLiteral: returns the normalized numeric string (e.g. "0x1" → "1"),
+//     recovering explicit-radix source tokens when needed for exact JavaScript
+//     rounding above 2^53
 //   - NoSubstitutionTemplateLiteral: returns the template text
-//   - RegularExpressionLiteral: returns the source text (e.g. /foo/g),
-//     matching JavaScript's implicit toString coercion when used as a property key
+//   - RegularExpressionLiteral: returns RegExp.prototype.toString's canonical
+//     value (e.g. /foo/mi becomes /foo/im) for property-key coercion
 //   - NullKeyword / TrueKeyword / FalseKeyword: return "null" / "true" / "false"
 //   - BigIntLiteral: returns the normalized decimal string (e.g. "1n" → "1")
 //
@@ -1857,11 +1903,11 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 	case ast.KindStringLiteral:
 		return node.AsStringLiteral().Text, true
 	case ast.KindNumericLiteral:
-		return NormalizeNumericLiteral(node.AsNumericLiteral().Text), true
+		return numericLiteralPropertyName(node), true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindRegularExpressionLiteral:
-		return node.AsRegularExpressionLiteral().Text, true
+		return RegExpLiteralStringValue(node.AsRegularExpressionLiteral().Text), true
 	case ast.KindNullKeyword:
 		return "null", true
 	case ast.KindTrueKeyword:
@@ -1996,7 +2042,9 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 	case ast.KindStringLiteral:
 		return left.AsStringLiteral().Text == right.AsStringLiteral().Text
 	case ast.KindNumericLiteral:
-		return NormalizeNumericLiteral(left.AsNumericLiteral().Text) == NormalizeNumericLiteral(right.AsNumericLiteral().Text)
+		leftValue, leftOK := GetStaticExpressionValue(left)
+		rightValue, rightOK := GetStaticExpressionValue(right)
+		return leftOK && rightOK && leftValue == rightValue
 	case ast.KindBigIntLiteral:
 		return NormalizeBigIntLiteral(left.AsBigIntLiteral().Text) == NormalizeBigIntLiteral(right.AsBigIntLiteral().Text)
 	case ast.KindRegularExpressionLiteral:
@@ -2009,11 +2057,17 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 // (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
 // Element access arguments are unwrapped through parentheses and TS assertions
 // because ESTree-based helpers treat those wrappers as transparent.
+//
+// A private name has no static name: ESLint's getStaticPropertyName accepts a
+// dotted key only when it is an `Identifier`, and ESTree gives `#x` its own
+// `PrivateIdentifier` type, so upstream falls through to its string-value
+// branch and answers null. That keeps `obj.#x` and `obj['#x']` in separate
+// equivalence classes, as the language does.
 func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
-		if name != nil {
+		if name != nil && name.Kind != ast.KindPrivateIdentifier {
 			return name.Text(), true
 		}
 	case ast.KindElementAccessExpression:
@@ -2524,10 +2578,11 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 	return true
 }
 
-// HasSameTokens reports whether two nodes produce the same token stream when
-// viewed at the raw-source level — matching ESLint's
-// `sourceCode.getTokens(a)` vs `sourceCode.getTokens(b)` semantics, which
-// preserves the original source form of each literal. Unlike
+// HasSameTokens reports whether two nodes produce the same parser token stream,
+// matching ESLint's `sourceCode.getTokens(a)` vs `sourceCode.getTokens(b)`
+// semantics. Literal spellings remain source-sensitive; Identifier,
+// PrivateIdentifier, and JSXText values follow the parser dialect exposed for
+// the source file (Espree for JS/JSX, typescript-eslint for TS/TSX). Unlike
 // [AreNodesStructurallyEqual], this helper distinguishes:
 //
 //   - `'a'` vs `"a"` (different quote style)
@@ -2537,8 +2592,8 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 //
 // Implementation: we recurse on the AST using [ast.SkipParentheses] and
 // [ast.Node.ForEachChild]. At leaf nodes (no children — identifiers,
-// literals, keyword tokens) we compare the raw source slice via
-// [scanner.GetSourceTextOfNodeFromSourceFile]. For composite nodes we
+// literals, keyword tokens) we compare their parser-visible token values. For
+// composite nodes we
 // recurse on children pairwise AND scan the "gaps" between children
 // (and before/after the first/last child) with [scanner.Scanner] to pick
 // up punctuation, keyword tokens, and operators that tsgo's ForEachChild
@@ -2569,16 +2624,54 @@ func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b))
+	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b), compareParserIdentifierValues)
 }
+
+// HasSameTokensWithDecodedIdentifiers compares the same token structure as
+// [HasSameTokens], but treats escaped Identifier and PrivateIdentifier
+// spellings with the same decoded text as equal in every script kind. It is
+// intended for semantic safety checks where an identifier escape cannot
+// change the meaning of generated code; it does not model TypeScript parser
+// token equality.
+func HasSameTokensWithDecodedIdentifiers(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b), compareDecodedIdentifierValues)
+}
+
+type identifierTokenComparison uint8
+
+const (
+	compareParserIdentifierValues identifierTokenComparison = iota
+	compareDecodedIdentifierValues
+)
 
 // hasSameTokens is the recursive core. It does NOT call SkipParentheses
 // on its inputs — parens nested inside a compound expression are visible
 // tokens in ESLint's per-node getTokens view (e.g. `(x).y` has tokens
 // `[(, x, ), ., y]`), so a recursive paren strip would collapse them.
-func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
+func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node, identifiers identifierTokenComparison) bool {
 	if a == nil || b == nil {
 		return a == b
+	}
+	if isJSXTextKind(a.Kind) || isJSXTextKind(b.Kind) {
+		if !isJSXTextKind(a.Kind) || !isJSXTextKind(b.Kind) {
+			return false
+		}
+		left := sf.Text()[a.Pos():a.End()]
+		right := sf.Text()[b.Pos():b.End()]
+		switch sf.ScriptKind {
+		case core.ScriptKindJS, core.ScriptKindJSX:
+			return ecmascript.JSXTextTokenValuesEqual(left, right)
+		case core.ScriptKindTS, core.ScriptKindTSX:
+			// @typescript-eslint/parser exposes the unmodified source spelling.
+			return left == right
+		default:
+			// Preserve the previous raw-text and exact-kind behavior for script
+			// kinds that do not map to either supported parser dialect.
+			return a.Kind == b.Kind && left == right
+		}
 	}
 	if a.Kind != b.Kind {
 		return false
@@ -2601,6 +2694,22 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 		switch a.Kind {
 		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
 			return sameTokensInRange(sf, a.Pos(), a.End(), b.Pos(), b.End())
+		case ast.KindIdentifier:
+			if a.AsIdentifier().Text != b.AsIdentifier().Text {
+				return false
+			}
+			return identifiers == compareDecodedIdentifierValues ||
+				!usesRawIdentifierTokenValues(sf) ||
+				scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
+					scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
+		case ast.KindPrivateIdentifier:
+			if a.AsPrivateIdentifier().Text != b.AsPrivateIdentifier().Text {
+				return false
+			}
+			return identifiers == compareDecodedIdentifierValues ||
+				!usesRawIdentifierTokenValues(sf) ||
+				scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
+					scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
 		}
 		return scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
 			scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
@@ -2625,12 +2734,20 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 		if !sameTokensInRange(sf, prevA, aKids[i].Pos(), prevB, bKids[i].Pos()) {
 			return false
 		}
-		if !hasSameTokens(sf, aKids[i], bKids[i]) {
+		if !hasSameTokens(sf, aKids[i], bKids[i], identifiers) {
 			return false
 		}
 		prevA, prevB = aKids[i].End(), bKids[i].End()
 	}
 	return sameTokensInRange(sf, prevA, a.End(), prevB, b.End())
+}
+
+func usesRawIdentifierTokenValues(sourceFile *ast.SourceFile) bool {
+	return sourceFile.ScriptKind == core.ScriptKindTS || sourceFile.ScriptKind == core.ScriptKindTSX
+}
+
+func isJSXTextKind(kind ast.Kind) bool {
+	return kind == ast.KindJsxText || kind == ast.KindJsxTextAllWhiteSpaces
 }
 
 func collectKids(n *ast.Node) []*ast.Node {

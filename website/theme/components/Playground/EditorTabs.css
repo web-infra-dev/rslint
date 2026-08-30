@@ -1,4 +1,14 @@
 /* Monaco Editor specific styles - cannot be done with Tailwind */
+
+/*
+ * Monaco gives the hover widget an inline `z-index: 50`, which sits below the
+ * Rspress header's `z-index: 60`, so the header paints over any hover opened
+ * near the top of the page.
+ */
+.monaco-resizable-hover {
+  z-index: 1000000 !important;
+}
+
 .monaco-editor .ast-node-highlight {
   background: rgba(198, 228, 255, 0.65);
   outline: 1px solid #0969da;
@@ -11,4 +21,15 @@
   outline: 2px solid #f59e0b;
   border-radius: 3px;
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
+}
+
+.dark .monaco-editor .ast-node-highlight {
+  background: rgba(31, 111, 235, 0.35);
+  outline-color: #58a6ff;
+}
+
+.dark .monaco-editor .ast-node-hover-highlight {
+  background: rgba(187, 128, 9, 0.35);
+  outline-color: #d29922;
+  box-shadow: 0 0 0 1px rgba(210, 153, 34, 0.35);
 }

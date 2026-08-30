@@ -1,7 +1,6 @@
 package no_deprecated
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -111,27 +110,6 @@ func buildDeprecated(pragma string) map[string]deprecationInfo {
 	m["ReactDOM.unmountComponentAtNode"] = deprecationInfo{"18.0.0", "root.unmount", "https://reactjs.org/link/switch-to-createroot"}
 	m["ReactDOMServer.renderToNodeStream"] = deprecationInfo{"18.0.0", "renderToPipeableStream", "https://reactjs.org/docs/react-dom-server.html#rendertonodestream"}
 	return m
-}
-
-// jsxPragmaRe matches a `@jsx Foo` directive anywhere in source text. The
-// comment form (block vs. line) isn't constrained — upstream's pragmaUtil
-// accepts the pragma from any comment, so we scan the raw source.
-var jsxPragmaRe = regexp.MustCompile(`@jsx\s+([A-Za-z_$][\w$.]*)`)
-
-// detectJsxPragma returns the identifier following the first `@jsx` directive
-// in the source, or "" when no directive is present.
-func detectJsxPragma(sourceText string) string {
-	// Most files do not carry a classic-runtime pragma. Avoid putting the
-	// regexp engine on the hot path for every file in that overwhelmingly
-	// common case.
-	if !strings.Contains(sourceText, "@jsx") {
-		return ""
-	}
-	m := jsxPragmaRe.FindStringSubmatch(sourceText)
-	if m == nil {
-		return ""
-	}
-	return m[1]
 }
 
 // parseVersion parses a leading "major[.minor[.patch]]" numeric triple and
@@ -326,12 +304,10 @@ var NoDeprecatedRule = rule.Rule{
 	Name:   "react/no-deprecated",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// Determine pragma: `@jsx` directive in source wins over
-		// `settings.react.pragma`, matching upstream's `pragmaUtil.getFromContext`.
-		pragma := detectJsxPragma(ctx.SourceFile.Text())
-		if pragma == "" {
-			pragma = reactutil.GetReactPragma(ctx.Settings)
-		}
+		// A `@jsx` annotation in the source wins over
+		// `settings.react.pragma`, matching upstream's
+		// `pragmaUtil.getFromContext`.
+		pragma := reactutil.GetReactPragmaFromContext(ctx)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		usesDefaultPragma := pragma == reactutil.DefaultReactPragma
 		deprecated := defaultDeprecated

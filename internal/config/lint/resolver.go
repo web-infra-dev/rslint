@@ -31,7 +31,6 @@ type ResolverOptions struct {
 	Config              config.RslintConfig
 	ConfigDirectory     string
 	Catalog             *rule.Catalog
-	EnforcePlugins      bool
 	TargetsBySourcePath map[string]target.File
 	// SourceMappingsIncludeCanonicalPaths indicates that Program binding
 	// already supplied both lexical and canonical source keys, so normalization
@@ -66,7 +65,6 @@ func NewResolver(options ResolverOptions) *Resolver {
 			options.FS,
 			options.PathSpaces,
 			options.Catalog,
-			options.EnforcePlugins,
 		)
 		if err != nil {
 			panic(err)

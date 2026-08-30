@@ -78,6 +78,16 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
   onNodeClick,
 }) => {
   const [hoveredNode, setHoveredNode] = useState<FlowGraphNode | null>(null);
+  const colors = {
+    edge: 'var(--rp-c-text-2)',
+    node: 'var(--rp-c-bg)',
+    nodeHover: 'var(--rp-c-bg-mute)',
+    stroke: 'var(--rp-c-text-2)',
+    strokeHover: 'var(--rp-c-brand)',
+    text: 'var(--rp-c-text-1)',
+    mutedText: 'var(--rp-c-text-2)',
+    separator: 'var(--rp-c-divider-light)',
+  };
 
   // Build layout using dagre
   const layout = useMemo(() => {
@@ -189,7 +199,7 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
             refY="3"
             orient="auto"
           >
-            <polygon points="0 0, 8 3, 0 6" fill="#666" />
+            <polygon points="0 0, 8 3, 0 6" fill={colors.edge} />
           </marker>
         </defs>
 
@@ -204,7 +214,7 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
               key={i}
               d={pathData}
               fill="none"
-              stroke="#666"
+              stroke={colors.edge}
               strokeWidth="1"
               markerEnd="url(#flow-arrowhead)"
             />
@@ -233,8 +243,8 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
                 width={width}
                 height={NODE_HEIGHT}
                 rx="3"
-                fill={isHovered ? '#f0f9ff' : '#fff'}
-                stroke={isHovered ? '#3b82f6' : '#333'}
+                fill={isHovered ? colors.nodeHover : colors.node}
+                stroke={isHovered ? colors.strokeHover : colors.stroke}
                 strokeWidth={isHovered ? 1.5 : 1}
               />
               {/* Text/expression label (top) */}
@@ -243,7 +253,7 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
                   x={width / 2}
                   y={18}
                   textAnchor="middle"
-                  fill="#111"
+                  fill={colors.text}
                   fontSize="12"
                   fontWeight="500"
                 >
@@ -257,7 +267,7 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
                   y1={NODE_HEIGHT / 2}
                   x2={width - 8}
                   y2={NODE_HEIGHT / 2}
-                  stroke="#ddd"
+                  stroke={colors.separator}
                   strokeWidth="1"
                 />
               )}
@@ -267,7 +277,7 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
                 y={hasText ? NODE_HEIGHT - 12 : NODE_HEIGHT / 2}
                 textAnchor="middle"
                 dominantBaseline={hasText ? 'auto' : 'middle'}
-                fill="#666"
+                fill={colors.mutedText}
                 fontSize="11"
               >
                 {flowType}

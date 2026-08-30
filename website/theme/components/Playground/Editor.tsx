@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, forwardRef, Ref, createRef } from 'react';
 import * as monaco from 'monaco-editor';
-import { type Diagnostic } from '@rslint/wasm';
+import { type Diagnostic } from '@rslint/core/service';
 import './Editor.css';
 
 window.MonacoEnvironment = {

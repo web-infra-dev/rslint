@@ -843,6 +843,45 @@ class A {
 		{
 			Code: `
 class A {
+  field = value++
+  constructor() {}
+  *iterator() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = value++\n  ;\n  *iterator() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
+  field = value--
+  constructor() {}
+  in() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = value--\n  ;\n  in() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
+  field = value++
+  constructor() {}
+  instanceof() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  field = value++\n  ;\n  instanceof() {}\n}"},
+				}},
+			},
+		},
+		{
+			Code: `
+class A {
   method() {}
   constructor() {}
   [0]() {}
@@ -1326,12 +1365,11 @@ class C {
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			HasTypeInfo:  true,
-			ExcludePaths: []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			Program:     lintprogram.NewFromCompiler(program),
+			File:        sourceFile.FileName(),
+			HasTypeInfo: true,
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     NoUselessConstructorRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

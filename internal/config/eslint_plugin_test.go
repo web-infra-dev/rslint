@@ -88,7 +88,7 @@ func TestResolveEnabledRules_PluginGateAndResolution(t *testing.T) {
 			Rules:   Rules{"testplugC/no-null": "error"},
 		},
 	}
-	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", cwd, true)
+	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", cwd)
 	if len(rules) != 1 {
 		t.Fatalf("expected exactly 1 enabled rule, got %d", len(rules))
 	}
@@ -102,14 +102,13 @@ func TestResolveEnabledRules_PluginGateAndResolution(t *testing.T) {
 		t.Errorf("expected SeverityError, got %v", rules[0].Severity)
 	}
 
-	// Prefix NOT declared in `plugins` → the plugin gate (enforcePlugins=true)
-	// drops the rule entirely.
+	// Prefix NOT declared in `plugins` → the plugin gate drops the rule.
 	cfgNoGate := RslintConfig{
 		{
 			Rules: Rules{"testplugC/no-null": "error"},
 		},
 	}
-	rulesNoGate, _ := ResolveEnabledRules(derivedCatalog, cfgNoGate, "/proj/a.ts", cwd, true)
+	rulesNoGate, _ := ResolveEnabledRules(derivedCatalog, cfgNoGate, "/proj/a.ts", cwd)
 	if len(rulesNoGate) != 0 {
 		t.Errorf("expected the gate to drop the rule when its prefix is not declared, got %d", len(rulesNoGate))
 	}
@@ -134,7 +133,7 @@ func TestResolveEnabledRules_SplitEntryGoAndCommunity(t *testing.T) {
 			Rules:   Rules{"testplugSplit/no-foo": "error"},
 		},
 	}
-	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", "/proj", true)
+	rules, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/a.ts", "/proj")
 
 	routing := map[string]bool{} // rule name -> IsEslintPluginRule
 	for _, r := range rules {
@@ -175,7 +174,7 @@ func TestResolveEnabledRulesKeepsGoAndCommunityRules(t *testing.T) {
 			Rules:   Rules{"unicornGap/no-null": "error"},
 		},
 	}
-	gap, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/gap.ts", "/proj", true)
+	gap, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/gap.ts", "/proj")
 	gapRouting := map[string]bool{}
 	for _, r := range gap {
 		gapRouting[r.Name] = r.IsEslintPluginRule
@@ -191,7 +190,7 @@ func TestResolveEnabledRulesKeepsGoAndCommunityRules(t *testing.T) {
 		t.Error("the surviving community rule must keep IsEslintPluginRule=true (routes to the worker)")
 	}
 
-	covered, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/covered.ts", "/proj", true)
+	covered, _ := ResolveEnabledRules(derivedCatalog, cfg, "/proj/covered.ts", "/proj")
 	coveredNames := map[string]bool{}
 	for _, r := range covered {
 		coveredNames[r.Name] = true

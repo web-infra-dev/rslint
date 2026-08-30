@@ -289,8 +289,8 @@ func lintPreferArraySomeWithDemand(program *compiler.Program, sourceFile *ast.So
 		Program:     lintprogram.NewFromCompiler(program),
 		File:        sourceFile.FileName(),
 		HasTypeInfo: true,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     prefer_array_some.PreferArraySomeRule.Name,
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -298,7 +298,6 @@ func lintPreferArraySomeWithDemand(program *compiler.Program, sourceFile *ast.So
 				},
 			}}
 		},
-		ExcludePaths: []string{},
 		Consumer: rule.DiagnosticConsumer{
 			Demand: demand,
 			Report: func(diagnostic rule.RuleDiagnostic) {

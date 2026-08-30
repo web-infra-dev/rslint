@@ -51,13 +51,13 @@ func runNoUnsafeArgumentLenientProgram(
 	}
 
 	var diagnostics []rule.RuleDiagnostic
-	_, err = linter.RunLinter(linter.RunLinterOptions{
-		Programs:       []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
-		SingleThreaded: true,
-		Scope:          linter.FileScope{Files: []string{sourceFile.FileName()}},
-		ExcludePaths:   []string{},
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+	programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         programs,
+		TargetsByProgram: [][]string{{sourceFile.FileName()}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:             NoUnsafeArgumentRule.Name,
 				Severity:         rule.SeverityError,
 				RequiresTypeInfo: true,
@@ -66,6 +66,13 @@ func runNoUnsafeArgumentLenientProgram(
 				},
 			}}
 		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
 		Consumer: rule.DiagnosticConsumer{
 			Demand: rule.EditDemandNone,
 			Report: func(diagnostic rule.RuleDiagnostic) {
@@ -126,6 +133,72 @@ export type InfrastructureLogging = {
 	if got := code[diagnostic.Range.Pos():diagnostic.Range.End()]; got != "tty" {
 		t.Fatalf("logical-AND diagnostic range covers %q, want tty", got)
 	}
+}
+
+func TestNoUnsafeArgumentES5ArrayConstraintSpread(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.es5.json",
+		t,
+		&NoUnsafeArgumentRule,
+		nil,
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+
+function forward<T extends readonly any[]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      5,
+					Column:    17,
+					EndLine:   5,
+					EndColumn: 26,
+				}},
+			},
+			{
+				// The ES5 fallback must retrieve an index type from each array
+				// union rather than requiring the whole type to be an array.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+declare const values: string[] | any[];
+
+acceptStrings(...values);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      5,
+					Column:    15,
+					EndLine:   5,
+					EndColumn: 24,
+				}},
+			},
+			{
+				// Generic array-union constraints take the same fallback after the
+				// checker resolves their base constraint.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+
+function forward<T extends string[] | any[]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      5,
+					Column:    17,
+					EndLine:   5,
+					EndColumn: 26,
+				}},
+			},
+		},
+	)
 }
 
 func TestNoUnsafeArgumentLogicalExpressionBoundaries(t *testing.T) {
@@ -305,11 +378,36 @@ identity(values);
 `,
 			},
 			{
-				// Locks in checkUnsafeArguments()'s non-array iterable spread branch.
+				// A safe iterable element type flows to the rest element type.
 				Code: `
 declare function acceptStrings(...values: string[]): void;
-declare const values: Set<any>;
+declare const values: Set<string>;
 acceptStrings(...values);
+`,
+			},
+			{
+				// The generic constraint supplies the iterable element type.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends Iterable<string>>(values: T): void {
+  acceptStrings(...values);
+}
+forward(new Set<string>());
+`,
+			},
+			{
+				// Any is safe when the iterable feeds a rest parameter that accepts any.
+				Code: `
+declare function acceptAnything(...values: any[]): void;
+declare const values: Set<any>;
+acceptAnything(...values);
+`,
+			},
+			{
+				// Strings use the same iterable yield path without introducing any.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+acceptStrings(...'safe');
 `,
 			},
 			{
@@ -336,6 +434,119 @@ optional();
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				// Locks in upstream FunctionSignature.create(): classify a generic rest parameter through its array constraint.
+				Code: `
+declare function acceptStrings<T extends string[]>(...values: T): void;
+function forward<T extends string[]>(value: any): void {
+  acceptStrings<T>(value);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    20,
+					EndLine:   4,
+					EndColumn: 25,
+				}},
+			},
+			{
+				// A non-array iterable still spreads its element type into the rest parameter.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+declare const values: Set<any>;
+acceptStrings(...values);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    15,
+					EndLine:   4,
+					EndColumn: 24,
+				}},
+			},
+			{
+				// A type parameter gets its iteration type through the generic constraint.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends Iterable<any>>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Line:      4,
+					Column:    17,
+					EndLine:   4,
+					EndColumn: 26,
+				}},
+			},
+			{
+				// Array-like generic constraints reach the same iterable path because T is not itself an array.
+				Code: `
+declare function acceptStrings(...values: string[]): void;
+function forward<T extends readonly any[]>(values: T): void {
+  acceptStrings(...values);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Line:      4,
+					Column:    17,
+					EndLine:   4,
+					EndColumn: 26,
+				}},
+			},
+			{
+				// A non-tuple spread does not consume the next fixed parameter for later arguments.
+				Code: `
+declare function acceptValues(first: string, second: number): void;
+declare const values: string[];
+acceptValues(...values, 1 as any);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    25,
+					EndLine:   4,
+					EndColumn: 33,
+				}},
+			},
+			{
+				// A non-tuple spread preserves the upstream receiver for a later argument even when a rest parameter exists.
+				Code: `
+declare function acceptValues(first: string, ...rest: number[]): void;
+declare const values: string[];
+acceptValues(...values, 1 as any);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `any` assigned to a parameter of type `string`.",
+					Line:      4,
+					Column:    25,
+					EndLine:   4,
+					EndColumn: 33,
+				}},
+			},
+			{
+				// Ordinary array spreads participate in rslint's iterable element-type check.
+				Code: `
+declare function acceptSets(...values: Set<string>[]): void;
+declare const values: Set<any>[];
+acceptSets(...values);
+`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeArgument",
+					Message:   "Unsafe argument of type `Set<any>` assigned to a parameter of type `Set<string>`.",
+					Line:      4,
+					Column:    12,
+					EndLine:   4,
+					EndColumn: 21,
+				}},
+			},
 			{
 				// ---- Dimension 4: one parenthesized argument; ESTree excludes parens ----
 				Code: `

@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"slices"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 )
 
@@ -341,6 +343,159 @@ func VisitDescendants(node *ast.Node, visit func(*ast.Node) bool) {
 		VisitDescendants(child, visit)
 		return false
 	})
+}
+
+// IsJSDocSyntaxNode reports whether node is the root of syntax that tsgo
+// synthesized from a JSDoc comment. Callers performing a depth-first walk can
+// prune the whole subtree as soon as this returns true; ordinary source nodes
+// do not require an ancestor walk.
+func IsJSDocSyntaxNode(node *ast.Node) bool {
+	return node != nil && (node.Flags&(ast.NodeFlagsJSDoc|ast.NodeFlagsReparsed) != 0 || ast.IsJSDocNode(node))
+}
+
+// JSDocTypeCastExpression returns the authored runtime expression inside
+// a JavaScript JSDoc @type or @satisfies cast. ESTree exposes only that
+// expression, while tsgo inserts AsExpression/SatisfiesExpression wrappers and
+// a reparsed type. Walkers should visit the returned expression instead.
+func JSDocTypeCastExpression(node *ast.Node) *ast.Node {
+	if ast.IsJSDocTypeAssertion(node) {
+		assertion := node.AsParenthesizedExpression().Expression
+		if assertion == nil || assertion.Kind != ast.KindAsExpression {
+			return nil
+		}
+		return assertion.AsAsExpression().Expression
+	}
+	if node == nil || !ast.IsInJSFile(node) {
+		return nil
+	}
+	switch node.Kind {
+	case ast.KindAsExpression:
+		expression := node.AsAsExpression()
+		if IsJSDocSyntaxNode(expression.Type) {
+			return expression.Expression
+		}
+	case ast.KindSatisfiesExpression:
+		expression := node.AsSatisfiesExpression()
+		if IsJSDocSyntaxNode(expression.Type) {
+			return expression.Expression
+		}
+	}
+	return nil
+}
+
+// IsJSDocTypeCastWrapper reports whether node is a wrapper that tsgo inserts
+// around a JavaScript JSDoc @type or @satisfies cast.
+func IsJSDocTypeCastWrapper(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.IsJSDocTypeAssertion(node) {
+		return true
+	}
+	if JSDocTypeCastExpression(node) != nil {
+		return true
+	}
+	return node.Kind == ast.KindAsExpression && node.Parent != nil && ast.IsJSDocTypeAssertion(node.Parent)
+}
+
+// ESTreeRuntimeExpression removes syntax that ESTree does not expose around a
+// runtime expression: source parentheses and wrappers synthesized from JSDoc
+// @type/@satisfies casts. Authored TypeScript assertions remain intact.
+func ESTreeRuntimeExpression(node *ast.Node) *ast.Node {
+	for node != nil {
+		node = ast.SkipParentheses(node)
+		if node.Kind != ast.KindAsExpression && node.Kind != ast.KindSatisfiesExpression {
+			return node
+		}
+		expression := JSDocTypeCastExpression(node)
+		if expression == nil {
+			return node
+		}
+		node = expression
+	}
+	return nil
+}
+
+// ESTreeParent returns the first parent that ESTree exposes, skipping source
+// parentheses and wrappers synthesized from JSDoc casts.
+func ESTreeParent(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	parent := node.Parent
+	for parent != nil {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			parent = parent.Parent
+		case ast.KindAsExpression, ast.KindSatisfiesExpression:
+			if !IsJSDocTypeCastWrapper(parent) {
+				return parent
+			}
+			parent = parent.Parent
+		default:
+			return parent
+		}
+	}
+	return nil
+}
+
+// ESTreeMembers removes empty class elements, which tsgo exposes as
+// SemicolonClassElement nodes but ESTree omits from ClassBody.body. The common
+// no-semicolon path returns the AST-owned slice without allocating; filtering
+// clones into a separate backing array so callers cannot rewrite that list.
+func ESTreeMembers(members []*ast.Node) []*ast.Node {
+	for index, member := range members {
+		if member.Kind != ast.KindSemicolonClassElement {
+			continue
+		}
+		filtered := make([]*ast.Node, 0, len(members)-1)
+		filtered = append(filtered, members[:index]...)
+		for _, remaining := range members[index+1:] {
+			if remaining.Kind != ast.KindSemicolonClassElement {
+				filtered = append(filtered, remaining)
+			}
+		}
+		return filtered
+	}
+	return members
+}
+
+// ESTreeParameters returns only parameters authored in source. tsgo prepends
+// a reparsed `this` parameter for JSDoc @this, but ESTree keeps the tag solely
+// as a comment.
+func ESTreeParameters(node *ast.Node) []*ast.Node {
+	return slices.DeleteFunc(slices.Clone(node.Parameters()), IsJSDocSyntaxNode)
+}
+
+// ESTreeTypeParameters returns only type parameters authored in source. tsgo
+// materializes JSDoc @template tags on function-like nodes, while ESTree keeps
+// those tags solely as comments.
+func ESTreeTypeParameters(node *ast.Node) []*ast.Node {
+	return slices.DeleteFunc(slices.Clone(node.TypeParameters()), IsJSDocSyntaxNode)
+}
+
+// ESTreeType returns the source-authored type annotation, excluding a type
+// that tsgo copied from JSDoc onto an otherwise ordinary declaration.
+func ESTreeType(node *ast.Node) *ast.Node {
+	typeNode := node.Type()
+	if IsJSDocSyntaxNode(typeNode) {
+		return nil
+	}
+	return typeNode
+}
+
+// ESTreeModifierFlags excludes modifiers synthesized from JSDoc tags such as
+// @private and @override.
+func ESTreeModifierFlags(node *ast.Node) ast.ModifierFlags {
+	var flags ast.ModifierFlags
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if !IsJSDocSyntaxNode(modifier) {
+				flags |= ast.ModifierToFlag(modifier.Kind)
+			}
+		}
+	}
+	return flags
 }
 
 // IsInJSDocSyntax reports whether node came from syntax parsed inside a JSDoc

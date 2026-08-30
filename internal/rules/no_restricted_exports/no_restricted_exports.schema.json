@@ -15,7 +15,7 @@
             },
             "restrictedNamedExportsPattern": {
               "type": "string",
-              "format": "regex"
+              "format": "regex-u"
             }
           },
           "additionalProperties": false
@@ -33,7 +33,7 @@
             },
             "restrictedNamedExportsPattern": {
               "type": "string",
-              "format": "regex"
+              "format": "regex-u"
             },
             "restrictDefaultExports": {
               "type": "object",

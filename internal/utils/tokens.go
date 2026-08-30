@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"sort"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -15,6 +17,8 @@ type SourceToken struct {
 	Start, End int
 	Text       string
 }
+
+var sourceTokenIndexKey = ast.NewSourceFileDataKey[[]SourceToken]()
 
 // Range returns the token's source span.
 func (t SourceToken) Range() core.TextRange {
@@ -68,67 +72,19 @@ func TokenAtOrAfter(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
 }
 
 // TokenBeforePosition returns the last non-trivia parser token whose end is
-// not after pos. It corrects regular-expression literals that the standalone
-// scanner initially sees as division punctuators.
+// not after pos. Reading the parsed tree preserves lexical context across
+// templates and recognizes regular-expression literals as single tokens.
 func TokenBeforePosition(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
-	sourceText := sourceFile.Text()
-	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
-
-	var previous SourceToken
-	found := false
-	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < pos {
-		if scan.TokenEnd() <= pos {
-			previous = SourceToken{
-				Kind:  scan.Token(),
-				Start: scan.TokenStart(),
-				End:   scan.TokenEnd(),
-				Text:  sourceTokenText(sourceText, scan.Token(), scan.TokenStart(), scan.TokenEnd()),
-			}
-			found = true
-		}
-		scan.Scan()
-	}
-	// A standalone TypeScript scanner tokenizes `/pattern/flags` as division
-	// punctuators plus identifiers; the parser is what recognizes that span as a
-	// regular-expression literal. Recover the parser token so callers observe
-	// the same token boundary ESLint's SourceCode API exposes.
-	if found {
-		container := ast.GetNodeAtPosition(sourceFile, previous.Start, false)
-		if token := parsedTokenContainingPosition(container, previous.Start); token != nil &&
-			ast.IsRegularExpressionLiteral(token) {
-			textRange := TrimNodeTextRange(sourceFile, token)
-			if textRange.End() <= pos {
-				previous = SourceToken{
-					Kind:  ast.KindRegularExpressionLiteral,
-					Start: textRange.Pos(),
-					End:   textRange.End(),
-					Text:  sourceText[textRange.Pos():textRange.End()],
-				}
-			}
-		}
-	}
-	return previous, found
-}
-
-func parsedTokenContainingPosition(node *ast.Node, pos int) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	if ast.IsTokenKind(node.Kind) {
-		if node.Pos() <= pos && pos < node.End() {
-			return node
-		}
-		return nil
-	}
-
-	var found *ast.Node
-	node.ForEachChild(func(child *ast.Node) bool {
-		if child.Pos() <= pos && pos < child.End() {
-			found = parsedTokenContainingPosition(child, pos)
-		}
-		return found != nil
+	tokens := ast.GetOrComputeSourceFileData(sourceFile, sourceTokenIndexKey, func(sourceFile *ast.SourceFile) []SourceToken {
+		return TokensOfNode(sourceFile, sourceFile.AsNode())
 	})
-	return found
+	index := sort.Search(len(tokens), func(index int) bool {
+		return tokens[index].End > pos
+	})
+	if index == 0 {
+		return SourceToken{}, false
+	}
+	return tokens[index-1], true
 }
 
 // PreviousTokenBefore returns the last token in node whose end is not after pos.
@@ -187,6 +143,18 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 	if scanner.IsIdentifierPart(leftRune) && scanner.IsIdentifierPart(rightRune) {
 		return false
 	}
+	if scanner.IsIdentifierPart(leftRune) && startsWithEscapedIdentifier(right) {
+		return false
+	}
+	// Keep a regexp delimiter distinct from a word-like token, and keep a
+	// trailing decimal point from swallowing the following word operator.
+	// These boundaries occur when fixes move regexp and `1.` literals next to
+	// statement keywords or operators such as `in`, `as`, and `satisfies`.
+	if (scanner.IsIdentifierPart(leftRune) && rightRune == '/' && startsWithRegularExpressionLiteral(right)) ||
+		(leftRune == '/' && scanner.IsIdentifierPart(rightRune) && endsWithRegularExpressionLiteral(left)) ||
+		(leftRune == '.' && scanner.IsIdentifierPart(rightRune)) {
+		return false
+	}
 	if (leftRune == '+' && rightRune == '+') || (leftRune == '-' && rightRune == '-') {
 		return false
 	}
@@ -196,14 +164,37 @@ func CanTokenTextsBeAdjacent(left string, right string) bool {
 	return true
 }
 
-func sourceTokenText(sourceText string, kind ast.Kind, start int, end int) string {
-	if start >= 0 && start < end && end <= len(sourceText) {
-		return sourceText[start:end]
+func startsWithRegularExpressionLiteral(text string) bool {
+	tokens := tokensOfText(text)
+	return len(tokens) > 0 &&
+		tokens[0].Start == 0 &&
+		tokens[0].Kind == ast.KindRegularExpressionLiteral &&
+		ecmascript.IsValidRegexLiteral(tokens[0].Text)
+}
+
+func endsWithRegularExpressionLiteral(text string) bool {
+	tokens := tokensOfText(text)
+	return len(tokens) > 0 &&
+		tokens[len(tokens)-1].End == len(text) &&
+		tokens[len(tokens)-1].Kind == ast.KindRegularExpressionLiteral &&
+		ecmascript.IsValidRegexLiteral(tokens[len(tokens)-1].Text)
+}
+
+func tokensOfText(text string) []SourceToken {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/token-adjacency.ts",
+		Path:     "/token-adjacency.ts",
+	}, text, core.ScriptKindTS)
+	return TokensOfNode(sourceFile, sourceFile.AsNode())
+}
+
+func startsWithEscapedIdentifier(text string) bool {
+	if text == "" || text[0] != '\\' {
+		return false
 	}
-	if text := scanner.TokenToString(kind); text != "" {
-		return text
-	}
-	return kind.String()
+	s := scanner.NewScanner()
+	s.SetText(text)
+	return s.Scan() == ast.KindIdentifier && s.TokenStart() == 0
 }
 
 // IsSameLine reports whether two positions are on the same ECMAScript line.

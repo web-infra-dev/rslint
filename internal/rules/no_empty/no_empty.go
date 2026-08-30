@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -30,8 +32,9 @@ var NoEmptyRule = rule.Rule{
 					return
 				}
 
-				// A function is generally allowed to be empty
-				if isFunction(node.Parent) {
+				// Function bodies and class static blocks are distinct ESTree node
+				// types, so ESLint's BlockStatement listener does not inspect them.
+				if ast.IsFunctionLikeOrClassStaticBlockDeclaration(node.Parent) {
 					return
 				}
 
@@ -40,17 +43,16 @@ var NoEmptyRule = rule.Rule{
 					return
 				}
 
-				// Allow blocks with comments inside
-				// For empty blocks, we check the source text for comment patterns
-				// This is safe because there are no statements (so no string literals to confuse)
-				if hasCommentInside(ctx.SourceFile.Text(), node.Pos(), node.End()) {
+				text := ctx.SourceFile.Text()
+				blockRange := core.NewTextRange(scanner.SkipTrivia(text, node.Pos()), node.End())
+				innerRange := bracedInnerRange(blockRange)
+				// An empty Block cannot contain strings, templates, regex literals,
+				// or JSX, so a comment opener in its inner source is a real comment.
+				if hasCommentInside(text, innerRange.Pos(), innerRange.End()) {
 					return
 				}
 
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "unexpected",
-					Description: "Empty block statement.",
-				})
+				reportEmptyStatement(ctx, blockRange, innerRange, "block")
 			},
 
 			ast.KindSwitchStatement: func(node *ast.Node) {
@@ -64,49 +66,84 @@ var NoEmptyRule = rule.Rule{
 					return
 				}
 
-				// Report if the switch has no cases
-				if caseBlock.Clauses == nil || len(caseBlock.Clauses.Nodes) == 0 {
-					// Allow switch statements with comments inside
-					if hasCommentInside(ctx.SourceFile.Text(), switchStmt.CaseBlock.Pos(), switchStmt.CaseBlock.End()) {
-						return
-					}
-
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "unexpected",
-						Description: "Empty switch statement.",
-					})
+				if caseBlock.Clauses != nil && len(caseBlock.Clauses.Nodes) != 0 {
+					return
 				}
+
+				text := ctx.SourceFile.Text()
+				caseBlockRange := core.NewTextRange(scanner.SkipTrivia(text, switchStmt.CaseBlock.Pos()), switchStmt.CaseBlock.End())
+				innerRange := bracedInnerRange(caseBlockRange)
+				if hasCommentInside(text, innerRange.Pos(), innerRange.End()) {
+					return
+				}
+
+				reportEmptyStatement(ctx, caseBlockRange, innerRange, "switch")
 			},
 		}
 	},
 }
 
-// hasCommentInside checks if there is a comment between the opening and closing braces
+func reportEmptyStatement(ctx rule.RuleContext, statementRange, innerRange core.TextRange, statementType string) {
+	ctx.ReportRangeWithDeferredSuggestions(statementRange, emptyStatementMessage(statementType), func() []rule.RuleSuggestion {
+		return []rule.RuleSuggestion{{
+			Message: suggestCommentMessage(statementType),
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(innerRange, " /* empty */ "),
+			},
+		}}
+	})
+}
+
+func emptyStatementMessage(statementType string) rule.RuleMessage {
+	description := "Empty block statement."
+	if statementType == "switch" {
+		description = "Empty switch statement."
+	}
+	return rule.RuleMessage{
+		Id:          "unexpected",
+		Description: description,
+		Data:        map[string]string{"type": statementType},
+	}
+}
+
+func suggestCommentMessage(statementType string) rule.RuleMessage {
+	description := "Add comment inside empty block statement."
+	if statementType == "switch" {
+		description = "Add comment inside empty switch statement."
+	}
+	return rule.RuleMessage{
+		Id:          "suggestComment",
+		Description: description,
+		Data:        map[string]string{"type": statementType},
+	}
+}
+
+func bracedInnerRange(statementRange core.TextRange) core.TextRange {
+	if statementRange.End() <= statementRange.Pos()+1 {
+		return core.NewTextRange(statementRange.Pos(), statementRange.Pos())
+	}
+	return core.NewTextRange(statementRange.Pos()+1, statementRange.End()-1)
+}
+
+// hasCommentInside reports whether the half-open source range contains a line
+// or block comment opener. Callers pass only the trivia inside a syntactically
+// empty braced node, where either opener necessarily denotes a real comment.
 func hasCommentInside(text string, pos, end int) bool {
 	if pos < 0 || end > len(text) || pos >= end {
 		return false
 	}
 
-	bodyText := text[pos:end]
-	// Find the opening brace
-	openIdx := strings.IndexByte(bodyText, '{')
-	if openIdx < 0 {
-		return false
-	}
-
-	// Check text between { and } for comment patterns
-	inner := bodyText[openIdx+1:]
-	return strings.Contains(inner, "//") || strings.Contains(inner, "/*")
-}
-
-func isFunction(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return true
+	inner := text[pos:end]
+	for searchStart := 0; searchStart < len(inner); {
+		offset := strings.IndexByte(inner[searchStart:], '/')
+		if offset < 0 {
+			return false
+		}
+		slash := searchStart + offset
+		if slash+1 < len(inner) && (inner[slash+1] == '/' || inner[slash+1] == '*') {
+			return true
+		}
+		searchStart = slash + 1
 	}
 	return false
 }

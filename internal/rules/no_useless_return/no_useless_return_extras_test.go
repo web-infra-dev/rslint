@@ -52,6 +52,19 @@ func TestNoUselessReturnExtras(t *testing.T) {
 			{Code: `function f() { throw e; try { for (var i = 0;; i++) { break; } return 1; } catch (e) { return; } }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- JSDoc traversal boundary: the annotation is comment metadata,
+			// while the authored ReturnStatement is still visited exactly once. ----
+			// ESLint 10.9.0 with @typescript-eslint/parser 8.67.0 reports this
+			// single runtime return at the same range.
+			{
+				Code:     `/** @returns {void} */ function f(){ return; } f();`,
+				FileName: "jsdoc-return.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Output:   []string{`/** @returns {void} */ function f(){  } f();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryReturn", Line: 1, Column: 38, EndLine: 1, EndColumn: 45},
+				},
+			},
 			// ---- Dimension 4: declaration / container forms — a code path root of every shape the rule can report in ----
 			{
 				Code:   `function f() { return; }`,
@@ -449,11 +462,10 @@ function third() { g(); return /* keep */; }`,
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			ExcludePaths: []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			Program: lintprogram.NewFromCompiler(program),
+			File:    sourceFile.FileName(),
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     NoUselessReturnRule.Name,
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

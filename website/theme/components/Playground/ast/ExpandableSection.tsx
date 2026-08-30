@@ -17,16 +17,20 @@ export const ExpandableSection: React.FC<ExpandableSectionProps> = ({
   return (
     <div className="my-1">
       <button
-        className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100"
+        className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
         onClick={() => setOpen(!open)}
       >
         <ChevronRightIcon
           className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-90' : ''}`}
         />
-        <span className="font-medium text-blue-700">{title}</span>
+        <span className="font-medium text-blue-700 dark:text-blue-400">
+          {title}
+        </span>
       </button>
       {open && (
-        <div className="ml-4 border-l border-gray-200 pl-2">{children}</div>
+        <div className="ml-4 border-l border-gray-200 pl-2 dark:border-gray-700">
+          {children}
+        </div>
       )}
     </div>
   );

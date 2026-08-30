@@ -1,7 +1,16 @@
-import { useState, useRef, useEffect, useImperativeHandle, Ref } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useImperativeHandle,
+  Ref,
+  ReactNode,
+} from 'react';
 import * as monaco from 'monaco-editor';
 import { jsonDefaults } from 'monaco-editor/languages/features/json/register';
-import { type Diagnostic } from '@rslint/wasm';
+import { type Diagnostic } from '@rslint/core/service';
+import { useDark } from '@rspress/core/runtime';
 import { Button } from '@components/ui/button';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
@@ -44,6 +53,7 @@ interface EditorTabsProps {
   onChange: (value: string) => void;
   onSelectionChange?: (start: number, end: number) => void;
   onConfigChange?: () => void;
+  toolbarEnd?: ReactNode;
 }
 
 const DEFAULT_RSLINT_CONFIG = `[
@@ -88,8 +98,11 @@ export const EditorTabs = ({
   onChange,
   onSelectionChange,
   onConfigChange,
+  toolbarEnd,
 }: EditorTabsProps) => {
   const [activeTab, setActiveTab] = useState<EditorTabType>('code');
+  const isDark = useDark();
+  const editorTheme = isDark ? 'vs-dark' : 'vs';
 
   const codeEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(
     null,
@@ -110,10 +123,21 @@ export const EditorTabs = ({
   const hoverHighlightDecorationIds = useRef<string[]>([]);
   const isEditingRef = useRef<boolean>(false);
   const editingTimer = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  const onConfigChangeRef = useRef(onConfigChange);
 
   // Store last valid parsed configs
   const lastValidRslintConfig = useRef<any>(null);
   const lastValidTsConfig = useRef<any>(null);
+
+  // Monaco keeps these subscriptions for the editor lifetime, so forward them
+  // through refs instead of retaining callbacks from the initial render.
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+    onSelectionChangeRef.current = onSelectionChange;
+    onConfigChangeRef.current = onConfigChange;
+  }, [onChange, onSelectionChange, onConfigChange]);
 
   function getInitialCode(): string {
     if (typeof window === 'undefined') {
@@ -296,19 +320,21 @@ export const EditorTabs = ({
     const editor = monaco.editor.create(codeContainerRef.current, {
       value: getInitialCode(),
       language: 'typescript',
+      theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     codeEditorRef.current = editor;
 
     // Trigger initial onChange
     const initialVal = editor.getValue() || '';
-    onChange(initialVal);
+    onChangeRef.current(initialVal);
     scheduleSerializeToUrl(initialVal);
 
     editor.onDidChangeModelContent(() => {
       const val = editor.getValue() || '';
-      onChange(val);
+      onChangeRef.current(val);
       scheduleSerializeToUrl(val);
 
       // Mark as editing to prevent AST tree selection during typing
@@ -347,7 +373,7 @@ export const EditorTabs = ({
         lineNumber: sel.endLineNumber,
         column: sel.endColumn,
       });
-      onSelectionChange?.(
+      onSelectionChangeRef.current?.(
         Math.min(startOffset, endOffset),
         Math.max(startOffset, endOffset),
       );
@@ -372,20 +398,22 @@ export const EditorTabs = ({
     });
   }, []);
 
-  // Create rslint.json editor
+  // Create the serialized config editor used by the low-level API.
   useEffect(() => {
     if (!rslintContainerRef.current) return;
 
     const editor = monaco.editor.create(rslintContainerRef.current, {
       value: DEFAULT_RSLINT_CONFIG,
       language: 'json',
+      theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     rslintEditorRef.current = editor;
 
     editor.onDidChangeModelContent(() => {
-      onConfigChange?.();
+      onConfigChangeRef.current?.();
     });
 
     return () => {
@@ -400,13 +428,15 @@ export const EditorTabs = ({
     const editor = monaco.editor.create(tsconfigContainerRef.current, {
       value: DEFAULT_TSCONFIG,
       language: 'json',
+      theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
+      fixedOverflowWidgets: true,
     });
     tsconfigEditorRef.current = editor;
 
     editor.onDidChangeModelContent(() => {
-      onConfigChange?.();
+      onConfigChangeRef.current?.();
     });
 
     return () => {
@@ -414,28 +444,34 @@ export const EditorTabs = ({
     };
   }, []);
 
+  useEffect(() => {
+    monaco.editor.setTheme(editorTheme);
+  }, [editorTheme]);
+
   const tabs: { key: EditorTabType; label: string }[] = [
     { key: 'code', label: 'Code' },
-    { key: 'rslint', label: 'rslint.json' },
+    { key: 'rslint', label: 'Config (JSON)' },
     { key: 'tsconfig', label: 'tsconfig' },
   ];
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="flex items-center gap-2 bg-gray-50 p-2 flex-shrink-0">
-        {tabs.map((tab) => (
-          <Button
-            key={tab.key}
-            type="button"
-            variant={activeTab === tab.key ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTab(tab.key)}
-            aria-pressed={activeTab === tab.key}
-            className="dark:text-accent dark:border-muted/20"
-          >
-            {tab.label}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-2 bg-[var(--rp-c-bg-soft)] p-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.key}
+              type="button"
+              variant={activeTab === tab.key ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab(tab.key)}
+              aria-pressed={activeTab === tab.key}
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+        {toolbarEnd}
       </div>
       <div className="flex-1 relative overflow-visible">
         <div

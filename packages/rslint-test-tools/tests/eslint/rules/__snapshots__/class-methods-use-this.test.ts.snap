@@ -1,0 +1,2238 @@
+// Rstest Snapshot v1
+
+exports[`class-methods-use-this > invalid 1`] = `
+{
+  "code": "class A { foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 2`] = `
+{
+  "code": "class A { foo() {/**this**/} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 3`] = `
+{
+  "code": "class A { foo() {var a = function () {this};} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 4`] = `
+{
+  "code": "class A { foo() {var a = function () {var b = function(){this}};} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 5`] = `
+{
+  "code": "class A { foo() {window.this} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 6`] = `
+{
+  "code": "class A { foo() {that.this = 'this';} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 7`] = `
+{
+  "code": "class A { foo() { () => undefined; } }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 8`] = `
+{
+  "code": "class A { foo() {} bar() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 9`] = `
+{
+  "code": "class A { foo() {} hasOwnProperty() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'hasOwnProperty'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 10`] = `
+{
+  "code": "class A { [foo]() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 11`] = `
+{
+  "code": "class A { #foo() { } foo() {} #bar() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class private method #bar.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 12`] = `
+{
+  "code": "class A { foo(){} 'bar'(){} 123(){} [\`baz\`](){} [a](){} [f(a)](){} get quux(){} set[a](b){} *quuux(){} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class method 'bar'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class method '123'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class method 'baz'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class getter 'quux'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 68,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class setter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 87,
+          "line": 1,
+        },
+        "start": {
+          "column": 81,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+    {
+      "message": "Expected 'this' to be used by class generator method 'quuux'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 99,
+          "line": 1,
+        },
+        "start": {
+          "column": 93,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 9,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 13`] = `
+{
+  "code": "class A { foo = function() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 14`] = `
+{
+  "code": "class A { foo = () => {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 15`] = `
+{
+  "code": "class A { #foo = function() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #foo.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 16`] = `
+{
+  "code": "class A { #foo = () => {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #foo.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 17`] = `
+{
+  "code": "class A { #foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #foo.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 18`] = `
+{
+  "code": "class A { get #foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private getter #foo.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 19`] = `
+{
+  "code": "class A { set #foo(x) {} }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private setter #foo.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 20`] = `
+{
+  "code": "class A { foo () { return class { foo = this }; } }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 21`] = `
+{
+  "code": "class A { foo () { return function () { foo = this }; } }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 22`] = `
+{
+  "code": "class A { foo () { return class { static { this; } } } }",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 23`] = `
+{
+  "code": "
+  class Foo {
+    method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 24`] = `
+{
+  "code": "
+  class Foo {
+    private method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 25`] = `
+{
+  "code": "
+  class Foo {
+    protected method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 26`] = `
+{
+  "code": "
+  class Foo {
+	accessor method = function () {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class function.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 27`] = `
+{
+  "code": "
+  class Foo {
+    accessor method = () => {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class arrow function.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 28`] = `
+{
+  "code": "
+  class Foo {
+    private accessor method = () => {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class arrow function.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 34,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 29`] = `
+{
+  "code": "
+  class Foo {
+    protected accessor method = () => {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class arrow function.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 36,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 30`] = `
+{
+  "code": "
+	class A {
+		foo() {
+			return class {
+				accessor bar = this;
+			};
+		}
+	}
+			",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'foo'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 31`] = `
+{
+  "code": "
+  class Derived extends Base {
+    override method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 32`] = `
+{
+  "code": "
+  class Derived extends Base {
+    property = () => {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 33`] = `
+{
+  "code": "
+  class Derived extends Base {
+    public property = () => {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 34`] = `
+{
+  "code": "
+  class Derived extends Base {
+    override property = () => {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 35`] = `
+{
+  "code": "
+  class Foo {
+    #method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 36`] = `
+{
+  "code": "
+  class Foo {
+    get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 37`] = `
+{
+  "code": "
+  class Foo {
+    private get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 38`] = `
+{
+  "code": "
+  class Foo {
+    protected get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 39`] = `
+{
+  "code": "
+  class Foo {
+    get #getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private getter #getter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 40`] = `
+{
+  "code": "
+  class Foo {
+    private set setter(b: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 41`] = `
+{
+  "code": "
+  class Foo {
+    protected set setter(b: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 42`] = `
+{
+  "code": "
+  class Foo {
+    set #setter(b: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private setter #setter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 43`] = `
+{
+  "code": "
+  function fn() {
+    this.foo = 303;
+
+    class Foo {
+      method() {}
+    }
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 6,
+        },
+        "start": {
+          "column": 7,
+          "line": 6,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 44`] = `
+{
+  "code": "
+  class Foo {
+    override method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 45`] = `
+{
+  "code": "
+  class Foo {
+    override get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 46`] = `
+{
+  "code": "
+  class Foo {
+    override set setter(v: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 47`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    override method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 48`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    override get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 49`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    override set setter(v: number) {}
+  }
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 50`] = `
+{
+  "code": "
+  class Foo {
+    override property = () => {};
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 51`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    override property = () => {};
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 52`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 53`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    #method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 54`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    #method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 55`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    private method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 56`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    protected method() {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 57`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 58`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    get #getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private getter #getter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 59`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    get #getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private getter #getter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 60`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    private get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 61`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    protected get getter(): number {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 62`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    set setter(v: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 63`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    set #setter(v: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private setter #setter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 64`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    set #setter(v: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private setter #setter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 65`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    private set setter(v: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 66`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    protected set setter(v: number) {}
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 67`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    property = () => {};
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 68`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    #property = () => {};
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #property.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 69`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    #property = () => {};
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #property.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 70`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    private property = () => {};
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 71`] = `
+{
+  "code": "
+  class Foo implements Bar {
+    protected property = () => {};
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 72`] = `
+{
+  "code": "const Foo = class implements Bar { method() {} };",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 73`] = `
+{
+  "code": "const Foo = class implements Bar { private method() {} };",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

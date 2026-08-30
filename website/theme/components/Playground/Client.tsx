@@ -1,22 +1,19 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import * as Rslint from '@rslint/wasm';
 import { EditorTabs, EditorTabsRef } from './EditorTabs';
 import { ResultPanel, Diagnostic } from './ResultPanel';
 import './Client.css';
 import { RemoteSourceFile, type Node, SyntaxKind } from '@rslint/api';
 import { ResizableSplitPane, type GetAstInfoResponse } from './ast';
-
-const wasmURL = new URL('@rslint/wasm/rslint.wasm.gz', import.meta.url).href;
-let rslintService: Rslint.RSLintService | null = null;
-
-async function ensureService() {
-  if (!rslintService) {
-    rslintService = await Rslint.initialize({
-      wasmURL: wasmURL,
-    });
-  }
-  return rslintService;
-}
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/theme/components/ui/select';
+import { ensureWasmService, fetchWasmVersions } from './wasm';
 
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorTabsRef | null>(null);
@@ -31,17 +28,53 @@ const Playground: React.FC = () => {
   const lastSourceTextRef = useRef<string>('');
   const [loading, setLoading] = useState(true);
   const lintTimer = useRef<number | null>(null);
+  const latestLintRunIdRef = useRef(0);
   const [selectedAstRange, setSelectedAstRange] = useState<
     { start: number; end: number; kind?: number } | undefined
   >();
   const [astInfo, setAstInfo] = useState<GetAstInfoResponse | null>(null);
   const [astInfoLoading, setAstInfoLoading] = useState(false);
+  const [wasmVersions, setWasmVersions] = useState<string[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState<string>();
+  const selectedVersionRef = useRef<string | undefined>(undefined);
 
-  async function runLint() {
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchWasmVersions(controller.signal)
+      .then((versions) => {
+        setWasmVersions(versions);
+        setSelectedVersion(versions[0]);
+      })
+      .catch((versionError) => {
+        if (
+          versionError instanceof DOMException &&
+          versionError.name === 'AbortError'
+        ) {
+          return;
+        }
+        const message =
+          versionError instanceof Error
+            ? versionError.message
+            : String(versionError);
+        setError(`Failed to load @rslint/wasm versions: ${message}`);
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  function isCurrentLintRun(runId: number, version: string) {
+    return (
+      latestLintRunIdRef.current === runId &&
+      selectedVersionRef.current === version
+    );
+  }
+
+  async function runLint(version: string, runId: number) {
     try {
       setError(undefined);
       if (!initialized) setLoading(true);
-      const service = await ensureService();
+      const service = await ensureWasmService(version);
+      if (!isCurrentLintRun(runId, version)) return;
       const code = editorRef.current?.getValue() ?? '';
       const rslintConfig = editorRef.current?.getRslintConfig();
       const tsConfig = editorRef.current?.getTsConfig();
@@ -57,7 +90,7 @@ const Playground: React.FC = () => {
       }
 
       // The JavaScript API takes the config object directly (Go no longer reads
-      // /rslint.json from the VFS). configDirectory is the memfs root where
+      // a config file from the VFS). configDirectory is the memfs root where
       // tsconfig.json lives, so the config's relative `project` resolves.
       // rules (with their options) travel inside the config entries; there is
       // no separate ruleOptions surface.
@@ -69,6 +102,7 @@ const Playground: React.FC = () => {
           : undefined,
         configDirectory: '/',
       });
+      if (!isCurrentLintRun(runId, version)) return;
       setInitialized(true);
 
       // Convert diagnostics to the expected format
@@ -144,34 +178,57 @@ const Playground: React.FC = () => {
         await buildTypeScriptAst(lastSourceTextRef.current);
       }
     } catch (err) {
+      if (!isCurrentLintRun(runId, version)) return;
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Linting failed: ${errorMessage}`);
     } finally {
-      setLoading(false);
+      if (isCurrentLintRun(runId, version)) setLoading(false);
     }
   }
 
   // Debounce linting to reduce recomputation while typing (1 second delay)
   function scheduleRunLint() {
+    // Invalidate an in-flight result as soon as its input becomes stale.
+    const runId = ++latestLintRunIdRef.current;
     if (lintTimer.current) {
       window.clearTimeout(lintTimer.current);
       lintTimer.current = null;
     }
     lintTimer.current = window.setTimeout(() => {
-      runLint();
+      lintTimer.current = null;
+      const version = selectedVersionRef.current;
+      if (version) void runLint(version, runId);
     }, 1000);
   }
 
   // Cleanup any pending timers on unmount
   useEffect(() => {
     return () => {
+      latestLintRunIdRef.current++;
       if (lintTimer.current) {
         window.clearTimeout(lintTimer.current);
         lintTimer.current = null;
       }
     };
   }, []);
-  // Initial lint is triggered by Editor's initial onChange
+
+  useEffect(() => {
+    selectedVersionRef.current = selectedVersion;
+    const runId = ++latestLintRunIdRef.current;
+    if (lintTimer.current) {
+      window.clearTimeout(lintTimer.current);
+      lintTimer.current = null;
+    }
+    if (!selectedVersion) return;
+    setInitialized(false);
+    setDiagnostics([]);
+    setAst(undefined);
+    setAstTree(undefined);
+    setTsAstTree(undefined);
+    setAstInfo(null);
+    setLoading(true);
+    void runLint(selectedVersion, runId);
+  }, [selectedVersion]);
 
   // Get AST info at a specific position - updates global state for main panel
   const handleRequestAstInfo = useCallback(
@@ -185,7 +242,7 @@ const Playground: React.FC = () => {
 
       try {
         setAstInfoLoading(true);
-        const service = await ensureService();
+        const service = await ensureWasmService(selectedVersion!);
         const code = editorRef.current?.getValue() ?? '';
         const tsConfig = editorRef.current?.getTsConfig();
 
@@ -208,7 +265,7 @@ const Playground: React.FC = () => {
         setAstInfoLoading(false);
       }
     },
-    [initialized],
+    [initialized, selectedVersion],
   );
 
   // Fetch AST info for lazy loading - does NOT update global state
@@ -222,7 +279,7 @@ const Playground: React.FC = () => {
       if (!initialized) return null;
 
       try {
-        const service = await ensureService();
+        const service = await ensureWasmService(selectedVersion!);
         const code = editorRef.current?.getValue() ?? '';
         const tsConfig = editorRef.current?.getTsConfig();
 
@@ -241,7 +298,7 @@ const Playground: React.FC = () => {
         return null;
       }
     },
-    [initialized],
+    [initialized, selectedVersion],
   );
 
   async function buildTypeScriptAst(text: string) {
@@ -307,6 +364,34 @@ const Playground: React.FC = () => {
                 })
               }
               onConfigChange={() => scheduleRunLint()}
+              toolbarEnd={
+                <div className="flex items-center">
+                  <Select
+                    value={selectedVersion}
+                    onValueChange={setSelectedVersion}
+                  >
+                    <SelectTrigger
+                      size="sm"
+                      aria-label="Select @rslint/wasm version"
+                      disabled={wasmVersions.length === 0}
+                    >
+                      <SelectValue placeholder="Loading...">
+                        {selectedVersion ? `v${selectedVersion}` : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Rslint Core</SelectLabel>
+                        {wasmVersions.map((version) => (
+                          <SelectItem key={version} value={version}>
+                            v{version}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              }
             />
           </div>
         }

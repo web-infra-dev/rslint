@@ -14,11 +14,11 @@
 
 Rslint is a high-performance, ESLint-compatible linter for JavaScript and TypeScript.
 
-Powered by [typescript-go](https://github.com/microsoft/typescript-go), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
+Powered by [TypeScript's native compiler](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
 
 ## ✨ Goals
 
-- 🚀 **Lightning Fast**: Powered by typescript-go, delivering 20-40x faster linting performance compared to traditional ESLint setups.
+- 🚀 **Lightning Fast**: Powered by TypeScript's native compiler, delivering 20-40x faster linting performance compared to traditional ESLint setups.
 - ⚡ **Minimal Configuration**: Typed linting enabled by default with minimal setup required — no complex configuration needed.
 - 📦 **Best Effort ESLint Compatible**: Compatible with most ESLint and TypeScript-ESLint configurations, significantly reducing migration costs.
 - 🎯 **TypeScript First**: Uses TypeScript Compiler semantics as the single source of truth, ensuring 100% consistency and eliminating edge-case bugs.
@@ -29,10 +29,7 @@ Powered by [typescript-go](https://github.com/microsoft/typescript-go), it deliv
 
 ## ✅ Current Status
 
-> [!NOTE]
-> Rslint is currently in an experimental phase but is under active development.
-
-Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), building upon the innovative proof-of-concept work by [@auvred](https://github.com/auvred). We decided to continue development as tsgolint has no current plans for continued development ([reference](https://x.com/bradzacher/status/1943475629376282998)).
+Rslint provides built-in support for 500+ high-performance rules, all implemented natively, including all [typescript-eslint](https://typescript-eslint.io/) rules and nearly all rules from [`@eslint/js`](https://www.npmjs.com/package/@eslint/js). It is also compatible with ESLint flat config and most ESLint plugins, making it easier to adopt in existing ESLint projects.
 
 ## 🚀 Getting Started
 

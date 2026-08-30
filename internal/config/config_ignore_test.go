@@ -249,7 +249,7 @@ func TestIsFileIgnored_MultiLevelNegateAndReIgnore(t *testing.T) {
 }
 
 func TestIsFileIgnoredSimple_Negation(t *testing.T) {
-	// isFileIgnoredSimple is the fallback when cwd is empty (JSON config path)
+	// isFileIgnoredSimple is the fallback when no authored base is available.
 	tests := []struct {
 		name         string
 		filePath     string
@@ -294,7 +294,7 @@ func TestIsFileIgnoredSimple_Negation(t *testing.T) {
 }
 
 func TestGetConfigForFile_NegationWithEmptyCwd(t *testing.T) {
-	// JSON config path uses empty cwd → isFileIgnoredSimple
+	// An empty authored base uses isFileIgnoredSimple.
 	config := RslintConfig{
 		{
 			Ignores: []string{"vendor/**/*", "!vendor/keep/**/*"},

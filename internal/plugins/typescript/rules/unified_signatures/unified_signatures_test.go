@@ -27,6 +27,23 @@ func TestUnifiedSignaturesRule(t *testing.T) {
 			{Code: `class C { constructor(); constructor(x: number, y: string); }`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Upstream @typescript-eslint 8.67.0 compares the closest preceding block
+			// comment's raw value when ignoreOverloadsWithDifferentJSDoc is enabled.
+			// Keep this skipped until the rule's existing TODO implementation is ported;
+			// implementing unified-signatures is intentionally outside PR #1877.
+			{
+				Code: `
+/** @deprecated */
+declare function f(x: number): unknown;
+/** @deprecated */
+declare function f(x: boolean): unknown;
+`,
+				Options: []any{map[string]any{"ignoreOverloadsWithDifferentJSDoc": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "singleParameterDifference", Line: 5, Column: 20},
+				},
+				Skip: true,
+			},
 			// NOTE: These test cases are placeholders
 			// Full implementation would detect overloads that can be unified
 			// For now, the rule doesn't report any errors (TODO implementation)

@@ -153,6 +153,10 @@ func compileSchemaJSON(rawJSON []byte) (*jsonschema.Schema, any, error) {
 	c := jsonschema.NewCompiler()
 	c.DefaultDraft(jsonschema.Draft4)
 	c.UseRegexpEngine(jsRegexpEngine)
+	c.RegisterFormat(&jsonschema.Format{
+		Name:     "regex-u",
+		Validate: validateUnicodeRegexp,
+	})
 	// An absolute URI in a private scheme, so the schema's base URL can never
 	// be confused with (or resolve against) a real file path or another
 	// resource's URL the way a bare relative "schema.json" could.
@@ -451,6 +455,18 @@ func jsRegexpEngine(pattern string) (jsonschema.Regexp, error) {
 		return nil, err
 	}
 	return jsRegexp{re}, nil
+}
+
+// validateUnicodeRegexp verifies a rule option intended for
+// `new RegExp(pattern, "u")`. This is deliberately a separate format from
+// JSON Schema's standard "regex", whose semantics are an unflagged RegExp.
+func validateUnicodeRegexp(v any) error {
+	pattern, ok := v.(string)
+	if !ok {
+		return nil
+	}
+	_, err := esregexp.Compile(pattern, "u")
+	return err
 }
 
 // jsRegexp adapts *esregexp.RegExp to satisfy jsonschema.Regexp, which asks

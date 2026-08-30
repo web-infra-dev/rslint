@@ -42,10 +42,9 @@ func runProgramTypeCheck(t *testing.T, program *compiler.Program) []rule.RuleDia
 	t.Helper()
 	var out []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(program),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(program),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {
@@ -287,10 +286,9 @@ export type T = typeof M;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(progA, progB),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(progA, progB),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {
@@ -330,10 +328,9 @@ export type T = typeof M;
 
 	var diags []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(progA, progB),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(progA, progB),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {
@@ -460,9 +457,9 @@ func TestMatrix_SourceOnlyProgramDoesNotRestrictTypeCheck(t *testing.T) {
 	sourceOnly := mustSourceOnlyTestProgram(t, program, []*ast.SourceFile{file})
 	var diagnostics []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:       append(wrapTestPrograms(program), sourceOnly),
-		SingleThreaded: true,
-		TypeCheck:      true,
+		TypeCheckOnlyPrograms: append(wrapTestPrograms(program), sourceOnly),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {
@@ -504,10 +501,9 @@ func TestMatrix_StrictOnlyDiagAcrossPrograms_KeptExactlyOnce(t *testing.T) {
 
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(strict, loose),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       true,
+		TypeCheckOnlyPrograms: wrapTestPrograms(strict, loose),
+		SingleThreaded:        true,
+		TypeCheck:             true,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {
@@ -548,10 +544,9 @@ func TestMatrix_TypeCheckFalse_NoPhaseTwo(t *testing.T) {
 	// TypeCheck=false → 0.
 	var got []rule.RuleDiagnostic
 	_, err := RunLinter(RunLinterOptions{
-		Programs:        wrapTestPrograms(build()),
-		SingleThreaded:  true,
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule { return nil },
-		TypeCheck:       false,
+		TypeCheckOnlyPrograms: wrapTestPrograms(build()),
+		SingleThreaded:        true,
+		TypeCheck:             false,
 		Consumer: rule.DiagnosticConsumer{
 			Report: func(d rule.RuleDiagnostic) {
 				if strings.HasPrefix(d.RuleName, "TypeScript(") {

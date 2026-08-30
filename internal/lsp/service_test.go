@@ -80,33 +80,12 @@ func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) 
 			s.fs,
 			s.jsConfigOwnerIndex.PathSpaces(),
 			s.currentRuleCatalog(),
-			true,
 		)
 		if err != nil {
 			panic(err)
 		}
 		s.jsFileConfigResolvers[configDirectory] = resolver
 	}
-}
-
-func installJSONConfigForTest(s *Server, configDirectory string, entries config.RslintConfig) {
-	s.jsonConfig = entries
-	s.jsonConfigOwnerIndex = target.NewOwnerIndex(
-		map[string]config.RslintConfig{configDirectory: entries},
-		s.fs,
-	)
-	resolver, err := config.NewFileConfigResolverWithPathSpaces(
-		entries,
-		configDirectory,
-		s.fs,
-		s.jsonConfigOwnerIndex.PathSpaces(),
-		rules.All(),
-		false,
-	)
-	if err != nil {
-		panic(err)
-	}
-	s.jsonFileConfigResolver = resolver
 }
 
 func installRuleCatalogForTest(s *Server, configs ...config.RslintConfig) {
@@ -145,16 +124,11 @@ func configuredRulesForLSPTest(
 	entries config.RslintConfig,
 	target target.File,
 	configDirectory string,
-	enforcePlugins bool,
 	hasTypeInfo bool,
 ) []rule.ConfiguredRule {
-	ruleCatalog := rules.All()
-	if enforcePlugins {
-		testServer := newTestServer()
-		installRuleCatalogForTest(testServer, entries)
-		ruleCatalog = testServer.ruleCatalog
-	}
-	rules, _ := config.NewFileConfigResolver(entries, configDirectory, ruleCatalog, enforcePlugins).
+	testServer := newTestServer()
+	installRuleCatalogForTest(testServer, entries)
+	rules, _ := config.NewFileConfigResolver(entries, configDirectory, testServer.ruleCatalog).
 		EnabledRulesForTarget(target.Path, target.CanonicalPath)
 	if !hasTypeInfo {
 		return rule.FilterNonTypeAwareRules(rules)
@@ -167,15 +141,15 @@ func documentLintSnapshotForTest(
 	uri lsproto.DocumentUri,
 	entries config.RslintConfig,
 	configDirectory string,
-	usesJavaScriptConfig bool,
+	usesConfigCatalog bool,
 	typeScriptConfigPaths []string,
 ) documentLintSnapshot {
 	ruleCatalog := rules.All()
-	if usesJavaScriptConfig {
+	if usesConfigCatalog {
 		ruleCatalog = s.currentRuleCatalog()
 	}
 	target := lspConfigTarget(uriToPath(uri), configDirectory, s.fs)
-	return documentLintSnapshot{
+	snapshot := documentLintSnapshot{
 		target: target,
 		config: entries,
 		pathSpaces: config.NewPathSpaceSnapshot(
@@ -184,8 +158,12 @@ func documentLintSnapshotForTest(
 		),
 		ruleCatalog:           ruleCatalog,
 		typeScriptConfigPaths: typeScriptConfigPaths,
-		usesJavaScriptConfig:  usesJavaScriptConfig,
+		pluginGeneration:      s.eslintPluginConfigGeneration,
 	}
+	if usesConfigCatalog {
+		snapshot.configKey = target.ConfigDirectory
+	}
+	return snapshot
 }
 
 func documentURIFromPath(filePath string) lsproto.DocumentUri {
@@ -1143,48 +1121,8 @@ func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
 	}
 }
 
-func TestGetConfigForURI_FallbackToJSON(t *testing.T) {
+func TestGetConfigForURI_EmptyRootBoundaryProtectsWorkspaceFallback(t *testing.T) {
 	s := newTestServer()
-
-	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
-	s.jsonConfig = config.RslintConfig{jsonRule}
-
-	// No JS configs — should fall back to JSON config; cwd = s.cwd
-	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
-		t.Errorf("should fall back to JSON config, got %v", cfg)
-	}
-	if cwd != s.cwd {
-		t.Errorf("fallback cwd should be s.cwd %q, got %q", s.cwd, cwd)
-	}
-}
-
-func TestGetConfigForURI_JSConfigOverridesJSON(t *testing.T) {
-	s := newTestServer()
-
-	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
-	s.jsonConfig = config.RslintConfig{jsonRule}
-
-	jsRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
-	installJSConfigsForTest(s, map[string]config.RslintConfig{
-		"/project": {jsRule},
-	})
-
-	// JS config should take priority over JSON; cwd = JS config's dir
-	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
-		t.Errorf("JS config should override JSON, got %v", cfg)
-	}
-	if cwd != "/project" {
-		t.Errorf("JS config cwd should be /project, got %q", cwd)
-	}
-}
-
-func TestGetConfigForURI_EmptyRootBoundaryProtectsJSONFallback(t *testing.T) {
-	s := newTestServer()
-	s.jsonConfig = config.RslintConfig{{
-		Rules: map[string]any{"no-debugger": "error"},
-	}}
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/project": {},
 		"/project/packages/app": {{
@@ -1204,9 +1142,8 @@ func TestGetConfigForURI_EmptyRootBoundaryProtectsJSONFallback(t *testing.T) {
 	}
 
 	outsideCfg, outsideCwd, outsideIsJS := s.getConfigForURI("file:///other/src/index.ts")
-	if len(outsideCfg) != 1 || outsideCfg[0].Rules["no-debugger"] != "error" ||
-		outsideCwd != s.cwd || outsideIsJS {
-		t.Fatalf("file outside JS boundaries must retain JSON fallback: cfg=%v cwd=%q isJS=%v", outsideCfg, outsideCwd, outsideIsJS)
+	if len(outsideCfg) != 0 || outsideCwd != s.cwd || outsideIsJS {
+		t.Fatalf("file outside config boundaries must use empty workspace fallback: cfg=%v cwd=%q isCatalog=%v", outsideCfg, outsideCwd, outsideIsJS)
 	}
 }
 
@@ -1392,31 +1329,26 @@ func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
 	// File outside the config dir should fallback
 	cfg3, _, _ := s.getConfigForURI("file:///Users/John%20Doe/other%20project/src/file.ts")
 	if len(cfg3) != 0 {
-		t.Errorf("File outside config dir should fallback to empty JSON config, got %v", cfg3)
+		t.Errorf("File outside config dir should use the empty workspace fallback, got %v", cfg3)
 	}
 }
 
-func TestGetConfigForURI_IsJSConfig(t *testing.T) {
+func TestGetConfigForURI_ReportsCatalogOwnership(t *testing.T) {
 	s := newTestServer()
-
-	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
-	s.jsonConfig = config.RslintConfig{jsonRule}
 
 	jsRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/project": {jsRule},
 	})
 
-	// JS config should return isJSConfig=true
-	_, _, isJS := s.getConfigForURI("file:///project/src/index.ts")
-	if !isJS {
-		t.Error("Expected isJSConfig=true when JS config matches")
+	_, _, catalogOwned := s.getConfigForURI("file:///project/src/index.ts")
+	if !catalogOwned {
+		t.Error("expected catalog ownership when a discovered config matches")
 	}
 
-	// File outside JS config range falls back to JSON → isJSConfig=false
-	_, _, isJS = s.getConfigForURI("file:///other/src/index.ts")
-	if isJS {
-		t.Error("Expected isJSConfig=false when falling back to JSON config")
+	_, _, catalogOwned = s.getConfigForURI("file:///other/src/index.ts")
+	if catalogOwned {
+		t.Error("expected workspace fallback outside discovered config ownership")
 	}
 }
 
@@ -1538,9 +1470,6 @@ func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 	if entry, ok := s.tsConfigPathsByConfig["/project-b"]; !ok || entry != nil {
 		t.Errorf("expected project-b entry present and nil (no tsconfig), got present=%v value=%v", ok, entry)
 	}
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected JSON fallback tsConfigPaths nil in JS-config mode, got %v", s.tsConfigPaths)
-	}
 }
 
 func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
@@ -1627,72 +1556,15 @@ func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T
 	}
 }
 
-func TestTsConfigPathsForURI_JSONFallbackRemainsTypedWithNestedJSConfig(t *testing.T) {
-	s := newTestServer()
-	s.cwd = "/workspace"
-	s.rslintConfigPath = "/workspace/rslint.json"
-	s.fs = &mockFS{files: map[string]bool{
-		"/workspace/tsconfig.json":              true,
-		"/workspace/packages/app/tsconfig.json": true,
-	}}
-	s.jsonConfig = config.RslintConfig{{
-		LanguageOptions: &config.LanguageOptions{
-			ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
-		},
-	}}
-	installJSConfigsForTest(s, map[string]config.RslintConfig{
-		"/workspace/packages/app": {{
-			LanguageOptions: &config.LanguageOptions{
-				ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
-			},
-		}},
-	})
-
-	s.rebuildTsConfigPaths()
-
-	jsonPaths := s.tsConfigPathsForURI("file:///workspace/packages/lib/src/index.ts")
-	if len(jsonPaths) != 1 || jsonPaths[0] != "/workspace/tsconfig.json" {
-		t.Fatalf("expected JSON fallback tsconfig, got %v", jsonPaths)
-	}
-	jsPaths := s.tsConfigPathsForURI("file:///workspace/packages/app/src/index.ts")
-	if len(jsPaths) != 1 || jsPaths[0] != "/workspace/packages/app/tsconfig.json" {
-		t.Fatalf("expected nested JS config tsconfig, got %v", jsPaths)
-	}
-}
-
-func TestReloadJSONFallbackWhileJSConfigIsActive(t *testing.T) {
-	dir := t.TempDir()
-	jsonConfigPath := filepath.Join(dir, "rslint.json")
-	if err := os.WriteFile(jsonConfigPath, []byte(`[{"rules":{"no-debugger":"error"}}]`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	s := newTestServer()
-	s.cwd = dir
-	s.fs = osvfs.FS()
-	installJSConfigsForTest(s, map[string]config.RslintConfig{
-		"/other": {{Rules: config.Rules{"no-console": "error"}}},
-	})
-	s.reloadConfigAndRelint()
-
-	if s.rslintConfigPath != jsonConfigPath {
-		t.Fatalf("expected JSON fallback path %q, got %q", jsonConfigPath, s.rslintConfigPath)
-	}
-	cfg, _, isJS := s.getConfigForURI("file:///workspace/src/index.ts")
-	if isJS || len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
-		t.Fatalf("expected refreshed JSON fallback while JS config remains active, got isJS=%v config=%v", isJS, cfg)
-	}
-}
-
 func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 
-	// No jsConfigs, no rslintConfigPath
+	// No discovered configs.
 	s.rebuildTsConfigPaths()
 
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths nil when no config, got %v", s.tsConfigPaths)
+	if s.tsConfigPathsByConfig != nil {
+		t.Errorf("expected no project map when no config, got %v", s.tsConfigPathsByConfig)
 	}
 }
 
@@ -1764,7 +1636,7 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 		linter.LintSingleFile(linter.LintSingleFileOptions{
 			Program: lintprogram.NewFromCompiler(program),
 			File:    file,
-			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 				targetPath := sourceFile.FileName()
 				return configuredRulesForLSPTest(
 					cfg,
@@ -1776,7 +1648,6 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 						ConfigDirectory: dir,
 					},
 					dir,
-					false,
 					true,
 				)
 			},
@@ -2006,10 +1877,10 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	if opened := s.session.Snapshot().ProjectCollection.ConfiguredProject(secondConfigID); opened != nil {
 		t.Fatal("lint-only custom tsconfig must not be added to the Session's permanent API-open project set")
 	}
-	if _, err := s.defaultFixAllNativeLint(
+	if _, err := speculativePipelineResultForTest(
+		s,
 		ctx,
 		toURI(sourcePath),
-		1,
 		"export const value = 2;\n",
 		documentLintSnapshotForTest(
 			s,
@@ -2149,7 +2020,7 @@ func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
 	uri := documentURIFromPath(filePath)
 	s.documents[uri] = malformed
 
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		malformed,
@@ -2161,21 +2032,21 @@ func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run lint: %v", err)
 	}
-	if !result.HasSyntaxErrors {
+	if !result.Observation.Native.HasTargetSyntaxErrors {
 		t.Fatal("malformed file was not marked as having syntax errors")
 	}
-	if len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS") {
-		t.Fatalf("expected a TypeScript syntax diagnostic, got %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) == 0 || !strings.HasPrefix(result.Observation.Native.Diagnostics[0].RuleName, "TypeScript(TS") {
+		t.Fatalf("expected a TypeScript syntax diagnostic, got %+v", result.Observation.Native.Diagnostics)
 	}
-	if result.Diagnostics[0].Origin != rule.DiagnosticOriginTypeScript {
-		t.Fatalf("TypeScript syntax diagnostic has wrong origin: %+v", result.Diagnostics[0])
+	if result.Observation.Native.Diagnostics[0].Origin != rule.DiagnosticOriginTypeScript {
+		t.Fatalf("TypeScript syntax diagnostic has wrong origin: %+v", result.Observation.Native.Diagnostics[0])
 	}
-	for _, diagnostic := range result.Diagnostics {
+	for _, diagnostic := range result.Observation.Native.Diagnostics {
 		if diagnostic.RuleName == "no-debugger" {
-			t.Fatalf("rules ran for malformed file: %+v", result.Diagnostics)
+			t.Fatalf("rules ran for malformed file: %+v", result.Observation.Native.Diagnostics)
 		}
 	}
-	s.diagnostics[uri] = result.Diagnostics
+	s.diagnostics[uri] = result.Observation.Native.Diagnostics
 	response, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
 		Range: lsproto.Range{
@@ -2220,7 +2091,7 @@ func TestRunConfiguredLintForContent_ZeroRuleTargetsReportSyntaxErrors(t *testin
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result, err := s.runConfiguredLintForContent(
+			result, err := configuredSpeculativePipelineResultForTest(s,
 				uri,
 				context.Background(),
 				malformed,
@@ -2232,12 +2103,12 @@ func TestRunConfiguredLintForContent_ZeroRuleTargetsReportSyntaxErrors(t *testin
 			if err != nil {
 				t.Fatalf("run lint: %v", err)
 			}
-			if !result.HasSyntaxErrors || len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS") {
+			if !result.Observation.Native.HasTargetSyntaxErrors || len(result.Observation.Native.Diagnostics) == 0 || !strings.HasPrefix(result.Observation.Native.Diagnostics[0].RuleName, "TypeScript(TS") {
 				t.Fatalf("zero-rule target did not report its syntax error: %+v", result)
 			}
-			for _, diagnostic := range result.Diagnostics {
+			for _, diagnostic := range result.Observation.Native.Diagnostics {
 				if diagnostic.RuleName == "no-debugger" {
-					t.Fatalf("a rule ran outside its files selector: %+v", result.Diagnostics)
+					t.Fatalf("a rule ran outside its files selector: %+v", result.Observation.Native.Diagnostics)
 				}
 			}
 		})
@@ -2262,9 +2133,9 @@ func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
 	return fs.FS.Realpath(filePath)
 }
 
-func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
+func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRealpath(t *testing.T) {
 	root := t.TempDir()
-	realRoot := filepath.Join(root, "real-workspace")
+	realRoot := filepath.Join(root, "node_modules", "real-workspace")
 	aliasRoot := filepath.Join(root, "alias-workspace")
 	realFile := filepath.Join(realRoot, "src", "index.ts")
 	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
@@ -2303,7 +2174,7 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 	}
 
 	const fixedContent = "debugger;\n"
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		fixedContent,
@@ -2318,8 +2189,8 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("canonical program read stale disk content: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("canonical program read stale disk content: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2348,7 +2219,7 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
 	uri := documentURIFromPath(aliasFile)
 	s.documents[uri] = source
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		source,
@@ -2363,8 +2234,8 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 	if err != nil {
 		t.Fatalf("run lint through symlinked root: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("symlinked config path lost scoped rules: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("symlinked config path lost scoped rules: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2399,7 +2270,7 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(aliasRoot) {
 		t.Fatalf("physical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
 	}
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		fileURI,
 		context.Background(),
 		source,
@@ -2411,15 +2282,15 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("physical file lost aliased files selector: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("physical file lost aliased files selector: %+v", result.Observation.Native.Diagnostics)
 	}
 
 	if err := os.WriteFile(filepath.Join(realRoot, ".gitignore"), []byte("src/index.ts\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	effective, configCwd, isJSConfig := s.getLintConfigForURI(fileURI)
-	result, err = s.runConfiguredLintForContent(
+	result, err = configuredSpeculativePipelineResultForTest(s,
 		fileURI,
 		context.Background(),
 		source,
@@ -2431,8 +2302,8 @@ func TestConfigCatalog_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent with .gitignore failed: %v", err)
 	}
-	if len(result.Diagnostics) != 0 {
-		t.Fatalf("physical file did not inherit aliased config .gitignore: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 0 {
+		t.Fatalf("physical file did not inherit aliased config .gitignore: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2469,7 +2340,7 @@ func TestConfigCatalog_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(root) {
 		t.Fatalf("lexical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
 	}
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		fileURI,
 		context.Background(),
 		source,
@@ -2481,15 +2352,15 @@ func TestConfigCatalog_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	ruleNames := make(map[string]struct{}, len(result.Diagnostics))
-	for _, diagnostic := range result.Diagnostics {
+	ruleNames := make(map[string]struct{}, len(result.Observation.Native.Diagnostics))
+	for _, diagnostic := range result.Observation.Native.Diagnostics {
 		ruleNames[diagnostic.RuleName] = struct{}{}
 	}
 	if _, ok := ruleNames["no-console"]; !ok {
-		t.Fatalf("lexical owner rule missing: %+v", result.Diagnostics)
+		t.Fatalf("lexical owner rule missing: %+v", result.Observation.Native.Diagnostics)
 	}
 	if _, ok := ruleNames["no-debugger"]; ok {
-		t.Fatalf("physical config replaced lexical owner: %+v", result.Diagnostics)
+		t.Fatalf("physical config replaced lexical owner: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2531,7 +2402,7 @@ func TestConfiguredLintPreservesTargetIdentityAcrossAuthoredConfigBases(t *testi
 	s.fs = osvfs.FS()
 	uri := documentURIFromPath(aliasFile)
 	s.documents[uri] = source
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		source,
@@ -2543,16 +2414,16 @@ func TestConfiguredLintPreservesTargetIdentityAcrossAuthoredConfigBases(t *testi
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	diagnosticsByRule := make(map[string]rule.RuleDiagnostic, len(result.Diagnostics))
-	for _, diagnostic := range result.Diagnostics {
+	diagnosticsByRule := make(map[string]rule.RuleDiagnostic, len(result.Observation.Native.Diagnostics))
+	for _, diagnostic := range result.Observation.Native.Diagnostics {
 		diagnosticsByRule[diagnostic.RuleName] = diagnostic
 	}
 	if _, ok := diagnosticsByRule["no-debugger"]; !ok {
-		t.Fatalf("config-directory rule did not match the shared target: %+v", result.Diagnostics)
+		t.Fatalf("config-directory rule did not match the shared target: %+v", result.Observation.Native.Diagnostics)
 	}
 	noVar, ok := diagnosticsByRule["no-var"]
 	if !ok {
-		t.Fatalf("workspace-authored rule lost the lexical symlink target: %+v", result.Diagnostics)
+		t.Fatalf("workspace-authored rule lost the lexical symlink target: %+v", result.Observation.Native.Diagnostics)
 	}
 	if len(noVar.Fixes()) == 0 {
 		t.Fatalf("workspace-authored fix was not preserved: %+v", noVar)
@@ -2602,7 +2473,7 @@ func TestConfiguredLintExternalConfigPreservesGitignoreTargetIdentity(t *testing
 	s.fs = osvfs.FS()
 	uri := documentURIFromPath(aliasFile)
 	s.documents[uri] = source
-	result, err := s.runConfiguredLintForContent(
+	result, err := configuredSpeculativePipelineResultForTest(s,
 		uri,
 		context.Background(),
 		source,
@@ -2614,8 +2485,8 @@ func TestConfiguredLintExternalConfigPreservesGitignoreTargetIdentity(t *testing
 	if err != nil {
 		t.Fatalf("runConfiguredLintForContent failed: %v", err)
 	}
-	if len(result.Diagnostics) != 0 {
-		t.Fatalf("external-config Git ignore lost the lexical symlink target: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 0 {
+		t.Fatalf("external-config Git ignore lost the lexical symlink target: %+v", result.Observation.Native.Diagnostics)
 	}
 }
 
@@ -2635,7 +2506,7 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	uri := documentURIFromPath(filePath)
 	s.documents[uri] = source
-	got := s.computeFixAllContent(
+	got := runSpeculativeFixAllForTest(t, s,
 		context.Background(),
 		uri,
 		source,
@@ -2674,14 +2545,14 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 		Files: []string{"**/*.ts"},
 		Rules: config.Rules{"no-var": "error"},
 	}}
-	result, err := s.runConfiguredLintForContent(uri, context.Background(), source, cfg, configDir, true, nil)
+	result, err := configuredSpeculativePipelineResultForTest(s, uri, context.Background(), source, cfg, configDir, true, nil)
 	if err != nil {
 		t.Fatalf("lint without tsconfig: %v", err)
 	}
-	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-var" {
-		t.Fatalf("lint without tsconfig lost native diagnostics: %+v", result.Diagnostics)
+	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-var" {
+		t.Fatalf("lint without tsconfig lost native diagnostics: %+v", result.Observation.Native.Diagnostics)
 	}
-	got := s.computeFixAllContent(
+	got := runSpeculativeFixAllForTest(t, s,
 		context.Background(),
 		uri,
 		source,
@@ -2718,12 +2589,12 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 		},
 		ConfigDirectory: "/project",
 	}
-	withoutTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true, false)
+	withoutTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", false)
 	if len(withoutTypeInfo) != 1 || withoutTypeInfo[0].Name != "no-debugger" {
 		t.Fatalf("expected only non-type-aware native rule without tsconfig, got %+v", withoutTypeInfo)
 	}
 
-	withTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true, true)
+	withTypeInfo := configuredRulesForLSPTest(cfg, target, "/project", true)
 	if len(withTypeInfo) != 2 {
 		t.Fatalf("expected both native rules with type info, got %+v", withTypeInfo)
 	}
@@ -2738,7 +2609,7 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 	}
 }
 
-// runLintWithSession must early-return for files matching the config's
+// documentGenerationProvider must early-return for files matching the config's
 // `ignores` patterns, WITHOUT touching the session. This test proves the
 // guard semantically (not just by coincidence of a no-op session):
 //
@@ -2753,6 +2624,8 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	ctx := context.Background()
 	cwd := "/project"
+	s := newTestServer()
+	s.cwd = cwd
 	cfg := config.RslintConfig{
 		// Global ignores entry: hides everything under lib/.
 		{Ignores: []string{"lib/**"}},
@@ -2769,13 +2642,11 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 			}
 		}()
 
-		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil, nil)
+		result, err := configuredDocumentPipelineResultForTest(s, ctx, ignoredURI, cfg, cwd, false, nil)
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
-		if diags == nil {
-			t.Fatal("expected non-nil empty slice (LSP protocol expects [], not null)")
-		}
+		diags := result.Observation.Native.Diagnostics
 		if len(diags) != 0 {
 			t.Errorf("expected 0 diagnostics for ignored file, got %d: %+v", len(diags), diags)
 		}
@@ -2792,12 +2663,14 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
 			}
 		}()
-		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
+		_, _ = configuredDocumentPipelineResultForTest(s, ctx, normalURI, cfg, cwd, false, nil)
 	})
 }
 
 func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) {
 	cfg := config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+	s := newTestServer()
+	s.cwd = "/project"
 	for _, uri := range []lsproto.DocumentUri{
 		"file:///project/node_modules/pkg/index.ts",
 		"file:///project/.git/hooks/pre-commit.ts",
@@ -2809,12 +2682,13 @@ func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) 
 				}
 			}()
 
-			diagnostics, err := runLintWithSession(uri, nil, context.Background(), cfg, "/project", false, nil, nil)
+			result, err := configuredDocumentPipelineResultForTest(s, context.Background(), uri, cfg, "/project", false, nil)
 			if err != nil {
-				t.Fatalf("runLintWithSession returned an error: %v", err)
+				t.Fatalf("document pipeline returned an error: %v", err)
 			}
-			if diagnostics == nil || len(diagnostics) != 0 {
-				t.Fatalf("default-excluded file diagnostics = %+v, want a non-nil empty slice", diagnostics)
+			diagnostics := result.Observation.Native.Diagnostics
+			if len(diagnostics) != 0 {
+				t.Fatalf("default-excluded file diagnostics = %+v, want empty", diagnostics)
 			}
 		})
 	}
@@ -2971,10 +2845,12 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			s := newTestServer()
 			s.cwd = configDir
 			s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			s.jsonConfig = test.config
+			installJSConfigsForTest(s, map[string]config.RslintConfig{
+				tspath.NormalizePath(configDir): test.config,
+			})
 			uri := documentURIFromPath(target)
 			effective, configCwd, isJSConfig := s.getLintConfigForURI(uri)
-			result, err := s.runConfiguredLintForContent(
+			result, err := configuredSpeculativePipelineResultForTest(s,
 				uri,
 				context.Background(),
 				malformed,
@@ -2986,10 +2862,10 @@ func TestLSPExplicitTargetIgnoreConformance(t *testing.T) {
 			if err != nil {
 				t.Fatalf("run lint: %v", err)
 			}
-			gotLinted := result.HasSyntaxErrors && len(result.Diagnostics) > 0 &&
-				strings.HasPrefix(result.Diagnostics[0].RuleName, "TypeScript(TS")
+			gotLinted := result.Observation.Native.HasTargetSyntaxErrors && len(result.Observation.Native.Diagnostics) > 0 &&
+				strings.HasPrefix(result.Observation.Native.Diagnostics[0].RuleName, "TypeScript(TS")
 			if gotLinted != test.wantLinted {
-				t.Fatalf("linted=%v, want %v: diagnostics=%+v", gotLinted, test.wantLinted, result.Diagnostics)
+				t.Fatalf("linted=%v, want %v: diagnostics=%+v", gotLinted, test.wantLinted, result.Observation.Native.Diagnostics)
 			}
 		})
 	}

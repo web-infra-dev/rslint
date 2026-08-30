@@ -170,13 +170,21 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			configPath := filepath.Join(configDir, "rslint.json")
-			if err := os.WriteFile(configPath, configJSON, 0o644); err != nil {
+			var cliConfig rslintconfig.RslintConfig
+			if err := json.Unmarshal(configJSON, &cliConfig); err != nil {
 				t.Fatal(err)
 			}
+			cliConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
+				cliConfig,
+				configDir,
+				configDir,
+				osvfs.FS(),
+				[]string{tspath.NormalizePath(target)},
+				nil,
+			)
 
-			code, stdout, stderr := runLintPipelineForTest(t, configDir, lintArgs{
-				Config:         configPath,
+			code, stdout, stderr := runLintCommandForTest(t, configDir, lintArgs{
+				ConfigCatalog:  explicitConfigCatalogForTest(configDir, cliConfig),
 				AllowFiles:     []string{tspath.NormalizePath(target)},
 				Format:         "default",
 				NoColor:        true,
@@ -254,7 +262,7 @@ func TestCLIMultiConfigGitignoreIsolation(t *testing.T) {
 		},
 	}
 
-	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 		ConfigCatalog:  catalog,
 		Format:         "jsonline",
 		NoColor:        true,
@@ -311,7 +319,7 @@ func TestCLIExplicitOnlyConfigDoesNotBlockParentGitignore(t *testing.T) {
 			},
 		},
 	}
-	code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 		ConfigCatalog:  catalog,
 		AllowFiles:     []string{tspath.NormalizePath(explicitTarget)},
 		AllowDirs:      []string{tspath.NormalizePath(ignoredDir)},
@@ -396,7 +404,7 @@ func TestCLIMultiConfigGitignoreOwnershipBoundaries(t *testing.T) {
 		{name: "concurrent"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			code, stdout, stderr := runLintPipelineForTest(t, workspace, lintArgs{
+			code, stdout, stderr := runLintCommandForTest(t, workspace, lintArgs{
 				ConfigCatalog:  catalog,
 				Format:         "jsonline",
 				NoColor:        true,

@@ -15,6 +15,8 @@ import (
 func TestNoInferrableTypesRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoInferrableTypesRule, []rule_tester.ValidTestCase{
 		// No type annotation - valid
+		{Code: "/** @type {number} */\nconst fromJSDoc = 10;", FileName: "file.mjs", TSConfig: "tsconfig.allow-js.json"},
+		{Code: "/** @param {number} value */\nfunction f(value = 10) {}", FileName: "file.mjs", TSConfig: "tsconfig.allow-js.json"},
 		{Code: `const a = 10;`},
 		{Code: `const a = true;`},
 		{Code: `const a = 'str';`},
@@ -643,12 +645,11 @@ const scoped: number = 1;
 
 		var diagnostics []rule.RuleDiagnostic
 		linter.LintSingleFile(linter.LintSingleFileOptions{
-			Program:      lintprogram.NewFromCompiler(program),
-			File:         sourceFile.FileName(),
-			HasTypeInfo:  true,
-			ExcludePaths: []string{},
-			GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-				return []linter.ConfiguredRule{{
+			Program:     lintprogram.NewFromCompiler(program),
+			File:        sourceFile.FileName(),
+			HasTypeInfo: true,
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				return []rule.ConfiguredRule{{
 					Name:     "@typescript-eslint/no-inferrable-types",
 					Severity: rule.SeverityError,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
