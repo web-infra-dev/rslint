@@ -151,6 +151,10 @@ interface I {
 			}},
 		},
 		{
+			Code:    `interface I { f(...[value]: [string]): void; f(...values: [string]): void; }`,
+			Options: []any{map[string]any{"ignoreDifferentlyNamedParameters": true}},
+		},
+		{
 			Code:    `declare function f(x: string = ""): void; declare function f(y: number): void;`,
 			Options: []any{map[string]any{"ignoreDifferentlyNamedParameters": true}},
 			Errors: []rule_tester.InvalidTestCaseError{{

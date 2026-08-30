@@ -323,12 +323,23 @@ func (a *overloadAnalyzer) report(result unifyResult, onlyTwo bool) {
 
 func signatureReportRange(sourceFile *ast.SourceFile, signature *ast.Node) core.TextRange {
 	trimmed := utils.TrimNodeTextRange(sourceFile, signature)
-	if signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindConstructor {
-		if parameters := signature.ParameterList(); parameters != nil && parameters.Pos() > 0 {
-			return core.NewTextRange(parameters.Pos()-1, trimmed.End())
+	start := trimmed.Pos()
+	// ESTree reports the inner declaration, not its ExportNamedDeclaration
+	// wrapper. tsgo includes `export` in the declaration range.
+	for _, modifier := range signature.ModifierNodes() {
+		if modifier.Kind == ast.KindExportKeyword {
+			start = scanner.SkipTrivia(sourceFile.Text(), modifier.End())
 		}
 	}
-	return trimmed
+	if (signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindMethodSignature || signature.Kind == ast.KindConstructor) && signature.ParameterList() != nil {
+		start = signature.ParameterList().Pos() - 1
+	}
+	// For generic class members, typescript-eslint reports the type-parameter
+	// list rather than the member key or opening parenthesis.
+	if (signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindMethodSignature) && len(signature.TypeParameters()) > 0 {
+		start = signature.TypeParameters()[0].Pos()
+	}
+	return core.NewTextRange(start, trimmed.End())
 }
 
 func failureStringStart(otherLine int) string {
@@ -440,6 +451,12 @@ func parametersHaveSameESTreeShape(left, right *ast.Node) bool {
 	}
 	if isRestParameter(left) != isRestParameter(right) {
 		return false
+	}
+	// ESTree represents both as RestElement regardless of the binding pattern
+	// carried by its argument. The argument name comparison below decides
+	// whether differently named rest parameters suppress the diagnostic.
+	if isRestParameter(left) {
+		return true
 	}
 	leftName, rightName := left.Name(), right.Name()
 	return leftName != nil && rightName != nil && leftName.Kind == rightName.Kind
