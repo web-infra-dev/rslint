@@ -18,7 +18,7 @@
         },
         "newIsCapExceptionPattern": {
           "type": "string",
-          "format": "regex"
+          "format": "regex-u"
         },
         "capIsNewExceptions": {
           "type": "array",
@@ -28,7 +28,7 @@
         },
         "capIsNewExceptionPattern": {
           "type": "string",
-          "format": "regex"
+          "format": "regex-u"
         },
         "properties": {
           "type": "boolean"

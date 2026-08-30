@@ -29,7 +29,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "format": "regex"
+                "format": "regex-u"
               },
               "uniqueItems": true
             }
