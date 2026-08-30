@@ -131,6 +131,48 @@ func TestRequireAwaitSuggestionBoundaries(t *testing.T) {
 				}},
 			},
 			{
+				Code: `class Example {
+  plain
+  static async [computed]() {
+    return 0;
+  }
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingAwait",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "removeAsync",
+						Output: `class Example {
+  plain
+  ;static [computed]() {
+    return 0;
+  }
+}`,
+					}},
+				}},
+			},
+			{
+				Code: `class Example {
+  plain
+  @dec
+  async [computed]() {
+    return 0;
+  }
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "missingAwait",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "removeAsync",
+						Output: `class Example {
+  plain
+  ;@dec
+  [computed]() {
+    return 0;
+  }
+}`,
+					}},
+				}},
+			},
+			{
 				Code: "async\u00a0/* keep-comment */ function comments() {\r\n  return 0;\r\n}",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingAwait",
