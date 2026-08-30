@@ -10,7 +10,7 @@
           "description": "Patterns of import paths to allow requiring from.",
           "items": {
             "type": "string",
-            "format": "regex"
+            "format": "regex-u"
           }
         }
       }

@@ -2,6 +2,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   Ref,
   ReactNode,
@@ -122,10 +123,21 @@ export const EditorTabs = ({
   const hoverHighlightDecorationIds = useRef<string[]>([]);
   const isEditingRef = useRef<boolean>(false);
   const editingTimer = useRef<number | null>(null);
+  const onChangeRef = useRef(onChange);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  const onConfigChangeRef = useRef(onConfigChange);
 
   // Store last valid parsed configs
   const lastValidRslintConfig = useRef<any>(null);
   const lastValidTsConfig = useRef<any>(null);
+
+  // Monaco keeps these subscriptions for the editor lifetime, so forward them
+  // through refs instead of retaining callbacks from the initial render.
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+    onSelectionChangeRef.current = onSelectionChange;
+    onConfigChangeRef.current = onConfigChange;
+  }, [onChange, onSelectionChange, onConfigChange]);
 
   function getInitialCode(): string {
     if (typeof window === 'undefined') {
@@ -317,12 +329,12 @@ export const EditorTabs = ({
 
     // Trigger initial onChange
     const initialVal = editor.getValue() || '';
-    onChange(initialVal);
+    onChangeRef.current(initialVal);
     scheduleSerializeToUrl(initialVal);
 
     editor.onDidChangeModelContent(() => {
       const val = editor.getValue() || '';
-      onChange(val);
+      onChangeRef.current(val);
       scheduleSerializeToUrl(val);
 
       // Mark as editing to prevent AST tree selection during typing
@@ -361,7 +373,7 @@ export const EditorTabs = ({
         lineNumber: sel.endLineNumber,
         column: sel.endColumn,
       });
-      onSelectionChange?.(
+      onSelectionChangeRef.current?.(
         Math.min(startOffset, endOffset),
         Math.max(startOffset, endOffset),
       );
@@ -401,7 +413,7 @@ export const EditorTabs = ({
     rslintEditorRef.current = editor;
 
     editor.onDidChangeModelContent(() => {
-      onConfigChange?.();
+      onConfigChangeRef.current?.();
     });
 
     return () => {
@@ -424,7 +436,7 @@ export const EditorTabs = ({
     tsconfigEditorRef.current = editor;
 
     editor.onDidChangeModelContent(() => {
-      onConfigChange?.();
+      onConfigChangeRef.current?.();
     });
 
     return () => {
