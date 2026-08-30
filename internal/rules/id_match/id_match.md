@@ -8,7 +8,7 @@ The pattern is the rule's first option and is read as a JavaScript regular expre
 
 TypeScript names count as identifiers too: type aliases, interfaces, type parameters, enums and their members, namespaces, and the names a type annotation refers to are all held to the pattern.
 
-Names the file does not declare are left alone, because the author has no say in what they are called: a reference to a global such as `Object` or `Array`, a type the TypeScript standard library declares such as `Record` or `Partial`, the key of an import attribute (`with { type: "json" }`), and `import.meta` / `new.target`. A type the file declares or imports is the author's, and is checked.
+References to known globals such as `Object` or `Array` are left alone unless that reference resolves to a declaration in the file. In TypeScript, the same is true of a reference used as a type when its name is a recognized standard-library type such as `Record` or `Partial`. A valid type or namespace reference is likewise left alone when it resolves to a global declaration supplied by another project file. Fixed syntax names such as the key of an import attribute (`with { type: "json" }`) and `import.meta` / `new.target` are also left alone. By contrast, `Missing_NS` in `type T = Missing_NS.Member`, `Record` in the value expression `Record;`, and a type declared or imported by the current file are checked.
 
 Examples of **incorrect** code for this rule:
 
@@ -159,10 +159,9 @@ var { category_id = 1 } = query;
 
 ## Differences from ESLint
 
-- A name carrying a type annotation, a `?`, or a `!` is reported over the name alone. ESLint with a TypeScript parser reports over the name and everything the annotation adds, so on `function f(a_1: string) {}` the report ends at column 15 here and at column 26 there, and on `let a_1!: number;` at column 8 here and at column 17 there.
-- A class constructor whose `constructor` spelling contains a Unicode escape is rejected as syntax before rules run. ESLint accepts that spelling and checks the decoded name.
+- Given `External_NS` as a global namespace supplied by another TypeScript project file, rslint does not report it in `type T = External_NS.Member` when it fails the configured pattern; ESLint does. Both skip `Record` in `type U = Record<string, unknown>`.
 
 ## Original Documentation
 
 - [ESLint: id-match](https://eslint.org/docs/latest/rules/id-match)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/id-match.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/id-match.js)

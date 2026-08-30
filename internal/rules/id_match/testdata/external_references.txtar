@@ -1,0 +1,50 @@
+-- external-references/tsconfig.json --
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ESNext"
+  },
+  "files": ["external.d.ts", "valid.ts", "namespace-export.ts", "class-export.ts", "parenthesized.ts", "controls.ts", "shadow.ts"]
+}
+-- external-references/external.d.ts --
+declare namespace External_NS {
+  interface T {}
+  namespace Nested {
+    interface T {}
+  }
+  const value: number;
+}
+
+declare interface External_Interface {}
+declare const External_Value: number;
+declare class External_Class {}
+-- external-references/valid.ts --
+type X = External_NS.T;
+type Y = External_NS.Nested.T;
+type Z = External_Interface;
+interface I extends External_NS.T {}
+interface J extends External_Interface {}
+class C implements External_NS.T {}
+class D implements External_Interface {}
+import Alias = External_NS.T;
+export = External_Interface;
+-- external-references/namespace-export.ts --
+export = External_NS;
+-- external-references/class-export.ts --
+export default External_Class;
+-- external-references/parenthesized.ts --
+export default (External_Interface);
+-- external-references/controls.ts --
+type Query = typeof External_NS.value;
+const local = External_Value;
+class Derived extends External_Class {}
+export default External_Value;
+import Invalid = External_Interface;
+type Missing = Missing_NS.T;
+interface Local_Type {}
+type Local = Local_Type;
+-- external-references/shadow.ts --
+const External_Interface = 1;
+export default External_Interface;

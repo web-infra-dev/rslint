@@ -2,9 +2,10 @@ package scope
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// isReferenceIdentifier reports whether `id` reads or writes a binding, as
+// IsReferenceIdentifier reports whether id reads or writes a binding, as
 // opposed to naming one (declarations), naming a member (`a.b`, `{ b: 1 }`),
 // or naming a label.
 //
@@ -12,7 +13,7 @@ import (
 // true` and every consumer filters those out, so treating them as non-
 // references here is equivalent — and it keeps the two representations of the
 // same identifier from disagreeing.
-func isReferenceIdentifier(id *ast.Node) bool {
+func IsReferenceIdentifier(id *ast.Node) bool {
 	if id == nil || id.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -44,7 +45,11 @@ func isReferenceIdentifier(id *ast.Node) bool {
 
 	case ast.KindExportSpecifier:
 		// The local binding is `local` in `export { local as exported }`, and
-		// the sole name in `export { local }`.
+		// the sole name in `export { local }`. Re-exports name another module's
+		// binding and therefore have no local reference.
+		if utils.IsReExportSpecifier(parent) {
+			return false
+		}
 		spec := parent.AsExportSpecifier()
 		if spec == nil {
 			return false
@@ -55,14 +60,23 @@ func isReferenceIdentifier(id *ast.Node) bool {
 		}
 		return local == id
 
-	case ast.KindImportSpecifier:
-		// Neither the imported name nor the local alias reads a local binding.
+	case ast.KindImportSpecifier, ast.KindNamespaceImport,
+		ast.KindImportClause, ast.KindNamespaceExport:
+		// Import bindings and namespace-export labels do not read a local
+		// binding.
 		return false
 
+	case ast.KindPropertyAssignment:
+		return parent.AsPropertyAssignment().Name() != id
+
 	case ast.KindBindingElement:
-		// `{ prop: local = init }` — only the default initializer reads.
-		be := parent.AsBindingElement()
-		return be != nil && be.Initializer == id
+		// `{ prop: local = init }` — the property and binding names do not read;
+		// an identifier in the default initializer does.
+		binding := parent.AsBindingElement()
+		return binding != nil && binding.Initializer == id
+
+	case ast.KindImportAttribute:
+		return parent.AsImportAttribute().Name() != id
 
 	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
 		return false
@@ -86,10 +100,71 @@ func isReferenceIdentifier(id *ast.Node) bool {
 	return !ast.IsDeclarationName(id)
 }
 
-// referenceSpaces reports which binding spaces `id` can resolve to. Most
-// identifiers name either a value or a type depending on where they sit; the
-// export forms name whichever space the exported binding happens to live in.
-func referenceSpaces(id *ast.Node) (value bool, isType bool) {
+// ReferenceSpace is the pair of independent reference capabilities exposed by
+// typescript-eslint's scope manager. A reference can be value-only, type-only,
+// or dual-capable.
+type ReferenceSpace uint8
+
+const (
+	ReferenceValue ReferenceSpace = 1 << iota
+	ReferenceType
+
+	ReferenceDual = ReferenceValue | ReferenceType
+)
+
+// IncludesValue reports whether the reference can resolve a value definition.
+func (space ReferenceSpace) IncludesValue() bool {
+	return space&ReferenceValue != 0
+}
+
+// IncludesType reports whether the reference can resolve a type definition.
+func (space ReferenceSpace) IncludesType() bool {
+	return space&ReferenceType != 0
+}
+
+// DeclarationMeaning translates typescript-eslint's reference capabilities
+// to TypeScript binder declaration spaces. Namespace declarations are both
+// value- and type-capable in scope-manager, while import aliases can satisfy
+// either capability.
+func (space ReferenceSpace) DeclarationMeaning() ast.SymbolFlags {
+	meaning := ast.SymbolFlagsAlias
+	if space.IncludesValue() {
+		meaning |= ast.SymbolFlagsValue | ast.SymbolFlagsNamespace
+	}
+	if space.IncludesType() {
+		meaning |= ast.SymbolFlagsType | ast.SymbolFlagsNamespace
+	}
+	return meaning
+}
+
+// ReferenceSpaces keeps typescript-eslint's scope capabilities independent
+// from TypeScript's exact semantic meaning. They deliberately differ for some
+// syntax: ESTree erases parentheses around a bare export assignment, while the
+// TypeScript checker treats a parenthesized identifier as a value expression;
+// import-equals is value-only to scope-manager but its lexical root has
+// namespace meaning to the checker.
+type ReferenceSpaces struct {
+	ESLint     ReferenceSpace
+	TypeScript ast.SemanticMeaning
+}
+
+// ClassifyReferenceSpaces returns the scope-manager and checker spaces of id.
+// Callers should first use IsReferenceIdentifier when the AST position itself
+// may be a declaration, member name, label, or other non-reference.
+func ClassifyReferenceSpaces(id *ast.Node) ReferenceSpaces {
+	return ReferenceSpaces{
+		ESLint:     ESLintReferenceSpace(id),
+		TypeScript: TypeScriptReferenceMeaning(id),
+	}
+}
+
+// ESLintReferenceSpace reports which binding spaces id can resolve to in
+// typescript-eslint's scope manager. Most identifiers name either a value or a
+// type; export forms can name whichever space the exported binding occupies.
+func ESLintReferenceSpace(id *ast.Node) ReferenceSpace {
+	if id == nil || id.Parent == nil {
+		return ReferenceValue
+	}
 	parent := id.Parent
 	// TSESTree erases parentheses, so a parenthesized bare identifier remains
 	// the direct declaration of `export default (X)` / `export = (X)` there.
@@ -99,7 +174,7 @@ func referenceSpaces(id *ast.Node) (value bool, isType bool) {
 			exportParent.Kind == ast.KindExportAssignment {
 			if assignment := exportParent.AsExportAssignment(); assignment != nil &&
 				ast.SkipParentheses(assignment.Expression) == id {
-				return true, true
+				return ReferenceDual
 			}
 		}
 	}
@@ -107,24 +182,87 @@ func referenceSpaces(id *ast.Node) (value bool, isType bool) {
 	case ast.KindExportSpecifier:
 		// `export type { T }` and `export { type T }` export types only.
 		if spec := parent.AsExportSpecifier(); spec != nil && spec.IsTypeOnly {
-			return false, true
+			return ReferenceType
 		}
 		if named := parent.Parent; named != nil && named.Parent != nil {
 			if decl := named.Parent.AsExportDeclaration(); decl != nil && decl.IsTypeOnly {
-				return false, true
+				return ReferenceType
 			}
 		}
-		return true, true
+		return ReferenceDual
 	case ast.KindTypePredicate:
 		// The parameter name is a value reference even though the surrounding
 		// predicate is a type node.
-		return true, false
+		return ReferenceValue
 	}
 
 	if InTypePosition(id) {
-		return false, true
+		return ReferenceType
 	}
-	return true, false
+	return ReferenceValue
+}
+
+// TypeScriptReferenceMeaning mirrors the declaration space TypeScript uses to
+// resolve a lexical identifier reference. It stays separate from the ESLint
+// space above so neither consumer has to approximate the other's semantics.
+func TypeScriptReferenceMeaning(id *ast.Node) ast.SemanticMeaning {
+	if id == nil || id.Parent == nil {
+		return ast.SemanticMeaningValue
+	}
+	parent := id.Parent
+
+	switch parent.Kind {
+	// Only the raw direct child receives export-assignment All meaning.
+	// Parentheses turn the identifier into an ordinary value expression in the
+	// TypeScript AST even though ESTree erases them.
+	case ast.KindExportAssignment:
+		return ast.SemanticMeaningAll
+	case ast.KindExportSpecifier:
+		if ast.IsTypeOnlyImportOrExportDeclaration(parent) {
+			return ast.SemanticMeaningType | ast.SemanticMeaningNamespace
+		}
+		return ast.SemanticMeaningAll
+	case ast.KindTypePredicate:
+		// A type-predicate parameter reads a value.
+		return ast.SemanticMeaningValue
+	case ast.KindQualifiedName:
+		// Dotted type names resolve their leftmost lexical identifier as a
+		// namespace.
+		if parent.AsQualifiedName().Left == id {
+			if ast.IsPartOfTypeQuery(id) {
+				return ast.SemanticMeaningValue
+			}
+			// This is also the root of an internal import-equals module name such
+			// as `A` in `import X = A.B`. The final qualified entity can have All
+			// meaning there, but its member name is not a lexical reference.
+			return ast.SemanticMeaningNamespace
+		}
+	case ast.KindPropertyAccessExpression:
+		// Type-only heritage clauses use PropertyAccessExpression for their
+		// qualified target, while class extends and ordinary accesses are values.
+		if ast.IsPartOfTypeQuery(id) {
+			return ast.SemanticMeaningValue
+		}
+		if isTypeOnlyPropertyAccessQualifier(id) {
+			return ast.SemanticMeaningNamespace
+		}
+		return ast.SemanticMeaningValue
+	case ast.KindImportEqualsDeclaration:
+		if parent.AsImportEqualsDeclaration().ModuleReference == id {
+			return ast.SemanticMeaningNamespace
+		}
+	}
+
+	// Most identifiers are ordinary values. Only ask the more specific
+	// type-query question after establishing that the identifier is nested in
+	// type syntax; a type-query operand still reads a value there.
+	if InTypePosition(id) {
+		if ast.IsPartOfTypeQuery(id) {
+			return ast.SemanticMeaningValue
+		}
+		return ast.SemanticMeaningType
+	}
+	return ast.SemanticMeaningValue
 }
 
 // InTypePosition reports whether `id` names a type rather than a value.
@@ -136,12 +274,31 @@ func referenceSpaces(id *ast.Node) (value bool, isType bool) {
 // with property accesses even in type position (`implements A.B.C`), so both
 // shapes have to be climbed.
 func InTypePosition(id *ast.Node) bool {
+	if id == nil {
+		return false
+	}
 	entity := id
 	for entity.Parent != nil &&
 		(entity.Parent.Kind == ast.KindQualifiedName || entity.Parent.Kind == ast.KindPropertyAccessExpression) {
 		entity = entity.Parent
 	}
 	return ast.IsPartOfTypeNode(entity)
+}
+
+// isTypeOnlyPropertyAccessQualifier reports whether id is the lexical root of
+// an expression-shaped qualified name used as a type. TypeScript represents
+// `N.T` in `class C implements N.T` and `interface I extends N.T` with a
+// PropertyAccessExpression, while class `extends N.T` remains value syntax.
+func isTypeOnlyPropertyAccessQualifier(id *ast.Node) bool {
+	entity := id
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
+		access := entity.Parent.AsPropertyAccessExpression()
+		if access == nil || access.Expression != entity {
+			break
+		}
+		entity = entity.Parent
+	}
+	return entity != id && ast.IsPartOfTypeNode(entity)
 }
 
 // isImportTypeQualifier reports whether `id` is part of the qualifier of an

@@ -45,6 +45,16 @@ func TestIdMatchExtrasNoProject(t *testing.T) {
 			options: []any{`^x$`},
 		},
 		{
+			name:    "library type in export assignment",
+			code:    "export = Record;",
+			options: []any{`^x$`},
+		},
+		{
+			name:    "library type in default export",
+			code:    "export default Record;",
+			options: []any{`^x$`},
+		},
+		{
 			// ---- A qualified member is still an authored name ----
 			name:    "library names as qualified type members",
 			code:    "type X = Foo.Record<string> | Foo.Array<string> | Foo.Partial<string>;",

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 // RefStore owns the per-file identifier-reference index for one linted source
@@ -195,13 +196,51 @@ func sharesDeclaration(a, b *ast.Symbol) bool {
 //
 // Returns nil for identifiers that aren't reference positions (declaration
 // names, property keys, import bindings, re-export/alias-label names, labels,
-// intrinsic JSX tags — see isReferencePosition) and for names that don't
+// intrinsic JSX tags — see scope.IsReferenceIdentifier) and for names that don't
 // resolve to any symbol.
 func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
-	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+	if s == nil || !scope.IsReferenceIdentifier(node) {
 		return nil
 	}
-	meaning := referenceMeaning(node)
+	return s.resolveReference(node, referenceMeaning(node))
+}
+
+// ResolveTypeOrNamespace returns the symbol selected by node's exact
+// TypeScript meaning only when that reference meaning, and the selected symbol
+// itself, are type- or namespace-capable. It resolves with the full meaning
+// first so a local value selected by a dual-space export cannot be bypassed by
+// a second, narrower type lookup.
+//
+// Alias capability is read through the checker when available, but the alias
+// symbol itself is returned so callers can still tell whether its declaration
+// belongs to the linted file.
+func (s *RefStore) ResolveTypeOrNamespace(node *ast.Node) *ast.Symbol {
+	if s == nil || !scope.IsReferenceIdentifier(node) {
+		return nil
+	}
+	semanticMeaning := scope.TypeScriptReferenceMeaning(node)
+	capability := typeOrNamespaceSymbolFlags(semanticMeaning)
+	if capability == 0 {
+		return nil
+	}
+	symbol := s.resolveReference(node, referenceMeaningForSemanticMeaning(node, semanticMeaning))
+	if symbol == nil {
+		return nil
+	}
+	flags := symbol.Flags
+	if flags&ast.SymbolFlagsAlias != 0 {
+		if s.tc == nil {
+			return nil
+		}
+		flags = s.tc.GetSymbolFlags(symbol)
+	}
+	if flags&capability == 0 {
+		return nil
+	}
+	return symbol
+}
+
+func (s *RefStore) resolveReference(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
 	if sym := s.binderReferenceSymbol(node, meaning); sym != nil {
 		return sym
 	}
@@ -219,7 +258,7 @@ func (s *RefStore) Resolve(node *ast.Node) *ast.Symbol {
 // their answer must not change merely because rslint happened to construct a
 // TypeChecker for the file.
 func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
-	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+	if s == nil || !scope.IsReferenceIdentifier(node) {
 		return nil
 	}
 	return s.binderReferenceSymbol(node, referenceMeaning(node))
@@ -231,7 +270,7 @@ func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
 // independently be type-capable, value-capable, or both. Like ResolveInFile,
 // it never consults the TypeChecker or declarations outside this source file.
 func (s *RefStore) ResolveInFileWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *ast.Symbol {
-	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+	if s == nil || !scope.IsReferenceIdentifier(node) {
 		return nil
 	}
 	return s.binderReferenceSymbol(node, meaning)
@@ -248,7 +287,7 @@ func (s *RefStore) HasImplicitWrapperBinding(name string) bool {
 // resolved file wrapper. It never consults the TypeChecker and does not
 // manufacture an ast.Symbol for an implicit binding.
 func (s *RefStore) IsDefinedInFile(node *ast.Node) bool {
-	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+	if s == nil || !scope.IsReferenceIdentifier(node) {
 		return false
 	}
 	if s.binderReferenceSymbol(node, referenceMeaning(node)) != nil {
@@ -565,7 +604,7 @@ func (s *RefStore) hasAuthoredProgramDefinition(name string) bool {
 // IsGlobalReference is IsGlobalNameReference using the declaration-space
 // meaning implied by node's syntactic reference position.
 func (s *RefStore) IsGlobalReference(node *ast.Node) bool {
-	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+	if s == nil || !scope.IsReferenceIdentifier(node) {
 		return false
 	}
 	meaning := referenceMeaning(node)
@@ -705,7 +744,7 @@ func (s *RefStore) collectCandidates() {
 	s.refs = make(map[*ast.Symbol][]*ast.Node)
 	var visit func(n *ast.Node) bool
 	visit = func(n *ast.Node) bool {
-		if n.Kind == ast.KindIdentifier && isReferencePosition(n) {
+		if scope.IsReferenceIdentifier(n) {
 			text := n.Text()
 			s.candidates[text] = append(s.candidates[text], n)
 		}
@@ -715,166 +754,37 @@ func (s *RefStore) collectCandidates() {
 	s.sourceFile.AsNode().ForEachChild(visit)
 }
 
-// isReferencePosition reports whether an identifier can reference a symbol
-// declared elsewhere: not a declaration name, and not a position that names
-// something non-local (property names, import bindings, labels, intrinsic JSX
-// tags). The one exception is a local named export's real target — see the
-// ExportSpecifier case below.
-func isReferencePosition(n *ast.Node) bool {
-	p := n.Parent
-	if p != nil && p.Kind == ast.KindShorthandPropertyAssignment && p.AsShorthandPropertyAssignment().Name() == n {
-		// `{x}` reads x as an expression, and `({x} = obj)` writes to x once
-		// the object literal is reinterpreted as an assignment pattern;
-		// IsDeclarationName treats this name as a declaration (it also
-		// declares the object's property), which would otherwise discard
-		// both real uses.
-		return true
-	}
-	if p != nil && p.Kind == ast.KindExportSpecifier {
-		// `export { foo }` / `export { foo as bar }` reads its local binding
-		// through PropertyName when present (the rename target, `foo`) or
-		// Name when it isn't (no rename) — ESLint's scope-manager marks this
-		// as a read of that binding. IsDeclarationName treats this node as a
-		// declaration either way (Name() equals the node itself when there's
-		// no PropertyName, and equals the alias label `bar` when there is),
-		// which would otherwise discard the real local reference the same
-		// way it would for a shorthand property name above. A re-export
-		// (`export { foo } from 'mod'`, aliased or not) references the
-		// other module's binding instead, so neither part is a reference
-		// there.
-		if utils.IsReExportSpecifier(p) {
-			return false
-		}
-		if propertyName := p.PropertyName(); propertyName != nil {
-			return propertyName == n
-		}
-		return true
-	}
-	if ast.IsDeclarationName(n) {
-		return false
-	}
-	if p == nil {
-		return false
-	}
-	switch p.Kind {
-	case ast.KindPropertyAccessExpression:
-		return p.AsPropertyAccessExpression().Name() != n
-	case ast.KindQualifiedName:
-		return p.AsQualifiedName().Right != n
-	case ast.KindPropertyAssignment:
-		return p.AsPropertyAssignment().Name() != n
-	case ast.KindBindingElement:
-		return p.AsBindingElement().PropertyName != n
-	case ast.KindImportAttribute:
-		// Import attribute keys (`type` in `with { type: "json" }`) are
-		// syntactic names, not references to same-named variables.
-		return p.AsImportAttribute().Name() != n
-	case ast.KindImportSpecifier, ast.KindNamespaceImport,
-		ast.KindImportClause, ast.KindNamespaceExport:
-		// Import bindings and the export half of `export * as NS` resolve
-		// through module/alias machinery the checker owns; the current
-		// consumers never treat them as references.
-		return false
-	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
-		// Labels live in their own namespace and never reference variables.
-		return false
-	case ast.KindMetaProperty:
-		// `target`/`meta`/`defer` in `new.target`, `import.meta`, and
-		// `import.defer` are syntactic, not identifiers that can reference a
-		// variable.
-		return false
-	case ast.KindJsxNamespacedName:
-		// The namespace and name pieces of a namespaced JSX tag or attribute
-		// (`<foo:bar attr:name="v" />`) are syntactic, never variable
-		// references; the plain identifier tag name case is still handled
-		// by IsJsxTagName below.
-		return false
-	}
-	if ast.IsJsxTagName(n) {
-		// Lowercase tag names are JSX intrinsics (`<div>`), not identifier
-		// references; uppercase ones reference a component value.
-		text := n.Text()
-		return len(text) > 0 && (text[0] < 'a' || text[0] > 'z')
-	}
-	return true
-}
-
 // referenceMeaning mirrors the meaning the checker's
 // getSymbolOfNameOrPropertyAccessExpression would resolve this identifier
 // with. SymbolFlagsAlias is always included: the plain binder lookup cannot
 // resolve alias targets, so import aliases must match on the alias symbol
 // itself (which is also what the reference consumers track).
 func referenceMeaning(n *ast.Node) ast.SymbolFlags {
-	p := n.Parent
-	if p != nil && p.Kind == ast.KindTypePredicate {
+	return referenceMeaningForSemanticMeaning(n, scope.TypeScriptReferenceMeaning(n))
+}
+
+func referenceMeaningForSemanticMeaning(n *ast.Node, meaning ast.SemanticMeaning) ast.SymbolFlags {
+	if n.Parent != nil && n.Parent.Kind == ast.KindTypePredicate {
 		// `x is T` — the x names a parameter.
 		return ast.SymbolFlagsFunctionScopedVariable
 	}
-	if p != nil && p.Kind == ast.KindExportAssignment {
-		// `export = Foo` and `export default Foo` resolve entity names in all
-		// declaration spaces. In particular, TypeScript permits type-only
-		// declarations such as an interface to be consumed by `export =`.
-		// Mirror the checker's getSymbolOfNameOrPropertyAccessExpression path
-		// instead of treating the identifier as an ordinary value expression.
-		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
-	}
-	if p != nil && p.Kind == ast.KindExportSpecifier {
-		// A type-only export creates a type reference. It may bind to a type,
-		// namespace, or import alias, but never to a value-only declaration.
-		// Namespace is separate from Type in the TypeScript binder even though
-		// typescript-eslint scope-manager treats namespace definitions as
-		// type-capable variables.
-		if ast.IsTypeOnlyImportOrExportDeclaration(p) {
-			return ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
-		}
-		// A regular local export creates a dual value/type reference, so it
-		// can bind in any declaration space.
-		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
-	}
-	// `import a = b.c` — the right-hand side may name a value, type, or
-	// namespace.
-	entity := n
-	for entity.Parent != nil && entity.Parent.Kind == ast.KindQualifiedName {
-		entity = entity.Parent
-	}
-	if entity.Parent != nil && entity.Parent.Kind == ast.KindImportEqualsDeclaration &&
-		entity.Parent.AsImportEqualsDeclaration().ModuleReference == entity {
-		return ast.SymbolFlagsValue | ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
-	}
-	// Heritage clauses parse dotted names as PropertyAccessExpressions rather
-	// than QualifiedNames. In a type-only heritage position, the root of that
-	// property-access chain still names a namespace and must skip a same-named
-	// value binding. A class `extends` expression is not part of a type node, so
-	// it deliberately continues to the value-space branch below.
-	if isTypeOnlyPropertyAccessQualifier(n) {
-		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
-	}
-	if ast.IsExpressionNode(n) {
-		return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
-	}
-	// Leftmost qualifier of a non-expression entity name (`A` in `let x: A.B`)
-	// names a namespace. Expression and typeof chains were handled above.
-	if p != nil && p.Kind == ast.KindQualifiedName && p.AsQualifiedName().Left == n {
-		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
-	}
-	if ast.IsPartOfTypeNode(n) {
-		return ast.SymbolFlagsType | ast.SymbolFlagsAlias
-	}
-	return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
+	return symbolFlagsForSemanticMeaning(meaning) | ast.SymbolFlagsAlias
 }
 
-// isTypeOnlyPropertyAccessQualifier reports whether n is the lexical root of
-// an expression-shaped qualified name used as a type. TypeScript represents
-// `N.T` in `class C implements N.T` and `interface I extends N.T` with a
-// PropertyAccessExpression, even though N has namespace meaning there.
-func isTypeOnlyPropertyAccessQualifier(n *ast.Node) bool {
-	entity := n
-	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
-		access := entity.Parent.AsPropertyAccessExpression()
-		if access == nil || access.Expression != entity {
-			break
-		}
-		entity = entity.Parent
+func symbolFlagsForSemanticMeaning(meaning ast.SemanticMeaning) ast.SymbolFlags {
+	var flags ast.SymbolFlags
+	if meaning&ast.SemanticMeaningValue != 0 {
+		flags |= ast.SymbolFlagsValue
 	}
-	return entity != n && ast.IsPartOfTypeNode(entity)
+	if meaning&ast.SemanticMeaningType != 0 {
+		flags |= ast.SymbolFlagsType
+	}
+	if meaning&ast.SemanticMeaningNamespace != 0 {
+		flags |= ast.SymbolFlagsNamespace
+	}
+	return flags
+}
+
+func typeOrNamespaceSymbolFlags(meaning ast.SemanticMeaning) ast.SymbolFlags {
+	return symbolFlagsForSemanticMeaning(meaning & (ast.SemanticMeaningType | ast.SemanticMeaningNamespace))
 }
