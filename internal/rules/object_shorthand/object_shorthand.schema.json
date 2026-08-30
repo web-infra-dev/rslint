@@ -50,7 +50,7 @@
             },
             "methodsIgnorePattern": {
               "type": "string",
-              "format": "regex"
+              "format": "regex-u"
             },
             "avoidQuotes": {
               "type": "boolean"

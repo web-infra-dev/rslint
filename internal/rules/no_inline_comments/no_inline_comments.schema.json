@@ -6,7 +6,7 @@
       "properties": {
         "ignorePattern": {
           "type": "string",
-          "format": "regex"
+          "format": "regex-u"
         }
       },
       "additionalProperties": false
