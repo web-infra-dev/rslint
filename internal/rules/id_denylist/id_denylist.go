@@ -7,8 +7,10 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed id_denylist.schema.json
@@ -34,7 +36,6 @@ var IdDenylistRule = rule.Rule{
 		if len(denyList) == 0 {
 			return rule.RuleListeners{}
 		}
-
 		check := func(node *ast.Node) {
 			name := node.Text()
 			isPrivate := node.Kind == ast.KindPrivateIdentifier
@@ -56,7 +57,7 @@ var IdDenylistRule = rule.Rule{
 				})
 				return
 			}
-			ctx.ReportNode(node, rule.RuleMessage{
+			ctx.ReportRange(identifierReportRange(ctx.SourceFile, node), rule.RuleMessage{
 				Id:          "restricted",
 				Description: fmt.Sprintf("Identifier '%s' is restricted.", name),
 			})
@@ -65,11 +66,28 @@ var IdDenylistRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindIdentifier:        check,
 			ast.KindPrivateIdentifier: check,
+			ast.KindImportType: func(node *ast.Node) {
+				name, nameRange, ok := importTypeAttributeKeywordRange(ctx.SourceFile, node)
+				if !ok {
+					return
+				}
+				if _, restricted := denyList[name]; !restricted {
+					return
+				}
+				ctx.ReportRange(nameRange, rule.RuleMessage{
+					Id:          "restricted",
+					Description: fmt.Sprintf("Identifier '%s' is restricted.", name),
+				})
+			},
 			ast.KindConstructor: func(node *ast.Node) {
 				if _, restricted := denyList["constructor"]; !restricted {
 					return
 				}
-				ctx.ReportRange(constructorNameRange(ctx.SourceFile, node), rule.RuleMessage{
+				nameRange, ok := constructorNameRange(ctx.SourceFile, node)
+				if !ok {
+					return
+				}
+				ctx.ReportRange(nameRange, rule.RuleMessage{
 					Id:          "restricted",
 					Description: "Identifier 'constructor' is restricted.",
 				})
@@ -78,18 +96,98 @@ var IdDenylistRule = rule.Rule{
 	},
 }
 
+// importTypeAttributeKeywordRange restores the outer `with`/`assert` key of
+// an import type's options object. typescript-eslint exposes that key as an
+// Identifier, but tsgo stores only its token kind on ImportAttributes and
+// emits no child node for the source token. Static and dynamic imports keep
+// their existing import-attribute exclusion because this listener is limited
+// to ImportType.
+func importTypeAttributeKeywordRange(
+	sourceFile *ast.SourceFile,
+	node *ast.Node,
+) (name string, textRange core.TextRange, ok bool) {
+	if sourceFile == nil || node == nil || node.Kind != ast.KindImportType {
+		return "", core.TextRange{}, false
+	}
+	importType := node.AsImportTypeNode()
+	if importType == nil || importType.Argument == nil || importType.Attributes == nil {
+		return "", core.TextRange{}, false
+	}
+	attributes := importType.Attributes.AsImportAttributes()
+	if attributes == nil {
+		return "", core.TextRange{}, false
+	}
+	switch attributes.Token {
+	case ast.KindWithKeyword:
+		name = "with"
+	case ast.KindAssertKeyword:
+		name = "assert"
+	default:
+		return "", core.TextRange{}, false
+	}
+
+	start, end := importType.Argument.End(), importType.Attributes.Pos()
+	if start < 0 || end <= start || end > len(sourceFile.Text()) {
+		return "", core.TextRange{}, false
+	}
+	s := scanner.GetScannerForSourceFile(sourceFile, start)
+	for s.Token() != ast.KindEndOfFile && s.TokenStart() < end {
+		if s.Token() == attributes.Token && s.TokenEnd() <= end {
+			return name, core.NewTextRange(s.TokenStart(), s.TokenEnd()), true
+		}
+		s.Scan()
+	}
+	return "", core.TextRange{}, false
+}
+
+// identifierReportRange matches the Identifier range typescript-eslint gives
+// core rules. A simple variable or non-rest parameter name owns its optional
+// marker and direct type annotation in ESTree; binding-pattern children and
+// rest identifiers do not. Initializers remain outside the reported range.
+func identifierReportRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	textRange := utils.TrimNodeTextRange(sourceFile, node)
+	parent := node.Parent
+	if parent == nil || parent.Name() != node {
+		return textRange
+	}
+
+	var last *ast.Node
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		last = parent.AsVariableDeclaration().Type
+	case ast.KindParameter:
+		parameter := parent.AsParameterDeclaration()
+		if parameter.DotDotDotToken == nil {
+			last = parameter.Type
+			if last == nil {
+				last = parameter.QuestionToken
+			}
+		}
+	}
+	if last != nil && !utils.IsInJSDocSyntax(last) && last.End() > textRange.End() {
+		return textRange.WithEnd(last.End())
+	}
+	return textRange
+}
+
 // constructorNameRange narrows a constructor declaration's modifier-inclusive
 // function head to its keyword, which is the identifier range ESLint reports.
-func constructorNameRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+func constructorNameRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRange, bool) {
+	if sourceFile == nil || node == nil {
+		return core.TextRange{}, false
+	}
 	start := node.Pos()
-	if sourceFile == nil || start < 0 || node.End() < start || node.End() > len(sourceFile.Text()) {
-		return utils.GetFunctionHeadLoc(sourceFile, node)
+	if modifiers := node.Modifiers(); modifiers != nil && len(modifiers.Nodes) > 0 {
+		start = modifiers.Nodes[len(modifiers.Nodes)-1].End()
 	}
-	if offset := strings.Index(sourceFile.Text()[start:node.End()], "constructor"); offset >= 0 {
-		start += offset
-		return core.NewTextRange(start, start+len("constructor"))
+	if start < 0 || start >= node.End() || node.End() > len(sourceFile.Text()) {
+		return core.TextRange{}, false
 	}
-	return utils.GetFunctionHeadLoc(sourceFile, node)
+	s := scanner.GetScannerForSourceFile(sourceFile, start)
+	if s.Token() != ast.KindConstructorKeyword || s.TokenEnd() > node.End() {
+		return core.TextRange{}, false
+	}
+	return core.NewTextRange(s.TokenStart(), s.TokenEnd()), true
 }
 
 // shouldCheck determines whether a restricted name in this position is
@@ -255,14 +353,43 @@ func isPropertyNameInDestructuring(node *ast.Node) bool {
 // is assumed that user has no control over the names of external global
 // variables.
 func isReferenceToGlobalVariable(ctx rule.RuleContext, node *ast.Node) bool {
-	if ctx.Refs == nil || !isVariableReference(node) {
+	if ctx.Refs == nil || node.Kind != ast.KindIdentifier || node.Parent == nil {
 		return false
+	}
+	// A non-aliased local export has one ts-go node for both the local
+	// reference and the exported name. Upstream visits the exported-name role,
+	// so a global local target must not hide that report.
+	if node.Parent.Kind == ast.KindExportSpecifier &&
+		node.Parent.PropertyName() == nil && !utils.IsReExportSpecifier(node.Parent) {
+		return false
+	}
+	// import("pkg").Name names an imported module member rather than an
+	// implicit global. Type arguments nested within the ImportType are not
+	// covered by this helper and keep their normal reference role.
+	if utils.IsImportTypeSyntax(node) {
+		return false
+	}
+
+	referenceSpace := scope.ESLintReferenceSpace(node)
+	if node.Parent.Kind != ast.KindNamespaceExportDeclaration && !isVariableReference(node) {
+		return false
+	}
+	if node.Parent.Kind == ast.KindNamespaceExportDeclaration {
+		referenceSpace = scope.ReferenceValue
 	}
 	name := node.Text()
-	if !ctx.Globals.Access(name).IsDeclared() {
+	meaning := referenceSpace.DeclarationMeaning()
+	if !ctx.Refs.IsGlobalNameReference(node, name, meaning) {
 		return false
 	}
-	return ctx.Refs.IsGlobalReference(node)
+	if ctx.Globals.Access(name).IsDeclared() {
+		return true
+	}
+	// typescript-eslint seeds a default esnext catalog in the type namespace.
+	// Keep the exemption space-sensitive: `Record` is external in a type, but
+	// the same spelling in a value expression remains authored code.
+	return referenceSpace.IncludesType() &&
+		rule.IsDefaultTypeScriptTypeGlobal(name)
 }
 
 // isVariableReference reports whether node occupies a position that upstream's
@@ -271,6 +398,10 @@ func isReferenceToGlobalVariable(ctx rule.RuleContext, node *ast.Node) bool {
 func isVariableReference(node *ast.Node) bool {
 	if node.Kind != ast.KindIdentifier {
 		return false
+	}
+	if node.Parent.Kind == ast.KindExportSpecifier && !utils.IsReExportSpecifier(node.Parent) {
+		propertyName := node.Parent.PropertyName()
+		return propertyName == nil || propertyName == node
 	}
 	// `{ foo }` is one node here and two upstream: a property key and a value
 	// reference. Only inside a destructuring pattern, where the key half is
@@ -295,7 +426,13 @@ func isImportAttributeKey(node *ast.Node) bool {
 
 	// Static import / re-export.
 	if parent.Kind == ast.KindImportAttribute && parent.AsImportAttribute().Name() == node {
-		return true
+		// ImportType options reuse ImportAttribute syntax in ts-go, while
+		// upstream exposes those keys as ordinary identifiers.
+		return !utils.IsImportTypeSyntax(node)
+	}
+	// Nested ImportType option keys use object syntax too.
+	if utils.IsImportTypeSyntax(node) {
+		return false
 	}
 
 	// Dynamic import. A computed key is evaluated rather than named, so it is
@@ -326,7 +463,7 @@ func isImportAttributeKey(node *ast.Node) bool {
 	if owner == nil {
 		return false
 	}
-	if ast.IsImportCall(owner) {
+	if ast.IsImportCall(owner) && !utils.IsImportTypeSyntax(owner) {
 		arguments := owner.AsCallExpression().Arguments
 		if arguments != nil && len(arguments.Nodes) > 1 && arguments.Nodes[1] == object {
 			return true

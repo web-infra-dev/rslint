@@ -574,6 +574,9 @@ func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meanin
 	if s == nil || location == nil || name == "" {
 		return false
 	}
+	if location.Parent != nil && location.Parent.Kind == ast.KindExportSpecifier && !isLocalExportTarget(location) {
+		return false
+	}
 	if !s.HasNonGlobalProgramScope() && s.hasAuthoredProgramDefinition(name) {
 		return false
 	}
@@ -583,10 +586,29 @@ func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meanin
 	if s.hasAuthoredImportBinding(name) {
 		return false
 	}
-	if hasAuthoredDeclaration(s.resolveName(location, name, meaning)) {
+	resolved := s.resolveName(location, name, meaning)
+	// A local export specifier declares its own alias at the same identifier
+	// location that references the local target. That alias is not an authored
+	// lexical definition which can shadow an environment global; continue past
+	// it with the same guard used by ordinary RefStore reference resolution.
+	if location.Kind == ast.KindIdentifier && location.Text() == name && isLocalExportTarget(location) {
+		resolved = s.binderReferenceSymbol(location, meaning)
+	}
+	if hasAuthoredDeclaration(resolved) {
 		return false
 	}
 	return meaning&ast.SymbolFlagsValue == 0 || !s.HasImplicitWrapperBinding(name)
+}
+
+func isLocalExportTarget(location *ast.Node) bool {
+	if location == nil || location.Parent == nil ||
+		location.Parent.Kind != ast.KindExportSpecifier || utils.IsReExportSpecifier(location.Parent) {
+		return false
+	}
+	if propertyName := location.Parent.PropertyName(); propertyName != nil {
+		return propertyName == location
+	}
+	return location.Parent.Name() == location
 }
 
 // hasAuthoredProgramDefinition reports whether the file spells a definition

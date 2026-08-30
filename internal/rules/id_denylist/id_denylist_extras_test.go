@@ -148,8 +148,9 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `[foo.bar!] = source;`, Options: deny("foo", "bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 2)}},
 
 			// Filtering JSDoc syntax must not hide the real declaration that follows
-			// it, nor an authored declaration carrying a JSDoc tag.
+			// it, nor let a synthesized JSDoc type move that declaration's range.
 			{Code: `/** @type {Foo} */ let Foo;`, FileName: "jsdoc-authored.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("Foo", 1, 24)}},
+			{Code: `/** @param {Foo} Foo */ function f(Foo) {}`, FileName: "jsdoc-parameter.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("Foo", 1, 36)}},
 			{Code: `/** @enum {number} */ const Number = {x: 1}; Number;`, FileName: "jsdoc-enum.js", TSConfig: "tsconfig.allow-js.json", Options: deny("Number"), Errors: []rule_tester.InvalidTestCaseError{restricted("Number", 1, 29), restricted("Number", 1, 46)}},
 
 			// `__filename` and `__dirname` are not globals in ESLint's CommonJS
@@ -310,12 +311,11 @@ function foo(a: any) {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTes
 			{Code: `let x: Foo.Bar;`, Options: deny("Foo", "Bar"), Errors: []rule_tester.InvalidTestCaseError{restricted("Foo", 1, 8), restricted("Bar", 1, 12)}},
 			{Code: `let a: Array<Foo>;`, Options: deny("Array", "Foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("Foo", 1, 14)}},
 
-			// ---- Dimension 4: an annotated variable declarator or parameter is
-			// reported over the name alone, where ESLint ends the range after the
-			// annotation. A class field, an interface member and a type-literal
-			// member carry an annotation too and do not differ ----
-			{Code: `let x: Foo;`, Options: deny("x"), Errors: []rule_tester.InvalidTestCaseError{restricted("x", 1, 5)}},
-			{Code: `function f(a: string) {}`, Options: deny("a"), Errors: []rule_tester.InvalidTestCaseError{restricted("a", 1, 12)}},
+			// ---- Dimension 4: ESTree folds a variable or parameter's direct type
+			// annotation into its Identifier range. A class field, interface member
+			// and type-literal member retain the plain name range ----
+			{Code: `let x: Foo;`, Options: deny("x"), Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Line: 1, Column: 5, EndLine: 1, EndColumn: 11}}},
+			{Code: `function f(a: string) {}`, Options: deny("a"), Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Line: 1, Column: 12, EndLine: 1, EndColumn: 21}}},
 			{Code: `class C { data: string[] = []; }`, Options: deny("data"), Errors: []rule_tester.InvalidTestCaseError{restricted("data", 1, 11)}},
 			{Code: `interface I { data: string }`, Options: deny("data"), Errors: []rule_tester.InvalidTestCaseError{restricted("data", 1, 15)}},
 
