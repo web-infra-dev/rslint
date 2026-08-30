@@ -52,6 +52,8 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `foo?.bar();`, Options: deny("bar")},
 			{Code: `foo?.(bar);`, Options: deny("bar")},
 			{Code: `Number?.NaN;`, Options: deny("Number")},
+			{Code: `foo?.bar = baz;`, Options: deny("bar")},
+			{Code: `foo?.bar.baz += qux;`, Options: deny("bar", "baz")},
 
 			// ---- Dimension 4: object key forms; only an identifier or a private name
 			// is a name this rule can read, and a computed key is an expression ----
@@ -190,6 +192,8 @@ func TestIdDenylistExtras(t *testing.T) {
 			{Code: `function* foo() {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 11)}},
 			{Code: `async function* foo() {}`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 17)}},
 			{Code: `class C { static #foo() {} }`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restrictedPrivate("foo", 1, 18)}},
+			{Code: `class C { constructor() {} }`, Options: deny("constructor"), Errors: []rule_tester.InvalidTestCaseError{restricted("constructor", 1, 11)}},
+			{Code: `class C { private constructor() {} }`, Options: deny("constructor"), Errors: []rule_tester.InvalidTestCaseError{restricted("constructor", 1, 19)}},
 
 			// ---- Dimension 4: same-kind nesting, where both the outer and the inner name are reported ----
 			{Code: `function foo() { function foo() {} }`, Options: deny("foo"), Errors: []rule_tester.InvalidTestCaseError{restricted("foo", 1, 10), restricted("foo", 1, 27)}},

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -64,8 +65,31 @@ var IdDenylistRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindIdentifier:        check,
 			ast.KindPrivateIdentifier: check,
+			ast.KindConstructor: func(node *ast.Node) {
+				if _, restricted := denyList["constructor"]; !restricted {
+					return
+				}
+				ctx.ReportRange(constructorNameRange(ctx.SourceFile, node), rule.RuleMessage{
+					Id:          "restricted",
+					Description: "Identifier 'constructor' is restricted.",
+				})
+			},
 		}
 	},
+}
+
+// constructorNameRange narrows a constructor declaration's modifier-inclusive
+// function head to its keyword, which is the identifier range ESLint reports.
+func constructorNameRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	start := node.Pos()
+	if sourceFile == nil || start < 0 || node.End() < start || node.End() > len(sourceFile.Text()) {
+		return utils.GetFunctionHeadLoc(sourceFile, node)
+	}
+	if offset := strings.Index(sourceFile.Text()[start:node.End()], "constructor"); offset >= 0 {
+		start += offset
+		return core.NewTextRange(start, start+len("constructor"))
+	}
+	return utils.GetFunctionHeadLoc(sourceFile, node)
 }
 
 // shouldCheck determines whether a restricted name in this position is
@@ -138,6 +162,12 @@ func shouldCheck(ctx rule.RuleContext, node *ast.Node) bool {
 // target. Prefix/postfix `++`/`--` and a bare `for (x.y in z)` target are
 // deliberately absent: upstream reports neither.
 func isAssignmentTarget(node *ast.Node) bool {
+	// ESTree retains a ChainExpression around optional property writes; tsgo
+	// flattens it into the access node. Until parentheses terminate that chain,
+	// the property is still a read rather than an assignment target upstream.
+	if ast.IsOptionalChain(node) {
+		return false
+	}
 	target := node
 	for target.Parent != nil && target.Parent.Kind == ast.KindParenthesizedExpression {
 		target = target.Parent

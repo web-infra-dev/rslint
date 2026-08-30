@@ -568,7 +568,15 @@ func (s *RefStore) IsGlobalReference(node *ast.Node) bool {
 	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
 		return false
 	}
-	return s.IsGlobalNameReference(node, node.Text(), referenceMeaning(node))
+	meaning := referenceMeaning(node)
+	// ESLint's global-reference check treats a namespace declaration as a
+	// controllable value binding, but ordinary RefStore expression resolution
+	// must not. Keeping this meaning local prevents namespace-only symbols from
+	// changing every Resolve consumer's answer.
+	if ast.IsExpressionNode(node) {
+		meaning |= ast.SymbolFlagsNamespace
+	}
+	return s.IsGlobalNameReference(node, node.Text(), meaning)
 }
 
 // hasAuthoredDeclaration reports whether symbol has a declaration the file
@@ -842,9 +850,7 @@ func referenceMeaning(n *ast.Node) ast.SymbolFlags {
 		return ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
 	}
 	if ast.IsExpressionNode(n) {
-		// A namespace declaration can be referenced as a value expression
-		// (`namespace N {}; N`), even when it contains no value member.
-		return ast.SymbolFlagsValue | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+		return ast.SymbolFlagsValue | ast.SymbolFlagsAlias
 	}
 	// Leftmost qualifier of a non-expression entity name (`A` in `let x: A.B`)
 	// names a namespace. Expression and typeof chains were handled above.
