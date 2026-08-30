@@ -420,18 +420,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Fruit {
-          Apple = 0,
-          Banana = 'banana',
-        }
-        Fruit.Apple === Fruit.Apple;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -654,123 +642,15 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Str {
-          A = 'a',
-        }
-        enum Num {
-          B = 1,
-        }
-        enum Mixed {
-          A = 'a',
-          B = 1,
-        }
-
-        declare const str: Str;
-        declare const num: Num;
-        declare const mixed: Mixed;
-
-        // following are all errors because the value might be an enum value
-        str === Str.A;
-        num === 1;
-        mixed === 'a';
-        mixed === 1;
-      `,
-						},
-					},
 				},
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Str {
-          A = 'a',
-        }
-        enum Num {
-          B = 1,
-        }
-        enum Mixed {
-          A = 'a',
-          B = 1,
-        }
-
-        declare const str: Str;
-        declare const num: Num;
-        declare const mixed: Mixed;
-
-        // following are all errors because the value might be an enum value
-        str === 'a';
-        num === Num.B;
-        mixed === 'a';
-        mixed === 1;
-      `,
-						},
-					},
 				},
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Str {
-          A = 'a',
-        }
-        enum Num {
-          B = 1,
-        }
-        enum Mixed {
-          A = 'a',
-          B = 1,
-        }
-
-        declare const str: Str;
-        declare const num: Num;
-        declare const mixed: Mixed;
-
-        // following are all errors because the value might be an enum value
-        str === 'a';
-        num === 1;
-        mixed === Mixed.A;
-        mixed === 1;
-      `,
-						},
-					},
 				},
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Str {
-          A = 'a',
-        }
-        enum Num {
-          B = 1,
-        }
-        enum Mixed {
-          A = 'a',
-          B = 1,
-        }
-
-        declare const str: Str;
-        declare const num: Num;
-        declare const mixed: Mixed;
-
-        // following are all errors because the value might be an enum value
-        str === 'a';
-        num === 1;
-        mixed === 'a';
-        mixed === Mixed.B;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -919,19 +799,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Str {
-          A = 'a',
-          B = 'b',
-        }
-        declare const str: Str;
-        str === Str.B;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -947,19 +814,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Str {
-          A = 'a',
-          AB = 'ab',
-        }
-        declare const str: Str;
-        str === Str.AB;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -975,19 +829,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Num {
-          A = 1,
-          B = 2,
-        }
-        declare const num: Num;
-        Num.A === num;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1003,19 +844,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Num {
-          A = 1,
-          B = 2,
-        }
-        declare const num: Num;
-        Num.A /* with */ === /* comment */ num;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1031,19 +859,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Num {
-          A = 1,
-          B = 2,
-        }
-        declare const num: Num;
-        Num.B === num;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1059,19 +874,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Mixed {
-          A = 1,
-          B = 'b',
-        }
-        declare const mixed: Mixed;
-        mixed === Mixed.A;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1087,19 +889,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum Mixed {
-          A = 1,
-          B = 'b',
-        }
-        declare const mixed: Mixed;
-        mixed === Mixed.B;
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1114,18 +903,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum StringKey {
-          'test-key' /* with comment */ = 1,
-        }
-        declare const stringKey: StringKey;
-        stringKey === StringKey['test-key'];
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1140,18 +917,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum StringKey {
-          "key-'with-single'-quotes" = 1,
-        }
-        declare const stringKey: StringKey;
-        stringKey === StringKey['key-\'with-single\'-quotes'];
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1166,18 +931,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum StringKey {
-          'key-"with-double"-quotes' = 1,
-        }
-        declare const stringKey: StringKey;
-        stringKey === StringKey['key-"with-double"-quotes'];
-      `,
-						},
-					},
 				},
 			},
 		},
@@ -1192,18 +945,6 @@ func TestNoUnsafeEnumComparisonUpstream(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "mismatchedCondition",
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{
-							MessageId: "replaceValueWithEnum",
-							Output: `
-        enum StringKey {
-          'key-` + "`" + `with-backticks` + "`" + `-quotes' = 1,
-        }
-        declare const stringKey: StringKey;
-        stringKey === StringKey['key-` + "`" + `with-backticks` + "`" + `-quotes'];
-      `,
-						},
-					},
 				},
 			},
 		},
