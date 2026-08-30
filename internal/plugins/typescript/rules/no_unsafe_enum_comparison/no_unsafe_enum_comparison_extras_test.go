@@ -12,8 +12,126 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestNoUnsafeEnumComparisonExtras(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeEnumComparisonRule, nil, []rule_tester.InvalidTestCase{
+		{
+			Code: `
+enum Num {
+  A = 1,
+}
+declare const num: Num;
+num === (1);
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			Code: `
+enum Num {
+  A = 1,
+}
+declare const num: Num;
+((1)) === num;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			// Sequence expressions still produce the diagnostic without
+			// offering a replacement that could discard an operand.
+			Code: `
+enum Num {
+  A = 2,
+}
+declare const num: Num;
+num === (1, 2);
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			Code: `
+enum Num {
+  A = 2,
+}
+declare const num: Num;
+num === 'ab'.length;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			Code: `
+enum Num {
+  A = 1,
+}
+declare const num: Num;
+num === 'ab'.indexOf('b');
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			// NaN is not equal to itself and must not produce a replacement.
+			Code: `
+enum Num {
+  A = 0 / 0,
+}
+declare const num: Num;
+num === 0 / 0;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			Code: `
+enum ComputedKey {
+  ['test-key' /* with comment */] = 1,
+}
+declare const computedKey: ComputedKey;
+computedKey === 1;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			Code: `
+enum ComputedKey {
+  [` + "`" + `test-key` + "`" + ` /* with comment */] = 1,
+}
+declare const computedKey: ComputedKey;
+computedKey === 1;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+		{
+			Code: `
+enum ComputedKey {
+  [` + "`" + `test-
+  key` + "`" + ` /* with comment */] = 1,
+}
+declare const computedKey: ComputedKey;
+computedKey === 1;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "mismatchedCondition",
+			}},
+		},
+	})
+}
 
 func TestNoUnsafeEnumComparisonDoesNotOfferUnsafeSuggestions(t *testing.T) {
 	tests := []struct {
