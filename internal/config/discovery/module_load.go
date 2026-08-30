@@ -16,6 +16,9 @@ import (
 type configCandidate struct {
 	path      string
 	directory string
+	// configArrayBase is set only when ConfigArray A differs from the config
+	// module directory, as for an explicit config. Empty means directory.
+	configArrayBase string
 }
 
 // configLoadState binds one candidate to the raw config and authored-ignore
@@ -170,9 +173,15 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 		} else if err := rslintconfig.ValidateConfig(result.Entries); err != nil {
 			state.failure = &ConfigModuleError{Code: "invalid", Message: err.Error()}
 		} else {
-			state.entries = append(rslintconfig.RslintConfig(nil), result.Entries...)
-			// Keep authored-ignore semantics bound to the exact loaded candidate.
-			// Git-derived ignores are added only to the separate effective draft.
+			entries := append(rslintconfig.RslintConfig(nil), result.Entries...)
+			configArrayBase := candidate.configArrayBase
+			if configArrayBase == "" {
+				configArrayBase = candidate.directory
+			}
+			state.entries = rslintconfig.ConfigWithResolvedBasePaths(
+				entries,
+				configArrayBase,
+			)
 			state.ignoreMatcher = rslintconfig.NewGlobalIgnoreMatcher(
 				state.entries,
 				candidate.directory,

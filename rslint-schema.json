@@ -16,6 +16,10 @@
           "type": "string",
           "description": "Optional human-readable name for this configuration entry"
         },
+        "basePath": {
+          "type": "string",
+          "description": "Entry-local matching root for files, ignores, and explicit TypeScript project paths"
+        },
         "files": {
           "type": "array",
           "description": "Non-empty file selector list. Top-level selectors are ORed; patterns inside a nested array are ANDed. Rslint unions these selectors with its default JavaScript and TypeScript extension baseline.",

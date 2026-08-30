@@ -121,6 +121,37 @@ func TestResolveDeclaredProjectPaths_MixedGlobAndNonGlob(t *testing.T) {
 	})
 }
 
+func TestExpandProjectGlobTreatsBaseDirectoryAsLiteral(t *testing.T) {
+	root := t.TempDir()
+	literalBase := filepath.Join(root, "pkg[1]")
+	createTestFile(t, filepath.Join(literalBase, "child", "tsconfig.json"))
+	createTestFile(t, filepath.Join(root, "pkg1", "child", "tsconfig.json"))
+
+	paths, err := expandProjectGlob(osvfs.FS(), literalBase, "*/tsconfig.json")
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []string{
+		filepath.ToSlash(filepath.Join(literalBase, "child", "tsconfig.json")),
+	})
+}
+
+func TestResolveDeclaredProjectPathsUsesResolvedBasePathOrigin(t *testing.T) {
+	root := t.TempDir()
+	configArrayBase := filepath.Join(root, "cwd")
+	projectPath := filepath.Join(configArrayBase, "pkg", "tsconfig.json")
+	createTestFile(t, projectPath)
+	basePath := "pkg"
+	config := ConfigWithResolvedBasePaths(RslintConfig{{
+		BasePath: &basePath,
+		LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+			Project: ProjectPaths{"./tsconfig.json"},
+		}},
+	}}, configArrayBase)
+
+	paths, err := resolveDeclaredProjectPaths(osvfs.FS(), config, filepath.Join(root, "configs"))
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []string{filepath.ToSlash(projectPath)})
+}
+
 func TestResolveDeclaredProjectPaths_DeduplicatesMatches(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))

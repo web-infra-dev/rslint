@@ -9,6 +9,22 @@ import {
   makeConfig,
 } from './helpers';
 
+describe('snapshot output normalization', () => {
+  test.each(['12ms', '1.234s', '1m2.345s', '1h2m3.456s'])(
+    'normalizes a %s duration',
+    (duration) => {
+      expect(
+        normalizeOutput(
+          `Found 0 errors and 0 warnings (linted 1 file with 1 rule in ${duration} using 2 threads)\n`,
+          '/tmp/unused',
+        ),
+      ).toBe(
+        'Found 0 errors and 0 warnings (linted 1 file with 1 rule in <TIME> using <N> thread(s))\n',
+      );
+    },
+  );
+});
+
 // ---------------------------------------------------------------------------
 // default format
 // ---------------------------------------------------------------------------

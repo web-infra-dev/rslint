@@ -75,9 +75,9 @@ Files outside all tsconfigs are still linted, but only rules that do not require
 }
 ```
 
-Relative project patterns in a config file are resolved from that file's directory. Relative project patterns in the JavaScript API's inline `overrideConfig` are resolved from the API `cwd`.
+When an entry has `basePath`, its explicit project literals and globs resolve from that directory. This changes only their path origin: Rslint's existing governing-config project collection remains owner-wide, so `files` and `ignores` do not filter which declared projects the loader considers. Without `basePath`, config-module project paths keep Rslint's existing module-directory base, while API inline `overrideConfig` paths use the API `cwd`.
 
-Omit `project` to use the governing config directory's default `tsconfig.json`. Set `project: []` to disable that fallback explicitly.
+Omit `project` to use the governing config directory's default `tsconfig.json`; `basePath` alone does not move that fallback. An explicit `project: []` disables that fallback for the governing config. See [Path resolution and `basePath`](/config/configuration-file#path-resolution-and-basepath).
 
 ## languageOptions.globals
 

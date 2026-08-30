@@ -18,6 +18,10 @@ type RslintConfig []ConfigEntry
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
 	Name string `json:"name,omitempty"`
+	// BasePath is ESLint flat config's entry-local matching base. A pointer
+	// preserves the distinction between omission and an explicitly authored
+	// empty string; both are valid, but only the latter scopes the entry.
+	BasePath *string `json:"basePath,omitempty"`
 	// Files retains the established Go construction API for top-level OR
 	// patterns. FilePatternGroups stores nested arrays, each of which is an AND
 	// group. JSON encoding combines both fields back into one mixed `files`
@@ -39,13 +43,9 @@ type ConfigEntry struct {
 	// matchers. Keeping the uncommon metadata behind one pointer preserves the
 	// original ConfigEntry footprint for every ordinary authored config entry.
 	collectedGitignore *collectedGitignoreMetadata
-	// authoredPathBase is present only when this entry was authored in a
-	// different directory from the config array that owns it. The native API's
-	// inline overrideConfig is the primary case: it is appended after each
-	// discovered config but keeps the invocation cwd as the base for its
-	// config-relative files, ignores, and parserOptions.project values. Target
-	// matching and project resolution consume this immutable origin instead of
-	// rebasing authored strings during composition.
+	// authoredPathBase stores the entry's effective path origin when it differs
+	// from the owning config's default path semantics. API composition and
+	// config loading populate it before downstream config consumers run.
 	authoredPathBase *configEntryPathBase
 }
 
@@ -68,6 +68,10 @@ type collectedGitignoreScope struct {
 
 type configEntryPathBase struct {
 	directory string
+	// configArrayBase records the ConfigArray root whose directory itself must
+	// remain traversable for a basePath-scoped entry.
+	configArrayBase string
+	basePathScoped  bool
 }
 
 // ConfigWithAuthoredPathBase returns a shallow config snapshot whose entries
@@ -81,21 +85,71 @@ func ConfigWithAuthoredPathBase(config RslintConfig, directory string) RslintCon
 	directory = tspath.NormalizePath(directory)
 	effective := append(RslintConfig(nil), config...)
 	for index := range effective {
-		effective[index].authoredPathBase = &configEntryPathBase{directory: directory}
+		// Entries with basePath inherit the ConfigArray root instead and are
+		// materialized by ConfigWithResolvedBasePaths.
+		if effective[index].BasePath == nil {
+			effective[index].authoredPathBase = &configEntryPathBase{directory: directory}
+		}
 	}
 	return effective
 }
 
 func configEntryBaseDirectory(entry ConfigEntry, defaultDirectory string) string {
+	return configEntryPathOrigin(entry, defaultDirectory).directory
+}
+
+func configEntryPathOrigin(entry ConfigEntry, defaultDirectory string) configEntryPathBase {
 	if entry.authoredPathBase != nil && entry.authoredPathBase.directory != "" {
-		return entry.authoredPathBase.directory
+		return *entry.authoredPathBase
 	}
-	return defaultDirectory
+	if entry.BasePath != nil {
+		return configEntryPathBase{
+			directory:       tspath.ResolvePath(defaultDirectory, *entry.BasePath),
+			configArrayBase: defaultDirectory,
+			basePathScoped:  true,
+		}
+	}
+	return configEntryPathBase{directory: defaultDirectory}
+}
+
+// ConfigWithResolvedBasePaths resolves every authored basePath once at the
+// config boundary and returns a shallow immutable snapshot. configArrayBase is
+// normally the config module directory, or the invocation cwd for an explicitly
+// selected config.
+func ConfigWithResolvedBasePaths(
+	config RslintConfig,
+	configArrayBase string,
+) RslintConfig {
+	usesBasePath := false
+	for _, entry := range config {
+		if entry.BasePath != nil && entry.authoredPathBase == nil {
+			usesBasePath = true
+			break
+		}
+	}
+	if !usesBasePath {
+		return config
+	}
+	configArrayBase = tspath.NormalizePath(configArrayBase)
+	effective := append(RslintConfig(nil), config...)
+	for index := range effective {
+		entry := &effective[index]
+		if entry.BasePath == nil || entry.authoredPathBase != nil {
+			continue
+		}
+		base := tspath.ResolvePath(configArrayBase, *entry.BasePath)
+		entry.authoredPathBase = &configEntryPathBase{
+			directory:       base,
+			configArrayBase: configArrayBase,
+			basePathScoped:  true,
+		}
+	}
+	return effective
 }
 
 func configNeedsTargetResolver(config RslintConfig) bool {
 	for _, entry := range config {
-		if entry.authoredPathBase != nil || entry.collectedGitignore != nil {
+		if entry.BasePath != nil || entry.authoredPathBase != nil || entry.collectedGitignore != nil {
 			return true
 		}
 	}
@@ -201,6 +255,15 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 
 		var decoded configEntryAlias
 		entryForDecode := rawEntry
+		if rawBasePath, ok := raw["basePath"]; ok {
+			var basePath any
+			if err := json.Unmarshal(rawBasePath, &basePath); err != nil {
+				return err
+			}
+			if _, valid := basePath.(string); !valid {
+				return fmt.Errorf("config entry at index %d: key \"basePath\": expected value to be a string", index)
+			}
+		}
 		if rawFiles, ok := raw["files"]; ok {
 			files, groups, err := decodeFilesSelectors(rawFiles, index)
 			if err != nil {
@@ -232,7 +295,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		// neutral but remains non-nil for isGlobalIgnoreEntry.
 		hasNonGlobalKey := false
 		for key := range raw {
-			if key != "ignores" && key != "name" {
+			if key != "ignores" && key != "name" && key != "basePath" {
 				hasNonGlobalKey = true
 				break
 			}
@@ -880,9 +943,9 @@ func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd stri
 	return config.mergeConfigEntries(key)
 }
 
-// isGlobalIgnoreEntry returns true if the entry has only ignores and an
-// optional name. Empty config objects are still present and make ignores local
-// to the entry, matching ESLint flat config semantics.
+// isGlobalIgnoreEntry returns true if the entry has only ignores plus optional
+// flat-config metadata (name and basePath). Empty config objects are still
+// present and make ignores local to the entry, matching ESLint semantics.
 func isGlobalIgnoreEntry(entry ConfigEntry) bool {
 	return entry.Files == nil &&
 		entry.FilePatternGroups == nil &&
