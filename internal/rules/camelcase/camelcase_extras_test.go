@@ -34,6 +34,8 @@ func TestCamelcaseExtras(t *testing.T) {
 			{Code: `target["snake_case"] = 1`},
 			// ---- Dimension 4: TS signature-only declarations have no upstream runtime listener ----
 			{Code: `declare function snake_case(value_name: number): void; interface Shape { property_name: string }`},
+			// ---- A configured global value in a type query honors ignoreGlobals ----
+			{Code: `let value: typeof configured_global`, Globals: map[string]any{"configured_global": "readonly"}, Options: map[string]any{"ignoreGlobals": true}},
 			// ---- Dimension 4: body-less abstract members are TS-only declaration forms ----
 			{Code: `abstract class Shape { abstract propertyName: string; abstract methodName(value_name: string): void }`},
 			// ---- tsgo collapses TSAbstract* and AccessorProperty into ordinary class-member kinds ----
@@ -64,6 +66,14 @@ func TestCamelcaseExtras(t *testing.T) {
 			{Code: `this.data.nested.variable_from_backend = "value"`, Options: map[string]any{"properties": "never"}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Type queries retain their leftmost value reference only ----
+			{
+				Code: `let value: typeof snake_case; let other: typeof namespace_case.member_name;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Line: 1, Column: 19, EndLine: 1, EndColumn: 29},
+					{MessageId: "notCamelCase", Line: 1, Column: 49, EndLine: 1, EndColumn: 63},
+				},
+			},
 			// ---- AST-03/RANGE-01: an implementation reports the first overload identifier ----
 			{
 				Code: `function snake_case(value_name: string): void; function snake_case(value_name: string) {}`,

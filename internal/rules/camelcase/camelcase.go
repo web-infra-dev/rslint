@@ -491,8 +491,25 @@ func isRuntimeReference(node *ast.Node) bool {
 	if isJsxIntrinsicTagName(node) {
 		return false
 	}
-	return node != nil && !ast.IsPartOfTypeNode(node) && !ast.IsPartOfTypeQuery(node) &&
-		!utils.IsNonReferenceIdentifier(node)
+	if ast.IsPartOfTypeQuery(node) {
+		return isTypeQueryValueReference(node)
+	}
+	return node != nil && !ast.IsPartOfTypeNode(node) && !utils.IsNonReferenceIdentifier(node)
+}
+
+// isTypeQueryValueReference recognizes the value-side root of a TypeScript
+// type query. In `typeof namespace.member`, only `namespace` is a value
+// reference; the remaining qualified-name segments are property names.
+func isTypeQueryValueReference(node *ast.Node) bool {
+	current := node
+	for current != nil && current.Parent != nil && current.Parent.Kind == ast.KindQualifiedName {
+		qualified := current.Parent.AsQualifiedName()
+		if qualified.Left != current {
+			return false
+		}
+		current = current.Parent
+	}
+	return current != nil && current.Parent != nil && current.Parent.Kind == ast.KindTypeQuery
 }
 
 // isJsxIntrinsicTagName reports bare lowercase intrinsic tag identifiers such
