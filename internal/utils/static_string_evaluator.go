@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -421,7 +420,7 @@ func (staticEvaluator *StaticStringEvaluator) evalTemplateExpression(node *ast.N
 			}
 		}
 	}
-	return staticEvalResult{value: builder.String(), ok: true}
+	return staticEvalResult{value: ecmascript.CombineSurrogatePairs(builder.String()), ok: true}
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Node) staticEvalResult {
@@ -519,7 +518,7 @@ func (staticEvaluator *StaticStringEvaluator) concatStaticValues(left any, right
 	if !ok {
 		return staticEvalResult{}
 	}
-	return staticEvalResult{value: leftString + rightString, ok: true}
+	return staticEvalResult{value: ecmascript.CombineSurrogatePairs(leftString + rightString), ok: true}
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalPrefixUnaryExpression(node *ast.Node) staticEvalResult {
@@ -715,7 +714,7 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 		if !value.ok {
 			return staticEvalResult{}
 		}
-		if propertyKey == key {
+		if ecmascript.CompareStrings(propertyKey, key) == 0 {
 			ownValue = value
 			ownFound = true
 		}
@@ -825,7 +824,7 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 	}
 	if key == "length" {
 		if text, ok := staticValueAsString(object.value); ok {
-			return staticEvalResult{value: staticNumberValue(len(utf16.Encode([]rune(text)))), ok: true}
+			return staticEvalResult{value: staticNumberValue(ecmascript.StringCodeUnitCount(text)), ok: true}
 		}
 	}
 	return staticMemberValue(object.value, key)
@@ -878,11 +877,11 @@ func staticMemberValue(object any, key string) staticEvalResult {
 
 func staticObjectOwnProperty(object *staticObjectValue, key string) (any, bool) {
 	for i := len(object.extraProperties) - 1; i >= 0; i-- {
-		if object.extraProperties[i].name == key {
+		if ecmascript.CompareStrings(object.extraProperties[i].name, key) == 0 {
 			return object.extraProperties[i].value, true
 		}
 	}
-	if object.propertyCount > 0 && object.property.name == key {
+	if object.propertyCount > 0 && ecmascript.CompareStrings(object.property.name, key) == 0 {
 		return object.property.value, true
 	}
 	return nil, false
@@ -1159,34 +1158,65 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 }
 
 func staticStringIndexOf(text string, arguments []any) staticEvalResult {
-	if len(arguments) == 0 {
-		return staticEvalResult{}
+	needle := "undefined"
+	if len(arguments) > 0 {
+		var ok bool
+		needle, ok = staticValueToString(arguments[0])
+		if !ok {
+			return staticEvalResult{}
+		}
 	}
-	needle, ok := staticValueToString(arguments[0])
+
+	start, ok := staticArgumentInteger(arguments, 1, 0)
 	if !ok {
 		return staticEvalResult{}
 	}
 
-	start := 0
-	if len(arguments) > 1 {
-		number, ok := staticValueToNumber(arguments[1])
-		if !ok {
-			return staticEvalResult{}
+	textUnits := ecmascript.StringCodeUnits(text)
+	needleUnits := ecmascript.StringCodeUnits(needle)
+	start = min(max(start, 0), len(textUnits))
+	index := indexOfCodeUnits(textUnits, needleUnits, start)
+	return staticEvalResult{value: staticNumberValue(index), ok: true}
+}
+
+func indexOfCodeUnits(text, needle []uint16, start int) int {
+	if len(needle) == 0 {
+		return start
+	}
+	if start >= len(text) || len(needle) > len(text)-start {
+		return -1
+	}
+	if len(needle) == 1 {
+		index := slices.Index(text[start:], needle[0])
+		if index < 0 {
+			return -1
 		}
-		if !math.IsNaN(number) {
-			start = int(math.Trunc(number))
-		}
+		return start + index
 	}
 
-	textUnits := utf16.Encode([]rune(text))
-	needleUnits := utf16.Encode([]rune(needle))
-	start = min(max(start, 0), len(textUnits))
-	for i := start; i+len(needleUnits) <= len(textUnits); i++ {
-		if slices.Equal(textUnits[i:i+len(needleUnits)], needleUnits) {
-			return staticEvalResult{value: staticNumberValue(i), ok: true}
+	prefixLength := make([]int, len(needle))
+	for i, matched := 1, 0; i < len(needle); i++ {
+		for matched > 0 && needle[i] != needle[matched] {
+			matched = prefixLength[matched-1]
+		}
+		if needle[i] == needle[matched] {
+			matched++
+		}
+		prefixLength[i] = matched
+	}
+
+	for i, matched := start, 0; i < len(text); i++ {
+		for matched > 0 && text[i] != needle[matched] {
+			matched = prefixLength[matched-1]
+		}
+		if text[i] == needle[matched] {
+			matched++
+			if matched == len(needle) {
+				return i - len(needle) + 1
+			}
 		}
 	}
-	return staticEvalResult{value: staticNumberValue(-1), ok: true}
+	return -1
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalCallArguments(node *ast.Node) ([]any, bool) {
@@ -1232,7 +1262,7 @@ func staticStringFromCharCode(arguments []any) staticEvalResult {
 		}
 		units = append(units, uint16(toUint32(number)))
 	}
-	return staticEvalResult{value: string(utf16.Decode(units)), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units), ok: true}
 }
 
 func staticStringSlice(text string, arguments []any) staticEvalResult {
@@ -1244,14 +1274,14 @@ func staticStringSlice(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	length := len(units)
 	from := normalizeSliceIndex(start, length)
 	to := normalizeSliceIndex(end, length)
 	if to < from {
 		to = from
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[from:to]), ok: true}
 }
 
 func staticStringSubstring(text string, arguments []any) staticEvalResult {
@@ -1263,14 +1293,14 @@ func staticStringSubstring(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	length := len(units)
 	from := clampSubstringIndex(start, length)
 	to := clampSubstringIndex(end, length)
 	if from > to {
 		from, to = to, from
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[from:to]), ok: true}
 }
 
 // staticStringSubstr implements the Annex B String#substr, whose second
@@ -1284,7 +1314,7 @@ func staticStringSubstr(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	length := len(units)
 	from := normalizeSliceIndex(start, length)
 	if count <= 0 {
@@ -1294,7 +1324,7 @@ func staticStringSubstr(text string, arguments []any) staticEvalResult {
 	if count < length-from {
 		to = from + count
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[from:to]), ok: true}
 }
 
 func staticStringCharAt(text string, arguments []any) staticEvalResult {
@@ -1302,11 +1332,11 @@ func staticStringCharAt(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	if index < 0 || index >= len(units) {
 		return staticEvalResult{value: "", ok: true}
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[index : index+1])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[index : index+1]), ok: true}
 }
 
 func staticStringConcat(text string, arguments []any) staticEvalResult {
@@ -1322,7 +1352,7 @@ func staticStringConcat(text string, arguments []any) staticEvalResult {
 		}
 		builder.WriteString(part)
 	}
-	return staticEvalResult{value: builder.String(), ok: true}
+	return staticEvalResult{value: ecmascript.CombineSurrogatePairs(builder.String()), ok: true}
 }
 
 func staticArgumentInteger(arguments []any, index int, defaultValue int) (int, bool) {
@@ -1727,7 +1757,7 @@ func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {
 	case staticKindString:
 		leftText, _ := staticValueAsString(left)
 		rightText, _ := staticValueAsString(right)
-		return leftText == rightText, true
+		return ecmascript.CompareStrings(leftText, rightText) == 0, true
 	case staticKindNumber:
 		leftNumber, leftOk := staticValueToNumber(left)
 		rightNumber, rightOk := staticValueToNumber(right)
@@ -1866,7 +1896,7 @@ func staticArrayJoin(value *staticArrayValue, separator string) (string, bool) {
 		}
 		builder.WriteString(part)
 	}
-	return builder.String(), true
+	return ecmascript.CombineSurrogatePairs(builder.String()), true
 }
 
 func evaluatorBool(fn func() bool) (value bool, ok bool) {
