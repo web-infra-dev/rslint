@@ -48,23 +48,6 @@ const baseConfig = `export default [${JSON.stringify({
   plugins: ['@typescript-eslint'],
 })}];`;
 
-const baseJsonConfig = JSON.stringify([
-  {
-    language: 'javascript',
-    files: ['**/*.ts'],
-    languageOptions: {
-      parserOptions: {
-        projectService: false,
-        project: ['./tsconfig.json'],
-      },
-    },
-    rules: {
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-    },
-    plugins: ['@typescript-eslint'],
-  },
-]);
-
 const baseTsConfig = JSON.stringify({
   compilerOptions: {
     target: 'ES2020',
@@ -451,7 +434,7 @@ describe('CLI File Arguments', () => {
 
   test('should work with --config and file arguments', async () => {
     const tempDir = await createTempDir({
-      'custom.json': baseJsonConfig,
+      'custom.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
       'clean.ts': 'export const x = 1;\n',
@@ -459,7 +442,7 @@ describe('CLI File Arguments', () => {
 
     try {
       const result = await runRslint(
-        ['--config', 'custom.json', 'error.ts'],
+        ['--config', 'custom.mjs', 'error.ts'],
         tempDir,
       );
       expect(result.exitCode).not.toBe(0);

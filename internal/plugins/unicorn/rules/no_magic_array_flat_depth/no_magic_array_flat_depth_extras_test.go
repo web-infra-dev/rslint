@@ -61,6 +61,22 @@ func TestNoMagicArrayFlatDepthExtras(t *testing.T) {
 
 			// ---- Branch: optional chain on the call disqualifies it ----
 			tsValid(`array.flat?.(2)`),
+
+			// ---- Static-call parity: known, safely evaluated non-arrays ----
+			jsValid(`Boolean({__proto__: null}).flat(2)`),
+			jsValid(`Number(1n).flat(2)`),
+			jsValid(`String(1n).flat(2)`),
+			jsValid(`parseInt(1n).flat(2)`),
+			jsValid(`Array.isArray(1n).flat(2)`),
+			jsValid(`/** @type {Array<number>} */ const value = 1; value.flat(2)`),
+			{
+				Code:     `array.flat<number>(/* explanation */ 2)`,
+				FileName: "file.ts",
+			},
+			{
+				Code:     `array.flat<number>(2 /* explanation */)`,
+				FileName: "file.ts",
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Branch lock-in: every non-1 numeric literal shape ----
@@ -93,6 +109,35 @@ func TestNoMagicArrayFlatDepthExtras(t *testing.T) {
 			{
 				Code:     `arr()?.flat(2)`,
 				FileName: "file.mjs",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   messageString,
+				}},
+			},
+
+			// ---- Static-call parity: unknown or throwing evaluations report ----
+			depthInvalid(`Math.abs({__proto__: null}).flat(2)`),
+			depthInvalid(`Number({__proto__: null}).flat(2)`),
+			depthInvalid(`String({__proto__: null}).flat(2)`),
+			depthInvalid(`parseInt({__proto__: null}, 10).flat(2)`),
+			depthInvalid(`String.fromCharCode(1n).flat(2)`),
+			depthInvalid(`Object.freeze({}, value).flat(2)`),
+			depthInvalid(`/* global value */ Object.freeze({}, value).flat(2)`),
+			depthInvalid(`/* global value */ (true ? Object.freeze({}, value) : 1).flat(2)`),
+			depthInvalid(`/** @type {number} */ const value = []; value.flat(2)`),
+			depthInvalid(`/** @type {number} */ const value = unknown; value.flat(2)`),
+			depthInvalid(`(/** @type {number} */ ([])).flat(2)`),
+			depthInvalid(`(/** @type {number} */ (unknown)).flat(2)`),
+			depthInvalid(`(/** @type {number[]} */ (1)).flat(2)`),
+			depthInvalid(`(/** @type {number} */ ('x')).flat(2)`),
+			depthInvalid(`(/** @type {number} */ ({})).flat(2)`),
+			depthInvalid("(/** @type {number} */ (`x`)).flat(2)"),
+			depthInvalid(`let value = {}; value.x = 1; Boolean(value).flat(2)`),
+			depthInvalid(`await using value = {}; value.flat(2)`),
+			depthInvalid(`const Math = {abs() { return 1 }}; Math.abs(-2).flat(2)`),
+			{
+				Code:     `array.flat<number>(2)`,
+				FileName: "file.ts",
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: messageID,
 					Message:   messageString,

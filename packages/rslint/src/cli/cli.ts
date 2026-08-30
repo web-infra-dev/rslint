@@ -51,39 +51,38 @@ export async function run(
       process.stderr.write(`Error: config file not found: ${configPath}\n`);
       return 1;
     }
+    if (!isJSConfigFile(configPath)) {
+      const migrationHint = /\.jsonc?$/.test(configPath)
+        ? ' Run `rslint --init` to migrate a legacy JSON config.'
+        : '';
+      process.stderr.write(
+        `Error: unsupported config file: ${configPath}\n` +
+          `Rslint configs must be JavaScript or TypeScript modules.${migrationHint}\n`,
+      );
+      return 1;
+    }
   }
 
   // Build Go args: start-time flag BEFORE positional args, because Go's
   // flag.Parse stops at the first positional argument.
   const goArgs = [`--start-time=${startTime}`, ...args.rest];
 
-  // JSON configuration remains native-Go. JS/TS configuration discovery is
-  // initiated by Go after the IPC channel is live; Node only evaluates the
-  // exact frontier candidates Go sends back through reverse RPC.
+  // Configuration discovery is initiated by Go after the IPC channel is
+  // live; Node only evaluates the exact frontier candidates Go sends back
+  // through reverse RPC.
   const explicitConfigPath = args.config
     ? path.resolve(cwd, args.config)
     : null;
-  const usesExplicitJSConfig =
-    explicitConfigPath != null && isJSConfigFile(explicitConfigPath);
-  const jsonGoArgs =
-    args.config && !usesExplicitJSConfig
-      ? ['--config', args.config, ...goArgs]
-      : goArgs;
   const { runEngine } = await import('./engine.js');
   return runEngine({
     binPath,
-    goArgs: jsonGoArgs,
+    goArgs,
     cwd,
     runtime: { singleThreaded: args.singleThreaded },
     extraInit: {
-      configDiscovery:
-        args.config && !usesExplicitJSConfig
-          ? undefined
-          : {
-              explicitConfigPath: usesExplicitJSConfig
-                ? explicitConfigPath
-                : undefined,
-            },
+      configDiscovery: {
+        explicitConfigPath: explicitConfigPath ?? undefined,
+      },
     },
   });
 }

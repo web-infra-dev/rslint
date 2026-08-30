@@ -814,7 +814,7 @@ func TestDiscoverLintTargetsFromRoot_SharedAliasAncestorKeepsRelativeConfigMeani
 	if len(targets) != 1 || targets[0].Path != visible {
 		t.Fatalf("shared-alias targets = %+v, want only %q", targets, visible)
 	}
-	merged := rslintconfig.NewFileConfigResolverWithFS(entries, configDir, osvfs.FS(), rules.All(), false).ConfigForFile(visible)
+	merged := rslintconfig.NewFileConfigResolverWithFS(entries, configDir, osvfs.FS(), rules.All()).ConfigForFile(visible)
 	if merged == nil || merged.Rules["rule"] == nil {
 		t.Fatalf("shared-alias effective config = %#v", merged)
 	}

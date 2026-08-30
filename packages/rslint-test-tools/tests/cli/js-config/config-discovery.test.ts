@@ -660,14 +660,9 @@ describe('CLI config discovery (upward traversal)', () => {
     }
   });
 
-  test('all broken JS configs should not fall back to JSON config', async () => {
+  test('all broken module configs should not read a legacy JSON config', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          files: ['**/*.ts'],
-          rules: { 'no-debugger': 'error' },
-        },
-      ]),
+      'rslint.json': '{ intentionally malformed legacy config',
       'rslint.config.js': 'export default [INVALID ROOT CONFIG;',
       'packages/broken/rslint.config.js':
         'export default [INVALID CHILD CONFIG;',
@@ -679,6 +674,7 @@ describe('CLI config discovery (upward traversal)', () => {
       expect(result.exitCode).toBe(1);
       expect(result.stdout).not.toContain('no-debugger');
       expect(result.stderr).toContain('Warning: skipping config');
+      expect(result.stderr).not.toContain('error parsing');
       expect(result.stderr).not.toContain('JSON configuration is deprecated');
     } finally {
       await cleanupTempDir(tempDir);

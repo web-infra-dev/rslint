@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "lib": ["es5"],
+    "module": "commonjs",
+    "strict": true,
+    "target": "es5",
+    "types": []
+  }
+}

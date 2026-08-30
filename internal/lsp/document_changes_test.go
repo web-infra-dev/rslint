@@ -361,7 +361,7 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 			}
 
 			cfg := config.RslintConfig{{Rules: config.Rules{"unicode-bom": test.option}}}
-			resolver := config.NewFileConfigResolver(cfg, dir, rules.All(), false)
+			resolver := config.NewFileConfigResolver(cfg, dir, rules.All())
 
 			target := lspConfigTarget(file, dir, fs)
 			generation := newLintGeneration(
@@ -417,7 +417,7 @@ func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 			"no-var":      "error",
 		},
 	}}
-	resolver := config.NewFileConfigResolver(cfg, dir, rules.All(), false)
+	resolver := config.NewFileConfigResolver(cfg, dir, rules.All())
 
 	target := lspConfigTarget(file, dir, fs)
 	generation := newLintGeneration(

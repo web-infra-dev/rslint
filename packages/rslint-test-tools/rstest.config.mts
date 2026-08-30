@@ -78,6 +78,7 @@ export default defineConfig({
     './tests/eslint/rules/dot-notation.test.ts',
     './tests/eslint/rules/func-name-matching.test.ts',
     './tests/eslint/rules/func-names.test.ts',
+    './tests/eslint/rules/grouped-accessor-pairs.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',
     './tests/eslint/rules/no-continue.test.ts',
@@ -111,6 +112,7 @@ export default defineConfig({
 
     './tests/eslint/rules/default-case-last.test.ts',
     './tests/eslint/rules/default-param-last.test.ts',
+    './tests/eslint/rules/logical-assignment-operators.test.ts',
     './tests/eslint/rules/no-extend-native.test.ts',
     './tests/eslint/rules/no-extra-bind.test.ts',
     './tests/eslint/rules/no-extra-label.test.ts',
@@ -204,6 +206,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-no-script-url.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-target-blank.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-undef.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-useless-fragment.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
@@ -596,6 +599,7 @@ export default defineConfig({
 
     // rstest
     './tests/rstest/rules/expect-expect.test.ts',
+    './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
     './tests/rstest/rules/no-alias-methods.test.ts',
     './tests/rstest/rules/no-commented-out-tests.test.ts',
@@ -615,6 +619,7 @@ export default defineConfig({
     './tests/rstest/rules/prefer-each.test.ts',
     './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
+    './tests/rstest/rules/prefer-import-in-mock.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
     './tests/rstest/rules/require-test-timeout.test.ts',

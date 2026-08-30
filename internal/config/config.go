@@ -291,8 +291,8 @@ func decodeFilesSelectors(raw json.RawMessage, entryIndex int) ([]string, [][]st
 	return files, groups, nil
 }
 
-// ValidateConfig checks config invariants for configs constructed in Go. JSON
-// config ingress rejects explicit null/empty `files` during unmarshaling.
+// ValidateConfig checks config invariants for configs constructed in Go.
+// Serialized ingress rejects explicit null/empty `files` during unmarshaling.
 func ValidateConfig(config RslintConfig) error {
 	for index, entry := range config {
 		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {

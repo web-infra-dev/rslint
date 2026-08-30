@@ -200,6 +200,17 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 		start := NodeTextRangeSkippingDecorators(sourceFile, node)
+		// @typescript-eslint represents accessors directly owned by an
+		// interface or type literal as TSMethodSignature nodes. Its function-head
+		// helper searches the complete signature for the first real `(` token, so
+		// a parenthesized or call-expression computed key can end the range before
+		// the parameter list. Use the parsed token tree here: a raw scanner would
+		// misread `(` inside a regular-expression literal as punctuation.
+		if isTypeAccessorSignature(node) {
+			if parenPos := findFirstParsedOpenParenStart(sourceFile, node, start.Pos()); parenPos >= 0 {
+				return start.WithEnd(parenPos)
+			}
+		}
 		// Start scanning for the parameters `(` after any decorator factory
 		// (e.g. `@dec()`) and after the method name. Nameless constructors
 		// fall back to the first token after the decorators.
@@ -954,6 +965,36 @@ func findOpenParenPosFrom(sourceFile *ast.SourceFile, start int, end int) int {
 		s.Scan()
 	}
 	return -1
+}
+
+func isTypeAccessorSignature(node *ast.Node) bool {
+	if node.Kind != ast.KindGetAccessor && node.Kind != ast.KindSetAccessor {
+		return false
+	}
+	parent := node.Parent
+	return parent != nil &&
+		(parent.Kind == ast.KindInterfaceDeclaration || parent.Kind == ast.KindTypeLiteral)
+}
+
+// findFirstParsedOpenParenStart walks parser-owned children in source order. The
+// parsed tree preserves lexical context for regular expressions and templates,
+// unlike scanning an arbitrary source range from scratch.
+func findFirstParsedOpenParenStart(sourceFile *ast.SourceFile, node *ast.Node, minimum int) int {
+	sourceText := sourceFile.Text()
+	parenPos := -1
+	forEachToken(node, func(token *ast.Node) bool {
+		if token.Kind != ast.KindOpenParenToken || ast.NodeIsMissing(token) || token.Flags&ast.NodeFlagsSynthesized != 0 {
+			return false
+		}
+		trimmed := TrimNodeTextRange(sourceFile, token)
+		if trimmed.Pos() < minimum || trimmed.Pos() >= trimmed.End() ||
+			trimmed.End() > len(sourceText) || sourceText[trimmed.Pos()] != '(' {
+			return false
+		}
+		parenPos = trimmed.Pos()
+		return true
+	}, sourceFile)
+	return parenPos
 }
 
 // findFunctionKeywordPos returns the start position of the function head,
@@ -2016,6 +2057,12 @@ func sameReferenceLiteralValue(left, right *ast.Node) bool {
 // (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
 // Element access arguments are unwrapped through parentheses and TS assertions
 // because ESTree-based helpers treat those wrappers as transparent.
+//
+// A private name has no static name: ESLint's getStaticPropertyName accepts a
+// dotted key only when it is an `Identifier`, and ESTree gives `#x` its own
+// `PrivateIdentifier` type, so upstream falls through to its string-value
+// branch and answers null. That keeps `obj.#x` and `obj['#x']` in separate
+// equivalence classes, as the language does.
 func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -2531,10 +2578,11 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 	return true
 }
 
-// HasSameTokens reports whether two nodes produce the same token stream when
-// viewed at the raw-source level — matching ESLint's
-// `sourceCode.getTokens(a)` vs `sourceCode.getTokens(b)` semantics, which
-// preserves the original source form of each literal. Unlike
+// HasSameTokens reports whether two nodes produce the same parser token stream,
+// matching ESLint's `sourceCode.getTokens(a)` vs `sourceCode.getTokens(b)`
+// semantics. Literal spellings remain source-sensitive; Identifier,
+// PrivateIdentifier, and JSXText values follow the parser dialect exposed for
+// the source file (Espree for JS/JSX, typescript-eslint for TS/TSX). Unlike
 // [AreNodesStructurallyEqual], this helper distinguishes:
 //
 //   - `'a'` vs `"a"` (different quote style)
@@ -2544,8 +2592,8 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 //
 // Implementation: we recurse on the AST using [ast.SkipParentheses] and
 // [ast.Node.ForEachChild]. At leaf nodes (no children — identifiers,
-// literals, keyword tokens) we compare the raw source slice via
-// [scanner.GetSourceTextOfNodeFromSourceFile]. For composite nodes we
+// literals, keyword tokens) we compare their parser-visible token values. For
+// composite nodes we
 // recurse on children pairwise AND scan the "gaps" between children
 // (and before/after the first/last child) with [scanner.Scanner] to pick
 // up punctuation, keyword tokens, and operators that tsgo's ForEachChild
@@ -2576,16 +2624,54 @@ func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b))
+	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b), compareParserIdentifierValues)
 }
+
+// HasSameTokensWithDecodedIdentifiers compares the same token structure as
+// [HasSameTokens], but treats escaped Identifier and PrivateIdentifier
+// spellings with the same decoded text as equal in every script kind. It is
+// intended for semantic safety checks where an identifier escape cannot
+// change the meaning of generated code; it does not model TypeScript parser
+// token equality.
+func HasSameTokensWithDecodedIdentifiers(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b), compareDecodedIdentifierValues)
+}
+
+type identifierTokenComparison uint8
+
+const (
+	compareParserIdentifierValues identifierTokenComparison = iota
+	compareDecodedIdentifierValues
+)
 
 // hasSameTokens is the recursive core. It does NOT call SkipParentheses
 // on its inputs — parens nested inside a compound expression are visible
 // tokens in ESLint's per-node getTokens view (e.g. `(x).y` has tokens
 // `[(, x, ), ., y]`), so a recursive paren strip would collapse them.
-func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
+func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node, identifiers identifierTokenComparison) bool {
 	if a == nil || b == nil {
 		return a == b
+	}
+	if isJSXTextKind(a.Kind) || isJSXTextKind(b.Kind) {
+		if !isJSXTextKind(a.Kind) || !isJSXTextKind(b.Kind) {
+			return false
+		}
+		left := sf.Text()[a.Pos():a.End()]
+		right := sf.Text()[b.Pos():b.End()]
+		switch sf.ScriptKind {
+		case core.ScriptKindJS, core.ScriptKindJSX:
+			return ecmascript.JSXTextTokenValuesEqual(left, right)
+		case core.ScriptKindTS, core.ScriptKindTSX:
+			// @typescript-eslint/parser exposes the unmodified source spelling.
+			return left == right
+		default:
+			// Preserve the previous raw-text and exact-kind behavior for script
+			// kinds that do not map to either supported parser dialect.
+			return a.Kind == b.Kind && left == right
+		}
 	}
 	if a.Kind != b.Kind {
 		return false
@@ -2608,6 +2694,22 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 		switch a.Kind {
 		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
 			return sameTokensInRange(sf, a.Pos(), a.End(), b.Pos(), b.End())
+		case ast.KindIdentifier:
+			if a.AsIdentifier().Text != b.AsIdentifier().Text {
+				return false
+			}
+			return identifiers == compareDecodedIdentifierValues ||
+				!usesRawIdentifierTokenValues(sf) ||
+				scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
+					scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
+		case ast.KindPrivateIdentifier:
+			if a.AsPrivateIdentifier().Text != b.AsPrivateIdentifier().Text {
+				return false
+			}
+			return identifiers == compareDecodedIdentifierValues ||
+				!usesRawIdentifierTokenValues(sf) ||
+				scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
+					scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
 		}
 		return scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
 			scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
@@ -2632,12 +2734,20 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 		if !sameTokensInRange(sf, prevA, aKids[i].Pos(), prevB, bKids[i].Pos()) {
 			return false
 		}
-		if !hasSameTokens(sf, aKids[i], bKids[i]) {
+		if !hasSameTokens(sf, aKids[i], bKids[i], identifiers) {
 			return false
 		}
 		prevA, prevB = aKids[i].End(), bKids[i].End()
 	}
 	return sameTokensInRange(sf, prevA, a.End(), prevB, b.End())
+}
+
+func usesRawIdentifierTokenValues(sourceFile *ast.SourceFile) bool {
+	return sourceFile.ScriptKind == core.ScriptKindTS || sourceFile.ScriptKind == core.ScriptKindTSX
+}
+
+func isJSXTextKind(kind ast.Kind) bool {
+	return kind == ast.KindJsxText || kind == ast.KindJsxTextAllWhiteSpaces
 }
 
 func collectKids(n *ast.Node) []*ast.Node {
