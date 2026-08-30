@@ -14,7 +14,7 @@ import (
 func missing(member string, line, column, endColumn int) []rule_tester.InvalidTestCaseError {
 	return []rule_tester.InvalidTestCaseError{{
 		MessageId: "missingTypeParameter",
-		Message:   "'" + member + "' is called without a type parameter, so its result is untyped.",
+		Message:   "'" + member + "' is called without a type parameter.",
 		Line:      line,
 		Column:    column,
 		EndLine:   line,
@@ -41,12 +41,17 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			{Code: `rstest.importMock('./example.js')`},
 
 			// ---- Dimension 4: access / key forms ----
-			// A computed member is not read as a member name, so neither
-			// branch matches it.
+			// `fn` is reached by resolving the receiver and reading a member
+			// name, so a computed key names no member to report.
 			{Code: `rs['fn']()`},
 			{Code: "rs[`fn`]()"},
 			{Code: `rs[0]()`},
-			{Code: `rs['importActual']('./example.js')`, Options: checkImports},
+			// The loader rewrite does read a computed key, but only a plain
+			// string one: a substitution and a non-string key are unknown until
+			// the code runs, so the call stays the throwing stub.
+			{Code: "rs[`import${'Actual'}`]('./example.js')", Options: checkImports},
+			{Code: `rs[loaderName]('./example.js')`, Options: checkImports},
+			{Code: `rs?.['importActual']('./example.js')`, Options: checkImports},
 
 			// ---- Dimension 4: nesting / traversal boundaries ----
 			// `fn` has to be the member the call goes through. An uncalled
@@ -90,6 +95,7 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			// keeps the rewrite from happening at all.
 			{Code: `const rs = { importActual: async (p) => ({}) }; rs.importActual('./example.js');`, Options: checkImports},
 			{Code: `function load(rs) { return rs.requireActual('./example.js'); }`, Options: checkImports},
+			{Code: `const rs = { importActual: async (p) => ({}) }; rs['importActual']('./example.js');`, Options: checkImports},
 			// An optional chain on the receiver is left as the runtime stub.
 			{Code: `rs?.importActual('./example.js')`, Options: checkImports},
 
@@ -101,6 +107,7 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			{Code: `rs.importActual()`, Options: checkImports},
 			{Code: `rs.importActual('./example.js', {})`, Options: checkImports},
 			{Code: `rs.requireMock('./example.js', {})`, Options: checkImports},
+			{Code: `rs['importActual'](path)`, Options: checkImports},
 
 			// ---- Dimension 4: receiver / expression wrappers ----
 			// The type parameter is what the rule asks for, through any wrapper.
@@ -134,6 +141,18 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			{Code: `(rs.importMock)('./example.js')`, Options: checkImports, Errors: missing("importMock", 1, 5, 15)},
 			{Code: `rs.importActual(('./example.js'))`, Options: checkImports, Errors: missing("importActual", 1, 4, 16)},
 			{Code: `rs.importActual('./example.js' as string)`, Options: checkImports, Errors: missing("importActual", 1, 4, 16)},
+
+			// ---- Dimension 4: the loader rewrite's wider call surface ----
+			// A computed string key and an optional call are both rewritten,
+			// measured on rstest 0.11.8, so both leave an untyped module.
+			{Code: `rs['importActual']('./example.js')`, Options: checkImports, Errors: missing("importActual", 1, 4, 18)},
+			{Code: "rs[`requireActual`]('./example.js')", Options: checkImports, Errors: missing("requireActual", 1, 4, 19)},
+			{Code: `rs.importActual?.('./example.js')`, Options: checkImports, Errors: missing("importActual", 1, 4, 16)},
+			{Code: `rs['importMock']?.('./example.js')`, Options: checkImports, Errors: missing("importMock", 1, 4, 16)},
+			{Code: `(rs as any)['importActual']('./example.js')`, Options: checkImports, Errors: missing("importActual", 1, 13, 27)},
+			// The shadowing rule is the same whichever way the member is
+			// written, and so is the argument shape.
+			{Code: `rs['requireMock']('./example.js')`, Options: checkImports, Errors: missing("requireMock", 1, 4, 17)},
 
 			// ---- The two module loaders Rstest adds ----
 			{

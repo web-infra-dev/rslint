@@ -47,7 +47,7 @@ func TestRequireMockTypeParametersUpstream(t *testing.T) {
 				Code: `rs.fn()`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingTypeParameter",
-					Message:   "'fn' is called without a type parameter, so its result is untyped.",
+					Message:   "'fn' is called without a type parameter.",
 					Line:      1,
 					Column:    4,
 					EndLine:   1,
@@ -69,7 +69,7 @@ func TestRequireMockTypeParametersUpstream(t *testing.T) {
 				Options: checkImports,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingTypeParameter",
-					Message:   "'importActual' is called without a type parameter, so its result is untyped.",
+					Message:   "'importActual' is called without a type parameter.",
 					Line:      1,
 					Column:    4,
 					EndLine:   1,
@@ -81,7 +81,7 @@ func TestRequireMockTypeParametersUpstream(t *testing.T) {
 				Options: checkImports,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "missingTypeParameter",
-					Message:   "'importMock' is called without a type parameter, so its result is untyped.",
+					Message:   "'importMock' is called without a type parameter.",
 					Line:      1,
 					Column:    4,
 					EndLine:   1,

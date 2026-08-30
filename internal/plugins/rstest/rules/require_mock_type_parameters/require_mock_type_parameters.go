@@ -27,7 +27,10 @@ const mockFactory = "fn"
 // signatures on them.
 //
 // All four are plugin-managed, so they are matched by the syntax at the call
-// site rather than by resolving the receiver.
+// site rather than by resolving the receiver. Their rewrite reads a wider set
+// of call shapes than the hoisted module-mock APIs do, so it is read by
+// parseModuleLoaderCall rather than by the shared parser: see the comment
+// there.
 var moduleLoaders = map[string]bool{
 	"importActual":  true,
 	"importMock":    true,
@@ -38,7 +41,7 @@ var moduleLoaders = map[string]bool{
 func missingTypeParameterMessage(member string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "missingTypeParameter",
-		Description: "'" + member + "' is called without a type parameter, so its result is untyped.",
+		Description: "'" + member + "' is called without a type parameter.",
 		Data:        map[string]string{"member": member},
 	}
 }
@@ -81,11 +84,10 @@ var RequireMockTypeParametersRule = rule.Rule{
 				}
 
 				if opts.CheckImportFunctions {
-					if utility := rstestUtils.ParseRstestUtilityCall(node); utility != nil &&
-						moduleLoaders[utility.Member] &&
+					if loader := parseModuleLoaderCall(call); loader != nil &&
 						loadsOneModule(call) &&
-						!isShadowed(ctx, utility.NamespaceNode) {
-						ctx.ReportNode(utility.MemberNode, missingTypeParameterMessage(utility.Member))
+						!isShadowed(ctx, loader.namespace) {
+						ctx.ReportNode(loader.memberNode, missingTypeParameterMessage(loader.member))
 						return
 					}
 				}
@@ -101,6 +103,81 @@ var RequireMockTypeParametersRule = rule.Rule{
 			},
 		}
 	},
+}
+
+// moduleLoaderCall is one of the four module loaders as it is written at the
+// call site: the member name, the node that names it, and the receiver.
+type moduleLoaderCall struct {
+	member     string
+	memberNode *ast.Node
+	namespace  *ast.Node
+}
+
+// parseModuleLoaderCall matches a module-loader call the way Rstest's rewrite
+// matches it, which is not the way the hoisted module-mock APIs are matched.
+// Measured on rstest 0.11.8, with `rs` imported from `@rstest/core`:
+//
+//	rs.importActual('./m')      rewritten    rs.mock('./m')      rewritten
+//	rs['importActual']('./m')   rewritten    rs['mock']('./m')   throws
+//	rs[`importActual`]('./m')   rewritten
+//	rs.importActual?.('./m')    rewritten    rs.mock?.('./m')    throws
+//	rs?.importActual('./m')     throws
+//
+// So a computed key and an optional call reach the loader rewrite and are
+// matched here, while an optional receiver does not and is left alone. The
+// shared parser keeps the narrower shape the mock family needs; widening it
+// there would report calls that really do stay as the throwing stub.
+//
+// Parentheses and type-only syntax are transparent on both sides, for the same
+// reason they are in the shared parser.
+func parseModuleLoaderCall(call *ast.CallExpression) *moduleLoaderCall {
+	callee := internalUtils.SkipAssertionsAndParens(call.Expression)
+	if callee == nil {
+		return nil
+	}
+
+	var member string
+	var memberNode, namespace *ast.Node
+	switch callee.Kind {
+	case ast.KindPropertyAccessExpression:
+		access := callee.AsPropertyAccessExpression()
+		if access == nil || access.QuestionDotToken != nil {
+			return nil
+		}
+		name := access.Name()
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return nil
+		}
+		member, memberNode, namespace = name.AsIdentifier().Text, name, access.Expression
+	case ast.KindElementAccessExpression:
+		access := callee.AsElementAccessExpression()
+		if access == nil || access.QuestionDotToken != nil {
+			return nil
+		}
+		// A key that is not a plain string is not a name the build can read,
+		// and a substitution is only known at run time.
+		key := internalUtils.SkipAssertionsAndParens(access.ArgumentExpression)
+		if key == nil ||
+			(key.Kind != ast.KindStringLiteral && key.Kind != ast.KindNoSubstitutionTemplateLiteral) {
+			return nil
+		}
+		member, memberNode, namespace = key.Text(), key, access.Expression
+	default:
+		return nil
+	}
+
+	if !moduleLoaders[member] {
+		return nil
+	}
+
+	namespace = internalUtils.SkipAssertionsAndParens(namespace)
+	if namespace == nil || namespace.Kind != ast.KindIdentifier {
+		return nil
+	}
+	if name := namespace.AsIdentifier().Text; name != "rs" && name != "rstest" {
+		return nil
+	}
+	return &moduleLoaderCall{member: member, memberNode: memberNode, namespace: namespace}
 }
 
 // calledMember returns the property name a call reaches its callee through,
