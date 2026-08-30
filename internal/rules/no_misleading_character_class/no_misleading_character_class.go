@@ -540,25 +540,12 @@ func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name s
 		utils.IsNonReferenceIdentifier(identifier) {
 		return false
 	}
-	if tracker.ctx.Refs != nil {
-		// RefStore's binder scope walk is authoritative for ordinary value
-		// bindings declared in this file. Resolve can also fall back to the
-		// TypeChecker for symbols declared outside this file (cross-file,
-		// .d.ts, standard-library globals); a symbol resolved that way is
-		// still the real global, not a shadowing local binding.
-		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
-			return false
-		}
-		// Namespace-only bindings are outside RefStore's value lookup. Only
-		// pay for the broader syntactic scope check when this file actually
-		// declared a watched root; doing it for every ordinary `window.*`
-		// read would make large files quadratic.
-		if !tracker.potentiallyShadowed[name] {
-			return true
-		}
+	if !tracker.potentiallyShadowed[name] {
+		return true
 	}
-	// Keep the syntactic fallback for namespace-only bindings and direct/unit
-	// callers without a Program.
+	// A namespace is a lexical value binding to ESLint even though ts-go's
+	// value-symbol lookup does not resolve it. The syntactic scope walk covers
+	// both namespace and ordinary local declarations consistently.
 	return !utils.IsShadowed(identifier, name)
 }
 
@@ -818,20 +805,22 @@ func (tracker *regexpCallTracker) trackIdentifierVariable(identifier *ast.Node, 
 		tracker.trackVariable(symbol, value)
 		return
 	}
-	if tracker.ctx.Refs != nil {
+	name := identifier.AsIdentifier().Text
+	shadowed := utils.IsShadowed(identifier, name)
+	if tracker.ctx.Refs != nil && shadowed {
 		// Only a symbol actually declared in this file is a local variable
 		// binding; Resolve's TypeChecker fallback can also reach a
 		// lib/ambient symbol declared elsewhere (e.g. assigning to a bare
-		// `window`), which belongs to the configured-global path below, not
-		// trackVariable's per-declaration tracking.
+		// `window`). The syntactic shadow check keeps a block-local namespace
+		// retained in SourceFile Locals from masquerading as such a binding
+		// outside its lexical scope.
 		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
 			return
 		}
 	}
 
-	name := identifier.AsIdentifier().Text
-	if tracker.ctx.Globals.Override(name).IsDeclared() {
+	if !shadowed && tracker.ctx.Globals.Override(name).IsDeclared() {
 		// The initial index contains only built-in roots. Indexing this
 		// configured-global name also records namespace-only declarations
 		// before deciding whether the assignment target is truly global.

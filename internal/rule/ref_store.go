@@ -524,34 +524,73 @@ func functionExpressionSelfBinding(fn *ast.Node, name string, meaning ast.Symbol
 // environment global rather than to a declaration in this file, mirroring
 // ESLint's sourceCode.isGlobalReference for the given declaration spaces.
 //
-// A global script file needs its own answer: ESLint keeps that file's top-level
-// declarations and the configured globals in one global-scope variable, so any
-// definition of the name there — a type-only `interface` or `type` included —
-// clears the global reference. Inner scopes hold separate variables, and a
-// value reference only resolves to one declared in a requested space, so a
-// type-only declaration inside a namespace or function leaves it global.
+// A global program scope needs its own answer: ESLint keeps that file's
+// top-level declarations and the configured globals in one global-scope
+// variable, so any definition of the name there — a type-only `interface` or
+// `type` included — clears the global reference. Inner scopes and module
+// program scopes hold separate variables, and a value reference only resolves
+// to one declared in a requested space, so a type-only declaration there
+// leaves it global.
 func (s *RefStore) IsGlobalNameReference(location *ast.Node, name string, meaning ast.SymbolFlags) bool {
 	if s == nil || location == nil || name == "" {
 		return false
 	}
-	if s.sourceFile != nil && !s.HasNonGlobalProgramScope() &&
-		hasAuthoredDeclaration(s.sourceFile.Locals[name]) {
+	if !s.HasNonGlobalProgramScope() && s.hasAuthoredProgramDefinition(name) {
 		return false
 	}
-	return !s.IsNameDefinedInFileWithMeaning(location, name, meaning)
+	// When a JSDoc import and an authored import bind the same local name,
+	// ts-go can retain only the synthesized declaration on the resolved symbol.
+	// The source scan is the authoritative evidence that the local exists.
+	if s.hasAuthoredImportBinding(name) {
+		return false
+	}
+	if hasAuthoredDeclaration(s.resolveName(location, name, meaning)) {
+		return false
+	}
+	return meaning&ast.SymbolFlagsValue == 0 || !s.HasImplicitWrapperBinding(name)
+}
+
+// hasAuthoredProgramDefinition reports whether the file spells a definition
+// that typescript-eslint places in its global Program scope. Dotted namespace
+// segments are present in ts-go's file locals for namespace resolution, but
+// typescript-eslint creates no variable definition for them.
+func (s *RefStore) hasAuthoredProgramDefinition(name string) bool {
+	if s.sourceFile == nil {
+		return false
+	}
+	symbol := s.sourceFile.Locals[name]
+	return hasAuthoredDeclaration(symbol) && !isQualifiedNamespaceNameOnly(symbol)
+}
+
+// IsGlobalReference is IsGlobalNameReference using the declaration-space
+// meaning implied by node's syntactic reference position.
+func (s *RefStore) IsGlobalReference(node *ast.Node) bool {
+	if s == nil || node == nil || node.Kind != ast.KindIdentifier || !isReferencePosition(node) {
+		return false
+	}
+	meaning := referenceMeaning(node)
+	// ESLint's global-reference check treats a namespace declaration as a
+	// controllable value binding, but ordinary RefStore expression resolution
+	// must not. Keeping this meaning local prevents namespace-only symbols from
+	// changing every Resolve consumer's answer.
+	if ast.IsExpressionNode(node) {
+		meaning |= ast.SymbolFlagsNamespace
+	}
+	return s.IsGlobalNameReference(node, node.Text(), meaning)
 }
 
 // hasAuthoredDeclaration reports whether symbol has a declaration the file
 // actually spells in syntax. A JSDoc tag such as `@typedef` or `@import` is
 // reparsed into synthesized declaration nodes that join the file's symbol
 // table; ESLint reads that same text as a comment and creates no scope variable
-// for it, so a symbol declared only that way defines nothing.
+// for it, so a symbol declared only that way defines nothing. A SourceFile
+// declaration is likewise synthesized for the CommonJS `exports` wrapper.
 func hasAuthoredDeclaration(symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if !isJSDocSynthesized(decl) {
+		if decl.Kind != ast.KindSourceFile && !isJSDocSynthesized(decl) {
 			return true
 		}
 	}

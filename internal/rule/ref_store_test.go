@@ -1005,6 +1005,89 @@ func TestRefStoreImplicitFileArguments(t *testing.T) {
 	}
 }
 
+func TestRefStoreCommonJSGlobalReference(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{name: "wrapper global", source: "exports.foo = 1;", want: true},
+		{name: "authored declaration", source: "const exports = {}; exports.foo = 1;"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/file.cjs", core.ScriptKindJS, test.source)
+			exports := identifiers(sourceFile.AsNode(), "exports")
+			reference := exports[len(exports)-1]
+			if got := refs.IsGlobalReference(reference); got != test.want {
+				t.Fatalf("IsGlobalReference(exports) = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestRefStoreGlobalReferenceProgramScopeSemantics(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileName   string
+		scriptKind core.ScriptKind
+		sourceType string
+		source     string
+		want       bool
+	}{
+		{
+			name:       "authored import retained beside JSDoc import",
+			fileName:   "/file.js",
+			scriptKind: core.ScriptKindJS,
+			sourceType: "module",
+			source:     "/** @import { Promise } from \"x\" */\nimport { Promise } from \"y\";\nPromise;",
+		},
+		{
+			name:       "type-only module declaration leaves value global",
+			fileName:   "/file.ts",
+			scriptKind: core.ScriptKindTS,
+			sourceType: "module",
+			source:     "interface Promise {} Promise;",
+			want:       true,
+		},
+		{
+			name:       "namespace module declaration binds value reference",
+			fileName:   "/file.ts",
+			scriptKind: core.ScriptKindTS,
+			sourceType: "module",
+			source:     "namespace Promise {} Promise;",
+			want:       false,
+		},
+		{
+			name:       "dotted namespace leaves built-in global uncontrollable",
+			fileName:   "/file.ts",
+			scriptKind: core.ScriptKindTS,
+			sourceType: "script",
+			source:     "namespace Promise.Inner {} Promise;",
+			want:       true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: test.fileName,
+				Path:     tspath.Path(test.fileName),
+			}, test.source, test.scriptKind)
+			binder.BindSourceFile(sourceFile)
+			_, refsInit, _ := ResolveLanguageDefaults(test.fileName, LanguageOptions{SourceType: test.sourceType})
+			refs := NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
+			occurrences := identifiers(sourceFile.AsNode(), "Promise")
+			if len(occurrences) == 0 {
+				t.Fatal("found no Promise identifier")
+			}
+			reference := occurrences[len(occurrences)-1]
+			if got := refs.IsGlobalReference(reference); got != test.want {
+				t.Fatalf("IsGlobalReference(Promise) = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestRefStoreResolveCheckerFallbackExcludedPositions(t *testing.T) {
 	// A TypeChecker resolves a property key's own declaration name to the
 	// property's symbol (its only declaration is that very key), not to
