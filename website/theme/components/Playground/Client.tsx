@@ -28,6 +28,7 @@ const Playground: React.FC = () => {
   const lastSourceTextRef = useRef<string>('');
   const [loading, setLoading] = useState(true);
   const lintTimer = useRef<number | null>(null);
+  const latestLintRunIdRef = useRef(0);
   const [selectedAstRange, setSelectedAstRange] = useState<
     { start: number; end: number; kind?: number } | undefined
   >();
@@ -61,13 +62,19 @@ const Playground: React.FC = () => {
     return () => controller.abort();
   }, []);
 
-  async function runLint(version = selectedVersion) {
-    if (!version) return;
+  function isCurrentLintRun(runId: number, version: string) {
+    return (
+      latestLintRunIdRef.current === runId &&
+      selectedVersionRef.current === version
+    );
+  }
+
+  async function runLint(version: string, runId: number) {
     try {
       setError(undefined);
       if (!initialized) setLoading(true);
       const service = await ensureWasmService(version);
-      if (selectedVersionRef.current !== version) return;
+      if (!isCurrentLintRun(runId, version)) return;
       const code = editorRef.current?.getValue() ?? '';
       const rslintConfig = editorRef.current?.getRslintConfig();
       const tsConfig = editorRef.current?.getTsConfig();
@@ -95,7 +102,7 @@ const Playground: React.FC = () => {
           : undefined,
         configDirectory: '/',
       });
-      if (selectedVersionRef.current !== version) return;
+      if (!isCurrentLintRun(runId, version)) return;
       setInitialized(true);
 
       // Convert diagnostics to the expected format
@@ -171,28 +178,33 @@ const Playground: React.FC = () => {
         await buildTypeScriptAst(lastSourceTextRef.current);
       }
     } catch (err) {
-      if (selectedVersionRef.current !== version) return;
+      if (!isCurrentLintRun(runId, version)) return;
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Linting failed: ${errorMessage}`);
     } finally {
-      if (selectedVersionRef.current === version) setLoading(false);
+      if (isCurrentLintRun(runId, version)) setLoading(false);
     }
   }
 
   // Debounce linting to reduce recomputation while typing (1 second delay)
   function scheduleRunLint() {
+    // Invalidate an in-flight result as soon as its input becomes stale.
+    const runId = ++latestLintRunIdRef.current;
     if (lintTimer.current) {
       window.clearTimeout(lintTimer.current);
       lintTimer.current = null;
     }
     lintTimer.current = window.setTimeout(() => {
-      runLint();
+      lintTimer.current = null;
+      const version = selectedVersionRef.current;
+      if (version) void runLint(version, runId);
     }, 1000);
   }
 
   // Cleanup any pending timers on unmount
   useEffect(() => {
     return () => {
+      latestLintRunIdRef.current++;
       if (lintTimer.current) {
         window.clearTimeout(lintTimer.current);
         lintTimer.current = null;
@@ -202,6 +214,11 @@ const Playground: React.FC = () => {
 
   useEffect(() => {
     selectedVersionRef.current = selectedVersion;
+    const runId = ++latestLintRunIdRef.current;
+    if (lintTimer.current) {
+      window.clearTimeout(lintTimer.current);
+      lintTimer.current = null;
+    }
     if (!selectedVersion) return;
     setInitialized(false);
     setDiagnostics([]);
@@ -210,7 +227,7 @@ const Playground: React.FC = () => {
     setTsAstTree(undefined);
     setAstInfo(null);
     setLoading(true);
-    void runLint(selectedVersion);
+    void runLint(selectedVersion, runId);
   }, [selectedVersion]);
 
   // Get AST info at a specific position - updates global state for main panel
