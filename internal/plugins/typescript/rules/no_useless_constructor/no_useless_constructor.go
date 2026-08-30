@@ -291,7 +291,10 @@ func needsLeadingSemicolon(sourceFile *ast.SourceFile, classNode *ast.Node, node
 		classNode,
 		node,
 		nextToken,
-		utils.ClassMemberLeadingSemicolonOptions{IncludePropertiesWithoutInitializers: true},
+		utils.ClassMemberLeadingSemicolonOptions{
+			IncludePropertiesWithoutInitializers: true,
+			IncludePostfixInitializers:           true,
+		},
 	)
 }
 

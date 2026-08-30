@@ -5,13 +5,17 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-// ClassMemberLeadingSemicolonOptions controls how
-// NeedsClassMemberLeadingSemicolon treats class fields without initializers.
+// ClassMemberLeadingSemicolonOptions controls which preceding class fields
+// NeedsClassMemberLeadingSemicolon treats as hazards.
 type ClassMemberLeadingSemicolonOptions struct {
 	// IncludePropertiesWithoutInitializers also treats plain fields like `foo`
 	// as hazards. Type-only fields like `foo: string` are always considered
 	// because the trailing type can merge with a following computed member.
 	IncludePropertiesWithoutInitializers bool
+	// IncludePostfixInitializers treats a postfix initializer as a hazard when
+	// the next member starts with `*`, `in`, or `instanceof`. A following `[`
+	// remains safe because it starts a computed member after the update.
+	IncludePostfixInitializers bool
 }
 
 // NeedsClassMemberLeadingSemicolon reports whether an edit that removes or
@@ -61,10 +65,11 @@ func NeedsClassMemberLeadingSemicolon(
 	}
 
 	init := prop.Initializer
-	// Postfix ++/-- are restricted productions, so ASI fires before the next
-	// class member token and no explicit semicolon is needed.
+	// A computed member after postfix ++/-- is unambiguous. The other
+	// expression-continuation tokens still need a semicolon when the caller can
+	// expose them as the next member's first token.
 	if init.Kind == ast.KindPostfixUnaryExpression {
-		return false
+		return options.IncludePostfixInitializers && nextToken.Kind != ast.KindOpenBracketToken
 	}
 	// Arrow functions with block bodies terminate at their own `}`; a following
 	// `[`/`in`/`instanceof`/`*` cannot become a member access on the initializer.

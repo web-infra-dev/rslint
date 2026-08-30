@@ -205,8 +205,9 @@ func buildRemoveAsyncMessage() rule.RuleMessage {
 }
 
 type asyncKeywordInfo struct {
-	tokenRange  core.TextRange
-	removeRange core.TextRange
+	tokenRange        core.TextRange
+	removeRange       core.TextRange
+	hasAuthoredPrefix bool
 }
 
 func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordInfo, bool) {
@@ -214,38 +215,71 @@ func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordI
 	if modifiers == nil {
 		return asyncKeywordInfo{}, false
 	}
+	hasAuthoredPrefix := false
 	for _, modifier := range modifiers.Nodes {
-		if modifier == nil || modifier.Kind != ast.KindAsyncKeyword {
+		if modifier == nil {
+			continue
+		}
+		if modifier.Kind != ast.KindAsyncKeyword {
+			if !utils.IsJSDocSyntaxNode(modifier) {
+				hasAuthoredPrefix = true
+			}
 			continue
 		}
 		tokenRange := utils.TrimNodeTextRange(sourceFile, modifier)
 		removeEnd := ecmascript.SkipLeadingWhitespace(sourceFile.Text(), tokenRange.End(), len(sourceFile.Text()))
 		return asyncKeywordInfo{
-			tokenRange:  tokenRange,
-			removeRange: core.NewTextRange(tokenRange.Pos(), removeEnd),
+			tokenRange:        tokenRange,
+			removeRange:       core.NewTextRange(tokenRange.Pos(), removeEnd),
+			hasAuthoredPrefix: hasAuthoredPrefix,
 		}, true
 	}
 	return asyncKeywordInfo{}, false
 }
 
-func needsLeadingSemicolon(sourceFile *ast.SourceFile, node *ast.Node, asyncInfo asyncKeywordInfo) bool {
-	nextToken, ok := utils.TokenAtOrAfter(sourceFile, asyncInfo.tokenRange.End())
-	if !ok {
-		return false
-	}
-
+func needsLeadingSemicolon(sourceFile *ast.SourceFile, node *ast.Node, asyncInfo asyncKeywordInfo, nextToken utils.SourceToken) bool {
 	if node.Kind == ast.KindMethodDeclaration {
+		// Removing async cannot expose nextToken as the member's first token
+		// when a decorator or another modifier precedes it.
+		if asyncInfo.hasAuthoredPrefix {
+			return false
+		}
 		return utils.NeedsClassMemberLeadingSemicolon(
 			sourceFile,
 			ast.GetContainingClass(node),
 			node,
 			nextToken,
-			utils.ClassMemberLeadingSemicolonOptions{IncludePropertiesWithoutInitializers: true},
+			utils.ClassMemberLeadingSemicolonOptions{
+				IncludePropertiesWithoutInitializers: true,
+				IncludePostfixInitializers:           true,
+			},
 		)
 	}
 	return (nextToken.Kind == ast.KindOpenBracketToken || nextToken.Kind == ast.KindOpenParenToken) &&
 		utils.IsStartOfExpressionStatement(sourceFile, node) &&
 		utils.NeedsPrecedingSemicolon(sourceFile, node)
+}
+
+func mayContainJSDocComment(text string, start int, end int) bool {
+	return start >= 0 && start < end && end <= len(text) && strings.Contains(text[start:end], "/**")
+}
+
+func hasJSDocCommentBetween(sourceFile *ast.SourceFile, text string, start int, end int) bool {
+	if start < 0 || start >= end || end > len(text) {
+		return false
+	}
+
+	for comment := range utils.GetCommentsInRange(sourceFile, core.NewTextRange(start, end)) {
+		if comment.Kind == ast.KindMultiLineCommentTrivia &&
+			comment.Pos() >= start &&
+			comment.End() <= end &&
+			comment.Pos()+3 < comment.End() &&
+			text[comment.Pos():comment.Pos()+3] == "/**" &&
+			text[comment.Pos()+3] != '/' {
+			return true
+		}
+	}
+	return false
 }
 
 func appendReturnTypeSuggestionFixes(sourceFile *ast.SourceFile, node *ast.Node, isGenerator bool, fixes []rule.RuleFix) []rule.RuleFix {
@@ -302,15 +336,43 @@ func buildRemoveAsyncSuggestion(sourceFile *ast.SourceFile, node *ast.Node, isGe
 		return nil
 	}
 
-	replacement := ""
-	if node.Kind != ast.KindMethodDeclaration && needsLeadingSemicolon(sourceFile, node, asyncInfo) {
-		replacement = ";"
+	nextToken, hasNextToken := utils.TokenAtOrAfter(sourceFile, asyncInfo.tokenRange.End())
+	text := sourceFile.Text()
+	if hasNextToken &&
+		mayContainJSDocComment(text, asyncInfo.tokenRange.End(), nextToken.Start) &&
+		hasJSDocCommentBetween(sourceFile, text, asyncInfo.tokenRange.End(), nextToken.Start) {
+		// Removing async can turn a JSDoc-style comment inside the function
+		// header into leading JSDoc and silently add declaration metadata. There
+		// is no syntax-preserving separator that works in every function context,
+		// so omit the suggestion instead of changing program semantics.
+		return nil
 	}
-	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(asyncInfo.removeRange, replacement)}
-	if node.Kind == ast.KindMethodDeclaration && needsLeadingSemicolon(sourceFile, node, asyncInfo) {
-		// Decorators and modifiers precede the async token, so the semicolon
-		// must be inserted before the entire member.
-		fixes = append(fixes, rule.RuleFixInsertBefore(sourceFile, node, ";"))
+
+	needsSemicolon := hasNextToken && needsLeadingSemicolon(sourceFile, node, asyncInfo, nextToken)
+	fixes := make([]rule.RuleFix, 0, 1)
+	if node.Kind == ast.KindMethodDeclaration && needsSemicolon {
+		memberStart := node.Pos()
+		asyncStart := asyncInfo.removeRange.Pos()
+		if memberStart >= 0 && memberStart < asyncStart &&
+			ecmascript.SkipLeadingWhitespace(text, memberStart, asyncStart) != asyncStart {
+			// Put the separator before leading comments so JSDoc stays attached
+			// to the method. Keep the insertion before the removal so the raw
+			// fixes also form legal LSP edits.
+			fixes = append(fixes,
+				rule.RuleFixReplaceRange(core.NewTextRange(memberStart, memberStart), ";"),
+				rule.RuleFixRemoveRange(asyncInfo.removeRange),
+			)
+		} else {
+			// This single edit preserves the established `;member` output and
+			// cannot conflict with the async removal at the same position.
+			fixes = append(fixes, rule.RuleFixReplaceRange(asyncInfo.removeRange, ";"))
+		}
+	} else {
+		replacement := ""
+		if needsSemicolon {
+			replacement = ";"
+		}
+		fixes = append(fixes, rule.RuleFixReplaceRange(asyncInfo.removeRange, replacement))
 	}
 	fixes = appendReturnTypeSuggestionFixes(sourceFile, node, isGenerator, fixes)
 	return []rule.RuleSuggestion{{
