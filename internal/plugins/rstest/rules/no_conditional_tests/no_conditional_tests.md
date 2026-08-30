@@ -13,10 +13,17 @@ time and is not reported. Only `if` is reported — conditional expressions,
 `switch`, and the logical operators are left alone. Hooks such as
 `beforeEach` are not registrations and are not reported.
 
-The rule looks only as far as the nearest enclosing function, so a
-registration wrapped in a helper is attributed to wherever that helper is
-called, not to an unrelated `if` the helper happens to sit under; the same
-boundary means a nested pair such as
+The rule does not carry an enclosing `if` through code that runs later. A
+registration in a function or method body, a parameter default, or an instance
+field initializer is attributed to the later call or construction rather than
+to an `if` around its declaration. Class static blocks, static field
+initializers, computed member names, and decorators run while the class is
+defined, so registrations in those positions remain conditional on an
+enclosing `if`.
+
+A registration wrapped in a helper is therefore attributed to wherever that
+helper is called, not to an unrelated `if` the helper happens to sit under; the
+same boundary means a nested pair such as
 `if (x) { describe('a', () => { test('b', fn) }) }` reports only the outer
 `describe`. Conditions written inside a test body are covered separately by
 `rstest/no-conditional-in-test`.

@@ -236,6 +236,11 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 		}
 		parts[len(parts)-1].invocation = rstestTagInvoked
 		return root, parts, rootInvoked, true
+	case ast.KindBinaryExpression:
+		if !internalUtils.IsCommaOperator(node) {
+			return nil, nil, false, false
+		}
+		return parseRstestChain(node.AsBinaryExpression().Right)
 	default:
 		return nil, nil, false, false
 	}
@@ -305,6 +310,11 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 		}
 		parts[len(parts)-1].invocation = rstestTagInvoked
 		return root, parts, rootInvoked, true
+	case ast.KindBinaryExpression:
+		if !internalUtils.IsCommaOperator(node) {
+			return nil, nil, false, false
+		}
+		return parseImportMetaRstestChain(node.AsBinaryExpression().Right)
 	default:
 		return nil, nil, false, false
 	}

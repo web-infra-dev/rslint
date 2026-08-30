@@ -86,11 +86,11 @@ func registeredUnderIfBranch(node *ast.Node) bool {
 // controls parent's own evaluation — so a registration on the far side of it
 // is no longer conditional on anything wrapping parent.
 //
-// A function, method, constructor or accessor body, and a parameter's default
-// value, qualify: neither runs when the declaration itself is evaluated, only
-// later when the function is called. An instance field initializer
-// (`p = expr`, no `static`) qualifies too: it runs once per `new`, not when
-// the class declaration is evaluated.
+// A function, method, constructor or accessor body, and the runtime-evaluated
+// parts of a parameter, qualify: none runs when the declaration itself is
+// evaluated, only later when the function is called. An instance field
+// initializer (`p = expr`, no `static`) qualifies too: it runs once per `new`,
+// not when the class declaration is evaluated.
 //
 // A class static block, a static field initializer (`static p = expr`), a
 // computed member name (`[expr]`), and a decorator (`@dec(expr)`) do not
@@ -106,11 +106,18 @@ func isDeferredExecutionBoundary(child *ast.Node, parent *ast.Node) bool {
 	switch parent.Kind {
 	case ast.KindComputedPropertyName, ast.KindDecorator, ast.KindClassStaticBlockDeclaration:
 		return false
+	case ast.KindParameter:
+		// Parameter decorators run while the enclosing class is evaluated.
+		// Defaults and binding patterns run later, when the function is called.
+		return child.Kind != ast.KindDecorator
 	case ast.KindPropertyDeclaration:
-		return !ast.HasStaticModifier(parent)
+		// A non-static field's initializer is deferred until construction, but
+		// its computed name and decorators run while the class is evaluated.
+		property := parent.AsPropertyDeclaration()
+		return !ast.HasStaticModifier(parent) && child == property.Initializer
 	}
 	if !ast.IsFunctionLikeDeclaration(parent) {
 		return false
 	}
-	return child == parent.Body() || child.Kind == ast.KindParameter
+	return child == parent.Body()
 }

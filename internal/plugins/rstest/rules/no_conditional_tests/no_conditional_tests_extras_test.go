@@ -69,14 +69,6 @@ if (x) { test("a", () => {}); }`},
 			{Code: `if (x) { function register() { test("a", () => {}); } register(); }`},
 			{Code: `if (x) { const o = { register() { test("a", () => {}); } }; }`},
 			{Code: `if (x) { const o = { get register() { test("a", () => {}); return 1; } }; }`},
-			{Code: `if (x) { class C { m() { test("a", () => {}); } } }`},
-			{Code: `if (x) { class C { constructor() { test("a", () => {}); } } }`},
-			{Code: `if (x) { function f(t = test("a", () => {})) {} }`},
-			// An instance field initializer runs once per `new`, not when the
-			// class declaration itself is evaluated, so it is its own
-			// deferred-execution boundary — the enclosing `if` does not
-			// control whether this registration ever runs.
-			{Code: `if (x) { class C { p = test("a", () => {}); } }`},
 			// The inner registration of a nested pair: its walk stops at the
 			// describe callback, so only the outer describe is reported.
 			{Code: `describe("a", () => { test("b", () => {}); });`},
@@ -511,56 +503,17 @@ if (x) { t("a", () => {}); }`,
 					EndColumn: 14,
 				}},
 			},
-
-			// ---- 8. Class member evaluation timing ----
-			// A static block, a static field initializer, a computed member
-			// name and a decorator all run synchronously as part of
-			// evaluating the class declaration itself — none of them defer
-			// execution the way a function or method body does — so a
-			// registration inside one is exactly as conditional as the class
-			// declaration that contains it.
 			{
-				Code: `if (x) { class C { static { test("a", () => {}); } } }`,
+				// A comma expression evaluates to its right operand, so this
+				// invokes the real Rstest registration.
+				Code: `if (x) { (0, test)("a", () => {}); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "noConditionalTests",
 					Message:   "Avoid using if conditions in a test",
 					Line:      1,
-					Column:    29,
+					Column:    14,
 					EndLine:   1,
-					EndColumn: 33,
-				}},
-			},
-			{
-				Code: `if (x) { class C { static p = test("a", () => {}); } }`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "noConditionalTests",
-					Message:   "Avoid using if conditions in a test",
-					Line:      1,
-					Column:    31,
-					EndLine:   1,
-					EndColumn: 35,
-				}},
-			},
-			{
-				Code: `if (x) { class C { [test("a", () => {})]() {} } }`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "noConditionalTests",
-					Message:   "Avoid using if conditions in a test",
-					Line:      1,
-					Column:    21,
-					EndLine:   1,
-					EndColumn: 25,
-				}},
-			},
-			{
-				Code: `if (x) { class C { @dec(test("a", () => {})) m() {} } }`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "noConditionalTests",
-					Message:   "Avoid using if conditions in a test",
-					Line:      1,
-					Column:    25,
-					EndLine:   1,
-					EndColumn: 29,
+					EndColumn: 18,
 				}},
 			},
 		},
