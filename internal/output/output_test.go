@@ -92,6 +92,25 @@ func TestSummaryText(t *testing.T) {
 			expected: "success Lint passed in 12ms (2 files, 3 rules, 4 threads)\n",
 		},
 		{
+			name: "lint passed with warnings",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint passed with 2 warnings in 12ms (2 files, 3 rules, 4 threads)\n",
+		},
+		{
+			name: "lint passed after applying fixes",
+			report: NewReport(nil, Metadata{
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4, FixedIssues: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint passed after applying 2 fixes in 12ms (2 files, 3 rules, 4 threads)\n",
+		},
+		{
 			name: "lint passed with warning and fix",
 			report: NewReport([]rule.RuleDiagnostic{
 				{Severity: rule.SeverityWarning},
@@ -126,6 +145,37 @@ func TestSummaryText(t *testing.T) {
 			expected: "error   Lint and type check failed with 2 lint errors, 1 TypeScript error, and 1 warning in 12ms (9 files, 8 rules, 2 threads)\n",
 		},
 		{
+			name: "lint and type check passed",
+			report: NewReport(nil, Metadata{
+				Mode: ModeLintAndTypeCheck, Files: 9, Rules: 8, Threads: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint and type check passed in 12ms (9 files, 8 rules, 2 threads)\n",
+		},
+		{
+			name: "lint and type check failed after applying fixes",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityError},
+				{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+			}, Metadata{
+				Mode: ModeLintAndTypeCheck, Files: 9, Rules: 8, Threads: 2, FixedIssues: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomeDiagnosticsFailed},
+			expected: "error   Lint and type check failed with 1 lint error and 1 TypeScript error after applying 2 fixes in 12ms (9 files, 8 rules, 2 threads)\n",
+		},
+		{
+			name: "lint and type check warning limit exceeded",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLintAndTypeCheck, Files: 9, Rules: 8, Threads: 2,
+			}),
+			outcome: Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 1},
+			expected: "error   Lint and type check failed in 12ms: 2 warnings exceeded the configured limit of 1 " +
+				"(9 files, 8 rules, 2 threads)\n",
+		},
+		{
 			name: "type check only failed",
 			report: NewReport([]rule.RuleDiagnostic{
 				{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
@@ -134,6 +184,14 @@ func TestSummaryText(t *testing.T) {
 			}),
 			outcome:  Outcome{Kind: OutcomeDiagnosticsFailed},
 			expected: "error   Type check failed with 1 TypeScript error in 12ms (1 file, 2 threads)\n",
+		},
+		{
+			name: "type check only passed",
+			report: NewReport(nil, Metadata{
+				Mode: ModeTypeCheckOnly, Files: 1, Threads: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Type check passed in 12ms (1 file, 2 threads)\n",
 		},
 		{
 			name: "warning limit exceeded",
@@ -145,6 +203,18 @@ func TestSummaryText(t *testing.T) {
 			}),
 			outcome: Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 0},
 			expected: "error   Lint failed in 12ms: 2 warnings exceeded the configured limit of 0 " +
+				"(2 files, 3 rules, 4 threads)\n",
+		},
+		{
+			name: "warning limit exceeded after applying fixes",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4, FixedIssues: 1,
+			}),
+			outcome: Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 0},
+			expected: "error   Lint failed after applying 1 fix in 12ms: 2 warnings exceeded the configured limit of 0 " +
 				"(2 files, 3 rules, 4 threads)\n",
 		},
 		{
@@ -252,6 +322,24 @@ func TestLifecycleColorsOnlyLabelsAndDetails(t *testing.T) {
 		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
 	if got := buf.String(); got != want {
 		t.Fatalf("completed output:\n got: %q\nwant: %q", got, want)
+	}
+	if got, want := buf.String(), "\x1b[32;1m"+"success"+"\x1b[0;22m Lint passed in 12ms "+
+		"\x1b[2m(2 files, 3 rules, 4 threads)\x1b[22m\n"; got != want {
+		t.Fatalf("success ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	report = NewReport([]rule.RuleDiagnostic{{Severity: rule.SeverityError}}, Metadata{
+		Mode: ModeLint, Files: 2, Rules: 3, Threads: 4,
+	})
+	renderSummary(w, report, Outcome{Kind: OutcomeDiagnosticsFailed}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := buf.String(), "\x1b[31;1m"+"error"+"\x1b[0;22m   Lint failed with 1 error in 12ms "+
+		"\x1b[2m(2 files, 3 rules, 4 threads)\x1b[22m\n"; got != want {
+		t.Fatalf("error ANSI contract:\n got: %q\nwant: %q", got, want)
 	}
 }
 

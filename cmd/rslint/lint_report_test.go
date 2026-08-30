@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -15,6 +17,17 @@ import (
 type realpathSpyFS struct {
 	vfs.FS
 	calls []string
+}
+
+type gatedStartWriter struct {
+	entered chan<- string
+	release <-chan struct{}
+}
+
+func (w gatedStartWriter) Write(p []byte) (int, error) {
+	w.entered <- string(p)
+	<-w.release
+	return len(p), nil
 }
 
 func (fsys *realpathSpyFS) Realpath(path string) string {
@@ -153,6 +166,153 @@ func TestCLIEmptyDefaultCompletesButMachineFormatStaysSilent(t *testing.T) {
 	code, stdout, _ = runLintCommandForTest(t, dir, machineArgs)
 	if code != 0 || stdout != "" {
 		t.Fatalf("machine empty result changed: code=%d stdout=%q", code, stdout)
+	}
+}
+
+func TestTypeCheckOnlyTimingDoesNotEmitRuleTable(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(dir, "index.ts"),
+		[]byte("export const value: number = 1;\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(dir, "tsconfig.json"),
+		[]byte(`{"files":["index.ts"]}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			LanguageOptions: &rslintconfig.LanguageOptions{
+				ParserOptions: &rslintconfig.ParserOptions{
+					Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+				},
+			},
+		}}),
+		TypeCheck:      true,
+		TypeCheckOnly:  true,
+		Timing:         true,
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+	if code != 0 {
+		t.Fatalf("type-check-only exit = %d, stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.HasPrefix(stdout, "start   Type checking...\n") ||
+		!strings.Contains(stdout, "success Type check passed in ") ||
+		!strings.Contains(stdout, "(1 file, 1 thread)") ||
+		strings.Contains(stdout, "rule") {
+		t.Fatalf("type-check-only lifecycle output = %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("type-check-only --timing emitted a rule table: %q", stderr)
+	}
+}
+
+func TestDefaultStartWriterCompletesBeforePostStartWarnings(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "ignored.js")
+	if err := os.WriteFile(filePath, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdoutFile, err := os.CreateTemp(t.TempDir(), "stdout-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdoutFile.Close()
+	stderrFile, err := os.CreateTemp(t.TempDir(), "stderr-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stderrFile.Close()
+
+	t.Chdir(dir)
+	originalStdout, originalStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = stdoutFile, stderrFile
+	defer func() { os.Stdout, os.Stderr = originalStdout, originalStderr }()
+
+	startEntered := make(chan string, 1)
+	releaseStart := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(releaseStart)
+		}
+	}()
+	codeCh := make(chan int, 1)
+	go func() {
+		codeCh <- handleLintCommand(lintArgs{
+			ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{
+				{Ignores: []string{"ignored.js"}},
+				{Rules: rslintconfig.Rules{"no-debugger": "error"}},
+			}),
+			Format:         "default",
+			NoColor:        true,
+			SingleThreaded: true,
+			AllowFiles:     []string{filePath},
+			StartWriter: gatedStartWriter{
+				entered: startEntered,
+				release: releaseStart,
+			},
+		}, context.Background(), nil)
+	}()
+
+	select {
+	case start := <-startEntered:
+		if start != "start   Linting...\n" {
+			t.Fatalf("start output = %q", start)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("start writer was not called")
+	}
+	if err := stderrFile.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	stderrInfo, err := stderrFile.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stderrInfo.Size() != 0 {
+		t.Fatalf("post-start warning was written before start acknowledgement; stderr bytes=%d", stderrInfo.Size())
+	}
+
+	close(releaseStart)
+	released = true
+	var code int
+	select {
+	case code = <-codeCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("lint command did not complete after start acknowledgement")
+	}
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if err := stderrFile.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	stderr, err := os.ReadFile(stderrFile.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(stderr), "warning: ignored.js is ignored because of a matching ignore pattern") {
+		t.Fatalf("post-start warning missing after acknowledgement: %q", stderr)
+	}
+	if err := stdoutFile.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := os.ReadFile(stdoutFile.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(stdout), "success No files to lint in ") {
+		t.Fatalf("terminal status missing after acknowledgement: %q", stdout)
 	}
 }
 

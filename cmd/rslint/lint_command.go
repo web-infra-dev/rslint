@@ -266,8 +266,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		Quiet:        quiet,
 		ColorEnabled: colorEnabled,
 	}
-	if err := output.RenderStart(os.Stdout, mode, outputOptions); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
+	startWriter := args.StartWriter
+	if startWriter == nil {
+		startWriter = os.Stdout
+	}
+	if err := output.RenderStart(startWriter, mode, outputOptions); err != nil {
+		if ctx.Err() == nil {
+			fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
+		}
 		return 1
 	}
 	abortRun := func(reason, legacyMessage string) int {

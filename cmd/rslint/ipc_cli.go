@@ -13,7 +13,7 @@
 //	│  stdin/stdout = bidirectional IPC frames (ipc.Channel)    │
 //	│  stderr       = inherited                                 │
 //	│  sends `init`; awaits `response{ok:true}`                 │
-//	│  forwards `output` notifications to its real stdout       │
+//	│  forwards `output` requests/notifications to real stdout  │
 //	└───────────────────────────────────────────────────────────┘
 //
 // Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
@@ -32,7 +32,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -61,7 +60,7 @@ import (
 const (
 	kindInit            ipc.MessageKind = "init"            // Node → Go: handshake payload
 	kindShutdown        ipc.MessageKind = "shutdown"        // Go → Node: lint done
-	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text
+	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text (request = acknowledged)
 	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: run ESLint-plugin rules in a worker
 	kindLoadConfigs     ipc.MessageKind = "loadConfigs"     // Go → Node: evaluate one config frontier
 	kindActivateConfigs ipc.MessageKind = "activateConfigs" // Go → Node: prepare the effective config/plugin set
@@ -347,9 +346,10 @@ func runCLI(args []string) int {
 	// The peer holds the real stdout for IPC frames, so any plain-text write
 	// (usage banner, "Created rslint.config.*", lint output) would corrupt the
 	// frame stream if it shared the fd. Redirect through `output`
-	// notifications, which the peer concatenates into its real stdout. Ordinary
-	// stderr stays inherited; deferred final stderr waits for Node's shutdown
-	// acknowledgement before using that inherited stream.
+	// notifications, which the peer concatenates into its real stdout. The
+	// default lifecycle start uses one acknowledged output request instead, so
+	// post-start inherited stderr cannot overtake it. Deferred final stderr
+	// waits for Node's shutdown acknowledgement as before.
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
 		_ = ch.Close()
@@ -398,10 +398,14 @@ func runCLI(args []string) int {
 	// sufficient ordering edge because Node's Writable writes are asynchronous.
 	var timingTable string
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
+	baseArgs.StartWriter = acknowledgedOutputWriter{ctx: lintCtx, channel: ch}
 
 	exitCode := handleLintCommand(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
+	// Publish cancellation synchronously before deciding whether to perform the
+	// shutdown handshake. The signal-mirroring goroutine may not have run yet.
+	markCLIInterrupted(lintCtx, state)
 	stdoutFlushed := shutdownPeer(ch, state)
 	if stdoutFlushed && !state.signalled.Load() && timingTable != "" {
 		fmt.Fprint(os.Stderr, timingTable)
@@ -438,6 +442,30 @@ func shutdownPeer(ch *ipc.Channel, state *runCLIState) bool {
 	defer cancel()
 	_, err := ch.SendRequest(ctx, kindShutdown, struct{}{})
 	return err == nil
+}
+
+// acknowledgedOutputWriter sends the default lifecycle start as an output
+// request rather than a notification. The Node host responds only after its
+// real stdout write callback completes, making Write the boundary between
+// preflight and post-start work even though ordinary child stderr is inherited.
+// Later report output keeps using the batched notification path below.
+type acknowledgedOutputWriter struct {
+	ctx     context.Context
+	channel *ipc.Channel
+}
+
+func (w acknowledgedOutputWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	_, err := w.channel.SendRequest(w.ctx, kindOutput, map[string]any{
+		"stream": "stdout",
+		"text":   string(p),
+	})
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 // classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
@@ -528,10 +556,10 @@ func discoverCLIConfigCatalog(
 	return nil
 }
 
-// stdoutDrainMinFlushBytes is the soft floor for batching IPC `output` frames
-// after the first frame. The first complete line flushes immediately so an
-// interactive lifecycle line is visible while the command is still running;
-// later chunks retain the existing amortized frame size.
+// stdoutDrainMinFlushBytes is the soft floor for batching IPC `output` frames.
+// Reads below this are buffered and combined with later reads; pending bytes
+// at or above it flush immediately. Sized to amortize a JSON frame's fixed
+// overhead over a meaningful chunk without stalling interactive runs.
 const stdoutDrainMinFlushBytes = 8 * 1024
 
 // drainStdoutToIPC consumes the stdout-redirect pipe and forwards bytes to the
@@ -541,10 +569,11 @@ const stdoutDrainMinFlushBytes = 8 * 1024
 //     character; string(buf[:n]) would then emit replacement bytes and the
 //     peer would see corrupted non-ASCII. We hold back any incomplete trailing
 //     sequence (1-3 bytes) and prepend it to the next read.
-//  2. Latency plus frame-count overhead. The first complete line is forwarded
-//     eagerly for interactive feedback. Later reads coalesce up to
-//     stdoutDrainMinFlushBytes per frame; the close path always flushes the
-//     remainder.
+//  2. Frame-count overhead. Each SendNotification is one JSON frame; for 100K+
+//     diagnostic lines that's 100K frames of CPU + syscall overhead. We
+//     coalesce up to stdoutDrainMinFlushBytes per frame; the close path always
+//     flushes the remainder. The lifecycle start bypasses this drain through
+//     acknowledgedOutputWriter.
 //
 // On the first SendNotification failure (peer closed its end) we flip into
 // discard mode: keep draining r so the lint pipeline's writes don't block on a
@@ -555,7 +584,6 @@ func drainStdoutToIPC(r io.Reader, ch *ipc.Channel, done chan<- struct{}) {
 	var leftover []byte // UTF-8 incomplete tail held back from last read
 	var pending []byte  // bytes ready to send, waiting for batch threshold
 	discard := false
-	sentFrame := false
 
 	flush := func() {
 		if len(pending) == 0 || discard {
@@ -578,7 +606,6 @@ func drainStdoutToIPC(r io.Reader, ch *ipc.Channel, done chan<- struct{}) {
 				"rslint: stopped forwarding stdout to peer (channel closed): %v\n", err)
 			discard = true
 		}
-		sentFrame = true
 		pending = pending[:0]
 	}
 
@@ -611,8 +638,7 @@ func drainStdoutToIPC(r io.Reader, ch *ipc.Channel, done chan<- struct{}) {
 				}
 			}
 
-			firstLineComplete := !sentFrame && bytes.ContainsRune(pending, '\n')
-			if readErr != nil || len(pending) >= stdoutDrainMinFlushBytes || firstLineComplete {
+			if readErr != nil || len(pending) >= stdoutDrainMinFlushBytes {
 				flush()
 			}
 		}
