@@ -981,6 +981,38 @@ func TestRefStoreLocalExportCheckerFallbackResolvesGlobalValue(t *testing.T) {
 	}
 }
 
+func TestRefStoreGlobalNameReferenceSkipsOwnExportAlias(t *testing.T) {
+	const typeMeaning = ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	for _, test := range []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{
+			name:   "implicit global type target",
+			source: `export type { Record as Safe };`,
+			want:   true,
+		},
+		{
+			name:   "authored local type target",
+			source: `type Record = {}; export type { Record as Safe };`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/export-global-name.ts", core.ScriptKindTS, test.source)
+			occurrences := identifiers(sourceFile.AsNode(), "Record")
+			specifier := occurrences[len(occurrences)-1]
+			if got := refs.IsGlobalNameReference(specifier, "Record", typeMeaning); got != test.want {
+				t.Fatalf("IsGlobalNameReference(Record) = %v, want %v", got, test.want)
+			}
+			if safe := identifiers(sourceFile.AsNode(), "Safe"); len(safe) == 1 &&
+				refs.IsGlobalNameReference(safe[0], "Safe", typeMeaning) {
+				t.Fatal("exported alias label Safe was treated as a global reference")
+			}
+		})
+	}
+}
+
 func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
 	// A non-default export is bound to an export symbol too; the local symbol
 	// left in the file's locals carries only the ExportValue marker, so
