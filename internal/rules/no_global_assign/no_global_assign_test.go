@@ -642,6 +642,32 @@ func TestNoGlobalAssignRule(t *testing.T) {
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
 				},
 			},
+			// TypeScript wrappers around a destructuring default are transparent
+			// when finding the enclosing pattern.
+			{
+				Code: `[(Object!! = 0) as any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `({x: (<any>(Object!! = 0))} = src);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 13},
+				},
+			},
+			{
+				Code: `for ([(Object!! = 0)!] of rows) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `[(Object!! = 0) satisfies any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
 			{
 				Code: `(Object as any) += 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
