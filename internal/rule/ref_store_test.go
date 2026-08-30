@@ -360,6 +360,112 @@ func TestRefStoreExportAssignmentResolvesTypeOnlySymbol(t *testing.T) {
 	}
 }
 
+func TestRefStoreResolveTypeOrNamespaceUsesExactReferenceMeaning(t *testing.T) {
+	tests := []struct {
+		name         string
+		source       string
+		identifier   string
+		wantResolved bool
+	}{
+		{
+			name:         "direct export resolves type",
+			source:       `export = Record;`,
+			identifier:   "Record",
+			wantResolved: true,
+		},
+		{
+			name:       "parenthesized export is value-only",
+			source:     `export = ((Record));`,
+			identifier: "Record",
+		},
+		{
+			name:       "import equals rejects type-only target",
+			source:     `import Alias = Record;`,
+			identifier: "Record",
+		},
+		{
+			name:         "import equals resolves namespace target",
+			source:       `import Alias = Intl.Collator;`,
+			identifier:   "Intl",
+			wantResolved: true,
+		},
+		{
+			name:         "qualified type root resolves namespace",
+			source:       `type T = Intl.CollatorOptions;`,
+			identifier:   "Intl",
+			wantResolved: true,
+		},
+		{
+			name:       "type query remains value-only",
+			source:     `type T = typeof Intl;`,
+			identifier: "Intl",
+		},
+		{
+			name:       "class extends remains value-only",
+			source:     `class C extends Intl.Collator {}`,
+			identifier: "Intl",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs, done := newCheckedRefStore(t, test.source)
+			defer done()
+			occurrences := identifiers(sourceFile.AsNode(), test.identifier)
+			if len(occurrences) != 1 {
+				t.Fatalf("identifier occurrences = %d, want 1", len(occurrences))
+			}
+			resolved := refs.ResolveTypeOrNamespace(occurrences[0])
+			if (resolved != nil) != test.wantResolved {
+				t.Fatalf("ResolveTypeOrNamespace(%s) = %v, wantResolved %v", test.identifier, resolved, test.wantResolved)
+			}
+		})
+	}
+}
+
+func TestRefStoreResolveTypeOrNamespaceKeepsTheExactTarget(t *testing.T) {
+	t.Run("import equals uses namespace meaning", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t, `import Alias = Record;`)
+		defer done()
+		occurrences := identifiers(sourceFile.AsNode(), "Record")
+		if len(occurrences) != 1 {
+			t.Fatalf("identifier occurrences = %d, want 1", len(occurrences))
+		}
+		if got := refs.Resolve(occurrences[0]); got != nil {
+			t.Fatalf("Resolve(type-only import-equals root) = %v, want nil", got)
+		}
+	})
+
+	t.Run("local value shadows external type", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t, `const Record = 1; export default Record;`)
+		defer done()
+		occurrences := identifiers(sourceFile.AsNode(), "Record")
+		if len(occurrences) != 2 {
+			t.Fatalf("identifier occurrences = %d, want 2", len(occurrences))
+		}
+		if got := refs.ResolveTypeOrNamespace(occurrences[1]); got != nil {
+			t.Fatalf("ResolveTypeOrNamespace(local value) = %v, want nil", got)
+		}
+		if got, want := refs.Resolve(occurrences[1]), occurrences[0].Parent.Symbol(); got != want {
+			t.Fatalf("Resolve(local value) = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("local alias retains its authored identity", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t, `import type { T as Alias } from "./foo"; export default Alias;`)
+		defer done()
+		occurrences := identifiers(sourceFile.AsNode(), "Alias")
+		if len(occurrences) != 2 {
+			t.Fatalf("identifier occurrences = %d, want 2", len(occurrences))
+		}
+		got := refs.ResolveTypeOrNamespace(occurrences[1])
+		want := occurrences[0].Parent.Symbol()
+		if got == nil || got != want {
+			t.Fatalf("ResolveTypeOrNamespace(local alias) = %v, want %v", got, want)
+		}
+	})
+}
+
 func TestRefStoreExportDefaultNamedFunction(t *testing.T) {
 	// A named default export is bound to an export symbol named "default", so
 	// looking its candidates up by symbol name finds nothing: the references

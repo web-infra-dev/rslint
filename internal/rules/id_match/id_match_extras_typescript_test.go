@@ -27,6 +27,14 @@ func TestIdMatchExtrasTypescript(t *testing.T) {
 				Options: []any{`^x$`},
 			},
 			{
+				Code:    `export = Record;`,
+				Options: []any{`^x$`},
+			},
+			{
+				Code:    `export default Record;`,
+				Options: []any{`^x$`},
+			},
+			{
 				Code:    `let x: ReadonlyArray<number>;`,
 				Options: []any{`^x$`},
 			},
@@ -72,6 +80,124 @@ func TestIdMatchExtrasTypescript(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Only a bare export assignment has type meaning ----
+			{
+				Code:    `export = (Record);`,
+				Options: []any{`^x$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^x$'.`,
+						Line:      1,
+						Column:    11,
+						EndLine:   1,
+						EndColumn: 17,
+					},
+				},
+			},
+			{
+				Code:    `export default ((Record));`,
+				Options: []any{`^x$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^x$'.`,
+						Line:      1,
+						Column:    18,
+						EndLine:   1,
+						EndColumn: 24,
+					},
+				},
+			},
+			{
+				Code:    `export default (Record as unknown);`,
+				Options: []any{`^x$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^x$'.`,
+						Line:      1,
+						Column:    17,
+						EndLine:   1,
+						EndColumn: 23,
+					},
+				},
+			},
+			{
+				Code:    `type X = Record.T;`,
+				Options: []any{`^(X|T)$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^(X|T)$'.`,
+						Line:      1,
+						Column:    10,
+						EndLine:   1,
+						EndColumn: 16,
+					},
+				},
+			},
+			{
+				Code:    `import X = Record;`,
+				Options: []any{`^X$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^X$'.`,
+						Line:      1,
+						Column:    12,
+						EndLine:   1,
+						EndColumn: 18,
+					},
+				},
+			},
+			{
+				Code:    `export type { Record as X };`,
+				Options: []any{`^X$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^X$'.`,
+						Line:      1,
+						Column:    15,
+						EndLine:   1,
+						EndColumn: 21,
+					},
+				},
+			},
+			{
+				Code:     `export default Record;`,
+				FileName: "export-default-global.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{`^x$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^x$'.`,
+						Line:      1,
+						Column:    16,
+						EndLine:   1,
+						EndColumn: 22,
+					},
+				},
+			},
+			{
+				Code:     `export default Record;`,
+				FileName: "export-default-global.jsx",
+				TSConfig: "tsconfig.allow-js.json",
+				Tsx:      true,
+				Options:  []any{`^x$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'Record' does not match the pattern '^x$'.`,
+						Line:      1,
+						Column:    16,
+						EndLine:   1,
+						EndColumn: 22,
+					},
+				},
+			},
 			// ---- A class constructor is checked like any other name ----
 			{
 				Code:    `class foo { constructor() {} }`,
@@ -298,7 +424,7 @@ let x: Foo_1;`,
 					},
 				},
 			},
-			// ---- A parameter is reported over its name, not over its type annotation ----
+			// ---- A direct binding identifier owns its TypeScript annotation in TSESTree ----
 			{
 				Code:    `function f(a_1: string) {}`,
 				Options: []any{`^[^_]+$`},
@@ -309,7 +435,52 @@ let x: Foo_1;`,
 						Line:      1,
 						Column:    12,
 						EndLine:   1,
-						EndColumn: 15,
+						EndColumn: 23,
+					},
+				},
+			},
+			// ---- A direct binding identifier owns its optional marker in TSESTree ----
+			{
+				Code:    `function f(a_1?) {}`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    12,
+						EndLine:   1,
+						EndColumn: 16,
+					},
+				},
+			},
+			// ---- A variable binding owns its definite marker and annotation in TSESTree ----
+			{
+				Code:    `let a_1!: number;`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    5,
+						EndLine:   1,
+						EndColumn: 17,
+					},
+				},
+			},
+			// ---- A rest parameter's Identifier remains the name alone in TSESTree ----
+			{
+				Code:    `function f(...a_1: string[]) {}`,
+				Options: []any{`^[^_]+$`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "notMatch",
+						Message:   `Identifier 'a_1' does not match the pattern '^[^_]+$'.`,
+						Line:      1,
+						Column:    15,
+						EndLine:   1,
+						EndColumn: 18,
 					},
 				},
 			},

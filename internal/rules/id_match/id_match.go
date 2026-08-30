@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed id_match.schema.json
@@ -110,7 +111,10 @@ func (r *idMatch) report(node *ast.Node, name string) {
 	if r.isReferenceToGlobalVariable(node, name) || r.isExternallyDeclaredType(node, name) {
 		return
 	}
-	r.ctx.ReportNode(node, messageNotMatch(name, r.opts.pattern))
+	r.ctx.ReportRange(
+		utils.GetESTreeBindingIdentifierRange(r.ctx.SourceFile, node),
+		messageNotMatch(name, r.opts.pattern),
+	)
 }
 
 func (r *idMatch) reportIfInvalid(node *ast.Node, name string) {
@@ -338,17 +342,32 @@ func isNonReferenceIdentifier(node *ast.Node) bool {
 	return utils.IsNonReferenceIdentifier(node)
 }
 
-// isExternallyDeclaredType reports whether a name used in a type position is
-// declared somewhere other than the linted file — `Record`, `Omit` and the
-// rest of the TypeScript standard library, an ambient declaration, a global
-// another file contributes.
+// isExternallyDeclaredType reports whether a reference that TypeScript can
+// resolve in type or namespace space is declared somewhere other than the
+// linted file — `Record`, `Omit` and the rest of the standard library, an
+// ambient declaration, or a global another file contributes.
 //
 // NOTE: Unlike ESLint, whose scope model has no types in it at all, rslint has
 // to answer this to stay usable on TypeScript: without it every `Record<K, V>`
 // in the project is reported against a pattern its author never chose. A name
 // the file itself declares or imports still counts as the author's.
 func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
-	if r.ctx.SourceFile == nil || !ast.IsPartOfTypeNode(node) || !isTypeGlobalReference(node) {
+	if r.ctx.SourceFile == nil || ast.IsInJSFile(node) || !isTypeGlobalReference(node) {
+		return false
+	}
+	// A local export specifier has an overlaid exported-name role in ESTree.
+	// In the unaliased form that non-reference role shares the reference's
+	// source range and decides the diagnostic; keep both aliased and unaliased
+	// forms authored rather than extending the external-type policy to invalid
+	// exports of ambient globals.
+	if node.Parent != nil && node.Parent.Kind == ast.KindExportSpecifier {
+		return false
+	}
+	// Preserve the ordinary-value fast path: those references account for the
+	// overwhelming majority of identifier visits and cannot select an external
+	// type. The explicit shapes are precisely the legal references that
+	// ast.IsPartOfTypeNode does not recognize on the identifier alone.
+	if !mayReferenceExternalTypeOrNamespace(node) {
 		return false
 	}
 	// The standard library's own names are answered without asking for a
@@ -357,15 +376,38 @@ func (r *idMatch) isExternallyDeclaredType(node *ast.Node, name string) bool {
 	// tsconfig owns and stays quiet in one a tsconfig does. This list is the
 	// type-capable global scope typescript-eslint seeds, which is where its
 	// own scope model finds these names.
-	if r.isDefaultTypeGlobal(name) && !r.isDeclaredInFile(node, name) {
-		return true
+	if r.isDefaultTypeGlobal(name) {
+		semanticMeaning := scope.TypeScriptReferenceMeaning(node)
+		if semanticMeaning&ast.SemanticMeaningType != 0 && !r.isDeclaredInFile(node, name) {
+			return true
+		}
 	}
-	symbol := r.ctx.Refs.Resolve(node)
+	symbol := r.ctx.Refs.ResolveTypeOrNamespace(node)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		// A name nothing declares is still the author's to fix.
 		return false
 	}
 	return !utils.IsSymbolDeclaredInFile(symbol, r.ctx.SourceFile)
+}
+
+func mayReferenceExternalTypeOrNamespace(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	parent := node.Parent
+	switch parent.Kind {
+	case ast.KindExportAssignment:
+		return true
+	case ast.KindQualifiedName:
+		return parent.AsQualifiedName().Left == node
+	case ast.KindPropertyAccessExpression:
+		access := parent.AsPropertyAccessExpression()
+		return access != nil && access.Expression == node && scope.InTypePosition(node)
+	case ast.KindImportEqualsDeclaration:
+		return parent.AsImportEqualsDeclaration().ModuleReference == node
+	default:
+		return ast.IsPartOfTypeNode(node)
+	}
 }
 
 // isDefaultTypeGlobal reports whether name belongs to TypeScript-ESLint's
