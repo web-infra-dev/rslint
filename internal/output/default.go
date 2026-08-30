@@ -94,18 +94,18 @@ func renderSummary(w *bufio.Writer, report Report, outcome Outcome, elapsed time
 		labelColor = colors.ErrorText
 		message = fmt.Sprintf("%s failed with %s%s in %s",
 			subject,
-			findingSummary(report),
+			findingSummary(report, colors),
 			fixes,
 			formatElapsed(elapsed),
 		)
 	case OutcomeWarningLimitExceeded:
 		label = "error"
 		labelColor = colors.ErrorText
-		message = fmt.Sprintf("%s failed%s in %s: %d %s exceeded the configured limit of %d",
+		message = fmt.Sprintf("%s failed%s in %s: %s %s exceeded the configured limit of %d",
 			subject,
 			fixes,
 			formatElapsed(elapsed),
-			report.counts.Warnings,
+			colors.WarnText("%d", report.counts.Warnings),
 			pluralize(report.counts.Warnings, "warning", "warnings"),
 			outcome.WarningLimit,
 		)
@@ -114,8 +114,8 @@ func renderSummary(w *bufio.Writer, report Report, outcome Outcome, elapsed time
 		labelColor = colors.SuccessText
 		warningSummary := ""
 		if report.counts.Warnings > 0 {
-			warningSummary = fmt.Sprintf(" with %d %s",
-				report.counts.Warnings,
+			warningSummary = fmt.Sprintf(" with %s %s",
+				colors.WarnText("%d", report.counts.Warnings),
 				pluralize(report.counts.Warnings, "warning", "warnings"),
 			)
 		}
@@ -190,24 +190,32 @@ func emptyMessage(mode Mode) string {
 	}
 }
 
-func findingSummary(report Report) string {
+func findingSummary(report Report, colors colorScheme) string {
 	findings := make([]string, 0, 3)
-	appendFinding := func(count int, singular, plural string) {
+	appendFinding := func(
+		count int,
+		singular string,
+		plural string,
+		countColor func(string, ...interface{}) string,
+	) {
 		if count > 0 {
-			findings = append(findings, fmt.Sprintf("%d %s", count, pluralize(count, singular, plural)))
+			findings = append(findings, fmt.Sprintf("%s %s",
+				countColor("%d", count),
+				pluralize(count, singular, plural),
+			))
 		}
 	}
 
 	switch report.metadata.Mode {
 	case ModeLintAndTypeCheck:
-		appendFinding(report.counts.LintErrors, "lint error", "lint errors")
-		appendFinding(report.counts.TypeErrors, "TypeScript error", "TypeScript errors")
+		appendFinding(report.counts.LintErrors, "lint error", "lint errors", colors.ErrorText)
+		appendFinding(report.counts.TypeErrors, "TypeScript error", "TypeScript errors", colors.ErrorText)
 	case ModeTypeCheckOnly:
-		appendFinding(report.counts.TypeErrors, "TypeScript error", "TypeScript errors")
+		appendFinding(report.counts.TypeErrors, "TypeScript error", "TypeScript errors", colors.ErrorText)
 	default:
-		appendFinding(report.counts.Errors, "error", "errors")
+		appendFinding(report.counts.Errors, "error", "errors", colors.ErrorText)
 	}
-	appendFinding(report.counts.Warnings, "warning", "warnings")
+	appendFinding(report.counts.Warnings, "warning", "warnings", colors.WarnText)
 
 	switch len(findings) {
 	case 0:

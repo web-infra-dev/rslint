@@ -297,7 +297,7 @@ func TestSummaryDetailsAreOneDimSpan(t *testing.T) {
 	}
 }
 
-func TestLifecycleColorsOnlyLabelsAndDetails(t *testing.T) {
+func TestLifecycleColors(t *testing.T) {
 	colors := newColorScheme(true)
 	options := Options{Format: FormatDefault, ColorEnabled: true}
 	var buf bytes.Buffer
@@ -337,9 +337,61 @@ func TestLifecycleColorsOnlyLabelsAndDetails(t *testing.T) {
 	if err := w.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := buf.String(), "\x1b[31;1m"+"error"+"\x1b[0;22m   Lint failed with 1 error in 12ms "+
+	if got, want := buf.String(), "\x1b[31;1m"+"error"+"\x1b[0;22m   Lint failed with "+
+		"\x1b[31;1m1\x1b[0;22m error in 12ms "+
 		"\x1b[2m(2 files, 3 rules, 4 threads)\x1b[22m\n"; got != want {
 		t.Fatalf("error ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	report = NewReport([]rule.RuleDiagnostic{
+		{Severity: rule.SeverityError},
+		{Severity: rule.SeverityError},
+		{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+		{Severity: rule.SeverityWarning},
+	}, Metadata{Mode: ModeLintAndTypeCheck, Files: 2, Rules: 3, Threads: 4})
+	renderSummary(w, report, Outcome{Kind: OutcomeDiagnosticsFailed}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	want = colors.ErrorText("%s", "error") + "   Lint and type check failed with " +
+		colors.ErrorText("%d", 2) + " lint errors, " +
+		colors.ErrorText("%d", 1) + " TypeScript error, and " +
+		colors.WarnText("%d", 1) + " warning in 12ms " +
+		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
+	if got := buf.String(); got != want {
+		t.Fatalf("mixed diagnostics ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	report = NewReport([]rule.RuleDiagnostic{
+		{Severity: rule.SeverityWarning},
+		{Severity: rule.SeverityWarning},
+	}, Metadata{Mode: ModeLint, Files: 2, Rules: 3, Threads: 4})
+	renderSummary(w, report, Outcome{Kind: OutcomePassed}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	want = colors.SuccessText("%s", "success") + " Lint passed with " +
+		colors.WarnText("%d", 2) + " warnings in 12ms " +
+		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
+	if got := buf.String(); got != want {
+		t.Fatalf("warning success ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	renderSummary(w, report, Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 0}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	want = colors.ErrorText("%s", "error") + "   Lint failed in 12ms: " +
+		colors.WarnText("%d", 2) + " warnings exceeded the configured limit of 0 " +
+		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
+	if got := buf.String(); got != want {
+		t.Fatalf("warning limit ANSI contract:\n got: %q\nwant: %q", got, want)
 	}
 }
 
