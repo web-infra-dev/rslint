@@ -1,0 +1,29 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "string",
+      "format": "regex-u"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "properties": {
+          "type": "boolean"
+        },
+        "classFields": {
+          "type": "boolean"
+        },
+        "onlyDeclarations": {
+          "type": "boolean"
+        },
+        "ignoreDestructuring": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}

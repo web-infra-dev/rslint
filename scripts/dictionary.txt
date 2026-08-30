@@ -190,6 +190,7 @@ fieldset
 figcaption
 fileless
 finalizer
+firstname
 fixability
 fixall
 flaggable
@@ -299,6 +300,7 @@ Kore
 labelledby
 lalala
 Laoo
+Larcher
 ldflags
 ldquo
 libc
@@ -329,6 +331,7 @@ marginx
 marginy
 materialise
 materialised
+Matthieu
 McCabe
 memfs
 menuitemcheckbox
