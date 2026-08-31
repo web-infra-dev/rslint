@@ -17,6 +17,14 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `const value = 5 as any;`},
+			{
+				Code: `declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x as string} />;`,
+				Tsx:  true,
+			},
+			{
+				Code:    `declare const x: number; x as /* comment */ number;`,
+				Options: []any{map[string]any{"typesToIgnore": []any{"number"}}},
+			},
 			{Code: `declare const value: unknown; const result: number = value as number;`},
 			{Code: `declare function fn(x: string | undefined): void; fn(undefined as string | undefined);`},
 			{Code: `declare function fn(x: number[]): void; fn([...(1 as any)]);`},
@@ -48,6 +56,11 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `declare const x: number; x  as number;`,
+				Output: []string{`declare const x: number; x;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
 			{
 				Code:   "const v: number = 5;\nconst x = <number>(<any>v);",
 				Output: []string{"const v: number = 5;\nconst x = v;"},

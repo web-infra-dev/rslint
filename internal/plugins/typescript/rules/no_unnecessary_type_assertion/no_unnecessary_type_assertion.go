@@ -327,6 +327,13 @@ func assertionIsInDestructuringDeclaration(node *ast.Node) bool {
 	return name != nil && (name.Kind == ast.KindObjectBindingPattern || name.Kind == ast.KindArrayBindingPattern)
 }
 
+func assertionIsInJsxAttribute(node *ast.Node) bool {
+	semanticNode := assertionWalkUpParentheses(node)
+	jsxExpression := semanticNode.Parent
+	return jsxExpression != nil && jsxExpression.Kind == ast.KindJsxExpression &&
+		jsxExpression.Parent != nil && jsxExpression.Parent.Kind == ast.KindJsxAttribute
+}
+
 func assertionIsPropertyInProblematicContext(ctx rule.RuleContext, node *ast.Node) bool {
 	semanticNode := assertionWalkUpParentheses(node)
 	property := semanticNode.Parent
@@ -501,6 +508,7 @@ func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.N
 	}
 	if ast.IsArrayLiteralExpression(ast.SkipParentheses(node.Expression())) ||
 		assertionIsInDestructuringDeclaration(node) ||
+		assertionIsInJsxAttribute(node) ||
 		assertionIsPropertyInProblematicContext(ctx, node) ||
 		assertionIsAssignmentInNonStatementContext(node) ||
 		assertionIsRightHandSideOfLogicalAssignment(node) ||
@@ -781,7 +789,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 		checkTypeAssertion := func(node *ast.Node) {
 			typeNode := node.Type()
-			if slices.Contains(opts.TypesToIgnore, ecmascript.StringTrim(sourceText[typeNode.Pos():typeNode.End()])) {
+			if slices.Contains(opts.TypesToIgnore, utils.TrimmedNodeText(ctx.SourceFile, typeNode)) {
 				return
 			}
 
@@ -798,13 +806,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				ctx.ReportNodeWithDeferredFixes(node, msg, func() []rule.RuleFix {
 					if node.Kind == ast.KindAsExpression {
 						asKeywordRange := getTokenRange(expression.End())
-						startPos := asKeywordRange.Pos()
-
-						if startPos > expression.End() && sourceText[startPos-1] == ' ' {
-							if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
-								startPos--
-							}
-						}
+						startPos := ecmascript.SkipTrailingWhitespace(sourceText, expression.End(), asKeywordRange.Pos())
 
 						fixRange := asKeywordRange.WithPos(startPos).WithEnd(typeNode.End())
 						return []rule.RuleFix{rule.RuleFixRemoveRange(fixRange)}
