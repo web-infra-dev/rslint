@@ -474,7 +474,7 @@ export const EditorTabs = ({
   const tabs: { key: EditorTabType; label: string }[] = [
     { key: 'code', label: 'Code' },
     { key: 'rslint', label: 'rslint.config.js' },
-    { key: 'tsconfig', label: 'tsconfig' },
+    { key: 'tsconfig', label: 'tsconfig.json' },
   ];
 
   return (
