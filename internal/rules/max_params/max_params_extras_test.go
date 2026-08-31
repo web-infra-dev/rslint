@@ -88,6 +88,34 @@ func TestMaxParamsExtras(t *testing.T) {
 			{Code: "function f(a, b, c, d) {} // eslint-disable-line test"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- JSDoc casts are transparent to the shared ESTree function owner ----
+			{
+				Code:     "const value = { field: /** @type {Function} */ ((a, b, c, d) => {}) };",
+				FileName: "jsdoc-object-property.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   exceedMessage("Method 'field'", 4, 3),
+					Line:      1,
+					Column:    17,
+					EndLine:   1,
+					EndColumn: 49,
+				}},
+			},
+			{
+				Code:     "class A { static #field = /** @type {Function} */ ((a, b, c, d) => {}); }",
+				FileName: "jsdoc-static-private-field.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "exceed",
+					Message:   exceedMessage("Static private method #field", 4, 3),
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 52,
+				}},
+			},
+
 			// ---- Dimension 4: declaration/container forms ----
 			{
 				Code:   "async function f(a, b, c, d) {}",

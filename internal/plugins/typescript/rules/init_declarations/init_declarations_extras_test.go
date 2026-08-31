@@ -854,8 +854,8 @@ let visibleAgain: number;
 				Programs:         programs,
 				TargetsByProgram: [][]string{{sourceFile.FileName()}},
 				SingleThreaded:   true,
-				GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
-					return []linter.ConfiguredRule{{
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{
 						Name:     "@typescript-eslint/init-declarations",
 						Severity: rule.SeverityWarning,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {

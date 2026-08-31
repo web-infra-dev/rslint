@@ -18,8 +18,8 @@ func runPatternTraversalTest(t *testing.T, source string, listeners rule.RuleLis
 		Programs:         programs,
 		SingleThreaded:   true,
 		TargetsByProgram: [][]string{{paths["input.ts"]}},
-		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
-			return []ConfiguredRule{{
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "pattern-traversal",
 				Severity: rule.SeverityWarning,
 				Run: func(rule.RuleContext) rule.RuleListeners {

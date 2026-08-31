@@ -6,7 +6,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
-const ConfigDiscoveryProtocolVersion = 2
+const ConfigDiscoveryProtocolVersion = 3
 
 type ConfigModuleLoadMode string
 

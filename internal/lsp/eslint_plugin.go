@@ -5,14 +5,15 @@ import (
 	stdjson "encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"os"
 
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 // methodPluginLint is the server→client reverse request that asks the
@@ -74,159 +75,33 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatcher {
 	return s.eslintPluginDispatch
 }
 
-// buildPluginFileInput assembles the single-file eslint-plugin dispatch input
-// for uri, or returns ok=false when the file has no plugin rules (so the
-// caller skips the reverse request entirely).
-//
-// The plugin rules are the IsEslintPluginRule subset of the file's enabled
-// rules — exactly the rules the native pass treats as no-op placeholders.
-// Per-file languageOptions / settings come from GetConfigForFile (the same
-// merged config the native pass resolves). configKey is the owning config
-// directory's catalog identity: the absolute filesystem path discovered by Go.
-// The worker routes tasks by matching it byte-for-byte.
-//
-// textOverride forces the text the worker lints: the diagnostics path passes
-// nil (use the s.documents overlay), while the multi-pass fixAll path passes
-// the in-progress fixed content of the current pass so plugin fix byte offsets
-// stay aligned with that content.
-//
-// Must be called from the main dispatch loop: it reads s.jsConfigs (lock-free)
-// and the s.documents overlay.
-func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *string) (linter.EslintPluginFileInput, bool) {
-	snapshot := s.documentLintSnapshot(uri)
-	if snapshot.unavailable {
-		return linter.EslintPluginFileInput{}, false
-	}
-	return s.buildPluginFileInputWithSnapshot(uri, textOverride, snapshot)
-}
-
-func (s *Server) buildPluginFileInputWithConfig(
-	uri lsproto.DocumentUri,
-	textOverride *string,
-	rslintConfig config.RslintConfig,
-	configCwd string,
-	isJSConfig bool,
-) (linter.EslintPluginFileInput, bool) {
-	ruleCatalog := rules.All()
-	if isJSConfig {
-		ruleCatalog = s.currentRuleCatalog()
-	}
-	target := lspConfigTarget(uriToPath(uri), configCwd, s.fs)
-	return s.buildPluginFileInputWithSnapshot(
-		uri,
-		textOverride,
-		resolveDocumentLintSnapshotConfig(documentLintSnapshot{
-			target: target,
-			config: rslintConfig,
-			pathSpaces: config.NewPathSpaceSnapshot(
-				map[string]config.RslintConfig{target.ConfigDirectory: rslintConfig},
-				s.fs,
-			),
-			ruleCatalog:          ruleCatalog,
-			usesJavaScriptConfig: isJSConfig,
-		}, s.fs),
+func (p *documentProgressiveDiagnostics) Submit(
+	parentCtx context.Context,
+	run linter.DeferredPluginRun,
+) {
+	p.server.startDiagnosticEnrichment(
+		parentCtx,
+		p.uri,
+		p.generation,
+		p.pluginGeneration,
+		run,
 	)
 }
 
-func (s *Server) buildPluginFileInputWithSnapshot(
-	uri lsproto.DocumentUri,
-	textOverride *string,
-	snapshot documentLintSnapshot,
-) (linter.EslintPluginFileInput, bool) {
-	if !snapshot.configResolved {
-		snapshot = resolveDocumentLintSnapshotConfig(snapshot, s.fs)
-	}
-	target := snapshot.target
-	filePath := target.Path
-	configCwd := target.ConfigDirectory
-	configKey := ""
-	if snapshot.usesJavaScriptConfig {
-		configKey = configCwd
-	}
-	if isDefaultExcludedLintPath(target.Path, s.cwd, s.fs) {
-		return linter.EslintPluginFileInput{}, false
-	}
-
-	enabledRules := snapshot.resolvedConfig.EnabledRules
-	merged := snapshot.resolvedConfig.MergedConfig
-	if merged == nil {
-		// File is globally ignored — no plugin (or native) diagnostics.
-		return linter.EslintPluginFileInput{}, false
-	}
-
-	// Text is the content the worker lints. An explicit override (fixAll's
-	// in-progress fixed content) wins; otherwise use the editor overlay
-	// (unsaved buffer) so the worker lints the in-memory content, not the
-	// stale on-disk copy. Fall back to nil (worker reads disk) only if we have
-	// neither.
-	text := textOverride
-	if text == nil {
-		if content, ok := s.documents[uri]; ok {
-			text = &content
-		}
-	}
-
-	// sourceFile=nil: the LSP rebuilds against the overlay Text (the worker
-	// linted that same string). Shared filter/assembly with the CLI (F1).
-	languageOptions, settings := config.PluginMergedMaps(merged)
-	return linter.BuildEslintPluginFileInput(filePath, configKey, enabledRules, languageOptions, settings, text, nil)
-}
-
-// pluginConfigKeyForURI returns the owning config directory's absolute path.
-// It uses the same resolver as getConfigForURI and preserves the catalog key
-// byte-for-byte for the Node worker.
-//
-// For the JSON-config fallback there is no JS config directory, so the key is
-// empty — the worker has no plugins registered for that path anyway (JSON
-// configs cannot mount object-form plugins), and a file with no plugin rules never
-// reaches dispatch.
-func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
-	if configKey, ok := s.nearestJSConfigKey(uri); ok {
-		return configKey
-	}
-	return ""
-}
-
-// dispatchPluginLint runs the eslint-plugin lint for uri in a goroutine and
-// delivers the rebuilt diagnostics back to the main dispatch loop via
-// pluginResultCh, tagged with generation. It is the concurrent companion to
-// pushDiagnostics's synchronous native pass.
-//
-// Concurrency (R1): the goroutine touches ONLY the dispatcher (sendRequest is
-// goroutine-safe) and a local diagnostics slice. It NEVER writes s.diagnostics
-// — that lock-free map is merged solely on the main loop when it consumes
-// pluginResultCh. The generation stamp lets the main loop drop results that a
-// newer keystroke has superseded.
-//
-// Must be called from the main dispatch loop (it reads jsConfigs + documents
-// to build the input and the generation map).
-func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) {
-	snapshot := s.documentLintSnapshot(uri)
-	if snapshot.unavailable {
-		s.cancelInflightPluginDispatch(uri)
-		return
-	}
-	s.dispatchPluginLintWithSnapshot(uri, generation, snapshot)
-}
-
-func (s *Server) dispatchPluginLintWithSnapshot(
+// startDiagnosticEnrichment implements the progressive request's asynchronous
+// executor port. RunPipeline alone decides when to submit work; this adapter
+// supplies transport, deadline, cancellation, and stale-result admission.
+func (s *Server) startDiagnosticEnrichment(
+	parentCtx context.Context,
 	uri lsproto.DocumentUri,
 	generation uint64,
-	snapshot documentLintSnapshot,
+	pluginGeneration string,
+	run linter.DeferredPluginRun,
 ) {
-	// Supersede any prior in-flight dispatch for this URI FIRST — before the
-	// no-plugin-work early return below. Even a relint that yields no plugin
-	// rules (the file became globally ignored, or its plugin-rule set dropped to
-	// empty after a config refresh) must still cancel the prior dispatch so its Node
-	// worker stops instead of running to completion. Go-side frees the goroutine;
-	// a $/cancelRequest tells the client to stop the worker.
-	s.cancelInflightPluginDispatch(uri)
-
-	input, ok := s.buildPluginFileInputWithSnapshot(uri, nil, snapshot)
-	if !ok {
+	if run == nil {
 		return
 	}
-	dispatch := s.pluginDispatchForGeneration(s.eslintPluginConfigGeneration)
+	dispatch := s.pluginDispatchForGeneration(pluginGeneration)
 
 	// Bound the reverse request as a backstop: even with supersede-cancel, a
 	// client that neither answers nor is ever superseded (the user stops typing)
@@ -235,7 +110,7 @@ func (s *Server) dispatchPluginLintWithSnapshot(
 	if timeout <= 0 {
 		timeout = defaultPluginReverseTimeout
 	}
-	ctx, cancel := context.WithTimeout(s.backgroundCtx, timeout)
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 
 	// Register so a later supersede or close can cancel the request. sendRequest
 	// forwards that context cancellation to the client.
@@ -248,30 +123,13 @@ func (s *Server) dispatchPluginLintWithSnapshot(
 		defer close(handle.done)
 		defer cancel()
 		defer s.clearInflightPluginDispatch(uri, handle)
-		// onDiagnostic is invoked serially (DispatchEslintPluginRules emits
-		// diagnostics single-threaded after its batches complete; here there is
-		// only ever one batch), so the local slice needs no lock.
-		var diags []rule.RuleDiagnostic
-		err := linter.DispatchEslintPluginRules(
-			ctx,
-			dispatch,
-			[]linter.EslintPluginFileInput{input},
-			// Collect fixes + materialize suggestions so the stored plugin
-			// diagnostics carry them for handleCodeAction's quickfix /
-			// suggestion actions (the editor reads fixes off the already-
-			// published diagnostics; it does not re-lint). The fixes are
-			// collected, never applied here. Cost: the worker runs each plugin
-			// rule's fix(fixer) per keystroke — small vs the lint itself.
-			true,                        // fix → collectFixes
-			linter.SuggestionsModeEager, // suggestionsMode
-			nil,                         // timing — the LSP never collects it
-			func(d rule.RuleDiagnostic) { diags = append(diags, d) },
-		)
-		// Categorize like the fixAll sibling (lintPluginRulesSync): a superseded
+		outcome, runErr := run(ctx, dispatch)
+		reportLSPPluginProtocolNotices(outcome.Notices)
+		err := errors.Join(runErr, outcome.DispatchError)
+		// Categorize like the fixAll sibling: a superseded
 		// batch (context.Canceled) is silent; a client that never answered within
 		// pluginReverseTimeout (context.DeadlineExceeded) is benign and expected —
-		// logging it at error severity would spam every debounced relint — so it
-		// gets an info-level note, not an error. Only a genuine failure is an
+		// it gets an info-level note, not an error. Only a genuine failure is an
 		// error. Generation already guards staleness, so a non-delivered result
 		// just leaves the pass native-only.
 		if err != nil {
@@ -288,7 +146,7 @@ func (s *Server) dispatchPluginLintWithSnapshot(
 		// result is never raced away by a deadline that expired in the gap between
 		// the worker returning and this select; fall back to the ctx.Done() drop
 		// only if the buffer is genuinely full (dispatch loop not draining).
-		result := pluginLintResult{uri: uri, generation: generation, diags: diags}
+		result := pluginLintResult{uri: uri, generation: generation, diags: outcome.Diagnostics}
 		select {
 		case s.pluginResultCh <- result:
 		default:
@@ -300,9 +158,24 @@ func (s *Server) dispatchPluginLintWithSnapshot(
 	}()
 }
 
+func reportLSPPluginProtocolNotices(notices []linter.EslintPluginProtocolNotice) {
+	writeLSPPluginProtocolNotices(os.Stderr, notices)
+}
+
+func writeLSPPluginProtocolNotices(w io.Writer, notices []linter.EslintPluginProtocolNotice) {
+	for _, notice := range notices {
+		switch notice.Kind {
+		case linter.EslintPluginMissingFileResult:
+			fmt.Fprintf(w, "rslint: plugin-lint returned no result for %q\n", notice.FilePath)
+		case linter.EslintPluginUnconfiguredDiagnostic:
+			fmt.Fprintf(w, "rslint: plugin diagnostic for unconfigured rule %q in %q\n", notice.RuleName, notice.FilePath)
+		}
+	}
+}
+
 // cancelInflightPluginDispatch cancels and $/cancelRequests the in-flight
-// background plugin dispatch for uri, if any. Called when a newer keystroke
-// supersedes it (dispatchPluginLint) or the document closes (handleDidClose).
+// background plugin dispatch for uri, if any. Called when a newer prepared
+// document generation supersedes it or the document closes (handleDidClose).
 func (s *Server) cancelInflightPluginDispatch(uri lsproto.DocumentUri) {
 	s.inflightPluginDispatchMu.Lock()
 	handle, ok := s.inflightPluginDispatch[uri]
@@ -359,81 +232,38 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 	}
 }
 
-// lintPluginRulesSync runs uri's eslint-plugin rules synchronously against the
-// given content and returns the rebuilt diagnostics (fixes collected when
-// fix=true). It is the blocking companion to dispatchPluginLint, used by
-// handleFixAllCodeAction to fold plugin fixes into each native fix pass.
-//
-// Blocking is safe even though handleCodeAction runs on the dispatch loop: the
-// reverse-request response is routed by readLoop (server.go pendingServer-
-// Requests), never by the dispatch loop, so awaiting our own request cannot
-// deadlock — the same reason the native fixAll pass may block on the language
-// service. onDiagnostic is invoked serially (DispatchEslintPluginRules emits
-// diagnostics single-threaded after its batches complete; this path has only
-// one batch), so the local slice needs no lock. Returns nil when the
-// file has no plugin rules.
-//
-// The caller (computeFixAllContent) passes a ctx already bounded by a deadline
-// (pluginReverseTimeout) so a wedged or mid-rebuild client that never answers
-// cannot stall the dispatch loop: on expiry DispatchEslintPluginRules returns a
-// context error and this returns nil, leaving the pass native-only.
-//
-// Must be called from the main dispatch loop (it reads jsConfigs + documents).
-func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUri, content string, fix bool, suggestionsMode string) []rule.RuleDiagnostic {
-	snapshot := s.documentLintSnapshot(uri)
-	if snapshot.unavailable {
-		return nil
-	}
-	return s.lintPluginRulesSyncWithSnapshot(ctx, uri, content, fix, suggestionsMode, snapshot)
-}
-
-func (s *Server) lintPluginRulesSyncWithSnapshot(
-	ctx context.Context,
-	uri lsproto.DocumentUri,
-	content string,
-	fix bool,
-	suggestionsMode string,
-	snapshot documentLintSnapshot,
-) []rule.RuleDiagnostic {
-	input, ok := s.buildPluginFileInputWithSnapshot(uri, &content, snapshot)
-	if !ok {
-		return nil
-	}
-	dispatch := s.pluginDispatchForGeneration(s.eslintPluginConfigGeneration)
-
-	var diags []rule.RuleDiagnostic
-	err := linter.DispatchEslintPluginRules(
-		ctx,
-		dispatch,
-		[]linter.EslintPluginFileInput{input},
-		fix,
-		suggestionsMode,
-		nil, // timing — the LSP never collects it
-		func(d rule.RuleDiagnostic) { diags = append(diags, d) },
-	)
-	if err != nil {
-		// context.Canceled means the editor aborted the fixAll request;
-		// context.DeadlineExceeded means the pluginReverseTimeout budget elapsed
-		// (an unresponsive client) — both leave this pass native-only. Other
-		// errors (worker crash, etc.) are logged but likewise leave the pass
-		// native-only rather than failing the whole fixAll; a per-file plugin
-		// crash is already surfaced on the diagnostics path.
-		switch {
-		case errors.Is(err, context.DeadlineExceeded):
-			log.Printf("[rslint] eslint-plugin fixAll for %s timed out (client unresponsive); applying native-only fixes", uri)
-		case errors.Is(err, context.Canceled):
-		default:
-			log.Printf("[rslint] eslint-plugin fixAll lint error for %s: %v", uri, err)
-		}
-		return nil
-	}
-	return diags
-}
-
 func (s *Server) pluginDispatchForGeneration(generation string) linter.EslintPluginDispatcher {
 	dispatch := s.installEslintPluginDispatch()
 	return func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		req.Generation = generation
 		return dispatch(ctx, req)
 	}
+}
+
+// pluginDispatchWithinBudget adapts the LSP reverse transport to one
+// operation-wide budget. Each call is also canceled when its individual lint
+// observation ends, while expiration prevents later observations from sending
+// another request.
+func (s *Server) pluginDispatchWithinBudget(
+	parent context.Context,
+	generation string,
+) (linter.EslintPluginDispatcher, context.CancelFunc) {
+	timeout := s.pluginReverseTimeout
+	if timeout <= 0 {
+		timeout = defaultPluginReverseTimeout
+	}
+	budgetCtx, cancelBudget := context.WithTimeout(parent, timeout)
+	dispatch := s.pluginDispatchForGeneration(generation)
+	return func(runCtx context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		if err := budgetCtx.Err(); err != nil {
+			return nil, err
+		}
+		callCtx, cancelCall := context.WithCancel(budgetCtx)
+		stop := context.AfterFunc(runCtx, cancelCall)
+		defer func() {
+			stop()
+			cancelCall()
+		}()
+		return dispatch(callCtx, request)
+	}, cancelBudget
 }

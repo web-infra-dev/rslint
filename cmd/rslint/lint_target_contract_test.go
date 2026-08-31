@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 type lintTargetContractDiagnostic struct {
@@ -77,9 +78,6 @@ func lintTargetContractPaths(
 func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string]string{
-		"rslint.jsonc": `[{
-			"rules": {"no-debugger": "error"}
-		}]`,
 		"source.js":   "debugger;\n",
 		"source.mjs":  "debugger;\n",
 		"source.cjs":  "debugger;\n",
@@ -93,8 +91,10 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 	}
 	writeLintTargetContractFiles(t, dir, files)
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
-		Config:         "rslint.jsonc",
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			Rules: rslintconfig.Rules{"no-debugger": "error"},
+		}}),
 		Format:         "default",
 		NoColor:        true,
 		SingleThreaded: true,
@@ -113,7 +113,7 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 			t.Errorf("default scan linted unsupported source%s: stdout=%q stderr=%q", extension, stdout, stderr)
 		}
 	}
-	if !strings.Contains(stdout, "linted 8 files") {
+	if !strings.Contains(stdout, "(8 files, 1 rule, 1 thread)") {
 		t.Fatalf("default scan did not lint exactly 8 script files: stdout=%q stderr=%q", stdout, stderr)
 	}
 }
@@ -121,11 +121,6 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 	dir := t.TempDir()
 	writeLintTargetContractFiles(t, dir, map[string]string{
-		"rslint.jsonc": `[{
-			"files": ["**/*.ts"],
-			"languageOptions": {"parserOptions": {"project": ["./tsconfig.json"]}},
-			"rules": {"no-debugger": "error"}
-		}]`,
 		"tsconfig.json": `{
 			"compilerOptions": {"strict": true},
 			"files": ["selected.ts", "unselected.ts"]
@@ -138,8 +133,16 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 
 	run := func(t *testing.T, typeCheck bool) []lintTargetContractDiagnostic {
 		t.Helper()
-		code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
-			Config:         "rslint.jsonc",
+		code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+			ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+				Files: []string{"**/*.ts"},
+				LanguageOptions: &rslintconfig.LanguageOptions{
+					ParserOptions: &rslintconfig.ParserOptions{
+						Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+					},
+				},
+				Rules: rslintconfig.Rules{"no-debugger": "error"},
+			}}),
 			AllowFiles:     []string{selected},
 			Format:         "jsonline",
 			NoColor:        true,
@@ -189,18 +192,17 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 	dir := t.TempDir()
 	writeLintTargetContractFiles(t, dir, map[string]string{
-		"rslint.jsonc": `[{
-			"files": ["**/*.js"],
-			"rules": {"no-var": "error"}
-		}]`,
 		"selected.js":   "var selected = 1;\nexport { selected };\n",
 		"unselected.js": "var unselected = 1;\nexport { unselected };\n",
 	})
 	selected := tspath.NormalizePath(filepath.Join(dir, "selected.js"))
 	unselected := filepath.Join(dir, "unselected.js")
 
-	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
-		Config:         "rslint.jsonc",
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			Files: []string{"**/*.js"},
+			Rules: rslintconfig.Rules{"no-var": "error"},
+		}}),
 		AllowFiles:     []string{selected},
 		Fix:            true,
 		Format:         "jsonline",

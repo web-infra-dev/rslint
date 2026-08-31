@@ -51,14 +51,14 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 		},
 	}
 	// Deliberately bypass the config resolver's type-info gate.
-	configuredRules, _ := rslintconfig.ResolveEnabledRules(rules.All(), cfg, targetFile, tmpDir, false)
+	configuredRules, _ := rslintconfig.ResolveEnabledRules(rules.All(), cfg, targetFile, tmpDir)
 	if len(configuredRules) != 1 || configuredRules[0].Name != "@typescript-eslint/no-unsafe-member-access" || !configuredRules[0].RequiresTypeInfo {
 		t.Fatalf("fixture did not resolve the expected type-aware rule: %+v", configuredRules)
 	}
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 		Programs:         loaded.Programs,
 		TargetsByProgram: loaded.TargetsByProgram,
-		GetRulesForFile: func(*ast.SourceFile) []linter.ConfiguredRule {
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return configuredRules
 		},
 	})

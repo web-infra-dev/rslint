@@ -52,7 +52,7 @@ catalog:
   ajv: ^6.15.0
   husky: ^9.1.7
   lint-staged: ^16.4.0
-  prettier: ^3.9.6
+  rstack: ^0.6.5
   zx: ^8.8.5
   '@types/mocha': ^10.0.10
   '@types/node': ^26.2.0
@@ -83,7 +83,7 @@ catalog:
   '@rsbuild/plugin-sass': ^1.5.3
   '@rspress/core': ^2.0.18
   '@rspress/plugin-sitemap': ^2.0.18
-  '@rstack-dev/doc-ui': ^1.14.7
+  '@rstackjs/doc-ui': 1.14.9
   '@tailwindcss/postcss': ^4.3.3
   '@types/dagre': ^0.7.54
   '@types/react-dom': ^19.2.3

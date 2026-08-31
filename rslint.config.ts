@@ -7,7 +7,7 @@ export default defineConfig([
     'typescript-go/**',
 
     // Release CI artifacts (downloaded binaries + tsgo lib files copied
-    // into the npm publish shells) — keep in sync with .prettierignore
+    // into the npm publish shells) — keep in sync with rstack.config.mts
     'binaries/**',
     'npm/**',
 
@@ -68,6 +68,7 @@ export default defineConfig([
       '@typescript-eslint/no-misused-promises': 'warn',
       '@typescript-eslint/require-await': 'warn',
       '@typescript-eslint/prefer-readonly': 'error',
+      '@typescript-eslint/prefer-readonly-parameter-types': 'warn',
       '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/no-dynamic-delete': 'error',
       '@typescript-eslint/prefer-includes': 'error',

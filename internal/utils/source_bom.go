@@ -7,8 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-// BOM is the Unicode byte order mark, U+FEFF, in the UTF-8 encoding source
-// text uses by the time rslint sees it.
+// BOM is U+FEFF encoded in the UTF-8 strings rslint uses for source text.
 const BOM = "\uFEFF"
 
 // BOMSource is implemented by a VFS layer that knows whether the text it hands
@@ -33,6 +32,17 @@ func SourceHasBOM(fileSystem vfs.FS, path string) bool {
 		return source.SourceHasBOM(path)
 	}
 	return fileBytesStartWithBOM(path)
+}
+
+// RestoreSourceBOM reconstructs the complete source text after a VFS or parser
+// has removed its encoding byte order mark. It deliberately does not inspect
+// text for a leading U+FEFF: a source can contain both an encoding mark and a
+// real U+FEFF as its first character, in which case both must be preserved.
+func RestoreSourceBOM(fileSystem vfs.FS, path string, text string) string {
+	if SourceHasBOM(fileSystem, path) {
+		return BOM + text
+	}
+	return text
 }
 
 // fileBytesStartWithBOM reports whether the bytes of path begin with a byte

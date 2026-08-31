@@ -652,7 +652,7 @@ export { regular as other } from "module";`,
 
 			// ---- Extra: lock-in tests (upstream branches not directly tested) ----
 
-			// Lock-in: the options object arrives from a JSON config as
+			// Lock-in: the options object arrives from the serialized config model as
 			// `[]interface{}{ map[string]interface{}{} }`, so parseOptions must
 			// read the object out of element 0.
 			{

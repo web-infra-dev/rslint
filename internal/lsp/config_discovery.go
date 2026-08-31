@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"sort"
 	"strings"
 	"time"
@@ -300,27 +299,25 @@ func decodeConfigTransactionResult(raw any, target any, method string) error {
 }
 
 type preparedLSPConfigSnapshot struct {
-	configs              map[string]config.RslintConfig
-	tsConfigPaths        map[string][]string
-	ownerIndex           *target.OwnerIndex
-	unavailableConfigs   map[string]struct{}
-	jsonConfig           config.RslintConfig
-	jsonConfigOwnerIndex *target.OwnerIndex
-	jsonConfigDirectory  string
-	jsonConfigPath       string
-	jsonTsConfigPaths    []string
-	transactionID        string
-	usableLastGood       bool
+	configs                  map[string]config.RslintConfig
+	tsConfigPaths            map[string][]string
+	ownerIndex               *target.OwnerIndex
+	unavailableConfigs       map[string]struct{}
+	fallbackConfig           config.RslintConfig
+	fallbackConfigOwnerIndex *target.OwnerIndex
+	fallbackConfigDirectory  string
+	transactionID            string
+	usableLastGood           bool
 }
 
 // lspDiscoveredConfigSnapshot is commit-ready: its configuration state and
 // exact rule catalog always belong to the same Node transaction.
 type lspDiscoveredConfigSnapshot struct {
 	preparedLSPConfigSnapshot
-	ruleCatalog            *rule.Catalog
-	fileConfigResolvers    map[string]*config.FileConfigResolver
-	jsonFileConfigResolver *config.FileConfigResolver
-	shadowedPluginRules    []string
+	ruleCatalog                *rule.Catalog
+	fileConfigResolvers        map[string]*config.FileConfigResolver
+	fallbackFileConfigResolver *config.FileConfigResolver
+	shadowedPluginRules        []string
 }
 
 func (s *Server) handleConfigRefresh(ctx context.Context, request configRefreshRequest) (configRefreshResponse, error) {
@@ -397,12 +394,10 @@ func normalizeLSPExplicitConfigPath(configPath string) (string, error) {
 		return "", fmt.Errorf("configPath must be absolute: %q", configPath)
 	}
 	normalized := tspath.NormalizePath(configPath)
-	switch path.Ext(normalized) {
-	case ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts":
+	if discovery.IsSupportedConfigModulePath(normalized) {
 		return normalized, nil
-	default:
-		return "", fmt.Errorf("configPath must name a JS/TS config module: %q", configPath)
 	}
+	return "", fmt.Errorf("configPath must name a JS/TS config module: %q", configPath)
 }
 
 func lspConfigPathsEqual(left string, right string, fsys vfs.FS) bool {
@@ -447,7 +442,7 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 			return configRefreshResponse{}, s.abortFailedConfigRefresh(ctx, loader, loader.transactionID, err)
 		}
 		// A broken config on first startup must not tear down the language
-		// client, and JSON fallback must not silently lint through that broken
+		// client, and the workspace fallback must not lint through that broken
 		// boundary. Commit a real empty Node generation plus unavailable Go
 		// ownership boundaries. This is intentionally not "last-good": a later
 		// refresh may replace it with another recovery snapshot until one full
@@ -608,10 +603,10 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		tsConfigPaths:      make(map[string][]string, len(configCatalog.Configs)),
 		unavailableConfigs: make(map[string]struct{}),
 		transactionID:      configCatalog.TransactionID,
-		// An empty catalog is a successfully committed absence of JavaScript
-		// config, not a usable JavaScript last-good generation. If a broken
+		// An empty catalog is a successfully committed absence of a module
+		// config, not a usable module-config last-good generation. If a broken
 		// config appears later, it must establish an unavailable boundary rather
-		// than preserving JSON fallback beneath that new boundary.
+		// than exposing the workspace fallback beneath that new boundary.
 		usableLastGood: len(configCatalog.Configs) > 0,
 	}
 	seenConfigDirs := make(map[string]string, len(configCatalog.Configs))
@@ -642,8 +637,8 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 		snapshot.tsConfigPaths[configDir] = paths
 	}
 
-	// A failed candidate still blocks the JSON fallback when no usable JS
-	// ancestor can own its subtree. The shared coordinator omits failures from
+	// A failed candidate still blocks the workspace fallback when no usable
+	// config ancestor can own its subtree. The shared coordinator omits failures from
 	// its effective catalog (which is correct for CLI/API parent fallback), so
 	// LSP materializes only the outermost such directories as retryable empty
 	// boundaries. A usable descendant remains in the same map and wins normal
@@ -661,43 +656,37 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	// the target package retains only routing and frozen path-space state.
 	// Successful automatic catalog entries already contain the Git sources read
 	// by their discovery generation; unavailable boundaries intentionally remain
-	// empty and only stop JSON fallback ownership.
+	// empty and only stop workspace fallback ownership.
 	snapshot.ownerIndex = target.NewOwnerIndex(snapshot.configs, fsys)
 	if configCatalog.Explicit {
-		// An explicit JS/TS config is invocation-wide and owns the cwd. JSON is
-		// not part of this mode, so an unrelated JSON file must not make the
-		// selected module's transaction fail.
+		// An explicit config is invocation-wide and owns every editor target, so
+		// no workspace fallback participates in this mode.
 		return snapshot, nil
 	}
 
-	jsonConfig, jsonPath, jsonTsConfigs, err := loadJSONConfigFallbackWithFS(s.cwd, fsys)
-	if err != nil {
-		return nil, err
-	}
-	// JSON fallback owns only portions of the workspace not handed to a JS/TS
-	// config (including an unavailable one). Include a synthetic cwd owner solely
-	// to calculate its direct source boundaries; JS ownership remains unchanged.
-	jsonBoundaryConfigs := make(map[string]config.RslintConfig, len(snapshot.configs)+1)
+	// The empty workspace fallback owns only portions of the workspace not
+	// handed to a discovered or unavailable config boundary. Include a synthetic
+	// cwd owner solely to calculate its direct source boundaries; discovered
+	// config ownership remains unchanged.
+	fallbackBoundaryConfigs := make(map[string]config.RslintConfig, len(snapshot.configs)+1)
 	for configDir, entries := range snapshot.configs {
-		jsonBoundaryConfigs[configDir] = entries
+		fallbackBoundaryConfigs[configDir] = entries
 	}
-	jsonCWD := tspath.NormalizePath(s.cwd)
-	jsonBoundaryConfigs[jsonCWD] = jsonConfig
-	jsonBoundaryResolver := target.NewOwnerIndex(jsonBoundaryConfigs, fsys)
-	snapshot.jsonConfig = config.ConfigWithGitignoreWithBoundaries(
-		jsonConfig,
-		jsonCWD,
+	fallbackCWD := tspath.NormalizePath(s.cwd)
+	fallbackBoundaryConfigs[fallbackCWD] = config.RslintConfig{}
+	fallbackBoundaryResolver := target.NewOwnerIndex(fallbackBoundaryConfigs, fsys)
+	snapshot.fallbackConfig = config.ConfigWithGitignoreWithBoundaries(
+		config.RslintConfig{},
+		fallbackCWD,
 		fsys,
 		nil,
-		jsonBoundaryResolver.ChildOwnerDirectories(jsonCWD),
+		fallbackBoundaryResolver.ChildOwnerDirectories(fallbackCWD),
 	)
-	snapshot.jsonConfigOwnerIndex = target.NewOwnerIndex(
-		map[string]config.RslintConfig{jsonCWD: snapshot.jsonConfig},
+	snapshot.fallbackConfigOwnerIndex = target.NewOwnerIndex(
+		map[string]config.RslintConfig{fallbackCWD: snapshot.fallbackConfig},
 		fsys,
 	)
-	snapshot.jsonConfigDirectory = jsonCWD
-	snapshot.jsonConfigPath = jsonPath
-	snapshot.jsonTsConfigPaths = jsonTsConfigs
+	snapshot.fallbackConfigDirectory = fallbackCWD
 	return snapshot, nil
 }
 
@@ -718,7 +707,6 @@ func completeDiscoveredConfigSnapshot(
 			fsys,
 			prepared.ownerIndex.PathSpaces(),
 			ruleCatalog,
-			true,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("prepare file config resolver for %q: %w", configDirectory, err)
@@ -726,29 +714,28 @@ func completeDiscoveredConfigSnapshot(
 		fileConfigResolvers[configDirectory] = resolver
 	}
 
-	var jsonFileConfigResolver *config.FileConfigResolver
-	if prepared.jsonConfigOwnerIndex != nil {
-		jsonCWD := prepared.jsonConfigDirectory
+	var fallbackFileConfigResolver *config.FileConfigResolver
+	if prepared.fallbackConfigOwnerIndex != nil {
+		fallbackCWD := prepared.fallbackConfigDirectory
 		resolver, err := config.NewFileConfigResolverWithPathSpaces(
-			prepared.jsonConfig,
-			jsonCWD,
+			prepared.fallbackConfig,
+			fallbackCWD,
 			fsys,
-			prepared.jsonConfigOwnerIndex.PathSpaces(),
+			prepared.fallbackConfigOwnerIndex.PathSpaces(),
 			rules.All(),
-			false,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("prepare JSON file config resolver for %q: %w", jsonCWD, err)
+			return nil, fmt.Errorf("prepare workspace fallback resolver for %q: %w", fallbackCWD, err)
 		}
-		jsonFileConfigResolver = resolver
+		fallbackFileConfigResolver = resolver
 	}
 
 	return &lspDiscoveredConfigSnapshot{
-		preparedLSPConfigSnapshot: *prepared,
-		ruleCatalog:               ruleCatalog,
-		fileConfigResolvers:       fileConfigResolvers,
-		jsonFileConfigResolver:    jsonFileConfigResolver,
-		shadowedPluginRules:       shadowedPluginRules,
+		preparedLSPConfigSnapshot:  *prepared,
+		ruleCatalog:                ruleCatalog,
+		fileConfigResolvers:        fileConfigResolvers,
+		fallbackFileConfigResolver: fallbackFileConfigResolver,
+		shadowedPluginRules:        shadowedPluginRules,
 	}, nil
 }
 
@@ -841,11 +828,9 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.jsConfigOwnerIndex = snapshot.ownerIndex
 	s.jsFileConfigResolvers = snapshot.fileConfigResolvers
 	s.jsUnavailableConfigs = snapshot.unavailableConfigs
-	s.jsonConfig = snapshot.jsonConfig
-	s.jsonConfigOwnerIndex = snapshot.jsonConfigOwnerIndex
-	s.jsonFileConfigResolver = snapshot.jsonFileConfigResolver
-	s.rslintConfigPath = snapshot.jsonConfigPath
-	s.tsConfigPaths = snapshot.jsonTsConfigPaths
+	s.fallbackConfig = snapshot.fallbackConfig
+	s.fallbackConfigOwnerIndex = snapshot.fallbackConfigOwnerIndex
+	s.fallbackFileConfigResolver = snapshot.fallbackFileConfigResolver
 	s.eslintPluginConfigGeneration = snapshot.transactionID
 	s.ruleCatalog = snapshot.ruleCatalog
 	s.configDiscoveryHasLastGood = snapshot.usableLastGood
@@ -861,26 +846,6 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	if err := s.RefreshDiagnostics(ctx); err != nil {
 		log.Printf("[rslint] Failed to refresh diagnostics after config refresh: %v", err)
 	}
-}
-
-func loadJSONConfigFallbackWithFS(
-	cwd string,
-	fsys vfs.FS,
-) (config.RslintConfig, string, []string, error) {
-	configPath, found := findRslintConfig(fsys, cwd)
-	if !found {
-		return config.RslintConfig{}, "", nil, nil
-	}
-	loader := config.NewConfigLoader(fsys, cwd, rules.All())
-	rslintConfig, _, err := loader.LoadRslintConfig(configPath)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("load JSON fallback %q: %w", configPath, err)
-	}
-	paths, err := resolveTsConfigPathsWithFS(rslintConfig, cwd, fsys)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("resolve tsconfig paths for JSON fallback %q: %w", configPath, err)
-	}
-	return rslintConfig, configPath, paths, nil
 }
 
 func resolveTsConfigPathsWithFS(cfg config.RslintConfig, cwd string, fsys vfs.FS) ([]string, error) {

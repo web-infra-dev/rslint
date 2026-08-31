@@ -14,6 +14,9 @@ func TestNoUselessCall(t *testing.T) {
 		t,
 		&NoUselessCallRule,
 		[]rule_tester.ValidTestCase{
+			// TypeScript parser tokens retain the escaped thisArg spelling.
+			{Code: `obj.foo.call(\u006fbj, 1, 2);`},
+
 			// `this` binding is different.
 			{Code: `foo.apply(obj, 1, 2);`},
 			{Code: `obj.foo.apply(null, 1, 2);`},
@@ -67,6 +70,14 @@ func TestNoUselessCall(t *testing.T) {
 			{Code: `foo.call.call(other, 1, 2);`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Espree decodes the escaped JavaScript Identifier token to `obj`.
+			{
+				Code:     `obj.foo.call(\u006fbj, 1, 2);`,
+				FileName: "no-useless-call-token.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryCall"}},
+			},
+
 			// ---- call ----
 			{
 				Code: `foo.call(undefined, 1, 2);`,

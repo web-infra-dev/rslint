@@ -112,7 +112,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_optional_chain"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly"
-	// "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly_parameter_types" // Temporarily disabled - incomplete implementation
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly_parameter_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_reduce_type_parameter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_regexp_exec"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_return_this_type"
@@ -248,10 +248,7 @@ func GetAllRules() []rule.Rule {
 		prefer_optional_chain.PreferOptionalChainRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
 		prefer_readonly.PreferReadonlyRule,
-		// TODO: prefer-readonly-parameter-types needs complete implementation for proper type checking
-		// Temporarily disabled until the isReadonlyType function is fully implemented with proper
-		// detection of readonly arrays, readonly objects, function types, and other edge cases
-		// prefer_readonly_parameter_types.PreferReadonlyParameterTypesRule,
+		prefer_readonly_parameter_types.PreferReadonlyParameterTypesRule,
 		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
 		prefer_regexp_exec.PreferRegExpExecRule,
 		prefer_return_this_type.PreferReturnThisTypeRule,

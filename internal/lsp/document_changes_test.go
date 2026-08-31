@@ -307,7 +307,7 @@ func lintOffTheEditorPath(program *compiler.Program, file string, resolver *conf
 	linter.LintSingleFile(linter.LintSingleFileOptions{
 		Program: lintprogram.NewFromCompiler(program),
 		File:    file,
-		GetRulesForFile: func(f *ast.SourceFile) []linter.ConfiguredRule {
+		GetRulesForFile: func(f *ast.SourceFile) []rule.ConfiguredRule {
 			rules, _ := resolver.EnabledRulesForFile(f.FileName())
 			return rules
 		},
@@ -361,12 +361,22 @@ func TestUnicodeBomIsNotServedToEditors(t *testing.T) {
 			}
 
 			cfg := config.RslintConfig{{Rules: config.Rules{"unicode-bom": test.option}}}
-			resolver := config.NewFileConfigResolver(cfg, dir, rules.All(), false)
+			resolver := config.NewFileConfigResolver(cfg, dir, rules.All())
 
 			target := lspConfigTarget(file, dir, fs)
-			served := lintSingleFile(
-				program, sourceFile, target, dir, true, resolver.ResolveTarget(target.Identity()).EnabledRules, rule.EditDemandAll, context.Background(),
-			).Diagnostics
+			generation := newLintGeneration(
+				program, sourceFile, target, dir, true,
+				resolver.ResolveTarget(target.Identity()).EnabledRules,
+				nil, nil,
+			)
+			result, err := runLSPGenerationForTest(
+				context.Background(), generation, nil,
+				linter.ArtifactDemand{Native: rule.EditDemandAll},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			served := result.Observation.Native.Diagnostics
 
 			if len(served) != 0 {
 				t.Errorf("the editor should be served nothing, got %+v", served)
@@ -407,12 +417,22 @@ func TestOtherRulesStillRunInTheEditor(t *testing.T) {
 			"no-var":      "error",
 		},
 	}}
-	resolver := config.NewFileConfigResolver(cfg, dir, rules.All(), false)
+	resolver := config.NewFileConfigResolver(cfg, dir, rules.All())
 
 	target := lspConfigTarget(file, dir, fs)
-	served := lintSingleFile(
-		program, sourceFile, target, dir, true, resolver.ResolveTarget(target.Identity()).EnabledRules, rule.EditDemandAll, context.Background(),
-	).Diagnostics
+	generation := newLintGeneration(
+		program, sourceFile, target, dir, true,
+		resolver.ResolveTarget(target.Identity()).EnabledRules,
+		nil, nil,
+	)
+	result, err := runLSPGenerationForTest(
+		context.Background(), generation, nil,
+		linter.ArtifactDemand{Native: rule.EditDemandAll},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	served := result.Observation.Native.Diagnostics
 
 	byRule := make(map[string][]rule.RuleFix, len(served))
 	for _, d := range served {

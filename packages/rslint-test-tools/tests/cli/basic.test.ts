@@ -88,23 +88,21 @@ describe('CLI Configuration Tests', () => {
 
   test('should use default config when no config specified', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        language: 'javascript',
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-            '@typescript-eslint/no-unsafe-member-access': 'error',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',
@@ -122,7 +120,7 @@ describe('CLI Configuration Tests', () => {
     try {
       const result = await runRslint([], tempDir);
 
-      // Should find and use the default rslint.json config
+      // Should find and use the default module config.
       expect(result.stdout).toContain('no-unsafe-member-access');
     } finally {
       await cleanupTempDir(tempDir);
@@ -131,23 +129,21 @@ describe('CLI Configuration Tests', () => {
 
   test('should use custom config when --config flag is specified', async () => {
     const tempDir = await createTempDir({
-      'custom-config.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'custom-config.mjs': `export default [${JSON.stringify({
+        language: 'javascript',
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-            '@typescript-eslint/no-unsafe-assignment': 'error',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-unsafe-assignment': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',
@@ -164,11 +160,30 @@ describe('CLI Configuration Tests', () => {
 
     try {
       const result = await runRslint(
-        ['--config', 'custom-config.json'],
+        ['--config', 'custom-config.mjs'],
         tempDir,
       );
 
       expect(result.stdout).toContain('no-unsafe-assignment');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('should reject a legacy JSON config with migration guidance', async () => {
+    const tempDir = await createTempDir({
+      'legacy.jsonc': '[{ this is intentionally not valid JSONC',
+      'test.ts': 'debugger;\n',
+    });
+
+    try {
+      const result = await runRslint(['--config', 'legacy.jsonc'], tempDir);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('unsupported config file');
+      expect(result.stderr).toContain('JavaScript or TypeScript modules');
+      expect(result.stderr).toContain('rslint --init');
+      expect(result.stderr).not.toContain('error parsing');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -415,20 +430,20 @@ describe('CLI Configuration Tests', () => {
     }
   });
 
-  test('should handle invalid config file gracefully', async () => {
+  test('should handle an invalid module config gracefully', async () => {
     const tempDir = await createTempDir({
-      'invalid-config.json': 'invalid json content',
+      'invalid.config.mjs': 'export default [INVALID SYNTAX',
       'test.ts': 'export const a = 1;',
     });
 
     try {
       const result = await runRslint(
-        ['--config', 'invalid-config.json'],
+        ['--config', 'invalid.config.mjs'],
         tempDir,
       );
 
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr || result.stdout).toContain('invalid');
+      expect(result.stderr || result.stdout).toContain('failed to load config');
     } finally {
       await cleanupTempDir(tempDir);
     }

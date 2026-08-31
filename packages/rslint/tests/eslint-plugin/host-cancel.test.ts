@@ -24,7 +24,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
         { path: 'a.ts', text: 'const x = null;', configKey: LOCAL_CONFIG_DIR },
       ],
       rules: { 'local/no-null': { options: [] } },
-      fix: false,
+      collectFixes: false,
       suggestionsMode: 'off',
     };
 

@@ -1015,3 +1015,116 @@ exports[`require-await > invalid 33`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`require-await > invalid 34`] = `
+{
+  "code": "class A {
+  a
+  async [b]() { return 0; }
+}",
+  "diagnostics": [
+    {
+      "message": "Async method has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 35`] = `
+{
+  "code": "class A {
+  a = 0
+  async in() { return 0; }
+}",
+  "diagnostics": [
+    {
+      "message": "Async method 'in' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 36`] = `
+{
+  "code": "const obj = {
+  foo,
+  async in() { return 0; }
+};",
+  "diagnostics": [
+    {
+      "message": "Async method 'in' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 37`] = `
+{
+  "code": "async function run() { using resource = getResource(); }",
+  "diagnostics": [
+    {
+      "message": "Async function 'run' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
