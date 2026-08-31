@@ -97,6 +97,10 @@ function filterSnapshot(diags: LintResponse & { code?: string }): LintResponse {
 }
 
 export class RuleTester {
+  public constructor(
+    private readonly defaultLanguageOptions?: TestLanguageOptions,
+  ) {}
+
   public run(
     ruleName: string,
     cases: {
@@ -123,9 +127,16 @@ export class RuleTester {
             typeof validCase === 'string' ? validCase : validCase.code;
           const options =
             typeof validCase === 'object' ? validCase.options : undefined;
-          const languageOptions =
+          const caseLanguageOptions =
             typeof validCase === 'object'
               ? validCase.languageOptions
+              : undefined;
+          const languageOptions =
+            this.defaultLanguageOptions || caseLanguageOptions
+              ? {
+                  ...this.defaultLanguageOptions,
+                  ...caseLanguageOptions,
+                }
               : undefined;
           const filename =
             typeof validCase === 'object'
@@ -168,7 +179,20 @@ export class RuleTester {
           if (item.skip) continue;
           if (hasOnly && !item.only) continue;
 
-          const { code, errors, options, languageOptions, filename } = item;
+          const {
+            code,
+            errors,
+            options,
+            languageOptions: caseLanguageOptions,
+            filename,
+          } = item;
+          const languageOptions =
+            this.defaultLanguageOptions || caseLanguageOptions
+              ? {
+                  ...this.defaultLanguageOptions,
+                  ...caseLanguageOptions,
+                }
+              : undefined;
           const virtual_entry = path.resolve(cwd, filename ?? 'src/virtual.ts');
 
           const { config: resolvedConfig, configDirectory } =

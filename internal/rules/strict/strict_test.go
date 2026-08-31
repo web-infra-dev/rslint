@@ -4,24 +4,47 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// Ported from ESLint's tests/lib/rules/strict.js.
+var (
+	moduleLanguageOptions   = rule.LanguageOptions{SourceType: "module"}
+	commonJSLanguageOptions = rule.LanguageOptions{SourceType: "commonjs"}
+)
+
+func withScriptSourceTypeValid(cases []rule_tester.ValidTestCase) []rule_tester.ValidTestCase {
+	for i := range cases {
+		if cases[i].LanguageOptions.SourceType == "" {
+			cases[i].LanguageOptions.SourceType = "script"
+		}
+	}
+	return cases
+}
+
+func withScriptSourceTypeInvalid(cases []rule_tester.InvalidTestCase) []rule_tester.InvalidTestCase {
+	for i := range cases {
+		if cases[i].LanguageOptions.SourceType == "" {
+			cases[i].LanguageOptions.SourceType = "script"
+		}
+	}
+	return cases
+}
+
+// Ported from ESLint v10.9.1's tests/lib/rules/strict.js.
 //
 // Cases that rely on ESLint-only language options (parserOptions.ecmaFeatures
-// .{impliedStrict,globalReturn} and sourceType === "commonjs") are preserved
-// with Skip: true so the mapping to the upstream suite stays explicit.
-// rslint detects ES modules structurally via ast.IsExternalModule, so any
-// test that needed sourceType: "module" is adapted to include an
-// `export {};` or equivalent trigger.
+// .{impliedStrict,globalReturn}) are preserved with Skip: true so the mapping
+// to the upstream suite stays explicit. The upstream RuleTester defaults this
+// suite to sourceType "script"; the helpers below apply the same default while
+// allowing individual module and CommonJS cases to override it.
 func TestStrictRule(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
 		t,
 		&StrictRule,
-		[]rule_tester.ValidTestCase{
+		withScriptSourceTypeValid([]rule_tester.ValidTestCase{
 			// ---- "never" mode ----
 			{Code: `foo();`, Options: "never"},
 			{Code: `function foo() { return; }`, Options: "never"},
@@ -32,11 +55,7 @@ func TestStrictRule(t *testing.T) {
 			{Code: `(function() { bar('use strict'); return; }());`, Options: "never"},
 			{Code: `var fn = x => 1;`, Options: "never"},
 			{Code: `var fn = x => { return; };`, Options: "never"},
-			// ESLint uses `sourceType: "module"` here; rslint triggers module mode
-			// via an import/export, and in module mode "use strict" is reported
-			// (not valid) — so the equivalent valid case is plain script code.
-			// The module variant is exercised in the invalid suite below.
-			{Code: `foo(); export {};`, Options: "never"},
+			{Code: `foo();`, Options: "never", LanguageOptions: moduleLanguageOptions},
 			// SKIP: parserOptions.ecmaFeatures.impliedStrict is not exposed by rslint.
 			{Code: `function foo() { return; }`, Options: "never", Skip: true},
 
@@ -46,10 +65,7 @@ func TestStrictRule(t *testing.T) {
 			{Code: `/* license */
 /* eslint-disable rule-to-test/strict */
 foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable semantics we don't emulate here.
-			// Module files always ignore "global" in favor of "module" mode — the
-			// ESLint variant uses sourceType: "module"; rslint adapts by adding
-			// `export {};` which likewise triggers module detection.
-			{Code: `foo(); export {};`, Options: "global", Skip: true}, // covered in invalid suite (module reports any "use strict")
+			{Code: `foo();`, Options: "global", LanguageOptions: moduleLanguageOptions},
 			// SKIP: parserOptions.ecmaFeatures.impliedStrict not exposed.
 			{Code: `function foo() { return; }`, Options: "global", Skip: true},
 			{Code: `'use strict'; function foo() { return; }`, Options: "global"},
@@ -61,19 +77,15 @@ foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable seman
 
 			// ---- "function" mode ----
 			{Code: `function foo() { 'use strict'; return; }`, Options: "function"},
-			// SKIP: ESLint uses sourceType: "module"; in rslint, module mode
-			// reports all "use strict" — the behavior is covered by the module
-			// test cases that add `export {};`.
-			{Code: `function foo() { return; } export {};`, Options: "function", Skip: true},
+			{Code: `function foo() { return; }`, Options: "function", LanguageOptions: moduleLanguageOptions},
 			// SKIP: parserOptions.ecmaFeatures.impliedStrict not exposed.
 			{Code: `function foo() { return; }`, Options: "function", Skip: true},
-			{Code: `var foo = function() { return; } export {};`, Options: "function", Skip: true},
+			{Code: `var foo = function() { return; }`, Options: "function", LanguageOptions: moduleLanguageOptions},
 			{Code: `var foo = function() { 'use strict'; return; }`, Options: "function"},
 			{Code: `function foo() { 'use strict'; return; } var bar = function() { 'use strict'; bar(); };`, Options: "function"},
 			{Code: `var foo = function() { 'use strict'; function bar() { return; } bar(); };`, Options: "function"},
 			{Code: `var foo = () => { 'use strict'; var bar = () => 1; bar(); };`, Options: "function"},
-			// SKIP: sourceType: "module" — nested arrow valid case, module variant covered by module tests.
-			{Code: `var foo = () => { var bar = () => 1; bar(); }; export {};`, Options: "function", Skip: true},
+			{Code: `var foo = () => { var bar = () => 1; bar(); };`, Options: "function", LanguageOptions: moduleLanguageOptions},
 			{Code: `class A { constructor() { } }`, Options: "function"},
 			{Code: `class A { foo() { } }`, Options: "function"},
 			{Code: `class A { foo() { function bar() { } } }`, Options: "function"},
@@ -83,8 +95,7 @@ foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable seman
 			{Code: `function foo() { 'use strict'; return; }`, Options: "safe"},
 			// SKIP: parserOptions.ecmaFeatures.globalReturn not exposed.
 			{Code: `'use strict'; function foo() { return; }`, Options: "safe", Skip: true},
-			// SKIP: sourceType: "module" valid case — behavior covered in invalid suite via `export {};`.
-			{Code: `function foo() { return; } export {};`, Options: "safe", Skip: true},
+			{Code: `function foo() { return; }`, Options: "safe", LanguageOptions: moduleLanguageOptions},
 			// SKIP: impliedStrict not exposed.
 			{Code: `function foo() { return; }`, Options: "safe", Skip: true},
 
@@ -92,8 +103,7 @@ foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable seman
 			{Code: `function foo() { 'use strict'; return; }`},
 			// SKIP: globalReturn not exposed.
 			{Code: `'use strict'; function foo() { return; }`, Skip: true},
-			// SKIP: module-sourced valid case covered elsewhere.
-			{Code: `function foo() { return; } export {};`, Skip: true},
+			{Code: `function foo() { return; }`, LanguageOptions: moduleLanguageOptions},
 			// SKIP: impliedStrict not exposed.
 			{Code: `function foo() { return; }`, Skip: true},
 
@@ -107,13 +117,11 @@ foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable seman
 			{Code: `class C { static { foo; } }`, Options: "never"},
 			{Code: `class C { static { 'use strict'; } }`, Options: "never"},
 			{Code: `class C { static { 'use strict'; 'use strict'; } }`, Options: "never"},
-			// SKIP: sourceType: "module" — module path exercised in invalid suite.
-			{Code: `class C { static { 'use strict'; } } export {};`, Options: "safe", Skip: true},
+			{Code: `class C { static { 'use strict'; } }`, Options: "safe", LanguageOptions: moduleLanguageOptions},
 			// SKIP: impliedStrict not exposed.
 			{Code: `class C { static { 'use strict'; } }`, Options: "safe", Skip: true},
-			// SKIP: sourceType: "commonjs" — rslint cannot distinguish CommonJS scripts.
-			{Code: `'use strict'; module.exports = function identity (value) { return value; }`, Skip: true},
-			{Code: `'use strict'; module.exports = function identity (value) { return value; }`, Options: "safe", Skip: true},
+			{Code: `'use strict'; module.exports = function identity (value) { return value; }`, LanguageOptions: commonJSLanguageOptions},
+			{Code: `'use strict'; module.exports = function identity (value) { return value; }`, Options: "safe", LanguageOptions: commonJSLanguageOptions},
 
 			// ---- Class heritage (not class body) ----
 			// A function in an `extends` clause is NOT inside the class body, so
@@ -139,8 +147,8 @@ foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable seman
 				Code:    `function foo(): void; function foo(a: number): void; function foo(a?: number) { 'use strict'; }`,
 				Options: "function",
 			},
-		},
-		[]rule_tester.InvalidTestCase{
+		}),
+		withScriptSourceTypeInvalid([]rule_tester.InvalidTestCase{
 			// ---- "never" mode ----
 			{
 				Code:    `"use strict"; foo();`,
@@ -178,11 +186,11 @@ foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable seman
 					{MessageId: "never", Line: 1, Column: 32},
 				},
 			},
-			// Module detection (rslint analogue of sourceType: "module").
 			{
-				Code:    `"use strict"; foo(); export {};`,
-				Output:  []string{` foo(); export {};`},
-				Options: "never",
+				Code:            `"use strict"; foo();`,
+				Output:          []string{` foo();`},
+				Options:         "never",
+				LanguageOptions: moduleLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "module", Line: 1, Column: 1},
 				},
@@ -267,9 +275,10 @@ function bar() {}
 				},
 			},
 			{
-				Code:    `'use strict'; foo(); export {};`,
-				Output:  []string{` foo(); export {};`},
-				Options: "global",
+				Code:            `'use strict'; foo();`,
+				Output:          []string{` foo();`},
+				Options:         "global",
+				LanguageOptions: moduleLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "module", Line: 1, Column: 1},
 				},
@@ -351,9 +360,10 @@ function bar() {}
 				},
 			},
 			{
-				Code:    `var foo = function() {  'use strict'; return; }; export {};`,
-				Output:  []string{`var foo = function() {   return; }; export {};`},
-				Options: "function",
+				Code:            `var foo = function() {  'use strict'; return; }`,
+				Output:          []string{`var foo = function() {   return; }`},
+				Options:         "function",
+				LanguageOptions: moduleLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "module", Line: 1, Column: 25},
 				},
@@ -705,10 +715,11 @@ function bar() {}
 			},
 			{
 				Code: `class C { static { function foo() {
-'use strict'; } } } export {};`,
+'use strict'; } } }`,
 				Output: []string{`class C { static { function foo() {
- } } } export {};`},
-				Options: "safe",
+ } } }`},
+				Options:         "safe",
+				LanguageOptions: moduleLanguageOptions,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "module", Line: 2},
 				},
@@ -754,17 +765,16 @@ function bar() {}
 					{MessageId: "multiple", Line: 3},
 				},
 			},
-			// SKIP: sourceType: "commonjs" — rslint cannot distinguish CommonJS scripts.
 			{
-				Code:    `module.exports = function identity (value) { return value; }`,
-				Options: "safe",
-				Skip:    true,
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "global", Line: 1}},
+				Code:            `module.exports = function identity (value) { return value; }`,
+				Options:         "safe",
+				LanguageOptions: commonJSLanguageOptions,
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "global", Line: 1}},
 			},
 			{
-				Code:   `module.exports = function identity (value) { return value; }`,
-				Skip:   true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "global", Line: 1}},
+				Code:            `module.exports = function identity (value) { return value; }`,
+				LanguageOptions: commonJSLanguageOptions,
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "global", Line: 1}},
 			},
 
 			// ---- Class heritage: functions in extends are NOT in class body ----
@@ -778,6 +788,6 @@ function bar() {}
 					{MessageId: "function", Line: 1, Column: 20},
 				},
 			},
-		},
+		}),
 	)
 }
