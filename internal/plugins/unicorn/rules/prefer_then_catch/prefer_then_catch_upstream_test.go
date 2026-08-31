@@ -52,6 +52,14 @@ func TestPreferThenCatchUpstream(t *testing.T) {
 			jsValid(`promise.then?.(onFulfilled, onRejected);`),
 
 			// ---- upstream valid: type-aware, non-native Promise receiver ----
+			tsValid(`class DerivedPromise extends Promise<string> {}` + "\n" +
+				`declare const derived: DerivedPromise;` + "\n" +
+				`derived.then(onFulfilled, onRejected);`),
+			tsValid(`declare const intersection: Promise<string> & {readonly tag: 'x'};` + "\n" +
+				`intersection.then(onFulfilled, onRejected);`),
+			tsValid(`function handle<T extends Promise<string>>(value: T) {` + "\n" +
+				`  value.then(onFulfilled, onRejected);` + "\n" +
+				`}`),
 			tsValid(`declare const object: {then(onFulfilled: () => void, onRejected: () => void): void};` + "\n" +
 				`object.then(onFulfilled, onRejected);`),
 			tsValid(`declare const promise: PromiseLike<string>;` + "\n" +
@@ -114,8 +122,8 @@ func TestPreferThenCatchUpstream(t *testing.T) {
 			upstreamInvalidTs(`promise.then(onFulfilled, <(error: unknown) => void> onRejected);`),
 
 			// ---- upstream invalid: rejection handler that is a function expression with comments ----
-			// No suggestion because removing it would drop the comment inside its body.
-			upstreamInvalidNoFix(`promise.then(onFulfilled, error => { /* Keep this comment. */ handle(error); });`),
+			// The handler source moves intact into `.catch(...)`, including comments.
+			upstreamInvalid(`promise.then(onFulfilled, error => { /* Keep this comment. */ handle(error); });`),
 
 			// ---- upstream invalid: rejection handlers not safe to move (no suggestion) ----
 			upstreamInvalidNoFix(`promise.then(onFulfilled, createRejectionHandler());`),

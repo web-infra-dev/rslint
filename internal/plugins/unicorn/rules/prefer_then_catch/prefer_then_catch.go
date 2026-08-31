@@ -134,12 +134,21 @@ func canThenResultCatch(call unicornutil.DotMethodCall, node *ast.Node, ctx rule
 	if utils.IsTypeAnyType(receiverType) || utils.IsTypeUnknownType(receiverType) {
 		return true
 	}
-	if !utils.IsPromiseLike(ctx.Program(), tc, receiverType) {
+	if !isNativePromiseType(ctx, receiverType) {
 		return false
 	}
 
 	resultType := tc.GetTypeAtLocation(node)
 	return hasCallableCatch(resultType, tc, node)
+}
+
+// isNativePromiseType mirrors upstream's isNativePromiseType: it accepts only
+// a type whose direct symbol is the default-library Promise. In particular,
+// this deliberately does not follow base types, intersection constituents, or
+// type-parameter constraints.
+func isNativePromiseType(ctx rule.RuleContext, t *checker.Type) bool {
+	symbol := checker.Type_symbol(t)
+	return symbol != nil && symbol.Name == "Promise" && utils.IsSymbolFromDefaultLibrary(ctx.Program(), symbol)
 }
 
 // hasCallableCatch mirrors upstream's hasCallableCatch. A union type is only
@@ -268,9 +277,9 @@ func hasTrailingArgumentComment(comments []*ast.CommentRange, rejectionHandler *
 }
 
 // buildSuggestion constructs the `.then(...).catch(...)` rewrite, or returns
-// nil when the rejection handler cannot safely be moved (side effects, or its
-// removal would also remove a comment, or there's a comment between it and
-// the closing paren).
+// nil when the rejection handler cannot safely be moved (side effects, a
+// comment in the discarded separator/trivia, or a comment between it and the
+// closing paren). Comments within the handler move with its source text.
 func buildSuggestion(ctx rule.RuleContext, callExpression *ast.Node, rejectionHandler *ast.Node) []rule.RuleSuggestion {
 	if !isRejectionHandlerSafeToMove(rejectionHandler) {
 		return nil
@@ -288,7 +297,9 @@ func buildSuggestion(ctx rule.RuleContext, callExpression *ast.Node, rejectionHa
 	}
 
 	comments := ctx.Comments.All()
-	if utils.HasCommentInSpan(comments, removalRange.Pos(), removalRange.End()) {
+	// The removal range also covers the handler, whose source is inserted into
+	// `.catch(...)`. Only comments in the separator before it are discarded.
+	if utils.HasCommentInSpan(comments, removalRange.Pos(), rejectionHandler.Pos()) {
 		return nil
 	}
 	if hasTrailingArgumentComment(comments, rejectionHandler, argsCloseParen) {

@@ -94,9 +94,21 @@ func TestPreferThenCatchExtras(t *testing.T) {
 			// Locks in isRejectionHandlerSafeToMove rejecting call expressions.
 			extrasInvalidNoFix(`promise.then(onFulfilled, createRejectionHandler());`),
 
-			// ---- Dimension 4: rejection handler with internal comment (would drop the comment) ----
-			// Locks in wouldRemoveComments blocking the suggestion.
-			extrasInvalidNoFix(`promise.then(onFulfilled, error => { /* Keep this comment. */ handle(error); });`),
+			// ---- Rejection-handler comments move into `.catch(...)` ----
+			// Locks in upstream behavior: handler source is reinserted verbatim, so
+			// comments inside its body, expression, or parameters are preserved.
+			extrasInvalidWithCode(
+				`promise.then(a, x => { /* keep */ return x; });`,
+				`promise.then(a).catch(x => { /* keep */ return x; });`,
+			),
+			extrasInvalidWithCode(
+				`promise.then(a, x => /* keep */ x);`,
+				`promise.then(a).catch(x => /* keep */ x);`,
+			),
+			extrasInvalidWithCode(
+				`promise.then(a, function (/* keep */ x) { return x; });`,
+				`promise.then(a).catch(function (/* keep */ x) { return x; });`,
+			),
 
 			// ---- Dimension 4: shadowed `undefined` parameter is NOT global ----
 			// Locks in isGlobalUndefined using IsSymbolDeclaredInFile to detect a
