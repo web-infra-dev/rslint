@@ -378,6 +378,16 @@ func assertionIsAssignmentInNonStatementContext(node *ast.Node) bool {
 	return assignment.Parent == nil || !ast.IsExpressionStatement(assignment.Parent)
 }
 
+func assertionIsAssignmentStatementContext(node *ast.Node) bool {
+	semanticNode := assertionWalkUpParentheses(node)
+	parent := semanticNode.Parent
+	if !ast.IsBinaryExpression(parent) || parent.AsBinaryExpression().Right != semanticNode {
+		return false
+	}
+	assignment := assertionWalkUpParentheses(parent)
+	return assignment.Parent != nil && ast.IsExpressionStatement(assignment.Parent)
+}
+
 func assertionIsRightHandSideOfLogicalAssignment(node *ast.Node) bool {
 	semanticNode := assertionWalkUpParentheses(node)
 	parent := semanticNode.Parent
@@ -399,11 +409,13 @@ func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type
 	if contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone); contextualType != nil {
 		return contextualType
 	}
-	if contextualType := utils.GetContextualType(ctx.TypeChecker, node); contextualType != nil {
-		return contextualType
-	}
 	semanticNode := assertionWalkUpParentheses(node)
 	parent := semanticNode.Parent
+	if ast.IsParameterDeclaration(parent) || ast.IsPropertyDeclaration(parent) {
+		if contextualType := utils.GetContextualType(ctx.TypeChecker, node); contextualType != nil {
+			return contextualType
+		}
+	}
 	if ast.IsConditionalExpression(parent) {
 		conditional := parent.AsConditionalExpression()
 		if conditional.WhenTrue == semanticNode || conditional.WhenFalse == semanticNode {
@@ -417,7 +429,15 @@ func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type
 			return ctx.TypeChecker.GetTypeAtLocation(parent)
 		}
 	}
+	if ast.IsSwitchStatement(parent) && parent.AsSwitchStatement().Expression == semanticNode {
+		return ctx.TypeChecker.GetTypeAtLocation(semanticNode)
+	}
 	return nil
+}
+
+func assertionIsInUnaryOrThrowContext(node *ast.Node) bool {
+	semanticNode := assertionWalkUpParentheses(node)
+	return ast.IsPrefixUnaryExpression(semanticNode.Parent) || ast.IsThrowStatement(semanticNode.Parent)
 }
 
 func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Node) bool {
@@ -553,6 +573,7 @@ func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.N
 		assertionIsInDestructuringDeclaration(node) ||
 		assertionIsPropertyInProblematicContext(ctx, node) ||
 		assertionIsAssignmentInNonStatementContext(node) ||
+		assertionIsAssignmentStatementContext(node) ||
 		assertionIsRightHandSideOfLogicalAssignment(node) ||
 		assertionIsArgumentToOverloadedFunction(ctx, node) ||
 		assertionIsArgumentToExplicitGenericCall(node) {
@@ -916,7 +937,8 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				getUnionTypeFlags(uncastType)&checker.TypeFlagsUndefined != 0 &&
 					getUnionTypeFlags(castType)&checker.TypeFlagsUndefined != 0 &&
 					assertionIsInOptionalOrLogicalContext(node)
-			if typeIsUnchanged && wouldSameTypeBeInferred && !isControlFlowSensitiveUndefinedUnion {
+			if typeIsUnchanged && wouldSameTypeBeInferred &&
+				!isControlFlowSensitiveUndefinedUnion && !assertionIsInUnaryOrThrowContext(node) {
 				reportAssertion(buildUnnecessaryAssertionMessage())
 				return
 			}

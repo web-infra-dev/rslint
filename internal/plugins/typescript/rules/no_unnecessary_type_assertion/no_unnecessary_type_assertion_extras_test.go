@@ -29,6 +29,9 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 			{Code: `declare let x: number; const y = (x = 1 as number);`},
 			{Code: `declare const value: string | undefined; (value as string | undefined)?.toLowerCase();`},
 			{Code: `declare const value: string | undefined; const result = (value as string | undefined) || 'fallback';`},
+			{Code: `declare const value: boolean; !(value as boolean);`},
+			{Code: `declare const value: Error; throw value as Error;`},
+			{Code: `declare let value: string; value = 'a' as string;`},
 			{Code: `declare const value: 'a'; declare function id<T>(value: T): T; id<string>(value as string);`},
 			{Code: `declare const value: 'a'; const result = true ? false ? value as string : 'b' : 'c';`},
 			{Code: `
@@ -70,6 +73,11 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `declare const value: 'a'; switch (value as string) { case 'a': break; }`,
+				Output: []string{`declare const value: 'a'; switch (value) { case 'a': break; }`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
 			{
 				Code:   `declare const value: 'a'; function f(parameter: string = value as string): void {}`,
 				Output: []string{`declare const value: 'a'; function f(parameter: string = value): void {}`},
