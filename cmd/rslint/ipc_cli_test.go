@@ -211,6 +211,110 @@ func TestShutdownPeerWaitsForAcknowledgement(t *testing.T) {
 	}
 }
 
+func TestAcknowledgedOutputWriterWaitsForPeer(t *testing.T) {
+	cli, peer := newCLIChannelPair(t)
+	requestSeen := make(chan string, 1)
+	releaseResponse := make(chan struct{})
+	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+		if msg.Kind != kindOutput {
+			return nil, fmt.Errorf("request kind = %q, want %q", msg.Kind, kindOutput)
+		}
+		var payload struct {
+			Stream string `json:"stream"`
+			Text   string `json:"text"`
+		}
+		if err := msg.Decode(&payload); err != nil {
+			return nil, err
+		}
+		if payload.Stream != "stdout" {
+			return nil, fmt.Errorf("stream = %q, want stdout", payload.Stream)
+		}
+		requestSeen <- payload.Text
+		<-releaseResponse
+		return map[string]any{"ok": true}, nil
+	})
+	cli.Start()
+	peer.Start()
+
+	text := "\x1b[36;1m" + "start" + "\x1b[0;22m   Linting...\n"
+	writeDone := make(chan error, 1)
+	go func() {
+		written, err := (acknowledgedOutputWriter{
+			ctx:     context.Background(),
+			channel: cli,
+		}).Write([]byte(text))
+		if err == nil && written != len(text) {
+			err = fmt.Errorf("written = %d, want %d", written, len(text))
+		}
+		writeDone <- err
+	}()
+
+	select {
+	case got := <-requestSeen:
+		if got != text {
+			t.Fatalf("output text = %q, want %q", got, text)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("peer did not receive acknowledged output request")
+	}
+	select {
+	case err := <-writeDone:
+		t.Fatalf("Write returned before peer acknowledgement: %v", err)
+	default:
+	}
+	close(releaseResponse)
+	select {
+	case err := <-writeDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Write did not return after peer acknowledgement")
+	}
+}
+
+func TestAcknowledgedOutputWriterReturnsOnCancellation(t *testing.T) {
+	cli, peer := newCLIChannelPair(t)
+	requestSeen := make(chan struct{})
+	releaseResponse := make(chan struct{})
+	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+		if msg.Kind != kindOutput {
+			return nil, fmt.Errorf("request kind = %q, want %q", msg.Kind, kindOutput)
+		}
+		close(requestSeen)
+		<-releaseResponse
+		return map[string]any{"ok": true}, nil
+	})
+	cli.Start()
+	peer.Start()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	writeDone := make(chan error, 1)
+	go func() {
+		written, err := (acknowledgedOutputWriter{ctx: ctx, channel: cli}).Write([]byte("start\n"))
+		if written != 0 {
+			err = fmt.Errorf("written = %d, want 0 after cancellation", written)
+		}
+		writeDone <- err
+	}()
+
+	select {
+	case <-requestSeen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("peer did not receive acknowledged output request")
+	}
+	cancel()
+	select {
+	case err := <-writeDone:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Write error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Write did not return after cancellation")
+	}
+	close(releaseResponse)
+}
+
 // TestDrainStdoutToIPC_DiscardsOnClosedPeer pins #4: once the channel is
 // closed (peer gone) the drain stops forwarding but keeps reading r — so the
 // lint pipeline never blocks on a full stdout pipe — and exits cleanly on EOF.
@@ -307,12 +411,49 @@ func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
 		"workingDirectory": dir,
 		"format":           "stylish",
 		"configDiscovery":  map[string]any{},
-	}, nil, false)
+	}, nil, 0, false)
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2; output=%q", code, output)
 	}
 	if output != "" {
 		t.Fatalf("invalid format unexpectedly produced stdout: %q", output)
+	}
+}
+
+func TestRunCLIMachineFormatDoesNotRequestAcknowledgedStart(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	filePath := filepath.Join(dir, "index.ts")
+	if err := os.WriteFile(filePath, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(dir, "rslint.config.mjs"),
+		[]byte("export default [];\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	code, output := runCLIInitForTest(t, map[string]any{
+		"workingDirectory": dir,
+		"files":            []string{filePath},
+		"format":           "jsonline",
+		"configDiscovery":  map[string]any{},
+	}, config.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		Rules: config.Rules{"no-debugger": "error"},
+	}}, 0, true)
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1; output=%q", code, output)
+	}
+	if !strings.Contains(output, `"ruleName":"no-debugger"`) {
+		t.Fatalf("machine diagnostic missing: %q", output)
+	}
+	if strings.Contains(output, "Linting...") || strings.Contains(output, "Lint failed") {
+		t.Fatalf("machine output contains default lifecycle text: %q", output)
 	}
 }
 
@@ -354,7 +495,7 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 		Files:   []string{"**/*.ts"},
 		Rules:   config.Rules{"@typescript-eslint/ban-ts-comment": "error"},
 		Plugins: []string{"@typescript-eslint"},
-	}}, true)
+	}}, 1, true)
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1 (one lint error)", code)
 	}
@@ -412,11 +553,11 @@ func TestRunCLI_WorkingDirectoryAliases(t *testing.T) {
 			}, config.RslintConfig{{
 				Files: []string{"**/*.ts"},
 				Rules: config.Rules{"no-debugger": "error"},
-			}}, true)
+			}}, 1, true)
 			if code != 1 {
 				t.Fatalf("exit code = %d, want 1; output: %q", code, text)
 			}
-			if !strings.Contains(text, "no-debugger") || !strings.Contains(text, "linted 1 file") {
+			if !strings.Contains(text, "no-debugger") || !strings.Contains(text, "(1 file, 1 rule,") {
 				t.Fatalf("symlinked working directory did not lint index.ts exactly once; output: %q", text)
 			}
 		})
@@ -445,18 +586,19 @@ func createWorkingDirectoryAlias(t *testing.T, target, alias string) {
 const cliTestInitRequestID = 1
 
 type cliTestPeerResult struct {
-	output           string
-	initReplies      int
-	shutdownRequests int
-	err              error
+	output                     string
+	initReplies                int
+	acknowledgedOutputRequests int
+	shutdownRequests           int
+	err                        error
 }
 
 // serveCLITestPeer models the ordering that matters in the real Node peer:
-// output notifications are handled synchronously as frames are decoded, and
-// only then can a later shutdown request be acknowledged. Using ipc.Channel
-// here would be incorrect because its Go-side notification and request
-// handlers intentionally run in independent goroutines and may overtake one
-// another.
+// output requests and notifications are handled synchronously as frames are
+// decoded, and only then can a later shutdown request be acknowledged. Using
+// ipc.Channel here would be incorrect because its Go-side notification and
+// request handlers intentionally run in independent goroutines and may
+// overtake one another.
 func serveCLITestPeer(
 	fromCLI io.Reader,
 	toCLI io.Writer,
@@ -519,6 +661,32 @@ func serveCLITestPeer(
 				recordError(fmt.Errorf("output stream = %q, want stdout", notification.Stream))
 			}
 			output.WriteString(notification.Text)
+
+		case msg.ID > 0 && msg.Kind == kindOutput:
+			result.acknowledgedOutputRequests++
+			if shutdownSeen {
+				recordError(errors.New("received acknowledged output after shutdown"))
+			}
+			var request struct {
+				Stream string `json:"stream"`
+				Text   string `json:"text"`
+			}
+			if err := msg.Decode(&request); err != nil {
+				recordError(fmt.Errorf("decode acknowledged output request: %w", err))
+				continue
+			}
+			if request.Stream != "stdout" {
+				recordError(fmt.Errorf("output stream = %q, want stdout", request.Stream))
+			}
+			output.WriteString(request.Text)
+			response, err := ipc.NewMessage(ipc.KindResponse, msg.ID, map[string]any{"ok": true})
+			if err != nil {
+				recordError(fmt.Errorf("build acknowledged output response: %w", err))
+				continue
+			}
+			if err := ipc.WriteFrame(toCLI, response); err != nil {
+				recordError(fmt.Errorf("write acknowledged output response: %w", err))
+			}
 
 		case msg.ID > 0 && msg.Kind == kindLoadConfigs:
 			var request discovery.ConfigLoadBatchRequest
@@ -604,6 +772,7 @@ func runCLIInitForTest(
 	t *testing.T,
 	payload any,
 	loadedConfig config.RslintConfig,
+	wantAcknowledgedOutputRequests int,
 	wantShutdown bool,
 ) (int, string) {
 	t.Helper()
@@ -681,6 +850,13 @@ func runCLIInitForTest(
 	}
 	if peerResult.initReplies != 1 {
 		t.Fatalf("init replies = %d, want 1", peerResult.initReplies)
+	}
+	if peerResult.acknowledgedOutputRequests != wantAcknowledgedOutputRequests {
+		t.Fatalf(
+			"acknowledged output requests = %d, want %d",
+			peerResult.acknowledgedOutputRequests,
+			wantAcknowledgedOutputRequests,
+		)
 	}
 	wantShutdownRequests := 0
 	if wantShutdown {

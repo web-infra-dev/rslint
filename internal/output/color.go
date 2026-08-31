@@ -5,6 +5,7 @@ import "github.com/fatih/color"
 type colorScheme struct {
 	RuleName    func(format string, a ...interface{}) string
 	FileName    func(format string, a ...interface{}) string
+	StartText   func(format string, a ...interface{}) string
 	ErrorText   func(format string, a ...interface{}) string
 	SuccessText func(format string, a ...interface{}) string
 	DimText     func(format string, a ...interface{}) string
@@ -26,6 +27,7 @@ func newColorScheme(enabled bool) colorScheme {
 	return colorScheme{
 		RuleName:    newPinnedColor(enabled, color.FgHiGreen).SprintfFunc(),
 		FileName:    newPinnedColor(enabled, color.FgCyan, color.Italic).SprintfFunc(),
+		StartText:   newPinnedColor(enabled, color.FgCyan, color.Bold).SprintfFunc(),
 		ErrorText:   newPinnedColor(enabled, color.FgRed, color.Bold).SprintfFunc(),
 		SuccessText: newPinnedColor(enabled, color.FgGreen, color.Bold).SprintfFunc(),
 		DimText:     newPinnedColor(enabled, color.Faint).SprintfFunc(),

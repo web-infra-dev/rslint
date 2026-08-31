@@ -3,12 +3,14 @@
 package utils
 
 import (
+	"math"
 	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"gotest.tools/v3/assert"
 )
 
@@ -324,6 +326,101 @@ func TestStaticArrayJoinRejectsExcessiveOutput(t *testing.T) {
 	}
 	if _, ok := staticArrayJoin(value, strings.Repeat("x", 1024)); ok {
 		t.Fatal("staticArrayJoin accepted output above the static string limit")
+	}
+}
+
+func TestStaticStringEvaluatorUTF16Semantics(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir.Dir, "utf16.ts")
+	code := `
+const loneLength = String('\uD800'.length);
+const indexAfterLone = String('\uD800x'.indexOf('x'));
+const astralHighIndex = String('😀'.indexOf('\uD83D'));
+const astralLowIndex = String('😀'.indexOf('\uDE00'));
+const positiveInfinityStart = String('abc'.indexOf('a', 1 / 0));
+const negativeInfinityStart = String('abc'.indexOf('a', -1 / 0));
+const hugePositiveStart = String('abc'.indexOf('a', 1e100));
+const nanStart = String('abc'.indexOf('a', 0 / 0));
+const missingNeedle = String('undefined!'.indexOf());
+const missingNeedleAbsent = String('abc'.indexOf());
+const emptyNeedleInfinity = String('abc'.indexOf('', 1 / 0));
+const emptyNeedleMidPair = String('😀'.indexOf('', 1));
+const sliceHigh = '😀'.slice(0, 1);
+const sliceLow = '😀'.slice(1, 2);
+const substringHigh = '😀'.substring(0, 1);
+const substrLow = '😀'.substr(1, 1);
+const charAtHigh = '😀'.charAt(0);
+const charAtLow = '😀'.charAt(1);
+const fromCharCodeHigh = String.fromCharCode(0xD83D);
+const fromCharCodePair = String.fromCharCode(0xD83D, 0xDE00);
+const concatPair = '\uD83D' + '\uDE00';
+` + "const templatePair = `${'\\uD83D'}${'\\uDE00'}`;\n" + `
+const joinPair = ['\uD83D', '\uDE00'].join('');
+const astralUpper = ('\uD801' + '\uDC28').toUpperCase();
+const astralLower = ('\uD801' + '\uDC00').toLowerCase();
+const strictPair = ('\uD83D' + '\uDE00') === '😀' ? 'yes' : 'no';
+const objectPair = ({['\uD83D' + '\uDE00']: 'yes'})['😀'];
+`
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
+	assert.NilError(t, err, "couldn't create program")
+	sourceFile := program.GetSourceFile(filePath)
+	assert.Assert(t, sourceFile != nil)
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+	staticEvaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+
+	high := ecmascript.StringFromCodeUnits([]uint16{0xD83D})
+	low := ecmascript.StringFromCodeUnits([]uint16{0xDE00})
+	tests := []struct {
+		name string
+		want string
+	}{
+		{name: "loneLength", want: "1"},
+		{name: "indexAfterLone", want: "1"},
+		{name: "astralHighIndex", want: "0"},
+		{name: "astralLowIndex", want: "1"},
+		{name: "positiveInfinityStart", want: "-1"},
+		{name: "negativeInfinityStart", want: "0"},
+		{name: "hugePositiveStart", want: "-1"},
+		{name: "nanStart", want: "0"},
+		{name: "missingNeedle", want: "0"},
+		{name: "missingNeedleAbsent", want: "-1"},
+		{name: "emptyNeedleInfinity", want: "3"},
+		{name: "emptyNeedleMidPair", want: "1"},
+		{name: "sliceHigh", want: high},
+		{name: "sliceLow", want: low},
+		{name: "substringHigh", want: high},
+		{name: "substrLow", want: low},
+		{name: "charAtHigh", want: high},
+		{name: "charAtLow", want: low},
+		{name: "fromCharCodeHigh", want: high},
+		{name: "fromCharCodePair", want: "😀"},
+		{name: "concatPair", want: "😀"},
+		{name: "templatePair", want: "😀"},
+		{name: "joinPair", want: "😀"},
+		{name: "astralUpper", want: "𐐀"},
+		{name: "astralLower", want: "𐐨"},
+		{name: "strictPair", want: "yes"},
+		{name: "objectPair", want: "yes"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := staticEvaluator.Eval(findVariableInitializer(t, sourceFile, tt.name))
+			if !ok || got != tt.want {
+				t.Fatalf("Eval(%s) = (%q, %v), want code units %v", tt.name, got, ok, ecmascript.StringCodeUnits(tt.want))
+			}
+		})
+	}
+}
+
+func TestStaticStringIndexOfCommonPrefix(t *testing.T) {
+	text := strings.Repeat("a", 100_000)
+	needle := strings.Repeat("a", 50_000) + "b"
+	result := staticStringIndexOf(text, []any{needle, staticNumberValue(math.Inf(-1))})
+	value, ok := staticValueToNumber(result.value)
+	if !result.ok || !ok || value != -1 {
+		t.Fatalf("staticStringIndexOf common prefix = (%v, %v), want -1", result.value, result.ok)
 	}
 }
 

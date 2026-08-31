@@ -53,7 +53,7 @@ export default defineConfig([
 With this config, a `rslint.config.ts` inside `e2e/` or any `fixtures/` directory is not used by a root directory traversal. An explicitly named file is still resolved from its nearest config.
 
 :::tip
-Only **global ignore entries** (entries containing only `ignores`) block directory target discovery. Entry-level ignores do not affect config discovery. See [`ignores`](/config/ignoring-files) for the distinction.
+Only **global ignore entries** (entries containing `ignores` plus optional `name` or `basePath`, with no configuration fields) block directory target discovery. Entry-level ignores do not affect config discovery. See [`ignores`](/config/ignoring-files) for the distinction.
 :::
 
 You can specify a config file explicitly, which overrides automatic discovery:
@@ -62,7 +62,9 @@ You can specify a config file explicitly, which overrides automatic discovery:
 rslint --config path/to/rslint.config.ts .
 ```
 
-Relative `files`, `ignores`, and `languageOptions.parserOptions.project` patterns are resolved from the config file's directory, whether the config is discovered automatically or supplied with `--config`.
+## Path resolution and `basePath`
+
+Relative config paths normally resolve from the config entry's authored directory. Use `basePath` to give one entry a different starting directory. See the [`basePath` configuration reference](/config/base-path) for its complete matching, TypeScript project, config-source, and `.gitignore` behavior.
 
 To generate a default config, run:
 
@@ -103,7 +105,7 @@ See the [Configuration overview](/config/) for every available option and [Rules
 
 When multiple config entries match a file, they are merged in array order:
 
-1. **Global ignores** — entries containing only `ignores` remove files from the target set
+1. **Global ignores** — entries containing `ignores` plus optional `name` or `basePath`, with no configuration fields, remove files from the target set
 2. **Selector union** — the implicit default baseline and effective explicit `files` entries decide whether the config selects the file
 3. **Files matching** — entries whose explicit `files` patterns don't match are skipped; entries without `files` cascade across the selector union
 4. **Entry-level ignores** — matching entries do not select or configure the file, but cannot remove a target selected elsewhere

@@ -123,6 +123,12 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		configDirectory = currentDirectory
 	}
 	configDirectory = tspath.NormalizePath(configDirectory)
+	if len(rslintConfig) > 0 {
+		rslintConfig = rslintconfig.ConfigWithResolvedBasePaths(
+			rslintConfig,
+			configDirectory,
+		)
+	}
 	if len(fileContents) > 0 {
 		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs)
 		fs = utils.NewOverlayVFS(fs, fileContents)
@@ -260,7 +266,10 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		} else {
 			// No JS candidate is a valid API state: lint with override entries (or
 			// syntax-only with an empty config).
-			rslintConfig = overrideConfig
+			rslintConfig = rslintconfig.ConfigWithResolvedBasePaths(
+				overrideConfig,
+				currentDirectory,
+			)
 			configDirectory = currentDirectory
 		}
 		catalogPlugins = configCatalog.EslintPlugins

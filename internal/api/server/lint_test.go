@@ -788,6 +788,31 @@ func TestHandleLint_LowLevelResponsePathsRemainRelativeToConfigDirectory(t *test
 	}
 }
 
+func TestHandleLint_LowLevelConfigResolvesBasePathFromConfigDirectory(t *testing.T) {
+	dir := t.TempDir()
+	inside := filepath.Join(dir, "src", "inside.js")
+	outside := filepath.Join(dir, "outside.js")
+	writeProgramTestFiles(t, dir, map[string]string{
+		"src/inside.js": "debugger;\n",
+		"outside.js":    "debugger;\n",
+	})
+
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
+		Config: json.RawMessage(`[
+			{"basePath":"src","files":["*.js"],"rules":{"no-debugger":"error"}}
+		]`),
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{inside, outside},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint: %v", err)
+	}
+	if response.FileCount != 2 || len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/inside.js" {
+		t.Fatalf("basePath scope was not resolved at the config boundary: %+v", response)
+	}
+}
+
 func TestHandleLint_LowLevelExternalConfigSeparatesAuthoredAndScanRoots(t *testing.T) {
 	root := t.TempDir()
 	configDirectory := filepath.Join(root, "config")
@@ -2219,16 +2244,24 @@ func TestHandleLint_ConfigDiscoveryExplicitFilesMustMatchFiles(t *testing.T) {
 
 func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *testing.T) {
 	tests := []struct {
-		name       string
-		source     string
-		override   json.RawMessage
-		wantPrefix string
+		name           string
+		targetRelative string
+		source         string
+		override       json.RawMessage
+		wantPrefix     string
 	}{
 		{
 			name:       "override config",
 			source:     "debugger;\n",
 			override:   json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
 			wantPrefix: "no-debugger",
+		},
+		{
+			name:           "override config basePath",
+			targetRelative: "src/input.js",
+			source:         "debugger;\n",
+			override:       json.RawMessage(`[{"basePath":"src","files":["*.js"],"rules":{"no-debugger":"error"}}]`),
+			wantPrefix:     "no-debugger",
 		},
 		{
 			name:       "syntax only",
@@ -2240,7 +2273,14 @@ func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *t
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
-			target := filepath.Join(dir, "input.js")
+			targetRelative := test.targetRelative
+			if targetRelative == "" {
+				targetRelative = "input.js"
+			}
+			target := filepath.Join(dir, targetRelative)
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				t.Fatalf("create target directory: %v", err)
+			}
 			if err := os.WriteFile(target, []byte(test.source), 0o644); err != nil {
 				t.Fatalf("write target: %v", err)
 			}

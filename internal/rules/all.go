@@ -36,7 +36,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/grouped_accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/id_denylist"
 	"github.com/web-infra-dev/rslint/internal/rules/id_length"
+	"github.com/web-infra-dev/rslint/internal/rules/id_match"
 	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/logical_assignment_operators"
 	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
@@ -259,7 +261,9 @@ func coreRules() []rule.Rule {
 		getter_return.GetterReturnRule,
 		grouped_accessor_pairs.GroupedAccessorPairsRule,
 		guard_for_in.GuardForInRule,
+		id_denylist.IdDenylistRule,
 		id_length.IdLengthRule,
+		id_match.IdMatchRule,
 		init_declarations.InitDeclarationsRule,
 		logical_assignment_operators.LogicalAssignmentOperatorsRule,
 		max_classes_per_file.MaxClassesPerFileRule,

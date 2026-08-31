@@ -113,7 +113,7 @@ func TestCLINoArgsUsesDefaultScriptExtensions(t *testing.T) {
 			t.Errorf("default scan linted unsupported source%s: stdout=%q stderr=%q", extension, stdout, stderr)
 		}
 	}
-	if !strings.Contains(stdout, "linted 8 files") {
+	if !strings.Contains(stdout, "(8 files, 1 rule, 1 thread)") {
 		t.Fatalf("default scan did not lint exactly 8 script files: stdout=%q stderr=%q", stdout, stderr)
 	}
 }

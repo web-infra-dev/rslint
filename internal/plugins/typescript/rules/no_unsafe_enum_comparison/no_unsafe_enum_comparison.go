@@ -22,14 +22,6 @@ func buildMismatchedConditionMessage() rule.RuleMessage {
 	}
 }
 
-//nolint:unused
-func buildReplaceValueWithEnumMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "replaceValueWithEnum",
-		Description: "Replace with an enum value comparison.",
-	}
-}
-
 /**
  * @returns What type a type's enum value is (number or string), if either.
  */
@@ -47,31 +39,34 @@ func getEnumValueType(t *checker.Type) checker.TypeFlags {
  * @returns Whether the right type is an unsafe comparison against any left type.
  */
 func typeViolates(leftTypeParts []*checker.Type, rightType *checker.Type) bool {
-	rightNumberLike, rightStringLike := false, false
-	for _, typePart := range utils.IntersectionTypeParts(rightType) {
-		if utils.IsTypeFlagSet(typePart, checker.TypeFlagsNumberLike) {
-			rightNumberLike = true
+	hasNumberEnum, hasStringEnum := false, false
+	for _, typePart := range leftTypeParts {
+		switch getEnumValueType(typePart) {
+		case checker.TypeFlagsNumber:
+			hasNumberEnum = true
+		case checker.TypeFlagsString:
+			hasStringEnum = true
 		}
-		if utils.IsTypeFlagSet(typePart, checker.TypeFlagsStringLike) {
-			rightStringLike = true
-		}
-		if rightNumberLike && rightStringLike {
-			break
-		}
-	}
-	if !rightNumberLike && !rightStringLike {
-		return false
 	}
 
-	for _, typePart := range leftTypeParts {
-		t := getEnumValueType(typePart)
-		if t == checker.TypeFlagsNumber && rightNumberLike {
-			return true
-		} else if t == checker.TypeFlagsString && rightStringLike {
-			return true
+	return (hasNumberEnum && isTypeLike(rightType, checker.TypeFlagsNumberLike)) ||
+		(hasStringEnum && isTypeLike(rightType, checker.TypeFlagsStringLike))
+}
+
+func isTypeLike(t *checker.Type, flags checker.TypeFlags) bool {
+	for _, unionPart := range utils.UnionTypeParts(t) {
+		matches := false
+		for _, intersectionPart := range utils.IntersectionTypeParts(unionPart) {
+			if utils.IsTypeFlagSet(intersectionPart, flags) {
+				matches = true
+				break
+			}
+		}
+		if !matches {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 var NoUnsafeEnumComparisonRule = rule.CreateRule(rule.Rule{
@@ -144,7 +139,8 @@ var NoUnsafeEnumComparisonRule = rule.CreateRule(rule.Rule{
 				rightType := ctx.TypeChecker.GetTypeAtLocation(expr.Right)
 
 				if isMismatchedComparison(leftType, rightType) {
-					// TODO(port): port suggestion
+					// Even apparently direct enum member reads can observe mutation,
+					// initialization order, or import elision at runtime.
 					ctx.ReportNode(node, buildMismatchedConditionMessage())
 				}
 			},

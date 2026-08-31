@@ -105,7 +105,7 @@ The directory map below folds the high-level module relationships into the packa
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `website/`                     | Documentation site and Playground UI                                                                                           | Uses `packages/rslint-wasm` to run browser linting and `packages/rslint-api` to decode encoded source files; Playground requests pass through `internal/api` and `internal/api/server` before reaching `internal/linter` or `internal/inspector`                                                                                                                                                                                            |
 | `cmd/rslint/`                  | Main Go binary entry point with CLI, API, and LSP modes                                                                        | Owns mode selection and process stdio/exit-code composition. The default CLI prepares config, targets, Program-generation and final disk-projection adapters for `internal/linter.RunPipeline`; `--api` delegates concrete requests to `internal/api/server`; `--lsp` delegates to `internal/lsp`                                                                                                                                           |
-| `internal/output/`             | Report model, summary, colors, and stdout formatters                                                                           | Consumes final sorted `internal/rule` diagnostics and renders `default`, `jsonline`, `github`, or `gitlab`; the CLI is its current consumer, while the package remains available to other repository integrations that need the same output behavior                                                                                                                                                                                        |
+| `internal/output/`             | Report model, lifecycle/status text, colors, and stdout formatters                                                             | Consumes command-selected lifecycle/outcome values plus final sorted `internal/rule` diagnostics and renders `default`, `jsonline`, `github`, or `gitlab`; the CLI is its current consumer, while the package remains available to other repository integrations that need the same output behavior                                                                                                                                         |
 | `cmd/tsgo/`                    | ts-go semantic inspection/export tool                                                                                          | Talks directly to `typescript-go` and bypasses the lint framework; consumed by `packages/tsgo` and `crates/tsgo-client`                                                                                                                                                                                                                                                                                                                     |
 | `internal/api/`                | stdio IPC protocol, wire types, and generic bidirectional service for JS/WASM integration                                      | Defines the stable request/response boundary used by `packages/rslint`, `packages/rslint-wasm`, and `internal/api/server`; it does not import concrete lint, config, Program-loader, or command implementations                                                                                                                                                                                                                             |
 | `internal/api/server/`         | Concrete rslint API request handlers                                                                                           | Implements lint and AST-inspection requests over `internal/api`, owns API-specific paths, request-overlay generation adapters, reverse config/plugin adapters, and structured response projection; it delegates lint planning, execution, and in-memory fix application to `internal/linter`                                                                                                                                                |
@@ -685,6 +685,7 @@ Each entry in the config array supports:
 
 | Field             | Type                                       | Description                                                                          |
 | ----------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `basePath`        | `string`                                   | Entry-local base for selectors, ignores, and explicit TypeScript projects            |
 | `files`           | `(string \| string[])[]`                   | Non-empty selector list; top-level selectors are ORed and nested selectors are ANDed |
 | `ignores`         | `string[]`                                 | Glob patterns excluded by this entry                                                 |
 | `languageOptions` | `object`                                   | `ecmaVersion`, globals, and parser options such as project settings                  |
@@ -947,12 +948,20 @@ single `internal/linter` pipeline, not independently stateful services.
 
 An explicit JS/TS `--config` or API `overrideConfigFile` bypasses automatic
 candidate selection and loads the exact module. Its directory remains the
-authored base for relative config content, while the invocation cwd remains the
+config owner and the existing base for entries that omit `basePath`; the
+invocation cwd anchors an explicitly authored `basePath` and remains the
 implicit scan and response-path root. The exact config path is never gated by `.gitignore`;
 only after it loads does a fixed-owner frontier freeze the invocation-scoped
 Git projection used to filter lint targets. That frontier never probes or
 activates nested config candidates. Automatic candidates instead use Git
 directory reachability while selecting ownership.
+
+Config loading resolves each authored `basePath` into the entry's existing
+internal path-origin model. The existing files/ignores matcher and explicit
+project-path resolver consume that effective directory; target planning,
+program loading, and LSP do not interpret `basePath`. Automatic configs resolve
+it from the module directory, while an explicitly selected config resolves it
+from the invocation cwd. `.gitignore` collection roots remain unchanged.
 
 No-candidate behavior is surface-specific. CLI reports that no rslint config
 was found and points to `rslint --init`. Native API discovery performs no
@@ -973,7 +982,7 @@ file lookup. The only disk JSONC parser for rslint configuration belongs to the
 
 Config merging follows flat-config-style semantics in `GetConfigForFile()`:
 
-1. entries containing only `ignores` and an optional `name` form the global-ignore set
+1. entries containing `ignores` plus optional `name` or `basePath`, and no configuration fields, form the global-ignore set
 2. the implicit default extension baseline plus effective explicit `files` selectors defines the config selector union; an entry's `ignores` prevents its selector from extending that union, top-level selectors are ORed, nested patterns are ANDed, and an explicit `files: []` is invalid
 3. entries without `files` cascade across that selector union, while entry-level `ignores` prevent only that entry from contributing configuration to an otherwise selected file
 4. later rule values override earlier values; a severity-only override retains earlier rule options
@@ -1010,17 +1019,12 @@ rules instead of independently reconstructing hierarchy on the Node side.
 
 Configuration meaning and invocation scope are separate inputs. For one
 invocation-wide config, `ConfigDirectory` is the config file's directory and is
-the authored base used by `files`, `ignores`, and `parserOptions.project`;
-`ScanRoot` is the invocation working directory used by implicit/no-argument
-target discovery and the default `.gitignore` collection scope. Supplying an external config therefore does not scan
-the config directory unless the user also targets it, and does not rebase the
-config's relative patterns onto the invocation cwd. A composed config entry may
-retain a different authored base (the native API's inline `overrideConfig` is
-the current case), so matching resolves every entry from its own origin before
-merging the matched shape, and project declarations resolve from that same
-origin before they reach the Program loader. Automatic config catalogs already
-encode one owner directory per config and do not use the invocation-wide
-`ScanRoot` to infer ownership.
+the authored base used by entries without `basePath`; `ScanRoot` is the
+invocation working directory used by implicit/no-argument target discovery and
+the default `.gitignore` collection scope. A composed config entry may retain a
+different authored base, and an entry with `basePath` receives its resolved
+effective base during config loading. Automatic config catalogs already encode
+one owner directory per config and do not use `ScanRoot` to infer ownership.
 
 `target.Request` is the lint-target boundary shared by CLI/API target
 selection. Explicit files and recursive directories form one union; omitted
@@ -1188,10 +1192,10 @@ and mutation sequencing do not.
 8. **Rule Plan Preparation**: for each acquired generation, the core calls `PrepareLintPlan()` with one ordered Program sequence, its exact parallel target projection, and the generation's rule resolver. Planning never discovers, excludes, or scans for fallback targets; a target absent from its bound Program is an invariant error. The immutable result owns that Program sequence, freezes rare syntax diagnostics in a sparse plan-level projection, and keeps each hot per-file execution unit limited to its source, resolved rules, shared rule environment, and checker capability. Syntax-error and zero-rule files remain selected, and the same non-empty file/rule projection feeds third-party plugin dispatch. Worker results are joined in stable Program/file order; cancellation cannot publish a partial plan, and callback panics return through the caller so the enclosing generation lifecycle remains exact-once.
 9. **Rule Execution**: the core invokes `RunLinter()` only with the prepared plan plus scheduling, diagnostic, timing, and optional program-wide type-check concerns. A nil plan explicitly skips lint for `--type-check-only`. Execution never recollects files, re-resolves rules, or accepts a second Program authority alongside a plan. Plans bind exact Program pointers, so every autofix re-observation constructs a fresh Program and plan over the current in-memory snapshot. When `--type-check` is enabled, Phase 2 schedules only Programs that expose complete program diagnostics.
 10. **Fix Rounds and Aggregation**: `RunPipeline` joins native/plugin results, projects stable target paths, computes whole-file changes, applies them to private memory, and reacquires a generation until stable or bounded. A file may move between Program generations when its import graph changes, but the target plan remains stable. Once memory differs from the initial generation, every plugin target is frozen inline from that generation even when the initial CLI host could read disk. CLI independently supplies a terminal committer and therefore touches disk only once after the last successful observation; API and LSP consume the returned memory delta without a committer. Integrations retain only presentation policy for structured plugin notices, path conversion, and output/protocol mapping.
-11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once so the summary and exit policy use the same values; `--quiet` filters rendering only.
-12. **Output Formatting**: the CLI-private output subsystem renders `default`, JSON line, GitHub workflow command, or GitLab Code Quality formats. Only `default` emits a summary; machine-readable formats never emit ANSI styling or a summary.
-13. **Output Synchronization**: in the default IPC CLI, Go drains all report text into ordered `output` notifications and then sends its terminal `shutdown` request. Node seals forwarding and waits for every real-stdout write callback before acknowledging; only after Go receives that acknowledgement does it emit deferred stderr (currently the `--timing` table), so merged `2>&1` output cannot place the table before or inside the report.
-14. **Exit Code**: depends on the report counts, `--max-warnings`, and fix outcomes
+11. **Report Assembly**: the CLI builds one output report from the final post-fix diagnostics plus run metadata. Diagnostics carry an explicit lint or TypeScript origin, and the report computes error/warning/type-error counts once. The CLI derives one outcome from those counts plus `--max-warnings`; both status rendering and exit policy consume that same value. The displayed file count is the canonical union of lint targets and compiler-capable Program roots for the selected mode, not a linter visit count; `--quiet` filters rendering only.
+12. **Output Formatting**: after config/rule preflight and before Program/target work, the CLI asks `internal/output` to emit a default-format start line. A complete report ends with a mode-specific success/error status, while a post-start runtime failure uses a separate incomplete-run status. The package owns this text and its ANSI spans; the command owns lifecycle ordering and outcome policy. JSON line, GitHub workflow command, and GitLab Code Quality formats remain diagnostics-only and never emit lifecycle text or ANSI styling.
+13. **Output Synchronization**: in the default IPC CLI, Go sends the rendered lifecycle start as an acknowledged `output` request; Node responds only after the real-stdout write callback completes, so post-start work cannot emit inherited stderr ahead of the start line. Remaining stdout text uses ordered, bounded `output` notifications for large diagnostic sets. Go then sends its terminal `shutdown` request. Node seals forwarding and waits for every remaining real-stdout write callback before acknowledging; only after Go receives that acknowledgement does it emit deferred stderr (currently the `--timing` table), so merged `2>&1` output cannot place the table before or inside the report.
+14. **Exit Code**: uses the same command-owned outcome rendered by the default status; diagnostic errors take precedence over an exceeded warning limit
 
 ### Concurrency Model
 
@@ -1435,7 +1439,7 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 ### Integration Points
 
 - **Language Server**: `internal/lsp` exposes diagnostics and code actions
-- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
+- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.1.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -50,6 +51,11 @@ type lintArgs struct {
 	// uses it to emit the table only after the async stdout forwarding has
 	// drained, so the table cannot interleave with the lint report.
 	DeferTimingTable func(table string)
+	// StartWriter, when non-nil, is the integration-owned destination for the
+	// default format's start line. The IPC CLI supplies an acknowledged writer
+	// so post-start work cannot write inherited stderr before the real stdout
+	// destination has completed the start write.
+	StartWriter io.Writer
 	// ConfigCatalog is the immutable result of Go-owned config discovery.
 	// Every lint invocation requires a non-empty automatic catalog or one
 	// explicit config entry.

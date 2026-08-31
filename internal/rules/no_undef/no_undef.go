@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed no_undef.schema.json
@@ -58,10 +59,10 @@ var NoUndefRule = rule.Rule{
 				if ctx.Globals.Access(name).IsDeclared() {
 					return
 				}
-				referenceSpace := typescriptESLintReferenceSpace(node)
+				referenceSpace := noUndefReferenceSpace(node)
 				// An explicit `off` removes only implicit globals. A declaration or
 				// import authored in this file still defines its references.
-				if ctx.Refs.ResolveInFileWithMeaning(node, referenceSpace.symbolMeaning()) != nil {
+				if ctx.Refs.ResolveInFileWithMeaning(node, referenceSpace.DeclarationMeaning()) != nil {
 					return
 				}
 				// CommonJS's wrapper-level `arguments` binding is lexical rather than
@@ -77,7 +78,7 @@ var NoUndefRule = rule.Rule{
 				// same-file resolution so authored declarations retain normal scope
 				// behavior, and do not consult the TypeChecker: ambient, cross-file,
 				// and host-library symbols are outside core no-undef's inputs.
-				if referenceSpace&eslintReferenceType != 0 && rule.IsDefaultTypeScriptTypeGlobal(name) {
+				if referenceSpace.IncludesType() && rule.IsDefaultTypeScriptTypeGlobal(name) {
 					return
 				}
 
@@ -88,6 +89,24 @@ var NoUndefRule = rule.Rule{
 			},
 		}
 	},
+}
+
+// noUndefReferenceSpace preserves the rule's established Espree-facing
+// behavior for JavaScript while sharing typescript-eslint's scope classifier
+// everywhere else. Main has historically treated a parenthesized JavaScript
+// default export as a value reference even though TSESTree erases the
+// parentheses and assigns both reference capabilities.
+func noUndefReferenceSpace(node *ast.Node) scope.ReferenceSpace {
+	if ast.IsInJSFile(node) && node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
+		if exportParent := ast.WalkUpParenthesizedExpressions(node.Parent); exportParent != nil &&
+			exportParent.Kind == ast.KindExportAssignment {
+			if assignment := exportParent.AsExportAssignment(); assignment != nil &&
+				ast.SkipParentheses(assignment.Expression) == node {
+				return scope.ReferenceValue
+			}
+		}
+	}
+	return scope.ESLintReferenceSpace(node)
 }
 
 // shouldSkip returns true if the identifier does not create a scope reference.
@@ -206,102 +225,6 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	}
 
 	return false
-}
-
-type eslintReferenceSpace uint8
-
-const (
-	eslintReferenceValue eslintReferenceSpace = 1 << iota
-	eslintReferenceType
-
-	eslintReferenceDual = eslintReferenceValue | eslintReferenceType
-)
-
-// symbolMeaning translates typescript-eslint's two reference capabilities to
-// TypeScript binder declaration spaces. Namespace declarations are considered
-// both type- and value-capable by scope-manager, and import aliases likewise
-// resolve in either capability regardless of `import type` spelling.
-func (space eslintReferenceSpace) symbolMeaning() ast.SymbolFlags {
-	meaning := ast.SymbolFlagsAlias
-	if space&eslintReferenceValue != 0 {
-		meaning |= ast.SymbolFlagsValue | ast.SymbolFlagsNamespace
-	}
-	if space&eslintReferenceType != 0 {
-		meaning |= ast.SymbolFlagsType | ast.SymbolFlagsNamespace
-	}
-	return meaning
-}
-
-// typescriptESLintReferenceSpace mirrors the reference kind assigned by
-// typescript-eslint's scope manager. Most type references are identified by
-// TypeScript-Go's IsPartOfTypeNode helper; the explicit cases below cover
-// dual-space exports, qualified heritage names, and value-only constructs
-// nested inside type syntax.
-func typescriptESLintReferenceSpace(node *ast.Node) eslintReferenceSpace {
-	if node == nil || node.Parent == nil {
-		return eslintReferenceValue
-	}
-
-	parent := node.Parent
-
-	// `typeof T` and the parameter name in `x is T` are value references.
-	if ast.IsPartOfTypeQuery(node) || parent.Kind == ast.KindTypePredicate {
-		return eslintReferenceValue
-	}
-
-	// TypeScript import-equals visits its module reference as a value, even
-	// though the TypeScript binder can also resolve namespaces there.
-	if isImportEqualsModuleReference(node) {
-		return eslintReferenceValue
-	}
-
-	// A bare identifier in an export assignment/default export, or in a local
-	// export specifier, can resolve either a value or a type upstream.
-	if parent.Kind == ast.KindExportAssignment {
-		return eslintReferenceDual
-	}
-	if parent.Kind == ast.KindExportSpecifier && !utils.IsReExportSpecifier(parent) {
-		if ast.IsTypeOnlyImportOrExportDeclaration(parent) {
-			return eslintReferenceType
-		}
-		return eslintReferenceDual
-	}
-
-	// Only the leftmost identifier of a qualified type name is a reference.
-	// shouldSkip has already removed every right-hand member name.
-	if parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Left == node {
-		return eslintReferenceType
-	}
-
-	if ast.IsPartOfTypeNode(node) {
-		return eslintReferenceType
-	}
-
-	// TypeScript represents dotted heritage targets as property-access chains.
-	// Their lexical root is a type reference in `implements` and interface
-	// `extends`, but a value reference in class `extends`.
-	entity := node
-	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression {
-		access := entity.Parent.AsPropertyAccessExpression()
-		if access == nil || access.Expression != entity {
-			break
-		}
-		entity = entity.Parent
-	}
-	if entity != node && ast.IsPartOfTypeNode(entity) {
-		return eslintReferenceType
-	}
-	return eslintReferenceValue
-}
-
-func isImportEqualsModuleReference(node *ast.Node) bool {
-	entity := node
-	for entity.Parent != nil && entity.Parent.Kind == ast.KindQualifiedName {
-		entity = entity.Parent
-	}
-	return entity.Parent != nil &&
-		entity.Parent.Kind == ast.KindImportEqualsDeclaration &&
-		entity.Parent.AsImportEqualsDeclaration().ModuleReference == entity
 }
 
 // isTypeOfOperand checks if the identifier is the sole operand of a typeof

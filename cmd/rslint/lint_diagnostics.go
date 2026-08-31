@@ -165,10 +165,10 @@ func collectAllowFileWarnings(
 	return out
 }
 
-// shouldShortCircuitOutput returns true when rslint should bail early
-// without printing diagnostics or a summary. The short-circuit exists so
-// that e.g. `rslint nonexistent-file.ts` returns 0 with no spurious output
-// when Phase 1 visited zero files.
+// shouldShortCircuitMachineOutput preserves the diagnostics-only formats'
+// empty-output behavior when Phase 1 visits no files. The default format does
+// not use this path because its start line must always receive a terminal
+// status.
 //
 // Any type-check mode (`--type-check` or `--type-check-only`) must NOT take
 // the short-circuit: Phase 2 runs program-wide and is not gated by the CLI
@@ -176,7 +176,7 @@ func collectAllowFileWarnings(
 // normal state in which Phase 2 may still have produced diagnostics.
 // Short-circuiting there would silently drop type errors that the user
 // explicitly asked for — see website/docs/en/guide/type-checking.md.
-func shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted bool, lintedFileCount int32) bool {
+func shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted bool, lintedFileCount int32) bool {
 	if typeCheckOnly || typeCheck {
 		return false
 	}

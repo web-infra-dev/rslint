@@ -72,6 +72,33 @@ func TestValidateConfig_RejectsEmptyFilesArrayFromJSON(t *testing.T) {
 	}
 }
 
+func TestConfigBasePathJSONRoundTripAndValidation(t *testing.T) {
+	var cfg RslintConfig
+	if err := json.Unmarshal([]byte(`[{"basePath":"packages/app","ignores":["dist/**"]}]`), &cfg); err != nil {
+		t.Fatalf("unmarshal basePath: %v", err)
+	}
+	if len(cfg) != 1 || cfg[0].BasePath == nil || *cfg[0].BasePath != "packages/app" {
+		t.Fatalf("basePath was not preserved: %+v", cfg)
+	}
+	encoded, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal basePath: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"basePath":"packages/app"`) {
+		t.Fatalf("basePath missing from round trip: %s", encoded)
+	}
+
+	for _, value := range []string{"null", "42", `{}`, `[]`} {
+		t.Run(value, func(t *testing.T) {
+			var invalid RslintConfig
+			err := json.Unmarshal([]byte(`[{"basePath":`+value+`}]`), &invalid)
+			if err == nil || !strings.Contains(err.Error(), `key "basePath": expected value to be a string`) {
+				t.Fatalf("invalid basePath error = %v", err)
+			}
+		})
+	}
+}
+
 func TestConfigFilesJSONSupportsMixedStringsAndAndGroups(t *testing.T) {
 	input := []byte(`[{
 		"files": ["special.ts", ["**/*.js", "!**/*.test.js"]],

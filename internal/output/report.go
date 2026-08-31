@@ -15,18 +15,33 @@ const (
 	ModeTypeCheckOnly
 )
 
+// OutcomeKind is the CLI decision that drives the completed status line. The
+// command computes it once so rendering and the process exit code cannot
+// disagree (notably when --max-warnings is exceeded).
+type OutcomeKind uint8
+
+const (
+	OutcomePassed OutcomeKind = iota
+	OutcomeDiagnosticsFailed
+	OutcomeWarningLimitExceeded
+)
+
+type Outcome struct {
+	Kind         OutcomeKind
+	WarningLimit int
+}
+
 // Metadata contains run-level values that cannot be derived from diagnostics.
 // StartedAt is retained instead of a precomputed duration so the default
-// summary preserves the existing end-to-end timing boundary, including
-// diagnostic rendering before the summary is written.
+// status preserves the existing end-to-end timing boundary, including
+// diagnostic rendering before the completed status is written.
 type Metadata struct {
-	Mode             Mode
-	LintedFiles      int
-	TypeCheckedFiles int
-	Rules            int
-	Threads          int
-	FixedIssues      int
-	StartedAt        time.Time
+	Mode        Mode
+	Files       int
+	Rules       int
+	Threads     int
+	FixedIssues int
+	StartedAt   time.Time
 }
 
 type Counts struct {
