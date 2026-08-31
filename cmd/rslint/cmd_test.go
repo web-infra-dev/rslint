@@ -301,7 +301,7 @@ func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts tspath.ComparePa
 		Threads:   1,
 		StartedAt: time.Now(),
 	})
-	if err := output.Render(&buf, report, output.Options{
+	if err := output.Render(&buf, report, output.Outcome{Kind: output.OutcomeDiagnosticsFailed}, output.Options{
 		Format:       output.FormatDefault,
 		ComparePaths: opts,
 	}); err != nil {
@@ -1255,7 +1255,7 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 	}
 }
 
-// --- shouldShortCircuitOutput ---
+// --- shouldShortCircuitMachineOutput ---
 //
 // Locks two regressions:
 //   1. `--type-check-only <dir>` returning exit 0 with no diagnostics
@@ -1269,7 +1269,7 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 //
 // Either type-check mode must never take the short-circuit.
 
-func TestShouldShortCircuitOutput_NotInTypeCheckOnly(t *testing.T) {
+func TestShouldShortCircuitMachineOutput_NotInTypeCheckOnly(t *testing.T) {
 	// All combinations of scope/lintedFileCount must NOT short-circuit
 	// when type-check-only is on, because Phase 2 may have output.
 	cases := []struct {
@@ -1285,13 +1285,13 @@ func TestShouldShortCircuitOutput_NotInTypeCheckOnly(t *testing.T) {
 		// typeCheckOnly=true with typeCheck=false is non-canonical (main()
 		// sets typeCheck=true when typeCheckOnly is on), but the guard must
 		// still hold on its own to avoid coupling.
-		if shouldShortCircuitOutput(true, false, c.scopeRestricted, c.lintedFileCount) {
+		if shouldShortCircuitMachineOutput(true, false, c.scopeRestricted, c.lintedFileCount) {
 			t.Errorf("type-check-only mode must never short-circuit (scope=%v lintedFiles=%d)", c.scopeRestricted, c.lintedFileCount)
 		}
 	}
 }
 
-func TestShouldShortCircuitOutput_NotInTypeCheckMode(t *testing.T) {
+func TestShouldShortCircuitMachineOutput_NotInTypeCheckMode(t *testing.T) {
 	// --type-check (without --type-check-only): Phase 2 runs program-wide
 	// regardless of Scope, so even lintedFileCount==0 + scopeRestricted is
 	// not enough to drop diagnostics. Locks review-111 Issue 1.
@@ -1305,19 +1305,19 @@ func TestShouldShortCircuitOutput_NotInTypeCheckMode(t *testing.T) {
 		{true, 5},
 	}
 	for _, c := range cases {
-		if shouldShortCircuitOutput(false, true, c.scopeRestricted, c.lintedFileCount) {
+		if shouldShortCircuitMachineOutput(false, true, c.scopeRestricted, c.lintedFileCount) {
 			t.Errorf("--type-check mode must never short-circuit (scope=%v lintedFiles=%d)", c.scopeRestricted, c.lintedFileCount)
 		}
 	}
 }
 
-func TestShouldShortCircuitOutput_LintModeShortCircuitsWhenEmpty(t *testing.T) {
-	if !shouldShortCircuitOutput(false, false, true, 0) {
+func TestShouldShortCircuitMachineOutput_LintModeShortCircuitsWhenEmpty(t *testing.T) {
+	if !shouldShortCircuitMachineOutput(false, false, true, 0) {
 		t.Error("lint mode with scope restriction and zero linted files should short-circuit")
 	}
 }
 
-func TestShouldShortCircuitOutput_LintModeKeepsRunningOtherwise(t *testing.T) {
+func TestShouldShortCircuitMachineOutput_LintModeKeepsRunningOtherwise(t *testing.T) {
 	cases := []struct {
 		name            string
 		scopeRestricted bool
@@ -1328,7 +1328,7 @@ func TestShouldShortCircuitOutput_LintModeKeepsRunningOtherwise(t *testing.T) {
 		{"scope, files present", true, 5},
 	}
 	for _, c := range cases {
-		if shouldShortCircuitOutput(false, false, c.scopeRestricted, c.lintedFileCount) {
+		if shouldShortCircuitMachineOutput(false, false, c.scopeRestricted, c.lintedFileCount) {
 			t.Errorf("%s: lint mode must not short-circuit", c.name)
 		}
 	}
@@ -1750,25 +1750,25 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 		t.Fatalf("write target: %v", err)
 	}
 
-	code, _, stderr := runLintCommandForTest(t, dir, lintArgs{
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
 		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
 		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
 		SingleThreaded: true,
 	})
 	if code != 0 {
-		t.Fatalf("plain lint resolved an inactive project: code=%d stderr=%s", code, stderr)
+		t.Fatalf("plain lint resolved an inactive project: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 
-	code, _, stderr = runLintCommandForTest(t, dir, lintArgs{
+	code, stdout, stderr = runLintCommandForTest(t, dir, lintArgs{
 		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
 		Format:         "default",
 		AllowFiles:     []string{tspath.NormalizePath(target)},
 		SingleThreaded: true,
 		TypeCheck:      true,
 	})
-	if code == 0 || !strings.Contains(stderr, "missing.json") {
-		t.Fatalf("type-check must resolve every configured project: code=%d stderr=%s", code, stderr)
+	if code == 0 || !strings.Contains(stdout, "missing.json") {
+		t.Fatalf("type-check must resolve every configured project: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 }
 
@@ -1864,7 +1864,7 @@ func TestCLIExplicitFileOutsideFilesCountsWithNoRules(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("expected explicit files-scope miss to exit cleanly, got code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "linted 1 file with 0 rules") {
+	if !strings.Contains(stdout, "(1 file, 0 rules, 1 thread)") {
 		t.Fatalf("expected the explicit file to be counted with zero matching rules, stdout=%q stderr=%q", stdout, stderr)
 	}
 	if strings.Contains(stdout, "no-debugger") {
@@ -1895,7 +1895,7 @@ func TestCLIExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.
 	if code != 1 {
 		t.Fatalf("expected malformed explicit target to exit 1, got code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "linted 1 file with 0 rules") {
+	if !strings.Contains(stdout, "(1 file, 0 rules, 1 thread)") {
 		t.Fatalf("expected the explicit file to be counted with zero matching rules, stdout=%q stderr=%q", stdout, stderr)
 	}
 	if !strings.Contains(stdout, "TypeScript(TS1134)") {
@@ -1956,7 +1956,7 @@ func findProgramFileForTest(t *testing.T, program *compiler.Program, suffix stri
 func TestGitlabReportState_EmptyProducesEmptyArray(t *testing.T) {
 	var buf bytes.Buffer
 	report := output.NewReport(nil, output.Metadata{})
-	if err := output.Render(&buf, report, output.Options{Format: output.FormatGitLab}); err != nil {
+	if err := output.Render(&buf, report, output.Outcome{Kind: output.OutcomePassed}, output.Options{Format: output.FormatGitLab}); err != nil {
 		t.Fatalf("render empty GitLab report: %v", err)
 	}
 
@@ -1983,7 +1983,7 @@ func TestPrintDiagnosticGitLab(t *testing.T) {
 
 	var buf bytes.Buffer
 	report := output.NewReport([]rule.RuleDiagnostic{diagWarning, diagError}, output.Metadata{})
-	if err := output.Render(&buf, report, output.Options{
+	if err := output.Render(&buf, report, output.Outcome{Kind: output.OutcomeDiagnosticsFailed}, output.Options{
 		Format:       output.FormatGitLab,
 		ComparePaths: opts,
 	}); err != nil {

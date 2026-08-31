@@ -97,6 +97,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			return 2
 		}
 	}
+	mode := output.ModeLint
+	if typeCheckOnly {
+		mode = output.ModeTypeCheckOnly
+	} else if typeCheck {
+		mode = output.ModeLintAndTypeCheck
+	}
 
 	// Resolve color against the real output destination. In native CLI runs
 	// the Go process writes to an IPC pipe, so the Node host supplies the TTY
@@ -206,13 +212,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 		currentDirectory = configDirectories[0]
 		rslintConfig = slices.Clone(configCatalog.Configs[currentDirectory])
-		if buildAllPrograms {
-			projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
-		}
 	} else {
 		configMap = make(map[string]rslintconfig.RslintConfig, len(configCatalog.Configs))
 		configTargetScopes = make(map[string]target.OwnerScope, len(configCatalog.Scopes))
@@ -221,14 +220,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			if scope, ok := configCatalog.Scopes[configDir]; ok {
 				scope.ExplicitFiles = slices.Clone(scope.ExplicitFiles)
 				configTargetScopes[configDir] = scope
-			}
-		}
-
-		if buildAllPrograms {
-			projectSet, err = programSession.BuildProjects(configMap, singleThreaded)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return 1
 			}
 		}
 	}
@@ -268,6 +259,52 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			fmt.Fprintf(os.Stderr, "error: %s\n", optionError.Error())
 		}
 		return 1
+	}
+
+	outputOptions := output.Options{
+		Format:       format,
+		Quiet:        quiet,
+		ColorEnabled: colorEnabled,
+	}
+	startWriter := args.StartWriter
+	if startWriter == nil {
+		startWriter = os.Stdout
+	}
+	if err := output.RenderStart(startWriter, mode, outputOptions); err != nil {
+		if ctx.Err() == nil {
+			fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
+		}
+		return 1
+	}
+	abortRun := func(reason, legacyMessage string) int {
+		// The IPC owner maps a canceled command to exit 130. Do not make an
+		// interrupted run look like an ordinary completed failure.
+		if ctx.Err() != nil {
+			return 1
+		}
+		if format == output.FormatDefault {
+			if err := output.RenderAbort(os.Stdout, mode, timeBefore, reason, outputOptions); err != nil {
+				fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
+			}
+		} else {
+			fmt.Fprintln(os.Stderr, legacyMessage)
+		}
+		return 1
+	}
+
+	// Program-wide type checking builds every configured project. Delay that
+	// expensive work until preflight has succeeded and the interactive start
+	// line is visible. The pre-override snapshots preserve the prior project
+	// selection semantics: --rule changes rules, not project discovery.
+	if buildAllPrograms {
+		if targetConfigMap != nil {
+			projectSet, err = programSession.BuildProjects(targetConfigMap, singleThreaded)
+		} else {
+			projectSet, err = programSession.BuildProject(currentDirectory, targetRslintConfig, singleThreaded)
+		}
+		if err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		}
 	}
 
 	// Use CWD for display paths (not any config directory).
@@ -315,8 +352,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			SingleThreaded:  singleThreaded,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		if !buildAllPrograms {
 			if configMap != nil {
@@ -334,14 +370,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				}
 			}
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return 1
+				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 			}
 		}
 		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		programs = loadedPrograms.Programs
 	}
@@ -502,16 +536,17 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	if err != nil {
 		operation := "running linter"
+		reason := err.Error()
 		if _, autofixStarted := pipelineResult.AppliedFixes(); autofixStarted {
 			operation = "applying fixes"
+			reason = operation + ": " + reason
 		}
-		fmt.Fprintf(os.Stderr, "error %s: %v\n", operation, err)
-		return 1
+		return abortRun(reason, fmt.Sprintf("error %s: %v", operation, err))
 	}
 	allDiags, complete := pipelineResult.Observation.CompleteDiagnostics()
 	if !complete {
-		fmt.Fprintln(os.Stderr, "error running linter: CLI lint returned an incomplete observation")
-		return 1
+		const reason = "CLI lint returned an incomplete observation"
+		return abortRun(reason, "error running linter: "+reason)
 	}
 	lintResult := pipelineResult.Observation.Native.Lint
 	initialObservation := pipelineResult.Observation
@@ -537,7 +572,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
-	if shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
+	if format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0
 	}
 
@@ -549,28 +584,17 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	linter.StableSortDiagnosticsByFileAndStart(allDiags)
 
 	// Phase 3: Build one report from the final post-fix diagnostics, then let
-	// the CLI output subsystem own format dispatch, colors, and summary text.
-	mode := output.ModeLint
-	if typeCheckOnly {
-		mode = output.ModeTypeCheckOnly
-	} else if typeCheck {
-		mode = output.ModeLintAndTypeCheck
-	}
-
-	typeCheckedFileCount := 0
+	// the CLI output subsystem own format dispatch, colors, and status text.
+	var typeCheckedRoots []string
 	if typeCheck {
-		// Count compiler-capable Program root files (tsconfig include/files),
-		// not transitive declarations, for every summary that includes type-check.
-		seen := make(map[string]struct{})
+		// Compiler-capable Program roots represent the user-authored type-check
+		// set; transitive declarations are intentionally excluded.
 		for _, prog := range programs {
 			if !prog.CanProvideProgramDiagnostics() {
 				continue
 			}
-			for _, fileName := range prog.RootFileNames() {
-				seen[fileName] = struct{}{}
-			}
+			typeCheckedRoots = append(typeCheckedRoots, prog.RootFileNames()...)
 		}
-		typeCheckedFileCount = len(seen)
 	}
 
 	threadsCount := 1
@@ -579,25 +603,32 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 
 	report := output.NewReport(allDiags, output.Metadata{
-		Mode:             mode,
-		LintedFiles:      int(lintedfileCount),
-		TypeCheckedFiles: typeCheckedFileCount,
-		Rules:            len(lintResult.ExecutedRules),
-		Threads:          threadsCount,
-		FixedIssues:      fixedCount,
-		StartedAt:        timeBefore,
+		Mode:        mode,
+		Files:       lintReportFileCount(mode, targetPlan.Files, typeCheckedRoots, fs),
+		Rules:       len(lintResult.ExecutedRules),
+		Threads:     threadsCount,
+		FixedIssues: fixedCount,
+		StartedAt:   timeBefore,
 	})
-	if err := output.Render(os.Stdout, report, output.Options{
-		Format:       format,
-		ComparePaths: comparePathOptions,
-		Quiet:        quiet,
-		ColorEnabled: colorEnabled,
-	}); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
-		return 1
+	counts := report.Counts()
+	outcome := lintReportOutcome(counts, maxWarnings)
+	outputOptions.ComparePaths = comparePathOptions
+	if err := renderLintReport(ctx, os.Stdout, report, outcome, outputOptions); err != nil {
+		return abortRun(
+			"writing lint report: "+err.Error(),
+			fmt.Sprintf("error writing lint report: %v", err),
+		)
 	}
+
+	// The default status already explains the warning-budget failure. Preserve
+	// the legacy stderr line for machine formats without contaminating stdout.
+	if format != output.FormatDefault && outcome.Kind == output.OutcomeWarningLimitExceeded {
+		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
+	}
+
 	// The timing table goes to stderr so machine-readable stdout formats
-	// (jsonline/github/gitlab) stay parseable with --timing enabled.
+	// (jsonline/github/gitlab) stay parseable with --timing enabled. It is
+	// deliberately emitted after every result message so it remains last.
 	if timingCollector != nil {
 		table := output.FormatRuleTimingTable(timingCollector.Timings(), timingLimit)
 		if args.DeferTimingTable != nil {
@@ -606,16 +637,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			fmt.Fprint(os.Stderr, table)
 		}
 	}
-	counts := report.Counts()
 
-	tooManyWarnings := maxWarnings >= 0 && counts.Warnings > maxWarnings
-
-	if counts.Errors == 0 && tooManyWarnings {
-		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
-	}
-
-	// Exit with non-zero status code if errors were found
-	if counts.Errors > 0 || tooManyWarnings {
+	if outcome.Kind != output.OutcomePassed {
 		return 1
 	}
 	return 0
