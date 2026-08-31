@@ -18,6 +18,8 @@ func TestCamelcaseExtras(t *testing.T) {
 		t,
 		&CamelcaseRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Review regression: import-type qualifiers are not lexical references ----
+			{Code: `type X = typeof import("pkg").value_name;`},
 			// ---- Review regression: JSX namespaced attributes are names, not references ----
 			{Code: `const element = <div attr_name:value_name="x" />`, Tsx: true},
 			// ---- Regression: upstream's MemberExpression target helper excludes updates and loop headers ----
@@ -68,6 +70,22 @@ func TestCamelcaseExtras(t *testing.T) {
 			{Code: `this.data.nested.variable_from_backend = "value"`, Options: map[string]any{"properties": "never"}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: function-expression names have a separate binding scope ----
+			{
+				Code: `const f = function snake_case(snake_case) { return snake_case; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+				},
+			},
+			// ---- Review regression: unresolved names in ordinary TypeScript type positions are references ----
+			{
+				Code: `type X = type_ref;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'type_ref' is not in camel case."},
+				},
+			},
 			// ---- Review regression: merged bindings report the first declaration once ----
 			{
 				Code: `var snake_case; var snake_case; snake_case;`,

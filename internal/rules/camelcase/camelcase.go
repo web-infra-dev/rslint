@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed camelcase.schema.json
@@ -262,6 +263,13 @@ func bindingReportIdentifier(node *ast.Node) *ast.Node {
 // TypeScript keeps as distinct error symbols, such as duplicate parameters or
 // conflicting var/function declarations.
 func bindingScope(node *ast.Node, name string) *ast.Node {
+	// ESLint gives a named function expression's self-binding its own scope,
+	// separate from the function scope that owns its parameters and body
+	// bindings. Keep the two scope-manager variables distinct when they share a
+	// name.
+	if node != nil && node.Parent != nil && node.Parent.Kind == ast.KindFunctionExpression && node.Parent.Name() == node {
+		return node
+	}
 	symbol := utils.BindingNameSymbol(node)
 	if symbol != nil {
 		for current := node.Parent; current != nil; current = current.Parent {
@@ -544,8 +552,14 @@ func isRuntimeReference(node *ast.Node) bool {
 	if isJsxIntrinsicTagName(node) || isJsxNamespacedAttributeName(node) {
 		return false
 	}
+	if utils.IsImportTypeSyntax(node) {
+		return false
+	}
 	if ast.IsPartOfTypeQuery(node) {
 		return isTypeQueryValueReference(node)
+	}
+	if ast.IsPartOfTypeNode(node) {
+		return scope.IsReferenceIdentifier(node)
 	}
 	return node != nil && !ast.IsPartOfTypeNode(node) && !utils.IsNonReferenceIdentifier(node)
 }
