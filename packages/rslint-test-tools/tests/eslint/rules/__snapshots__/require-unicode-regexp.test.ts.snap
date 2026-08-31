@@ -1,0 +1,1041 @@
+// Rstest Snapshot v1
+
+exports[`require-unicode-regexp > invalid 1`] = `
+{
+  "code": "/\\a/",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 2`] = `
+{
+  "code": "/foo/",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 3`] = `
+{
+  "code": "/foo/gimy",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 4`] = `
+{
+  "code": "RegExp()",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 5`] = `
+{
+  "code": "RegExp('foo')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 6`] = `
+{
+  "code": "RegExp('\\\\a')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 7`] = `
+{
+  "code": "RegExp('foo', '')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 8`] = `
+{
+  "code": "RegExp('foo', 'gimy')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 9`] = `
+{
+  "code": "RegExp('foo', \`gimy\`)",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 10`] = `
+{
+  "code": "new RegExp('foo')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 11`] = `
+{
+  "code": "new RegExp('foo',)",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 12`] = `
+{
+  "code": "new RegExp('foo', false)",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 13`] = `
+{
+  "code": "new RegExp('foo', 1)",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 14`] = `
+{
+  "code": "new RegExp('foo', '')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 15`] = `
+{
+  "code": "new RegExp('foo', 'gimy')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 16`] = `
+{
+  "code": "new RegExp(('foo'))",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 17`] = `
+{
+  "code": "new RegExp(('unrelated', 'foo'))",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 18`] = `
+{
+  "code": "const flags = 'gi'; new RegExp('foo', flags)",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 19`] = `
+{
+  "code": "const flags = 'gi'; new RegExp('foo', ('unrelated', flags))",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 20`] = `
+{
+  "code": "let flags; new RegExp('foo', flags = 'g')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 21`] = `
+{
+  "code": "const flags = \`gi\`; new RegExp(\`foo\`, (\`unrelated\`, flags))",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 22`] = `
+{
+  "code": "const flags = 'gimu'; new RegExp('foo', flags[0])",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 23`] = `
+{
+  "code": "new window.RegExp('foo')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 24`] = `
+{
+  "code": "new global.RegExp('foo')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 25`] = `
+{
+  "code": "new globalThis.RegExp('foo')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 26`] = `
+{
+  "code": "/foo/",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 27`] = `
+{
+  "code": "/foo/u",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 28`] = `
+{
+  "code": "/foo/u",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 29`] = `
+{
+  "code": "/[[a]/u",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 30`] = `
+{
+  "code": "new RegExp('foo', 'u')",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 31`] = `
+{
+  "code": "new RegExp('[[a]', 'u')",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 32`] = `
+{
+  "code": "new RegExp("foo", "\\u0067")",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 33`] = `
+{
+  "code": "new RegExp("foo", \`\\u0067\`)",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 34`] = `
+{
+  "code": "new RegExp("foo", "\\u0075")",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 35`] = `
+{
+  "code": "new RegExp("foo", \`\\u0075\`)",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 36`] = `
+{
+  "code": "const regularFlags = "sm"; new RegExp("foo", \`\${regularFlags}g\`)",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 37`] = `
+{
+  "code": "const regularFlags = "smu"; new RegExp("foo", \`\${regularFlags}g\`)",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 38`] = `
+{
+  "code": "/foo/v",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 39`] = `
+{
+  "code": "new RegExp('foo')",
+  "diagnostics": [
+    {
+      "message": "Use the 'v' flag.",
+      "messageId": "requireVFlag",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-unicode-regexp > invalid 40`] = `
+{
+  "code": "new RegExp('foo', 'v')",
+  "diagnostics": [
+    {
+      "message": "Use the 'u' flag.",
+      "messageId": "requireUFlag",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-unicode-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
