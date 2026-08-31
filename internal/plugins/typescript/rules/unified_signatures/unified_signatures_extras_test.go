@@ -80,6 +80,8 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 		{Code: `function f<T>(x: T): void; function f<U>(x: U): void;`},
 		// Locks in upstream constraint-kind equality arm.
 		{Code: `function f<T extends number>(x: T): void; function f<T extends string>(x: T): void;`},
+		// ESTree exposes a null constraint as TSNullKeyword rather than TSLiteralType.
+		{Code: `function f<T extends null>(x: string): void; function f<T extends 'x'>(x: number): void;`},
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
@@ -223,6 +225,61 @@ declare function f(a: number): void;`,
 				Message:   "These overloads can be combined into one signature with identical parameters.",
 				Line:      2, Column: 1, EndLine: 2, EndColumn: 37,
 			}},
+		},
+		// Method signatures report their full ESTree node range, starting at the key.
+		{
+			Code: `interface I {
+  f
+  (x: string): void;
+  f
+  (x: string): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      4,
+				Column:    3,
+			}},
+		},
+		// A class method value starts at its type-parameter-list opening token.
+		{
+			Code: `declare class C {
+  f<T>
+  (x: string): void;
+  f<T>
+  (x: string): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      4,
+				Column:    4,
+			}},
+		},
+		// The export wrapper ends after default; the inner declaration begins at function.
+		{
+			Code: `declare function ExportDefaultDeclaration(x: string): void;
+export default
+function (x: string): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      3,
+				Column:    1,
+			}},
+		},
+		// In larger groups, the message line is the corresponding ESTree signature range.
+		{
+			Code: `declare class C {
+  f
+  (x: string): void;
+  f
+  (x: number): void;
+  f
+  (x: boolean): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "singleParameterDifference", Message: "This overload and the one on line 3 can be combined into one signature taking `string | number`.", Line: 5},
+				{MessageId: "singleParameterDifference", Message: "This overload and the one on line 3 can be combined into one signature taking `string | boolean`.", Line: 7},
+				{MessageId: "singleParameterDifference", Message: "This overload and the one on line 5 can be combined into one signature taking `number | boolean`.", Line: 7},
+			},
 		},
 		// Locks in upstream optional-extra-parameter arm.
 		{

@@ -264,7 +264,13 @@ func (a *overloadAnalyzer) signaturesHaveSameAmountOfParameters(left, right *ast
 	if !parametersHaveEqualSigils(leftParams[index], rightParams[index]) || isRestParameter(leftParams[index]) {
 		return unifyResult{}, false
 	}
-	return unifyResult{kind: unifySingleParameterDifference, parameter0: leftParams[index], parameter1: rightParams[index]}, true
+	return unifyResult{
+		kind:       unifySingleParameterDifference,
+		parameter0: leftParams[index],
+		parameter1: rightParams[index],
+		signature0: left,
+		signature1: right,
+	}, true
 }
 
 func signaturesDifferByOptionalOrRestParameter(sourceFile *ast.SourceFile, left, right *ast.Node) (unifyResult, bool) {
@@ -298,7 +304,7 @@ func (a *overloadAnalyzer) report(result unifyResult, onlyTwo bool) {
 	switch result.kind {
 	case unifySingleParameterDifference:
 		if !onlyTwo {
-			otherLine = lineOf(a.ctx.SourceFile, result.parameter0)
+			otherLine = lineOfRange(a.ctx.SourceFile, signatureReportRange(a.ctx.SourceFile, result.signature0))
 		}
 		a.ctx.ReportNode(result.parameter1, rule.RuleMessage{
 			Id:          "singleParameterDifference",
@@ -306,7 +312,7 @@ func (a *overloadAnalyzer) report(result unifyResult, onlyTwo bool) {
 		})
 	case unifyExtraParameter:
 		if !onlyTwo {
-			otherLine = lineOf(a.ctx.SourceFile, result.otherSignature)
+			otherLine = lineOfRange(a.ctx.SourceFile, signatureReportRange(a.ctx.SourceFile, result.otherSignature))
 		}
 		messageID, suffix := "omittingSingleParameter", " with an optional parameter."
 		if isRestParameter(result.extraParameter) {
@@ -315,7 +321,7 @@ func (a *overloadAnalyzer) report(result unifyResult, onlyTwo bool) {
 		a.ctx.ReportNode(result.extraParameter, rule.RuleMessage{Id: messageID, Description: failureStringStart(otherLine) + suffix})
 	case unifyAllParametersAreSame:
 		if !onlyTwo {
-			otherLine = lineOf(a.ctx.SourceFile, result.signature0)
+			otherLine = lineOfRange(a.ctx.SourceFile, signatureReportRange(a.ctx.SourceFile, result.signature0))
 		}
 		a.ctx.ReportRange(signatureReportRange(a.ctx.SourceFile, result.signature1), rule.RuleMessage{Id: "allParametersAreSame", Description: failureStringStart(otherLine) + " with identical parameters."})
 	}
@@ -327,17 +333,21 @@ func signatureReportRange(sourceFile *ast.SourceFile, signature *ast.Node) core.
 	// ESTree reports the inner declaration, not its ExportNamedDeclaration
 	// wrapper. tsgo includes `export` in the declaration range.
 	for _, modifier := range signature.ModifierNodes() {
-		if modifier.Kind == ast.KindExportKeyword {
-			start = scanner.SkipTrivia(sourceFile.Text(), modifier.End())
+		if modifier.Kind != ast.KindExportKeyword {
+			continue
+		}
+		start = scanner.SkipTrivia(sourceFile.Text(), modifier.End())
+		if ast.HasSyntacticModifier(signature, ast.ModifierFlagsDefault) {
+			start = scanner.SkipTrivia(sourceFile.Text(), start+len("default"))
 		}
 	}
-	if (signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindMethodSignature || signature.Kind == ast.KindConstructor) && signature.ParameterList() != nil {
+	if (signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindConstructor) && signature.ParameterList() != nil {
 		start = signature.ParameterList().Pos() - 1
 	}
 	// For generic class members, typescript-eslint reports the type-parameter
 	// list rather than the member key or opening parenthesis.
-	if (signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindMethodSignature) && len(signature.TypeParameters()) > 0 {
-		start = signature.TypeParameters()[0].Pos()
+	if signature.Kind == ast.KindMethodDeclaration && len(signature.TypeParameters()) > 0 {
+		start = signature.TypeParameters()[0].Pos() - 1
 	}
 	return core.NewTextRange(start, trimmed.End())
 }
@@ -513,7 +523,16 @@ func typeParametersAreEqual(left, right []*ast.Node) bool {
 
 func constraintsAreEqual(left, right *ast.Node) bool {
 	left, right = skipParenthesizedType(left), skipParenthesizedType(right)
-	return left == right || left != nil && right != nil && left.Kind == right.Kind
+	return left == right || left != nil && right != nil && estreeConstraintKind(left) == estreeConstraintKind(right)
+}
+
+func estreeConstraintKind(node *ast.Node) ast.Kind {
+	if node.Kind == ast.KindLiteralType {
+		if literal := node.AsLiteralTypeNode().Literal; literal != nil && literal.Kind == ast.KindNullKeyword {
+			return ast.KindNullKeyword
+		}
+	}
+	return node.Kind
 }
 
 func skipParenthesizedType(node *ast.Node) *ast.Node {
@@ -560,6 +579,6 @@ func typeContainsTypeParameter(typeNode *ast.Node, names map[string]struct{}) bo
 	return false
 }
 
-func lineOf(sourceFile *ast.SourceFile, node *ast.Node) int {
-	return scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), utils.TrimNodeTextRange(sourceFile, node).Pos()) + 1
+func lineOfRange(sourceFile *ast.SourceFile, textRange core.TextRange) int {
+	return scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), textRange.Pos()) + 1
 }
