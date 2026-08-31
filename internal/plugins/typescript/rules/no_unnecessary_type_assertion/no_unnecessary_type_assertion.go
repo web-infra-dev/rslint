@@ -389,6 +389,12 @@ func assertionIsRightHandSideOfLogicalAssignment(node *ast.Node) bool {
 		ast.IsLogicalOrCoalescingAssignmentOperator(binary.OperatorToken.Kind)
 }
 
+func assertionIsInOptionalOrLogicalContext(node *ast.Node) bool {
+	semanticNode := assertionWalkUpParentheses(node)
+	parent := semanticNode.Parent
+	return ast.IsOptionalChain(parent) || ast.IsLogicalOrCoalescingBinaryExpression(parent)
+}
+
 func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Node) bool {
 	semanticNode := assertionWalkUpParentheses(node)
 	parent := semanticNode.Parent
@@ -870,7 +876,11 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			if castTypeIsLiteral {
 				wouldSameTypeBeInferred = isImplicitlyNarrowedLiteralDeclaration(node)
 			}
-			if typeIsUnchanged && wouldSameTypeBeInferred {
+			isControlFlowSensitiveUndefinedUnion :=
+				getUnionTypeFlags(uncastType)&checker.TypeFlagsUndefined != 0 &&
+					getUnionTypeFlags(castType)&checker.TypeFlagsUndefined != 0 &&
+					assertionIsInOptionalOrLogicalContext(node)
+			if typeIsUnchanged && wouldSameTypeBeInferred && !isControlFlowSensitiveUndefinedUnion {
 				reportAssertion(buildUnnecessaryAssertionMessage())
 				return
 			}
