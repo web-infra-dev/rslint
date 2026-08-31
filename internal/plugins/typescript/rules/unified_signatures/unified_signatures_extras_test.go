@@ -82,6 +82,22 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 		{Code: `function f<T extends number>(x: T): void; function f<T extends string>(x: T): void;`},
 		// ESTree exposes a null constraint as TSNullKeyword rather than TSLiteralType.
 		{Code: `function f<T extends null>(x: string): void; function f<T extends 'x'>(x: number): void;`},
+		// Method-signature diagnostics are disabled on the method-key line, not its parameter line.
+		{Code: `interface I {
+  f
+  (x: string): void;
+  // eslint-disable-next-line test
+  f
+  (x: string): void;
+}`},
+		// Generic class method values start at <, which remains on the declaration line.
+		{Code: `declare class C {
+  f<T>
+  (x: string): void;
+  // eslint-disable-next-line test
+  f<T>
+  (x: string): void;
+}`},
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
@@ -262,6 +278,29 @@ function (x: string): void;`,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "allParametersAreSame",
 				Line:      3,
+				Column:    1,
+			}},
+		},
+		// Named exports retain the inner declare-function range after the wrapper.
+		{
+			Code: `export declare function f(x: string): void;
+export
+declare function f(x: string): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      3,
+				Column:    1,
+			}},
+		},
+		// A directive before export does not suppress an anonymous default declaration on its function line.
+		{
+			Code: `declare function ExportDefaultDeclaration(x: string): void;
+// eslint-disable-next-line test
+export /* wrapper */ default
+function (x: string): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      4,
 				Column:    1,
 			}},
 		},
