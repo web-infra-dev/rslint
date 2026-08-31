@@ -160,6 +160,12 @@ func TestIsDefaultValueInDestructuringAssignment(t *testing.T) {
 			nodeText: `a = a || b`,
 			want:     false,
 		},
+		{
+			name:     "type wrapper keeps ordinary assignment an expression",
+			code:     `[(a = a || b) as any] = array`,
+			nodeText: `a = a || b`,
+			want:     false,
+		},
 	}
 
 	for _, tt := range tests {

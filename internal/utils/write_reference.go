@@ -263,11 +263,7 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 transparentWrappers:
 	for parent := assignmentTargetNode.Parent; parent != nil; parent = assignmentTargetNode.Parent {
 		switch parent.Kind {
-		case ast.KindParenthesizedExpression,
-			ast.KindAsExpression,
-			ast.KindTypeAssertionExpression,
-			ast.KindNonNullExpression,
-			ast.KindSatisfiesExpression:
+		case ast.KindParenthesizedExpression:
 			assignmentTargetNode = parent
 		default:
 			break transparentWrappers

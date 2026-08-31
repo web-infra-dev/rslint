@@ -58,7 +58,7 @@ func hasStackedTypeWrappers(node *ast.Node) bool {
 			if binary == nil || binary.OperatorToken == nil || binary.Left != current {
 				return false
 			}
-			if utils.IsDefaultValueInDestructuringAssignment(parent) {
+			if isDefaultValueInDestructuringAssignment(parent) {
 				return false
 			}
 			return wrappers > 1 && ast.IsAssignmentOperator(binary.OperatorToken.Kind)
@@ -76,6 +76,28 @@ func hasStackedTypeWrappers(node *ast.Node) bool {
 		current = parent
 	}
 	return false
+}
+
+// isDefaultValueInDestructuringAssignment extends the shared assignment-pattern
+// check only for this rule's scope-reference emulation. ESLint's scope walk
+// sees the TypeScript wrappers here before it reaches the enclosing pattern;
+// other rules inspect ESTree AssignmentExpression nodes and must not treat the
+// same wrappers as transparent.
+func isDefaultValueInDestructuringAssignment(node *ast.Node) bool {
+	assignmentTargetNode := node
+	for parent := assignmentTargetNode.Parent; parent != nil; parent = assignmentTargetNode.Parent {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindTypeAssertionExpression,
+			ast.KindNonNullExpression,
+			ast.KindSatisfiesExpression:
+			assignmentTargetNode = parent
+		default:
+			return utils.IsDefaultValueInDestructuringAssignment(assignmentTargetNode)
+		}
+	}
+	return utils.IsDefaultValueInDestructuringAssignment(assignmentTargetNode)
 }
 
 func buildGlobalShouldNotBeModifiedMessage(name string) rule.RuleMessage {
