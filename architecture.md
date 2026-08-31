@@ -858,10 +858,11 @@ The transport and target phase differ by surface:
   channel across all runtimes. Each `LanguageClient` uses the same `rslint`
   client ID, so `vscode-languageclient` is the sole authority that reads
   `rslint.trace.server`, applies the initial level, and sends live `$/setTrace`
-  updates without restarting a native server. Runtime-scoped output views add
-  the workspace-folder URI and physical core identity to every trace line for
-  attribution, but neither own configuration state nor dispose the shared
-  channel.
+  updates without restarting a native server. The server accepts that standard
+  notification as a no-op because the protocol trace is rendered client-side.
+  Runtime-scoped output views add the workspace-folder URI and physical core
+  identity to every trace line for attribution, but neither own configuration
+  state nor dispose the shared channel.
 - `RuntimeManager` keys a runtime by VS Code workspace-folder URI plus the
   package directory's normalized physical realpath. Documents resolving through
   symlinks to the same installation share its process and worker state; distinct
