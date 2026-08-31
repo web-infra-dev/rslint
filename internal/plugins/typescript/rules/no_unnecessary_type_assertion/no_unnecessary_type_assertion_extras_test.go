@@ -27,6 +27,20 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 			{Code: `declare const source: unknown; const { value } = source as { value: string };`},
 			{Code: `declare let x: number | undefined; x ??= 1 as number;`},
 			{Code: `declare let x: number; const y = (x = 1 as number);`},
+			{Code: `
+interface W { name?: string }
+interface N { name: string }
+declare const n: N;
+declare function id<T>(value: T): T;
+const result = (id({ value: n as W })) satisfies { value: W };
+`},
+			{Code: `
+interface W { name?: string }
+interface N { name: string }
+declare const n: N;
+declare function id<T>(value: T): T;
+const result = (((id({ value: n as W })))) satisfies { value: W };
+`},
 			{Code: `type ValuePath = 'values' | ` + "`values.${string}`" + `; declare function apply(paths: ValuePath[]): void; declare const ids: string[]; apply(ids.map(id => ` + "`values.${id}`" + ` as ValuePath));`},
 			{Code: `
 declare function fn(x: string): void;

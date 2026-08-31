@@ -351,8 +351,17 @@ func assertionIsPropertyInProblematicContext(ctx rule.RuleContext, node *ast.Nod
 		return !checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncastType, propertyContext)
 	}
 	objectParent := assertionWalkUpParentheses(objectExpression).Parent
-	return objectParent != nil && (objectParent.Kind == ast.KindSatisfiesExpression ||
-		(ast.IsCallExpression(objectParent) && objectParent.Parent != nil && objectParent.Parent.Kind == ast.KindSatisfiesExpression))
+	if objectParent == nil {
+		return false
+	}
+	if objectParent.Kind == ast.KindSatisfiesExpression {
+		return true
+	}
+	if !ast.IsCallExpression(objectParent) {
+		return false
+	}
+	return assertionWalkUpParentheses(objectParent).Parent != nil &&
+		assertionWalkUpParentheses(objectParent).Parent.Kind == ast.KindSatisfiesExpression
 }
 
 func assertionIsAssignmentInNonStatementContext(node *ast.Node) bool {
