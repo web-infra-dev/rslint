@@ -226,6 +226,18 @@ func declaredType(n *ast.Node, aliases map[string]*ast.Node, depth int) (map[str
 		return nil, false
 	case ast.KindParenthesizedType:
 		return declaredType(n.AsParenthesizedTypeNode().Type, aliases, depth-1)
+	case ast.KindIntersectionType:
+		declared := map[string]propType{}
+		found := false
+		for _, part := range n.AsIntersectionTypeNode().Types.Nodes {
+			if members, ok := declaredType(part, aliases, depth-1); ok {
+				for name, prop := range members {
+					declared[name] = prop
+				}
+				found = true
+			}
+		}
+		return declared, found
 	default:
 		return nil, false
 	}
@@ -252,6 +264,71 @@ func propTypeFromType(n *ast.Node, aliases map[string]*ast.Node, depth int) prop
 		return propType{children: children}
 	}
 	return propType{open: true}
+}
+
+func classPropsType(class *ast.Node) *ast.Node {
+	if class == nil {
+		return nil
+	}
+	var clauses *ast.HeritageClauseList
+	switch class.Kind {
+	case ast.KindClassDeclaration:
+		clauses = class.AsClassDeclaration().HeritageClauses
+	case ast.KindClassExpression:
+		clauses = class.AsClassExpression().HeritageClauses
+	default:
+		return nil
+	}
+	if clauses == nil {
+		return nil
+	}
+	for _, clause := range clauses.Nodes {
+		if clause == nil || clause.Kind != ast.KindHeritageClause {
+			continue
+		}
+		types := clause.AsHeritageClause().Types
+		if types == nil {
+			continue
+		}
+		for _, typ := range types.Nodes {
+			if typ == nil || typ.Kind != ast.KindExpressionWithTypeArguments {
+				continue
+			}
+			arguments := typ.AsExpressionWithTypeArguments().TypeArguments
+			if arguments != nil && len(arguments.Nodes) > 0 {
+				return arguments.Nodes[0]
+			}
+		}
+	}
+	return nil
+}
+
+func componentVariableType(n *ast.Node) *ast.Node {
+	for current := n; current != nil && current.Parent != nil; {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression:
+			current = parent
+			continue
+		case ast.KindVariableDeclaration:
+			if parent.AsVariableDeclaration().Initializer == current && parent.AsVariableDeclaration().Type != nil {
+				return parent.AsVariableDeclaration().Type.AsNode()
+			}
+		}
+		return nil
+	}
+	return nil
+}
+
+func firstTypeArgument(typeNode *ast.Node) *ast.Node {
+	if typeNode == nil || typeNode.Kind != ast.KindTypeReference {
+		return nil
+	}
+	arguments := typeNode.AsTypeReferenceNode().TypeArguments
+	if arguments == nil || len(arguments.Nodes) == 0 {
+		return nil
+	}
+	return arguments.Nodes[0]
 }
 
 func className(n *ast.Node) string { return reactutil.BindingIdentifierName(n) }
@@ -668,6 +745,10 @@ var PropTypesRule = rule.Rule{
 				if reactutil.ExtendsReactComponent(n, pragma) {
 					c := &component{node: n, declared: map[string]propType{}, destructured: map[string][]string{}}
 					comps = append(comps, c)
+					if declared, ok := declaredType(classPropsType(n), typeAliases, 8); ok {
+						c.declared = declared
+						c.declaredBlock = true
+					}
 					if name := componentName(n); name != "" {
 						byName[name] = c
 					}
@@ -701,6 +782,9 @@ var PropTypesRule = rule.Rule{
 								c.declared = declared
 								c.declaredBlock = true
 							}
+						} else if declared, ok := declaredType(firstTypeArgument(componentVariableType(n)), typeAliases, 8); ok {
+							c.declared = declared
+							c.declaredBlock = true
 						}
 					}
 				}
@@ -719,6 +803,14 @@ var PropTypesRule = rule.Rule{
 				}
 			case ast.KindPropertyDeclaration:
 				pd := n.AsPropertyDeclaration()
+				if keyName(pd.Name()) == "props" && !ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) {
+					if c := componentFor(n.Parent, comps); c != nil && pd.Type != nil {
+						if declared, ok := declaredType(pd.Type.AsNode(), typeAliases, 8); ok {
+							c.declared = declared
+							c.declaredBlock = true
+						}
+					}
+				}
 				if keyName(pd.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
 						if m, ok := declared(pd.Initializer, o.customValidators, propWrappers); ok {

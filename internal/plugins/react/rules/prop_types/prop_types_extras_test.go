@@ -38,6 +38,10 @@ func TestPropTypesRuleExtras(t *testing.T) {
 			{Code: `const Greetings = { Hello: class extends React.Component { render() { return <div>{this.props.name}</div>; } } }; Greetings.Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
 			{Code: `function Hello(props: { user: { name: string } }) { return <div>{props.user.name}</div>; }`, Tsx: true},
 			{Code: `interface Props { user: { name: string } } function Hello(props: Props) { return <div>{props.user.name}</div>; }`, Tsx: true},
+			{Code: `type First = { first: string }; type Last = { last: string }; function Hello(props: First & Last) { return <div>{props.first}{props.last}</div>; }`, Tsx: true},
+			{Code: `class Hello extends React.Component<{ user: { name: string } }> { render() { return <div>{this.props.user.name}</div>; } }`, Tsx: true},
+			{Code: `class Hello extends React.Component { props: { name: string }; render() { return <div>{this.props.name}</div>; } }`, Tsx: true},
+			{Code: `const Hello: React.FC<{ name: string }> = props => <div>{props.name}</div>;`, Tsx: true},
 			{Code: `let Hello; Hello = props => <div>{props.name}</div>; Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
 			{Code: `const Hello = createReactClass({ render: function() { return <div>{this.props.name}</div>; } }); Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
 		}, []rule_tester.InvalidTestCase{
