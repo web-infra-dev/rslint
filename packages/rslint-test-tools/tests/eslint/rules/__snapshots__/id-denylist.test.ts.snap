@@ -1,0 +1,2865 @@
+// Rstest Snapshot v1
+
+exports[`id-denylist > invalid 1`] = `
+{
+  "code": "foo = "bar"",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 2`] = `
+{
+  "code": "bar = "bar"",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 3`] = `
+{
+  "code": "foo = "bar"",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 4`] = `
+{
+  "code": "function foo(){}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 5`] = `
+{
+  "code": "import foo from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 6`] = `
+{
+  "code": "import * as foo from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 7`] = `
+{
+  "code": "export * as foo from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 8`] = `
+{
+  "code": "import { foo } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 9`] = `
+{
+  "code": "import { foo as bar } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 10`] = `
+{
+  "code": "import { foo as bar } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 11`] = `
+{
+  "code": "import { foo as foo } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 12`] = `
+{
+  "code": "import { foo, foo as bar } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 13`] = `
+{
+  "code": "import { foo as bar, foo } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 14`] = `
+{
+  "code": "import foo, { foo as bar } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 15`] = `
+{
+  "code": "var foo; export { foo as bar };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 16`] = `
+{
+  "code": "var foo; export { foo };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 17`] = `
+{
+  "code": "var foo; export { foo as bar };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 18`] = `
+{
+  "code": "var foo; export { foo as foo };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 19`] = `
+{
+  "code": "var foo; export { foo as bar };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 20`] = `
+{
+  "code": "export { foo } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 21`] = `
+{
+  "code": "export { foo as bar } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 22`] = `
+{
+  "code": "export { foo as bar } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 23`] = `
+{
+  "code": "export { foo as foo } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 24`] = `
+{
+  "code": "export { foo, foo as bar } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 25`] = `
+{
+  "code": "export { foo as bar, foo } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 26`] = `
+{
+  "code": "foo.bar()",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 27`] = `
+{
+  "code": "foo[bar] = baz;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 28`] = `
+{
+  "code": "baz = foo[bar];",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 29`] = `
+{
+  "code": "var foo = bar.baz;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 30`] = `
+{
+  "code": "var foo = bar.baz;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 31`] = `
+{
+  "code": "if (foo.bar) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 32`] = `
+{
+  "code": "var obj = { key: foo.bar };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'obj' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 33`] = `
+{
+  "code": "var obj = { key: foo.bar };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'key' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 34`] = `
+{
+  "code": "var obj = { key: foo.bar };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 35`] = `
+{
+  "code": "var arr = [foo.bar];",
+  "diagnostics": [
+    {
+      "message": "Identifier 'arr' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 36`] = `
+{
+  "code": "var arr = [foo.bar];",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 37`] = `
+{
+  "code": "[foo.bar]",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 38`] = `
+{
+  "code": "if (foo.bar === bar.baz) { [bing.baz] }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 39`] = `
+{
+  "code": "if (foo.bar === bar.baz) { [foo.bar] }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 40`] = `
+{
+  "code": "var myArray = new Array(); var myDate = new Date();",
+  "diagnostics": [
+    {
+      "message": "Identifier 'myDate' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 41`] = `
+{
+  "code": "var myArray = new Array(); var myDate = new Date();",
+  "diagnostics": [
+    {
+      "message": "Identifier 'myArray' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 42`] = `
+{
+  "code": "foo.bar = 1",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 43`] = `
+{
+  "code": "foo.bar.baz = 1",
+  "diagnostics": [
+    {
+      "message": "Identifier 'baz' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 44`] = `
+{
+  "code": "const {foo} = baz",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 45`] = `
+{
+  "code": "const {foo: bar} = baz",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 46`] = `
+{
+  "code": "const {[foo]: bar} = baz",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 47`] = `
+{
+  "code": "const {foo: {bar: baz}} = qux",
+  "diagnostics": [
+    {
+      "message": "Identifier 'baz' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 48`] = `
+{
+  "code": "const {foo: {[bar]: baz}} = qux",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'baz' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 49`] = `
+{
+  "code": "const {[foo]: {[bar]: baz}} = qux",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'baz' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 50`] = `
+{
+  "code": "function foo({ bar: baz }) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'baz' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 51`] = `
+{
+  "code": "function foo({ bar: {baz: qux} }) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'qux' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 52`] = `
+{
+  "code": "({foo: obj.bar} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 53`] = `
+{
+  "code": "({foo: obj.bar.bar.bar.baz} = {});",
+  "diagnostics": [
+    {
+      "message": "Identifier 'baz' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 54`] = `
+{
+  "code": "({[foo]: obj.bar} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 55`] = `
+{
+  "code": "({foo: { a: obj.bar }} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 56`] = `
+{
+  "code": "({a: obj.bar = baz} = qux);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 57`] = `
+{
+  "code": "({a: obj.bar.bar.baz = obj.qux} = obj.qux);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'baz' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 58`] = `
+{
+  "code": "({a: obj[bar] = obj.qux} = obj.qux);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 59`] = `
+{
+  "code": "({a: [obj.bar] = baz} = qux);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 60`] = `
+{
+  "code": "({foo: { a: obj.bar = baz}} = qux);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 61`] = `
+{
+  "code": "({foo: { [a]: obj.bar }} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 62`] = `
+{
+  "code": "({...obj.bar} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 63`] = `
+{
+  "code": "([obj.bar] = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 64`] = `
+{
+  "code": "const [bar] = baz;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 65`] = `
+{
+  "code": "foo.undefined = 1;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 66`] = `
+{
+  "code": "var foo = { undefined: 1 };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 67`] = `
+{
+  "code": "var foo = { undefined: undefined };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 68`] = `
+{
+  "code": "var foo = { Number() {} };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 69`] = `
+{
+  "code": "class Foo { Number() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 70`] = `
+{
+  "code": "myGlobal: while(foo) { break myGlobal; } ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'myGlobal' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'myGlobal' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 71`] = `
+{
+  "code": "const foo = 1; bar = foo;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 72`] = `
+{
+  "code": "let foo; foo = bar;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 73`] = `
+{
+  "code": "bar = foo; var foo;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 74`] = `
+{
+  "code": "function foo() {} var bar = foo;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 75`] = `
+{
+  "code": "class Foo {} var bar = Foo;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'Foo' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 76`] = `
+{
+  "code": "let undefined; undefined = 1;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 77`] = `
+{
+  "code": "foo = undefined; var undefined;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 78`] = `
+{
+  "code": "function undefined(){} x = undefined;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 79`] = `
+{
+  "code": "class Number {} x = Number.NaN;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 80`] = `
+{
+  "code": "/* globals myGlobal */ window.myGlobal = 5; foo = myGlobal;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'myGlobal' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 81`] = `
+{
+  "code": "var foo = undefined;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 82`] = `
+{
+  "code": "/* globals Number: off */ Number.parseInt()",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 83`] = `
+{
+  "code": "var foo = [Map];",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Map' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 84`] = `
+{
+  "code": "if (foo) { let undefined; bar = undefined; }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 85`] = `
+{
+  "code": "function foo(Number) { var x = Number.NaN; }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 86`] = `
+{
+  "code": "function foo() { var myGlobal; x = myGlobal; }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'myGlobal' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'myGlobal' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 87`] = `
+{
+  "code": "function foo(bar) { return Number.parseInt(bar); } const Number = 1;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 88`] = `
+{
+  "code": "import Number from 'myNumber'; const foo = Number.parseInt(bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier 'Number' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 89`] = `
+{
+  "code": "var foo = function undefined() {};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 90`] = `
+{
+  "code": "var foo = { undefined }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 91`] = `
+{
+  "code": "class C { camelCase; #camelCase; #camelCase2() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'camelCase' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier '#camelCase' is restricted.",
+      "messageId": "restrictedPrivate",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 92`] = `
+{
+  "code": "class C { snake_case; #snake_case() {}; #snake_case2() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_case' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+    {
+      "message": "Identifier '#snake_case' is restricted.",
+      "messageId": "restrictedPrivate",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 93`] = `
+{
+  "code": "import('foo.json', { with: { [type]: 'json' } })",
+  "diagnostics": [
+    {
+      "message": "Identifier 'type' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-denylist > invalid 94`] = `
+{
+  "code": "import('foo.json', { with: { type: json } })",
+  "diagnostics": [
+    {
+      "message": "Identifier 'json' is restricted.",
+      "messageId": "restricted",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-denylist",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -13,30 +14,13 @@ import (
 // Rstest's mock transform sees neither parentheses nor TypeScript's type-only
 // syntax: `as`, `satisfies` and `!` are erased before it runs, and it reads
 // through parentheses. So `(rs as any).mock('./dep')`, `rs!.mock('./dep')` and
-// `(rs.mock)(('./dep'))` are rewritten exactly like the bare form, and every
-// receiver, callee and argument here is read through
-// utils.SkipAssertionsAndParens.
+// `(rs.mock)(('./dep'))` are rewritten exactly like the bare form.
+// rstestUtils.ParseRstestUtilityCall reads the receiver and the callee that
+// way; the argument here is read through utils.SkipAssertionsAndParens for the
+// same reason.
 
 //go:embed prefer_import_in_mock.schema.json
 var schemaJSON []byte
-
-// utilityNames are the two names the module mock APIs are reachable under.
-// `@rstest/core` exports the same utilities object twice, as `rstest` and as
-// `rs`, and registers both onto `globalThis` under `globals: true`.
-//
-// The receiver is matched on the name written at the call site alone, with no
-// attempt to resolve where the binding came from, because that is what Rstest
-// does: its mock transform rewrites `rs.mock` and `rstest.mock` by spelling.
-// A local object, and even a function parameter, that happens to be named `rs`
-// has its `rs.mock(...)` hoisted and applied like any other; conversely a
-// binding renamed away from both names, `import { rstest as vi }`, is never
-// rewritten and throws "[Rstest] mock() was not transformed by Rstest" at run
-// time. Resolving the identifier instead of reading it would disagree with the
-// transform in both directions.
-var utilityNames = map[string]bool{
-	"rstest": true,
-	"rs":     true,
-}
 
 // mockMethods are the module mock APIs whose first parameter is typed
 // `string | Promise<T>`. `mockRequire` and `doMockRequire` take a `string`
@@ -120,14 +104,11 @@ var PreferImportInMockRule = rule.Rule{
 // call that Rstest's mock transform rewrites, together with the plain string
 // naming the module inside it. Both are nil when the call is anything else.
 func mockPathArgument(node *ast.Node) (*ast.Node, *ast.Node) {
+	utility := rstestUtils.ParseRstestUtilityCall(node)
+	if utility == nil || !mockMethods[utility.Member] || !isTransformablePosition(node) {
+		return nil, nil
+	}
 	call := node.AsCallExpression()
-	if call == nil || call.QuestionDotToken != nil {
-		return nil, nil
-	}
-
-	if !isMockCallee(call.Expression) || !isTransformablePosition(node) {
-		return nil, nil
-	}
 
 	// An explicit type argument, `rs.mock<{ value: number }>('./module')`,
 	// already states the mocked module's shape. Wrapping the path would pin
@@ -192,29 +173,4 @@ func isTransformablePosition(node *ast.Node) bool {
 		}
 		outermost = parent
 	}
-}
-
-// isMockCallee reports whether expression is `rs.mock`, `rs.doMock`, or the
-// same two under the `rstest` name. Wrappers the transform cannot see are
-// unwrapped around both the callee and the receiver; an optional chain and a
-// computed member are not rewritten by the transform, so they are rejected.
-func isMockCallee(expression *ast.Node) bool {
-	callee := utils.SkipAssertionsAndParens(expression)
-	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-	access := callee.AsPropertyAccessExpression()
-	if access == nil || access.QuestionDotToken != nil {
-		return false
-	}
-
-	name := access.Name()
-	if name == nil || name.Kind != ast.KindIdentifier || !mockMethods[name.Text()] {
-		return false
-	}
-
-	receiver := utils.SkipAssertionsAndParens(access.Expression)
-	return receiver != nil &&
-		receiver.Kind == ast.KindIdentifier &&
-		utilityNames[receiver.Text()]
 }

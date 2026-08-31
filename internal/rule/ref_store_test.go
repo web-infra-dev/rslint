@@ -360,6 +360,112 @@ func TestRefStoreExportAssignmentResolvesTypeOnlySymbol(t *testing.T) {
 	}
 }
 
+func TestRefStoreResolveTypeOrNamespaceUsesExactReferenceMeaning(t *testing.T) {
+	tests := []struct {
+		name         string
+		source       string
+		identifier   string
+		wantResolved bool
+	}{
+		{
+			name:         "direct export resolves type",
+			source:       `export = Record;`,
+			identifier:   "Record",
+			wantResolved: true,
+		},
+		{
+			name:       "parenthesized export is value-only",
+			source:     `export = ((Record));`,
+			identifier: "Record",
+		},
+		{
+			name:       "import equals rejects type-only target",
+			source:     `import Alias = Record;`,
+			identifier: "Record",
+		},
+		{
+			name:         "import equals resolves namespace target",
+			source:       `import Alias = Intl.Collator;`,
+			identifier:   "Intl",
+			wantResolved: true,
+		},
+		{
+			name:         "qualified type root resolves namespace",
+			source:       `type T = Intl.CollatorOptions;`,
+			identifier:   "Intl",
+			wantResolved: true,
+		},
+		{
+			name:       "type query remains value-only",
+			source:     `type T = typeof Intl;`,
+			identifier: "Intl",
+		},
+		{
+			name:       "class extends remains value-only",
+			source:     `class C extends Intl.Collator {}`,
+			identifier: "Intl",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs, done := newCheckedRefStore(t, test.source)
+			defer done()
+			occurrences := identifiers(sourceFile.AsNode(), test.identifier)
+			if len(occurrences) != 1 {
+				t.Fatalf("identifier occurrences = %d, want 1", len(occurrences))
+			}
+			resolved := refs.ResolveTypeOrNamespace(occurrences[0])
+			if (resolved != nil) != test.wantResolved {
+				t.Fatalf("ResolveTypeOrNamespace(%s) = %v, wantResolved %v", test.identifier, resolved, test.wantResolved)
+			}
+		})
+	}
+}
+
+func TestRefStoreResolveTypeOrNamespaceKeepsTheExactTarget(t *testing.T) {
+	t.Run("import equals uses namespace meaning", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t, `import Alias = Record;`)
+		defer done()
+		occurrences := identifiers(sourceFile.AsNode(), "Record")
+		if len(occurrences) != 1 {
+			t.Fatalf("identifier occurrences = %d, want 1", len(occurrences))
+		}
+		if got := refs.Resolve(occurrences[0]); got != nil {
+			t.Fatalf("Resolve(type-only import-equals root) = %v, want nil", got)
+		}
+	})
+
+	t.Run("local value shadows external type", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t, `const Record = 1; export default Record;`)
+		defer done()
+		occurrences := identifiers(sourceFile.AsNode(), "Record")
+		if len(occurrences) != 2 {
+			t.Fatalf("identifier occurrences = %d, want 2", len(occurrences))
+		}
+		if got := refs.ResolveTypeOrNamespace(occurrences[1]); got != nil {
+			t.Fatalf("ResolveTypeOrNamespace(local value) = %v, want nil", got)
+		}
+		if got, want := refs.Resolve(occurrences[1]), occurrences[0].Parent.Symbol(); got != want {
+			t.Fatalf("Resolve(local value) = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("local alias retains its authored identity", func(t *testing.T) {
+		sourceFile, refs, done := newCheckedRefStore(t, `import type { T as Alias } from "./foo"; export default Alias;`)
+		defer done()
+		occurrences := identifiers(sourceFile.AsNode(), "Alias")
+		if len(occurrences) != 2 {
+			t.Fatalf("identifier occurrences = %d, want 2", len(occurrences))
+		}
+		got := refs.ResolveTypeOrNamespace(occurrences[1])
+		want := occurrences[0].Parent.Symbol()
+		if got == nil || got != want {
+			t.Fatalf("ResolveTypeOrNamespace(local alias) = %v, want %v", got, want)
+		}
+	})
+}
+
 func TestRefStoreExportDefaultNamedFunction(t *testing.T) {
 	// A named default export is bound to an export symbol named "default", so
 	// looking its candidates up by symbol name finds nothing: the references
@@ -875,6 +981,38 @@ func TestRefStoreLocalExportCheckerFallbackResolvesGlobalValue(t *testing.T) {
 	}
 }
 
+func TestRefStoreGlobalNameReferenceSkipsOwnExportAlias(t *testing.T) {
+	const typeMeaning = ast.SymbolFlagsType | ast.SymbolFlagsNamespace | ast.SymbolFlagsAlias
+	for _, test := range []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{
+			name:   "implicit global type target",
+			source: `export type { Record as Safe };`,
+			want:   true,
+		},
+		{
+			name:   "authored local type target",
+			source: `type Record = {}; export type { Record as Safe };`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/export-global-name.ts", core.ScriptKindTS, test.source)
+			occurrences := identifiers(sourceFile.AsNode(), "Record")
+			specifier := occurrences[len(occurrences)-1]
+			if got := refs.IsGlobalNameReference(specifier, "Record", typeMeaning); got != test.want {
+				t.Fatalf("IsGlobalNameReference(Record) = %v, want %v", got, test.want)
+			}
+			if safe := identifiers(sourceFile.AsNode(), "Safe"); len(safe) == 1 &&
+				refs.IsGlobalNameReference(safe[0], "Safe", typeMeaning) {
+				t.Fatal("exported alias label Safe was treated as a global reference")
+			}
+		})
+	}
+}
+
 func TestRefStoreExportedFunctionDeclaration(t *testing.T) {
 	// A non-default export is bound to an export symbol too; the local symbol
 	// left in the file's locals carries only the ExportValue marker, so
@@ -1000,6 +1138,89 @@ func TestRefStoreImplicitFileArguments(t *testing.T) {
 				if got := refs.IsDefinedInFile(node); got != test.want[i] {
 					t.Errorf("IsDefinedInFile(arguments occurrence %d) = %v, want %v", i, got, test.want[i])
 				}
+			}
+		})
+	}
+}
+
+func TestRefStoreCommonJSGlobalReference(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source string
+		want   bool
+	}{
+		{name: "wrapper global", source: "exports.foo = 1;", want: true},
+		{name: "authored declaration", source: "const exports = {}; exports.foo = 1;"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, "/file.cjs", core.ScriptKindJS, test.source)
+			exports := identifiers(sourceFile.AsNode(), "exports")
+			reference := exports[len(exports)-1]
+			if got := refs.IsGlobalReference(reference); got != test.want {
+				t.Fatalf("IsGlobalReference(exports) = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestRefStoreGlobalReferenceProgramScopeSemantics(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileName   string
+		scriptKind core.ScriptKind
+		sourceType string
+		source     string
+		want       bool
+	}{
+		{
+			name:       "authored import retained beside JSDoc import",
+			fileName:   "/file.js",
+			scriptKind: core.ScriptKindJS,
+			sourceType: "module",
+			source:     "/** @import { Promise } from \"x\" */\nimport { Promise } from \"y\";\nPromise;",
+		},
+		{
+			name:       "type-only module declaration leaves value global",
+			fileName:   "/file.ts",
+			scriptKind: core.ScriptKindTS,
+			sourceType: "module",
+			source:     "interface Promise {} Promise;",
+			want:       true,
+		},
+		{
+			name:       "namespace module declaration binds value reference",
+			fileName:   "/file.ts",
+			scriptKind: core.ScriptKindTS,
+			sourceType: "module",
+			source:     "namespace Promise {} Promise;",
+			want:       false,
+		},
+		{
+			name:       "dotted namespace leaves built-in global uncontrollable",
+			fileName:   "/file.ts",
+			scriptKind: core.ScriptKindTS,
+			sourceType: "script",
+			source:     "namespace Promise.Inner {} Promise;",
+			want:       true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: test.fileName,
+				Path:     tspath.Path(test.fileName),
+			}, test.source, test.scriptKind)
+			binder.BindSourceFile(sourceFile)
+			_, refsInit, _ := ResolveLanguageDefaults(test.fileName, LanguageOptions{SourceType: test.sourceType})
+			refs := NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit)
+			occurrences := identifiers(sourceFile.AsNode(), "Promise")
+			if len(occurrences) == 0 {
+				t.Fatal("found no Promise identifier")
+			}
+			reference := occurrences[len(occurrences)-1]
+			if got := refs.IsGlobalReference(reference); got != test.want {
+				t.Fatalf("IsGlobalReference(Promise) = %v, want %v", got, test.want)
 			}
 		})
 	}

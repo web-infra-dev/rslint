@@ -22,7 +22,7 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "format": "regex"
+            "format": "regex-u"
           }
         },
         "properties": {

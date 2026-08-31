@@ -96,7 +96,7 @@ describe('Entry point (bin/rslint.js)', () => {
 
       expect(result.stderr).not.toContain('failed to load config');
       expect(result.stdout).toContain('no-debugger');
-      expect(result.stdout).toMatch(/linted [1-9]\d* files?/);
+      expect(result.stdout).toMatch(/\([1-9]\d* files?,/);
       expect(result.exitCode).toBe(1);
     } finally {
       await cleanupTempDir(tempDir);

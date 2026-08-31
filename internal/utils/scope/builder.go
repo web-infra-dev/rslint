@@ -29,11 +29,16 @@ func (b *builder) reference(id *ast.Node, s *Scope) {
 	if !b.collectReferences || id == nil || s == nil {
 		return
 	}
-	if !isReferenceIdentifier(id) {
+	if !IsReferenceIdentifier(id) {
 		return
 	}
-	value, isType := referenceSpaces(id)
-	ref := &Reference{Identifier: id, From: s, isValueReference: value, isTypeReference: isType}
+	space := ESLintReferenceSpace(id)
+	ref := &Reference{
+		Identifier:       id,
+		From:             s,
+		isValueReference: space.IncludesValue(),
+		isTypeReference:  space.IncludesType(),
+	}
 	s.References = append(s.References, ref)
 	b.manager.References = append(b.manager.References, ref)
 }

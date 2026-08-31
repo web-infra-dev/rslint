@@ -7,7 +7,7 @@ export default defineConfig([
     'typescript-go/**',
 
     // Release CI artifacts (downloaded binaries + tsgo lib files copied
-    // into the npm publish shells) — keep in sync with .prettierignore
+    // into the npm publish shells) — keep in sync with rstack.config.mts
     'binaries/**',
     'npm/**',
 
