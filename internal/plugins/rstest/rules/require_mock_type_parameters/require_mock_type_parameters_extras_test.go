@@ -84,6 +84,26 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			// no `fn` on it to type.
 			{Code: `import.meta.rstest.fn();`},
 
+			// ---- Accepted false negatives ----
+			// A false negative is the side this rule errs on, so each of these
+			// stays unreported until the shape it needs is understood
+			// everywhere. Any change that starts reporting one belongs in the
+			// invalid list, deliberately.
+			//
+			// A tagged template is a distinct node, not a `CallExpression`, so
+			// the listener never sees it. Nothing is lost in practice: `fn`
+			// takes the implementation to infer from, and a tag is handed a
+			// `TemplateStringsArray` that no `FunctionLike` accepts.
+			{Code: "import { rs } from '@rstest/core'; rs.fn`service`;"},
+			// `import = require` binds the module namespace, but the shared
+			// resolver in internal/utils/test_framework recognizes only a
+			// namespace import and a `require` initializer as one.
+			{Code: `import core = require('@rstest/core'); core.rs.fn();`},
+			// The same resolver has no branch for a dynamic import, so a
+			// destructure of one — renamed or not — is not resolved either.
+			{Code: `async function setup() { const { rs } = await import('@rstest/core'); rs.fn(); }`},
+			{Code: `async function setup() { const { rs: mocker } = await import('@rstest/core'); mocker.fn(); }`},
+
 			// ---- Locks in the syntax match for the module loaders ----
 			// Rstest rewrites these four on the name written at the call site,
 			// so a renamed binding is never rewritten and throws where it

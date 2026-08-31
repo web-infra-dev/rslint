@@ -14,57 +14,28 @@ var utilityNamespaces = map[string]bool{
 	"rstest": true,
 }
 
-// pluginManagedAPIs are the members of the utilities object that never run as
-// written. Each one is a stub that throws
-// "[Rstest] <name>() was not transformed by Rstest"
-// (packages/core/src/runtime/api/utilities.ts, `createPluginManagedApi`); the
-// call that does the work is emitted by Rstest's build, which rewrites the call
-// site itself.
-//
-// The distinction decides how a rule may recognize a call. Everything else on
-// the object — `fn`, `spyOn`, `mocked`, the timer and stub helpers — is an
-// ordinary function reached through an ordinary binding, so a renamed import
-// still works and a rule should resolve the receiver. These fourteen are
-// matched by the build on the name written at the call site, so a rule must
-// read the receiver instead of resolving it: see ParseRstestUtilityCall.
-var pluginManagedAPIs = map[string]bool{
-	"mock":            true,
-	"mockRequire":     true,
-	"doMock":          true,
-	"doMockRequire":   true,
-	"unmock":          true,
-	"doUnmock":        true,
-	"unmockRequire":   true,
-	"doUnmockRequire": true,
-	"importMock":      true,
-	"requireMock":     true,
-	"importActual":    true,
-	"requireActual":   true,
-	"resetModules":    true,
-	"hoisted":         true,
-}
-
-// IsPluginManagedAPI reports whether member names one of the utilities-object
-// members Rstest's build rewrites rather than calls.
-func IsPluginManagedAPI(member string) bool {
-	return pluginManagedAPIs[member]
-}
-
 // RstestUtilityCall is a call written as a plain member of the utilities
 // object: `rs.mock(...)`, `rstest.hoisted(...)`, and so on.
 type RstestUtilityCall struct {
 	// Namespace is the receiver as it is written, "rs" or "rstest".
-	Namespace     string
-	NamespaceNode *ast.Node
+	Namespace string
 	// Member is the property name as it is written.
 	Member     string
 	MemberNode *ast.Node
-	Call       *ast.Node
 }
 
 // ParseRstestUtilityCall matches a call on the utilities object by the syntax
 // at the call site alone. It never resolves a binding and never consults the
 // TypeChecker, because the builds this shape describes do not either.
+//
+// This shape fits the members that never run as written. Each of them is a
+// stub that throws "[Rstest] <name>() was not transformed by Rstest"
+// (packages/core/src/runtime/api/utilities.ts, `createPluginManagedApi`), and
+// the call that does the work is emitted by Rstest's build, which rewrites the
+// call site itself. Everything else on the object — `fn`, `spyOn`, `mocked`,
+// the timer and stub helpers — is an ordinary function reached through an
+// ordinary binding, so a renamed import still works and a rule should resolve
+// the receiver rather than parse it here.
 //
 // Rstest's mock transform matches the receiver by the name written in the
 // source: `rs.mock('./m')` is rewritten in a file whose only `rs` is a local
@@ -119,10 +90,8 @@ func ParseRstestUtilityCall(node *ast.Node) *RstestUtilityCall {
 	}
 
 	return &RstestUtilityCall{
-		Namespace:     namespace,
-		NamespaceNode: namespaceNode,
-		Member:        memberNode.AsIdentifier().Text,
-		MemberNode:    memberNode,
-		Call:          node,
+		Namespace:  namespace,
+		Member:     memberNode.AsIdentifier().Text,
+		MemberNode: memberNode,
 	}
 }

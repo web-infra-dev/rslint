@@ -94,32 +94,3 @@ func TestParseRstestUtilityCall(t *testing.T) {
 		},
 	)
 }
-
-// The plugin-managed list is what tells a rule which matching strategy an API
-// needs, so it has to stay exactly the set Rstest's build rewrites.
-func TestIsPluginManagedAPI(t *testing.T) {
-	managed := []string{
-		"mock", "mockRequire", "doMock", "doMockRequire",
-		"unmock", "doUnmock", "unmockRequire", "doUnmockRequire",
-		"importMock", "requireMock", "importActual", "requireActual",
-		"resetModules", "hoisted",
-	}
-	for _, member := range managed {
-		if !rstestUtils.IsPluginManagedAPI(member) {
-			t.Errorf("IsPluginManagedAPI(%q) = false, want true", member)
-		}
-	}
-
-	// Ordinary functions on the same object, and names that are not on it.
-	ordinary := []string{
-		"fn", "spyOn", "mocked", "isMockFunction", "mockObject",
-		"clearAllMocks", "resetAllMocks", "restoreAllMocks",
-		"stubEnv", "stubGlobal", "useFakeTimers", "waitFor", "waitUntil",
-		"setConfig", "", "Mock", "test", "expect",
-	}
-	for _, member := range ordinary {
-		if rstestUtils.IsPluginManagedAPI(member) {
-			t.Errorf("IsPluginManagedAPI(%q) = true, want false", member)
-		}
-	}
-}
