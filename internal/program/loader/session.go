@@ -12,9 +12,11 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-// Session owns Program-construction services for one CLI invocation or API
-// request. It is reused across fix generations but never shared between
-// requests or with the LSP session lifecycle.
+// Session owns Program-construction services for one immutable CLI/API source
+// generation. A caller may explicitly invalidate its source snapshots before
+// reusing it, but the lint pipeline's overlay providers use a fresh Session per
+// fix generation. Sessions are never shared between requests or with the LSP
+// lifecycle.
 type Session struct {
 	context            *buildContext
 	initialPrograms    []*compiler.Program

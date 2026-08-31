@@ -450,13 +450,6 @@ func filterNativeRules(rules []rule.ConfiguredRule) []rule.ConfiguredRule {
 	return nativeRules
 }
 
-func shouldSkipRulesForSyntax(opts programRulePlanOptions, file *ast.SourceFile, ctx context.Context) bool {
-	if opts.SkipSyntaxCheck {
-		return false
-	}
-	return len(opts.Program.SyntacticDiagnostics(ctx, file)) > 0
-}
-
 // RunLinter runs all configured lint rules across the given programs in
 // parallel, then optionally collects program-level type-check diagnostics
 // aligned with `tsc --noEmit` semantics.

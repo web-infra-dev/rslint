@@ -182,16 +182,17 @@ type Server struct {
 	// generation. Document requests reuse them instead of repeatedly parsing selectors
 	// and ignore patterns on every edit.
 	jsFileConfigResolvers map[string]*config.FileConfigResolver
-	// jsonConfigOwnerIndex freezes the invocation-wide JSON config's authored
-	// path space when that config generation is loaded.
-	jsonConfigOwnerIndex   *target.OwnerIndex
-	jsonFileConfigResolver *config.FileConfigResolver
+	// fallbackConfigOwnerIndex freezes the workspace fallback's authored path
+	// space. The fallback is an empty config plus the committed .gitignore view
+	// for files outside every discovered config boundary.
+	fallbackConfigOwnerIndex   *target.OwnerIndex
+	fallbackFileConfigResolver *config.FileConfigResolver
 	// configDiscoveryActive becomes true after the first structurally valid
 	// configRefresh request. It lets Go's supplemental strict-ancestor JS and
 	// config-scoped .gitignore watchers trigger a fresh transaction without
 	// sending reverse requests before the client installs its handlers. The
-	// extension remains the sole refresh owner for workspace/descendant JS and
-	// JSON changes.
+	// extension remains the sole refresh owner for workspace/descendant config
+	// changes.
 	configDiscoveryActive bool
 	// configRefreshInitialized records that the client has chosen this process's
 	// invocation-wide config source. configRefreshConfigPath is empty for
@@ -204,21 +205,18 @@ type Server struct {
 	// unavailable boundaries used to keep LSP alive when every JS config is
 	// broken. Refresh failures preserve only the usable JS catalog as last-good.
 	configDiscoveryHasLastGood bool
-	// configSnapshotIncludesGitignore means the current catalog already contains
-	// the .gitignore view captured during its transaction. Before the first
-	// committed snapshot, the JSON startup config still uses the live policy.
+	// configSnapshotIncludesGitignore means the current catalog and workspace
+	// fallback already contain the .gitignore view captured during their
+	// transaction. Before the first committed snapshot, fallback evaluation uses
+	// the live policy.
 	configSnapshotIncludesGitignore bool
 	// jsUnavailableConfigs contains absolute config-directory paths for failed
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}
-	jsonConfig           config.RslintConfig // fallback JSON config (rslint.json/rslint.jsonc)
-	rslintConfigPath     string              // path to rslint.json/rslint.jsonc, empty if not found
-	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
-	// For the JSON-config path this is a single global list.
-	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
-	// which keys per-config-directory so a nested config with no tsconfig
-	// does not disable filtering for files under other configs.
-	tsConfigPaths []string
+	fallbackConfig       config.RslintConfig
+	// Configured project paths are keyed per owner so a nested config with no
+	// tsconfig does not disable filtering for files under other configs. The
+	// empty workspace fallback never supplies type information.
 	// A nil map value means the corresponding config has no type information.
 	tsConfigPathsByConfig map[string][]string
 	documents             map[lsproto.DocumentUri]string                // URI -> content
@@ -248,22 +246,15 @@ type Server struct {
 	// on a serialized config transaction and is captured before dispatching work
 	// to a goroutine.
 	eslintPluginConfigGeneration string
-	// fixAllNativeLint, when non-nil, overrides the per-pass native lint used by
-	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
-	// used, driving an isolated overlay Program); tests inject a mock to exercise the
-	// plugin-fix fold loop without spinning up a language service.
-	fixAllNativeLint func(
-		ctx context.Context,
-		uri lsproto.DocumentUri,
-		pass int,
-		content string,
-		snapshot documentLintSnapshot,
-	) (lintPassResult, error)
+	// speculativeGeneration, when non-nil, overrides speculative generation
+	// acquisition. Production leaves it nil and builds Programs from one captured
+	// editor environment; tests may inject generations while execution remains in
+	// the linter-owned pipeline.
+	speculativeGeneration speculativeGenerationAcquire
 
-	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
-	// client (rslint/pluginLint) on BOTH paths: source.fixAll (summed across
-	// passes, where it runs on the dispatch loop as a blocking method) and the
-	// background diagnostics dispatch (per request). A wedged or mid-rebuild
+	// pluginReverseTimeout bounds one background eslint-plugin reverse request
+	// and the aggregate plugin budget for all source.fixAll observations. The
+	// latter runs on the dispatch loop as a blocking method. A wedged or mid-rebuild
 	// client that never answers would otherwise stall editor interaction or leak
 	// the dispatch goroutine + its pending-request entry. On expiry fixAll folds
 	// native-only fixes and the diagnostics dispatch is dropped. Zero means use
@@ -847,16 +838,16 @@ func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOpt
 	}
 }
 
-// defaultPluginReverseTimeout caps each eslint-plugin reverse request to the
-// client — the source.fixAll passes (summed) and each background diagnostics
-// dispatch. It is a generous BACKSTOP, not a precise budget: a superseded
+// defaultPluginReverseTimeout caps the aggregate source.fixAll plugin budget and
+// each background diagnostics request. It is a generous BACKSTOP, not a precise
+// budget: a superseded
 // diagnostics dispatch is already discarded by the generation stamp, so this
 // only has to bound a client that is genuinely wedged (never answers and is
 // never superseded). 30s sits well above any legitimate single-file plugin lint
 // — so a slow-but-valid lint is never cut off — while still freeing a dead
 // client's goroutine and unblocking the fixAll dispatch loop in bounded time.
-// (Fine-grained supersede cancellation via $/cancelRequest, which would let this
-// be tightened, is a separate follow-up; see dispatchPluginLint.)
+// Superseding prepared document generations normally cancel earlier through
+// $/cancelRequest; this deadline remains the no-supersede backstop.
 const defaultPluginReverseTimeout = 30 * time.Second
 
 func isBlockingMethod(method lsproto.Method) bool {

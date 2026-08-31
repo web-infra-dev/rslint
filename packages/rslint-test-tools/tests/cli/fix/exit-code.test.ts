@@ -20,8 +20,8 @@ describe('CLI --fix exit code', () => {
     try {
       const result = await runRslint(['--fix', 'index.ts'], tempDir);
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('Found 0 errors');
-      expect(result.stdout).toContain('fixed 1 issue');
+      expect(result.stdout).toContain('success Lint passed');
+      expect(result.stdout).toContain('after applying 1 fix');
 
       const content = await fs.readFile(path.join(tempDir, 'index.ts'), 'utf8');
       expect(content).not.toContain('as string');
@@ -39,8 +39,8 @@ describe('CLI --fix exit code', () => {
     try {
       const result = await runRslint(['--fix', 'index.ts'], tempDir);
       expect(result.exitCode).toBe(1);
-      expect(result.stdout).toMatch(/Found \d+ error/);
-      expect(result.stdout).not.toContain('Found 0 errors');
+      expect(result.stdout).toMatch(/error   Lint failed with \d+ errors?/);
+      expect(result.stdout).not.toContain('success Lint passed');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -61,8 +61,8 @@ describe('CLI --fix exit code', () => {
     try {
       const result = await runRslint(['--fix', 'index.ts'], tempDir);
       expect(result.exitCode).toBe(1);
-      expect(result.stdout).toContain('fixed 1 issue');
-      expect(result.stdout).not.toContain('Found 0 errors');
+      expect(result.stdout).toContain('after applying 1 fix');
+      expect(result.stdout).not.toContain('success Lint passed');
 
       const content = await fs.readFile(path.join(tempDir, 'index.ts'), 'utf8');
       expect(content).not.toContain('as string');

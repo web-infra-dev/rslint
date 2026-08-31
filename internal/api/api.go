@@ -64,7 +64,7 @@ const (
 )
 
 // Version is the IPC protocol version.
-const Version = "2.0.0"
+const Version = "3.1.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
 const CapabilityReverseConfigLoad = "reverseConfigLoadV1"
@@ -100,9 +100,10 @@ type LintRequest struct {
 	// ConfigDiscovery enables the high-level host-filesystem path. It is
 	// mutually exclusive with Config and intentionally unsupported by WASM.
 	ConfigDiscovery *ConfigDiscoveryRequest `json:"configDiscovery,omitempty"`
-	// Anchor directory for resolving relative paths in the low-level Config.
-	// High-level ConfigDiscovery entries use their owning config directory;
-	// ConfigDiscovery.OverrideConfig entries use WorkingDirectory.
+	// Owner and anchor directory for the low-level Config. In high-level
+	// discovery, module entries without basePath use their owner; inline override
+	// entries without basePath use WorkingDirectory. An authored basePath instead
+	// inherits the selected ConfigArray base.
 	ConfigDirectory string `json:"configDirectory,omitempty"`
 	// PluginConfigDirectory is the opaque worker routing key for community
 	// plugins. It is independent from the directory used to resolve config paths.
@@ -112,11 +113,11 @@ type LintRequest struct {
 	// EslintPlugins carries the names included as Node-dispatched placeholders
 	// in this request's rule catalog. The live implementations remain in JS.
 	EslintPlugins []EslintPluginEntry `json:"eslintPlugins,omitempty"`
-	// Fix, when true, applies rule auto-fixes in-band and returns the fixed
-	// source per file in LintResponse.Output (ESLint's `fix: true`). The fix is
-	// computed but NOT written to disk — the JS side (Rslint.outputFixes) writes
-	// it. Diagnostics describe the original input; callers can lint Output again
-	// when they need post-fix diagnostics.
+	// Fix, when true, applies rule auto-fixes in-band and returns the final source
+	// for each file to which a fix was applied in LintResponse.Output (ESLint's
+	// `fix: true`). The fix is computed but NOT written to disk — the JS side
+	// (Rslint.outputFixes) writes it. Diagnostics and encoded sources describe the
+	// final post-fix generation.
 	Fix                       bool `json:"fix,omitempty"`
 	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
@@ -129,8 +130,9 @@ type ConfigDiscoveryRequest struct {
 	// config discovery below them to branches that can govern those files.
 	Directories   []string `json:"directories,omitempty"`
 	ExplicitFiles []bool   `json:"explicitFiles,omitempty"`
-	// OverrideConfig is appended to every selected config while retaining
-	// LintRequest.WorkingDirectory as its authored relative-path base.
+	// OverrideConfig is appended to every selected config. Entries without
+	// basePath retain LintRequest.WorkingDirectory as their authored relative-path
+	// base; an authored basePath inherits the selected ConfigArray base.
 	OverrideConfig json.RawMessage `json:"overrideConfig,omitempty"`
 }
 

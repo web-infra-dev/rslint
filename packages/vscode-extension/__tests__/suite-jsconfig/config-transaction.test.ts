@@ -228,7 +228,7 @@ suite('LSP config discovery transactions', () => {
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.ts/);
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.mts/);
     assert.doesNotMatch(CONFIG_REFRESH_WATCH_GLOB, /rslint\.config\.\*/);
-    assert.match(CONFIG_REFRESH_WATCH_GLOB, /rslint\.jsonc/);
+    assert.doesNotMatch(CONFIG_REFRESH_WATCH_GLOB, /rslint\.json/);
     assert.match(CONFIG_REFRESH_WATCH_GLOB, /pnpm-lock\.yaml/);
     assert.doesNotMatch(CONFIG_REFRESH_WATCH_GLOB, /\.gitignore/);
     assert.strictEqual(

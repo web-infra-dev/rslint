@@ -386,8 +386,14 @@ func (a *OperandAnalyzer) classifyTypeofOperand(bin *ast.BinaryExpression, chain
 
 		// `typeof globalThis !== 'undefined'` asks whether the global exists at
 		// all, which an optional chain cannot express.
-		if ast.IsIdentifier(inner) && typescriptutil.IsReferenceToGlobalIdentifier(a.ctx, inner) {
-			return Operand{Node: bin.AsNode(), Validity: OperandInvalid}, true
+		if ast.IsIdentifier(inner) {
+			isGlobal, resolvedInCurrentFile := a.classifyCurrentFileTypeofIdentifier(inner)
+			if !resolvedInCurrentFile {
+				isGlobal = typescriptutil.IsReferenceToGlobalIdentifier(a.ctx, inner)
+			}
+			if isGlobal {
+				return Operand{Node: bin.AsNode(), Validity: OperandInvalid}, true
+			}
 		}
 
 		var compType NullishComparisonType
@@ -408,6 +414,44 @@ func (a *OperandAnalyzer) classifyTypeofOperand(bin *ast.BinaryExpression, chain
 	}
 
 	return Operand{}, false
+}
+
+// classifyCurrentFileTypeofIdentifier decides identifiers whose checker symbol
+// has a declaration in this file. A declaration in `declare global` is global:
+// it creates no runtime lexical binding, so removing a typeof guard could make
+// an absent host global throw. Any ordinary same-file declaration shadows it.
+// Identifiers with no same-file declaration are left to the shared scope
+// fallback, which covers lib globals and checker resolution edge cases.
+func (a *OperandAnalyzer) classifyCurrentFileTypeofIdentifier(ident *ast.Node) (isGlobal, resolved bool) {
+	if a.ctx.TypeChecker == nil {
+		return false, false
+	}
+	symbol := a.ctx.TypeChecker.GetSymbolAtLocation(ident)
+	if symbol == nil {
+		return false, false
+	}
+
+	foundGlobalAugmentation := false
+	for _, decl := range symbol.Declarations {
+		if decl == nil || ast.GetSourceFileOfNode(decl) != a.ctx.SourceFile {
+			continue
+		}
+		if decl.Flags&ast.NodeFlagsAmbient == 0 {
+			return false, true
+		}
+		inGlobalAugmentation := false
+		for parent := decl.Parent; parent != nil; parent = parent.Parent {
+			if ast.IsGlobalScopeAugmentation(parent) {
+				inGlobalAugmentation = true
+				break
+			}
+		}
+		if !inGlobalAugmentation {
+			return false, true
+		}
+		foundGlobalAugmentation = true
+	}
+	return foundGlobalAugmentation, foundGlobalAugmentation
 }
 
 func isEqualityOperator(opKind ast.Kind) bool {

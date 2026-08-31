@@ -63,26 +63,29 @@ func newFunctionSignature(
 
 	for i, param := range parameters {
 		t := typeChecker.GetTypeOfSymbolAtLocation(param, node)
+		constrainedType := checker.Checker_getBaseConstraintOfType(typeChecker, t)
+		if constrainedType == nil {
+			constrainedType = t
+		}
 
 		if len(param.Declarations) != 0 {
 			decl := param.Declarations[0]
 			if utils.IsRestParameterDeclaration(decl) {
-				// is a rest param
-				if checker.Checker_isArrayType(typeChecker, t) {
-					restT = restType{
-						Type:  checker.Checker_getTypeArguments(typeChecker, t)[0],
-						Index: i,
-						Kind:  restTypeKindArray,
-					}
-				} else if checker.IsTupleType(t) {
+				if checker.IsTupleType(constrainedType) {
 					restT = restType{
 						Index:         i,
 						Kind:          restTypeKindTuple,
-						TypeArguments: checker.Checker_getTypeArguments(typeChecker, t),
+						TypeArguments: checker.Checker_getTypeArguments(typeChecker, constrainedType),
+					}
+				} else if elementType := utils.GetNumberIndexType(typeChecker, constrainedType); elementType != nil {
+					restT = restType{
+						Type:  elementType,
+						Index: i,
+						Kind:  restTypeKindArray,
 					}
 				} else {
 					restT = restType{
-						Type:  t,
+						Type:  constrainedType,
 						Index: i,
 						Kind:  restTypeKindOther,
 					}
@@ -247,12 +250,48 @@ var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 							signature.consumeRemainingArguments()
 						}
 
-					} else
-					//nolint:staticcheck // FIXME: todo
-					{
-						// something that's iterable
-						// handling this will be pretty complex - so we ignore it for now
-						// TODO - handle generic iterable case
+					} else {
+						// A non-tuple spread contributes an unknown number of values.
+						// Prefer the iterable yield type, which follows generic iterable
+						// constraints. When the active libs do not define Iterable (for
+						// example, lib.es5), arrays are still valid spread sources, so
+						// fall back to their numeric index type.
+						spreadElementType := checker.Checker_getIterationTypeOfIterable(
+							ctx.TypeChecker,
+							checker.IterationUseSpread,
+							checker.IterationTypeKindYield,
+							spreadArgType,
+							nil,
+						)
+						if spreadElementType == nil {
+							constrainedType := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, spreadArgType)
+							if constrainedType == nil {
+								constrainedType = spreadArgType
+							}
+							// GetNumberIndexType returns nil for non-indexable types. Do not
+							// require a single array or tuple here: an array union also has
+							// a numeric index type.
+							spreadElementType = utils.GetNumberIndexType(ctx.TypeChecker, constrainedType)
+						}
+						// Match upstream's argument alignment for an indeterminate-length
+						// spread: inspect the current parameter without advancing the real
+						// signature cursor used by later arguments.
+						spreadSignature := signature
+						parameterType := spreadSignature.getNextParameterType()
+						if spreadElementType != nil && parameterType != nil {
+							_, _, unsafe := utils.IsUnsafeAssignment(
+								spreadElementType,
+								parameterType,
+								ctx.TypeChecker,
+								nil,
+							)
+							if unsafe {
+								ctx.ReportNode(argument, buildUnsafeArgumentMessage(
+									describeType(spreadElementType),
+									describeType(parameterType),
+								))
+							}
+						}
 					}
 
 				default:

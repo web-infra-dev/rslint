@@ -36,8 +36,14 @@ func NewTargetMatcherWithPathSpaces(
 		return TargetMatcher{}, err
 	}
 	for _, entry := range config {
-		if _, err := pathSpaces.requireBase(configEntryBaseDirectory(entry, configDirectory)); err != nil {
+		origin := configEntryPathOrigin(entry, configDirectory)
+		if _, err := pathSpaces.requireBase(origin.directory); err != nil {
 			return TargetMatcher{}, err
+		}
+		if origin.basePathScoped {
+			if _, err := pathSpaces.requireBase(origin.configArrayBase); err != nil {
+				return TargetMatcher{}, err
+			}
 		}
 	}
 	return TargetMatcher{resolver: newConfigTargetResolverWithBases(config, configDirectory, fsys, pathSpaces.bases)}, nil

@@ -32,9 +32,9 @@ func TestGetConfigForFile_ExplicitRulesOnly(t *testing.T) {
 	}
 }
 
-func TestGetConfigForFile_WithoutNormalize_PluginDoesNotAutoEnable(t *testing.T) {
+func TestGetConfigForFile_PluginDeclarationDoesNotAutoEnableRules(t *testing.T) {
 
-	// Without normalizeJSONConfig, plugins should not auto-enable rules
+	// A plugin declaration gates namespaced rules but does not enable rules.
 	config := RslintConfig{
 		{
 			Plugins: []string{"@typescript-eslint"},
@@ -47,7 +47,7 @@ func TestGetConfigForFile_WithoutNormalize_PluginDoesNotAutoEnable(t *testing.T)
 		return
 	}
 
-	// No rules should be enabled (JS config behavior)
+	// No rules should be enabled without an explicit rule or preset.
 	if len(merged.Rules) != 0 {
 		t.Errorf("Expected 0 rules without normalization, got %d", len(merged.Rules))
 	}

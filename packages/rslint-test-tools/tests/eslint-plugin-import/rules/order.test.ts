@@ -2135,6 +2135,20 @@ ruleTester.run('order', rule, {
 
 ruleTester.run('order', rule, {
   valid: [
+    // Exact Node builtins take precedence over TypeScript paths resolution.
+    {
+      code: "import { Buffer } from 'buffer';\n\nimport { includes, isUndefined } from 'lodash-es';",
+      options: [
+        {
+          groups: ['builtin', 'external', 'internal'],
+          alphabetize: { order: 'desc', caseInsensitive: true },
+          'newlines-between': 'always',
+        },
+      ],
+      settings: {
+        'import/external-module-folders': ['src/order-internal-modules'],
+      },
+    },
     // Upstream regression: https://github.com/import-js/eslint-plugin-import/issues/3235
     {
       code: "import checkpoint from '../../checkpoint/models';\nimport common from '../common/files';\nimport avatar from './adapters/avatar';\nimport execution from './adapters/execution';\nimport config from './config';",

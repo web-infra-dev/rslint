@@ -28,6 +28,7 @@
       "isTypeAssignableTo",
       "isTypeStrictSubtypeOf",
       "getIndexInfosOfType",
+      "getIterationTypeOfIterable",
       "getTypeParameterFromMappedType",
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
@@ -36,6 +37,8 @@
   },
   "ExtraFields": {
     "Type": ["alias", "flags", "symbol", "objectFlags"],
+    "ConditionalType": ["root"],
+    "ConditionalRoot": ["node"],
     "TupleType": ["combinedFlags"],
     "LiteralType": ["freshType", "regularType"],
     "Signature": ["parameters", "declaration"],

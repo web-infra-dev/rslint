@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -238,7 +238,7 @@ func TestConfigShapeResolutionMatchesLegacyAlgorithm(t *testing.T) {
 			config[index] = entry
 		}
 
-		resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog(), false)
+		resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog())
 		for _, filePath := range paths {
 			want := legacyMergedConfigForTest(config, filePath, "/repo", extractConfigIgnores(config))
 			if got := config.GetConfigForFile(filePath, "/repo"); !reflect.DeepEqual(got, want) {
@@ -297,7 +297,7 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 		},
 	}
 
-	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog(), false)
+	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog())
 	paths := []string{
 		"/repo/src/a.ts",
 		"/repo/src/b.ts",
@@ -310,7 +310,7 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 	}
 	for _, filePath := range paths {
 		directMerged := config.GetConfigForFile(filePath, "/repo")
-		directRules := ConfiguredRules(baseRuleCatalog(), directMerged, false)
+		directRules := ConfiguredRules(baseRuleCatalog(), directMerged)
 		resolvedRules, resolvedMerged := resolver.EnabledRulesForFile(filePath)
 		if !reflect.DeepEqual(resolvedMerged, directMerged) {
 			t.Fatalf("%s merged config mismatch:\nresolver: %#v\ndirect:   %#v", filePath, resolvedMerged, directMerged)
@@ -331,7 +331,7 @@ func TestFileConfigResolverMatchesDirectResolutionAcrossShapes(t *testing.T) {
 
 func TestFileConfigResolverDistinguishesMatchedZeroRulesAndMisses(t *testing.T) {
 	config := RslintConfig{{Settings: Settings{}}}
-	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog(), false)
+	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog())
 
 	rules, merged := resolver.EnabledRulesForFile("/repo/src/file.ts")
 	if merged == nil || len(rules) != 0 {
@@ -363,7 +363,7 @@ func TestFileConfigResolverShapeKeyPreservesEntriesBeyond64(t *testing.T) {
 		Rules: Rules{"no-console": "warn"},
 	}
 
-	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog(), false)
+	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog())
 	paths := []string{
 		"/repo/src/ordinary.ts",
 		"/repo/src/low.ts",
@@ -375,7 +375,7 @@ func TestFileConfigResolverShapeKeyPreservesEntriesBeyond64(t *testing.T) {
 	for _, filePath := range paths {
 		resolvedRules, resolvedMerged := resolver.EnabledRulesForFile(filePath)
 		directMerged := config.GetConfigForFile(filePath, "/repo")
-		directRules := ConfiguredRules(baseRuleCatalog(), directMerged, false)
+		directRules := ConfiguredRules(baseRuleCatalog(), directMerged)
 		if !reflect.DeepEqual(resolvedMerged, directMerged) ||
 			!reflect.DeepEqual(configuredRuleViews(resolvedRules), configuredRuleViews(directRules)) {
 			t.Fatalf("resolution mismatch for %s", filePath)
@@ -408,7 +408,7 @@ func TestFileConfigResolverPreservesWindowsPathMatching(t *testing.T) {
 		{"C:/repo/packages/foo/src/index.ts", "C:/repo"},
 	}
 	for _, test := range tests {
-		resolver := NewFileConfigResolver(config, test.cwd, baseRuleCatalog(), false)
+		resolver := NewFileConfigResolver(config, test.cwd, baseRuleCatalog())
 		got := resolver.ConfigForFile(test.filePath)
 		want := config.GetConfigForFile(test.filePath, test.cwd)
 		if !reflect.DeepEqual(got, want) {
@@ -425,7 +425,7 @@ func TestFileConfigResolverConcurrentShapePublication(t *testing.T) {
 			"no-debugger": "error",
 		},
 	}}
-	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog(), false)
+	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog())
 	plans := make(chan *effectiveConfigPlan, 128)
 	var waitGroup sync.WaitGroup
 	for index := range 128 {
@@ -458,7 +458,7 @@ func TestFileConfigResolverConcurrentDirectoryBlockCache(t *testing.T) {
 		{Ignores: []string{"dist/**"}},
 		{Files: []string{"**/*.ts"}, Settings: Settings{}},
 	}
-	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog(), false)
+	resolver := NewFileConfigResolver(config, "/repo", baseRuleCatalog())
 
 	var waitGroup sync.WaitGroup
 	results := make(chan *MergedConfig, 128)
@@ -493,7 +493,7 @@ type configuredRuleView struct {
 	hasRun             bool
 }
 
-func configuredRuleViews(rules []linter.ConfiguredRule) []configuredRuleView {
+func configuredRuleViews(rules []rule.ConfiguredRule) []configuredRuleView {
 	views := make([]configuredRuleView, len(rules))
 	for index, configuredRule := range rules {
 		views[index] = configuredRuleView{

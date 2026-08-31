@@ -1,0 +1,15 @@
+export default [
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: ['./tsconfig.json'],
+      },
+    },
+    rules: {
+      'unicode-bom': 'error',
+      'no-var': 'error',
+    },
+  },
+];

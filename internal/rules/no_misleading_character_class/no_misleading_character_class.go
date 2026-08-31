@@ -376,12 +376,13 @@ type regexpCallTracker struct {
 	indexedNames      map[string]bool
 	allNamesIndexed   bool
 
-	propertyEvaluator   *utils.StaticStringEvaluator
-	potentiallyShadowed map[string]bool
-	disabledRoots       map[string]bool
-	tracedVariables     map[regexpTraceVariable]struct{}
-	tracedGlobals       map[regexpTraceGlobal]struct{}
-	calls               map[*ast.Node]struct{}
+	propertyEvaluator            *utils.StaticStringEvaluator
+	potentiallyShadowed          map[string]bool
+	potentiallyNamespaceShadowed map[string]bool
+	disabledRoots                map[string]bool
+	tracedVariables              map[regexpTraceVariable]struct{}
+	tracedGlobals                map[regexpTraceGlobal]struct{}
+	calls                        map[*ast.Node]struct{}
 }
 
 func newRegExpCallTracker(ctx rule.RuleContext) *regexpCallTracker {
@@ -422,6 +423,7 @@ func (tracker *regexpCallTracker) collectRootIdentifiers() {
 					}
 					tracker.potentiallyShadowed[name] = true
 				}
+				tracker.recordNamespaceBinding(node, name)
 				node.ForEachChild(visit)
 				return false
 			}
@@ -540,26 +542,38 @@ func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name s
 		utils.IsNonReferenceIdentifier(identifier) {
 		return false
 	}
-	if tracker.ctx.Refs != nil {
+	if !tracker.potentiallyShadowed[name] {
+		return true
+	}
+	if tracker.ctx.Refs != nil && !tracker.potentiallyNamespaceShadowed[name] {
 		// RefStore's binder scope walk is authoritative for ordinary value
 		// bindings declared in this file. Resolve can also fall back to the
 		// TypeChecker for symbols declared outside this file (cross-file,
-		// .d.ts, standard-library globals); a symbol resolved that way is
-		// still the real global, not a shadowing local binding.
-		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+		// .d.ts, standard-library globals); a symbol resolved that way is still
+		// the real global, not a shadowing local binding.
+		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil &&
+			utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			return false
 		}
-		// Namespace-only bindings are outside RefStore's value lookup. Only
-		// pay for the broader syntactic scope check when this file actually
-		// declared a watched root; doing it for every ordinary `window.*`
-		// read would make large files quadratic.
-		if !tracker.potentiallyShadowed[name] {
-			return true
-		}
+		return true
 	}
-	// Keep the syntactic fallback for namespace-only bindings and direct/unit
-	// callers without a Program.
+	// Namespace-only bindings are outside RefStore's value lookup. Keep the
+	// syntactic fallback for those and for direct/unit callers without a
+	// Program.
 	return !utils.IsShadowed(identifier, name)
+}
+
+func (tracker *regexpCallTracker) recordNamespaceBinding(identifier *ast.Node, name string) {
+	if identifier == nil || identifier.Parent == nil ||
+		identifier.Parent.Kind != ast.KindModuleDeclaration ||
+		identifier.Parent.Name() != identifier ||
+		utils.IsQualifiedNamespaceSegment(identifier.Parent) {
+		return
+	}
+	if tracker.potentiallyNamespaceShadowed == nil {
+		tracker.potentiallyNamespaceShadowed = make(map[string]bool)
+	}
+	tracker.potentiallyNamespaceShadowed[name] = true
 }
 
 func (tracker *regexpCallTracker) isRegExpCall(node *ast.Node, callee *ast.Node) bool {
@@ -818,20 +832,22 @@ func (tracker *regexpCallTracker) trackIdentifierVariable(identifier *ast.Node, 
 		tracker.trackVariable(symbol, value)
 		return
 	}
-	if tracker.ctx.Refs != nil {
+	name := identifier.AsIdentifier().Text
+	shadowed := utils.IsShadowed(identifier, name)
+	if tracker.ctx.Refs != nil && shadowed {
 		// Only a symbol actually declared in this file is a local variable
 		// binding; Resolve's TypeChecker fallback can also reach a
 		// lib/ambient symbol declared elsewhere (e.g. assigning to a bare
-		// `window`), which belongs to the configured-global path below, not
-		// trackVariable's per-declaration tracking.
+		// `window`). The syntactic shadow check keeps a block-local namespace
+		// retained in SourceFile Locals from masquerading as such a binding
+		// outside its lexical scope.
 		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil && utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
 			return
 		}
 	}
 
-	name := identifier.AsIdentifier().Text
-	if tracker.ctx.Globals.Override(name).IsDeclared() {
+	if !shadowed && tracker.ctx.Globals.Override(name).IsDeclared() {
 		// The initial index contains only built-in roots. Indexing this
 		// configured-global name also records namespace-only declarations
 		// before deciding whether the assignment target is truly global.
@@ -921,6 +937,7 @@ func (tracker *regexpCallTracker) identifiersForName(name string) []*ast.Node {
 					}
 					tracker.potentiallyShadowed[identifierName] = true
 				}
+				tracker.recordNamespaceBinding(node, identifierName)
 			} else if !tracker.indexedNames[identifierName] {
 				tracker.identifiersByName[identifierName] = append(tracker.identifiersByName[identifierName], node)
 			}

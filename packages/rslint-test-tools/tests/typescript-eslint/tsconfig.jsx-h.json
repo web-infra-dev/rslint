@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.decorators-00.json",
+  "compilerOptions": {
+    "jsxFactory": "h"
+  }
+}

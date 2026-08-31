@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/block_scoped_var"
 	"github.com/web-infra-dev/rslint/internal/rules/capitalized_comments"
+	"github.com/web-infra-dev/rslint/internal/rules/class_methods_use_this"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_this"
@@ -25,14 +26,20 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
+	"github.com/web-infra-dev/rslint/internal/rules/default_param_last"
 	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
+	"github.com/web-infra-dev/rslint/internal/rules/func_name_matching"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
+	"github.com/web-infra-dev/rslint/internal/rules/grouped_accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/id_denylist"
 	"github.com/web-infra-dev/rslint/internal/rules/id_length"
+	"github.com/web-infra-dev/rslint/internal/rules/id_match"
 	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
+	"github.com/web-infra-dev/rslint/internal/rules/logical_assignment_operators"
 	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
@@ -40,7 +47,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/max_nested_callbacks"
 	"github.com/web-infra-dev/rslint/internal/rules/max_params"
 	"github.com/web-infra-dev/rslint/internal/rules/max_statements"
+	"github.com/web-infra-dev/rslint/internal/rules/new_cap"
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
+	"github.com/web-infra-dev/rslint/internal/rules/no_array_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
 	"github.com/web-infra-dev/rslint/internal/rules/no_bitwise"
@@ -88,6 +97,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_inline_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
+	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_this"
 	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
 	"github.com/web-infra-dev/rslint/internal/rules/no_iterator"
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
@@ -190,6 +200,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
+	"github.com/web-infra-dev/rslint/internal/rules/sort_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/sort_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/sort_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
@@ -197,6 +208,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/unicode_bom"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
+	"github.com/web-infra-dev/rslint/internal/rules/vars_on_top"
+	"github.com/web-infra-dev/rslint/internal/rules/yoda"
 )
 
 var allRuleCatalog = sync.OnceValue(func() *rule.Catalog {
@@ -231,6 +244,7 @@ func coreRules() []rule.Rule {
 		arrow_body_style.ArrowBodyStyleRule,
 		block_scoped_var.BlockScopedVarRule,
 		capitalized_comments.CapitalizedCommentsRule,
+		class_methods_use_this.ClassMethodsUseThisRule,
 		complexity.ComplexityRule,
 		consistent_return.ConsistentReturnRule,
 		consistent_this.ConsistentThisRule,
@@ -238,13 +252,19 @@ func coreRules() []rule.Rule {
 		curly.CurlyRule,
 		default_case.DefaultCaseRule,
 		default_case_last.DefaultCaseLastRule,
+		default_param_last.DefaultParamLastRule,
 		dot_notation.DotNotationRule,
 		for_direction.ForDirectionRule,
+		func_name_matching.FuncNameMatchingRule,
 		func_names.FuncNamesRule,
 		getter_return.GetterReturnRule,
+		grouped_accessor_pairs.GroupedAccessorPairsRule,
 		guard_for_in.GuardForInRule,
+		id_denylist.IdDenylistRule,
 		id_length.IdLengthRule,
+		id_match.IdMatchRule,
 		init_declarations.InitDeclarationsRule,
+		logical_assignment_operators.LogicalAssignmentOperatorsRule,
 		max_classes_per_file.MaxClassesPerFileRule,
 		max_depth.MaxDepthRule,
 		max_lines.MaxLinesRule,
@@ -252,7 +272,9 @@ func coreRules() []rule.Rule {
 		max_nested_callbacks.MaxNestedCallbacksRule,
 		max_params.MaxParamsRule,
 		max_statements.MaxStatementsRule,
+		new_cap.NewCapRule,
 		no_alert.NoAlertRule,
+		no_array_constructor.NoArrayConstructorRule,
 		no_async_promise_executor.NoAsyncPromiseExecutorRule,
 		no_await_in_loop.NoAwaitInLoopRule,
 		no_bitwise.NoBitwiseRule,
@@ -360,6 +382,7 @@ func coreRules() []rule.Rule {
 		prefer_template.PreferTemplateRule,
 		no_this_before_super.NoThisBeforeSuperRule,
 		no_var.NoVarRule,
+		vars_on_top.VarsOnTopRule,
 		no_void.NoVoidRule,
 		no_warning_comments.NoWarningCommentsRule,
 		no_with.NoWithRule,
@@ -367,6 +390,7 @@ func coreRules() []rule.Rule {
 		prefer_spread.PreferSpreadRule,
 		no_empty_character_class.NoEmptyCharacterClassRule,
 		no_invalid_regexp.NoInvalidRegexpRule,
+		no_invalid_this.NoInvalidThisRule,
 		no_iterator.NoIteratorRule,
 		no_setter_return.NoSetterReturnRule,
 		no_unsafe_negation.NoUnsafeNegationRule,
@@ -408,7 +432,9 @@ func coreRules() []rule.Rule {
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
 		unicode_bom.UnicodeBomRule,
 		operator_assignment.OperatorAssignmentRule,
+		sort_imports.SortImportsRule,
 		sort_keys.SortKeysRule,
 		sort_vars.SortVarsRule,
+		yoda.YodaRule,
 	}
 }

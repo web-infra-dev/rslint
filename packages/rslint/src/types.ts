@@ -59,7 +59,7 @@ export interface LintResponse {
   // discovery requests use workingDirectory. Present for lintFiles so the
   // Rslint class seeds one result per linted file.
   lintedFiles?: string[];
-  output?: Record<string, string>; // Per-file fixed source, present when fix:true applied a fix
+  output?: Record<string, string>; // Per-file final source, present when fix:true applied at least one fix
   encodedSourceFiles?: Record<string, string>; // Binary encoded source files as base64-encoded strings
 }
 
@@ -89,8 +89,9 @@ export interface LintOptions {
     /** Parallel to `files`; true only for caller-literal file targets. */
     explicitFiles?: boolean[];
     /**
-     * Normalized API override entries appended to every selected config;
-     * relative paths retain workingDirectory as their authored base.
+     * Normalized API override entries appended to every selected config array.
+     * Relative fields without `basePath` retain `workingDirectory` as their
+     * authored base; `basePath` itself inherits the selected ConfigArray base.
      */
     overrideConfig?: Record<string, unknown>[];
   };
@@ -98,8 +99,8 @@ export interface LintOptions {
   // request-scoped placeholder rules from this metadata, then asks the Node
   // peer to execute them through a reverse `pluginLint` request.
   eslintPlugins?: Array<{ prefix: string; ruleNames: string[] }>;
-  // Anchor for relative paths in low-level `config`. Native discovery entries
-  // use their owning config directory; inline overrides use workingDirectory.
+  // Owner and anchor for low-level `config`. Native discovery entries without
+  // basePath use their owner; inline entries without it use workingDirectory.
   configDirectory?: string;
   // Opaque community-plugin worker identity, independent from the directory
   // used to resolve config paths.
@@ -108,9 +109,10 @@ export interface LintOptions {
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
   includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
   // Apply rule auto-fixes in-band (ESLint's `fix: true`); the fixed source per
-  // file is returned in LintResponse.output and is NOT written to disk. Rules
-  // and languageOptions live in the config entries — there is no separate
-  // ruleOptions / languageOptions override surface.
+  // file is returned in LintResponse.output and is NOT written to disk.
+  // Diagnostics and encoded sources describe the final post-fix generation.
+  // Rules and languageOptions live in the config entries — there is no
+  // separate ruleOptions / languageOptions override surface.
   fix?: boolean;
 }
 

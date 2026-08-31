@@ -204,6 +204,7 @@ describe('normalizeConfig', () => {
   test('preserves all known fields', () => {
     const result = normalizeConfig([
       {
+        basePath: 'packages/app',
         files: ['**/*.ts'],
         ignores: ['dist/**'],
         languageOptions: {
@@ -215,6 +216,7 @@ describe('normalizeConfig', () => {
       },
     ]);
     const entry = result[0];
+    expect(entry.basePath).toBe('packages/app');
     expect(entry.files).toEqual(['**/*.ts']);
     expect(entry.ignores).toEqual(['dist/**']);
     expect(entry.rules).toEqual({ 'no-console': 'error' });
@@ -306,6 +308,21 @@ describe('normalizeConfig', () => {
     expect(() => normalizeConfig([{ ignores: [null], rules: {} }])).toThrow(
       '"ignores" must contain only strings',
     );
+  });
+
+  test.each([null, undefined, 42, {}, []])(
+    'rejects invalid basePath %p',
+    (basePath) => {
+      expect(() => normalizeConfig([{ basePath }])).toThrow(
+        '"basePath" must be a string',
+      );
+    },
+  );
+
+  test('preserves basePath without changing an ignores-only entry shape', () => {
+    expect(
+      normalizeConfig([{ basePath: 'packages/app', ignores: ['dist/**'] }]),
+    ).toEqual([{ basePath: 'packages/app', ignores: ['dist/**'] }]);
   });
 
   test('allows omitted files and ignores', () => {

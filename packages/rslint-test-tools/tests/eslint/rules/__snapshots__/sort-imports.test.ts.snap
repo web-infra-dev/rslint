@@ -1,0 +1,819 @@
+// Rstest Snapshot v1
+
+exports[`sort-imports > invalid 1`] = `
+{
+  "code": "import a from 'foo.js';
+import A from 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 2`] = `
+{
+  "code": "import b from 'foo.js';
+import a from 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 3`] = `
+{
+  "code": "import {b, c} from 'foo.js';
+import {a, d} from 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 4`] = `
+{
+  "code": "import * as foo from 'foo.js';
+import * as bar from 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 5`] = `
+{
+  "code": "import a from 'foo.js';
+import {b, c} from 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Expected 'multiple' syntax before 'single' syntax.",
+      "messageId": "unexpectedSyntaxOrder",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 6`] = `
+{
+  "code": "import a from 'foo.js';
+import * as b from 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Expected 'all' syntax before 'single' syntax.",
+      "messageId": "unexpectedSyntaxOrder",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 7`] = `
+{
+  "code": "import a from 'foo.js';
+import 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Expected 'none' syntax before 'single' syntax.",
+      "messageId": "unexpectedSyntaxOrder",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 8`] = `
+{
+  "code": "import b from 'bar.js';
+import * as a from 'foo.js';",
+  "diagnostics": [
+    {
+      "message": "Expected 'all' syntax before 'single' syntax.",
+      "messageId": "unexpectedSyntaxOrder",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 9`] = `
+{
+  "code": "import {b, a, d, c} from 'foo.js';",
+  "diagnostics": [
+    {
+      "message": "Member 'a' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 10`] = `
+{
+  "code": "import {b, a, d, c} from 'foo.js';
+import {e, f, g, h} from 'bar.js';",
+  "diagnostics": [
+    {
+      "message": "Member 'a' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 11`] = `
+{
+  "code": "import {a, B, c, D} from 'foo.js';",
+  "diagnostics": [
+    {
+      "message": "Member 'B' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 12`] = `
+{
+  "code": "import {zzzzz, /* comment */ aaaaa} from 'foo.js';",
+  "diagnostics": [
+    {
+      "message": "Member 'aaaaa' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 13`] = `
+{
+  "code": "import {zzzzz /* comment */, aaaaa} from 'foo.js';",
+  "diagnostics": [
+    {
+      "message": "Member 'aaaaa' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 14`] = `
+{
+  "code": "import {/* comment */ zzzzz, aaaaa} from 'foo.js';",
+  "diagnostics": [
+    {
+      "message": "Member 'aaaaa' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 15`] = `
+{
+  "code": "import {zzzzz, aaaaa /* comment */} from 'foo.js';",
+  "diagnostics": [
+    {
+      "message": "Member 'aaaaa' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 16`] = `
+{
+  "code": "
+              import {
+                boop,
+                foo,
+                zoo,
+                baz as qux,
+                bar,
+                beep
+              } from 'foo.js';
+            ",
+  "diagnostics": [
+    {
+      "message": "Member 'qux' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 6,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 17`] = `
+{
+  "code": "import b from 'b';
+import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 18`] = `
+{
+  "code": "import b from 'b';
+
+import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 19`] = `
+{
+  "code": "import b from 'b';
+import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 20`] = `
+{
+  "code": "import b from 'b';
+import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 21`] = `
+{
+  "code": "import b from 'b';import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 22`] = `
+{
+  "code": "import b from 'b'; /* comment */ import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 23`] = `
+{
+  "code": "import b from 'b'; // comment
+import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 24`] = `
+{
+  "code": "import b from 'b'; // comment 1
+/* comment 2 */import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 25`] = `
+{
+  "code": "import { b } from 'b'; /* comment line 1 
+ comment line 2 */ import { a } from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 26`] = `
+{
+  "code": "import b
+from 'b'; import a
+from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 27`] = `
+{
+  "code": "import { b } from 
+'b'; /* comment */ import
+ { a } from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 28`] = `
+{
+  "code": "import { b } from 
+'b';
+import
+ { a } from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 29`] = `
+{
+  "code": "import c from 'c';
+
+import b from 'b';
+import a from 'a';",
+  "diagnostics": [
+    {
+      "message": "Imports should be sorted alphabetically.",
+      "messageId": "sortImportsAlphabetically",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`sort-imports > invalid 30`] = `
+{
+  "code": "import b from 'b';
+
+import { c, a } from 'c';",
+  "diagnostics": [
+    {
+      "message": "Member 'a' of the import declaration should be sorted alphabetically.",
+      "messageId": "sortMembersAlphabetically",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "sort-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

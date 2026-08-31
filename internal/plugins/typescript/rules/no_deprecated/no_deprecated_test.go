@@ -250,8 +250,8 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 		Programs:         programs,
 		TargetsByProgram: [][]string{{sourceFile.FileName()}},
 		SingleThreaded:   true,
-		GetRulesForFile: func(_ *ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
+		GetRulesForFile: func(_ *ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
 				Name:     "test",
 				Severity: rule.SeverityError,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {

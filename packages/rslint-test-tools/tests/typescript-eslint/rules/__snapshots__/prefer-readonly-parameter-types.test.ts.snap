@@ -1,0 +1,1305 @@
+// Rstest Snapshot v1
+
+exports[`prefer-readonly-parameter-types > invalid 1`] = `
+{
+  "code": "function foo(arg: string[]) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 2`] = `
+{
+  "code": "function foo(arg: Array<string>) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 3`] = `
+{
+  "code": "function foo(arg: [string]) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 4`] = `
+{
+  "code": "function foo(arg: readonly string[][]) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 5`] = `
+{
+  "code": "function foo(arg: Readonly<string[][]>) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 6`] = `
+{
+  "code": "function foo(arg: ReadonlyArray<Array<string>>) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 7`] = `
+{
+  "code": "function foo(arg: { foo: '' }) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 8`] = `
+{
+  "code": "function foo(arg: { foo: readonly string[] }) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 9`] = `
+{
+  "code": "function foo(arg: { foo(): void }) {}",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 10`] = `
+{
+  "code": "
+function foo(arg: {
+  readonly foo: {
+    bar: string;
+  };
+}) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 11`] = `
+{
+  "code": "
+function foo(arg: { [key: string]: string }) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 12`] = `
+{
+  "code": "
+function foo(arg: { [key: number]: string }) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 13`] = `
+{
+  "code": "
+interface Test {
+  (): void;
+  property: boolean;
+}
+function foo(arg: Test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 14`] = `
+{
+  "code": "
+type Test = (() => void) & {
+  property: boolean;
+};
+function foo(arg: Test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 15`] = `
+{
+  "code": "
+interface Test extends Array<string> {
+  readonly property: boolean;
+}
+function foo(arg: Test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 16`] = `
+{
+  "code": "
+interface Test extends Array<string> {
+  property: boolean;
+}
+function foo(arg: Test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 17`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    private arg1: string[],
+    public arg2: string[],
+    protected arg3: string[],
+    readonly arg4: string[],
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 18`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    private arg1: readonly string[],
+    public arg2: readonly string[],
+    protected arg3: readonly string[],
+    readonly arg4: readonly string[],
+    arg5: string[],
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 19`] = `
+{
+  "code": "
+interface Foo {
+  (arg: string[]): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 20`] = `
+{
+  "code": "
+interface Foo {
+  new (arg: string[]): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 21`] = `
+{
+  "code": "class Foo { foo(arg: string[]): void; };",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 22`] = `
+{
+  "code": "function foo(arg: string[]);",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 23`] = `
+{
+  "code": "type Foo = (arg: string[]) => void;",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 24`] = `
+{
+  "code": "
+interface Foo {
+  foo(arg: string[]): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 25`] = `
+{
+  "code": "
+interface Foo {
+  prop: Foo;
+}
+function foo(arg: Foo) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 26`] = `
+{
+  "code": "
+interface Foo {
+  prop: Foo;
+}
+function foo(arg: Readonly<Foo>) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 27`] = `
+{
+  "code": "
+interface Foo {
+  prop: Bar;
+}
+interface Bar {
+  readonly prop: Foo;
+}
+function foo(arg: Foo) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 28`] = `
+{
+  "code": "
+interface Foo {
+  prop: Bar;
+}
+interface Bar {
+  readonly prop: Foo;
+}
+function foo(arg: Readonly<Foo>) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 29`] = `
+{
+  "code": "
+interface Foo {
+  prop: Readonly<Bar>;
+}
+interface Bar {
+  prop: Readonly<Foo>;
+}
+function foo(arg: Foo) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 30`] = `
+{
+  "code": "
+class ClassExample {}
+type Test = typeof ClassExample & {
+  readonly property: boolean;
+};
+function foo(arg: Test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 31`] = `
+{
+  "code": "
+const sym = Symbol('sym');
+
+interface WithSymbol {
+  [sym]: number;
+}
+
+const willNot = (foo: WithSymbol) => {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 8,
+        },
+        "start": {
+          "column": 18,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 32`] = `
+{
+  "code": "
+type Callback<T> = (options: T) => void;
+
+declare const acceptsCallback: <T>(callback: Callback<T>) => void;
+
+interface CallbackOptions {
+  prop: string;
+}
+
+acceptsCallback<CallbackOptions>((options: CallbackOptions) => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 10,
+        },
+        "start": {
+          "column": 35,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 33`] = `
+{
+  "code": "
+type MyType = {
+  readonly prop: string;
+  method(): string;
+};
+function foo(arg: MyType) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 34`] = `
+{
+  "code": "
+type MyType<T> = {
+  [K in keyof T]: 'cat' | 'dog' | T[K];
+};
+
+function method<A extends any[] = string[]>(value: MyType<A>) {
+  return value;
+}
+
+method(['cat', 'dog']);
+method<'mouse'[]>(['cat', 'mouse']);
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 6,
+        },
+        "start": {
+          "column": 45,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 35`] = `
+{
+  "code": "
+declare const fooFactory: <T>(x: readonly T[]) => (f: (x: T) => void) => void;
+fooFactory([{ abc: 42 }])(x => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 36`] = `
+{
+  "code": "
+function foo(arg: RegExp) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 37`] = `
+{
+  "code": "
+interface Foo {
+  readonly prop: RegExp;
+}
+
+function foo(arg: Foo) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 38`] = `
+{
+  "code": "
+interface Foo {
+  readonly prop: RegExp;
+}
+
+function foo(arg: Foo) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 39`] = `
+{
+  "code": "
+interface Foo {
+  readonly prop: RegExp;
+}
+
+function foo(arg: Foo) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 40`] = `
+{
+  "code": "
+function foo(arg: RegExp) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 41`] = `
+{
+  "code": "
+function foo(arg: RegExp) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-readonly-parameter-types > invalid 42`] = `
+{
+  "code": "
+declare function foo<T>(callback: (arg: T) => void): void;
+foo<string[]>(arg => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter should be a read only type.",
+      "messageId": "shouldBeReadonly",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-readonly-parameter-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

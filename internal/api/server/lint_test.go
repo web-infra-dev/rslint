@@ -114,6 +114,73 @@ func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
 	}
 }
 
+func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAlias(t *testing.T) {
+	root := t.TempDir()
+	realPath := filepath.Join(root, "real.ts")
+	aliasPath := filepath.Join(root, "alias.ts")
+	if err := os.WriteFile(realPath, []byte("const value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(`{"compilerOptions":{"noLib":true},"files":["real.ts"]}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	var wirePath string
+	response, err := (&Handler{}).handleLint(
+		context.Background(),
+		api.LintRequest{
+			Files:          []string{aliasPath},
+			CanonicalFiles: []string{realPath},
+			Config: json.RawMessage(`[{
+				"files":["**/*.ts"],
+				"plugins":["community"],
+				"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},
+				"rules":{"community/check":"error"}
+			}]`),
+			ConfigDirectory:  root,
+			WorkingDirectory: root,
+			EslintPlugins: []api.EslintPluginEntry{{
+				Prefix:    "community",
+				RuleNames: []string{"check"},
+			}},
+		},
+		func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			if len(request.Files) != 1 {
+				return nil, fmt.Errorf("plugin files = %d, want 1", len(request.Files))
+			}
+			wirePath = request.Files[0].Path
+			return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+				FilePath: wirePath,
+				Diagnostics: []linter.EslintPluginDiagnostic{{
+					RuleName: "community/check",
+					Message:  "reported",
+					StartPos: 0,
+					EndPos:   5,
+				}},
+			}}}, nil
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wirePath != tspath.NormalizePath(realPath) {
+		t.Fatalf("plugin wire path = %q, want Program identity %q", wirePath, tspath.NormalizePath(realPath))
+	}
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "alias.ts" {
+		t.Fatalf("projected diagnostics = %+v, want requested alias", response.Diagnostics)
+	}
+	if !reflect.DeepEqual(response.LintedFiles, []string{"alias.ts"}) {
+		t.Fatalf("linted files = %v, want requested alias", response.LintedFiles)
+	}
+}
+
 func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
@@ -718,6 +785,31 @@ func TestHandleLint_LowLevelResponsePathsRemainRelativeToConfigDirectory(t *test
 	}
 	if !reflect.DeepEqual(response.LintedFiles, []string{"src/source.js"}) {
 		t.Fatalf("linted files = %v, want config-relative source", response.LintedFiles)
+	}
+}
+
+func TestHandleLint_LowLevelConfigResolvesBasePathFromConfigDirectory(t *testing.T) {
+	dir := t.TempDir()
+	inside := filepath.Join(dir, "src", "inside.js")
+	outside := filepath.Join(dir, "outside.js")
+	writeProgramTestFiles(t, dir, map[string]string{
+		"src/inside.js": "debugger;\n",
+		"outside.js":    "debugger;\n",
+	})
+
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
+		Config: json.RawMessage(`[
+			{"basePath":"src","files":["*.js"],"rules":{"no-debugger":"error"}}
+		]`),
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{inside, outside},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint: %v", err)
+	}
+	if response.FileCount != 2 || len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "src/inside.js" {
+		t.Fatalf("basePath scope was not resolved at the config boundary: %+v", response)
 	}
 }
 
@@ -1381,48 +1473,6 @@ func TestHandleLint_SuggestionDataConverted(t *testing.T) {
 	}
 	if len(s.Fixes) != 1 || s.Fixes[0].Text != "Bar" {
 		t.Fatalf("expected suggestion fix text \"Bar\", got %+v", s.Fixes)
-	}
-}
-
-// ⑥: fix:true applies fixes in-band and returns the fixed source per file in
-// Output (not written to disk), plus fixable*Count split by severity.
-func TestHandleLint_FixProducesInBandOutput(t *testing.T) {
-	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
-	if err != nil {
-		t.Fatalf("resolve fixtures dir: %v", err)
-	}
-	config := json.RawMessage(`[{
-		"files": ["**/*.ts"],
-		"languageOptions": { "parserOptions": { "project": ["./tsconfig.json"] } },
-		"rules": { "@typescript-eslint/array-type": "error" },
-		"plugins": ["@typescript-eslint"]
-	}]`)
-	gapFile := filepath.Join(fixturesDir, "gap-fix.ts")
-
-	handler := &Handler{}
-	resp, err := handler.HandleLint(api.LintRequest{
-		Config:           config,
-		ConfigDirectory:  fixturesDir,
-		WorkingDirectory: fixturesDir,
-		Files:            []string{gapFile},
-		FileContents:     map[string]string{gapFile: "let a: Array<string> = [];\n"},
-		Fix:              true,
-	})
-	if err != nil {
-		t.Fatalf("HandleLint returned error: %v", err)
-	}
-	if resp.FixableErrorCount != 1 || resp.FixableWarningCount != 0 {
-		t.Fatalf("expected fixableErrorCount=1 fixableWarningCount=0, got %d/%d", resp.FixableErrorCount, resp.FixableWarningCount)
-	}
-	if resp.Output == nil {
-		t.Fatal("expected non-nil Output for fix:true")
-	}
-	got, ok := resp.Output["gap-fix.ts"]
-	if !ok {
-		t.Fatalf("expected in-band output keyed \"gap-fix.ts\", got %d entries", len(resp.Output))
-	}
-	if want := "let a: string[] = [];\n"; got != want {
-		t.Fatalf("expected fixed output %q, got %q", want, got)
 	}
 }
 
@@ -2194,16 +2244,24 @@ func TestHandleLint_ConfigDiscoveryExplicitFilesMustMatchFiles(t *testing.T) {
 
 func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *testing.T) {
 	tests := []struct {
-		name       string
-		source     string
-		override   json.RawMessage
-		wantPrefix string
+		name           string
+		targetRelative string
+		source         string
+		override       json.RawMessage
+		wantPrefix     string
 	}{
 		{
 			name:       "override config",
 			source:     "debugger;\n",
 			override:   json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
 			wantPrefix: "no-debugger",
+		},
+		{
+			name:           "override config basePath",
+			targetRelative: "src/input.js",
+			source:         "debugger;\n",
+			override:       json.RawMessage(`[{"basePath":"src","files":["*.js"],"rules":{"no-debugger":"error"}}]`),
+			wantPrefix:     "no-debugger",
 		},
 		{
 			name:       "syntax only",
@@ -2215,7 +2273,14 @@ func TestHandleLint_ConfigDiscoveryWithoutCandidateUsesOverrideOrSyntaxOnly(t *t
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
-			target := filepath.Join(dir, "input.js")
+			targetRelative := test.targetRelative
+			if targetRelative == "" {
+				targetRelative = "input.js"
+			}
+			target := filepath.Join(dir, targetRelative)
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				t.Fatalf("create target directory: %v", err)
+			}
 			if err := os.WriteFile(target, []byte(test.source), 0o644); err != nil {
 				t.Fatalf("write target: %v", err)
 			}
@@ -2306,7 +2371,7 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 
 	var calls atomic.Int32
 	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
-		calls.Add(1)
+		call := calls.Add(1)
 		if kind != api.KindPluginLint {
 			t.Fatalf("expected pluginLint reverse request, got %q", kind)
 		}
@@ -2314,11 +2379,18 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 		if !ok {
 			t.Fatalf("unexpected pluginLint payload type %T", payload)
 		}
-		if !req.Fix || req.SuggestionsMode != linter.SuggestionsModeEager {
-			t.Fatalf("unexpected fix settings: fix=%v suggestions=%q", req.Fix, req.SuggestionsMode)
+		if !req.CollectFixes || req.SuggestionsMode != linter.SuggestionsModeEager {
+			t.Fatalf("unexpected edit settings: collectFixes=%v suggestions=%q", req.CollectFixes, req.SuggestionsMode)
 		}
-		if len(req.Files) != 1 || req.Files[0].Text == nil || *req.Files[0].Text != source {
+		if len(req.Files) != 1 || req.Files[0].Text == nil {
 			t.Fatalf("plugin request must carry the exact overlay text, got %+v", req.Files)
+		}
+		wantText := source
+		if call == 2 {
+			wantText = "const good = 1;\n"
+		}
+		if *req.Files[0].Text != wantText {
+			t.Fatalf("plugin request %d text = %q, want %q", call, *req.Files[0].Text, wantText)
 		}
 		if req.Files[0].ConfigKey != pluginConfigDirectory {
 			t.Fatalf("expected configKey %q, got %q", pluginConfigDirectory, req.Files[0].ConfigKey)
@@ -2328,9 +2400,9 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 			t.Fatalf("missing normalized plugin rule options: %+v", req.Rules)
 		}
 
-		result := linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
-			FilePath: req.Files[0].Path,
-			Diagnostics: []linter.EslintPluginDiagnostic{{
+		result := linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{FilePath: req.Files[0].Path}}}
+		if call == 1 {
+			result.Results[0].Diagnostics = []linter.EslintPluginDiagnostic{{
 				RuleName:  "community/rename",
 				MessageId: "rename",
 				Message:   "rename bad",
@@ -2340,8 +2412,8 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 					Range: [2]int{6, 9},
 					Text:  "good",
 				}},
-			}},
-		}}}
+			}}
+		}
 		return ipc.NewMessage(ipc.KindResponse, 1, result)
 	})
 
@@ -2361,28 +2433,106 @@ func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleLintWithContext returned error: %v", err)
 	}
-	if calls.Load() != 1 {
-		t.Fatalf("expected one pluginLint request, got %d", calls.Load())
+	if calls.Load() != 2 {
+		t.Fatalf("pluginLint requests = %d, want fixing and final observations", calls.Load())
 	}
-	if len(response.Diagnostics) != 1 {
-		t.Fatalf("expected one plugin diagnostic, got %+v", response.Diagnostics)
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("final plugin diagnostics = %+v, want none", response.Diagnostics)
 	}
-	diagnostic := response.Diagnostics[0]
-	if diagnostic.RuleName != "community/rename" || diagnostic.MessageId != "rename" || diagnostic.FilePath != "input.js" {
-		t.Fatalf("unexpected plugin diagnostic: %+v", diagnostic)
-	}
-	if diagnostic.Range.Start.Line != 1 || diagnostic.Range.Start.Column != 7 ||
-		diagnostic.Range.End.Line != 1 || diagnostic.Range.End.Column != 10 {
-		t.Fatalf("unexpected plugin diagnostic range: %+v", diagnostic.Range)
-	}
-	if len(diagnostic.Fixes) != 1 || diagnostic.Fixes[0].StartPos != 6 || diagnostic.Fixes[0].EndPos != 9 {
-		t.Fatalf("unexpected plugin fix: %+v", diagnostic.Fixes)
-	}
-	if response.ErrorCount != 1 || response.FixableErrorCount != 1 || response.RuleCount != 1 {
+	if response.ErrorCount != 0 || response.FixableErrorCount != 0 || response.RuleCount != 1 {
 		t.Fatalf("unexpected plugin counts: errors=%d fixable=%d rules=%d", response.ErrorCount, response.FixableErrorCount, response.RuleCount)
 	}
 	if got := response.Output["input.js"]; got != "const good = 1;\n" {
 		t.Fatalf("expected plugin fix in Output, got %q", got)
+	}
+}
+
+func TestHandleLint_EslintPluginEditsWithoutAutofix(t *testing.T) {
+	dir := t.TempDir()
+	pluginConfigDirectory := filepath.Join(dir, "authored-config")
+	target := filepath.Join(dir, "input.js")
+	const source = "const bad = 1;\n"
+	config := json.RawMessage(`[{
+		"plugins": ["community"],
+		"rules": { "community/rename": "warn" }
+	}]`)
+
+	var calls atomic.Int32
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		calls.Add(1)
+		if kind != api.KindPluginLint {
+			t.Fatalf("expected pluginLint reverse request, got %q", kind)
+		}
+		req, ok := payload.(linter.EslintPluginLintRequest)
+		if !ok {
+			t.Fatalf("unexpected pluginLint payload type %T", payload)
+		}
+		if !req.CollectFixes || req.SuggestionsMode != linter.SuggestionsModeEager {
+			t.Fatalf("unexpected edit settings: collectFixes=%v suggestions=%q", req.CollectFixes, req.SuggestionsMode)
+		}
+		if len(req.Files) != 1 || req.Files[0].Text == nil || *req.Files[0].Text != source {
+			t.Fatalf("plugin request must carry the exact overlay text, got %+v", req.Files)
+		}
+		result := linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+			FilePath: req.Files[0].Path,
+			Diagnostics: []linter.EslintPluginDiagnostic{{
+				RuleName:  "community/rename",
+				MessageId: "rename",
+				Message:   "rename bad",
+				StartPos:  6,
+				EndPos:    9,
+				Fixes: []linter.EslintPluginFix{{
+					Range: [2]int{6, 9},
+					Text:  "good",
+				}},
+				Suggestions: []linter.EslintPluginSuggestion{{
+					MessageId: "suggestRename",
+					Desc:      "Rename to better",
+					Fixes: []linter.EslintPluginFix{{
+						Range: [2]int{6, 9},
+						Text:  "better",
+					}},
+				}},
+			}},
+		}}}
+		return ipc.NewMessage(ipc.KindResponse, 1, result)
+	})
+
+	response, err := (&Handler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Config:                config,
+		ConfigDirectory:       dir,
+		PluginConfigDirectory: pluginConfigDirectory,
+		WorkingDirectory:      dir,
+		Files:                 []string{target},
+		FileContents:          map[string]string{target: source},
+		EslintPlugins: []api.EslintPluginEntry{{
+			Prefix:    "community",
+			RuleNames: []string{"rename"},
+		}},
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext returned error: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("pluginLint requests = %d, want one non-mutating observation", calls.Load())
+	}
+	if len(response.Diagnostics) != 1 {
+		t.Fatalf("plugin diagnostics = %+v, want one", response.Diagnostics)
+	}
+	diagnostic := response.Diagnostics[0]
+	if len(diagnostic.Fixes) != 1 || diagnostic.Fixes[0].Text != "good" {
+		t.Fatalf("plugin autofix payload = %+v, want replacement good", diagnostic.Fixes)
+	}
+	if len(diagnostic.Suggestions) != 1 || len(diagnostic.Suggestions[0].Fixes) != 1 ||
+		diagnostic.Suggestions[0].Fixes[0].Text != "better" {
+		t.Fatalf("plugin suggestion payload = %+v, want replacement better", diagnostic.Suggestions)
+	}
+	if response.WarningCount != 1 || response.FixableWarningCount != 1 || response.ErrorCount != 0 {
+		t.Fatalf("unexpected plugin counts: warnings=%d fixableWarnings=%d errors=%d",
+			response.WarningCount, response.FixableWarningCount, response.ErrorCount)
+	}
+	if len(response.Output) != 0 {
+		t.Fatalf("non-autofix request unexpectedly produced output: %+v", response.Output)
 	}
 }
 
