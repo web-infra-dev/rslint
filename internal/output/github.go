@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
-
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type githubFormatter struct{}
@@ -15,9 +13,9 @@ func (githubFormatter) begin(_ *bufio.Writer, _ Report, _ bool) error { return n
 func (githubFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error {
 	severity := "notice"
 	switch view.raw.Severity {
-	case rule.SeverityError:
+	case SeverityError:
 		severity = "error"
-	case rule.SeverityWarning:
+	case SeverityWarning:
 		severity = "warning"
 	}
 
@@ -30,7 +28,7 @@ func (githubFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error {
 		view.start.column+1,
 		view.end.column+1,
 		escapeProperty(view.raw.RuleName),
-		escapeData(view.raw.Message.Description),
+		escapeData(view.raw.Message),
 	)
 	return nil
 }
