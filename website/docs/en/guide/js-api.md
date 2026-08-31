@@ -184,4 +184,4 @@ Each `LintMessage`:
 | `fix`                | `boolean`                                   | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                                                  |
 | `virtualFiles`       | `Record<string, string>`                    | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                                                |
 
-See [Path resolution and `basePath`](/config/configuration-file#path-resolution-and-basepath) for the full source matrix.
+See the [`basePath` configuration reference](/config/base-path) for the full source matrix.

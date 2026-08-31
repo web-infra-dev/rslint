@@ -80,6 +80,47 @@ func (resolver *configTargetResolver) entryMatchesScope(
 	return true
 }
 
+// entryDirectoryCandidateDepthFloor locates the ConfigArray root in the exact
+// path spelling received by the existing ignore matcher. Subtracting the
+// directory's depth below that root from the matcher path's depth gives the
+// root's depth in the entry's path space. This remains valid across aliases and
+// filesystem-free case variants without replacing the original matcher.
+func (resolver *configTargetResolver) entryDirectoryCandidateDepthFloor(
+	matcherPath string,
+	entryMatch *configTargetMatch,
+	configArrayMatch *configTargetMatch,
+) int {
+	entryRelative, withinEntry := RelativePathWithinConfigRoot(
+		entryMatch.path,
+		entryMatch.directory,
+		resolver.scopeUseCaseSensitive(entryMatch.directory),
+	)
+	configArrayRelative, withinConfigArray := RelativePathWithinConfigRoot(
+		configArrayMatch.path,
+		configArrayMatch.directory,
+		resolver.scopeUseCaseSensitive(configArrayMatch.directory),
+	)
+	if !withinEntry || !withinConfigArray {
+		return 0
+	}
+	configArrayDepth := relativePathDepth(configArrayRelative)
+	if relativePathDepth(entryRelative) <= configArrayDepth {
+		return 0
+	}
+	matcherDepth := relativePathDepth(matcherPath)
+	if matcherDepth <= configArrayDepth {
+		return 0
+	}
+	return matcherDepth - configArrayDepth
+}
+
+func relativePathDepth(path string) int {
+	if path == "" {
+		return 0
+	}
+	return 1 + strings.Count(path, "/")
+}
+
 type scopedDirectoryRelation uint8
 
 const (
@@ -101,30 +142,46 @@ func (resolver *configTargetResolver) entryDirectoryRelation(
 		if atBase {
 			return scopedDirectoryDescendantsOnly
 		}
-		_, atConfigArrayBase := resolver.configTargetMatchWithinBase(&matches[entry.configArrayBaseIndex])
-		if atConfigArrayBase {
+		configArrayMatch := &matches[entry.configArrayBaseIndex]
+		withinConfigArray, atConfigArrayBase := resolver.configTargetMatchWithinBase(configArrayMatch)
+		if atConfigArrayBase || (!withinConfigArray && resolver.targetContainsBase(
+			configArrayMatch,
+			entry.configArrayBaseIndex,
+			target,
+		)) {
 			return scopedDirectoryDescendantsOnly
 		}
 		return scopedDirectoryInside
 	}
+	if resolver.targetContainsBase(match, entry.baseIndex, target) {
+		return scopedDirectoryDescendantsOnly
+	}
+	return scopedDirectoryOutside
+}
+
+func (resolver *configTargetResolver) targetContainsBase(
+	match *configTargetMatch,
+	baseIndex int,
+	target configTargetIdentity,
+) bool {
 	if _, containsBase := RelativePathWithinConfigRoot(
 		match.directory,
 		match.path,
 		resolver.scopeUseCaseSensitive(match.directory),
 	); containsBase {
-		return scopedDirectoryDescendantsOnly
+		return true
 	}
 	if target.canonicalMatchPath != "" {
-		physicalBase := resolver.bases[entry.baseIndex].physicalDirectory
+		physicalBase := resolver.bases[baseIndex].physicalDirectory
 		if _, containsPhysicalBase := RelativePathWithinConfigRoot(
 			physicalBase,
 			target.canonicalMatchPath,
 			true,
 		); containsPhysicalBase {
-			return scopedDirectoryDescendantsOnly
+			return true
 		}
 	}
-	return scopedDirectoryOutside
+	return false
 }
 
 // configTargetIdentity is the immutable caller-visible/canonical pair for one
@@ -589,8 +646,10 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 				matcher:   newFileMatchPath(path, match.directory),
 			}
 		}
+		minimumDirectoryDepth := 0
+		configArrayMatch := configTargetMatch{}
 		if entry.configArrayBaseIndex >= 0 {
-			configArrayMatch := matches[entry.configArrayBaseIndex]
+			configArrayMatch = matches[entry.configArrayBaseIndex]
 			if fileTarget {
 				configArrayMatch.path = tspath.GetDirectoryPath(configArrayMatch.path)
 			}
@@ -605,7 +664,23 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 				group.patterns,
 				selectedGitScope,
 			)
-			if ok && isDirAbsolutelyBlocked(relative, group.patterns) {
+			if !ok {
+				continue
+			}
+			if entry.configArrayBaseIndex >= 0 {
+				minimumDirectoryDepth = resolver.entryDirectoryCandidateDepthFloor(
+					relative,
+					directoryMatch,
+					&configArrayMatch,
+				)
+			}
+			if minimumDirectoryDepth == 0 {
+				if isDirAbsolutelyBlocked(relative, group.patterns) {
+					return true
+				}
+				continue
+			}
+			if isDirAbsolutelyBlockedAboveFloor(relative, group.patterns, minimumDirectoryDepth) {
 				return true
 			}
 		}
@@ -649,7 +724,23 @@ func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPa
 			if !ok {
 				continue
 			}
-			if isDirAbsolutelyBlocked(relative, group.patterns) {
+			minimumDirectoryDepth := 0
+			if entry.configArrayBaseIndex >= 0 {
+				minimumDirectoryDepth = resolver.entryDirectoryCandidateDepthFloor(
+					relative,
+					match,
+					&matches[entry.configArrayBaseIndex],
+				)
+			}
+			if minimumDirectoryDepth == 0 {
+				if isDirAbsolutelyBlocked(relative, group.patterns) {
+					return true
+				}
+			} else if isDirAbsolutelyBlockedAboveFloor(
+				relative,
+				group.patterns,
+				minimumDirectoryDepth,
+			) {
 				return true
 			}
 			if !negationCanReach && group.negationReach.overlaps(relative) {

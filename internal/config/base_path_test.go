@@ -164,6 +164,44 @@ func TestBasePathDoesNotChangeFilesystemFreeMatcherCoordinates(t *testing.T) {
 	}
 }
 
+func TestBasePathDotPreservesFilesystemFreeDirectoryIgnoreCoordinates(t *testing.T) {
+	basePath := "."
+	for _, test := range []struct {
+		name   string
+		root   string
+		target string
+	}{
+		{name: "drive", root: "C:/Top/Repo", target: "c:/top/repo/sub/visible.js"},
+		{name: "UNC", root: "//SERVER/share/Top/Repo", target: "//server/SHARE/top/repo/sub/visible.js"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plain := ConfigWithResolvedBasePaths(RslintConfig{
+				{Ignores: []string{"**/repo"}},
+				{Rules: Rules{"no-debugger": "error"}},
+			}, test.root)
+			dot := ConfigWithResolvedBasePaths(RslintConfig{
+				{BasePath: &basePath, Ignores: []string{"**/repo"}},
+				{Rules: Rules{"no-debugger": "error"}},
+			}, test.root)
+
+			assert.Assert(t, plain.GetConfigForFile(test.target, test.root) == nil)
+			assert.Equal(
+				t,
+				dot.GetConfigForFile(test.target, test.root) != nil,
+				plain.GetConfigForFile(test.target, test.root) != nil,
+			)
+			parent := tspath.GetDirectoryPath(test.target)
+			plainPrunes := newConfigTargetResolver(plain, test.root, nil).canPruneDirectory(parent, "")
+			assert.Assert(t, plainPrunes)
+			assert.Equal(
+				t,
+				newConfigTargetResolver(dot, test.root, nil).canPruneDirectory(parent, ""),
+				plainPrunes,
+			)
+		})
+	}
+}
+
 func TestBasePathIsLiteralNotGlob(t *testing.T) {
 	basePath := "pkg*"
 	config := ConfigWithResolvedBasePaths(RslintConfig{{
@@ -190,15 +228,141 @@ func TestBasePathScopesGlobalIgnores(t *testing.T) {
 }
 
 func TestBasePathGlobalIgnoreKeepsConfigArrayRootReachable(t *testing.T) {
-	basePath := ".."
-	config := ConfigWithResolvedBasePaths(RslintConfig{
-		{BasePath: &basePath, Ignores: []string{"*"}},
-		{Files: []string{"**/*.js"}, Rules: Rules{"no-debugger": "error"}},
-	}, "/repo")
-	resolver := newConfigTargetResolver(config, "/repo", nil)
+	t.Run("one segment below basePath", func(t *testing.T) {
+		basePath := ".."
+		config := ConfigWithResolvedBasePaths(RslintConfig{
+			{BasePath: &basePath, Ignores: []string{"*"}},
+			{Files: []string{"**/*.js"}, Rules: Rules{"no-debugger": "error"}},
+		}, "/repo")
+		resolver := newConfigTargetResolver(config, "/repo", nil)
 
-	assert.Assert(t, config.GetConfigForFile("/repo/visible.js", "/repo") != nil)
-	assert.Assert(t, !resolver.canPruneDirectory("/repo", ""))
+		assert.Assert(t, config.GetConfigForFile("/repo/visible.js", "/repo") != nil)
+		assert.Assert(t, config.GetConfigForFile("/repo/sub/visible.js", "/repo") != nil)
+		assert.Assert(t, !resolver.canPruneDirectory("/repo", ""))
+		assert.Assert(t, !resolver.canPruneDirectory("/repo/sub", ""))
+	})
+
+	t.Run("multiple segments keep descendant matching", func(t *testing.T) {
+		basePath := "../.."
+		config := ConfigWithResolvedBasePaths(RslintConfig{
+			{BasePath: &basePath, Ignores: []string{"workspace", "workspace/repo/blocked/**"}},
+			{Files: []string{"**/*.js"}, Rules: Rules{"no-debugger": "error"}},
+		}, "/workspace/repo")
+		resolver := newConfigTargetResolver(config, "/workspace/repo", nil)
+
+		assert.Assert(t, config.GetConfigForFile("/workspace/repo/nested/visible.js", "/workspace/repo") != nil)
+		assert.Assert(t, config.GetConfigForFile("/workspace/repo/blocked/ignored.js", "/workspace/repo") == nil)
+		assert.Assert(t, !resolver.canPruneDirectory("/workspace", ""))
+		assert.Assert(t, !resolver.canPruneDirectory("/workspace/repo/nested", ""))
+		assert.Assert(t, resolver.canPruneDirectory("/workspace/repo/blocked", ""))
+	})
+}
+
+func TestBasePathGlobalIgnoreKeepsFilesystemFreeConfigArrayRootReachable(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		root   string
+		target string
+	}{
+		{
+			name:   "drive",
+			root:   "C:/Top/Repo",
+			target: "c:/top/repo/sub/visible.js",
+		},
+		{
+			name:   "UNC",
+			root:   "//SERVER/share/Top/Repo",
+			target: "//server/SHARE/top/repo/sub/visible.js",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			basePath := ".."
+			config := ConfigWithResolvedBasePaths(RslintConfig{
+				{BasePath: &basePath, Ignores: []string{"**/top/repo"}},
+				{Rules: Rules{"no-debugger": "error"}},
+			}, test.root)
+			resolver := newConfigTargetResolver(config, test.root, nil)
+
+			assert.Assert(t, config.GetConfigForFile(test.target, test.root) != nil)
+			assert.Assert(t, !resolver.canPruneDirectory(tspath.GetDirectoryPath(test.target), ""))
+		})
+	}
+}
+
+func TestBasePathGlobalIgnoreKeepsAliasedConfigArrayRootReachable(t *testing.T) {
+	root := t.TempDir()
+	physicalBase := filepath.Join(root, "physical")
+	physicalConfig := filepath.Join(physicalBase, "x", "y")
+	workspace := filepath.Join(root, "workspace")
+	configRoot := filepath.Join(workspace, "repo")
+	if err := os.MkdirAll(physicalConfig, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(physicalConfig, filepath.Join(physicalBase, "repo")); err != nil {
+		t.Skipf("directory symlinks unavailable: %v", err)
+	}
+	if err := os.Symlink(physicalBase, workspace); err != nil {
+		t.Skipf("directory symlinks unavailable: %v", err)
+	}
+	lexicalVisible := filepath.Join(configRoot, "nested", "visible.js")
+	lexicalBlocked := filepath.Join(configRoot, "blocked", "ignored.js")
+	physicalVisible := filepath.Join(physicalConfig, "nested", "visible.js")
+	physicalBlocked := filepath.Join(physicalConfig, "blocked", "ignored.js")
+	writeBasePathTestFiles(t, physicalVisible, physicalBlocked)
+
+	basePath := ".."
+	configRoot = tspath.NormalizePath(configRoot)
+	config := ConfigWithResolvedBasePaths(RslintConfig{
+		{BasePath: &basePath, Ignores: []string{
+			"repo",
+			"x/y",
+			"repo/blocked",
+			"x/y/blocked",
+		}},
+		{Files: []string{"**/*.js"}, Rules: Rules{"no-debugger": "error"}},
+	}, configRoot)
+	fsys := osvfs.FS()
+	snapshot := NewPathSpaceSnapshot(map[string]RslintConfig{configRoot: config}, fsys)
+	matcher, err := NewTargetMatcherWithPathSpaces(config, configRoot, fsys, snapshot)
+	assert.NilError(t, err)
+	matchFile := func(file string) TargetMatch {
+		file = tspath.NormalizePath(file)
+		return matcher.MatchFile(PathIdentity{
+			Path:                file,
+			CanonicalPath:       tspath.NormalizePath(fsys.Realpath(file)),
+			CanonicalParentPath: tspath.NormalizePath(fsys.Realpath(tspath.GetDirectoryPath(file))),
+		})
+	}
+
+	for _, file := range []string{lexicalVisible, physicalVisible} {
+		decision := matchFile(file)
+		assert.Assert(t, decision.Selected)
+		assert.Assert(t, !decision.GloballyIgnored)
+		assert.Assert(t, !matcher.CanPruneDirectory(DirectoryIdentity{
+			LexicalPath:   tspath.NormalizePath(filepath.Dir(file)),
+			CanonicalPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(file))),
+		}))
+	}
+	for _, file := range []string{lexicalBlocked, physicalBlocked} {
+		decision := matchFile(file)
+		assert.Assert(t, decision.GloballyIgnored)
+		assert.Assert(t, matcher.CanPruneDirectory(DirectoryIdentity{
+			LexicalPath:   tspath.NormalizePath(filepath.Dir(file)),
+			CanonicalPath: tspath.NormalizePath(fsys.Realpath(filepath.Dir(file))),
+		}))
+	}
+}
+
+func writeBasePathTestFiles(t *testing.T, files ...string) {
+	t.Helper()
+	for _, file := range files {
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte("debugger;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestBasePathNegationKeepsReachableSubtreeOpen(t *testing.T) {

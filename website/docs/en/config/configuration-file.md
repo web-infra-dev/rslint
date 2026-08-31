@@ -64,37 +64,7 @@ rslint --config path/to/rslint.config.ts .
 
 ## Path resolution and `basePath`
 
-`basePath` is a directory path, not a glob. It scopes one flat-config entry to that directory. The entry's `files`, `ignores`, and explicit `languageOptions.parserOptions.project` paths resolve from the resulting directory. It changes only that starting directory; `files` and `ignores` keep exactly the same glob syntax and matching behavior as entries without `basePath`.
-
-```ts
-{
-  basePath: 'packages/app',
-  files: ['src/**/*.ts'],
-  ignores: ['src/generated/**'],
-  languageOptions: {
-    parserOptions: { project: ['./tsconfig.json'] },
-  },
-}
-```
-
-The base used to resolve `basePath` depends on how the config was selected:
-
-| Config entry source                                                | `basePath` resolves from    | Relative paths when `basePath` is absent           |
-| ------------------------------------------------------------------ | --------------------------- | -------------------------------------------------- |
-| Automatically discovered config module                             | Config module directory     | Config module directory                            |
-| Explicit `--config`, API `overrideConfigFile`, or fixed LSP config | Invocation/workspace cwd    | Config module directory (existing Rslint behavior) |
-| API inline `overrideConfig` in automatic-discovery mode            | Discovered config directory | API `cwd`                                          |
-| API inline `overrideConfig` with an explicit config or no config   | API `cwd`                   | API `cwd`                                          |
-
-An inline override therefore uses the discovered module directory for
-`basePath` in automatic mode, and API `cwd` with an explicit config or
-`overrideConfigFile: true`. This is how ESLint appends `overrideConfig` to the
-selected ConfigArray. Relative fields in an inline entry without `basePath`
-keep Rslint's existing API-`cwd` behavior.
-
-The explicit-config rule matches ESLint: if `/project` invokes `--config /configs/rslint.config.ts`, then `basePath: 'app'` means `/project/app`, not `/configs/app`. An empty string is valid and still scopes the entry. Invalid values are rejected when the config loads, even if the entry matches no target.
-
-`basePath` does not change the config owner, scan root, or `.gitignore` collection root. See [`.gitignore` integration](/config/ignoring-files#gitignore-integration).
+Relative config paths normally resolve from the config entry's authored directory. Use `basePath` to give one entry a different starting directory. See the [`basePath` configuration reference](/config/base-path) for its complete matching, TypeScript project, config-source, and `.gitignore` behavior.
 
 To generate a default config, run:
 

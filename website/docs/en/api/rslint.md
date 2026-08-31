@@ -56,7 +56,7 @@ const rslint = new Rslint(options);
 
 With automatic discovery, Go selects each file's nearest config and owns ignore and target-admission semantics. The JavaScript host evaluates and normalizes the JS or TS config modules selected for that run.
 
-See [Path resolution and `basePath`](/config/configuration-file#path-resolution-and-basepath) for automatic, explicit-file, and inline-override behavior.
+See the [`basePath` configuration reference](/config/base-path) for automatic, explicit-file, and inline-override behavior.
 
 :::warning
 Object-form community plugins are not supported in `overrideConfig`, because a plugin worker cannot re-import an in-memory plugin object. Put community plugin declarations in a JS or TS config file. Array-form built-in plugins work in `overrideConfig`.
