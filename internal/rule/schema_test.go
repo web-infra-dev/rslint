@@ -216,6 +216,24 @@ func TestValidateAcceptsJavaScriptOnlyRegexAsFormatRegexValue(t *testing.T) {
 	}
 }
 
+func TestValidateUnicodeRegexFormat(t *testing.T) {
+	schema := NewSchema([]byte(`{
+		"type": "array",
+		"items": [{
+			"type": "object",
+			"properties": { "pattern": { "type": "string", "format": "regex-u" } },
+			"additionalProperties": false
+		}]
+	}`))
+
+	if err := schema.Validate([]any{map[string]any{"pattern": `\p{L}+`}}); err != nil {
+		t.Errorf("expected a Unicode property escape to satisfy format: regex-u, got: %v", err)
+	}
+	if err := schema.Validate([]any{map[string]any{"pattern": `\a`}}); err == nil {
+		t.Error("expected an invalid Unicode identity escape to fail format: regex-u, got nil error")
+	}
+}
+
 func TestValidateFillsDefaultsIntoCallerOptionsInPlace(t *testing.T) {
 	// The public Validate contract config.ValidateRuleOptions relies on:
 	// defaults land in the caller's own option maps, so the very config value

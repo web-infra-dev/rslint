@@ -72,6 +72,33 @@ func TestValidateConfig_RejectsEmptyFilesArrayFromJSON(t *testing.T) {
 	}
 }
 
+func TestConfigBasePathJSONRoundTripAndValidation(t *testing.T) {
+	var cfg RslintConfig
+	if err := json.Unmarshal([]byte(`[{"basePath":"packages/app","ignores":["dist/**"]}]`), &cfg); err != nil {
+		t.Fatalf("unmarshal basePath: %v", err)
+	}
+	if len(cfg) != 1 || cfg[0].BasePath == nil || *cfg[0].BasePath != "packages/app" {
+		t.Fatalf("basePath was not preserved: %+v", cfg)
+	}
+	encoded, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal basePath: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"basePath":"packages/app"`) {
+		t.Fatalf("basePath missing from round trip: %s", encoded)
+	}
+
+	for _, value := range []string{"null", "42", `{}`, `[]`} {
+		t.Run(value, func(t *testing.T) {
+			var invalid RslintConfig
+			err := json.Unmarshal([]byte(`[{"basePath":`+value+`}]`), &invalid)
+			if err == nil || !strings.Contains(err.Error(), `key "basePath": expected value to be a string`) {
+				t.Fatalf("invalid basePath error = %v", err)
+			}
+		})
+	}
+}
+
 func TestConfigFilesJSONSupportsMixedStringsAndAndGroups(t *testing.T) {
 	input := []byte(`[{
 		"files": ["special.ts", ["**/*.js", "!**/*.test.js"]],
@@ -238,18 +265,18 @@ func TestValidateConfig_RuleSeverities(t *testing.T) {
 			t.Fatalf("unmarshal numeric rule severities: %v", err)
 		}
 		if err := ValidateConfig(cfg); err != nil {
-			t.Fatalf("valid JSON rule severities were rejected: %v", err)
+			t.Fatalf("valid serialized rule severities were rejected: %v", err)
 		}
 		merged := cfg.GetConfigForFile("src/app.ts", "")
 		if merged == nil {
-			t.Fatal("expected JSON config to merge")
+			t.Fatal("expected serialized config to merge")
 			return
 		}
 		for name, want := range map[string]string{
 			"numeric-off": "off", "numeric-warn": "warn", "numeric-error": "error",
 		} {
 			if got := merged.Rules[name]; got == nil || got.Level != want {
-				t.Errorf("JSON rule %q = %#v, want level %q", name, got, want)
+				t.Errorf("serialized rule %q = %#v, want level %q", name, got, want)
 			}
 		}
 		arrayRule := merged.Rules["array-numeric"]

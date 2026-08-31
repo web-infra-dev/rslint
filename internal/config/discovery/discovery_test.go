@@ -1517,6 +1517,28 @@ func TestConfigDiscoveryExplicitConfigLoadsBeforeProjectingGitignore(t *testing.
 	}
 }
 
+func TestConfigDiscoveryExplicitConfigRejectsNonModulePathsBeforeLoading(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"rslint.json", "rslint.jsonc", "rslint.yaml"} {
+		t.Run(name, func(t *testing.T) {
+			loader := newFixtureConfigLoader()
+			configPath := writeDiscoveryFixture(t, root, name, `[{"rules":{"no-debugger":"error"}}]`)
+			_, err := LoadExplicitConfig(
+				context.Background(),
+				discoveryTestFS(),
+				loader,
+				ExplicitConfigRequest{CWD: root, ConfigPath: configPath},
+			)
+			if err == nil || !strings.Contains(err.Error(), "JS/TS config module") {
+				t.Fatalf("LoadExplicitConfig(%q) error = %v", configPath, err)
+			}
+			if len(loader.batches) != 0 {
+				t.Fatalf("unsupported config reached module loader: %+v", loader.batches)
+			}
+		})
+	}
+}
+
 func TestConfigDiscoveryExplicitConfigDoesNotDiscoverNestedCandidates(t *testing.T) {
 	root := t.TempDir()
 	loader := newFixtureConfigLoader()

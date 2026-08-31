@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,7 +19,6 @@ import (
 // runCLI additionally from the IPC init-handshake payload.
 type lintArgs struct {
 	Init           bool
-	Config         string
 	Fix            bool
 	TypeCheck      bool
 	TypeCheckOnly  bool
@@ -51,9 +51,14 @@ type lintArgs struct {
 	// uses it to emit the table only after the async stdout forwarding has
 	// drained, so the table cannot interleave with the lint report.
 	DeferTimingTable func(table string)
-	// ConfigCatalog is the immutable result of Go-owned JS/TS config discovery.
-	// A nil or empty automatic catalog selects the native JSON/JSONC loader;
-	// explicit catalogs remain authoritative even when their config is empty.
+	// StartWriter, when non-nil, is the integration-owned destination for the
+	// default format's start line. The IPC CLI supplies an acknowledged writer
+	// so post-start work cannot write inherited stderr before the real stdout
+	// destination has completed the start write.
+	StartWriter io.Writer
+	// ConfigCatalog is the immutable result of Go-owned config discovery.
+	// Every lint invocation requires a non-empty automatic catalog or one
+	// explicit config entry.
 	ConfigCatalog *discovery.ConfigCatalog
 }
 
@@ -70,7 +75,7 @@ Usage:
 
 Options:
   --init                Initialize a default config in the current directory.
-  -c, --config PATH     Which rslint config file to use.
+  -c, --config PATH     Which JS/TS module config file to use.
   --format FORMAT       Output format: default | jsonline | github | gitlab
   --fix                 Automatically fix problems
   --type-check          Enable TypeScript type checking
@@ -116,8 +121,6 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	var ruleFlags repeatedFlag
 
 	fs.StringVar(&args.Format, "format", "default", "output format")
-	fs.StringVar(&args.Config, "config", "", "which rslint config to use")
-	fs.StringVar(&args.Config, "c", "", "which rslint config to use")
 	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
 	fs.BoolVar(&args.Fix, "fix", false, "automatically fix problems")
 	fs.BoolVar(&args.TypeCheck, "type-check", false, "enable TypeScript type checking")

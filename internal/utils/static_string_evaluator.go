@@ -2,9 +2,9 @@ package utils
 
 import (
 	"math"
+	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -420,7 +420,7 @@ func (staticEvaluator *StaticStringEvaluator) evalTemplateExpression(node *ast.N
 			}
 		}
 	}
-	return staticEvalResult{value: builder.String(), ok: true}
+	return staticEvalResult{value: ecmascript.CombineSurrogatePairs(builder.String()), ok: true}
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Node) staticEvalResult {
@@ -430,6 +430,11 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 	}
 
 	switch binary.OperatorToken.Kind {
+	case ast.KindCommaToken:
+		// A sequence expression evaluates to its final operand. This mirrors
+		// eslint-utils getStaticValue for the expression shapes that consume the
+		// result rather than its side effects.
+		return staticEvaluator.evalValue(binary.Right)
 	case ast.KindEqualsToken:
 		result := staticEvaluator.evalValue(binary.Right)
 		if result.ok && staticValueIsAggregate(result.value) {
@@ -513,7 +518,7 @@ func (staticEvaluator *StaticStringEvaluator) concatStaticValues(left any, right
 	if !ok {
 		return staticEvalResult{}
 	}
-	return staticEvalResult{value: leftString + rightString, ok: true}
+	return staticEvalResult{value: ecmascript.CombineSurrogatePairs(leftString + rightString), ok: true}
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalPrefixUnaryExpression(node *ast.Node) staticEvalResult {
@@ -709,7 +714,7 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 		if !value.ok {
 			return staticEvalResult{}
 		}
-		if propertyKey == key {
+		if ecmascript.CompareStrings(propertyKey, key) == 0 {
 			ownValue = value
 			ownFound = true
 		}
@@ -817,6 +822,11 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 	if !object.ok {
 		return staticEvalResult{}
 	}
+	if key == "length" {
+		if text, ok := staticValueAsString(object.value); ok {
+			return staticEvalResult{value: staticNumberValue(ecmascript.StringCodeUnitCount(text)), ok: true}
+		}
+	}
 	return staticMemberValue(object.value, key)
 }
 
@@ -834,13 +844,23 @@ func (staticEvaluator *StaticStringEvaluator) evalAccessExpressionKey(node *ast.
 	return staticValueToString(argument.value)
 }
 
-// staticMemberValue reads key off a folded object or array literal. Reading a
-// key that isn't there yields `undefined`, as it would at runtime. A key an
-// array inherits — `length`, `join` — stays unresolved, because folding it
-// would need a numeric or callable value representation this evaluator doesn't
-// carry.
+// staticMemberValue reads key off a folded object, array, or string literal.
+// Reading a key that isn't there yields `undefined`, as it would at runtime. A
+// key an array inherits — `length`, `join` — stays unresolved, because folding
+// it would need a numeric or callable value representation this evaluator
+// doesn't carry; string indexing is narrower (a canonical index only) and
+// returns the UTF-16 code unit at that index, matching how JavaScript indexes
+// a string.
 func staticMemberValue(object any, key string) staticEvalResult {
 	switch object := object.(type) {
+	case string:
+		return staticStringMemberValue(object, key)
+	case *staticStringNode:
+		str, ok := staticValueAsString(object)
+		if !ok {
+			return staticEvalResult{}
+		}
+		return staticStringMemberValue(str, key)
 	case *staticObjectValue:
 		if value, ok := staticObjectOwnProperty(object, key); ok {
 			return staticEvalResult{value: value, ok: true}
@@ -865,13 +885,33 @@ func staticMemberValue(object any, key string) staticEvalResult {
 	return staticEvalResult{}
 }
 
+// staticStringMemberValue indexes a string by a canonical array-index key, the
+// way JavaScript's string indexing does: by UTF-16 code unit, not by byte or
+// rune. A non-canonical numeric-shaped key (`"-1"`, `"01"`) yields `undefined`
+// like an absent array element; any other key stays unresolved, since this
+// evaluator carries no representation for `String.prototype` methods.
+func staticStringMemberValue(s string, key string) staticEvalResult {
+	index, ok := staticArrayIndex(key)
+	if !ok {
+		if staticNumberShapedKey(key) {
+			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+		}
+		return staticEvalResult{}
+	}
+	units := ecmascript.StringCodeUnits(s)
+	if index >= len(units) {
+		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[index : index+1]), ok: true}
+}
+
 func staticObjectOwnProperty(object *staticObjectValue, key string) (any, bool) {
 	for i := len(object.extraProperties) - 1; i >= 0; i-- {
-		if object.extraProperties[i].name == key {
+		if ecmascript.CompareStrings(object.extraProperties[i].name, key) == 0 {
 			return object.extraProperties[i].value, true
 		}
 	}
-	if object.propertyCount > 0 && object.property.name == key {
+	if object.propertyCount > 0 && ecmascript.CompareStrings(object.property.name, key) == 0 {
 		return object.property.value, true
 	}
 	return nil, false
@@ -1126,6 +1166,8 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 	}
 
 	switch method {
+	case "indexOf":
+		return staticStringIndexOf(text, arguments)
 	case "toUpperCase":
 		return staticEvalResult{value: ecmascript.StringToUpperCase(text), ok: true}
 	case "toLowerCase":
@@ -1143,6 +1185,68 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 	}
 
 	return staticEvalResult{}
+}
+
+func staticStringIndexOf(text string, arguments []any) staticEvalResult {
+	needle := "undefined"
+	if len(arguments) > 0 {
+		var ok bool
+		needle, ok = staticValueToString(arguments[0])
+		if !ok {
+			return staticEvalResult{}
+		}
+	}
+
+	start, ok := staticArgumentInteger(arguments, 1, 0)
+	if !ok {
+		return staticEvalResult{}
+	}
+
+	textUnits := ecmascript.StringCodeUnits(text)
+	needleUnits := ecmascript.StringCodeUnits(needle)
+	start = min(max(start, 0), len(textUnits))
+	index := indexOfCodeUnits(textUnits, needleUnits, start)
+	return staticEvalResult{value: staticNumberValue(index), ok: true}
+}
+
+func indexOfCodeUnits(text, needle []uint16, start int) int {
+	if len(needle) == 0 {
+		return start
+	}
+	if start >= len(text) || len(needle) > len(text)-start {
+		return -1
+	}
+	if len(needle) == 1 {
+		index := slices.Index(text[start:], needle[0])
+		if index < 0 {
+			return -1
+		}
+		return start + index
+	}
+
+	prefixLength := make([]int, len(needle))
+	for i, matched := 1, 0; i < len(needle); i++ {
+		for matched > 0 && needle[i] != needle[matched] {
+			matched = prefixLength[matched-1]
+		}
+		if needle[i] == needle[matched] {
+			matched++
+		}
+		prefixLength[i] = matched
+	}
+
+	for i, matched := start, 0; i < len(text); i++ {
+		for matched > 0 && text[i] != needle[matched] {
+			matched = prefixLength[matched-1]
+		}
+		if text[i] == needle[matched] {
+			matched++
+			if matched == len(needle) {
+				return i - len(needle) + 1
+			}
+		}
+	}
+	return -1
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalCallArguments(node *ast.Node) ([]any, bool) {
@@ -1188,7 +1292,7 @@ func staticStringFromCharCode(arguments []any) staticEvalResult {
 		}
 		units = append(units, uint16(toUint32(number)))
 	}
-	return staticEvalResult{value: string(utf16.Decode(units)), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units), ok: true}
 }
 
 func staticStringSlice(text string, arguments []any) staticEvalResult {
@@ -1200,14 +1304,14 @@ func staticStringSlice(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	length := len(units)
 	from := normalizeSliceIndex(start, length)
 	to := normalizeSliceIndex(end, length)
 	if to < from {
 		to = from
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[from:to]), ok: true}
 }
 
 func staticStringSubstring(text string, arguments []any) staticEvalResult {
@@ -1219,14 +1323,14 @@ func staticStringSubstring(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	length := len(units)
 	from := clampSubstringIndex(start, length)
 	to := clampSubstringIndex(end, length)
 	if from > to {
 		from, to = to, from
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[from:to]), ok: true}
 }
 
 // staticStringSubstr implements the Annex B String#substr, whose second
@@ -1240,7 +1344,7 @@ func staticStringSubstr(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	length := len(units)
 	from := normalizeSliceIndex(start, length)
 	if count <= 0 {
@@ -1250,7 +1354,7 @@ func staticStringSubstr(text string, arguments []any) staticEvalResult {
 	if count < length-from {
 		to = from + count
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[from:to])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[from:to]), ok: true}
 }
 
 func staticStringCharAt(text string, arguments []any) staticEvalResult {
@@ -1258,11 +1362,11 @@ func staticStringCharAt(text string, arguments []any) staticEvalResult {
 	if !ok {
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(text))
+	units := ecmascript.StringCodeUnits(text)
 	if index < 0 || index >= len(units) {
 		return staticEvalResult{value: "", ok: true}
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[index : index+1])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[index : index+1]), ok: true}
 }
 
 func staticStringConcat(text string, arguments []any) staticEvalResult {
@@ -1278,7 +1382,7 @@ func staticStringConcat(text string, arguments []any) staticEvalResult {
 		}
 		builder.WriteString(part)
 	}
-	return staticEvalResult{value: builder.String(), ok: true}
+	return staticEvalResult{value: ecmascript.CombineSurrogatePairs(builder.String()), ok: true}
 }
 
 func staticArgumentInteger(arguments []any, index int, defaultValue int) (int, bool) {
@@ -1683,7 +1787,7 @@ func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {
 	case staticKindString:
 		leftText, _ := staticValueAsString(left)
 		rightText, _ := staticValueAsString(right)
-		return leftText == rightText, true
+		return ecmascript.CompareStrings(leftText, rightText) == 0, true
 	case staticKindNumber:
 		leftNumber, leftOk := staticValueToNumber(left)
 		rightNumber, rightOk := staticValueToNumber(right)
@@ -1822,7 +1926,7 @@ func staticArrayJoin(value *staticArrayValue, separator string) (string, bool) {
 		}
 		builder.WriteString(part)
 	}
-	return builder.String(), true
+	return ecmascript.CombineSurrogatePairs(builder.String()), true
 }
 
 func evaluatorBool(fn func() bool) (value bool, ok bool) {

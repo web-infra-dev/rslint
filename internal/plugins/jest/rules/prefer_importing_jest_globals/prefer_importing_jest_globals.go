@@ -9,7 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
-	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed prefer_importing_jest_globals.schema.json
@@ -72,7 +72,7 @@ func (s *nameSet) joined() string {
 
 func (s *nameSet) sortedJoined() string {
 	sorted := slices.Clone(s.order)
-	slices.Sort(sorted)
+	slices.SortFunc(sorted, ecmascript.CompareStrings)
 	return strings.Join(sorted, ", ")
 }
 
@@ -208,7 +208,27 @@ func collectExistingImportNames(importDecl *ast.ImportDeclaration, names *nameSe
 	}
 }
 
-func collectExistingRequireNames(binding *ast.Node, names *nameSet) {
+func requireAccessorValue(sourceFile *ast.SourceFile, node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return node.AsIdentifier().Text, true
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		text := rslintUtils.TrimmedNodeText(sourceFile, node)
+		if len(text) < 2 || text[0] != '`' || text[len(text)-1] != '`' {
+			return "", false
+		}
+		return text[1 : len(text)-1], true
+	default:
+		return "", false
+	}
+}
+
+func collectExistingRequireNames(sourceFile *ast.SourceFile, binding *ast.Node, names *nameSet) {
 	if binding == nil || binding.Kind != ast.KindObjectBindingPattern {
 		return
 	}
@@ -229,13 +249,18 @@ func collectExistingRequireNames(binding *ast.Node, names *nameSet) {
 		keyNode := be.PropertyName
 		if keyNode == nil {
 			keyNode = be.Name()
+		} else if keyNode.Kind == ast.KindComputedPropertyName {
+			keyNode = ast.SkipParentheses(keyNode.AsComputedPropertyName().Expression)
 		}
-		importName, ok := accessorValue(keyNode)
+		importName, ok := requireAccessorValue(sourceFile, keyNode)
 		if !ok {
 			continue
 		}
-		if local, ok := accessorValue(be.Name()); ok && importName != local {
-			importName += ": " + local
+		if be.Initializer == nil {
+			local, ok := requireAccessorValue(sourceFile, be.Name())
+			if ok && importName != local {
+				importName += ": " + local
+			}
 		}
 		names.add(importName)
 	}
@@ -260,7 +285,43 @@ type jestGlobalsRequire struct {
 	decl *ast.VariableDeclaration
 }
 
-func findJestGlobalsRequire(statements []*ast.Node) *jestGlobalsRequire {
+func isJestGlobalsRequireCall(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil || !ast.IsCallExpression(node) || ast.IsOptionalChain(node) {
+		return false
+	}
+
+	call := node.AsCallExpression()
+	if call == nil {
+		return false
+	}
+	callee := ast.SkipParentheses(call.Expression)
+	if callee == nil || !ast.IsIdentifier(callee) || callee.Text() != "require" {
+		return false
+	}
+
+	arguments := node.Arguments()
+	if len(arguments) == 0 || arguments[0] == nil {
+		return false
+	}
+	specifier := ast.SkipParentheses(arguments[0])
+	if specifier == nil {
+		return false
+	}
+
+	switch specifier.Kind {
+	case ast.KindStringLiteral:
+		return specifier.AsStringLiteral().Text == jestGlobalsModule
+	case ast.KindNoSubstitutionTemplateLiteral:
+		text := rslintUtils.TrimmedNodeText(sourceFile, specifier)
+		return len(text) >= 2 && text[0] == '`' && text[len(text)-1] == '`' &&
+			text[1:len(text)-1] == jestGlobalsModule
+	default:
+		return false
+	}
+}
+
+func findJestGlobalsRequire(sourceFile *ast.SourceFile, statements []*ast.Node) *jestGlobalsRequire {
 	for _, stmt := range statements {
 		if stmt == nil || stmt.Kind != ast.KindVariableStatement {
 			continue
@@ -286,7 +347,7 @@ func findJestGlobalsRequire(statements []*ast.Node) *jestGlobalsRequire {
 				(name.Kind != ast.KindIdentifier && name.Kind != ast.KindObjectBindingPattern) {
 				continue
 			}
-			if testFramework.IsModuleRequireCall(decl.Initializer, jestGlobalsModule) {
+			if isJestGlobalsRequireCall(sourceFile, decl.Initializer) {
 				return &jestGlobalsRequire{stmt: stmt, decl: decl}
 			}
 		}
@@ -340,9 +401,9 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 		}
 	}
 
-	if req := findJestGlobalsRequire(statements); req != nil {
+	if req := findJestGlobalsRequire(ctx.SourceFile, statements); req != nil {
 		if req.decl.Name() != nil && req.decl.Name().Kind == ast.KindObjectBindingPattern {
-			collectExistingRequireNames(req.decl.Name(), names)
+			collectExistingRequireNames(ctx.SourceFile, req.decl.Name(), names)
 		}
 		return []rule.RuleFix{
 			rule.RuleFixReplace(ctx.SourceFile, req.stmt, createFixerImports(isModule, names.sortedJoined())),

@@ -24,6 +24,11 @@
   },
   {
     "type": "file",
+    "name": "base-path",
+    "label": "basePath"
+  },
+  {
+    "type": "file",
     "name": "files",
     "label": "files"
   },

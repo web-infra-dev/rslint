@@ -30,7 +30,11 @@ func NewPathSpaceSnapshot(configMap map[string]RslintConfig, fsys vfs.FS) *PathS
 	for configDir, entries := range configMap {
 		freezeBase(configDir)
 		for _, entry := range entries {
-			freezeBase(configEntryBaseDirectory(entry, configDir))
+			origin := configEntryPathOrigin(entry, configDir)
+			freezeBase(origin.directory)
+			if origin.basePathScoped {
+				freezeBase(origin.configArrayBase)
+			}
 		}
 	}
 	return &PathSpaceSnapshot{bases: bases}

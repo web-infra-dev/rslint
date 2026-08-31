@@ -51,7 +51,8 @@ func TestResolverUsesOnlyBoundTargetOwnership(t *testing.T) {
 			Rules: config.Rules{"no-console": "error"},
 		}},
 		"/repo/packages/app": {{
-			Files: []string{"**/*.ts"},
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"@typescript-eslint"},
 			Rules: config.Rules{
 				"@typescript-eslint/require-await": "error",
 				"no-debugger":                      "error",

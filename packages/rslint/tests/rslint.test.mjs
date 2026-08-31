@@ -702,6 +702,21 @@ module.exports = config;`
     },
   );
 
+  test('overrideConfigFile rejects a legacy JSON config before loading it', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-json-config-'));
+    const configPath = path.join(tmp, 'rslint.jsonc');
+    await writeFile(configPath, '{ intentionally malformed legacy config');
+    const rslint = new Rslint({ cwd: tmp, overrideConfigFile: configPath });
+    try {
+      await expect(
+        rslint.lintText('debugger;\n', { filePath: 'test.ts' }),
+      ).rejects.toThrow(/JS\/TS config module/);
+    } finally {
+      await rslint.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   test('lintFiles returns one result per matched file, routed correctly', async () => {
     const { mkdtemp, writeFile, mkdir, rm } = await import('node:fs/promises');
     const os = await import('node:os');
@@ -1986,6 +2001,30 @@ module.exports = config;`
       expect(fixed.messages).toEqual([]);
     } finally {
       await Promise.all([inspector.close(), fixer.close()]);
+    }
+  });
+
+  test('low-level --api accepts a JSON config payload', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-config-'));
+    const filePath = path.join(tmp, 'api-json-config.ts');
+    // A malformed legacy file beside the request must be irrelevant: `config`
+    // is a JSON wire payload, not a request to discover or read a JSON file.
+    await writeFile(path.join(tmp, 'rslint.json'), '{ not valid JSON');
+    try {
+      const response = await lint({
+        config: [{ rules: { 'no-debugger': 'error' } }],
+        configDirectory: tmp,
+        workingDirectory: tmp,
+        files: [filePath],
+        fileContents: { [filePath]: 'debugger;\n' },
+      });
+
+      expect(response.errorCount).toBe(1);
+      expect(response.ruleCount).toBe(1);
+      expect(response.diagnostics).toHaveLength(1);
+      expect(response.diagnostics[0].ruleName).toBe('no-debugger');
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
     }
   });
 

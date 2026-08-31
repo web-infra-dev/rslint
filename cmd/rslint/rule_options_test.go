@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 // The rule-options validation step runs after configuration is fully
@@ -13,24 +15,19 @@ import (
 // lint diagnostics.
 func TestCLIInvalidRuleOptionsFailFastBeforeLinting(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
-		{
-			"files": ["*.js"],
-			"rules": {
-				"no-console": ["error", { "allow": "warn" }],
-				"eqeqeq": ["error", "sometimes"],
-				"no-debugger": "error"
-			}
-		}
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(dir, "app.js"), []byte("debugger;\n"), 0o644); err != nil {
 		t.Fatalf("write app.js: %v", err)
 	}
 
 	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		Config:         "rslint.jsonc",
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			Files: []string{"*.js"},
+			Rules: rslintconfig.Rules{
+				"no-console":  []any{"error", map[string]any{"allow": "warn"}},
+				"eqeqeq":      []any{"error", "sometimes"},
+				"no-debugger": "error",
+			},
+		}}),
 		Format:         "default",
 		NoColor:        true,
 		SingleThreaded: true,
@@ -49,30 +46,28 @@ func TestCLIInvalidRuleOptionsFailFastBeforeLinting(t *testing.T) {
 	if strings.Contains(stdout, "no-debugger") {
 		t.Errorf("expected no lint diagnostics before validation passes, stdout=%q", stdout)
 	}
+	if strings.Contains(stdout, "start") {
+		t.Errorf("preflight failure must not emit lifecycle output, stdout=%q", stdout)
+	}
 }
 
 // The same config with schema-valid options must sail through the validation
 // step and lint normally.
 func TestCLIValidRuleOptionsLintNormally(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
-		{
-			"files": ["*.js"],
-			"rules": {
-				"no-console": ["error", { "allow": ["warn"] }],
-				"eqeqeq": ["error", "smart"],
-				"no-debugger": "error"
-			}
-		}
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(dir, "app.js"), []byte("debugger;\n"), 0o644); err != nil {
 		t.Fatalf("write app.js: %v", err)
 	}
 
 	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		Config:         "rslint.jsonc",
+		ConfigCatalog: explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{{
+			Files: []string{"*.js"},
+			Rules: rslintconfig.Rules{
+				"no-console":  []any{"error", map[string]any{"allow": []any{"warn"}}},
+				"eqeqeq":      []any{"error", "smart"},
+				"no-debugger": "error",
+			},
+		}}),
 		Format:         "default",
 		NoColor:        true,
 		SingleThreaded: true,

@@ -48,57 +48,13 @@ func TestRelativeGlobPatternPreservesFilesystemRoots(t *testing.T) {
 	}
 }
 
-func TestNewConfigLoaderRequiresRuleCatalog(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected nil rule catalog to panic")
-		}
-	}()
-	NewConfigLoader(osvfs.FS(), t.TempDir(), nil)
-}
-
-func TestLoadRslintConfig_RejectsEmptyFilesArray(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "rslint.jsonc")
-	if err := os.WriteFile(configPath, []byte(`[
-		{
-			"files": [],
-			"rules": { "no-console": "error" }
-		}
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
-	_, _, err := loader.LoadRslintConfig("rslint.jsonc")
-	assert.ErrorContains(t, err, `key "files": expected value to be a non-empty array`)
-}
-
-func TestLoadRslintConfig_AllowsMissingFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "rslint.jsonc")
-	if err := os.WriteFile(configPath, []byte(`[
-		{
-			"rules": { "no-console": "error" }
-		}
-	]`), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
-	cfg, _, err := loader.LoadRslintConfig("rslint.jsonc")
-	assert.NilError(t, err)
-	assert.Equal(t, len(cfg), 1)
-	assert.Assert(t, cfg[0].Files == nil)
-}
-
-func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
+func TestResolveDeclaredProjectPaths_GlobExpansion(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/utils/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "apps/web/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -112,7 +68,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
@@ -121,9 +77,9 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_NoMatches(t *testing.T) {
+func TestResolveDeclaredProjectPaths_NoMatches(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -134,16 +90,16 @@ func TestLoadTsConfigsFromRslintConfig_NoMatches(t *testing.T) {
 		},
 	}
 
-	_, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.ErrorContains(t, err, "glob pattern")
 }
 
-func TestLoadTsConfigsFromRslintConfig_MixedGlobAndNonGlob(t *testing.T) {
+func TestResolveDeclaredProjectPaths_MixedGlobAndNonGlob(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -157,7 +113,7 @@ func TestLoadTsConfigsFromRslintConfig_MixedGlobAndNonGlob(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "tsconfig.json")),
@@ -165,11 +121,42 @@ func TestLoadTsConfigsFromRslintConfig_MixedGlobAndNonGlob(t *testing.T) {
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_DeduplicatesMatches(t *testing.T) {
+func TestExpandProjectGlobTreatsBaseDirectoryAsLiteral(t *testing.T) {
+	root := t.TempDir()
+	literalBase := filepath.Join(root, "pkg[1]")
+	createTestFile(t, filepath.Join(literalBase, "child", "tsconfig.json"))
+	createTestFile(t, filepath.Join(root, "pkg1", "child", "tsconfig.json"))
+
+	paths, err := expandProjectGlob(osvfs.FS(), literalBase, "*/tsconfig.json")
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []string{
+		filepath.ToSlash(filepath.Join(literalBase, "child", "tsconfig.json")),
+	})
+}
+
+func TestResolveDeclaredProjectPathsUsesResolvedBasePathOrigin(t *testing.T) {
+	root := t.TempDir()
+	configArrayBase := filepath.Join(root, "cwd")
+	projectPath := filepath.Join(configArrayBase, "pkg", "tsconfig.json")
+	createTestFile(t, projectPath)
+	basePath := "pkg"
+	config := ConfigWithResolvedBasePaths(RslintConfig{{
+		BasePath: &basePath,
+		LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+			Project: ProjectPaths{"./tsconfig.json"},
+		}},
+	}}, configArrayBase)
+
+	paths, err := resolveDeclaredProjectPaths(osvfs.FS(), config, filepath.Join(root, "configs"))
+	assert.NilError(t, err)
+	assert.DeepEqual(t, paths, []string{filepath.ToSlash(projectPath)})
+}
+
+func TestResolveDeclaredProjectPaths_DeduplicatesMatches(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -184,21 +171,21 @@ func TestLoadTsConfigsFromRslintConfig_DeduplicatesMatches(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_GlobExpansionWithOverlayVFS(t *testing.T) {
+func TestResolveDeclaredProjectPaths_GlobExpansionWithOverlayVFS(t *testing.T) {
 	tmpDir := t.TempDir()
 	virtualFiles := map[string]string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")):    `{}`,
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/utils/tsconfig.json")): `{}`,
 	}
 
-	loader := NewConfigLoader(utils.NewOverlayVFS(osvfs.FS(), virtualFiles), tmpDir, baseRuleCatalog())
+	fsys := utils.NewOverlayVFS(osvfs.FS(), virtualFiles)
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -209,7 +196,7 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansionWithOverlayVFS(t *testing.T)
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
@@ -217,9 +204,9 @@ func TestLoadTsConfigsFromRslintConfig_GlobExpansionWithOverlayVFS(t *testing.T)
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_NonExistentNonGlobFile(t *testing.T) {
+func TestResolveDeclaredProjectPaths_NonExistentNonGlobFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -230,17 +217,17 @@ func TestLoadTsConfigsFromRslintConfig_NonExistentNonGlobFile(t *testing.T) {
 		},
 	}
 
-	_, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.ErrorContains(t, err, "doesn't exist")
 }
 
-func TestLoadTsConfigsFromRslintConfig_DoubleStarPattern(t *testing.T) {
+func TestResolveDeclaredProjectPaths_DoubleStarPattern(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/subpackage/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/stores/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -251,7 +238,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarPattern(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/stores/tsconfig.json")),
@@ -260,7 +247,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarPattern(t *testing.T) {
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T) {
+func TestResolveDeclaredProjectPaths_SingleStarDoesNotMatchNested(t *testing.T) {
 	tmpDir := t.TempDir()
 	// Direct child — should match
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
@@ -268,7 +255,7 @@ func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/node_modules/foo/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/src/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -279,16 +266,16 @@ func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_NonExistentSearchRoot(t *testing.T) {
+func TestResolveDeclaredProjectPaths_NonExistentSearchRoot(t *testing.T) {
 	tmpDir := t.TempDir()
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -299,11 +286,11 @@ func TestLoadTsConfigsFromRslintConfig_NonExistentSearchRoot(t *testing.T) {
 		},
 	}
 
-	_, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.ErrorContains(t, err, "glob pattern")
 }
 
-func TestLoadTsConfigsFromRslintConfig_DoubleStarWithSymlinkCycle(t *testing.T) {
+func TestResolveDeclaredProjectPaths_DoubleStarWithSymlinkCycle(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
 	// Create symlink cycle: packages/ui/loop -> packages
@@ -312,7 +299,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarWithSymlinkCycle(t *testing.T) 
 		filepath.Join(tmpDir, "packages/ui/loop"),
 	))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -324,7 +311,7 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarWithSymlinkCycle(t *testing.T) 
 	}
 
 	// Should complete without hanging, finding only the real tsconfig
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.Assert(t, len(tsConfigs) >= 1, "should find at least the real tsconfig.json")
 
@@ -337,14 +324,14 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarWithSymlinkCycle(t *testing.T) 
 	assert.Assert(t, found, "should find packages/ui/tsconfig.json")
 }
 
-func TestLoadTsConfigsFromRslintConfig_QuestionMarkPattern(t *testing.T) {
+func TestResolveDeclaredProjectPaths_QuestionMarkPattern(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/a/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/b/tsconfig.json"))
 	// "ab" is two chars — should NOT match single ?
 	createTestFile(t, filepath.Join(tmpDir, "packages/ab/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -355,7 +342,7 @@ func TestLoadTsConfigsFromRslintConfig_QuestionMarkPattern(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/a/tsconfig.json")),
@@ -363,14 +350,14 @@ func TestLoadTsConfigsFromRslintConfig_QuestionMarkPattern(t *testing.T) {
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_CharacterClassPattern(t *testing.T) {
+func TestResolveDeclaredProjectPaths_CharacterClassPattern(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "tsconfig1.json"))
 	createTestFile(t, filepath.Join(tmpDir, "tsconfig2.json"))
 	// "a" is not in [0-9] — should NOT match
 	createTestFile(t, filepath.Join(tmpDir, "tsconfiga.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -381,7 +368,7 @@ func TestLoadTsConfigsFromRslintConfig_CharacterClassPattern(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "tsconfig1.json")),
@@ -389,13 +376,13 @@ func TestLoadTsConfigsFromRslintConfig_CharacterClassPattern(t *testing.T) {
 	})
 }
 
-func TestLoadTsConfigsFromRslintConfig_NegatedCharacterClass(t *testing.T) {
+func TestResolveDeclaredProjectPaths_NegatedCharacterClass(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/a/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/b/tsconfig.json"))
 	createTestFile(t, filepath.Join(tmpDir, "packages/c/tsconfig.json"))
 
-	loader := NewConfigLoader(osvfs.FS(), tmpDir, baseRuleCatalog())
+	fsys := osvfs.FS()
 	rslintConfig := RslintConfig{
 		{
 			LanguageOptions: &LanguageOptions{
@@ -407,7 +394,7 @@ func TestLoadTsConfigsFromRslintConfig_NegatedCharacterClass(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/b/tsconfig.json")),

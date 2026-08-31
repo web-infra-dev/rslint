@@ -89,8 +89,9 @@ export interface LintOptions {
     /** Parallel to `files`; true only for caller-literal file targets. */
     explicitFiles?: boolean[];
     /**
-     * Normalized API override entries appended to every selected config;
-     * relative paths retain workingDirectory as their authored base.
+     * Normalized API override entries appended to every selected config array.
+     * Relative fields without `basePath` retain `workingDirectory` as their
+     * authored base; `basePath` itself inherits the selected ConfigArray base.
      */
     overrideConfig?: Record<string, unknown>[];
   };
@@ -98,8 +99,8 @@ export interface LintOptions {
   // request-scoped placeholder rules from this metadata, then asks the Node
   // peer to execute them through a reverse `pluginLint` request.
   eslintPlugins?: Array<{ prefix: string; ruleNames: string[] }>;
-  // Anchor for relative paths in low-level `config`. Native discovery entries
-  // use their owning config directory; inline overrides use workingDirectory.
+  // Owner and anchor for low-level `config`. Native discovery entries without
+  // basePath use their owner; inline entries without it use workingDirectory.
   configDirectory?: string;
   // Opaque community-plugin worker identity, independent from the directory
   // used to resolve config paths.

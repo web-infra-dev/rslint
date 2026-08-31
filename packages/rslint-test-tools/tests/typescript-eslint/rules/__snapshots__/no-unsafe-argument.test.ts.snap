@@ -3,6 +3,67 @@
 exports[`no-unsafe-argument > invalid 1`] = `
 {
   "code": "
+declare function foo(...args: [string, string]): void;
+
+declare const spread: [string, ...string[]];
+foo(...spread, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 2`] = `
+{
+  "code": "
+declare function foo(...args: [string, ...string[]]): void;
+
+foo('a', 'b', 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type \`any\` assigned to a parameter of type \`string\`.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 3`] = `
+{
+  "code": "
 declare function foo(arg: number): void;
 foo(1 as any);
       ",
@@ -29,7 +90,7 @@ foo(1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 2`] = `
+exports[`no-unsafe-argument > invalid 4`] = `
 {
   "code": "
 declare function foo(arg: number): void;
@@ -58,7 +119,7 @@ foo(error);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 3`] = `
+exports[`no-unsafe-argument > invalid 5`] = `
 {
   "code": "
 declare function foo(arg1: number, arg2: string): void;
@@ -87,7 +148,7 @@ foo(1, 1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 4`] = `
+exports[`no-unsafe-argument > invalid 6`] = `
 {
   "code": "
 declare function foo(...arg: number[]): void;
@@ -116,7 +177,7 @@ foo(1, 2, 3, 1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 5`] = `
+exports[`no-unsafe-argument > invalid 7`] = `
 {
   "code": "
 declare function foo(arg: string, ...arg: number[]): void;
@@ -160,7 +221,7 @@ foo(1 as any, 1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 6`] = `
+exports[`no-unsafe-argument > invalid 8`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number): void;
@@ -190,7 +251,7 @@ foo(...(x as any));
 }
 `;
 
-exports[`no-unsafe-argument > invalid 7`] = `
+exports[`no-unsafe-argument > invalid 9`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number): void;
@@ -220,7 +281,7 @@ foo(...(x as any[]));
 }
 `;
 
-exports[`no-unsafe-argument > invalid 8`] = `
+exports[`no-unsafe-argument > invalid 10`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number): void;
@@ -252,7 +313,7 @@ foo(...errors);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 9`] = `
+exports[`no-unsafe-argument > invalid 11`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number): void;
@@ -283,7 +344,7 @@ foo(...x);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 10`] = `
+exports[`no-unsafe-argument > invalid 12`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number): void;
@@ -314,7 +375,7 @@ foo(...x);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 11`] = `
+exports[`no-unsafe-argument > invalid 13`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number): void;
@@ -343,7 +404,7 @@ foo(...(['foo', 1, 2] as [string, any, number]));
 }
 `;
 
-exports[`no-unsafe-argument > invalid 12`] = `
+exports[`no-unsafe-argument > invalid 14`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number, arg2: string): void;
@@ -374,7 +435,7 @@ foo('a', ...x, 1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 13`] = `
+exports[`no-unsafe-argument > invalid 15`] = `
 {
   "code": "
 declare function foo(arg1: string, arg2: number, ...rest: string[]): void;
@@ -405,7 +466,7 @@ foo('a', ...x, 1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 14`] = `
+exports[`no-unsafe-argument > invalid 16`] = `
 {
   "code": "
 declare function foo(arg1: Set<string>, arg2: Map<string, string>): void;
@@ -451,7 +512,7 @@ foo(new Set<any>(), ...x);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 15`] = `
+exports[`no-unsafe-argument > invalid 17`] = `
 {
   "code": "
 declare function foo(...params: [number, string, any]): void;
@@ -495,7 +556,7 @@ foo(1 as any, 'a' as any, 1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 16`] = `
+exports[`no-unsafe-argument > invalid 18`] = `
 {
   "code": "
 declare function foo(param1: string, ...params: [number, string, any]): void;
@@ -539,7 +600,7 @@ foo('a', 1 as any, 'a' as any, 1 as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 17`] = `
+exports[`no-unsafe-argument > invalid 19`] = `
 {
   "code": "
 type T = [number, T[]];
@@ -570,7 +631,7 @@ foo(t as any);
 }
 `;
 
-exports[`no-unsafe-argument > invalid 18`] = `
+exports[`no-unsafe-argument > invalid 20`] = `
 {
   "code": "
 function foo(
@@ -620,7 +681,7 @@ foo<number>\`\${arg}\${arg}\${arg}\`;
 }
 `;
 
-exports[`no-unsafe-argument > invalid 19`] = `
+exports[`no-unsafe-argument > invalid 21`] = `
 {
   "code": "
 function foo(templates: TemplateStringsArray, arg: number) {}
@@ -650,7 +711,7 @@ foo\`\${arg}\`;
 }
 `;
 
-exports[`no-unsafe-argument > invalid 20`] = `
+exports[`no-unsafe-argument > invalid 22`] = `
 {
   "code": "
 type T = [number, T[]];

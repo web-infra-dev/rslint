@@ -87,10 +87,11 @@ const [result] = await rslint.lintText(
 
 **Use relative paths** in `virtualFiles` keys and inside the tsconfig:
 
-- **`virtualFiles` keys**: prefer relative paths (`'tsconfig.json'`). Keys are resolved against `cwd`, so a relative key always lines up with `parserOptions.project` (also resolved against `cwd`). An absolute key like `'/tsconfig.json'` happens to match only when `cwd` is `/`; with any other `cwd` it lands at the filesystem root and won't match the project path.
-- **Inside the tsconfig** (`files`) and in **`parserOptions.project`**: use relative paths. The TypeScript compiler resolves these, and a bare POSIX-absolute path (such as `/a.ts`) has no drive letter on Windows, so it won't match the overlay.
+- **`virtualFiles` keys**: prefer relative paths (`'tsconfig.json'`). Keys are always resolved against `cwd`. An absolute key like `'/tsconfig.json'` happens to match only when `cwd` is `/`; with any other `cwd` it lands at the filesystem root.
+- **`parserOptions.project`**: relative paths resolve from the config entry's effective base. In this override-only example that base is `cwd`; a `basePath` changes it. For a discovered config module it is normally the module directory.
+- **Inside the tsconfig** (`files` and `include`): relative paths resolve from the tsconfig's own directory. A bare POSIX-absolute path (such as `/a.ts`) has no drive letter on Windows, so it won't match the overlay.
 
-**Pin the tsconfig to explicit `files`** — a broad `include` glob is expanded against the real filesystem and would scan `cwd` on disk.
+**Pin the tsconfig to explicit `files`** — a broad `include` glob is expanded against the real filesystem and scans from the tsconfig's directory (which is `cwd` in this example).
 
 ## Auto-fixing
 
@@ -175,10 +176,12 @@ Each `LintMessage`:
 
 [`new Rslint(options)`](/api/rslint#constructor) accepts:
 
-| Option               | Type                                        | Default     | Description                                                                                                                                      |
-| -------------------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cwd`                | `string`                                    | current cwd | Working directory for targets and discovery; also the base of inline `overrideConfig` paths                                                      |
-| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —           | Extra config appended after the resolved/discovered config; relative `files`, `ignores`, and `parserOptions.project` paths use `cwd`             |
-| `overrideConfigFile` | `string \| true \| null`                    | `null`      | `string`: use this config module and resolve its config-relative paths from its directory; `true`: use only `overrideConfig`; otherwise discover |
-| `fix`                | `boolean`                                   | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                    |
-| `virtualFiles`       | `Record<string, string>`                    | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                  |
+| Option               | Type                                        | Default     | Description                                                                                                                                                                    |
+| -------------------- | ------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cwd`                | `string`                                    | current cwd | Working directory for targets and discovery; also the authored base of inline entries without `basePath`                                                                       |
+| `overrideConfig`     | `RslintConfigEntry \| RslintConfig \| null` | —           | Extra config appended after the resolved/discovered config; `basePath` inherits the ConfigArray base, while entries without it keep Rslint's existing `cwd`-relative behavior  |
+| `overrideConfigFile` | `string \| true \| null`                    | `null`      | `string`: use this module; `basePath` resolves from `cwd`, while entries without it retain the module-directory base. `true`: use only the inline override; otherwise discover |
+| `fix`                | `boolean`                                   | `false`     | Apply rule auto-fixes; results carry `output`                                                                                                                                  |
+| `virtualFiles`       | `Record<string, string>`                    | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                                                                |
+
+See the [`basePath` configuration reference](/config/base-path) for the full source matrix.
