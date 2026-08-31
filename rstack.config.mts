@@ -14,3 +14,8 @@ define.fmt({
     'packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/',
   ],
 });
+
+define.staged({
+  '*.{js,jsx,ts,tsx}': ['rs fmt'],
+  '*.{json,css,scss,md,yaml,yml}': ['rs fmt'],
+});
