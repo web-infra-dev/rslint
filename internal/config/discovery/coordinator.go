@@ -62,10 +62,9 @@ func (coordinator *discoveryCoordinator) build() (*ConfigCatalog, error) {
 	if coordinator.explicitConfigPath != "" {
 		configPath := normalizeDiscoveryPath(coordinator.explicitConfigPath, cwd)
 		candidate := configCandidate{
-			path: configPath,
-			// The invocation cwd controls the default scan scope. Relative paths
-			// authored inside the selected config use the config file's directory.
-			directory: tspath.GetDirectoryPath(configPath),
+			path:            configPath,
+			directory:       tspath.GetDirectoryPath(configPath),
+			configArrayBase: cwd,
 		}
 		if err := coordinator.modules.loadCandidates([]configCandidate{candidate}); err != nil {
 			return nil, err

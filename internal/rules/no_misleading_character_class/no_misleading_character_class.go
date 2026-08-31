@@ -376,12 +376,13 @@ type regexpCallTracker struct {
 	indexedNames      map[string]bool
 	allNamesIndexed   bool
 
-	propertyEvaluator   *utils.StaticStringEvaluator
-	potentiallyShadowed map[string]bool
-	disabledRoots       map[string]bool
-	tracedVariables     map[regexpTraceVariable]struct{}
-	tracedGlobals       map[regexpTraceGlobal]struct{}
-	calls               map[*ast.Node]struct{}
+	propertyEvaluator            *utils.StaticStringEvaluator
+	potentiallyShadowed          map[string]bool
+	potentiallyNamespaceShadowed map[string]bool
+	disabledRoots                map[string]bool
+	tracedVariables              map[regexpTraceVariable]struct{}
+	tracedGlobals                map[regexpTraceGlobal]struct{}
+	calls                        map[*ast.Node]struct{}
 }
 
 func newRegExpCallTracker(ctx rule.RuleContext) *regexpCallTracker {
@@ -422,6 +423,7 @@ func (tracker *regexpCallTracker) collectRootIdentifiers() {
 					}
 					tracker.potentiallyShadowed[name] = true
 				}
+				tracker.recordNamespaceBinding(node, name)
 				node.ForEachChild(visit)
 				return false
 			}
@@ -543,10 +545,35 @@ func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name s
 	if !tracker.potentiallyShadowed[name] {
 		return true
 	}
-	// A namespace is a lexical value binding to ESLint even though ts-go's
-	// value-symbol lookup does not resolve it. The syntactic scope walk covers
-	// both namespace and ordinary local declarations consistently.
+	if tracker.ctx.Refs != nil && !tracker.potentiallyNamespaceShadowed[name] {
+		// RefStore's binder scope walk is authoritative for ordinary value
+		// bindings declared in this file. Resolve can also fall back to the
+		// TypeChecker for symbols declared outside this file (cross-file,
+		// .d.ts, standard-library globals); a symbol resolved that way is still
+		// the real global, not a shadowing local binding.
+		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil &&
+			utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+			return false
+		}
+		return true
+	}
+	// Namespace-only bindings are outside RefStore's value lookup. Keep the
+	// syntactic fallback for those and for direct/unit callers without a
+	// Program.
 	return !utils.IsShadowed(identifier, name)
+}
+
+func (tracker *regexpCallTracker) recordNamespaceBinding(identifier *ast.Node, name string) {
+	if identifier == nil || identifier.Parent == nil ||
+		identifier.Parent.Kind != ast.KindModuleDeclaration ||
+		identifier.Parent.Name() != identifier ||
+		utils.IsQualifiedNamespaceSegment(identifier.Parent) {
+		return
+	}
+	if tracker.potentiallyNamespaceShadowed == nil {
+		tracker.potentiallyNamespaceShadowed = make(map[string]bool)
+	}
+	tracker.potentiallyNamespaceShadowed[name] = true
 }
 
 func (tracker *regexpCallTracker) isRegExpCall(node *ast.Node, callee *ast.Node) bool {
@@ -910,6 +937,7 @@ func (tracker *regexpCallTracker) identifiersForName(name string) []*ast.Node {
 					}
 					tracker.potentiallyShadowed[identifierName] = true
 				}
+				tracker.recordNamespaceBinding(node, identifierName)
 			} else if !tracker.indexedNames[identifierName] {
 				tracker.identifiersByName[identifierName] = append(tracker.identifiersByName[identifierName], node)
 			}

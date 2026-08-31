@@ -1358,6 +1358,10 @@ type C = const;`,
 				FileName: "type-global-export-assignment.ts",
 			},
 			{
+				Code:     `export default ((Record));`,
+				FileName: "parenthesized-type-global-export.ts",
+			},
+			{
 				Code:     `type Foo = {}; type T = Foo.Member;`,
 				FileName: "qualified-type-alias-reference.ts",
 			},
@@ -1430,6 +1434,23 @@ type C = const;`,
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `export default ((Record));`,
+				FileName: "parenthesized-type-global-export.js",
+				TSConfig: "tsconfig.allowJs.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 18},
+				},
+			},
+			{
+				Code:     `export default ((Record));`,
+				FileName: "parenthesized-type-global-export.jsx",
+				TSConfig: "tsconfig.allowJs.json",
+				Tsx:      true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 18},
+				},
+			},
 			{
 				Code:     `Record; AsyncIterator;`,
 				FileName: "type-globals-do-not-leak-into-value-space.ts",

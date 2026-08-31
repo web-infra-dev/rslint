@@ -6,7 +6,7 @@ Glob patterns for files to exclude. The behavior depends on whether `ignores` ap
 
 ## Global and entry-level ignores
 
-An entry containing **only** `ignores` acts as a global ignore: matching files are removed from the lint target set. An entry-level ignore prevents that entry's `files` selector, rules, and options from contributing. It cannot remove a path selected by the default extension baseline or another entry, so such a path may still receive configuration or a zero-rule syntax pass.
+An entry containing `ignores` and no fields other than optional `name` and `basePath` acts as a global ignore: matching files are removed from the lint target set. An entry-level ignore prevents that entry's `files` selector, rules, and options from contributing. It cannot remove a path selected by the default extension baseline or another entry, so such a path may still receive configuration or a zero-rule syntax pass.
 
 ```ts
 // Global ignore entry
@@ -24,7 +24,7 @@ An entry containing **only** `ignores` acts as a global ignore: matching files a
 
 ## The `globalIgnores` helper
 
-Writing an entry with only `ignores` is common enough that `@rslint/core` exports a `globalIgnores` helper, mirroring ESLint v10. It returns a config entry containing just the given patterns, so the global-ignore intent is explicit:
+Writing a global-ignore entry is common enough that `@rslint/core` exports a `globalIgnores` helper, mirroring ESLint v10. It returns a config entry containing the given patterns, so the global-ignore intent is explicit:
 
 ```ts
 import { defineConfig, globalIgnores } from '@rslint/core';
@@ -101,6 +101,8 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 ## .gitignore integration
 
 The CLI, JavaScript API, and LSP automatically read `.gitignore` files and treat their patterns as additional global ignores. Automatically discovered configs and ordinary LSP files start collection at the governing config directory. An explicitly selected invocation-wide config (`--config`, API `overrideConfigFile`, or the LSP `configPath` setting) starts at the invocation or workspace-folder `cwd`, even when the config file is elsewhere. A requested directory outside `cwd` gets its own independent Git scope. Collection never searches a scope's parents. In the editor, saved `.gitignore` changes refresh diagnostics for open files.
+
+An entry's [`basePath`](/config/base-path) does not move these `.gitignore` roots. It only scopes that authored entry and rebases its own `ignores` patterns.
 
 - **Nested `.gitignore` files** inside one Git scope are supported — each one only affects its own directory subtree
 - **Parent patterns cascade** to child directories within that scope (e.g., root `dist/` also ignores `packages/app/dist/`)

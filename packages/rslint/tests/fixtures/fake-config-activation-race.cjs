@@ -26,7 +26,7 @@ function onMessage(msg) {
       kind: 'loadConfigs',
       id: 200,
       data: {
-        protocolVersion: 2,
+        protocolVersion: 3,
         transactionId: 'cli-prepare-race',
         loadMode: 'cached',
         candidates: [
@@ -45,7 +45,7 @@ function onMessage(msg) {
       kind: 'activateConfigs',
       id: 201,
       data: {
-        protocolVersion: 2,
+        protocolVersion: 3,
         transactionId: 'cli-prepare-race',
         effectiveConfigIds: ['root'],
       },

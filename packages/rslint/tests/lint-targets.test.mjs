@@ -155,6 +155,136 @@ function normalizedDiagnostics(cwd, diagnostics) {
     });
 }
 
+describe('CLI basePath product contract', () => {
+  test('automatic config scopes files, ignores, and project from its directory', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-base-path-'));
+    try {
+      await writeFixture(root, {
+        'packages/app/rslint.config.mjs': `export default [
+  { basePath: 'src', ignores: ['global-ignored.ts'] },
+  {
+    basePath: 'src',
+    files: ['*.ts'],
+    ignores: ['local-ignored.ts'],
+    languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+    rules: { 'no-debugger': 'error' },
+  },
+];\n`,
+        'packages/app/.gitignore': 'src/git-ignored.ts\n',
+        'packages/app/src/tsconfig.json': JSON.stringify({
+          compilerOptions: { strict: true },
+          files: ['visible.ts'],
+        }),
+        'packages/app/src/visible.ts':
+          "debugger;\nexport const broken: number = 'value';\n",
+        'packages/app/src/global-ignored.ts': 'debugger;\n',
+        'packages/app/src/local-ignored.ts': 'debugger;\n',
+        'packages/app/src/git-ignored.ts': 'debugger;\n',
+        'packages/app/src/deep/not-matched.ts': 'debugger;\n',
+        'packages/app/outside-base.ts': 'debugger;\n',
+      });
+
+      const result = await runCLI(root, [
+        '--type-check',
+        path.join('packages', 'app'),
+      ]);
+      const visible = path.join(root, 'packages', 'app', 'src', 'visible.ts');
+
+      expect(result.code).toBe(1);
+      expect(
+        normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
+      ).toEqual([
+        { filePath: visible, ruleName: 'TypeScript(TS2322)' },
+        { filePath: visible, ruleName: 'no-debugger' },
+      ]);
+      expect(result.stderr).not.toContain('warning:');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('explicit external config resolves basePath from cwd without moving gitignore', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-external-'));
+    const configDir = path.join(root, 'configs');
+    const cwd = path.join(root, 'packages', 'app');
+    const configPath = path.join(configDir, 'rslint.config.mjs');
+    try {
+      await writeFixture(root, {
+        'configs/rslint.config.mjs': `export default [
+  { basePath: 'src', ignores: ['config-ignored.ts'] },
+  {
+    basePath: 'src',
+    files: ['**/*.ts'],
+    languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+    rules: { 'no-debugger': 'error' },
+  },
+];\n`,
+        'packages/app/src/tsconfig.json': JSON.stringify({
+          compilerOptions: { strict: true },
+          files: ['visible.ts'],
+        }),
+        'configs/.gitignore': 'visible.ts\n',
+        'packages/app/.gitignore': 'src/git-ignored.ts\n',
+        'packages/app/src/visible.ts':
+          "debugger;\nexport const broken: number = 'value';\n",
+        'packages/app/src/git-ignored.ts': 'debugger;\n',
+        'packages/app/src/config-ignored.ts': 'debugger;\n',
+      });
+
+      const configArgument = path.relative(cwd, configPath);
+      const result = await runCLI(cwd, [
+        '--type-check',
+        '--config',
+        configArgument,
+      ]);
+      const visible = path.join(cwd, 'src', 'visible.ts');
+
+      expect(result.code).toBe(1);
+      expect(
+        normalizedDiagnostics(cwd, parseDiagnostics(result.stdout)),
+      ).toEqual([
+        { filePath: visible, ruleName: 'TypeScript(TS2322)' },
+        { filePath: visible, ruleName: 'no-debugger' },
+      ]);
+      expect(result.stderr).not.toContain('warning:');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('ancestor basePath does not let a global ignore prune the config root', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-base-path-'));
+    try {
+      await writeFixture(root, {
+        'app/rslint.config.mjs': `export default [
+  { basePath: '..', ignores: ['*'] },
+  { files: ['**/*.js'], rules: { 'no-debugger': 'error' } },
+];\n`,
+        'app/root.js': 'debugger;\n',
+        'app/nested/child.js': 'debugger;\n',
+      });
+
+      const result = await runCLI(root, ['app']);
+      const expected = [
+        path.join(root, 'app', 'root.js'),
+        path.join(root, 'app', 'nested', 'child.js'),
+      ].sort();
+
+      expect(result.code).toBe(1);
+      expect(
+        absoluteDiagnosticPaths(
+          root,
+          parseDiagnostics(result.stdout),
+          'no-debugger',
+        ),
+      ).toEqual(expected);
+      expect(result.stderr).not.toContain('warning:');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('CLI lint target contracts', () => {
   test('external config keeps authored paths and invocation target scope', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-external-'));

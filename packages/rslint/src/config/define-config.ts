@@ -191,6 +191,13 @@ export interface RslintConfigEntry {
   /** Optional human-readable name for this config entry. */
   name?: string;
   /**
+   * Directory used as the matching and project-path base for this entry.
+   * Relative values resolve from the flat config array's base: normally the
+   * config file directory, or the invocation working directory with an
+   * explicitly selected config.
+   */
+  basePath?: string;
+  /**
    * Glob selectors for files this entry applies to. Top-level selectors are
    * ORed; strings inside one nested array are ANDed, matching ESLint flat
    * config semantics.

@@ -64,7 +64,7 @@ const (
 )
 
 // Version is the IPC protocol version.
-const Version = "3.0.0"
+const Version = "3.1.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
 const CapabilityReverseConfigLoad = "reverseConfigLoadV1"
@@ -100,9 +100,10 @@ type LintRequest struct {
 	// ConfigDiscovery enables the high-level host-filesystem path. It is
 	// mutually exclusive with Config and intentionally unsupported by WASM.
 	ConfigDiscovery *ConfigDiscoveryRequest `json:"configDiscovery,omitempty"`
-	// Anchor directory for resolving relative paths in the low-level Config.
-	// High-level ConfigDiscovery entries use their owning config directory;
-	// ConfigDiscovery.OverrideConfig entries use WorkingDirectory.
+	// Owner and anchor directory for the low-level Config. In high-level
+	// discovery, module entries without basePath use their owner; inline override
+	// entries without basePath use WorkingDirectory. An authored basePath instead
+	// inherits the selected ConfigArray base.
 	ConfigDirectory string `json:"configDirectory,omitempty"`
 	// PluginConfigDirectory is the opaque worker routing key for community
 	// plugins. It is independent from the directory used to resolve config paths.
@@ -129,8 +130,9 @@ type ConfigDiscoveryRequest struct {
 	// config discovery below them to branches that can govern those files.
 	Directories   []string `json:"directories,omitempty"`
 	ExplicitFiles []bool   `json:"explicitFiles,omitempty"`
-	// OverrideConfig is appended to every selected config while retaining
-	// LintRequest.WorkingDirectory as its authored relative-path base.
+	// OverrideConfig is appended to every selected config. Entries without
+	// basePath retain LintRequest.WorkingDirectory as their authored relative-path
+	// base; an authored basePath inherits the selected ConfigArray base.
 	OverrideConfig json.RawMessage `json:"overrideConfig,omitempty"`
 }
 

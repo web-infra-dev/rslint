@@ -4,7 +4,7 @@ package rule
 import "slices"
 
 // defaultTypeScriptTypeGlobals matches the type-capable implicit variables
-// seeded by @typescript-eslint/scope-manager 8.65's default esnext library.
+// seeded by @typescript-eslint/scope-manager 8.68's default esnext library.
 // Keep it aligned when that dependency is upgraded.
 var defaultTypeScriptTypeGlobals = [...]string{
 	"AggregateError",
