@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -72,7 +73,7 @@ func (s *nameSet) joined() string {
 
 func (s *nameSet) sortedJoined() string {
 	sorted := slices.Clone(s.order)
-	slices.Sort(sorted)
+	slices.SortFunc(sorted, ecmascript.CompareStrings)
 	return strings.Join(sorted, ", ")
 }
 

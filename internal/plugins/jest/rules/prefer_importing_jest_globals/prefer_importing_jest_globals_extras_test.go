@@ -279,6 +279,21 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
 			},
+			// ---- JavaScript parity: generated names sort by UTF-16 code units ----
+			{
+				Code: `
+        const { ["𐐀"]: astral, ["Ａ"]: fullwidth } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, test, 𐐀: astral, Ａ: fullwidth } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
 		},
 	)
 }
