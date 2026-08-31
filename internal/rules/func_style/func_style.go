@@ -44,22 +44,10 @@ var FuncStyleRule = rule.Rule{
 		}
 
 		checkAssignedToVariable := func(node *ast.Node) {
-			// ESTree flattens parentheses, so `var foo = (function(){})`
-			// still has a VariableDeclarator parent for the FunctionExpression
-			// upstream visits. tsgo instead wraps it in an explicit
-			// ParenthesizedExpression, so the declarator has to be found by
-			// walking back up through any such wrapper(s) first.
-			declarator := ast.WalkUpParenthesizedExpressions(node.Parent)
-			// In JavaScript, a leading JSDoc `@type` cast is represented by
-			// tsgo as a reparsed AsExpression inside a ParenthesizedExpression.
-			// ESTree keeps the annotation as a comment, so this wrapper is
-			// transparent to upstream's direct VariableDeclarator check. Do not
-			// unwrap ordinary TypeScript assertions: those remain real ESTree
-			// nodes and intentionally stop the check.
-			for declarator != nil && declarator.Kind == ast.KindAsExpression &&
-				declarator.Parent != nil && ast.IsJSDocTypeAssertion(declarator.Parent) {
-				declarator = ast.WalkUpParenthesizedExpressions(declarator.Parent)
-			}
+			// ESTree exposes neither source parentheses nor wrappers synthesized
+			// from JSDoc `@type`/`@satisfies` casts. Authored TypeScript
+			// assertions remain visible and intentionally stop this parent check.
+			declarator := utils.ESTreeParent(node)
 			if declarator == nil || declarator.Kind != ast.KindVariableDeclaration {
 				return
 			}
@@ -80,6 +68,27 @@ var FuncStyleRule = rule.Rule{
 		markThisOrSuper := func(node *ast.Node) {
 			if len(stack) > 0 {
 				stack[len(stack)-1] = true
+			}
+		}
+		markTypeQueryThis := func(node *ast.Node) {
+			for node.Parent != nil {
+				parent := node.Parent
+				switch parent.Kind {
+				case ast.KindTypeQuery:
+					markThisOrSuper(node)
+					return
+				case ast.KindQualifiedName:
+					if parent.AsQualifiedName().Left != node {
+						return
+					}
+				case ast.KindPropertyAccessExpression:
+					if parent.AsPropertyAccessExpression().Expression != node {
+						return
+					}
+				default:
+					return
+				}
+				node = parent
 			}
 		}
 
@@ -114,10 +123,10 @@ var FuncStyleRule = rule.Rule{
 			ast.KindSuperKeyword: markThisOrSuper,
 			ast.KindIdentifier: func(node *ast.Node) {
 				// typescript-eslint exposes `this` in `typeof this` as a
-				// ThisExpression. tsgo instead uses an Identifier under TypeQuery,
-				// so include that one AST-only spelling in the same frame tracking.
-				if node.Text() == "this" && node.Parent != nil && node.Parent.Kind == ast.KindTypeQuery {
-					markThisOrSuper(node)
+				// ThisExpression. tsgo instead uses an Identifier that may sit under
+				// the receiver side of a qualified-name/property-access chain.
+				if node.Text() == "this" {
+					markTypeQueryThis(node)
 				}
 			},
 		}
@@ -132,11 +141,16 @@ var FuncStyleRule = rule.Rule{
 		// only inside a nested method would wrongly mark an outer arrow's
 		// frame as needing `this`/`super`.
 		enterFunctionExpressionLike := func(node *ast.Node) {
+			if node.Body() == nil {
+				return
+			}
 			stack = append(stack, false)
 			checkAssignedToVariable(node)
 		}
 		exitFunctionExpressionLike := func(node *ast.Node) {
-			stack = stack[:len(stack)-1]
+			if node.Body() != nil {
+				stack = stack[:len(stack)-1]
+			}
 		}
 		for _, kind := range []ast.Kind{
 			ast.KindFunctionExpression,
@@ -244,7 +258,7 @@ func isNamedExport(node *ast.Node) bool {
 // belongs to a member this rule opened a `this`/`super` frame for.
 func isMemberMetadata(node *ast.Node) bool {
 	parent := node.Parent
-	if parent == nil {
+	if parent == nil || parent.Body() == nil {
 		return false
 	}
 	switch parent.Kind {

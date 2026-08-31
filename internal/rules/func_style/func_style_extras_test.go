@@ -109,6 +109,12 @@ export default function test(a: unknown) { return a; }
 			// Identifier, while typescript-eslint exposes a ThisExpression. It
 			// still marks the enclosing arrow as depending on `this` upstream ----
 			{Code: "const foo = (): typeof this => ({});", Options: []any{"declaration"}},
+			{Code: "const foo = (): typeof this.value => ({});", Options: []any{"declaration"}},
+
+			// ---- A bodyless abstract method is a TSEmptyBodyFunctionExpression
+			// upstream, so it does not open a FunctionExpression frame. Its type
+			// query therefore belongs to the enclosing arrow and keeps that arrow ----
+			{Code: "const outer = () => { abstract class C { abstract method(): typeof this; } };", Options: []any{"declaration"}},
 
 			// ---- Dimension 2 nesting: a member's decorators and computed name
 			// live inside the member node in tsgo, but hang off
@@ -191,6 +197,16 @@ export default function test(a: unknown) { return a; }
 			{
 				Code:     "const foo = /** @type {Function} */ () => 1;",
 				FileName: "jsdoc-direct-cast.js",
+				TSConfig: "tsconfig.allow-js.json",
+				Options:  []any{"declaration"},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "declaration"}},
+			},
+			// ---- Like JSDoc `@type`, `@satisfies` remains a comment in ESTree.
+			// tsgo's synthetic SatisfiesExpression must therefore be transparent
+			// without making an authored TypeScript `satisfies` transparent ----
+			{
+				Code:     "const foo = /** @satisfies {Function} */ (() => 1);",
+				FileName: "jsdoc-satisfies-cast.js",
 				TSConfig: "tsconfig.allow-js.json",
 				Options:  []any{"declaration"},
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "declaration"}},
