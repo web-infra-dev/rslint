@@ -187,11 +187,26 @@ func componentName(n *ast.Node) string {
 	if name := className(n); name != "" {
 		return name
 	}
-	if n != nil && n.Parent != nil && n.Parent.Kind == ast.KindVariableDeclaration && n.Parent.AsVariableDeclaration().Initializer == n {
-		name := n.Parent.AsVariableDeclaration().Name()
-		if name != nil && name.Kind == ast.KindIdentifier {
-			return name.AsIdentifier().Text
+	for current := n; current != nil && current.Parent != nil; {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression,
+			ast.KindTypeAssertionExpression,
+			ast.KindCallExpression:
+			current = parent
+			continue
+		case ast.KindVariableDeclaration:
+			if parent.AsVariableDeclaration().Initializer == current {
+				name := parent.AsVariableDeclaration().Name()
+				if name != nil && name.Kind == ast.KindIdentifier {
+					return name.AsIdentifier().Text
+				}
+			}
 		}
+		return ""
 	}
 	return ""
 }
@@ -238,6 +253,33 @@ func addDestructured(c *component, pattern *ast.Node, prefix []string) {
 			addDestructured(c, be.Name(), path)
 		}
 	}
+}
+
+func addThisPropsDestructured(c *component, pattern *ast.Node) bool {
+	if c == nil || pattern == nil || pattern.Kind != ast.KindObjectBindingPattern {
+		return false
+	}
+	for _, e := range pattern.AsBindingPattern().Elements.Nodes {
+		if e == nil || e.Kind != ast.KindBindingElement {
+			continue
+		}
+		be := e.AsBindingElement()
+		key := keyName(be.PropertyName)
+		if key == "" {
+			key = keyName(be.Name())
+		}
+		if key != "props" || be.Name() == nil {
+			continue
+		}
+		switch be.Name().Kind {
+		case ast.KindObjectBindingPattern:
+			addDestructured(c, be.Name(), nil)
+		case ast.KindIdentifier:
+			c.destructured[be.Name().AsIdentifier().Text] = nil
+		}
+		return true
+	}
+	return false
 }
 
 func propsPath(root *ast.Node, names []string, c *component) ([]string, bool) {
@@ -469,6 +511,9 @@ var PropTypesRule = rule.Rule{
 				if vd.Name() != nil {
 					if root, names, ok := memberNames(vd.Initializer); ok && root != nil {
 						if c := componentFor(n, comps); c != nil {
+							if root.Kind == ast.KindThisKeyword && len(names) == 0 && vd.Name().Kind == ast.KindObjectBindingPattern {
+								addThisPropsDestructured(c, vd.Name())
+							}
 							if path, ok := propsPath(root, names, c); ok {
 								switch vd.Name().Kind {
 								case ast.KindObjectBindingPattern:
