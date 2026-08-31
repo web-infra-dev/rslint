@@ -52,7 +52,7 @@ catalog:
   ajv: ^6.15.0
   husky: ^9.1.7
   lint-staged: ^16.4.0
-  prettier: ^3.9.6
+  rstack: ^0.6.5
   zx: ^8.8.5
   '@types/mocha': ^10.0.10
   '@types/node': ^26.2.0
