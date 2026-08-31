@@ -361,6 +361,8 @@ func parseOptions(options []any, sourceType string) strictMode {
 		return modeNever
 	case "global":
 		return modeGlobal
+	case "function":
+		return modeFunction
 	default:
 		if sourceType == "commonjs" {
 			return modeGlobal

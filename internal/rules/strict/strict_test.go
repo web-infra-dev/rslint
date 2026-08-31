@@ -122,6 +122,7 @@ foo();`, Options: "global", Skip: true}, // SKIP: relies on ESLint disable seman
 			{Code: `class C { static { 'use strict'; } }`, Options: "safe", Skip: true},
 			{Code: `'use strict'; module.exports = function identity (value) { return value; }`, LanguageOptions: commonJSLanguageOptions},
 			{Code: `'use strict'; module.exports = function identity (value) { return value; }`, Options: "safe", LanguageOptions: commonJSLanguageOptions},
+			{Code: `function foo() { 'use strict'; return; }`, Options: "function", LanguageOptions: commonJSLanguageOptions},
 
 			// ---- Class heritage (not class body) ----
 			// A function in an `extends` clause is NOT inside the class body, so
