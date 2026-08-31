@@ -419,12 +419,10 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 				},
 			},
 			// Probe: TS-only — ban TSEnumDeclaration. ESTree extension
-			// for TS adds this; tsgo has KindEnumDeclaration. We don't
-			// map it yet; this probe documents the gap.
+			// for TS adds this; tsgo has KindEnumDeclaration.
 			{
 				Code:    `enum E { A, B }`,
 				Options: []interface{}{"TSEnumDeclaration"},
-				Skip:    true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax"},
 				},
@@ -433,7 +431,6 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 			{
 				Code:    `var x = 1n;`,
 				Options: []interface{}{"Literal[bigint]"},
-				Skip:    true, // bigint attribute path not modelled; user can use Literal[value=/n$/].
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax"},
 				},
@@ -467,11 +464,10 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 			},
 			// Probe: ban specific decorator name
 			{
-				Code:    `@sealed class A {}`,
+				Code:    `@sealed() class A {}`,
 				Options: []interface{}{`Decorator > CallExpression[callee.name='sealed']`},
-				Skip:    true, // tsgo wraps decorator over Identifier directly here, no Call. Skip; cover via :has below.
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "restrictedSyntax"},
+					{MessageId: "restrictedSyntax", Message: `Using 'Decorator > CallExpression[callee.name='sealed']' is not allowed.`},
 				},
 			},
 			{
@@ -610,22 +606,6 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 				Code:    `if (a == b) {}`,
 				Options: []interface{}{"BinaryExpression[operator='==']"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "restrictedSyntax", Message: "Using 'BinaryExpression[operator='=='] ' is not allowed."},
-				},
-				Skip: true, // intentional bug test (typo) — disabled.
-			},
-			{
-				Code:    `if (a == b) {}`,
-				Options: []interface{}{"BinaryExpression[operator='==']"},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "restrictedSyntax", Message: "Using 'BinaryExpression[operator='=='] is not allowed."},
-				},
-				Skip: true, // intentional message-mismatch — disabled.
-			},
-			{
-				Code:    `if (a == b) {}`,
-				Options: []interface{}{"BinaryExpression[operator='==']"},
-				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax", Message: "Using 'BinaryExpression[operator='==']' is not allowed."},
 				},
 			},
@@ -724,7 +704,6 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 			{
 				Code:    `class A { foo() {} }`,
 				Options: []interface{}{"MethodDefinition[value.body.body.length=0]"},
-				Skip:    true, // ESTree's MethodDefinition has `value: FunctionExpression`; tsgo MethodDeclaration directly has Body. Different shape.
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "restrictedSyntax"},
 				},

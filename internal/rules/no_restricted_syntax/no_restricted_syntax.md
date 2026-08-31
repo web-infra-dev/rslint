@@ -65,10 +65,14 @@ The rule accepts an array of restriction entries. Each entry is either:
 
 ### Supported selector forms
 
-The implementation covers the subset of [esquery] used in real-world ESLint
-configurations and in the upstream `no-restricted-syntax` test suite:
+The implementation follows the esquery 1.7 selector forms used by ESLint
+10.9.1, including the complete upstream `no-restricted-syntax` test suite:
 
-- ESTree node names (e.g. `Identifier`, `FunctionDeclaration`, `BinaryExpression`).
+- ESTree node names (e.g. `Identifier`, `FunctionDeclaration`,
+  `BinaryExpression`) and supported TS-ESTree names such as
+  `TSEnumDeclaration`. ESTree-only wrapper shapes such as `ClassBody`,
+  `JSXEmptyExpression`, and `MethodDefinition.value` are exposed as virtual
+  facades over the tsgo AST.
 - Wildcard `*`.
 - Field selectors, including nested fields (e.g. `Literal.key` and
   `.body.declarations.init`).
@@ -76,29 +80,30 @@ configurations and in the upstream `no-restricted-syntax` test suite:
   (`[name="x"]`, `[kind='using']`), inequality (`!=`), numeric comparisons
   (`[params.length>2]`), numeric path segments (`[arguments.0.type='Literal']`),
   `type(...)`, and regex matching (`[regex.flags=/i/]`). Attribute paths may
-  inspect ESLint's `parent` link.
+  inspect ESLint's `parent` link. BigInt metadata and class-method function
+  fields are available through selectors such as `Literal[bigint]` and
+  `MethodDefinition[value.body.body.length=0]`.
 - Combinators `>` (direct child), descendant whitespace, `+`
-  (adjacent sibling), `~` (general sibling).
+  (adjacent sibling), `~` (general sibling), including decorator selectors
+  such as `Decorator > CallExpression[callee.name='sealed']`.
+- The `!` subject marker, including its reverse sibling/adjacent matching
+  behavior, and ESLint's `:exit` event suffix.
 - Pseudo-classes `:is()`, `:matches()`, `:not()`, `:has()`,
   `:first-child`, `:last-child`, `:nth-child(N)`, `:nth-last-child(N)`, and
   the semantic classes `:statement`, `:expression`, `:declaration`,
   `:function`, and `:pattern`.
 
-## Differences from ESLint
+## AST representation note
 
-- ESLint rejects the configuration when a selector has invalid syntax. rslint
-  ignores only that selector and continues with the remaining selectors, so
-  its restriction is not enforced.
-- Selectors that target TS-ESTree-only nodes or fields may report fewer
-  diagnostics than ESLint. For example, `ClassBody > MethodDefinition`
-  produces no diagnostics in rslint because tsgo has no separate `ClassBody`
-  node.
-- rslint ignores selectors using the `!` subject marker, such as
-  `!IfStatement > BlockStatement`, while ESLint accepts them.
+tsgo does not allocate separate nodes for every ESTree wrapper. Direct
+selectors and structural relationships for those wrappers are modeled, with
+ESLint-compatible ranges. A universe selector such as `*`, however, walks the
+physical tsgo tree and therefore does not emit an additional diagnostic for
+each virtual wrapper around the same physical node.
 
 ## Original Documentation
 
 - [ESLint: no-restricted-syntax](https://eslint.org/docs/latest/rules/no-restricted-syntax)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-restricted-syntax.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-restricted-syntax.js)
 
 [esquery]: https://github.com/estools/esquery

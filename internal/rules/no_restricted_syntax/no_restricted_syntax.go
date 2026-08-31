@@ -8,7 +8,9 @@ import (
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_restricted_syntax.schema.json
@@ -24,8 +26,8 @@ var schemaJSON []byte
 //
 // https://eslint.org/docs/latest/rules/no-restricted-syntax
 var NoRestrictedSyntaxRule = rule.Rule{
-	Name:   "no-restricted-syntax",
-	Schema: rule.NewSchema(schemaJSON),
+	Name:            "no-restricted-syntax",
+	Schema:          rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		plan := cachedRulePlan(options)
 		if len(plan.buckets) == 0 {
@@ -292,7 +294,12 @@ func supportsSingleDispatch(path []string) bool {
 }
 
 func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
+	if selectorTargetsClassBody(sel) {
+		return attrs
+	}
 	switch value := sel.(type) {
+	case subjectSelector:
+		attrs = collectDispatchAttrs(value.Inner, attrs)
 	case attrSelector:
 		attrs = collectDispatchAttrs(value.Inner, attrs)
 		if value.Op == attrEqual {
@@ -316,6 +323,11 @@ func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
 
 func stripDispatchAttr(sel selector, pathKey, expected string) (selector, bool) {
 	switch value := sel.(type) {
+	case subjectSelector:
+		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
+			value.Inner = inner
+			return value, true
+		}
 	case attrSelector:
 		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
 			value.Inner = inner
@@ -387,14 +399,52 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 	if !matches(compiled, node, mc) {
 		return
 	}
-	ctx.ReportNode(node, rule.RuleMessage{
+	message := rule.RuleMessage{
 		Id:          "restrictedSyntax",
 		Description: entry.formatMessage(),
-	})
+	}
+	if selectorTargetsClassBody(entry.compiled) && isClassLikeNode(node) {
+		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
+		return
+	}
+	if selectorTargetsJSXEmptyExpression(entry.compiled) && isEmptyJSXExpression(node) {
+		nodeRange := utils.TrimNodeTextRange(mc.sf, node)
+		ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
+		return
+	}
+	ctx.ReportNode(node, message)
 }
 
 func (e ruleEntry) formatMessage() string {
 	return e.message
+}
+
+func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	var members *ast.NodeList
+	switch node.Kind {
+	case ast.KindClassDeclaration:
+		members = node.AsClassDeclaration().Members
+	case ast.KindClassExpression:
+		members = node.AsClassExpression().Members
+	}
+	if sf == nil || members == nil {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+
+	text := sf.Text()
+	leftLimit := max(node.Pos(), 0)
+	rightLimit := min(max(members.Pos()+1, leftLimit), len(text))
+	openOffset := strings.LastIndex(text[leftLimit:rightLimit], "{")
+	if openOffset < 0 {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	open := leftLimit + openOffset
+	closeStart := min(max(members.End(), open+1), len(text))
+	closeOffset := strings.Index(text[closeStart:min(node.End(), len(text))], "}")
+	if closeOffset < 0 {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	return core.NewTextRange(open, closeStart+closeOffset+1)
 }
 
 func deduplicateRuleEntries(entries []ruleEntry) []ruleEntry {
@@ -445,6 +495,8 @@ func analyzeSelectorSpecificity(sel selector) selectorSpecificity {
 	var visit func(selector)
 	visit = func(current selector) {
 		switch value := current.(type) {
+		case subjectSelector:
+			visit(value.Inner)
 		case identifierSelector:
 			if value.Name != "*" {
 				result.identifiers++
@@ -512,7 +564,7 @@ func parseRuleOptions(options []any) []ruleEntry {
 }
 
 func buildEntryFromString(sel string) ruleEntry {
-	compiled, err := parseSelector(sel)
+	compiled, err := parseRuleSelector(sel)
 	if err != nil {
 		return ruleEntry{selector: sel}
 	}
@@ -524,7 +576,7 @@ func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
 	if rawSel == "" {
 		return ruleEntry{}, false
 	}
-	compiled, err := parseSelector(rawSel)
+	compiled, err := parseRuleSelector(rawSel)
 	if err != nil {
 		return ruleEntry{}, false
 	}
@@ -533,6 +585,13 @@ func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
 		msg = defaultRuleMessage(rawSel)
 	}
 	return ruleEntry{selector: rawSel, compiled: compiled, message: msg}, true
+}
+
+// ESLint handles the event-phase suffix outside esquery. This rule emits the
+// same diagnostic on enter or exit, so matching can discard the suffix while
+// retaining it in the diagnostic text.
+func parseRuleSelector(sel string) (selector, error) {
+	return parseSelector(strings.TrimSuffix(sel, ":exit"))
 }
 
 func defaultRuleMessage(selector string) string {

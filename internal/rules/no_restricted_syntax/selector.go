@@ -13,6 +13,15 @@ type selector interface {
 	isSelector()
 }
 
+// subjectSelector records esquery's leading `!` marker. For ESLint rule
+// listeners the marker only changes matching direction for sibling and
+// adjacent combinators; all other matchers treat it as transparent.
+type subjectSelector struct {
+	Inner selector
+}
+
+func (subjectSelector) isSelector() {}
+
 // identifierSelector matches a node by its (ESTree) type name. Name == "*"
 // is the wildcard. ESTree type names map to one or more tsgo ast.Kind values
 // via estreeKindMap in selector_mapping.go.
