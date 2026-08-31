@@ -66,6 +66,22 @@ func TestRequireAwaitedExpectPollExtras(t *testing.T) {
 			{Code: `let p; ([p = expect.poll(() => el).toBeVisible()] = values);`},
 			{Code: `let p; ({p = expect.poll(() => el).toBeVisible()} = values);`},
 
+			// ---- B3. Enclosing expressions and containers pass the promise on ----
+			// Locks in a review finding on PR #1920: handled-value detection
+			// follows value-producing conditional and short-circuit branches to
+			// their eventual consumer, and recognizes class, constructor and JSX
+			// containers that bind or pass on the assertion promise directly.
+			{Code: `class Pending { visible = expect.poll(() => el).toBeVisible(); }`},
+			{Code: `class Pending { accessor loaded = expect.element(el).toBeVisible(); }`},
+			{Code: `new Collector(expect.poll(() => el).toBeVisible());`},
+			{Code: `const pending = ready ? expect.poll(() => el).toBeVisible() : fallback;`},
+			{Code: `const pending = ready && expect.element(el).toBeVisible();`},
+			{Code: `const pending = expect.poll(() => el).toBeVisible() || fallback;`},
+			{Code: `const pending = expect.element(el).toBeVisible() ?? fallback;`},
+			{Code: `const pending = ready ? fallback : other ? expect.poll(() => el).toBeVisible() : fallback;`},
+			{Code: `const view = <Widget assertion={expect.element(el).toBeVisible()} />;`, Tsx: true},
+			{Code: `const view = <Widget>{expect.poll(() => el).toBeVisible()}</Widget>;`, Tsx: true},
+
 			// ---- C. Wrappers that do not consume the promise ----
 			// tsgo keeps parentheses and TypeScript assertions as real nodes
 			// where ESTree has none, so the walk out of the chain has to see
@@ -142,9 +158,7 @@ function run() { const core = helper(); core.expect.poll(() => el).toBeVisible()
 			{Code: `expect[factories.poll](() => el).toBeVisible();`},
 			{Code: `expect[0](() => el).toBeVisible();`},
 			// N/A: private identifiers (`#poll`) cannot appear on the expect
-			// object, and declaration/container forms — class vs function,
-			// async vs generator, overload signatures — are unrelated to a
-			// rule whose single listener runs over resolved expect chains.
+			// object.
 
 			// ---- H. Comma expressions: last operand inherits the position ----
 			// Locks in upstream skipSequenceExpressions() arm 1 crossed with
@@ -355,6 +369,27 @@ expect.poll(() => el).toBeVisible();`,
 			{
 				Code:   `const ok = expect.poll(() => el).toBeVisible() && other;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 12, EndLine: 1, EndColumn: 23}},
+			},
+			{
+				// A promise used as the condition is not the conditional result.
+				Code:   `const pending = expect.poll(() => el).toBeVisible() ? value : fallback;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 17, EndLine: 1, EndColumn: 28}},
+			},
+			{
+				// A value-producing branch is still dropped when the enclosing
+				// expression has no consumer.
+				Code:   `ready && expect.element(el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 10, EndLine: 1, EndColumn: 24}},
+			},
+			{
+				Code:   `ready ? expect.poll(() => el).toBeVisible() : fallback;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 9, EndLine: 1, EndColumn: 20}},
+			},
+			{
+				// A computed class-property name consumes the promise as a key;
+				// it does not bind the promise as the field value.
+				Code:   `class Pending { [expect.element(el).toBeVisible()] = value; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 18, EndLine: 1, EndColumn: 32}},
 			},
 			{
 				// A variable declaration's *name* is not its initializer.

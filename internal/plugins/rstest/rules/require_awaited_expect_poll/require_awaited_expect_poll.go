@@ -74,22 +74,50 @@ func isAwaitedFactory(parsed *rstestUtils.ParsedRstestExpectCall) bool {
 // upstream's skipMatchersAndModifiers arrives at. What remains is upstream's
 // skipSequenceExpressions: a comma expression evaluates to its last operand,
 // so an assertion in final position is handled exactly when the comma
-// expression is, while any earlier position discards the promise.
+// expression is, while any earlier position discards the promise. Conditional
+// branches and short-circuit operands similarly flow into the enclosing
+// expression, so keep walking until reaching the position that consumes the
+// resulting value.
 func topMostConsumedNode(node *ast.Node) *ast.Node {
 	current := ascendThroughWrappers(node)
 	for {
 		parent := current.Parent
-		if parent == nil || parent.Kind != ast.KindBinaryExpression {
+		if parent == nil {
 			return current
 		}
-		binary := parent.AsBinaryExpression()
-		if binary.OperatorToken == nil ||
-			binary.OperatorToken.Kind != ast.KindCommaToken ||
-			binary.Right != current {
+
+		switch parent.Kind {
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary.OperatorToken == nil || !binaryValueFlowsFrom(binary, current) {
+				return current
+			}
+		case ast.KindConditionalExpression:
+			conditional := parent.AsConditionalExpression()
+			if conditional.WhenTrue != current && conditional.WhenFalse != current {
+				return current
+			}
+		default:
 			return current
 		}
+
 		current = ascendThroughWrappers(parent)
 	}
+}
+
+// binaryValueFlowsFrom reports whether a short-circuit or comma expression
+// can return current's promise as its own value. A right operand always becomes
+// the result when evaluated. A promise on the left is also the result of `||`
+// and `??` because promises are truthy and non-nullish, but `promise && other`
+// evaluates to other and therefore drops the promise.
+func binaryValueFlowsFrom(binary *ast.BinaryExpression, current *ast.Node) bool {
+	operator := binary.OperatorToken.Kind
+	if binary.Right == current {
+		return operator == ast.KindCommaToken ||
+			ast.IsLogicalOrCoalescingBinaryOperator(operator)
+	}
+	return binary.Left == current &&
+		(operator == ast.KindBarBarToken || operator == ast.KindQuestionQuestionToken)
 }
 
 // ascendThroughWrappers returns the outermost node that wraps node without
@@ -119,9 +147,10 @@ func ascendThroughWrappers(node *ast.Node) *ast.Node {
 // NOTE: Unlike ESLint, which accepts only `await` and `return`, every position
 // below hands the promise to something that can settle it — a concise arrow
 // body returns it, an initializer, assignment or property binds it, a call
-// argument passes it on (which is how `Promise.all([...])` and
-// `Promise.allSettled([...])` are written), a destructuring or parameter
-// default binds it when the default runs, and `yield` suspends on it.
+// or constructor argument passes it on (which is how `Promise.all([...])`
+// and `Promise.allSettled([...])` are written), a JSX expression passes it
+// as a prop or child, a destructuring or parameter default binds it when the
+// default runs, and `yield` suspends on it.
 // Reporting those would be a false positive; the cost is that a promise stored
 // and then dropped goes unreported.
 func isHandled(node *ast.Node) bool {
@@ -136,6 +165,8 @@ func isHandled(node *ast.Node) bool {
 		return parent.AsArrowFunction().Body == node
 	case ast.KindVariableDeclaration:
 		return parent.AsVariableDeclaration().Initializer == node
+	case ast.KindPropertyDeclaration:
+		return parent.AsPropertyDeclaration().Initializer == node
 	case ast.KindPropertyAssignment:
 		return parent.AsPropertyAssignment().Initializer == node
 	case ast.KindYieldExpression:
@@ -144,6 +175,11 @@ func isHandled(node *ast.Node) bool {
 		return true
 	case ast.KindCallExpression:
 		return parent.AsCallExpression().Expression != node
+	case ast.KindNewExpression:
+		return parent.AsNewExpression().Expression != node
+	case ast.KindJsxExpression:
+		jsxExpression := parent.AsJsxExpression()
+		return jsxExpression.DotDotDotToken == nil && jsxExpression.Expression == node
 	case ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
 		return binary.OperatorToken != nil &&
