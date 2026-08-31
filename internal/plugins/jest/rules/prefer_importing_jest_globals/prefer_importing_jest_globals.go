@@ -10,7 +10,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
-	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 //go:embed prefer_importing_jest_globals.schema.json
@@ -286,7 +285,43 @@ type jestGlobalsRequire struct {
 	decl *ast.VariableDeclaration
 }
 
-func findJestGlobalsRequire(statements []*ast.Node) *jestGlobalsRequire {
+func isJestGlobalsRequireCall(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil || !ast.IsCallExpression(node) || ast.IsOptionalChain(node) {
+		return false
+	}
+
+	call := node.AsCallExpression()
+	if call == nil {
+		return false
+	}
+	callee := ast.SkipParentheses(call.Expression)
+	if callee == nil || !ast.IsIdentifier(callee) || callee.Text() != "require" {
+		return false
+	}
+
+	arguments := node.Arguments()
+	if len(arguments) == 0 || arguments[0] == nil {
+		return false
+	}
+	specifier := ast.SkipParentheses(arguments[0])
+	if specifier == nil {
+		return false
+	}
+
+	switch specifier.Kind {
+	case ast.KindStringLiteral:
+		return specifier.AsStringLiteral().Text == jestGlobalsModule
+	case ast.KindNoSubstitutionTemplateLiteral:
+		text := rslintUtils.TrimmedNodeText(sourceFile, specifier)
+		return len(text) >= 2 && text[0] == '`' && text[len(text)-1] == '`' &&
+			text[1:len(text)-1] == jestGlobalsModule
+	default:
+		return false
+	}
+}
+
+func findJestGlobalsRequire(sourceFile *ast.SourceFile, statements []*ast.Node) *jestGlobalsRequire {
 	for _, stmt := range statements {
 		if stmt == nil || stmt.Kind != ast.KindVariableStatement {
 			continue
@@ -312,7 +347,7 @@ func findJestGlobalsRequire(statements []*ast.Node) *jestGlobalsRequire {
 				(name.Kind != ast.KindIdentifier && name.Kind != ast.KindObjectBindingPattern) {
 				continue
 			}
-			if testFramework.IsModuleRequireCall(decl.Initializer, jestGlobalsModule) {
+			if isJestGlobalsRequireCall(sourceFile, decl.Initializer) {
 				return &jestGlobalsRequire{stmt: stmt, decl: decl}
 			}
 		}
@@ -366,7 +401,7 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 		}
 	}
 
-	if req := findJestGlobalsRequire(statements); req != nil {
+	if req := findJestGlobalsRequire(ctx.SourceFile, statements); req != nil {
 		if req.decl.Name() != nil && req.decl.Name().Kind == ast.KindObjectBindingPattern {
 			collectExistingRequireNames(ctx.SourceFile, req.decl.Name(), names)
 		}

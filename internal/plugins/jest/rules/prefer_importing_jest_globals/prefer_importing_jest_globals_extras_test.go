@@ -261,6 +261,86 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
 			},
+			// ---- ESTree parity: parentheses around the require callee are transparent ----
+			{
+				Code: `
+        const { ["describe"]: context } = ((require))('@jest/globals');
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: require matching only inspects the first argument ----
+			{
+				Code: `
+        const { ["describe"]: context } = require('@jest/globals', extra);
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: optional require calls are not merge targets ----
+			{
+				Code: `
+        const { ["describe"]: context } = require?.('@jest/globals');
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, test } = require('@jest/globals');
+        const { ["describe"]: context } = require?.('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// Keep parenthesized arguments from bypassing the optional-call guard.
+			{
+				Code: `
+        const { ["describe"]: context } = require?.(('@jest/globals'));
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, test } = require('@jest/globals');
+        const { ["describe"]: context } = require?.(('@jest/globals'));
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// Upstream compares a template module specifier's raw text, not its cooked value.
+			{
+				Code:            "\n        const { [\"describe\"]: context } = require(`@jest/\\u0067lobals`);\n        describe(\"suite\", () => test(\"foo\"));\n      ",
+				Output:          []string{"\n        const { describe, test } = require('@jest/globals');\n        const { [\"describe\"]: context } = require(`@jest/\\u0067lobals`);\n        describe(\"suite\", () => test(\"foo\"));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// String literals use their cooked value, unlike template module specifiers.
+			{
+				Code:            "\n        const { [\"describe\"]: context } = require('@jest/\\u0067lobals');\n        describe(\"suite\", () => test(\"foo\"));\n      ",
+				Output:          []string{"\n        const { describe, describe: context, test } = require('@jest/globals');\n        describe(\"suite\", () => test(\"foo\"));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
 			// ---- Upstream parity: computed numeric require keys are unsupported ----
 			{
 				Code: `

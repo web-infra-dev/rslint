@@ -205,7 +205,7 @@ func IsModuleRequireCall(node *ast.Node, importModule string) bool {
 	}
 
 	node = ast.SkipParentheses(node)
-	if node == nil || !ast.IsRequireCall(node, false /* requireStringLiteralLikeArgument */) {
+	if node == nil || !ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
 		return false
 	}
 
