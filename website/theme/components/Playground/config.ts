@@ -9,16 +9,16 @@ function prepareModule(source: string, wasmVersion: string): string {
 
 function normalizeConfig(value: unknown): PlaygroundConfig {
   if (!Array.isArray(value)) {
-    throw new Error("rslint.config.js must default-export an array.");
+    throw new Error('rslint.config.js must default-export an array.');
   }
   const entries = value.flat();
   if (
     entries.some(
       (entry) =>
-        entry === null || typeof entry !== "object" || Array.isArray(entry),
+        entry === null || typeof entry !== 'object' || Array.isArray(entry),
     )
   ) {
-    throw new Error("rslint.config.js must contain only config objects.");
+    throw new Error('rslint.config.js must contain only config objects.');
   }
   return entries as PlaygroundConfig;
 }
@@ -30,7 +30,7 @@ export async function evaluateConfig(
 ): Promise<PlaygroundConfig> {
   const moduleUrl = URL.createObjectURL(
     new Blob([prepareModule(source, wasmVersion)], {
-      type: "text/javascript",
+      type: 'text/javascript',
     }),
   );
   try {
