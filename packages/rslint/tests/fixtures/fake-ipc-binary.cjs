@@ -2,13 +2,15 @@
 // Minimal Go-binary stand-in for engine tests, speaking the IPC frame
 // protocol ([4-byte u32 LE length][JSON {kind,id,data}]) over stdio:
 //   1. expects an `init` request → replies `response {ok:true}`,
-//   2. echoes the received init payload back as two `output` notifications,
-//   3. sends a `shutdown` request,
-//   4. exits 0 on an acknowledgement or 2 if the peer rejects shutdown.
+//   2. sends the first output half as an acknowledged `output` request,
+//   3. after its acknowledgement, sends the second half as a notification,
+//   4. sends a `shutdown` request,
+//   5. exits 0 on both acknowledgements or 2 if the peer rejects either.
 // This mirrors the real binary's happy-path frame sequence so runEngine can
 // be exercised end-to-end without Go.
 
 let buf = Buffer.alloc(0);
+let remainingText = '';
 
 function send(msg) {
   const body = Buffer.from(JSON.stringify(msg), 'utf8');
@@ -22,15 +24,18 @@ function onMessage(msg) {
     send({ kind: 'response', id: msg.id, data: { ok: true } });
     const text = JSON.stringify(msg.data);
     const split = Math.ceil(text.length / 2);
+    remainingText = text.slice(split);
     send({
       kind: 'output',
-      id: 0,
+      id: 999,
       data: { stream: 'stdout', text: text.slice(0, split) },
     });
+  } else if (msg.id === 999) {
+    if (msg.kind !== 'response') process.exit(2);
     send({
       kind: 'output',
       id: 0,
-      data: { stream: 'stdout', text: text.slice(split) },
+      data: { stream: 'stdout', text: remainingText },
     });
     send({ kind: 'shutdown', id: 1000, data: {} });
   } else if (msg.id === 1000) {

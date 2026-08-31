@@ -57,8 +57,8 @@ describe('runEngine init payload TTY fact', () => {
   });
 });
 
-describe('runEngine output shutdown barrier', () => {
-  test('waits for stdout under backpressure before acknowledging shutdown', async () => {
+describe('runEngine output write barriers', () => {
+  test('waits for the destination callback before acknowledging output', async () => {
     const events: string[] = [];
     let releaseFirstWrite!: () => void;
     let markFirstWriteStarted!: () => void;
@@ -102,6 +102,7 @@ describe('runEngine output shutdown barrier', () => {
       await firstWriteStarted;
       await new Promise<void>((resolve) => setImmediate(resolve));
       expect(settled).toBe(false);
+      expect(events).toEqual(['stdout:1:start']);
     } finally {
       releaseFirstWrite();
     }
@@ -115,7 +116,51 @@ describe('runEngine output shutdown barrier', () => {
     ]);
   });
 
-  test('rejects shutdown when stdout forwarding fails', async () => {
+  test('waits for later stdout writes before acknowledging shutdown', async () => {
+    let releaseSecondWrite!: () => void;
+    let markSecondWriteStarted!: () => void;
+    const secondWriteStarted = new Promise<void>((resolve) => {
+      markSecondWriteStarted = resolve;
+    });
+    const secondWriteGate = new Promise<void>((resolve) => {
+      releaseSecondWrite = resolve;
+    });
+    let stdoutWrites = 0;
+    const stdout = new Writable({
+      write(_chunk, _encoding, callback) {
+        stdoutWrites++;
+        if (stdoutWrites === 2) {
+          markSecondWriteStarted();
+          void secondWriteGate.then(() => callback());
+          return;
+        }
+        callback();
+      },
+    });
+    let settled = false;
+    const run = runEngine({
+      binPath: process.execPath,
+      goArgs: [FAKE_BIN],
+      stdout,
+      stderr: new PassThrough(),
+    }).then((code) => {
+      settled = true;
+      return code;
+    });
+
+    try {
+      await secondWriteStarted;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(settled).toBe(false);
+    } finally {
+      releaseSecondWrite();
+    }
+
+    expect(await run).toBe(0);
+    expect(stdoutWrites).toBe(2);
+  });
+
+  test('returns failure when acknowledged stdout forwarding fails', async () => {
     const stdout = new Writable({
       write(_chunk, _encoding, callback) {
         callback(new Error('injected stdout failure'));
@@ -131,7 +176,7 @@ describe('runEngine output shutdown barrier', () => {
     expect(exitCode).toBe(2);
   });
 
-  test('rejects shutdown without hanging when stdout closes mid-write', async () => {
+  test('returns failure without hanging when stdout closes during acknowledged write', async () => {
     const stdout = new Writable({
       write() {
         stdout.destroy();
@@ -145,6 +190,52 @@ describe('runEngine output shutdown barrier', () => {
     });
 
     expect(exitCode).toBe(2);
+  });
+
+  test('rejects shutdown when a later stdout notification fails', async () => {
+    let stdoutWrites = 0;
+    const stdout = new Writable({
+      write(_chunk, _encoding, callback) {
+        stdoutWrites++;
+        callback(
+          stdoutWrites === 2
+            ? new Error('injected notification failure')
+            : undefined,
+        );
+      },
+    });
+    const exitCode = await runEngine({
+      binPath: process.execPath,
+      goArgs: [FAKE_BIN],
+      stdout,
+      stderr: new PassThrough(),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(stdoutWrites).toBe(2);
+  });
+
+  test('rejects shutdown without hanging when stdout closes during a later notification', async () => {
+    let stdoutWrites = 0;
+    const stdout = new Writable({
+      write(_chunk, _encoding, callback) {
+        stdoutWrites++;
+        if (stdoutWrites === 2) {
+          stdout.destroy();
+          return;
+        }
+        callback();
+      },
+    });
+    const exitCode = await runEngine({
+      binPath: process.execPath,
+      goArgs: [FAKE_BIN],
+      stdout,
+      stderr: new PassThrough(),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(stdoutWrites).toBe(2);
   });
 });
 
