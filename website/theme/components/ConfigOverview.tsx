@@ -42,6 +42,7 @@ interface Group {
 // Keep the documented, user-facing options tied to @rslint/core's config
 // types while intentionally omitting metadata-only fields.
 const CONFIG_OPTION_LINKS = {
+  basePath: '/config/base-path',
   files: '/config/files',
   ignores: '/config/ignoring-files',
   rules: '/config/rules',
@@ -66,7 +67,7 @@ const OVERVIEW_GROUPS: Group[] = [
   {
     name: 'matching',
     icon: FilesIcon,
-    items: [option('files'), option('ignores')],
+    items: [option('basePath'), option('files'), option('ignores')],
   },
   {
     name: 'linting',

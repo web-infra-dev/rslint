@@ -1,7 +1,8 @@
 // Rstest Snapshot v1
 
 exports[`--type-check output snapshots (default format) > --quiet suppresses warnings, keeps type errors 1`] = `
-"
+"start   Linting and type checking...
+
   TypeScript(TS2322)  — [error] Type 'string' is not assignable to type 'number'.
   ╭─┴──────────( test.ts:2:7 )─────
   │ 1 │  let a: any = 1;
@@ -9,12 +10,13 @@ exports[`--type-check output snapshots (default format) > --quiet suppresses war
   │ 3 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 1 warning (linted 2 files with 1 rule, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 TypeScript error and 1 warning in <TIME> (2 files, 1 rule, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > both lint error and type error 1`] = `
-"
+"start   Linting and type checking...
+
   @typescript-eslint/no-explicit-any  — [error] Unexpected any. Specify a different type.
   ╭─┴──────────( test.ts:1:8 )─────
   │ 1 │  let a: any = 1;
@@ -28,36 +30,39 @@ exports[`--type-check output snapshots (default format) > both lint error and ty
   │ 3 │  
   ╰────────────────────────────────
 
-Found 1 lint error, 1 type error and 0 warnings (linted 2 files with 1 rule, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 lint error and 1 TypeScript error in <TIME> (2 files, 1 rule, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > lint error only with --type-check 1`] = `
-"
+"start   Linting and type checking...
+
   @typescript-eslint/no-explicit-any  — [error] Unexpected any. Specify a different type.
   ╭─┴──────────( test.ts:1:8 )─────
   │ 1 │  let a: any = 1;
   │ 2 │  console.log(a);
   ╰────────────────────────────────
 
-Found 1 lint error, 0 type errors and 0 warnings (linted 2 files with 1 rule, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 lint error in <TIME> (2 files, 1 rule, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > lint error without --type-check (baseline) 1`] = `
-"
+"start   Linting...
+
   @typescript-eslint/no-explicit-any  — [error] Unexpected any. Specify a different type.
   ╭─┴──────────( test.ts:1:8 )─────
   │ 1 │  let a: any = 1;
   │ 2 │  console.log(a);
   ╰────────────────────────────────
 
-Found 1 error and 0 warnings (linted 2 files with 1 rule in <TIME> using <N> thread(s))
+error   Lint failed with 1 error in <TIME> (2 files, 1 rule, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > multi-line lint error (unbound-method) 1`] = `
-"
+"start   Linting...
+
   @typescript-eslint/unbound-method  — [error] Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
     │                                  If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.
   ╭─┴──────────( test.ts:5:12 )─────
@@ -66,12 +71,13 @@ exports[`--type-check output snapshots (default format) > multi-line lint error 
   │ 6 │  console.log(fn);
   ╰────────────────────────────────
 
-Found 1 error and 0 warnings (linted 2 files with 1 rule in <TIME> using <N> thread(s))
+error   Lint failed with 1 error in <TIME> (2 files, 1 rule, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > multi-line lint error + type error together 1`] = `
-"
+"start   Linting and type checking...
+
   @typescript-eslint/unbound-method  — [error] Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
     │                                  If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.
   ╭─┴──────────( test.ts:5:12 )─────
@@ -87,12 +93,13 @@ exports[`--type-check output snapshots (default format) > multi-line lint error 
   │ 7 │  
   ╰────────────────────────────────
 
-Found 1 lint error, 1 type error and 0 warnings (linted 2 files with 1 rule, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 lint error and 1 TypeScript error in <TIME> (2 files, 1 rule, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > multi-line: MessageChain (TS7016 untyped module) 1`] = `
-"
+"start   Linting and type checking...
+
   TypeScript(TS7016)  — [error] Could not find a declaration file for module 'some-untyped-pkg'. '<TEMPDIR>/node_modules/some-untyped-pkg/index.js' implicitly has an 'any' type.
     Try \`npm i --save-dev @types/some-untyped-pkg\` if it exists or add a new declaration (.d.ts) file containing \`declare module 'some-untyped-pkg';\`
   ╭─┴──────────( test.ts:1:17 )─────
@@ -100,12 +107,13 @@ exports[`--type-check output snapshots (default format) > multi-line: MessageCha
   │ 2 │  console.log(foo);
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 2 files with 0 rules, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 TypeScript error in <TIME> (2 files, 0 rules, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > multi-line: RelatedInformation (missing property TS2741) 1`] = `
-"
+"start   Linting and type checking...
+
   TypeScript(TS2741)  — [error] Property 'also' is missing in type '{ required: string; }' but required in type 'C'.
     <TEMPDIR>/test.ts:1: 'also' is declared here.
   ╭─┴──────────( test.ts:2:7 )─────
@@ -114,12 +122,13 @@ exports[`--type-check output snapshots (default format) > multi-line: RelatedInf
   │ 3 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 2 files with 0 rules, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 TypeScript error in <TIME> (2 files, 0 rules, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > multi-line: RelatedInformation (property type mismatch) 1`] = `
-"
+"start   Linting and type checking...
+
   TypeScript(TS2322)  — [error] Type 'string' is not assignable to type 'number'.
     <TEMPDIR>/test.ts:1: The expected type comes from property 'baz' which is declared here on type '{ baz: number; }'
   ╭─┴──────────( test.ts:2:27 )─────
@@ -128,12 +137,13 @@ exports[`--type-check output snapshots (default format) > multi-line: RelatedInf
   │ 3 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 2 files with 0 rules, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 TypeScript error in <TIME> (2 files, 0 rules, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > multi-line: deep MessageChain (nested interface mismatch) 1`] = `
-"
+"start   Linting and type checking...
+
   TypeScript(TS2322)  — [error] Type 'B' is not assignable to type 'A'.
     The types of 'x.y.z' are incompatible between these types.
       Type 'number' is not assignable to type 'string'.
@@ -143,24 +153,26 @@ exports[`--type-check output snapshots (default format) > multi-line: deep Messa
   │ 4 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 2 files with 0 rules, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 TypeScript error in <TIME> (2 files, 0 rules, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > no errors with --type-check 1`] = `
-"Found 0 lint errors, 0 type errors and 0 warnings (linted 2 files with 0 rules, type-checked 1 file in <TIME> using <N> thread(s))
+"start   Linting and type checking...
+success Lint and type check passed in <TIME> (2 files, 0 rules, <N> thread(s))
 "
 `;
 
 exports[`--type-check output snapshots (default format) > type error only (TS2322) 1`] = `
-"
+"start   Linting and type checking...
+
   TypeScript(TS2322)  — [error] Type 'string' is not assignable to type 'number'.
   ╭─┴──────────( test.ts:1:7 )─────
   │ 1 │  const x: number = 'hello';
   │ 2 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 2 files with 0 rules, type-checked 1 file in <TIME> using <N> thread(s))
+error   Lint and type check failed with 1 TypeScript error in <TIME> (2 files, 0 rules, <N> thread(s))
 "
 `;
 
