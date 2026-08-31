@@ -444,11 +444,7 @@ func isRstestNamespaceSpecifier(element *ast.Node) bool {
 // somewhere the rule's fixes do not reach.
 func (file *fileNamespaces) isSurvivingUse(node *ast.Node, boundName *ast.Node) bool {
 	if node.Kind == ast.KindExportSpecifier {
-		specifier := node.AsExportSpecifier()
-		return specifier != nil &&
-			specifier.PropertyName == nil &&
-			specifier.Name() != nil &&
-			specifier.Name().Text() == file.disallowed
+		return exportSpecifierLocalName(node) == file.disallowed
 	}
 	if node.Kind != ast.KindIdentifier ||
 		node == boundName ||
@@ -460,6 +456,26 @@ func (file *fileNamespaces) isSurvivingUse(node *ast.Node, boundName *ast.Node) 
 	}
 	_, ok := file.resolveNamespace(node)
 	return ok
+}
+
+// exportSpecifierLocalName returns the name an export specifier reads from the
+// enclosing module. It is the property name when the export is aliased, since
+// `export { rstest as helper }` and `export type { rstest as Namespace }` both
+// name the imported binding on their left-hand side, and the exported name
+// otherwise.
+func exportSpecifierLocalName(node *ast.Node) string {
+	specifier := node.AsExportSpecifier()
+	if specifier == nil {
+		return ""
+	}
+	local := specifier.PropertyName
+	if local == nil {
+		local = specifier.Name()
+	}
+	if local == nil || local.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return local.AsIdentifier().Text
 }
 
 // specifierRemovalRange spans the specifier at index together with the comma

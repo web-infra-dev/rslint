@@ -202,6 +202,26 @@ rstest.mock('./service');`,
 				},
 			},
 			{
+				// An aliased re-export names the binding just as a plain one does.
+				Code: `import { rstest } from '@rstest/core';
+export { rstest as helper };
+rstest.mock('./service');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 3, 1, 7),
+				},
+			},
+			{
+				// A type-only re-export keeps the binding live as well.
+				Code: `import { rstest } from '@rstest/core';
+export type { rstest as RstestNamespace };
+rstest.mock('./service');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 3, 1, 7),
+				},
+			},
+			{
 				// A destructured require binds the namespace under a name the
 				// import fix never reaches, so the calls are reported unfixed.
 				Code: `const { rstest } = require('@rstest/core');
