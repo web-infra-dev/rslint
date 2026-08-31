@@ -64,6 +64,25 @@ var ConsistentRstestNamespaceRule = rule.Rule{
 		// `.mockReturnValue(value)` that follows it share the same identifier —
 		// so the identifier, not the call, is what gets reported once.
 		reportedRoots := map[*ast.Node]bool{}
+		reportInvocation := func(expression *ast.Node) {
+			root := namespaceInvocationRoot(expression)
+			if root == nil ||
+				root.AsIdentifier().Text != disallowed ||
+				reportedRoots[root] {
+				return
+			}
+			mode, ok := file.resolveNamespace(root)
+			if !ok {
+				return
+			}
+			reportedRoots[root] = true
+			ctx.ReportNodeWithDeferredFixes(root, message, func() []rule.RuleFix {
+				if mode == rstestUtils.RSTEST_IMPORT_MODE && !file.bindingRewritable() {
+					return nil
+				}
+				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, root, preferred)}
+			})
+		}
 
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
@@ -84,56 +103,89 @@ var ConsistentRstestNamespaceRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				root := namespaceCallRoot(node)
-				if root == nil ||
-					root.AsIdentifier().Text != disallowed ||
-					reportedRoots[root] {
-					return
+				call := node.AsCallExpression()
+				if call != nil {
+					reportInvocation(call.Expression)
 				}
-				mode, ok := file.resolveNamespace(root)
-				if !ok {
-					return
+			},
+			ast.KindTaggedTemplateExpression: func(node *ast.Node) {
+				tagged := node.AsTaggedTemplateExpression()
+				if tagged != nil {
+					reportInvocation(tagged.Tag)
 				}
-				reportedRoots[root] = true
-				ctx.ReportNodeWithDeferredFixes(root, message, func() []rule.RuleFix {
-					if mode == rstestUtils.RSTEST_IMPORT_MODE && !file.bindingRewritable() {
-						return nil
-					}
-					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, root, preferred)}
-				})
 			},
 		}
 	},
 }
 
-// namespaceCallRoot returns the identifier a call is headed by when the call
-// goes through a member of that identifier. A direct `rstest(...)` call has no
-// namespace object to rewrite, so it is not a root.
-func namespaceCallRoot(node *ast.Node) *ast.Node {
-	call := node.AsCallExpression()
-	if call == nil {
-		return nil
+// namespaceInvocationRoot returns the identifier an invocation is headed by
+// when it goes through a member of that identifier. A direct `rstest(...)` call
+// or tagged template has no namespace object to rewrite, so it is not a root.
+func namespaceInvocationRoot(expression *ast.Node) *ast.Node {
+	throughMember := false
+	for expression != nil {
+		switch expression.Kind {
+		case ast.KindIdentifier:
+			if throughMember {
+				return expression
+			}
+			return nil
+		case ast.KindParenthesizedExpression:
+			expression = expression.AsParenthesizedExpression().Expression
+		case ast.KindNonNullExpression:
+			expression = expression.AsNonNullExpression().Expression
+		case ast.KindAsExpression:
+			expression = expression.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			expression = expression.AsTypeAssertion().Expression
+		case ast.KindSatisfiesExpression:
+			expression = expression.AsSatisfiesExpression().Expression
+		case ast.KindCallExpression:
+			expression = expression.AsCallExpression().Expression
+		case ast.KindTaggedTemplateExpression:
+			expression = expression.AsTaggedTemplateExpression().Tag
+		case ast.KindPropertyAccessExpression:
+			throughMember = true
+			expression = expression.AsPropertyAccessExpression().Expression
+		case ast.KindElementAccessExpression:
+			throughMember = true
+			expression = expression.AsElementAccessExpression().Expression
+		default:
+			return nil
+		}
 	}
-	callee := ast.SkipParentheses(call.Expression)
-	if callee == nil || callee.Kind == ast.KindIdentifier {
-		return nil
-	}
-	root := testFramework.ResolveFirstIdentifier(callee)
-	if root == nil || root.Kind != ast.KindIdentifier {
-		return nil
-	}
-	return root
+	return nil
 }
 
-// isNamespaceCallRoot is the reverse question: given an identifier, does it
-// head a member call? It is what tells a use the rule rewrites apart from one
-// it leaves alone, such as `const mock = rstest.fn` or `[rstest]`.
-func isNamespaceCallRoot(identifier *ast.Node) bool {
+// isNamespaceInvocationRoot is the reverse question: given an identifier, does
+// it head a member call or tagged template? It is what tells a use the rule
+// rewrites apart from one it leaves alone, such as `const mock = rstest.fn` or
+// `[rstest]`.
+func isNamespaceInvocationRoot(identifier *ast.Node) bool {
 	current := identifier
 	throughMember := false
 	for parent := current.Parent; parent != nil; parent = parent.Parent {
 		switch parent.Kind {
-		case ast.KindParenthesizedExpression, ast.KindNonNullExpression:
+		case ast.KindParenthesizedExpression:
+			if parent.AsParenthesizedExpression().Expression != current {
+				return false
+			}
+		case ast.KindNonNullExpression:
+			if parent.AsNonNullExpression().Expression != current {
+				return false
+			}
+		case ast.KindAsExpression:
+			if parent.AsAsExpression().Expression != current {
+				return false
+			}
+		case ast.KindTypeAssertionExpression:
+			if parent.AsTypeAssertion().Expression != current {
+				return false
+			}
+		case ast.KindSatisfiesExpression:
+			if parent.AsSatisfiesExpression().Expression != current {
+				return false
+			}
 		case ast.KindPropertyAccessExpression:
 			if parent.AsPropertyAccessExpression().Expression != current {
 				return false
@@ -146,6 +198,8 @@ func isNamespaceCallRoot(identifier *ast.Node) bool {
 			throughMember = true
 		case ast.KindCallExpression:
 			return throughMember && parent.AsCallExpression().Expression == current
+		case ast.KindTaggedTemplateExpression:
+			return throughMember && parent.AsTaggedTemplateExpression().Tag == current
 		default:
 			return false
 		}
@@ -312,7 +366,7 @@ func (file *fileNamespaces) isSurvivingUse(node *ast.Node, boundName *ast.Node) 
 		node.AsIdentifier().Text != file.disallowed ||
 		ast.IsIdentifierName(node) ||
 		ast.IsDeclarationNameOrImportPropertyName(node) ||
-		isNamespaceCallRoot(node) {
+		isNamespaceInvocationRoot(node) {
 		return false
 	}
 	_, ok := file.resolveNamespace(node)
@@ -330,18 +384,38 @@ func specifierRemovalRange(sourceFile *ast.SourceFile, elements []*ast.Node, ind
 		return core.NewTextRange(previousEnd, elementRange.End())
 	}
 	nextStart := utils.TrimNodeTextRange(sourceFile, elements[index+1]).Pos()
-	return core.NewTextRange(elementRange.Pos(), commentAwareEnd(sourceFile.Text(), elementRange.End(), nextStart))
+	return core.NewTextRange(elementRange.Pos(), firstSpecifierRemovalEnd(sourceFile.Text(), elementRange.End(), nextStart))
 }
 
-func commentAwareEnd(text string, start int, end int) int {
+func firstSpecifierRemovalEnd(text string, start int, end int) int {
 	if start < 0 || end > len(text) || start >= end {
 		return end
 	}
-	if offset := strings.Index(text[start:end], "//"); offset >= 0 {
-		end = start + offset
+	between := text[start:end]
+	comma := strings.IndexByte(between, ',')
+	if comma < 0 {
+		return end
 	}
-	if offset := strings.Index(text[start:end], "/*"); offset >= 0 {
-		end = start + offset
+	comment := firstCommentOffset(between)
+	if comment < 0 {
+		return end
+	}
+	if comment > comma {
+		return start + comment
+	}
+	if afterComma := firstCommentOffset(between[comma+1:]); afterComma >= 0 {
+		return start + comma + 1 + afterComma
 	}
 	return end
+}
+
+func firstCommentOffset(text string) int {
+	offset := -1
+	if line := strings.Index(text, "//"); line >= 0 {
+		offset = line
+	}
+	if block := strings.Index(text, "/*"); block >= 0 && (offset < 0 || block < offset) {
+		offset = block
+	}
+	return offset
 }

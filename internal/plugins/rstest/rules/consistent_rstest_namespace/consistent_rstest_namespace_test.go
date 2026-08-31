@@ -106,6 +106,14 @@ rs.clearAllMocks();`},
 				},
 			},
 			{
+				// A trailing comment belongs to the specifier that is removed.
+				Code:   `import { rstest /* remove with namespace */, rs } from '@rstest/core';`,
+				Output: []string{`import { rs } from '@rstest/core';`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+				},
+			},
+			{
 				// The reverse preference.
 				Code: `import { rs } from '@rstest/core';
 rs.mock('./service');`,
@@ -141,6 +149,36 @@ rstest.mock('./service');`},
 				Output: []string{`rs.mocked(pay).mockReturnValue(true);`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					namespaceError("rs", "rstest", 1, 1, 7),
+				},
+			},
+			{
+				// TypeScript expression wrappers do not hide the namespace call.
+				Code: `import { rstest } from '@rstest/core';
+rstest!.mock('./service');`,
+				Output: []string{`import { rs } from '@rstest/core';
+rs!.mock('./service');`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 2, 1, 7),
+				},
+			},
+			{
+				// The runtime root is reported through an assertion, but its type
+				// query prevents a partial binding rewrite.
+				Code: `import { rstest } from '@rstest/core';
+(rstest as typeof rstest).mock('./service');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 2, 2, 8),
+				},
+			},
+			{
+				// A member invoked as a tagged template is still a namespace use.
+				Code:   "import { rstest } from '@rstest/core';\nrstest.fn`service`;",
+				Output: []string{"import { rs } from '@rstest/core';\nrs.fn`service`;"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 2, 1, 7),
 				},
 			},
 			{

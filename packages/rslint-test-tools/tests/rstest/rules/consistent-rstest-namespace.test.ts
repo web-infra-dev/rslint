@@ -94,6 +94,11 @@ rs.clearAllMocks();`,
       errors: [namespaceError('rs', 'rstest', 1, 10, 16)],
     },
     {
+      code: `import { rstest /* remove with namespace */, rs } from '@rstest/core';`,
+      output: `import { rs } from '@rstest/core';`,
+      errors: [namespaceError('rs', 'rstest', 1, 10, 16)],
+    },
+    {
       code: `import { rs } from '@rstest/core';
 rs.mock('./service');`,
       output: `import { rstest } from '@rstest/core';
@@ -122,6 +127,34 @@ rstest.mock('./service');`,
       code: `rstest.mocked(pay).mockReturnValue(true);`,
       output: `rs.mocked(pay).mockReturnValue(true);`,
       errors: [namespaceError('rs', 'rstest', 1, 1, 7)],
+    },
+    {
+      code: `import { rstest } from '@rstest/core';
+rstest!.mock('./service');`,
+      output: `import { rs } from '@rstest/core';
+rs!.mock('./service');`,
+      errors: [
+        namespaceError('rs', 'rstest', 1, 10, 16),
+        namespaceError('rs', 'rstest', 2, 1, 7),
+      ],
+    },
+    {
+      code: `import { rstest } from '@rstest/core';
+(rstest as typeof rstest).mock('./service');`,
+      errors: [
+        namespaceError('rs', 'rstest', 1, 10, 16),
+        namespaceError('rs', 'rstest', 2, 2, 8),
+      ],
+    },
+    {
+      code: `import { rstest } from '@rstest/core';
+rstest.fn\`service\`;`,
+      output: `import { rs } from '@rstest/core';
+rs.fn\`service\`;`,
+      errors: [
+        namespaceError('rs', 'rstest', 1, 10, 16),
+        namespaceError('rs', 'rstest', 2, 1, 7),
+      ],
     },
     {
       code: `import { rstest } from '@rstest/core';
