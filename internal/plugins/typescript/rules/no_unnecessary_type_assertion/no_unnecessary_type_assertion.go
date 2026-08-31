@@ -407,6 +407,13 @@ func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type
 	if ast.IsConditionalExpression(parent) {
 		conditional := parent.AsConditionalExpression()
 		if conditional.WhenTrue == semanticNode || conditional.WhenFalse == semanticNode {
+			conditionalParent := assertionWalkUpParentheses(parent).Parent
+			if ast.IsConditionalExpression(conditionalParent) {
+				outerConditional := conditionalParent.AsConditionalExpression()
+				if outerConditional.WhenTrue == parent || outerConditional.WhenFalse == parent {
+					return nil
+				}
+			}
 			return ctx.TypeChecker.GetTypeAtLocation(parent)
 		}
 	}
@@ -460,6 +467,16 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 		if !checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncastType, parameterType) {
 			return true
 		}
+	}
+	return false
+}
+
+func assertionIsArgumentToExplicitGenericCall(node *ast.Node) bool {
+	semanticNode := assertionWalkUpParentheses(node)
+	parent := semanticNode.Parent
+	if (ast.IsCallExpression(parent) || ast.IsNewExpression(parent)) && parent.TypeArguments() != nil {
+		_, isArgument := assertionArgumentIndex(parent, node)
+		return isArgument
 	}
 	return false
 }
@@ -537,7 +554,8 @@ func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.N
 		assertionIsPropertyInProblematicContext(ctx, node) ||
 		assertionIsAssignmentInNonStatementContext(node) ||
 		assertionIsRightHandSideOfLogicalAssignment(node) ||
-		assertionIsArgumentToOverloadedFunction(ctx, node) {
+		assertionIsArgumentToOverloadedFunction(ctx, node) ||
+		assertionIsArgumentToExplicitGenericCall(node) {
 		return true
 	}
 	if assertionIsInGenericContext(ctx, node) {

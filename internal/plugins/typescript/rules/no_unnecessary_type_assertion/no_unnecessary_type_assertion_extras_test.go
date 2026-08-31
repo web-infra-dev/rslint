@@ -29,6 +29,8 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 			{Code: `declare let x: number; const y = (x = 1 as number);`},
 			{Code: `declare const value: string | undefined; (value as string | undefined)?.toLowerCase();`},
 			{Code: `declare const value: string | undefined; const result = (value as string | undefined) || 'fallback';`},
+			{Code: `declare const value: 'a'; declare function id<T>(value: T): T; id<string>(value as string);`},
+			{Code: `declare const value: 'a'; const result = true ? false ? value as string : 'b' : 'c';`},
 			{Code: `
 interface W { name?: string }
 interface N { name: string }
