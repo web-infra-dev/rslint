@@ -12,6 +12,10 @@ import { registerCommands } from './commands';
 import { WorkspaceDocumentRouter } from './WorkspaceDocumentRouter';
 import { CoreResolver } from './CoreResolver';
 import { RuntimeManager } from './RuntimeManager';
+import {
+  createRuntimeTraceLabel,
+  SharedTraceOutputChannel,
+} from './SharedTraceOutputChannel';
 
 const CORE_TOPOLOGY_GLOB =
   '**/{package-lock.json,pnpm-lock.yaml,yarn.lock,node_modules/@rslint/core/package.json}';
@@ -43,20 +47,30 @@ export class Extension {
     ));
     const lspOutputChannel = (this.lspOutputChannel =
       window.createOutputChannel('Rslint Language Server(LSP)'));
+    const sharedTraceOutputChannel = new SharedTraceOutputChannel(
+      lspOutputChannel,
+    );
 
     const router = new WorkspaceDocumentRouter();
     const runtimeManager = new RuntimeManager(
       router,
       new CoreResolver(),
-      (resolved) =>
-        new Rslint({
+      (resolved) => {
+        const traceOutputChannel = sharedTraceOutputChannel.forRuntime(
+          createRuntimeTraceLabel(
+            resolved.workspaceFolder.uri.toString(),
+            resolved.installation.identity,
+          ),
+        );
+        return new Rslint({
           rootKey: resolved.key,
           workspaceFolder: resolved.workspaceFolder,
           installation: resolved.installation,
           outputChannel,
-          lspOutputChannel,
+          traceOutputChannel,
           router,
-        }),
+        });
+      },
       this.logger,
     );
     this.router = router;
