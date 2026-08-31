@@ -18,6 +18,8 @@ func TestCamelcaseExtras(t *testing.T) {
 		t,
 		&CamelcaseRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Review regression: JSX namespaced attributes are names, not references ----
+			{Code: `const element = <div attr_name:value_name="x" />`, Tsx: true},
 			// ---- Regression: upstream's MemberExpression target helper excludes updates and loop headers ----
 			{Code: `obj.snake_case++; ++obj.other_case; for (obj.third_case in source); for (obj.fourth_case of source);`},
 			// ---- WRAP-03/WRAP-05: TypeScript wrappers stop member assignment-target classification ----
@@ -66,6 +68,46 @@ func TestCamelcaseExtras(t *testing.T) {
 			{Code: `this.data.nested.variable_from_backend = "value"`, Options: map[string]any{"properties": "never"}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: merged bindings report the first declaration once ----
+			{
+				Code: `var snake_case; var snake_case; snake_case;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 15},
+					{MessageId: "notCamelCase", Line: 1, Column: 33, EndLine: 1, EndColumn: 43},
+				},
+			},
+			{
+				Code: `var snake_case; function snake_case() {} snake_case;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 15},
+					{MessageId: "notCamelCase", Line: 1, Column: 42, EndLine: 1, EndColumn: 52},
+				},
+			},
+			{
+				Code: `function f(snake_case, snake_case) { snake_case; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Line: 1, Column: 12, EndLine: 1, EndColumn: 22},
+					{MessageId: "notCamelCase", Line: 1, Column: 38, EndLine: 1, EndColumn: 48},
+				},
+			},
+			// ---- Review regression: parameter-property references use the local parameter symbol ----
+			{
+				Code: `class C { constructor(public snake_case: string) { snake_case; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase"},
+					{MessageId: "notCamelCase"},
+				},
+			},
+			// ---- Review regression: computed outer import options stop key exemption recursion ----
+			{
+				Code:    `import('x', { [my_with]: { my_type: my_value } })`,
+				Options: map[string]any{"properties": "always", "ignoreImports": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'my_with' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'my_type' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'my_value' is not in camel case."},
+				},
+			},
 			// ---- Type queries retain their leftmost value reference only ----
 			{
 				Code: `let value: typeof snake_case; let other: typeof namespace_case.member_name;`,
@@ -231,9 +273,11 @@ func TestCamelcaseExtras(t *testing.T) {
 }
 
 func TestCamelcaseAllowSchemaRejectsInvalidRegexp(t *testing.T) {
-	invalid := []any{map[string]any{"allow": []any{"["}}}
-	if err := CamelcaseRule.Schema.Validate(invalid); err == nil {
-		t.Fatal("expected an invalid allow regexp to fail schema validation")
+	for _, pattern := range []string{"[", `\a`} {
+		invalid := []any{map[string]any{"allow": []any{pattern}}}
+		if err := CamelcaseRule.Schema.Validate(invalid); err == nil {
+			t.Errorf("expected invalid allow regexp %q to fail schema validation", pattern)
+		}
 	}
 
 	valid := []any{map[string]any{"allow": []any{`^(?=snake_)snake_case$`}}}

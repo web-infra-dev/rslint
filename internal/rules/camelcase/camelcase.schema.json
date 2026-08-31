@@ -10,7 +10,7 @@
         "properties": { "enum": ["always", "never"] },
         "allow": {
           "type": "array",
-          "items": { "type": "string", "format": "regex" },
+          "items": { "type": "string", "format": "regex-u" },
           "minItems": 0,
           "uniqueItems": true
         }

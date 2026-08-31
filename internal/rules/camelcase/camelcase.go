@@ -25,9 +25,10 @@ var CamelcaseRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		state := camelcaseState{
-			ctx:      ctx,
-			opts:     opts,
-			reported: make(map[int]struct{}),
+			ctx:              ctx,
+			opts:             opts,
+			reported:         make(map[int]struct{}),
+			reportedBindings: make(map[bindingReportKey]struct{}),
 		}
 
 		return rule.RuleListeners{
@@ -120,6 +121,12 @@ type camelcaseState struct {
 	identifiers        []*ast.Node
 	privateIdentifiers []*ast.Node
 	reported           map[int]struct{}
+	reportedBindings   map[bindingReportKey]struct{}
+}
+
+type bindingReportKey struct {
+	scope *ast.Node
+	name  string
 }
 
 func (s *camelcaseState) checkFile() {
@@ -129,7 +136,7 @@ func (s *camelcaseState) checkFile() {
 		if kind == bindingNone || s.opts.isGoodName(identifier.AsIdentifier().Text) {
 			continue
 		}
-		if sym := utils.BindingNameSymbol(identifier); sym != nil && s.ctx.Refs != nil {
+		if sym := bindingReferenceSymbol(identifier); sym != nil && s.ctx.Refs != nil {
 			for _, reference := range s.ctx.Refs.References(sym) {
 				badReferences[reference] = struct{}{}
 			}
@@ -211,6 +218,13 @@ func (s *camelcaseState) checkFile() {
 
 func (s *camelcaseState) reportBinding(node *ast.Node, name string) {
 	node = bindingReportIdentifier(node)
+	if scope := bindingScope(node, name); scope != nil {
+		key := bindingReportKey{scope: scope, name: name}
+		if _, exists := s.reportedBindings[key]; exists {
+			return
+		}
+		s.reportedBindings[key] = struct{}{}
+	}
 	if _, exists := s.reported[node.Pos()]; exists {
 		return
 	}
@@ -241,6 +255,45 @@ func bindingReportIdentifier(node *ast.Node) *ast.Node {
 		}
 	}
 	return node
+}
+
+// bindingScope identifies the scope-manager variable that owns a declaration.
+// Looking up the first enclosing table by name also covers declarations that
+// TypeScript keeps as distinct error symbols, such as duplicate parameters or
+// conflicting var/function declarations.
+func bindingScope(node *ast.Node, name string) *ast.Node {
+	symbol := utils.BindingNameSymbol(node)
+	if symbol != nil {
+		for current := node.Parent; current != nil; current = current.Parent {
+			if locals := current.Locals(); locals != nil && locals[name] == symbol {
+				return current
+			}
+		}
+	}
+	for current := node.Parent; current != nil; current = current.Parent {
+		if locals := current.Locals(); locals != nil && locals[name] != nil {
+			return current
+		}
+	}
+	return nil
+}
+
+// A parameter property is entered into both the constructor's local scope and
+// the class's property table. The second bind leaves the property symbol on the
+// declaration node, while references in the constructor body resolve through
+// the constructor's local table.
+func bindingReferenceSymbol(node *ast.Node) *ast.Symbol {
+	symbol := utils.BindingNameSymbol(node)
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindParameter ||
+		node.Parent.Parent == nil || !ast.IsParameterPropertyDeclaration(node.Parent, node.Parent.Parent) {
+		return symbol
+	}
+	if locals := node.Parent.Parent.Locals(); locals != nil {
+		if local := locals[node.Text()]; local != nil {
+			return local
+		}
+	}
+	return symbol
 }
 
 func (s *camelcaseState) reportReference(node *ast.Node, name string) {
@@ -488,13 +541,19 @@ func isLabel(node *ast.Node) bool {
 }
 
 func isRuntimeReference(node *ast.Node) bool {
-	if isJsxIntrinsicTagName(node) {
+	if isJsxIntrinsicTagName(node) || isJsxNamespacedAttributeName(node) {
 		return false
 	}
 	if ast.IsPartOfTypeQuery(node) {
 		return isTypeQueryValueReference(node)
 	}
 	return node != nil && !ast.IsPartOfTypeNode(node) && !utils.IsNonReferenceIdentifier(node)
+}
+
+func isJsxNamespacedAttributeName(node *ast.Node) bool {
+	return node != nil && node.Parent != nil && node.Parent.Kind == ast.KindJsxNamespacedName &&
+		node.Parent.Parent != nil && node.Parent.Parent.Kind == ast.KindJsxAttribute &&
+		node.Parent.Parent.Name() == node.Parent
 }
 
 // isTypeQueryValueReference recognizes the value-side root of a TypeScript

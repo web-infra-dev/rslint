@@ -84,7 +84,8 @@ func IsImportAttributeKey(node *ast.Node) bool {
 		return call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword &&
 			call.Arguments != nil && len(call.Arguments.Nodes) > 1 && call.Arguments.Nodes[1] == outer
 	}
-	if container.Kind == ast.KindPropertyAssignment && container.AsPropertyAssignment().Initializer == outer {
+	if container.Kind == ast.KindPropertyAssignment && container.AsPropertyAssignment().Initializer == outer &&
+		!ast.IsComputedPropertyName(container.Name()) {
 		return IsImportAttributeKey(container.Name())
 	}
 	return false
