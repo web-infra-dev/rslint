@@ -208,7 +208,27 @@ func collectExistingImportNames(importDecl *ast.ImportDeclaration, names *nameSe
 	}
 }
 
-func collectExistingRequireNames(binding *ast.Node, names *nameSet) {
+func requireAccessorValue(sourceFile *ast.SourceFile, node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return node.AsIdentifier().Text, true
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		text := rslintUtils.TrimmedNodeText(sourceFile, node)
+		if len(text) < 2 || text[0] != '`' || text[len(text)-1] != '`' {
+			return "", false
+		}
+		return text[1 : len(text)-1], true
+	default:
+		return "", false
+	}
+}
+
+func collectExistingRequireNames(sourceFile *ast.SourceFile, binding *ast.Node, names *nameSet) {
 	if binding == nil || binding.Kind != ast.KindObjectBindingPattern {
 		return
 	}
@@ -232,12 +252,15 @@ func collectExistingRequireNames(binding *ast.Node, names *nameSet) {
 		} else if keyNode.Kind == ast.KindComputedPropertyName {
 			keyNode = ast.SkipParentheses(keyNode.AsComputedPropertyName().Expression)
 		}
-		importName, ok := accessorValue(keyNode)
+		importName, ok := requireAccessorValue(sourceFile, keyNode)
 		if !ok {
 			continue
 		}
-		if local, ok := accessorValue(be.Name()); ok && importName != local {
-			importName += ": " + local
+		if be.Initializer == nil {
+			local, ok := requireAccessorValue(sourceFile, be.Name())
+			if ok && importName != local {
+				importName += ": " + local
+			}
 		}
 		names.add(importName)
 	}
@@ -344,7 +367,7 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 
 	if req := findJestGlobalsRequire(statements); req != nil {
 		if req.decl.Name() != nil && req.decl.Name().Kind == ast.KindObjectBindingPattern {
-			collectExistingRequireNames(req.decl.Name(), names)
+			collectExistingRequireNames(ctx.SourceFile, req.decl.Name(), names)
 		}
 		return []rule.RuleFix{
 			rule.RuleFixReplace(ctx.SourceFile, req.stmt, createFixerImports(isModule, names.sortedJoined())),

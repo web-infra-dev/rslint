@@ -246,6 +246,39 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
 			},
+			// ---- Upstream parity: computed numeric require keys are unsupported ----
+			{
+				Code: `
+        const { [1]: context, [0x2]: another } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `,
+				Output: []string{`
+        const { describe, test } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: defaulted aliases are unsupported accessor values ----
+			{
+				Code:            "\n        const { [\"describe\"]: context = fallback, [`test`]: spec = fallback } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      ",
+				Output:          []string{"\n        const { describe, test } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: template require keys preserve their raw value ----
+			{
+				Code:            "\n        const { [`descr\\u0069be`]: context } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      ",
+				Output:          []string{"\n        const { descr\\u0069be: context, describe, test } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
 		},
 	)
 }
