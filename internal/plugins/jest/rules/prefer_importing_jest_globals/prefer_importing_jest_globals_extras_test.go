@@ -222,6 +222,30 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
 			},
+			// ---- AST parity: computed string require key preserves its local alias ----
+			{
+				Code: `
+        const { ["describe"]: context } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- AST parity: computed template require key preserves its local alias ----
+			{
+				Code:            "\n        const { [`describe`]: context } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      ",
+				Output:          []string{"\n        const { describe, describe: context, test } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
 		},
 	)
 }

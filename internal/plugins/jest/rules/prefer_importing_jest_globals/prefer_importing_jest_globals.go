@@ -229,6 +229,8 @@ func collectExistingRequireNames(binding *ast.Node, names *nameSet) {
 		keyNode := be.PropertyName
 		if keyNode == nil {
 			keyNode = be.Name()
+		} else if keyNode.Kind == ast.KindComputedPropertyName {
+			keyNode = ast.SkipParentheses(keyNode.AsComputedPropertyName().Expression)
 		}
 		importName, ok := accessorValue(keyNode)
 		if !ok {
