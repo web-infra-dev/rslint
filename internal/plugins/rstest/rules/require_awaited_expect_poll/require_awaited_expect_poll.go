@@ -167,7 +167,8 @@ func isBindingAssignmentOperator(operator ast.Kind) bool {
 // binds it, a call or constructor argument passes it on (which is how
 // `Promise.all([...])` and `Promise.allSettled([...])` are written), a JSX
 // expression passes it as a prop or child, a destructuring or parameter
-// default binds it when the default runs, and `yield` suspends on it.
+// default binds it when the default runs, and a non-delegating `yield`
+// suspends on it.
 // Reporting those would be a false positive; the cost is that a promise stored
 // and then dropped goes unreported.
 func isHandled(node *ast.Node) bool {
@@ -187,7 +188,13 @@ func isHandled(node *ast.Node) bool {
 	case ast.KindPropertyAssignment:
 		return parent.AsPropertyAssignment().Initializer == node
 	case ast.KindYieldExpression:
-		return parent.AsYieldExpression().Expression == node
+		// Only a non-delegating `yield` hands the promise to whatever drives
+		// the generator. `yield* promise` instead looks up an iterator on the
+		// promise, which a native promise does not have, so it neither passes
+		// the promise on nor awaits it.
+		yieldExpression := parent.AsYieldExpression()
+		return yieldExpression.AsteriskToken == nil &&
+			yieldExpression.Expression == node
 	case ast.KindArrayLiteralExpression:
 		return true
 	case ast.KindCallExpression:

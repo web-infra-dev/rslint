@@ -427,6 +427,20 @@ expect.poll(() => el).toBeVisible();`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 23, EndLine: 1, EndColumn: 37}},
 			},
 			{
+				// `yield*` delegates to an iterator obtained from the promise
+				// rather than handing the promise to whatever drives the
+				// generator, and a native promise is not iterable, so the
+				// assertion is neither passed on nor awaited.
+				Code:   `function* pending() { yield* expect.poll(() => el).toBeVisible(); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 30, EndLine: 1, EndColumn: 41}},
+			},
+			{
+				// An async generator looks for Symbol.asyncIterator first, which
+				// a promise does not have either.
+				Code:   `async function* pending() { yield* expect.element(el).toBeVisible(); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 36, EndLine: 1, EndColumn: 50}},
+			},
+			{
 				// A promise used as the condition is not the conditional result.
 				Code:   `const pending = expect.poll(() => el).toBeVisible() ? value : fallback;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 17, EndLine: 1, EndColumn: 28}},
