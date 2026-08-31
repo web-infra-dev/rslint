@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed prop_types.schema.json
@@ -20,6 +21,7 @@ type options struct {
 }
 type propType struct {
 	children  map[string]propType
+	union     []propType
 	any, open bool
 }
 type use struct {
@@ -62,11 +64,27 @@ func keyName(n *ast.Node) string {
 	if n == nil {
 		return ""
 	}
-	if n.Kind == ast.KindIdentifier {
-		return n.AsIdentifier().Text
+	if name, ok := utils.GetStaticPropertyName(n); ok {
+		return name
 	}
-	if n.Kind == ast.KindStringLiteral {
-		return n.AsStringLiteral().Text
+	return ""
+}
+
+func elementName(n *ast.Node) string {
+	n = unwrap(n)
+	if n == nil {
+		return ""
+	}
+	switch n.Kind {
+	case ast.KindStringLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindNullKeyword,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindRegularExpressionLiteral:
+		return keyName(n)
 	}
 	return ""
 }
@@ -82,6 +100,10 @@ func propMap(n *ast.Node) (map[string]propType, bool) {
 		out := map[string]propType{}
 		for _, p := range n.AsObjectLiteralExpression().Properties.Nodes {
 			if p == nil {
+				continue
+			}
+			if p.Kind == ast.KindSpreadAssignment {
+				out["__ANY_KEY__"] = propType{any: true}
 				continue
 			}
 			var name, value *ast.Node
@@ -111,6 +133,9 @@ func validatorType(n *ast.Node) propType {
 	if n == nil {
 		return propType{any: true}
 	}
+	if n.Kind == ast.KindPropertyAccessExpression && keyName(n.AsPropertyAccessExpression().Name()) == "isRequired" {
+		n = unwrap(n.AsPropertyAccessExpression().Expression)
+	}
 	if n.Kind != ast.KindCallExpression {
 		return propType{}
 	}
@@ -130,6 +155,20 @@ func validatorType(n *ast.Node) propType {
 	if name == "objectOf" || name == "arrayOf" {
 		if call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
 			return propType{open: true, children: map[string]propType{"__ANY_KEY__": validatorType(call.Arguments.Nodes[0])}}
+		}
+	}
+	if name == "oneOfType" && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
+		argument := unwrap(call.Arguments.Nodes[0])
+		if argument != nil && argument.Kind == ast.KindArrayLiteralExpression {
+			var union []propType
+			for _, candidate := range argument.AsArrayLiteralExpression().Elements.Nodes {
+				if candidate != nil && candidate.Kind != ast.KindOmittedExpression {
+					union = append(union, validatorType(candidate))
+				}
+			}
+			if len(union) > 0 {
+				return propType{union: union}
+			}
 		}
 	}
 	return propType{}
@@ -181,11 +220,11 @@ func memberNames(n *ast.Node) (*ast.Node, []string, bool) {
 			cur = unwrap(pa.Expression)
 		case ast.KindElementAccessExpression:
 			ea := cur.AsElementAccessExpression()
-			arg := unwrap(ea.ArgumentExpression)
-			if arg == nil || arg.Kind != ast.KindStringLiteral {
+			k := elementName(ea.ArgumentExpression)
+			if k == "" {
 				return nil, nil, false
 			}
-			names = append([]string{arg.AsStringLiteral().Text}, names...)
+			names = append([]string{k}, names...)
 			report = cur
 			cur = unwrap(ea.Expression)
 		default:
@@ -207,25 +246,32 @@ func rootMatches(n *ast.Node, c *component) bool {
 }
 
 func isDeclared(m map[string]propType, names []string) bool {
-	for i, name := range names {
-		p, ok := m[name]
-		if !ok {
-			if p, ok = m["__ANY_KEY__"]; !ok {
-				return false
-			}
-		}
-		if i == len(names)-1 {
+	if len(names) == 0 {
+		return true
+	}
+	p, ok := m[names[0]]
+	if !ok {
+		p, ok = m["__ANY_KEY__"]
+	}
+	if !ok {
+		return false
+	}
+	return propTypeDeclares(p, names[1:])
+}
+
+func propTypeDeclares(p propType, remaining []string) bool {
+	if len(remaining) == 0 || p.any || p.open {
+		return true
+	}
+	for _, candidate := range p.union {
+		if propTypeDeclares(candidate, remaining) {
 			return true
-		}
-		if p.any || p.open {
-			return true
-		}
-		m = p.children
-		if m == nil {
-			return false
 		}
 	}
-	return true
+	if p.children == nil {
+		return false
+	}
+	return isDeclared(p.children, remaining)
 }
 
 func reportName(names []string) string {
@@ -276,6 +322,9 @@ var PropTypesRule = rule.Rule{
 							for _, e := range name.AsBindingPattern().Elements.Nodes {
 								if e.Kind == ast.KindBindingElement {
 									be := e.AsBindingElement()
+									if be.DotDotDotToken != nil {
+										continue
+									}
 									k := keyName(be.PropertyName)
 									if k == "" {
 										k = keyName(be.Name())
