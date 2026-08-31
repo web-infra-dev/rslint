@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -504,11 +505,6 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 		if staticValueIsString(right.value) {
 			return staticEvaluator.concatStaticValues(left.value, right.value)
 		}
-	case ast.KindCommaToken:
-		// The comma operator's value is its right operand; the left operand
-		// is evaluated for side effects only, which static analysis has none
-		// of to lose, so whether it can itself be evaluated doesn't gate the result.
-		return staticEvaluator.evalValue(binary.Right)
 	}
 
 	return staticEvaluator.evalWithTsgo(node)
