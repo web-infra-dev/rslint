@@ -226,6 +226,76 @@ import { rstest } from '@rstest/core';`,
 					namespaceError("rs", "rstest", 1, 31, 37),
 				},
 			},
+			{
+				// A trailing comment on a specifier in the middle of the list goes
+				// with it, and the comma that separates the two that stay remains.
+				Code:   `import { rs, rstest /* remove with namespace */, expect } from '@rstest/core';`,
+				Output: []string{`import { rs, expect } from '@rstest/core';`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 14, 20),
+				},
+			},
+			{
+				// The same for the last specifier of the list.
+				Code:   `import { rs, rstest /* remove with namespace */ } from '@rstest/core';`,
+				Output: []string{`import { rs } from '@rstest/core';`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 14, 20),
+				},
+			},
+			{
+				// A comment past the separating comma belongs to the specifier
+				// that follows it, so it stays.
+				Code:   `import { rs, rstest, /* the assertion */ expect } from '@rstest/core';`,
+				Output: []string{`import { rs, /* the assertion */ expect } from '@rstest/core';`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 14, 20),
+				},
+			},
+			{
+				// A top-level binding of the preferred spelling would be declared
+				// twice by the rename, so the report carries no fix.
+				Code: `import { rstest } from '@rstest/core';
+const rs = { mock(path: string) {} };
+rstest.mock('./service');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 3, 1, 7),
+				},
+			},
+			{
+				// A binding in a nested scope would capture the rewritten call.
+				Code: `import { rstest } from '@rstest/core';
+function run() {
+  const rs = { mock(path: string) {} };
+  rstest.mock('./service');
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 4, 3, 9),
+				},
+			},
+			{
+				// A global namespace is captured by such a binding just the same.
+				Code: `function run() {
+  const rs = { mock(path: string) {} };
+  rstest.mock('./service');
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 3, 3, 9),
+				},
+			},
+			{
+				// The name taken by an import of something else is taken all the
+				// same.
+				Code: `import { rs } from './helpers';
+import { rstest } from '@rstest/core';
+rstest.mock('./service');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 2, 10, 16),
+					namespaceError("rs", "rstest", 3, 1, 7),
+				},
+			},
 		},
 	)
 }

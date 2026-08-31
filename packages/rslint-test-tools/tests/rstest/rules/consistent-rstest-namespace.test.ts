@@ -189,5 +189,56 @@ import { rstest } from '@rstest/core';`,
       output: `import { expect as check, rs } from '@rstest/core';`,
       errors: [namespaceError('rs', 'rstest', 1, 31, 37)],
     },
+    {
+      code: `import { rs, rstest /* remove with namespace */, expect } from '@rstest/core';`,
+      output: `import { rs, expect } from '@rstest/core';`,
+      errors: [namespaceError('rs', 'rstest', 1, 14, 20)],
+    },
+    {
+      code: `import { rs, rstest /* remove with namespace */ } from '@rstest/core';`,
+      output: `import { rs } from '@rstest/core';`,
+      errors: [namespaceError('rs', 'rstest', 1, 14, 20)],
+    },
+    {
+      code: `import { rs, rstest, /* the assertion */ expect } from '@rstest/core';`,
+      output: `import { rs, /* the assertion */ expect } from '@rstest/core';`,
+      errors: [namespaceError('rs', 'rstest', 1, 14, 20)],
+    },
+    {
+      code: `import { rstest } from '@rstest/core';
+const rs = { mock(path: string) {} };
+rstest.mock('./service');`,
+      errors: [
+        namespaceError('rs', 'rstest', 1, 10, 16),
+        namespaceError('rs', 'rstest', 3, 1, 7),
+      ],
+    },
+    {
+      code: `import { rstest } from '@rstest/core';
+function run() {
+  const rs = { mock(path: string) {} };
+  rstest.mock('./service');
+}`,
+      errors: [
+        namespaceError('rs', 'rstest', 1, 10, 16),
+        namespaceError('rs', 'rstest', 4, 3, 9),
+      ],
+    },
+    {
+      code: `function run() {
+  const rs = { mock(path: string) {} };
+  rstest.mock('./service');
+}`,
+      errors: [namespaceError('rs', 'rstest', 3, 3, 9)],
+    },
+    {
+      code: `import { rs } from './helpers';
+import { rstest } from '@rstest/core';
+rstest.mock('./service');`,
+      errors: [
+        namespaceError('rs', 'rstest', 2, 10, 16),
+        namespaceError('rs', 'rstest', 3, 1, 7),
+      ],
+    },
   ],
 });

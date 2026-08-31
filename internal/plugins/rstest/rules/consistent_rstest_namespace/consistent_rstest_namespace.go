@@ -77,6 +77,9 @@ var ConsistentRstestNamespaceRule = rule.Rule{
 			}
 			reportedRoots[root] = true
 			ctx.ReportNodeWithDeferredFixes(root, message, func() []rule.RuleFix {
+				if !file.preferredNameFree() {
+					return nil
+				}
 				if mode == rstestUtils.RSTEST_IMPORT_MODE && !file.bindingRewritable() {
 					return nil
 				}
@@ -241,10 +244,11 @@ func plainImportedName(element *ast.Node) string {
 	return name.AsIdentifier().Text
 }
 
-// fileNamespaces answers the two file-wide questions the fixes depend on:
-// whether the preferred spelling is already imported, and whether every use of
-// the imported disallowed spelling is one the rule rewrites. Both are computed
-// on the first fix demand, so a file that only reports never pays for them.
+// fileNamespaces answers the file-wide questions the fixes depend on: whether
+// the preferred spelling is already imported, whether the preferred spelling is
+// free for the fix to write, and whether every use of the imported disallowed
+// spelling is one the rule rewrites. All are computed on the first fix demand,
+// so a file that only reports never pays for them.
 type fileNamespaces struct {
 	ctx        rule.RuleContext
 	preferred  string
@@ -252,6 +256,7 @@ type fileNamespaces struct {
 
 	scanned           bool
 	preferredImported bool
+	preferredFree     bool
 	disallowedImport  *ast.Node
 	rewritable        bool
 }
@@ -267,6 +272,18 @@ func (file *fileNamespaces) resolveNamespace(identifier *ast.Node) (rstestUtils.
 	return mode, original == file.disallowed
 }
 
+// preferredNameFree reports whether the preferred spelling can be written into
+// the file at all. It cannot when something other than an Rstest namespace
+// import already declares that name: a top-level declaration would collide with
+// a renamed import, and a declaration in any nested scope would capture a
+// rewritten call. Scopes are not distinguished, because a fix withheld from a
+// file that would have accepted it is a smaller harm than one that points a
+// call at the binding next to it.
+func (file *fileNamespaces) preferredNameFree() bool {
+	file.scan()
+	return file.preferredFree
+}
+
 // bindingRewritable reports whether rewriting the imported disallowed spelling
 // leaves the file consistent. It does not when the binding is one the import
 // listener never renames — a destructured `require`, or a specifier written as
@@ -280,7 +297,7 @@ func (file *fileNamespaces) bindingRewritable() bool {
 
 func (file *fileNamespaces) importFixes(elements []*ast.Node, index int) []rule.RuleFix {
 	file.scan()
-	if !file.rewritable {
+	if !file.rewritable || !file.preferredFree {
 		return nil
 	}
 	element := elements[index]
@@ -303,6 +320,7 @@ func (file *fileNamespaces) scan() {
 	}
 	file.scanned = true
 	file.rewritable = true
+	file.preferredFree = true
 	sourceFile := file.ctx.SourceFile
 	if sourceFile == nil {
 		return
@@ -330,17 +348,25 @@ func (file *fileNamespaces) scan() {
 		}
 	}
 
-	if file.disallowedImport == nil {
-		return
+	// The walk answers both remaining questions at once. The preferred spelling
+	// has to be checked even when the disallowed one is a global, since a call
+	// rewritten in global mode is captured by a local binding just the same.
+	var boundName *ast.Node
+	if file.disallowedImport != nil {
+		boundName = file.disallowedImport.AsImportSpecifier().Name()
 	}
-	boundName := file.disallowedImport.AsImportSpecifier().Name()
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
-		if node == nil || !file.rewritable {
+		if node == nil {
 			return
 		}
-		if file.isSurvivingUse(node, boundName) {
+		if file.preferredFree && file.declaresPreferredName(node) {
+			file.preferredFree = false
+		}
+		if boundName != nil && file.rewritable && file.isSurvivingUse(node, boundName) {
 			file.rewritable = false
+		}
+		if !file.preferredFree && (boundName == nil || !file.rewritable) {
 			return
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -349,6 +375,69 @@ func (file *fileNamespaces) scan() {
 		})
 	}
 	visit(sourceFile.AsNode())
+}
+
+// declaresPreferredName reports whether node declares the preferred spelling as
+// something the fix would collide with. An `@rstest/core` import of either
+// spelling is excluded: it binds the very namespace the fix rewrites to, so a
+// call rewritten to reach it reaches the right object.
+func (file *fileNamespaces) declaresPreferredName(node *ast.Node) bool {
+	if node.Kind != ast.KindIdentifier ||
+		node.AsIdentifier().Text != file.preferred ||
+		!ast.IsDeclarationName(node) {
+		return false
+	}
+	if node.Parent.Kind != ast.KindImportSpecifier {
+		return declaresBinding(node.Parent)
+	}
+	return !isRstestNamespaceSpecifier(node.Parent)
+}
+
+// declaresBinding tells the declarations that introduce a name into a scope
+// apart from the ones that only name a member, such as an object literal
+// property or a class method.
+func declaresBinding(declaration *ast.Node) bool {
+	switch declaration.Kind {
+	case ast.KindVariableDeclaration,
+		ast.KindParameter,
+		ast.KindBindingElement,
+		ast.KindFunctionDeclaration,
+		ast.KindFunctionExpression,
+		ast.KindClassDeclaration,
+		ast.KindClassExpression,
+		ast.KindEnumDeclaration,
+		ast.KindModuleDeclaration,
+		ast.KindImportClause,
+		ast.KindNamespaceImport,
+		ast.KindImportEqualsDeclaration:
+		return true
+	default:
+		return false
+	}
+}
+
+// isRstestNamespaceSpecifier reports whether an import specifier brings in one
+// of the two spellings of the Rstest namespace from `@rstest/core`.
+func isRstestNamespaceSpecifier(element *ast.Node) bool {
+	specifier := element.AsImportSpecifier()
+	if specifier == nil || specifier.IsTypeOnly {
+		return false
+	}
+	declaration := testFramework.FindImportDeclaration(element)
+	if declaration == nil ||
+		declaration.ModuleSpecifier == nil ||
+		declaration.ModuleSpecifier.Text() != rstestUtils.RstestImportModule {
+		return false
+	}
+	imported := specifier.Name()
+	if specifier.PropertyName != nil {
+		imported = specifier.PropertyName
+	}
+	if imported == nil || imported.Kind != ast.KindIdentifier {
+		return false
+	}
+	name := imported.AsIdentifier().Text
+	return name == namespaceRs || name == namespaceRstest
 }
 
 // isSurvivingUse reports whether node names the imported disallowed spelling
@@ -376,15 +465,67 @@ func (file *fileNamespaces) isSurvivingUse(node *ast.Node, boundName *ast.Node) 
 // specifierRemovalRange spans the specifier at index together with the comma
 // that separates it from its neighbour. A comment written for the specifier
 // that stays is kept; one written for the specifier that goes is removed with
-// it.
+// it. Which comment is whose is read from the separating comma: the comments
+// on the removed specifier's side of it go with the specifier.
 func specifierRemovalRange(sourceFile *ast.SourceFile, elements []*ast.Node, index int) core.TextRange {
 	elementRange := utils.TrimNodeTextRange(sourceFile, elements[index])
 	if index > 0 {
+		// The comma this range starts at is the one before the specifier, so the
+		// comments that follow it run up to the next comma, or to the end of the
+		// list when the removed specifier is the last one.
 		previousEnd := utils.TrimNodeTextRange(sourceFile, elements[index-1]).End()
-		return core.NewTextRange(previousEnd, elementRange.End())
+		limit := specifierListEnd(sourceFile, elements, index)
+		return core.NewTextRange(previousEnd, commentsEnd(sourceFile.Text(), elementRange.End(), limit))
 	}
 	nextStart := utils.TrimNodeTextRange(sourceFile, elements[index+1]).Pos()
 	return core.NewTextRange(elementRange.Pos(), firstSpecifierRemovalEnd(sourceFile.Text(), elementRange.End(), nextStart))
+}
+
+// specifierListEnd is how far after the specifier at index its own comments can
+// reach: the next specifier for a specifier in the middle of the list, and the
+// closing brace of the list for the last one.
+func specifierListEnd(sourceFile *ast.SourceFile, elements []*ast.Node, index int) int {
+	if index+1 < len(elements) {
+		return utils.TrimNodeTextRange(sourceFile, elements[index+1]).Pos()
+	}
+	if parent := elements[index].Parent; parent != nil {
+		return utils.TrimNodeTextRange(sourceFile, parent).End()
+	}
+	return len(sourceFile.Text())
+}
+
+// commentsEnd walks the whitespace and comments that begin at start and returns
+// the end of the last comment it consumed, or start when it meets anything else
+// first — the separating comma or the closing brace of the list.
+func commentsEnd(text string, start int, limit int) int {
+	if start < 0 || limit > len(text) || start >= limit {
+		return start
+	}
+	end := start
+	for position := start; position < limit; {
+		rest := text[position:limit]
+		switch {
+		case rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\r' || rest[0] == '\n':
+			position++
+		case strings.HasPrefix(rest, "//"):
+			length := strings.IndexByte(rest, '\n')
+			if length < 0 {
+				length = len(rest)
+			}
+			position += length
+			end = position
+		case strings.HasPrefix(rest, "/*"):
+			length := strings.Index(rest, "*/")
+			if length < 0 {
+				return end
+			}
+			position += length + 2
+			end = position
+		default:
+			return end
+		}
+	}
+	return end
 }
 
 func firstSpecifierRemovalEnd(text string, start int, end int) int {
