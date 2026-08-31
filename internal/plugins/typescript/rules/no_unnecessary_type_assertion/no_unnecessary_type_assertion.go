@@ -399,6 +399,9 @@ func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type
 	if contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone); contextualType != nil {
 		return contextualType
 	}
+	if contextualType := utils.GetContextualType(ctx.TypeChecker, node); contextualType != nil {
+		return contextualType
+	}
 	semanticNode := assertionWalkUpParentheses(node)
 	parent := semanticNode.Parent
 	if ast.IsConditionalExpression(parent) {
