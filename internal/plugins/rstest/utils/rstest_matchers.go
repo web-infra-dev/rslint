@@ -287,3 +287,14 @@ func mergeRstestExpectNameSets(sets ...map[string]bool) map[string]bool {
 	}
 	return merged
 }
+
+// RSTEST_EQUALITY_MATCHERS lists the matchers that assert a value equals
+// another value written out in the assertion. They are the matchers a rule can
+// rewrite into a dedicated matcher once it knows what the expected value is.
+// Source: @vitest/expect@4.1.10 dist/index.d.ts (JestAssertion declares toBe,
+// toEqual and toStrictEqual); the three names are identical to Jest's.
+var RSTEST_EQUALITY_MATCHERS = map[string]bool{
+	"toBe":          true,
+	"toEqual":       true,
+	"toStrictEqual": true,
+}

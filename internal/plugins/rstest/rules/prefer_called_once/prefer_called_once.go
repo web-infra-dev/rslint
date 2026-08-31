@@ -2,7 +2,6 @@ package prefer_called_once
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -57,7 +56,7 @@ var PreferCalledOnceRule = rule.Rule{
 						return nil
 					}
 
-					argumentsRange, ok := argumentListRange(ctx.SourceFile, matcherCall)
+					argumentsRange, ok := rstestUtils.MatcherArgumentListRange(ctx.SourceFile, matcherCall)
 					if !ok {
 						return nil
 					}
@@ -106,7 +105,7 @@ func calledOnceMatcherEntry(
 		return rstestUtils.ParsedRstestFnMemberEntry{}, nil, false
 	}
 
-	call := matcherCall(parsed.MatcherEntry)
+	call := rstestUtils.MatcherCall(parsed.MatcherEntry)
 	if call == nil {
 		return rstestUtils.ParsedRstestFnMemberEntry{}, nil, false
 	}
@@ -130,108 +129,8 @@ func calledOnceMatcherEntry(
 // neither, because ESTree's Literal `value` is `1n` for the first and there is no
 // Literal at all for the second.
 func isOneLiteral(node *ast.Node) bool {
-	node = followTypeAssertionChain(node)
+	node = rstestUtils.FollowTypeAssertionChain(node)
 	return node != nil &&
 		node.Kind == ast.KindNumericLiteral &&
 		utils.NormalizeNumericLiteral(node.Text()) == "1"
-}
-
-// followTypeAssertionChain unwraps `x as T` and `<T>x` wrappers, along with the
-// parentheses that ESTree drops before upstream's own unwrapping runs.
-func followTypeAssertionChain(node *ast.Node) *ast.Node {
-	for node != nil {
-		node = ast.SkipParentheses(node)
-		switch node.Kind {
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		default:
-			return node
-		}
-	}
-	return nil
-}
-
-// matcherCall returns the call expression that directly invokes entry's
-// accessor.
-//
-// MemberEntry.Call cannot be used for this. GetMemberEntries marks the last
-// entry of a callee chain as invoked, so each enclosing call overwrites the
-// field: for `expect(fn).toHaveBeenCalledTimes(1)()` the matcher entry ends up
-// carrying the outer call, whose parentheses hold no matcher argument list at
-// all. Removing that call's arguments would delete the wrong text. Walking up
-// from the accessor instead always lands on the call the matcher name is the
-// callee of, and stops at it. Parentheses around the callee are transparent,
-// matching how the chain was parsed in the first place.
-func matcherCall(entry *rstestUtils.ParsedRstestFnMemberEntry) *ast.Node {
-	_, accessor := testFramework.AccessorReceiverAndParent(entry)
-	if accessor == nil {
-		return nil
-	}
-
-	child := accessor
-	parent := accessor.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		child = parent
-		parent = parent.Parent
-	}
-	if parent == nil ||
-		parent.Kind != ast.KindCallExpression ||
-		parent.AsCallExpression().Expression != child {
-		return nil
-	}
-	return parent
-}
-
-// argumentListRange returns the span between the matcher call's parentheses,
-// which is the text the count occupies.
-//
-// Upstream removes the argument node itself, which leaves behind whatever was
-// written around it: `toBeCalledTimes(1,)` keeps its comma and becomes
-// `toBeCalledOnce(,)`, a syntax error. Taking the whole span between the
-// parentheses removes the trailing comma and the whitespace of a multi-line
-// argument list along with the count.
-//
-// The opening parenthesis is scanned for rather than assumed to follow the
-// matcher name, because `x['toBeCalledTimes'](1)`,
-// `x.toBeCalledTimes /* c */ (1)` and a call split across lines all put other
-// characters in between; the scan starts after the callee so that the
-// parentheses of the receiver — `expect(fn)` — are never mistaken for the
-// matcher's own. A call expression always ends on its own closing parenthesis,
-// so the last token of the call is the other end of the span.
-func argumentListRange(sourceFile *ast.SourceFile, call *ast.Node) (core.TextRange, bool) {
-	callee := call.AsCallExpression().Expression
-	if callee == nil {
-		return core.TextRange{}, false
-	}
-
-	start := callee.End()
-	// A type argument list may hold parentheses of its own, as in
-	// `toHaveBeenCalledTimes<(a: string) => void>(1)`.
-	if typeArguments := call.AsCallExpression().TypeArguments; typeArguments != nil {
-		start = max(start, typeArguments.End())
-	}
-
-	tokens := utils.TokensOfNode(sourceFile, call)
-	if len(tokens) == 0 {
-		return core.TextRange{}, false
-	}
-	closeParen := tokens[len(tokens)-1]
-	if closeParen.Kind != ast.KindCloseParenToken {
-		return core.TextRange{}, false
-	}
-
-	for _, token := range tokens {
-		if token.Start < start {
-			continue
-		}
-		if token.Kind == ast.KindOpenParenToken {
-			if token.End > closeParen.Start {
-				return core.TextRange{}, false
-			}
-			return core.NewTextRange(token.End, closeParen.Start), true
-		}
-	}
-	return core.TextRange{}, false
 }
