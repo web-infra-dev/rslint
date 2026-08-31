@@ -75,7 +75,8 @@ describe('suite', () => {
 
 ## Original Documentation
 
-- [jest/prefer-importing-jest-globals](https://github.com/jest-community/eslint-plugin-jest/blob/main/docs/rules/prefer-importing-jest-globals.md)
+- [eslint-plugin-jest: prefer-importing-jest-globals](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-importing-jest-globals.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-importing-jest-globals.ts)
 
 ## Differences from ESLint
 

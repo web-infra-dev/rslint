@@ -37,7 +37,7 @@ This document summarizes how to work on rslint effectively and consistently.
 ## Coding Style & Naming Conventions
 
 - Go uses gofmt/goimports; keep functions focused and small.
-- TS/JS/MD/CSS use Prettier via `pnpm run format`.
+- TS/JS/MD/CSS use Rstack CLI's formatter via `pnpm run format`.
 - Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
 - Prefer table-driven tests. Keep package-specific helpers beside their tests; put reusable test infrastructure in `internal/testutil`, not production utility packages.
 - A value that came from JavaScript — a string to trim or case, a character to classify, a number to print, a regexp or glob out of a rule option — is read through `internal/utils/ecmascript`, `ecmascript/regexp`, `unicode17`, `minimatch3`, or `isglob`, never through `strings.TrimSpace`, `strings.ToLower`, the `unicode` package, the stdlib `regexp`, or `doublestar`. An identifier question goes to tsgo's `scanner`, so a rule and the parser never disagree. `depguard` and `forbidigo` enforce this under `internal/rules/**` and `internal/plugins/**`.

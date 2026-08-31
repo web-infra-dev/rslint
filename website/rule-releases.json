@@ -747,5 +747,30 @@
       "rstest:prefer-todo",
       "rstest:require-local-test-context-for-concurrent-snapshots"
     ]
+  },
+  {
+    "version": "0.9.0",
+    "rules": [
+      "eslint-plugin-jest:prefer-importing-jest-globals",
+      "eslint-plugin-react:jsx-no-useless-fragment",
+      "eslint-plugin-unicorn:no-array-concat-in-loop",
+      "eslint-plugin-unicorn:no-exports-in-scripts",
+      "eslint-plugin-unicorn:no-magic-array-flat-depth",
+      "eslint-plugin-unicorn:prefer-ternary",
+      "eslint-plugin-unicorn:throw-new-error",
+      "eslint:accessorutil",
+      "eslint:class-methods-use-this",
+      "eslint:grouped-accessor-pairs",
+      "eslint:id-denylist",
+      "eslint:id-match",
+      "eslint:logical-assignment-operators",
+      "eslint:no-invalid-this",
+      "eslint:yoda",
+      "rstest:hoisted-apis-on-top",
+      "rstest:prefer-called-once",
+      "rstest:prefer-import-in-mock",
+      "rstest:require-test-timeout",
+      "rstest:warn-todo"
+    ]
   }
 ]
