@@ -44,6 +44,7 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			// ReferenceTracker ignores every global RegExp use when the global has
 			// been reassigned anywhere in the file.
 			{Code: "RegExp = custom; RegExp('(a)' + '');"},
+			{Code: "globalThis = custom; globalThis.RegExp('(a)' + '');", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}},
 
 			// ---- Config `/* global RegExp: off */` / `languageOptions.globals` un-declares the builtin ----
 			{Code: "new RegExp('(a)');", Globals: map[string]any{"RegExp": "off"}},
@@ -88,6 +89,22 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			// ---- Escapes that are only valid in the context they're missing ----
 			{Code: `RegExp('\\q{a}(b)', 'v');`}, // \q{...} is a class-only string disjunction
 			{Code: `RegExp('\\c(a)', 'u');`},    // \c without a control letter is a u-mode syntax error
+			{Code: `RegExp('(a)' + '[\\a]', 'u');`},
+			{Code: `RegExp('(a)' + '[\\x]', 'u');`},
+			{Code: `RegExp('(a)' + '[\\01]', 'u');`},
+			{Code: `RegExp('(a)' + '[\\u{110000}]', 'u');`},
+			{Code: `RegExp('(a)' + '[\\c1]', 'u');`},
+			{Code: `RegExp('(a)' + '[\\k<a>]', 'u');`},
+			{Code: `RegExp('(a)' + '[\\q]', 'v');`},
+			{Code: `RegExp('(a)' + '[\\B]', 'u');`},
+			{Code: `RegExp('(a)' + '[\\1]', 'v');`},
+			{Code: `RegExp('(?<name>a)(?<name>b)(c)');`},
+			{Code: `RegExp('(?<😀>a)(b)', 'u');`},
+			{Code: `RegExp('(a)[a&&]', 'v');`},
+			{Code: `RegExp('(a)[a--]', 'v');`},
+			{Code: `RegExp('(a)[a-]', 'v');`},
+			{Code: `RegExp('(a)[-a]', 'v');`},
+			{Code: `RegExp('(a)[a&&b--c]', 'v');`},
 
 			// N/A: declaration/container forms (class/function shape) do not affect
 			// this expression-only rule — every observable branch is reached through
@@ -107,6 +124,67 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			},
 			{
 				Code:   "(RegExp || other)('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   "(RegExp || RegExp)('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}, {MessageId: "required"}},
+			},
+			{
+				Code:   "(RegExp && RegExp)('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}, {MessageId: "required"}},
+			},
+			{
+				Code:   "(RegExp ?? RegExp)('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}, {MessageId: "required"}},
+			},
+			{
+				Code:            "(globalThis || other).RegExp('(a)' + '');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:            "(true ? globalThis : other).RegExp('(a)' + '');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:            "(globalThis || globalThis).RegExp('(a)' + '');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "required"}, {MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('(a)' + '[\\cA]', 'u');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('(a)' + '[\\q{ab}]', 'v');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('(a)' + '[\\!]', 'v');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('(a)' + '[\\-]', 'u');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('(a)\\p{RGI_Emoji}', 'v');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code: `/😀(a)/u;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: `/😀(?<temp1>a)/u;`},
+						{MessageId: "addNonCapture", Output: `/😀(?:a)/u;`},
+					},
+				}},
+			},
+			{
+				Code:   `RegExp('(?<name>a)|(?<name>b)(c)' + '');`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
 			},
 			{

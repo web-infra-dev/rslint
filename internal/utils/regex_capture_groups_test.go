@@ -34,6 +34,7 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		{`\u{110000}(a)`, u},
 		{`\uZZZZ(a)`, u},
 		{`\p(a)`, u},
+		{`(a)\p{NotAProperty}`, u},
 		{`\k(a)`, u},
 		{`\01(a)`, u},
 		{`(a)`, uv},
@@ -95,6 +96,8 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		{`(?<n a>b)`, RegexFlags{}},
 		{`(?<>a)`, RegexFlags{}},
 		{`(?<n\>a)`, RegexFlags{}},
+		{`(?<name>a)(?<name>b)(c)`, RegexFlags{}},
+		{`(?<😀>a)(b)`, u},
 
 		// Closers with no opener are literals in Annex B only.
 		{`](a)`, u},

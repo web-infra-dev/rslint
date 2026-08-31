@@ -5,6 +5,9 @@ import (
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"github.com/microsoft/typescript-go/shim/scanner"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 // RegexCapturingGroup is one capturing group found by RegexCapturingGroups:
@@ -34,6 +37,12 @@ func RegexCapturingGroups(pattern string, flags RegexFlags) (groups []RegexCaptu
 	if flags.Unicode && flags.UnicodeSets {
 		return nil, false
 	}
+	if flags.UV() && !regexPropertyEscapesValid(pattern, flags) {
+		return nil, false
+	}
+	if flags.UnicodeSets && hasIncompleteVClassOperator(pattern) {
+		return nil, false
+	}
 	classesValid := true
 	if !IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
 		elements, _, parsed := ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
@@ -53,6 +62,9 @@ func RegexCapturingGroups(pattern string, flags RegexFlags) (groups []RegexCaptu
 				return
 			}
 		}
+		if flags.UV() && classHasInvalidUnicodeEscape(pattern, start, end, flags.UnicodeSets) {
+			classesValid = false
+		}
 	}) || !classesValid {
 		return nil, false
 	}
@@ -67,7 +79,236 @@ func RegexCapturingGroups(pattern string, flags RegexFlags) (groups []RegexCaptu
 	if !regexBackrefsResolve(pattern, flags, groups) {
 		return nil, false
 	}
+	if !regexDuplicateNamedGroupsValid(pattern, flags, groups) {
+		return nil, false
+	}
 	return groups, true
+}
+
+// hasIncompleteVClassOperator catches the v-only set operators which the
+// capture scanner otherwise skips as ordinary class text. The shared full v
+// validator is intentionally stricter than this scanner for nested sets, so
+// keep this check to the unambiguous dangling-operator forms.
+func hasIncompleteVClassOperator(pattern string) bool {
+	invalid := false
+	IterateRegexCharacterClasses(pattern, RegexFlags{UnicodeSets: true}, func(start, end int) {
+		if invalid {
+			return
+		}
+		body := pattern[start+1 : end-1]
+		sawIntersection := false
+		sawDifference := false
+		for i := 0; i < len(body); i++ {
+			if body[i] == '\\' {
+				i++
+				continue
+			}
+			if body[i] == '&' && i+1 < len(body) && body[i+1] == '&' {
+				if i == 0 || i+2 >= len(body) || body[i-1] == '&' || body[i+2] == '&' {
+					invalid = true
+					return
+				}
+				i++
+				sawIntersection = true
+				continue
+			}
+			if body[i] == '-' {
+				if i+1 < len(body) && body[i+1] == '-' {
+					if i == 0 || i+2 >= len(body) || body[i-1] == '-' || body[i+2] == '-' {
+						invalid = true
+						return
+					}
+					i++
+					sawDifference = true
+					continue
+				}
+				if i == 0 || i+1 >= len(body) {
+					invalid = true
+					return
+				}
+			}
+		}
+		if sawIntersection && sawDifference {
+			invalid = true
+		}
+	})
+	return invalid
+}
+
+type regexAlternative struct {
+	group int
+	index int
+}
+
+// regexDuplicateNamedGroupsValid permits a duplicate name only when every
+// possible match chooses at most one of the declarations. The ECMAScript
+// grammar permits the two sides of a disjunction to reuse a name, but rejects
+// sequential or nested duplicates that can both participate in one match.
+func regexDuplicateNamedGroupsValid(pattern string, flags RegexFlags, groups []RegexCapturingGroup) bool {
+	paths := make(map[int][]regexAlternative)
+	stack := []regexAlternative{{group: 0}}
+	nextGroup := 1
+	for i := 0; i < len(pattern); {
+		switch pattern[i] {
+		case '\\':
+			step, ok := skipPatternLevelEscape(pattern, i, flags)
+			if !ok {
+				return false
+			}
+			i += step
+		case '[':
+			end, ok := ClassEnd(pattern, i, flags)
+			if !ok {
+				return false
+			}
+			i = end
+		case '(':
+			paths[i] = append([]regexAlternative(nil), stack...)
+			stack = append(stack, regexAlternative{group: nextGroup})
+			nextGroup++
+			i++
+		case '|':
+			stack[len(stack)-1].index++
+			i++
+		case ')':
+			if len(stack) == 1 {
+				return false
+			}
+			stack = stack[:len(stack)-1]
+			i++
+		default:
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			i += width
+		}
+	}
+	seen := make(map[string][][]regexAlternative)
+	for _, group := range groups {
+		if group.Name == "" {
+			continue
+		}
+		name, ok := normalizeRegexGroupName(group.Name)
+		if !ok {
+			return false
+		}
+		path := paths[group.Start]
+		for _, earlier := range seen[name] {
+			if !regexPathsExclusive(earlier, path) {
+				return false
+			}
+		}
+		seen[name] = append(seen[name], path)
+	}
+	return true
+}
+
+func regexPathsExclusive(left, right []regexAlternative) bool {
+	for i := 0; i < len(left) && i < len(right); i++ {
+		if left[i].group != right[i].group {
+			return false
+		}
+		if left[i].index != right[i].index {
+			return true
+		}
+	}
+	return false
+}
+
+// regexPropertyEscapesValid delegates each complete Unicode property escape to
+// the shared ECMAScript regex compiler. The capturing-group scanner otherwise
+// only needs to skip over property escapes, but an unknown property name makes
+// the entire constructor pattern invalid and must suppress diagnostics.
+func regexPropertyEscapesValid(pattern string, flags RegexFlags) bool {
+	for i := 0; i < len(pattern); {
+		if pattern[i] != '\\' {
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			i += width
+			continue
+		}
+		step, ok := SkipPatternEscape(pattern, i, flags)
+		if !ok {
+			return false
+		}
+		if i+1 < len(pattern) && (pattern[i+1] == 'p' || pattern[i+1] == 'P') {
+			if flags.UnicodeSets && isUnicodeSetsStringProperty(pattern[i:i+step]) {
+				i += step
+				continue
+			}
+			if _, err := esregexp.Compile(pattern[i:i+step], "u"); err != nil {
+				return false
+			}
+		}
+		i += step
+	}
+	return true
+}
+
+// isUnicodeSetsStringProperty recognizes the properties of strings that v-mode
+// adds beyond u-mode's code-point properties. The shared compiler validates
+// under u, so it cannot accept these otherwise-valid v-mode escapes.
+func isUnicodeSetsStringProperty(escape string) bool {
+	if len(escape) < 5 || escape[0] != '\\' || escape[1] != 'p' || escape[2] != '{' || escape[len(escape)-1] != '}' {
+		return false
+	}
+	switch escape[3 : len(escape)-1] {
+	case "Basic_Emoji", "Emoji_Keycap_Sequence", "RGI_Emoji", "RGI_Emoji_Flag_Sequence",
+		"RGI_Emoji_Modifier_Sequence", "RGI_Emoji_Tag_Sequence", "RGI_Emoji_ZWJ_Sequence":
+		return true
+	default:
+		return false
+	}
+}
+
+// classHasInvalidUnicodeEscape validates the strict escape forms ClassEnd
+// deliberately treats permissively to find a closing bracket. In u/v classes,
+// an identity escape is not a fallback: incomplete hex escapes, legacy octal
+// escapes, malformed control escapes, and Unicode code points above U+10FFFF
+// reject the whole pattern.
+func classHasInvalidUnicodeEscape(pattern string, start, end int, unicodeSets bool) bool {
+	for i := start + 1; i < end-1; {
+		if pattern[i] != '\\' {
+			_, w := utf8.DecodeRuneInString(pattern[i:])
+			i += w
+			continue
+		}
+		if i+1 >= end-1 {
+			return true
+		}
+		// `\B` and non-zero decimal escapes are valid AtomEscapes but not
+		// CharacterClassEscape forms. They are SyntaxErrors inside a u/v class.
+		if pattern[i+1] == 'B' || (pattern[i+1] >= '1' && pattern[i+1] <= '9') {
+			return true
+		}
+		// A hyphen may be escaped in a u-mode class. In v mode it is instead a
+		// class-set reserved punctuator and is handled with the other escapes.
+		if !unicodeSets && pattern[i+1] == '-' {
+			i += 2
+			continue
+		}
+		// v-mode permits escaping its class-set reserved punctuators, which
+		// aren't AtomEscape syntax characters outside a class.
+		if unicodeSets && strings.ContainsRune(reservedClassSetPunctuators+"()[]{}\\/|-", rune(pattern[i+1])) {
+			i += 2
+			continue
+		}
+		if unicodeSets && pattern[i+1] == 'q' && i+2 < end-1 && pattern[i+2] == '{' {
+			step, ok := SkipPatternEscape(pattern, i, RegexFlags{UnicodeSets: true})
+			if !ok {
+				return true
+			}
+			i += step
+			continue
+		}
+		// Named backreferences are AtomEscapes and never class elements.
+		if pattern[i+1] == 'k' {
+			return true
+		}
+		step, ok := skipUnicodePatternEscape(pattern, i)
+		if !ok {
+			return true
+		}
+		i += step
+	}
+	return false
 }
 
 // regexBackrefsResolve reports whether every backreference in an already
@@ -536,10 +777,7 @@ func scanRegexGroup(pattern string, flags RegexFlags, pos *int, groups *[]RegexC
 }
 
 // isRegexGroupName reports whether name could be an IdentifierName, the grammar
-// a `(?<name>...)` group name has to follow. Only the ASCII range is checked —
-// every non-ASCII rune is accepted rather than run against the ID_Start /
-// ID_Continue tables, so an invalid name there slips through instead of
-// suppressing a diagnostic on a pattern that's actually fine.
+// a `(?<name>...)` group name has to follow.
 func isRegexGroupName(name string) bool {
 	if name == "" {
 		return false
@@ -548,25 +786,10 @@ func isRegexGroupName(name string) bool {
 	if !ok || normalized == "" {
 		return false
 	}
-	for i := 0; i < len(normalized); {
-		c := normalized[i]
-		switch {
-		case c >= utf8.RuneSelf:
-			_, w := utf8.DecodeRuneInString(normalized[i:])
-			if w == 0 {
-				return false
-			}
-			i += w
-			continue
-		case isASCIILetter(c), c == '$', c == '_':
-		case isRegexDigit(c):
-			if i == 0 {
-				return false
-			}
-		default:
+	for i, r := range normalized {
+		if (i == 0 && !scanner.IsIdentifierStart(r)) || (i != 0 && !scanner.IsIdentifierPart(r)) {
 			return false
 		}
-		i++
 	}
 	return true
 }

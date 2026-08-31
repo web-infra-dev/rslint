@@ -17,6 +17,7 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 	Name:   "prefer-named-capture-group",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		modifiedGlobals := collectModifiedGlobalRoots(ctx)
 		var eval *utils.StaticStringEvaluator
 		getEval := func() *utils.StaticStringEvaluator {
 			if eval == nil {
@@ -26,7 +27,8 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 		}
 
 		checkConstructor := func(node *ast.Node, callee *ast.Node, args *ast.NodeList) {
-			if !isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(callee), getEval()) {
+			calleeReferences := globalRegExpCalleeReferences(ctx, utils.SkipAssertionsAndParens(callee), getEval(), modifiedGlobals)
+			if calleeReferences == 0 {
 				return
 			}
 			if args == nil || len(args.Nodes) == 0 {
@@ -46,7 +48,9 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 				}
 			}
 
-			checkRegex(ctx, node, patternNode, pattern, flags)
+			for range calleeReferences {
+				checkRegex(ctx, node, patternNode, pattern, flags)
+			}
 		}
 
 		return rule.RuleListeners{
@@ -163,89 +167,125 @@ func buildSuggestions(ctx rule.RuleContext, patternSourceNode *ast.Node, pattern
 	}
 }
 
-// isGlobalRegExpCallee reports whether callee resolves to the global `RegExp`
-// constructor through the expression forms ESLint's ReferenceTracker follows:
-// the bare identifier, a property/element access on a global-object alias, or
-// the final value of a comma expression. Each name must resolve to the real
-// global — not a local declaration or an `off`-disabled global.
-func isGlobalRegExpCallee(ctx rule.RuleContext, callee *ast.Node, eval *utils.StaticStringEvaluator) bool {
+// globalRegExpCalleeReferences returns how many global RegExp references flow
+// to callee through the ReferenceTracker pass-through expressions. A logical
+// or conditional expression can contain more than one tracked root, and ESLint
+// reports once for each one. A write to a global root disables every use of
+// that root, including source-only runs where RefStore cannot resolve lib.d.ts
+// globals.
+func globalRegExpCalleeReferences(ctx rule.RuleContext, callee *ast.Node, eval *utils.StaticStringEvaluator, modifiedGlobals map[string]bool) int {
 	if callee == nil {
-		return false
+		return 0
 	}
 
 	switch callee.Kind {
 	case ast.KindIdentifier:
-		if callee.AsIdentifier().Text != "RegExp" || utils.IsShadowed(callee, "RegExp") {
-			return false
+		if callee.AsIdentifier().Text == "RegExp" && isUnmodifiedGlobal(ctx, callee, "RegExp", modifiedGlobals) {
+			return 1
 		}
-		if symbol := ctx.Refs.Resolve(callee); symbol != nil {
-			for _, reference := range ctx.Refs.References(symbol) {
-				if utils.IsWriteReference(reference) {
-					return false
-				}
-			}
-		}
-		return ctx.Globals.Access("RegExp").IsDeclared()
+		return 0
 	case ast.KindPropertyAccessExpression:
 		access := callee.AsPropertyAccessExpression()
 		if access == nil || access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
-			return false
+			return 0
 		}
 		if access.Name().AsIdentifier().Text != "RegExp" {
-			return false
+			return 0
 		}
-		return isKnownGlobalObject(ctx, access.Expression)
+		return knownGlobalObjectReferences(ctx, access.Expression, modifiedGlobals)
 	case ast.KindElementAccessExpression:
 		access := callee.AsElementAccessExpression()
 		if access == nil || access.ArgumentExpression == nil {
-			return false
+			return 0
 		}
 		value, ok := eval.EvalToString(utils.SkipAssertionsAndParens(access.ArgumentExpression))
 		if !ok || value != "RegExp" {
-			return false
+			return 0
 		}
-		return isKnownGlobalObject(ctx, access.Expression)
+		return knownGlobalObjectReferences(ctx, access.Expression, modifiedGlobals)
 	case ast.KindBinaryExpression:
 		binary := callee.AsBinaryExpression()
 		if binary == nil || binary.OperatorToken == nil {
-			return false
+			return 0
 		}
 		switch binary.OperatorToken.Kind {
 		case ast.KindCommaToken:
-			return isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Right), eval)
+			return globalRegExpCalleeReferences(ctx, utils.SkipAssertionsAndParens(binary.Right), eval, modifiedGlobals)
 		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
-			return isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Left), eval) ||
-				isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(binary.Right), eval)
+			return globalRegExpCalleeReferences(ctx, utils.SkipAssertionsAndParens(binary.Left), eval, modifiedGlobals) +
+				globalRegExpCalleeReferences(ctx, utils.SkipAssertionsAndParens(binary.Right), eval, modifiedGlobals)
 		}
 	case ast.KindConditionalExpression:
 		conditional := callee.AsConditionalExpression()
-		return conditional != nil &&
-			(isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(conditional.WhenTrue), eval) ||
-				isGlobalRegExpCallee(ctx, utils.SkipAssertionsAndParens(conditional.WhenFalse), eval))
+		if conditional != nil {
+			return globalRegExpCalleeReferences(ctx, utils.SkipAssertionsAndParens(conditional.WhenTrue), eval, modifiedGlobals) +
+				globalRegExpCalleeReferences(ctx, utils.SkipAssertionsAndParens(conditional.WhenFalse), eval, modifiedGlobals)
+		}
 	}
 
-	return false
+	return 0
 }
 
-func isKnownGlobalObject(ctx rule.RuleContext, node *ast.Node) bool {
+func knownGlobalObjectReferences(ctx rule.RuleContext, node *ast.Node, modifiedGlobals map[string]bool) int {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
-		return false
+		return 0
 	}
 	if node.Kind == ast.KindBinaryExpression {
 		binary := node.AsBinaryExpression()
-		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken {
-			return isKnownGlobalObject(ctx, binary.Right)
+		if binary != nil && binary.OperatorToken != nil {
+			switch binary.OperatorToken.Kind {
+			case ast.KindCommaToken:
+				return knownGlobalObjectReferences(ctx, binary.Right, modifiedGlobals)
+			case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+				return knownGlobalObjectReferences(ctx, binary.Left, modifiedGlobals) + knownGlobalObjectReferences(ctx, binary.Right, modifiedGlobals)
+			}
+		}
+	}
+	if node.Kind == ast.KindConditionalExpression {
+		conditional := node.AsConditionalExpression()
+		if conditional != nil {
+			return knownGlobalObjectReferences(ctx, conditional.WhenTrue, modifiedGlobals) + knownGlobalObjectReferences(ctx, conditional.WhenFalse, modifiedGlobals)
 		}
 	}
 	if node.Kind != ast.KindIdentifier {
-		return false
+		return 0
 	}
 	name := node.AsIdentifier().Text
 	switch name {
 	case "globalThis", "window", "self", "global":
-		return !utils.IsShadowed(node, name) && ctx.Globals.Access(name).IsDeclared()
+		if isUnmodifiedGlobal(ctx, node, name, modifiedGlobals) {
+			return 1
+		}
 	default:
+		return 0
+	}
+	return 0
+}
+
+func isUnmodifiedGlobal(ctx rule.RuleContext, node *ast.Node, name string, modifiedGlobals map[string]bool) bool {
+	return !utils.IsShadowed(node, name) && ctx.Globals.Access(name).IsDeclared() && !modifiedGlobals[name]
+}
+
+func collectModifiedGlobalRoots(ctx rule.RuleContext) map[string]bool {
+	modified := make(map[string]bool)
+	if ctx.SourceFile == nil {
+		return modified
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier {
+			name := node.AsIdentifier().Text
+			switch name {
+			case "RegExp", "globalThis", "window", "self", "global":
+				if !utils.IsNonReferenceIdentifier(node) && utils.IsWriteReference(node) && !utils.IsShadowed(node, name) {
+					modified[name] = true
+				}
+			}
+		}
+		node.ForEachChild(visit)
 		return false
 	}
+	ctx.SourceFile.AsNode().ForEachChild(visit)
+	return modified
 }
