@@ -79,7 +79,7 @@ func hasRegExpPatternModifiers(literal string) bool {
 	pattern := literal[1 : lastSlash+1]
 	inClass := false
 	escaped := false
-	for i := 0; i < len(pattern); i++ {
+	for i := range len(pattern) {
 		switch {
 		case escaped:
 			escaped = false
