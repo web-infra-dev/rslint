@@ -137,7 +137,9 @@ func validatorType(n *ast.Node) propType {
 		n = unwrap(n.AsPropertyAccessExpression().Expression)
 	}
 	if n.Kind != ast.KindCallExpression {
-		return propType{}
+		// Primitive and broad validators (for example PropTypes.object and
+		// PropTypes.string) validate any property read beneath the prop.
+		return propType{open: true}
 	}
 	call := n.AsCallExpression()
 	callee := unwrap(call.Expression)
@@ -180,6 +182,75 @@ func declared(n *ast.Node) (map[string]propType, bool) {
 }
 
 func className(n *ast.Node) string { return reactutil.BindingIdentifierName(n) }
+
+func componentName(n *ast.Node) string {
+	if name := className(n); name != "" {
+		return name
+	}
+	if n != nil && n.Parent != nil && n.Parent.Kind == ast.KindVariableDeclaration && n.Parent.AsVariableDeclaration().Initializer == n {
+		name := n.Parent.AsVariableDeclaration().Name()
+		if name != nil && name.Kind == ast.KindIdentifier {
+			return name.AsIdentifier().Text
+		}
+	}
+	return ""
+}
+
+func setDeclared(m map[string]propType, names []string, value propType) {
+	if len(names) == 0 {
+		return
+	}
+	if len(names) == 1 {
+		m[names[0]] = value
+		return
+	}
+	p := m[names[0]]
+	if p.children == nil {
+		p.children = map[string]propType{}
+	}
+	setDeclared(p.children, names[1:], value)
+	m[names[0]] = p
+}
+
+func addDestructured(c *component, pattern *ast.Node) {
+	if c == nil || pattern == nil || pattern.Kind != ast.KindObjectBindingPattern {
+		return
+	}
+	for _, e := range pattern.AsBindingPattern().Elements.Nodes {
+		if e == nil || e.Kind != ast.KindBindingElement {
+			continue
+		}
+		be := e.AsBindingElement()
+		if be.DotDotDotToken != nil {
+			continue
+		}
+		key := keyName(be.PropertyName)
+		if key == "" {
+			key = keyName(be.Name())
+		}
+		if key != "" && be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
+			c.destructured[be.Name().AsIdentifier().Text] = key
+		}
+	}
+}
+
+func getterReturn(body *ast.Node) *ast.Node {
+	var result *ast.Node
+	var visit ast.Visitor
+	visit = func(n *ast.Node) bool {
+		if n == nil {
+			return false
+		}
+		if n.Kind == ast.KindReturnStatement {
+			result = n.AsReturnStatement().Expression
+			return false
+		}
+		n.ForEachChild(visit)
+		return false
+	}
+	visit(body)
+	return result
+}
 
 func componentFor(node *ast.Node, comps []*component) *component {
 	var best *component
@@ -297,7 +368,7 @@ var PropTypesRule = rule.Rule{
 				if reactutil.ExtendsReactComponent(n, pragma) {
 					c := &component{node: n, declared: map[string]propType{}, destructured: map[string]string{}}
 					comps = append(comps, c)
-					if name := className(n); name != "" {
+					if name := componentName(n); name != "" {
 						byName[name] = c
 					}
 				}
@@ -310,7 +381,7 @@ var PropTypesRule = rule.Rule{
 				if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, ctx.TypeChecker, wrappers) {
 					c := &component{node: n, declared: map[string]propType{}, destructured: map[string]string{}}
 					comps = append(comps, c)
-					if name := className(n); name != "" {
+					if name := componentName(n); name != "" {
 						byName[name] = c
 					}
 					ps := n.Parameters()
@@ -319,21 +390,7 @@ var PropTypesRule = rule.Rule{
 						if name != nil && name.Kind == ast.KindIdentifier {
 							c.props = name.AsIdentifier().Text
 						} else if name != nil && name.Kind == ast.KindObjectBindingPattern {
-							for _, e := range name.AsBindingPattern().Elements.Nodes {
-								if e.Kind == ast.KindBindingElement {
-									be := e.AsBindingElement()
-									if be.DotDotDotToken != nil {
-										continue
-									}
-									k := keyName(be.PropertyName)
-									if k == "" {
-										k = keyName(be.Name())
-									}
-									if k != "" {
-										c.destructured[keyName(be.Name())] = k
-									}
-								}
-							}
+							addDestructured(c, name)
 						}
 					}
 				}
@@ -363,21 +420,43 @@ var PropTypesRule = rule.Rule{
 						}
 					}
 				}
+			case ast.KindGetAccessor:
+				ga := n.AsGetAccessorDeclaration()
+				if keyName(ga.Name()) == "propTypes" {
+					if c := componentFor(n.Parent, comps); c != nil {
+						if m, ok := declared(getterReturn(ga.Body)); ok {
+							c.declared = m
+							c.declaredBlock = true
+						}
+					}
+				}
+			case ast.KindVariableDeclaration:
+				vd := n.AsVariableDeclaration()
+				if vd.Name() != nil && vd.Name().Kind == ast.KindObjectBindingPattern {
+					if root, names, ok := memberNames(vd.Initializer); ok && root != nil {
+						if c := componentFor(n, comps); c != nil && rootMatches(root, c) &&
+							((root.Kind == ast.KindThisKeyword && len(names) == 1 && names[0] == "props") ||
+								(root.Kind == ast.KindIdentifier && len(names) == 0 && root.AsIdentifier().Text == c.props)) {
+							addDestructured(c, vd.Name())
+						}
+					}
+				}
 			case ast.KindBinaryExpression:
 				b := n.AsBinaryExpression()
 				if b.OperatorToken != nil && b.OperatorToken.Kind == ast.KindEqualsToken && b.Left != nil && b.Left.Kind == ast.KindPropertyAccessExpression {
-					pa := b.Left.AsPropertyAccessExpression()
-					if keyName(pa.Name()) == "propTypes" {
-						if id := unwrap(pa.Expression); id != nil && id.Kind == ast.KindIdentifier {
-							if c := byName[id.AsIdentifier().Text]; c != nil {
+					root, names, ok := memberNames(b.Left)
+					if ok && root != nil && root.Kind == ast.KindIdentifier && len(names) >= 1 && names[0] == "propTypes" {
+						if c := byName[root.AsIdentifier().Text]; c != nil {
+							if len(names) == 1 {
 								if m, ok := declared(b.Right); ok {
 									c.declared = m
-									c.declaredBlock = true
 								} else {
-									c.declaredBlock = true
 									c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
 								}
+							} else {
+								setDeclared(c.declared, names[1:], validatorType(b.Right))
 							}
+							c.declaredBlock = true
 						}
 					}
 				}
