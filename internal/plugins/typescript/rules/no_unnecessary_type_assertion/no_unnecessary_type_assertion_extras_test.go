@@ -69,6 +69,11 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				Code:   `declare const value: 'a'; const result = true ? (value as string) : 'b';`,
+				Output: []string{`declare const value: 'a'; const result = true ? (value) : 'b';`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+			{
 				Code:   `const x = ((1 as 1));`,
 				Output: []string{`const x = ((1));`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},

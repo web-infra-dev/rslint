@@ -395,6 +395,21 @@ func assertionIsInOptionalOrLogicalContext(node *ast.Node) bool {
 	return ast.IsOptionalChain(parent) || ast.IsLogicalOrCoalescingBinaryExpression(parent)
 }
 
+func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type {
+	if contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone); contextualType != nil {
+		return contextualType
+	}
+	semanticNode := assertionWalkUpParentheses(node)
+	parent := semanticNode.Parent
+	if ast.IsConditionalExpression(parent) {
+		conditional := parent.AsConditionalExpression()
+		if conditional.WhenTrue == semanticNode || conditional.WhenFalse == semanticNode {
+			return ctx.TypeChecker.GetTypeAtLocation(parent)
+		}
+	}
+	return nil
+}
+
 func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Node) bool {
 	semanticNode := assertionWalkUpParentheses(node)
 	parent := semanticNode.Parent
@@ -895,7 +910,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			castIsAny := utils.IsTypeFlagSet(castType, checker.TypeFlagsAny) && !parentSkipsAnyFallback
 			var contextualType *checker.Type
 			if !shouldSkipAssertionContextualTypeFallback(ctx, node, castIsAny) {
-				contextualType = checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone)
+				contextualType = assertionContextualType(ctx, node)
 			}
 			if contextualType != nil {
 				contextualTypeIsAny := utils.IsTypeAnyType(contextualType)
