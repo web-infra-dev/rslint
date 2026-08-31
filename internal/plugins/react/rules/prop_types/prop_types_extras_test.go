@@ -29,6 +29,7 @@ func TestPropTypesRuleExtras(t *testing.T) {
 			{Code: `const Hello = myObserver(props => <div>{props.name}</div>); Hello.propTypes = { name: PropTypes.string };`, Settings: map[string]interface{}{"componentWrapperFunctions": []interface{}{"myObserver"}}, Tsx: true},
 			{Code: `const Hello = React.memo((props => <div>{props.name}</div>) as unknown); Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
 			{Code: `class Hello extends React.Component { render() { const { props: { name } } = this; return <div>{name}</div>; } } Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.user.name}</div>; } Hello.propTypes = { user: CustomValidator.object() };`, Options: map[string]interface{}{"customValidators": []interface{}{"CustomValidator"}}, Tsx: true},
 		}, []rule_tester.InvalidTestCase{
 			{Code: `function Hello(props) { return <div>{props[0]}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'0' is missing in props validation`}}},
 			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.shape({}) };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType"}}},
@@ -37,5 +38,8 @@ func TestPropTypesRuleExtras(t *testing.T) {
 			{Code: `function Hello(props) { const { user: { name } } = props; return <div>{name}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'user.name' is missing in props validation`}}},
 			{Code: `class Hello extends React.Component { get propTypes() { return { name: PropTypes.string }; } render() { return <div>{this.props.name}</div>; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
 			{Code: `class Hello extends React.Component { render() { const { props: { name } } = this; return <div>{name}</div>; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `class Hello extends React.Component { constructor(props) { super(props); this.name = props.name; } render() { return <div />; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `class Hello extends React.Component { componentWillReceiveProps(nextProps) { this.name = nextProps.name; } render() { return <div />; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `const userType = PropTypes.shape({}); function Hello(props) { return <div>{props.user.name}</div>; } Hello.propTypes = { user: userType };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'user.name' is missing in props validation`}}},
 		})
 }

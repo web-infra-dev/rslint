@@ -91,7 +91,7 @@ func elementName(n *ast.Node) string {
 
 func unwrap(n *ast.Node) *ast.Node { return reactutil.SkipExpressionWrappers(n) }
 
-func propMap(n *ast.Node) (map[string]propType, bool) {
+func propMap(n *ast.Node, customValidators []string) (map[string]propType, bool) {
 	n = unwrap(n)
 	if n == nil {
 		return nil, false
@@ -121,17 +121,31 @@ func propMap(n *ast.Node) (map[string]propType, bool) {
 				out["__ANY_KEY__"] = propType{any: true}
 				continue
 			}
-			out[k] = validatorType(value)
+			out[k] = validatorType(value, customValidators)
 		}
 		return out, true
 	}
 	return nil, false
 }
 
-func validatorType(n *ast.Node) propType {
+func validatorType(n *ast.Node, customValidators []string) propType {
+	return validatorTypeSeen(n, customValidators, map[*ast.Node]bool{})
+}
+
+func validatorTypeSeen(n *ast.Node, customValidators []string, seen map[*ast.Node]bool) propType {
 	n = unwrap(n)
 	if n == nil {
 		return propType{any: true}
+	}
+	if n.Kind == ast.KindIdentifier {
+		if seen[n] {
+			return propType{open: true}
+		}
+		seen[n] = true
+		if initializer := reactutil.ResolveIdentifierInitializer(n, nil); initializer != nil && initializer != n {
+			return validatorTypeSeen(initializer, customValidators, seen)
+		}
+		return propType{open: true}
 	}
 	if n.Kind == ast.KindPropertyAccessExpression && keyName(n.AsPropertyAccessExpression().Name()) == "isRequired" {
 		n = unwrap(n.AsPropertyAccessExpression().Expression)
@@ -146,17 +160,20 @@ func validatorType(n *ast.Node) propType {
 	name := ""
 	if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
 		name = keyName(callee.AsPropertyAccessExpression().Name())
+		if object := unwrap(callee.AsPropertyAccessExpression().Expression); object != nil && object.Kind == ast.KindIdentifier && slices.Contains(customValidators, object.AsIdentifier().Text) {
+			return propType{open: true}
+		}
 	}
 	if name == "shape" || name == "exact" {
 		if call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-			if m, ok := propMap(call.Arguments.Nodes[0]); ok {
+			if m, ok := propMap(call.Arguments.Nodes[0], customValidators); ok {
 				return propType{children: m}
 			}
 		}
 	}
 	if name == "objectOf" || name == "arrayOf" {
 		if call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-			return propType{open: true, children: map[string]propType{"__ANY_KEY__": validatorType(call.Arguments.Nodes[0])}}
+			return propType{open: true, children: map[string]propType{"__ANY_KEY__": validatorTypeSeen(call.Arguments.Nodes[0], customValidators, seen)}}
 		}
 	}
 	if name == "oneOfType" && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
@@ -165,7 +182,7 @@ func validatorType(n *ast.Node) propType {
 			var union []propType
 			for _, candidate := range argument.AsArrayLiteralExpression().Elements.Nodes {
 				if candidate != nil && candidate.Kind != ast.KindOmittedExpression {
-					union = append(union, validatorType(candidate))
+					union = append(union, validatorTypeSeen(candidate, customValidators, seen))
 				}
 			}
 			if len(union) > 0 {
@@ -176,8 +193,8 @@ func validatorType(n *ast.Node) propType {
 	return propType{}
 }
 
-func declared(n *ast.Node) (map[string]propType, bool) {
-	m, ok := propMap(n)
+func declared(n *ast.Node, customValidators []string) (map[string]propType, bool) {
+	m, ok := propMap(n, customValidators)
 	return m, ok
 }
 
@@ -296,13 +313,49 @@ func propsPath(root *ast.Node, names []string, c *component) ([]string, bool) {
 	if root.Kind != ast.KindIdentifier {
 		return nil, false
 	}
-	if root.AsIdentifier().Text == c.props {
+	if root.AsIdentifier().Text == c.props || isClassPropsParameter(root, c) {
 		return names, true
 	}
 	if prefix, ok := c.destructured[root.AsIdentifier().Text]; ok {
 		return append(append([]string{}, prefix...), names...), true
 	}
 	return nil, false
+}
+
+func isClassPropsParameter(ident *ast.Node, c *component) bool {
+	if ident == nil || ident.Kind != ast.KindIdentifier || c == nil || (c.node.Kind != ast.KindClassDeclaration && c.node.Kind != ast.KindClassExpression) {
+		return false
+	}
+	for current := ident.Parent; current != nil && current != c.node; current = current.Parent {
+		switch current.Kind {
+		case ast.KindConstructor:
+			return functionFirstParameterName(current) == ident.AsIdentifier().Text
+		case ast.KindMethodDeclaration:
+			name := keyName(current.Name())
+			switch name {
+			case "componentWillReceiveProps", "shouldComponentUpdate", "componentWillUpdate", "componentDidUpdate",
+				"getDerivedStateFromProps", "getSnapshotBeforeUpdate", "UNSAFE_componentWillReceiveProps", "UNSAFE_componentWillUpdate":
+				return functionFirstParameterName(current) == ident.AsIdentifier().Text
+			default:
+				return false
+			}
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindGetAccessor, ast.KindSetAccessor:
+			return false
+		}
+	}
+	return false
+}
+
+func functionFirstParameterName(fn *ast.Node) string {
+	params := reactutil.FunctionParameters(fn)
+	if len(params) == 0 || params[0] == nil || params[0].Kind != ast.KindParameter {
+		return ""
+	}
+	name := params[0].AsParameterDeclaration().Name()
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return name.AsIdentifier().Text
 }
 
 func getterReturn(body *ast.Node) *ast.Node {
@@ -385,7 +438,7 @@ func rootMatches(n *ast.Node, c *component) bool {
 	if n.Kind != ast.KindIdentifier {
 		return false
 	}
-	if n.AsIdentifier().Text == c.props {
+	if n.AsIdentifier().Text == c.props || isClassPropsParameter(n, c) {
 		return true
 	}
 	_, ok := c.destructured[n.AsIdentifier().Text]
@@ -474,7 +527,7 @@ var PropTypesRule = rule.Rule{
 				pa := n.AsPropertyAssignment()
 				if keyName(pa.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(pa.Initializer); ok {
+						if m, ok := declared(pa.Initializer, o.customValidators); ok {
 							c.declared = m
 							c.declaredBlock = true
 						} else {
@@ -487,7 +540,7 @@ var PropTypesRule = rule.Rule{
 				pd := n.AsPropertyDeclaration()
 				if keyName(pd.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(pd.Initializer); ok {
+						if m, ok := declared(pd.Initializer, o.customValidators); ok {
 							c.declared = m
 							c.declaredBlock = true
 						} else {
@@ -500,7 +553,7 @@ var PropTypesRule = rule.Rule{
 				ga := n.AsGetAccessorDeclaration()
 				if ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) && keyName(ga.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(getterReturn(ga.Body)); ok {
+						if m, ok := declared(getterReturn(ga.Body), o.customValidators); ok {
 							c.declared = m
 							c.declaredBlock = true
 						}
@@ -532,13 +585,13 @@ var PropTypesRule = rule.Rule{
 					if ok && root != nil && root.Kind == ast.KindIdentifier && len(names) >= 1 && names[0] == "propTypes" {
 						if c := byName[root.AsIdentifier().Text]; c != nil {
 							if len(names) == 1 {
-								if m, ok := declared(b.Right); ok {
+								if m, ok := declared(b.Right, o.customValidators); ok {
 									c.declared = m
 								} else {
 									c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
 								}
 							} else {
-								setDeclared(c.declared, names[1:], validatorType(b.Right))
+								setDeclared(c.declared, names[1:], validatorType(b.Right, o.customValidators))
 							}
 							c.declaredBlock = true
 						}
