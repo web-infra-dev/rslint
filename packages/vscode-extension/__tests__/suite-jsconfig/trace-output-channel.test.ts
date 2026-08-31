@@ -4,9 +4,9 @@ import {
   ConfigurationTarget,
   extensions,
   Uri,
-  ViewColumn,
   workspace,
   type OutputChannel,
+  type ViewColumn,
   type WorkspaceFolder,
 } from 'vscode';
 import {
@@ -24,20 +24,11 @@ import {
   type TraceValues,
 } from 'vscode-languageserver/node';
 import { createLanguageClientOptions } from '../../src/Rslint';
-import {
-  createRuntimeTraceLabel,
-  SharedTraceOutputChannel,
-} from '../../src/SharedTraceOutputChannel';
 
 class MemoryOutputChannel implements OutputChannel {
   public readonly name = 'Rslint trace test';
   public value = '';
-  public clearCalls = 0;
   public disposeCalls = 0;
-  public hideCalls = 0;
-  public readonly showCalls: Array<
-    readonly [ViewColumn | boolean | undefined, boolean | undefined]
-  > = [];
 
   public append(value: string): void {
     this.value += value;
@@ -52,22 +43,17 @@ class MemoryOutputChannel implements OutputChannel {
   }
 
   public clear(): void {
-    this.clearCalls++;
     this.value = '';
   }
 
   public show(preserveFocus?: boolean): void;
   public show(column?: ViewColumn, preserveFocus?: boolean): void;
   public show(
-    columnOrPreserveFocus?: ViewColumn | boolean,
-    preserveFocus?: boolean,
-  ): void {
-    this.showCalls.push([columnOrPreserveFocus, preserveFocus]);
-  }
+    _columnOrPreserveFocus?: ViewColumn | boolean,
+    _preserveFocus?: boolean,
+  ): void {}
 
-  public hide(): void {
-    this.hideCalls++;
-  }
+  public hide(): void {}
 
   public dispose(): void {
     this.disposeCalls++;
@@ -102,7 +88,7 @@ function createTraceClientHarness(
   name: string,
   workspaceFolder: WorkspaceFolder,
   serverLog: OutputChannel,
-  traceView: OutputChannel,
+  traceOutputChannel: OutputChannel,
 ): TraceClientHarness {
   let serverStarts = 0;
   let initialTrace: TraceValues | undefined;
@@ -130,7 +116,7 @@ function createTraceClientHarness(
       connection.listen();
       return { reader: clientInput, writer: clientOutput };
     },
-    createLanguageClientOptions(workspaceFolder, serverLog, traceView),
+    createLanguageClientOptions(workspaceFolder, serverLog, traceOutputChannel),
   );
 
   return {
@@ -154,7 +140,7 @@ function createTraceClientHarness(
   };
 }
 
-suite('shared LSP trace output', () => {
+suite('window-wide LSP trace output', () => {
   test('declares one window-wide trace setting', () => {
     const extension = extensions.getExtension('rstack.rslint');
     assert.ok(extension, 'Rslint extension must be installed in the test host');
@@ -170,32 +156,6 @@ suite('shared LSP trace output', () => {
     assert.strictEqual(traceSetting.default, 'off');
   });
 
-  test('distinguishes same-name workspaces and same-version core copies', () => {
-    const leftWorkspace = createRuntimeTraceLabel(
-      'file:///repo/twins/left/app',
-      '/repo/node_modules/@rslint/core',
-    );
-    const rightWorkspace = createRuntimeTraceLabel(
-      'file:///repo/twins/right/app',
-      '/repo/node_modules/@rslint/core',
-    );
-    const nestedCore = createRuntimeTraceLabel(
-      'file:///repo/twins/left/app',
-      '/repo/packages/nested/node_modules/@rslint/core',
-    );
-
-    assert.notStrictEqual(leftWorkspace, rightWorkspace);
-    assert.notStrictEqual(leftWorkspace, nestedCore);
-    assert.strictEqual(
-      createRuntimeTraceLabel('file:///repo\nforged', '/core\rforged'),
-      'workspace="file:///repo\\nforged" core="/core\\rforged"',
-    );
-    assert.strictEqual(
-      createRuntimeTraceLabel('file:///repo\u2028forged', '/core\u2029forged'),
-      'workspace="file:///repo\\u2028forged" core="/core\\u2029forged"',
-    );
-  });
-
   test('updates every workspace and core runtime without replacing clients', async function () {
     this.timeout(15_000);
     const workspaceFolder = workspace.workspaceFolders?.[0];
@@ -208,33 +168,32 @@ suite('shared LSP trace output', () => {
     const configuration = workspace.getConfiguration('rslint');
     const originalWorkspaceValue =
       configuration.inspect<string>('trace.server')?.workspaceValue;
-    const serverLogs = [new MemoryOutputChannel(), new MemoryOutputChannel()];
-    const traceLog = new MemoryOutputChannel();
-    const shared = new SharedTraceOutputChannel(traceLog);
-    const firstLabel = createRuntimeTraceLabel(
-      workspaceFolder.uri.toString(),
-      '/virtual/core-a',
-    );
-    const secondLabel = createRuntimeTraceLabel(
-      secondWorkspaceFolder.uri.toString(),
-      '/virtual/core-b',
-    );
-    const traceViews = [
-      shared.forRuntime(firstLabel),
-      shared.forRuntime(secondLabel),
+    const serverLogs = [
+      new MemoryOutputChannel(),
+      new MemoryOutputChannel(),
+      new MemoryOutputChannel(),
     ];
+    const traceLog = new MemoryOutputChannel();
     const harnesses = [
       createTraceClientHarness(
         'Rslint live trace test A',
         workspaceFolder,
         serverLogs[0],
-        traceViews[0],
+        traceLog,
       ),
       createTraceClientHarness(
         'Rslint live trace test B',
         secondWorkspaceFolder,
         serverLogs[1],
-        traceViews[1],
+        traceLog,
+      ),
+      // A second client for the same workspace models documents that resolve
+      // to another physical core installation within that workspace.
+      createTraceClientHarness(
+        'Rslint live trace test C',
+        workspaceFolder,
+        serverLogs[2],
+        traceLog,
       ),
     ];
 
@@ -248,6 +207,7 @@ suite('shared LSP trace output', () => {
       assert.strictEqual(harnesses[0].initialTrace, 'off');
       assert.strictEqual(harnesses[0].serverStarts, 1);
       assert.strictEqual(harnesses[1].serverStarts, 0);
+      assert.strictEqual(harnesses[2].serverStarts, 0);
 
       await harnesses[0].client.sendNotification('rslint/traceProbe', {
         phase: 'off',
@@ -265,9 +225,14 @@ suite('shared LSP trace output', () => {
       );
       // A runtime created after the setting changed must inherit the current
       // level in initialize rather than waiting for another settings event.
-      await harnesses[1].client.start();
-      assert.strictEqual(harnesses[1].initialTrace, 'messages');
-      assert.strictEqual(harnesses[1].serverStarts, 1);
+      await Promise.all([
+        harnesses[1].client.start(),
+        harnesses[2].client.start(),
+      ]);
+      for (const harness of harnesses.slice(1)) {
+        assert.strictEqual(harness.initialTrace, 'messages');
+        assert.strictEqual(harness.serverStarts, 1);
+      }
       await Promise.all(
         harnesses.map(({ client }, index) =>
           client.sendNotification('rslint/traceProbe', {
@@ -275,14 +240,16 @@ suite('shared LSP trace output', () => {
           }),
         ),
       );
-      assert.ok(traceLog.value.includes(`[${firstLabel}] `));
-      assert.ok(traceLog.value.includes(`[${secondLabel}] `));
+      assert.ok(
+        traceLog.value.split('rslint/traceProbe').length - 1 >=
+          harnesses.length,
+        'every runtime should write protocol messages to the shared channel',
+      );
       assert.ok(
         serverLogs.every(
-          (serverLog) =>
-            !serverLog.value.includes(`[${firstLabel}]`) &&
-            !serverLog.value.includes(`[${secondLabel}]`),
+          (serverLog) => !serverLog.value.includes('rslint/traceProbe'),
         ),
+        'protocol traces must not fall back to a server log',
       );
 
       await configuration.update(
@@ -304,8 +271,9 @@ suite('shared LSP trace output', () => {
           }),
         ),
       );
-      assert.ok(traceLog.value.includes('verbose-payload-0'));
-      assert.ok(traceLog.value.includes('verbose-payload-1'));
+      for (const index of harnesses.keys()) {
+        assert.ok(traceLog.value.includes(`verbose-payload-${String(index)}`));
+      }
 
       await configuration.update(
         'trace.server',
@@ -331,10 +299,11 @@ suite('shared LSP trace output', () => {
         assert.strictEqual(harness.serverStarts, 1);
       }
     } finally {
+      let traceDisposeCallsAfterClientClose: number | undefined;
       try {
         await Promise.all(harnesses.map((harness) => harness.dispose()));
       } finally {
-        traceViews.forEach((traceView) => traceView.dispose());
+        traceDisposeCallsAfterClientClose = traceLog.disposeCalls;
         serverLogs.forEach((serverLog) => serverLog.dispose());
         traceLog.dispose();
         await configuration.update(
@@ -343,88 +312,11 @@ suite('shared LSP trace output', () => {
           ConfigurationTarget.Workspace,
         );
       }
+      assert.strictEqual(
+        traceDisposeCallsAfterClientClose,
+        0,
+        'language clients must not dispose the extension-owned channel',
+      );
     }
-  });
-
-  test('prefixes append sequences and every physical line', () => {
-    const channel = new MemoryOutputChannel();
-    const shared = new SharedTraceOutputChannel(channel);
-    const label = createRuntimeTraceLabel('file:///workspace', '/core/a');
-    const runtime = shared.forRuntime(label);
-
-    runtime.append('request: ');
-    runtime.appendLine('initialize');
-    runtime.appendLine('first payload line\nsecond payload line');
-
-    assert.strictEqual(
-      channel.value,
-      `[${label}] request: initialize\n` +
-        `[${label}] first payload line\n` +
-        `[${label}] second payload line\n`,
-    );
-  });
-
-  test('never merges partial lines from interleaved runtimes', () => {
-    const channel = new MemoryOutputChannel();
-    const shared = new SharedTraceOutputChannel(channel);
-    const firstLabel = createRuntimeTraceLabel('file:///first', '/core/a');
-    const secondLabel = createRuntimeTraceLabel('file:///second', '/core/b');
-    const first = shared.forRuntime(firstLabel);
-    const second = shared.forRuntime(secondLabel);
-
-    first.append('partial request');
-    second.appendLine('complete response');
-    first.appendLine('continued request');
-
-    assert.strictEqual(
-      channel.value,
-      `[${firstLabel}] partial request\n` +
-        `[${secondLabel}] complete response\n` +
-        `[${firstLabel}] continued request\n`,
-    );
-  });
-
-  test('keeps shared channel ownership in the extension', () => {
-    const channel = new MemoryOutputChannel();
-    const shared = new SharedTraceOutputChannel(channel);
-    const firstLabel = createRuntimeTraceLabel('file:///first', '/core/a');
-    const secondLabel = createRuntimeTraceLabel('file:///second', '/core/b');
-    const first = shared.forRuntime(firstLabel);
-    const second = shared.forRuntime(secondLabel);
-
-    assert.strictEqual(first.name, channel.name);
-    first.appendLine('discarded by replacement');
-    second.replace('replacement\ncontinued');
-    assert.strictEqual(
-      channel.value,
-      `[${secondLabel}] replacement\n[${secondLabel}] continued`,
-    );
-
-    first.clear();
-    assert.strictEqual(channel.value, '');
-    assert.strictEqual(channel.clearCalls, 1);
-
-    first.dispose();
-    first.appendLine('must not be written');
-    second.appendLine('still active');
-    assert.strictEqual(channel.value, `[${secondLabel}] still active\n`);
-    assert.strictEqual(channel.disposeCalls, 0);
-
-    second.show(true);
-    second.show(ViewColumn.Two, false);
-    second.hide();
-    assert.deepStrictEqual(channel.showCalls, [
-      [true, undefined],
-      [ViewColumn.Two, false],
-    ]);
-    assert.strictEqual(channel.hideCalls, 1);
-
-    second.dispose();
-    assert.strictEqual(channel.disposeCalls, 0);
-  });
-
-  test('rejects an unattributed runtime view', () => {
-    const shared = new SharedTraceOutputChannel(new MemoryOutputChannel());
-    assert.throws(() => shared.forRuntime(''), /must not be empty/);
   });
 });

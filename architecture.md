@@ -860,9 +860,8 @@ The transport and target phase differ by surface:
   `rslint.trace.server`, applies the initial level, and sends live `$/setTrace`
   updates without restarting a native server. The server accepts that standard
   notification as a no-op because the protocol trace is rendered client-side.
-  Runtime-scoped output views add the workspace-folder URI and physical core
-  identity to every trace line for attribution, but neither own configuration
-  state nor dispose the shared channel.
+  Every `LanguageClient` borrows the same channel directly; only the extension
+  disposes it after all runtimes close.
 - `RuntimeManager` keys a runtime by VS Code workspace-folder URI plus the
   package directory's normalized physical realpath. Documents resolving through
   symlinks to the same installation share its process and worker state; distinct

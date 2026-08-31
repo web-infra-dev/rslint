@@ -338,6 +338,7 @@ export class Rslint implements Disposable {
   public readonly workspaceFolder: WorkspaceFolder;
   private readonly installation: CoreInstallation;
   private readonly router: WorkspaceDocumentRouter;
+  /** Borrowed from Extension; runtimes must not dispose the shared channel. */
   private readonly traceOutputChannel: OutputChannel;
   private readonly outputChannel: OutputChannel | undefined;
   private configWatcher: FileSystemWatcher | undefined;
@@ -860,7 +861,6 @@ export class Rslint implements Disposable {
         errors.push(reason);
       }
     }
-    disposeSafely(this.traceOutputChannel);
     try {
       for (const error of errors) {
         this.logger.error('Failed to close Rslint workspace resource', error);
