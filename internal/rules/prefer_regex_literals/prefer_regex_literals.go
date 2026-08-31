@@ -427,7 +427,7 @@ func canFixTo(ctx rule.RuleContext, node *ast.Node, literal string) bool {
 			return false
 		}
 	}
-	return ecmascript.IsValidRegexLiteral(literal)
+	return ecmascript.IsValidRegexLiteralForVersion(literal, ctx.LanguageOptions.EffectiveECMAVersion())
 }
 
 func areFlagsEqual(flagsA string, flagsB string) bool {
