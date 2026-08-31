@@ -246,6 +246,21 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
 					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
 				},
 			},
+			// ---- AST parity: parentheses around require arguments are transparent ----
+			{
+				Code: `
+        const { ["describe"]: context } = require(('@jest/globals'));
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
 			// ---- Upstream parity: computed numeric require keys are unsupported ----
 			{
 				Code: `
