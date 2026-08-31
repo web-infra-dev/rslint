@@ -193,7 +193,14 @@ func validatorTypeSeen(n *ast.Node, customValidators []string, seen map[*ast.Nod
 	return propType{}
 }
 
-func declared(n *ast.Node, customValidators []string) (map[string]propType, bool) {
+func declared(n *ast.Node, customValidators []string, propWrappers []reactutil.PropWrapperEntry) (map[string]propType, bool) {
+	n = unwrap(n)
+	if n != nil && n.Kind == ast.KindCallExpression && reactutil.IsPropWrapperCall(n, propWrappers) {
+		call := n.AsCallExpression()
+		if call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
+			return declared(call.Arguments.Nodes[0], customValidators, propWrappers)
+		}
+	}
 	m, ok := propMap(n, customValidators)
 	return m, ok
 }
@@ -220,6 +227,13 @@ func componentName(n *ast.Node) string {
 				name := parent.AsVariableDeclaration().Name()
 				if name != nil && name.Kind == ast.KindIdentifier {
 					return name.AsIdentifier().Text
+				}
+			}
+		case ast.KindBinaryExpression:
+			assignment := parent.AsBinaryExpression()
+			if assignment.OperatorToken != nil && assignment.OperatorToken.Kind == ast.KindEqualsToken && assignment.Right == current {
+				if left := unwrap(assignment.Left); left != nil && left.Kind == ast.KindIdentifier {
+					return left.AsIdentifier().Text
 				}
 			}
 		}
@@ -485,6 +499,7 @@ var PropTypesRule = rule.Rule{
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
+		propWrappers := reactutil.GetPropWrapperFunctions(ctx.Settings)
 		var comps []*component
 		byName := map[string]*component{}
 		var walk ast.Visitor
@@ -505,6 +520,9 @@ var PropTypesRule = rule.Rule{
 				if reactutil.IsCreateReactClassObjectArg(n, pragma, createClass) {
 					c := &component{node: n, declared: map[string]propType{}, destructured: map[string][]string{}}
 					comps = append(comps, c)
+					if name := componentName(n); name != "" {
+						byName[name] = c
+					}
 				}
 			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
 				if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, ctx.TypeChecker, wrappers) {
@@ -527,7 +545,7 @@ var PropTypesRule = rule.Rule{
 				pa := n.AsPropertyAssignment()
 				if keyName(pa.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(pa.Initializer, o.customValidators); ok {
+						if m, ok := declared(pa.Initializer, o.customValidators, propWrappers); ok {
 							c.declared = m
 							c.declaredBlock = true
 						} else {
@@ -540,7 +558,7 @@ var PropTypesRule = rule.Rule{
 				pd := n.AsPropertyDeclaration()
 				if keyName(pd.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(pd.Initializer, o.customValidators); ok {
+						if m, ok := declared(pd.Initializer, o.customValidators, propWrappers); ok {
 							c.declared = m
 							c.declaredBlock = true
 						} else {
@@ -553,7 +571,7 @@ var PropTypesRule = rule.Rule{
 				ga := n.AsGetAccessorDeclaration()
 				if ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) && keyName(ga.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(getterReturn(ga.Body), o.customValidators); ok {
+						if m, ok := declared(getterReturn(ga.Body), o.customValidators, propWrappers); ok {
 							c.declared = m
 							c.declaredBlock = true
 						}
@@ -585,7 +603,7 @@ var PropTypesRule = rule.Rule{
 					if ok && root != nil && root.Kind == ast.KindIdentifier && len(names) >= 1 && names[0] == "propTypes" {
 						if c := byName[root.AsIdentifier().Text]; c != nil {
 							if len(names) == 1 {
-								if m, ok := declared(b.Right, o.customValidators); ok {
+								if m, ok := declared(b.Right, o.customValidators, propWrappers); ok {
 									c.declared = m
 								} else {
 									c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
