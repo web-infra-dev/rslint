@@ -34,7 +34,7 @@ type component struct {
 	used          []use
 	declaredBlock bool
 	props         string
-	destructured  map[string]string
+	destructured  map[string][]string
 }
 
 func parseOptions(raw []any) options {
@@ -212,7 +212,7 @@ func setDeclared(m map[string]propType, names []string, value propType) {
 	m[names[0]] = p
 }
 
-func addDestructured(c *component, pattern *ast.Node) {
+func addDestructured(c *component, pattern *ast.Node, prefix []string) {
 	if c == nil || pattern == nil || pattern.Kind != ast.KindObjectBindingPattern {
 		return
 	}
@@ -228,28 +228,55 @@ func addDestructured(c *component, pattern *ast.Node) {
 		if key == "" {
 			key = keyName(be.Name())
 		}
-		if key != "" && be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
-			c.destructured[be.Name().AsIdentifier().Text] = key
+		if key == "" || be.Name() == nil {
+			continue
+		}
+		path := append(append([]string{}, prefix...), key)
+		if be.Name().Kind == ast.KindIdentifier {
+			c.destructured[be.Name().AsIdentifier().Text] = path
+		} else if be.Name().Kind == ast.KindObjectBindingPattern {
+			addDestructured(c, be.Name(), path)
 		}
 	}
 }
 
-func getterReturn(body *ast.Node) *ast.Node {
-	var result *ast.Node
-	var visit ast.Visitor
-	visit = func(n *ast.Node) bool {
-		if n == nil {
-			return false
-		}
-		if n.Kind == ast.KindReturnStatement {
-			result = n.AsReturnStatement().Expression
-			return false
-		}
-		n.ForEachChild(visit)
-		return false
+func propsPath(root *ast.Node, names []string, c *component) ([]string, bool) {
+	root = unwrap(root)
+	if root == nil || c == nil {
+		return nil, false
 	}
-	visit(body)
-	return result
+	if root.Kind == ast.KindThisKeyword {
+		if len(names) > 0 && names[0] == "props" {
+			return names[1:], true
+		}
+		return nil, false
+	}
+	if root.Kind != ast.KindIdentifier {
+		return nil, false
+	}
+	if root.AsIdentifier().Text == c.props {
+		return names, true
+	}
+	if prefix, ok := c.destructured[root.AsIdentifier().Text]; ok {
+		return append(append([]string{}, prefix...), names...), true
+	}
+	return nil, false
+}
+
+func getterReturn(body *ast.Node) *ast.Node {
+	if body == nil || body.Kind != ast.KindBlock {
+		return nil
+	}
+	stmts := body.AsBlock().Statements
+	if stmts == nil {
+		return nil
+	}
+	for i := len(stmts.Nodes) - 1; i >= 0; i-- {
+		if stmt := stmts.Nodes[i]; stmt != nil && stmt.Kind == ast.KindReturnStatement {
+			return stmt.AsReturnStatement().Expression
+		}
+	}
+	return nil
 }
 
 func componentFor(node *ast.Node, comps []*component) *component {
@@ -313,7 +340,14 @@ func rootMatches(n *ast.Node, c *component) bool {
 	if n.Kind == ast.KindThisKeyword {
 		return true
 	}
-	return n.Kind == ast.KindIdentifier && (n.AsIdentifier().Text == c.props || c.destructured[n.AsIdentifier().Text] != "")
+	if n.Kind != ast.KindIdentifier {
+		return false
+	}
+	if n.AsIdentifier().Text == c.props {
+		return true
+	}
+	_, ok := c.destructured[n.AsIdentifier().Text]
+	return ok
 }
 
 func isDeclared(m map[string]propType, names []string) bool {
@@ -366,7 +400,7 @@ var PropTypesRule = rule.Rule{
 			switch n.Kind {
 			case ast.KindClassDeclaration, ast.KindClassExpression:
 				if reactutil.ExtendsReactComponent(n, pragma) {
-					c := &component{node: n, declared: map[string]propType{}, destructured: map[string]string{}}
+					c := &component{node: n, declared: map[string]propType{}, destructured: map[string][]string{}}
 					comps = append(comps, c)
 					if name := componentName(n); name != "" {
 						byName[name] = c
@@ -374,12 +408,12 @@ var PropTypesRule = rule.Rule{
 				}
 			case ast.KindObjectLiteralExpression:
 				if reactutil.IsCreateReactClassObjectArg(n, pragma, createClass) {
-					c := &component{node: n, declared: map[string]propType{}, destructured: map[string]string{}}
+					c := &component{node: n, declared: map[string]propType{}, destructured: map[string][]string{}}
 					comps = append(comps, c)
 				}
 			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
 				if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, ctx.TypeChecker, wrappers) {
-					c := &component{node: n, declared: map[string]propType{}, destructured: map[string]string{}}
+					c := &component{node: n, declared: map[string]propType{}, destructured: map[string][]string{}}
 					comps = append(comps, c)
 					if name := componentName(n); name != "" {
 						byName[name] = c
@@ -390,7 +424,7 @@ var PropTypesRule = rule.Rule{
 						if name != nil && name.Kind == ast.KindIdentifier {
 							c.props = name.AsIdentifier().Text
 						} else if name != nil && name.Kind == ast.KindObjectBindingPattern {
-							addDestructured(c, name)
+							addDestructured(c, name, nil)
 						}
 					}
 				}
@@ -422,7 +456,7 @@ var PropTypesRule = rule.Rule{
 				}
 			case ast.KindGetAccessor:
 				ga := n.AsGetAccessorDeclaration()
-				if keyName(ga.Name()) == "propTypes" {
+				if ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) && keyName(ga.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
 						if m, ok := declared(getterReturn(ga.Body)); ok {
 							c.declared = m
@@ -432,12 +466,17 @@ var PropTypesRule = rule.Rule{
 				}
 			case ast.KindVariableDeclaration:
 				vd := n.AsVariableDeclaration()
-				if vd.Name() != nil && vd.Name().Kind == ast.KindObjectBindingPattern {
+				if vd.Name() != nil {
 					if root, names, ok := memberNames(vd.Initializer); ok && root != nil {
-						if c := componentFor(n, comps); c != nil && rootMatches(root, c) &&
-							((root.Kind == ast.KindThisKeyword && len(names) == 1 && names[0] == "props") ||
-								(root.Kind == ast.KindIdentifier && len(names) == 0 && root.AsIdentifier().Text == c.props)) {
-							addDestructured(c, vd.Name())
+						if c := componentFor(n, comps); c != nil {
+							if path, ok := propsPath(root, names, c); ok {
+								switch vd.Name().Kind {
+								case ast.KindObjectBindingPattern:
+									addDestructured(c, vd.Name(), path)
+								case ast.KindIdentifier:
+									c.destructured[vd.Name().AsIdentifier().Text] = path
+								}
+							}
 						}
 					}
 				}
@@ -470,13 +509,8 @@ var PropTypesRule = rule.Rule{
 					break
 				}
 				if rootMatches(root, c) {
-					if root.Kind == ast.KindThisKeyword && len(names) > 0 && names[0] == "props" {
-						appendUse(c, n, names[1:])
-					} else if root.Kind == ast.KindIdentifier {
-						if key, ok := c.destructured[root.AsIdentifier().Text]; ok {
-							names = append([]string{key}, names...)
-						}
-						appendUse(c, n, names)
+					if path, ok := propsPath(root, names, c); ok {
+						appendUse(c, n, path)
 					}
 				}
 			case ast.KindIdentifier:
@@ -485,8 +519,8 @@ var PropTypesRule = rule.Rule{
 					break
 				}
 				memberBase := n.Parent != nil && (n.Parent.Kind == ast.KindPropertyAccessExpression && n.Parent.AsPropertyAccessExpression().Expression == n || n.Parent.Kind == ast.KindElementAccessExpression && n.Parent.AsElementAccessExpression().Expression == n)
-				if k, ok := c.destructured[n.AsIdentifier().Text]; ok && n != c.node && !ast.IsPartOfParameterDeclaration(n) && !memberBase {
-					appendUse(c, n, []string{k})
+				if path, ok := c.destructured[n.AsIdentifier().Text]; ok && n != c.node && !ast.IsPartOfParameterDeclaration(n) && !memberBase {
+					appendUse(c, n, path)
 				}
 			}
 			n.ForEachChild(walk)
