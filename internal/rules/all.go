@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/block_scoped_var"
 	"github.com/web-infra-dev/rslint/internal/rules/capitalized_comments"
+	"github.com/web-infra-dev/rslint/internal/rules/class_methods_use_this"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_return"
 	"github.com/web-infra-dev/rslint/internal/rules/consistent_this"
@@ -32,9 +33,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/func_name_matching"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
+	"github.com/web-infra-dev/rslint/internal/rules/grouped_accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/id_denylist"
 	"github.com/web-infra-dev/rslint/internal/rules/id_length"
+	"github.com/web-infra-dev/rslint/internal/rules/id_match"
 	"github.com/web-infra-dev/rslint/internal/rules/init_declarations"
+	"github.com/web-infra-dev/rslint/internal/rules/logical_assignment_operators"
 	"github.com/web-infra-dev/rslint/internal/rules/max_classes_per_file"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
@@ -91,6 +96,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_inline_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
+	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_this"
 	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
 	"github.com/web-infra-dev/rslint/internal/rules/no_iterator"
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
@@ -202,6 +208,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 	"github.com/web-infra-dev/rslint/internal/rules/vars_on_top"
+	"github.com/web-infra-dev/rslint/internal/rules/yoda"
 )
 
 var allRuleCatalog = sync.OnceValue(func() *rule.Catalog {
@@ -236,6 +243,7 @@ func coreRules() []rule.Rule {
 		arrow_body_style.ArrowBodyStyleRule,
 		block_scoped_var.BlockScopedVarRule,
 		capitalized_comments.CapitalizedCommentsRule,
+		class_methods_use_this.ClassMethodsUseThisRule,
 		complexity.ComplexityRule,
 		consistent_return.ConsistentReturnRule,
 		consistent_this.ConsistentThisRule,
@@ -249,9 +257,13 @@ func coreRules() []rule.Rule {
 		func_name_matching.FuncNameMatchingRule,
 		func_names.FuncNamesRule,
 		getter_return.GetterReturnRule,
+		grouped_accessor_pairs.GroupedAccessorPairsRule,
 		guard_for_in.GuardForInRule,
+		id_denylist.IdDenylistRule,
 		id_length.IdLengthRule,
+		id_match.IdMatchRule,
 		init_declarations.InitDeclarationsRule,
+		logical_assignment_operators.LogicalAssignmentOperatorsRule,
 		max_classes_per_file.MaxClassesPerFileRule,
 		max_depth.MaxDepthRule,
 		max_lines.MaxLinesRule,
@@ -376,6 +388,7 @@ func coreRules() []rule.Rule {
 		prefer_spread.PreferSpreadRule,
 		no_empty_character_class.NoEmptyCharacterClassRule,
 		no_invalid_regexp.NoInvalidRegexpRule,
+		no_invalid_this.NoInvalidThisRule,
 		no_iterator.NoIteratorRule,
 		no_setter_return.NoSetterReturnRule,
 		no_unsafe_negation.NoUnsafeNegationRule,
@@ -420,5 +433,6 @@ func coreRules() []rule.Rule {
 		sort_imports.SortImportsRule,
 		sort_keys.SortKeysRule,
 		sort_vars.SortVarsRule,
+		yoda.YodaRule,
 	}
 }

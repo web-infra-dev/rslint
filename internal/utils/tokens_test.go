@@ -51,3 +51,39 @@ func TestTokenBeforePositionDoesNotTreatDivisionAsRegularExpression(t *testing.T
 		t.Fatalf("TokenBeforePosition() = %#v, want the identifier after division", token)
 	}
 }
+
+func TestTokenBeforePositionAfterInterpolatedTemplate(t *testing.T) {
+	code := "`${seed}`; function *f(){yield(1)<a}"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, code, core.ScriptKindTS)
+
+	token, ok := TokenBeforePosition(sourceFile, strings.Index(code, "(1)"))
+	if !ok || token.Kind != ast.KindYieldKeyword || token.Text != "yield" {
+		t.Fatalf("TokenBeforePosition() = %#v, %v, want the yield keyword", token, ok)
+	}
+}
+
+func TestCanTokenTextsBeAdjacentFixBoundaries(t *testing.T) {
+	for _, tt := range []struct {
+		left, right string
+		want        bool
+	}{
+		{left: "return", right: "/a/", want: false},
+		{left: "/a/", right: "instanceof", want: false},
+		{left: "return", right: "/a/ > value", want: false},
+		{left: "value > /a/", right: "instanceof", want: false},
+		{left: "/", right: "0b111", want: true},
+		{left: "foo/", right: "bar", want: true},
+		{left: "foo", right: "/bar", want: true},
+		{left: "1.", right: "satisfies", want: false},
+		{left: "return", right: `"a"`, want: true},
+		{left: `"a"`, right: "instanceof", want: true},
+		{left: "return", right: "`a`", want: true},
+	} {
+		if got := CanTokenTextsBeAdjacent(tt.left, tt.right); got != tt.want {
+			t.Errorf("CanTokenTextsBeAdjacent(%q, %q) = %v, want %v", tt.left, tt.right, got, tt.want)
+		}
+	}
+}

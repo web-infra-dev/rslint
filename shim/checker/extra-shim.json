@@ -28,6 +28,7 @@
       "isTypeAssignableTo",
       "isTypeStrictSubtypeOf",
       "getIndexInfosOfType",
+      "getIterationTypeOfIterable",
       "getTypeParameterFromMappedType",
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",

@@ -11,7 +11,7 @@
  * transport boundary.
  */
 
-export const CONFIG_DISCOVERY_PROTOCOL_VERSION = 2 as const;
+export const CONFIG_DISCOVERY_PROTOCOL_VERSION = 3 as const;
 
 export type ConfigModuleLoadMode = 'cached' | 'fresh';
 
@@ -20,7 +20,7 @@ export interface ConfigModuleCandidate {
   id: string;
   /** Absolute path to the JS/TS config module Node must execute. */
   configPath: string;
-  /** Go-authoritative directory used for config matching and plugin routing. */
+  /** Go-authoritative config-owner and routing identity. */
   configDirectory: string;
 }
 

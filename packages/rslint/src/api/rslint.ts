@@ -45,18 +45,24 @@ import type {
 
 export interface RslintOptions {
   /**
-   * Working directory for targets and discovery; also the base of inline
-   * `overrideConfig` paths.
+   * Working directory for targets and discovery. It is also the authored path
+   * base for relative fields in inline `overrideConfig` entries that omit
+   * `basePath`.
    */
   cwd?: string;
   /**
-   * Extra config appended after the resolved/discovered config. Relative
-   * `files`, `ignores`, and `parserOptions.project` paths resolve from `cwd`.
+   * Extra config appended to the selected config array. An authored `basePath`
+   * inherits that array's base (the discovered module directory in automatic
+   * mode, or `cwd` for an explicit/override-only array), matching ESLint.
+   * Relative fields in entries without `basePath` retain Rslint's existing
+   * `cwd`-relative behavior.
    */
   overrideConfig?: RslintConfigEntry | RslintConfig | null;
   /**
-   * `string` — use this JS/TS config module (no discovery); its relative
-   *            config paths resolve from the module's directory.
+   * `string` — use this JS/TS config module (no discovery); an authored
+   *            `basePath` resolves from `cwd`, matching ESLint's explicit
+   *            config behavior. Entries without `basePath` retain rslint's
+   *            existing module-directory-relative behavior.
    * `true`   — use only `overrideConfig` (no file, no discovery).
    * `null`/absent — auto-discover the nearest config (ESLint v10 semantics; no `false`).
    */
@@ -68,14 +74,15 @@ export interface RslintOptions {
    * put the `tsconfig.json` that `parserOptions.project` names plus any
    * dependency files here, then lint a buffer with `lintText`. Keys resolve
    * against `cwd` like a linted path (relative or absolute both work); a
-   * same-path `lintText` code entry wins. Inside the tsconfig (`files`) and
-   * `parserOptions.project`, use relative paths — the TS compiler resolves
-   * those, and a bare POSIX-absolute path there has no drive letter on Windows,
-   * so it won't match the overlay. The overlay permits filesystem fallback and
-   * is not a sandbox. rslint-only — ESLint has no in-memory file map.
+   * same-path `lintText` code entry wins. `parserOptions.project` resolves from
+   * the config entry's effective base, while paths inside the tsconfig resolve
+   * from that tsconfig's directory. Prefer relative paths for portability: a
+   * bare POSIX-absolute path has no drive letter on Windows. The overlay permits
+   * filesystem fallback and is not a sandbox. rslint-only — ESLint has no
+   * in-memory file map.
    *
    * Give the tsconfig explicit `files`, not a broad `include` glob: a glob is
-   * expanded against the real filesystem and would scan `cwd` on disk.
+   * expanded against the real filesystem from the tsconfig's directory.
    */
   virtualFiles?: Record<string, string>;
 }
@@ -724,7 +731,7 @@ export class Rslint {
         contents[abs] = stripBOM(await readFile(abs, 'utf8'));
         contentPaths.add(key);
       } catch {
-        // Unreadable (e.g. virtual/deleted) — mergeFixes degrades to first edit.
+        // Unreadable (e.g. deleted) — mergeFixes omits the atomic multi-edit.
       }
     }
     return contents;
@@ -828,17 +835,19 @@ function toLintMessage(d: Diagnostic, sourceText?: string): LintMessage {
   const fix = mergeFixes(d.fixes, sourceText);
   if (fix) message.fix = fix;
   if (d.suggestions && d.suggestions.length > 0) {
-    message.suggestions = d.suggestions.map((s) => {
+    const suggestions: LintSuggestion[] = [];
+    for (const s of d.suggestions) {
       const sFix = mergeFixes(s.fixes, sourceText);
-      return {
-        messageId: s.messageId,
-        ...(s.data ? { data: s.data } : {}),
+      if (!sFix) continue;
+      const suggestion: LintSuggestion = {
         desc: s.message,
-        // A suggestion always carries a fix; fall back to an empty edit if a
-        // rule somehow emitted none (keeps the ESLint shape non-optional).
-        fix: sFix ?? { range: [0, 0], text: '' },
+        fix: sFix,
       };
-    });
+      if (s.messageId) suggestion.messageId = s.messageId;
+      if (s.data) suggestion.data = s.data;
+      suggestions.push(suggestion);
+    }
+    if (suggestions.length > 0) message.suggestions = suggestions;
   }
   return message;
 }
@@ -847,8 +856,9 @@ function toLintMessage(d: Diagnostic, sourceText?: string): LintMessage {
  * Collapse rslint's per-diagnostic fix edits (possibly several) into ESLint's
  * single `{ range, text }`. A lone edit maps directly; multiple edits merge
  * into one span, filling gaps from sourceText (ESLint's mergeFixes). Without
- * sourceText (e.g. a diagnosed file whose source could not be read), a
- * multi-edit fix degrades to its first edit rather than guessing across a gap.
+ * sourceText (e.g. a diagnosed file whose source could not be read), omit the
+ * whole atomic multi-edit rather than exposing a partial edit the rule never
+ * returned.
  *
  * Offsets are flat UTF-16, in the same byte-order-mark-free space as Go's fix
  * ranges (matching ESLint v10, whose `fix.range` is relative to BOM-stripped
@@ -870,10 +880,7 @@ function mergeFixes(
   const start = sorted[0].startPos;
   const end = sorted[sorted.length - 1].endPos;
   if (sourceText === undefined) {
-    return {
-      range: [sorted[0].startPos, sorted[0].endPos],
-      text: sorted[0].text,
-    };
+    return undefined;
   }
   let text = '';
   let lastPos = start;

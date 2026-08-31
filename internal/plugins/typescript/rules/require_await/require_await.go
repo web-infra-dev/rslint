@@ -5,8 +5,10 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func buildMissingAwaitMessage(node *ast.Node) rule.RuleMessage {
@@ -195,12 +197,188 @@ func functionOuterName(node *ast.Node) string {
 	return ""
 }
 
-//nolint:unused
 func buildRemoveAsyncMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "removeAsync",
 		Description: "Remove 'async'.",
 	}
+}
+
+type asyncKeywordInfo struct {
+	tokenRange        core.TextRange
+	removeRange       core.TextRange
+	hasAuthoredPrefix bool
+}
+
+func findAsyncKeyword(sourceFile *ast.SourceFile, node *ast.Node) (asyncKeywordInfo, bool) {
+	modifiers := node.Modifiers()
+	if modifiers == nil {
+		return asyncKeywordInfo{}, false
+	}
+	hasAuthoredPrefix := false
+	for _, modifier := range modifiers.Nodes {
+		if modifier == nil {
+			continue
+		}
+		if modifier.Kind != ast.KindAsyncKeyword {
+			if !utils.IsJSDocSyntaxNode(modifier) {
+				hasAuthoredPrefix = true
+			}
+			continue
+		}
+		tokenRange := utils.TrimNodeTextRange(sourceFile, modifier)
+		removeEnd := ecmascript.SkipLeadingWhitespace(sourceFile.Text(), tokenRange.End(), len(sourceFile.Text()))
+		return asyncKeywordInfo{
+			tokenRange:        tokenRange,
+			removeRange:       core.NewTextRange(tokenRange.Pos(), removeEnd),
+			hasAuthoredPrefix: hasAuthoredPrefix,
+		}, true
+	}
+	return asyncKeywordInfo{}, false
+}
+
+func needsLeadingSemicolon(sourceFile *ast.SourceFile, node *ast.Node, asyncInfo asyncKeywordInfo, nextToken utils.SourceToken) bool {
+	if node.Kind == ast.KindMethodDeclaration {
+		// Removing async cannot expose nextToken as the member's first token
+		// when a decorator or another modifier precedes it.
+		if asyncInfo.hasAuthoredPrefix {
+			return false
+		}
+		return utils.NeedsClassMemberLeadingSemicolon(
+			sourceFile,
+			ast.GetContainingClass(node),
+			node,
+			nextToken,
+			utils.ClassMemberLeadingSemicolonOptions{
+				IncludePropertiesWithoutInitializers: true,
+				IncludePostfixInitializers:           true,
+			},
+		)
+	}
+	return (nextToken.Kind == ast.KindOpenBracketToken || nextToken.Kind == ast.KindOpenParenToken) &&
+		utils.IsStartOfExpressionStatement(sourceFile, node) &&
+		utils.NeedsPrecedingSemicolon(sourceFile, node)
+}
+
+func mayContainJSDocComment(text string, start int, end int) bool {
+	return start >= 0 && start < end && end <= len(text) && strings.Contains(text[start:end], "/**")
+}
+
+func hasJSDocCommentBetween(sourceFile *ast.SourceFile, text string, start int, end int) bool {
+	if start < 0 || start >= end || end > len(text) {
+		return false
+	}
+
+	for comment := range utils.GetCommentsInRange(sourceFile, core.NewTextRange(start, end)) {
+		if comment.Kind == ast.KindMultiLineCommentTrivia &&
+			comment.Pos() >= start &&
+			comment.End() <= end &&
+			comment.Pos()+3 < comment.End() &&
+			text[comment.Pos():comment.Pos()+3] == "/**" &&
+			text[comment.Pos()+3] != '/' {
+			return true
+		}
+	}
+	return false
+}
+
+func appendReturnTypeSuggestionFixes(sourceFile *ast.SourceFile, node *ast.Node, isGenerator bool, fixes []rule.RuleFix) []rule.RuleFix {
+	returnType := node.Type()
+	if returnType == nil {
+		return fixes
+	}
+	returnType = ast.SkipTypeParentheses(returnType)
+	if returnType.Kind != ast.KindTypeReference {
+		return fixes
+	}
+
+	typeReference := returnType.AsTypeReferenceNode()
+	typeName := typeReference.TypeName
+	if typeName == nil || typeName.Kind != ast.KindIdentifier {
+		return fixes
+	}
+
+	typeNameText := typeName.AsIdentifier().Text
+	if isGenerator {
+		if typeNameText == "AsyncGenerator" {
+			fixes = append(fixes, rule.RuleFixReplace(sourceFile, typeName, "Generator"))
+		}
+		return fixes
+	}
+	if typeNameText != "Promise" || typeReference.TypeArguments == nil {
+		return fixes
+	}
+
+	typeNameRange := utils.TrimNodeTextRange(sourceFile, typeName)
+	returnTypeRange := utils.TrimNodeTextRange(sourceFile, returnType)
+	openAngleEnd := typeReference.TypeArguments.Pos()
+	closeAngleStart := returnTypeRange.End() - 1
+	text := sourceFile.Text()
+	if openAngleEnd <= typeNameRange.End() ||
+		openAngleEnd > len(text) ||
+		text[openAngleEnd-1] != '<' ||
+		closeAngleStart < openAngleEnd ||
+		closeAngleStart >= len(text) ||
+		text[closeAngleStart] != '>' {
+		return fixes
+	}
+
+	return append(
+		fixes,
+		rule.RuleFixRemoveRange(core.NewTextRange(closeAngleStart, closeAngleStart+1)),
+		rule.RuleFixRemoveRange(core.NewTextRange(typeNameRange.Pos(), openAngleEnd)),
+	)
+}
+
+func buildRemoveAsyncSuggestion(sourceFile *ast.SourceFile, node *ast.Node, isGenerator bool) []rule.RuleSuggestion {
+	asyncInfo, ok := findAsyncKeyword(sourceFile, node)
+	if !ok {
+		return nil
+	}
+
+	nextToken, hasNextToken := utils.TokenAtOrAfter(sourceFile, asyncInfo.tokenRange.End())
+	text := sourceFile.Text()
+	if hasNextToken &&
+		mayContainJSDocComment(text, asyncInfo.tokenRange.End(), nextToken.Start) &&
+		hasJSDocCommentBetween(sourceFile, text, asyncInfo.tokenRange.End(), nextToken.Start) {
+		// Removing async can turn a JSDoc-style comment inside the function
+		// header into leading JSDoc and silently add declaration metadata. There
+		// is no syntax-preserving separator that works in every function context,
+		// so omit the suggestion instead of changing program semantics.
+		return nil
+	}
+
+	needsSemicolon := hasNextToken && needsLeadingSemicolon(sourceFile, node, asyncInfo, nextToken)
+	fixes := make([]rule.RuleFix, 0, 1)
+	if node.Kind == ast.KindMethodDeclaration && needsSemicolon {
+		memberStart := node.Pos()
+		asyncStart := asyncInfo.removeRange.Pos()
+		if memberStart >= 0 && memberStart < asyncStart &&
+			ecmascript.SkipLeadingWhitespace(text, memberStart, asyncStart) != asyncStart {
+			// Put the separator before leading comments so JSDoc stays attached
+			// to the method. Keep the insertion before the removal so the raw
+			// fixes also form legal LSP edits.
+			fixes = append(fixes,
+				rule.RuleFixReplaceRange(core.NewTextRange(memberStart, memberStart), ";"),
+				rule.RuleFixRemoveRange(asyncInfo.removeRange),
+			)
+		} else {
+			// This single edit preserves the established `;member` output and
+			// cannot conflict with the async removal at the same position.
+			fixes = append(fixes, rule.RuleFixReplaceRange(asyncInfo.removeRange, ";"))
+		}
+	} else {
+		replacement := ""
+		if needsSemicolon {
+			replacement = ";"
+		}
+		fixes = append(fixes, rule.RuleFixReplaceRange(asyncInfo.removeRange, replacement))
+	}
+	fixes = appendReturnTypeSuggestionFixes(sourceFile, node, isGenerator, fixes)
+	return []rule.RuleSuggestion{{
+		Message:  buildRemoveAsyncMessage(),
+		FixesArr: fixes,
+	}}
 }
 
 type scopeInfo struct {
@@ -312,131 +490,14 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 		exitFunction := func(node *ast.Node) {
 			scope := &scopes[len(scopes)-1]
 			if scope.functionFlags&ast.FunctionFlagsAsync != 0 && !scope.hasAwait && (scope.functionFlags&ast.FunctionFlagsGenerator == 0 || !scope.isAsyncYield) {
-				// TODO(port): implement suggestions
-				// // If the function belongs to a method definition or
-				// // property, then the function's range may not include the
-				// // `async` keyword and we should look at the parent instead.
-				// const nodeWithAsyncKeyword =
-				//   (node.parent.type === AST_NODE_TYPES.MethodDefinition &&
-				//     node.parent.value === node) ||
-				//   (node.parent.type === AST_NODE_TYPES.Property &&
-				//     node.parent.method &&
-				//     node.parent.value === node)
-				//     ? node.parent
-				//     : node;
-				//
-				// const asyncToken = nullThrows(
-				//   context.sourceCode.getFirstToken(
-				//     nodeWithAsyncKeyword,
-				//     token => token.value === 'async',
-				//   ),
-				//   'The node is an async function, so it must have an "async" token.',
-				// );
-				//
-				// const asyncRange: Readonly<AST.Range> = [
-				//   asyncToken.range[0],
-				//   nullThrows(
-				//     context.sourceCode.getTokenAfter(asyncToken, {
-				//       includeComments: true,
-				//     }),
-				//     'There will always be a token after the "async" keyword.',
-				//   ).range[0],
-				// ] as const;
-				//
-				// // Removing the `async` keyword can cause parsing errors if the
-				// // current statement is relying on automatic semicolon insertion.
-				// // If ASI is currently being used, then we should replace the
-				// // `async` keyword with a semicolon.
-				// const nextToken = nullThrows(
-				//   context.sourceCode.getTokenAfter(asyncToken),
-				//   'There will always be a token after the "async" keyword.',
-				// );
-				// const addSemiColon =
-				//   nextToken.type === AST_TOKEN_TYPES.Punctuator &&
-				//   (nextToken.value === '[' || nextToken.value === '(') &&
-				//   (nodeWithAsyncKeyword.type === AST_NODE_TYPES.MethodDefinition ||
-				//     isStartOfExpressionStatement(nodeWithAsyncKeyword)) &&
-				//   needsPrecedingSemicolon(context.sourceCode, nodeWithAsyncKeyword);
-				//
-				// const changes = [
-				//   { range: asyncRange, replacement: addSemiColon ? ';' : undefined },
-				// ];
-				//
-				// // If there's a return type annotation and it's a
-				// // `Promise<T>`, we can also change the return type
-				// // annotation to just `T` as part of the suggestion.
-				// // Alternatively, if the function is a generator and
-				// // the return type annotation is `AsyncGenerator<T>`,
-				// // then we can change it to `Generator<T>`.
-				// if (
-				//   node.returnType?.typeAnnotation.type ===
-				//   AST_NODE_TYPES.TSTypeReference
-				// ) {
-				//   if (scopeInfo.isGen) {
-				//     if (hasTypeName(node.returnType.typeAnnotation, 'AsyncGenerator')) {
-				//       changes.push({
-				//         range: node.returnType.typeAnnotation.typeName.range,
-				//         replacement: 'Generator',
-				//       });
-				//     }
-				//   } else if (
-				//     hasTypeName(node.returnType.typeAnnotation, 'Promise') &&
-				//     node.returnType.typeAnnotation.typeArguments != null
-				//   ) {
-				//     const openAngle = nullThrows(
-				//       context.sourceCode.getFirstToken(
-				//         node.returnType.typeAnnotation,
-				//         token =>
-				//           token.type === AST_TOKEN_TYPES.Punctuator &&
-				//           token.value === '<',
-				//       ),
-				//       'There are type arguments, so the angle bracket will exist.',
-				//     );
-				//     const closeAngle = nullThrows(
-				//       context.sourceCode.getLastToken(
-				//         node.returnType.typeAnnotation,
-				//         token =>
-				//           token.type === AST_TOKEN_TYPES.Punctuator &&
-				//           token.value === '>',
-				//       ),
-				//       'There are type arguments, so the angle bracket will exist.',
-				//     );
-				//     changes.push(
-				//       // Remove the closing angled bracket.
-				//       { range: closeAngle.range, replacement: undefined },
-				//       // Remove the "Promise" identifier
-				//       // and the opening angled bracket.
-				//       {
-				//         range: [
-				//           node.returnType.typeAnnotation.typeName.range[0],
-				//           openAngle.range[1],
-				//         ],
-				//         replacement: undefined,
-				//       },
-				//     );
-				//   }
-				// }
-				//
-				// context.report({
-				//   loc: getFunctionHeadLoc(node, context.sourceCode),
-				//   node,
-				//   messageId: 'missingAwait',
-				//   data: {
-				//     name: upperCaseFirst(getFunctionNameWithKind(node)),
-				//   },
-				//   suggest: [
-				//     {
-				//       messageId: 'removeAsync',
-				//       fix: (fixer): RuleFix[] =>
-				//         changes.map(change =>
-				//           change.replacement != null
-				//             ? fixer.replaceTextRange(change.range, change.replacement)
-				//             : fixer.removeRange(change.range),
-				//         ),
-				//     },
-				//   ],
-				// });
-				ctx.ReportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, node), buildMissingAwaitMessage(node))
+				isGenerator := scope.functionFlags&ast.FunctionFlagsGenerator != 0
+				ctx.ReportRangeWithDeferredSuggestions(
+					utils.GetFunctionHeadLoc(ctx.SourceFile, node),
+					buildMissingAwaitMessage(node),
+					func() []rule.RuleSuggestion {
+						return buildRemoveAsyncSuggestion(ctx.SourceFile, node, isGenerator)
+					},
+				)
 			}
 
 			scopes = scopes[:len(scopes)-1]

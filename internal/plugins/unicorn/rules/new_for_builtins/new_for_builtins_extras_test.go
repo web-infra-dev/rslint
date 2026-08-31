@@ -21,6 +21,8 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// ---- Dimension 4: optional calls that would require optional `new` are ignored ----
 			jsValid("const value = (globalThis?.Array)();"),
+			// ---- Dimension 4: optional chains remain visible through TS assertions ----
+			tsValid("const value = (globalThis?.Array as any)();"),
 			// ---- Dimension 4: dynamic element access is not a static builtin reference ----
 			jsValid("const key = 'Array'; globalThis[key]();"),
 			// ---- Dimension 4: numeric element keys do not match builtin names ----
@@ -158,6 +160,8 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 			enforceInvalid("const value = ((globalThis)).Array();", "((globalThis)).Array()", "Array"),
 			// ---- Dimension 4: TS type-expression wrappers on receivers are transparent ----
 			tsEnforceInvalid("const value = (globalThis as any).Array();", "(globalThis as any).Array()", "Array"),
+			// ---- Dimension 4: TS-wrapped non-optional builtin callees still report ----
+			tsEnforceInvalid("const value = (globalThis.Array as any)();", "(globalThis.Array as any)()", "Array"),
 			// ---- Dimension 4: TS non-null wrappers on receivers are transparent ----
 			tsEnforceInvalid("const value = (globalThis!).Array();", "(globalThis!).Array()", "Array"),
 			// ---- Dimension 4: TS satisfies wrappers on receivers are transparent ----

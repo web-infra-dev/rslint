@@ -1,0 +1,1441 @@
+// Rstest Snapshot v1
+
+exports[`id-match > invalid 1`] = `
+{
+  "code": "var __foo = "Matthieu"",
+  "diagnostics": [
+    {
+      "message": "Identifier '__foo' does not match the pattern '^[a-z]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 2`] = `
+{
+  "code": "first_name = "Matthieu"",
+  "diagnostics": [
+    {
+      "message": "Identifier 'first_name' does not match the pattern '^[a-z]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 3`] = `
+{
+  "code": "first_name = "Matthieu"",
+  "diagnostics": [
+    {
+      "message": "Identifier 'first_name' does not match the pattern '^z'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 4`] = `
+{
+  "code": "Last_Name = "Larcher"",
+  "diagnostics": [
+    {
+      "message": "Identifier 'Last_Name' does not match the pattern '^[a-z]+(_[A-Z][a-z])*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 5`] = `
+{
+  "code": "var obj = {key: no_under}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 6`] = `
+{
+  "code": "function no_under21(){}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under21' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 7`] = `
+{
+  "code": "obj.no_under22 = function(){};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under22' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 8`] = `
+{
+  "code": "no_under23.foo = function(){};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under23' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 9`] = `
+{
+  "code": "[no_under24.baz]",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under24' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 10`] = `
+{
+  "code": "if (foo.bar_baz === boom.bam_pow) { [no_under25.baz] }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under25' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 11`] = `
+{
+  "code": "foo.no_under26 = boom.bam_pow",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under26' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 12`] = `
+{
+  "code": "var foo = { no_under27: boom.bam_pow }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under27' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 13`] = `
+{
+  "code": "foo.qux.no_under28 = { bar: boom.bam_pow }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under28' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 14`] = `
+{
+  "code": "var o = {no_under29: 1}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under29' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 15`] = `
+{
+  "code": "obj.no_under30 = 2;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_under30' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 16`] = `
+{
+  "code": "var { category_id: category_alias } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_alias' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 17`] = `
+{
+  "code": "var { category_id: category_alias } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_alias' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 18`] = `
+{
+  "code": "var { category_id: categoryId, ...other_props } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'other_props' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 19`] = `
+{
+  "code": "var { category_id } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_id' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 20`] = `
+{
+  "code": "var { category_id = 1 } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_id' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 21`] = `
+{
+  "code": "import no_camelcased from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 22`] = `
+{
+  "code": "import * as no_camelcased from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 23`] = `
+{
+  "code": "export * as no_camelcased from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 24`] = `
+{
+  "code": "import { no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 25`] = `
+{
+  "code": "import { no_camelcased as no_camel_cased } from "external module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camel_cased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 26`] = `
+{
+  "code": "import { camelCased as no_camel_cased } from "external module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camel_cased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 27`] = `
+{
+  "code": "import { camelCased, no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 28`] = `
+{
+  "code": "import { no_camelcased as camelCased, another_no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'another_no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 29`] = `
+{
+  "code": "import camelCased, { no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 30`] = `
+{
+  "code": "import no_camelcased, { another_no_camelcased as camelCased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 31`] = `
+{
+  "code": "function foo({ no_camelcased }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 32`] = `
+{
+  "code": "function foo({ no_camelcased = 'default value' }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 33`] = `
+{
+  "code": "const no_camelcased = 0; function foo({ camelcased_value = no_camelcased }) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'camelcased_value' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 34`] = `
+{
+  "code": "const { bar: no_camelcased } = foo;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 35`] = `
+{
+  "code": "function foo({ value_1: my_default }) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'my_default' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 36`] = `
+{
+  "code": "function foo({ isCamelcased: no_camelcased }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 37`] = `
+{
+  "code": "var { foo: bar_baz = 1 } = quz;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar_baz' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 38`] = `
+{
+  "code": "const { no_camelcased = false } = bar;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 39`] = `
+{
+  "code": "
+            const foo_variable = 1;
+            class MyClass {
+            }
+            let a = new MyClass();
+            let b = {id: 1};
+            let c = Object.keys(b);
+            let d = Array.from(b);
+            let e = (Object) => Object.keys(obj, prop); // not global Object
+            let f = (Array) => Array.from(obj, prop); // not global Array
+            foo.Array = 5; // not global Array
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo_variable' does not match the pattern '^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'MyClass' does not match the pattern '^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'Object' does not match the pattern '^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 9,
+        },
+        "start": {
+          "column": 22,
+          "line": 9,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'Object' does not match the pattern '^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 9,
+        },
+        "start": {
+          "column": 33,
+          "line": 9,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'Array' does not match the pattern '^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 10,
+        },
+        "start": {
+          "column": 22,
+          "line": 10,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'Array' does not match the pattern '^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 10,
+        },
+        "start": {
+          "column": 32,
+          "line": 10,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'Array' does not match the pattern '^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 11,
+        },
+        "start": {
+          "column": 17,
+          "line": 11,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 40`] = `
+{
+  "code": "class x { _foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier '_foo' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 41`] = `
+{
+  "code": "class x { #_foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier '#_foo' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatchPrivate",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 42`] = `
+{
+  "code": "class x { _foo = 1; }",
+  "diagnostics": [
+    {
+      "message": "Identifier '_foo' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 43`] = `
+{
+  "code": "class x { #_foo = 1; }",
+  "diagnostics": [
+    {
+      "message": "Identifier '#_foo' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatchPrivate",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 44`] = `
+{
+  "code": "
+            const foo = {
+                foo_one: 1,
+                bar_one: 2,
+                fooBar: 3
+            };
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo_one' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'bar_one' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 45`] = `
+{
+  "code": "
+            const foo = {
+                foo_one: 1,
+                bar_one: 2,
+                fooBar: 3
+            };
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo_one' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "id-match",
+    },
+    {
+      "message": "Identifier 'bar_one' does not match the pattern '^[^_]+$'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 46`] = `
+{
+  "code": "
+            const foo = {
+                [a]: 1,
+            };
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a' does not match the pattern '^[^a]'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 47`] = `
+{
+  "code": "
+            const foo = {
+                [a]: 1,
+            };
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a' does not match the pattern '^[^a]'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 48`] = `
+{
+  "code": "import('foo.json', { with: { [type]: 'json' } })",
+  "diagnostics": [
+    {
+      "message": "Identifier 'type' does not match the pattern '^foo'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`id-match > invalid 49`] = `
+{
+  "code": "import('foo.json', { with: { type: json } })",
+  "diagnostics": [
+    {
+      "message": "Identifier 'json' does not match the pattern '^foo'.",
+      "messageId": "notMatch",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "id-match",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

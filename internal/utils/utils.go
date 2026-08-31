@@ -456,6 +456,16 @@ func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
 	return text[1 : lastSlash+1], text[lastSlash+2:]
 }
 
+// RegExpLiteralStringValue returns the value produced by
+// RegExp.prototype.toString for a regular-expression literal. JavaScript emits
+// flags in canonical order even when the source authored them differently.
+func RegExpLiteralStringValue(text string) string {
+	pattern, flags := ExtractRegexPatternAndFlags(text)
+	canonicalFlags := []byte(flags)
+	slices.Sort(canonicalFlags)
+	return "/" + pattern + "/" + string(canonicalFlags)
+}
+
 // ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape:
 // the single option element is either a bare number (`3`) or an object
 // (`{max: 3}` / `{maximum: 3}`). `maximum` wins only when it coerces to a
@@ -530,7 +540,7 @@ func CoerceIntegral(v any) (int, bool) {
 
 // ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,
 // extracting only the string elements. Returns nil if the input is nil, not an array,
-// or contains no strings. Useful for parsing rule options from JSON config.
+// or contains no strings. Useful for parsing serialized rule options.
 func ToStringSlice(val interface{}) []string {
 	if val == nil {
 		return nil

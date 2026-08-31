@@ -693,7 +693,6 @@ func newLintConfigResolver(opts lintConfigResolverOptions) *testLintConfigResolv
 			opts.CurrentDirectory,
 			opts.FS,
 			rules.All(),
-			false,
 		),
 		lintTargetBySource: opts.LintTargetBySourcePath,
 	}

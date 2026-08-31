@@ -111,7 +111,40 @@ foo` + "`" + `` + "`" + `;
 function foo(templates: TemplateStringsArray, arg: any) {}
 foo` + "`" + `${1 as any}` + "`" + `;
     `},
+		{Code: `
+declare function foo(...args: any): void;
+foo(1 as any);
+    `},
 	}, []rule_tester.InvalidTestCase{
+		{
+			Code: `
+declare function foo(...args: [string, string]): void;
+
+declare const spread: [string, ...string[]];
+foo(...spread, 1 as any);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unsafeArgument",
+				Line:      5,
+				Column:    16,
+				EndLine:   5,
+				EndColumn: 24,
+			}},
+		},
+		{
+			Code: `
+declare function foo(...args: [string, ...string[]]): void;
+
+foo('a', 'b', 1 as any);
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unsafeArgument",
+				Line:      4,
+				Column:    15,
+				EndLine:   4,
+				EndColumn: 23,
+			}},
+		},
 		{
 			Code: `
 declare function foo(arg: number): void;

@@ -66,12 +66,78 @@ function outer() {
 	assertDeclares(t, m.Scopes[0], "outer", DefFunctionName)
 	// `var` lands in the function scope even though it is written in a block.
 	assertDeclares(t, m.Scopes[1], "hoisted", DefVariable)
+	if got := len(m.Scopes[1].Declarations("hoisted")); got != 1 {
+		t.Fatalf("function scope has %d definitions of hoisted, want 1", got)
+	}
 	assertDeclares(t, m.Scopes[2], "blockOnly", DefVariable)
 	if len(m.Scopes[2].Declarations("hoisted")) != 0 {
 		t.Error("var declaration should not also live in the block scope")
 	}
 	if m.Scopes[2].VariableScope() != m.Scopes[1] {
 		t.Error("block scope's variable scope should be the enclosing function")
+	}
+}
+
+func TestBuildHoistsFunctionsThroughScopeLessStatements(t *testing.T) {
+	m := build(t, `
+function outer() {
+  if (condition) function fromIf() {}
+  label: function fromLabel() {}
+  while (condition) function fromWhile() {}
+  do function fromDo() {} while (condition);
+  for (; condition;) function fromFor() {}
+  for (let index = 0; condition;) function inFor() {}
+  if (condition) { function blockOnly() {} }
+}
+`)
+	outer := m.Scopes[1]
+	for _, name := range []string{"fromIf", "fromLabel", "fromWhile", "fromDo", "fromFor"} {
+		assertDeclares(t, outer, name, DefFunctionName)
+	}
+	if len(outer.Declarations("inFor")) != 0 {
+		t.Error("a let-initialized for loop should keep its function binding in the loop scope")
+	}
+	if len(outer.Declarations("blockOnly")) != 0 {
+		t.Error("a braced body should keep its function binding in the block scope")
+	}
+
+	var forScope, blockScope *Scope
+	for _, candidate := range m.Scopes {
+		if candidate.Block == nil {
+			continue
+		}
+		switch candidate.Block.Kind {
+		case ast.KindForStatement:
+			if len(candidate.Declarations("inFor")) != 0 {
+				forScope = candidate
+			}
+		case ast.KindBlock:
+			if len(candidate.Declarations("blockOnly")) != 0 {
+				blockScope = candidate
+			}
+		}
+	}
+	if forScope == nil {
+		t.Error("let-initialized loop scope does not declare inFor")
+	}
+	if blockScope == nil {
+		t.Error("braced block scope does not declare blockOnly")
+	}
+}
+
+func TestBuildDottedNamespaceSegmentsDoNotDeclareVariables(t *testing.T) {
+	m := build(t, `
+let A = [];
+namespace A.B { export const value = 1; }
+`)
+	declarations := m.Global.Declarations("A")
+	if len(declarations) != 1 || declarations[0].Kind != DefVariable {
+		t.Fatalf("global A definitions = %#v, want only the variable", declarations)
+	}
+	for _, candidate := range m.Scopes {
+		if len(candidate.Declarations("B")) != 0 {
+			t.Fatalf("scope %v unexpectedly declares dotted namespace segment B", candidate.Kind)
+		}
 	}
 }
 
@@ -386,6 +452,132 @@ func TestBuildKeepsReferenceSpacesIndependent(t *testing.T) {
 			t.Fatal("type predicate parameter should resolve to the value binding")
 		}
 	})
+}
+
+func TestClassifyReferenceSpacesKeepsESLintAndTypeScriptMeaningsIndependent(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		eslint     ReferenceSpace
+		typescript ast.SemanticMeaning
+	}{
+		{
+			name:       "direct export assignment",
+			source:     `export default Subject; interface Subject {}`,
+			eslint:     ReferenceDual,
+			typescript: ast.SemanticMeaningAll,
+		},
+		{
+			name:       "parenthesized export assignment",
+			source:     `export default ((Subject)); interface Subject {}`,
+			eslint:     ReferenceDual,
+			typescript: ast.SemanticMeaningValue,
+		},
+		{
+			name:       "direct type reference",
+			source:     `type T = Subject; interface Subject {}`,
+			eslint:     ReferenceType,
+			typescript: ast.SemanticMeaningType,
+		},
+		{
+			name:       "qualified type root",
+			source:     `type T = Subject.Member; declare namespace Subject { interface Member {} }`,
+			eslint:     ReferenceType,
+			typescript: ast.SemanticMeaningNamespace,
+		},
+		{
+			name:       "interface heritage root",
+			source:     `interface I extends Subject.Member {} declare namespace Subject { interface Member {} }`,
+			eslint:     ReferenceType,
+			typescript: ast.SemanticMeaningNamespace,
+		},
+		{
+			name:       "class implements root",
+			source:     `class C implements Subject.Member {} declare namespace Subject { interface Member {} }`,
+			eslint:     ReferenceType,
+			typescript: ast.SemanticMeaningNamespace,
+		},
+		{
+			name:       "class extends root",
+			source:     `class C extends Subject.Base {} declare namespace Subject { class Base {} }`,
+			eslint:     ReferenceValue,
+			typescript: ast.SemanticMeaningValue,
+		},
+		{
+			name:       "import equals root",
+			source:     `import Alias = Subject.Member; declare namespace Subject { interface Member {} }`,
+			eslint:     ReferenceValue,
+			typescript: ast.SemanticMeaningNamespace,
+		},
+		{
+			name:       "type query operand",
+			source:     `type T = typeof Subject; declare const Subject: unknown;`,
+			eslint:     ReferenceValue,
+			typescript: ast.SemanticMeaningValue,
+		},
+		{
+			name:       "computed type key",
+			source:     `type T = { [Subject]: unknown }; declare const Subject: unique symbol;`,
+			eslint:     ReferenceValue,
+			typescript: ast.SemanticMeaningValue,
+		},
+		{
+			name:       "type-only export specifier",
+			source:     `interface Subject {} export type { Subject };`,
+			eslint:     ReferenceType,
+			typescript: ast.SemanticMeaningType | ast.SemanticMeaningNamespace,
+		},
+		{
+			name:       "regular export specifier",
+			source:     `interface Subject {} export { Subject };`,
+			eslint:     ReferenceDual,
+			typescript: ast.SemanticMeaningAll,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			reference := findReference(t, buildWithReferences(t, test.source), "Subject")
+			spaces := ClassifyReferenceSpaces(reference.Identifier)
+			if spaces.ESLint != test.eslint {
+				t.Errorf("ESLint space = %v, want %v", spaces.ESLint, test.eslint)
+			}
+			if spaces.TypeScript != test.typescript {
+				t.Errorf("TypeScript meaning = %v, want %v", spaces.TypeScript, test.typescript)
+			}
+		})
+	}
+}
+
+func TestIsReferenceIdentifierRejectsReExportAndImportTypeNames(t *testing.T) {
+	for _, source := range []string{
+		`export { Subject } from "mod";`,
+		`type T = import("mod").Subject;`,
+	} {
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: "/test.ts",
+			Path:     "/test.ts",
+		}, source, core.ScriptKindTS)
+		for _, identifier := range identifiersWithText(sourceFile.AsNode(), "Subject") {
+			if IsReferenceIdentifier(identifier) {
+				t.Errorf("%s: Subject unexpectedly classified as a local reference", source)
+			}
+		}
+	}
+}
+
+func identifiersWithText(root *ast.Node, text string) []*ast.Node {
+	var identifiers []*ast.Node
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && node.Text() == text {
+			identifiers = append(identifiers, node)
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	root.ForEachChild(visit)
+	return identifiers
 }
 
 func TestBuildFunctionTypeScopeKeepsComputedMethodKeyOutside(t *testing.T) {

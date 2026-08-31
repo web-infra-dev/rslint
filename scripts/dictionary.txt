@@ -2,6 +2,7 @@
 aavascript
 abce
 accesskey
+accessorutil
 accum
 acdfg
 acefg
@@ -141,6 +142,8 @@ destabilising
 destructures
 desugars
 desync
+dgimsuy
+dgimsuvy
 dialytika
 dirxml
 disqualifier
@@ -187,6 +190,7 @@ fieldset
 figcaption
 fileless
 finalizer
+firstname
 fixability
 fixall
 flaggable
@@ -296,6 +300,7 @@ Kore
 labelledby
 lalala
 Laoo
+Larcher
 ldflags
 ldquo
 libc
@@ -326,6 +331,7 @@ marginx
 marginy
 materialise
 materialised
+Matthieu
 McCabe
 memfs
 menuitemcheckbox
@@ -346,6 +352,7 @@ mmap
 mobx
 Modns
 modns
+moofoo
 morestack
 mousein
 mouseout

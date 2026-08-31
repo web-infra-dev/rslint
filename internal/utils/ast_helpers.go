@@ -404,6 +404,9 @@ func IsJSDocTypeCastWrapper(node *ast.Node) bool {
 func ESTreeRuntimeExpression(node *ast.Node) *ast.Node {
 	for node != nil {
 		node = ast.SkipParentheses(node)
+		if node.Kind != ast.KindAsExpression && node.Kind != ast.KindSatisfiesExpression {
+			return node
+		}
 		expression := JSDocTypeCastExpression(node)
 		if expression == nil {
 			return node
@@ -420,11 +423,41 @@ func ESTreeParent(node *ast.Node) *ast.Node {
 		return nil
 	}
 	parent := node.Parent
-	for parent != nil &&
-		(parent.Kind == ast.KindParenthesizedExpression || IsJSDocTypeCastWrapper(parent)) {
-		parent = parent.Parent
+	for parent != nil {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			parent = parent.Parent
+		case ast.KindAsExpression, ast.KindSatisfiesExpression:
+			if !IsJSDocTypeCastWrapper(parent) {
+				return parent
+			}
+			parent = parent.Parent
+		default:
+			return parent
+		}
 	}
-	return parent
+	return nil
+}
+
+// ESTreeMembers removes empty class elements, which tsgo exposes as
+// SemicolonClassElement nodes but ESTree omits from ClassBody.body. The common
+// no-semicolon path returns the AST-owned slice without allocating; filtering
+// clones into a separate backing array so callers cannot rewrite that list.
+func ESTreeMembers(members []*ast.Node) []*ast.Node {
+	for index, member := range members {
+		if member.Kind != ast.KindSemicolonClassElement {
+			continue
+		}
+		filtered := make([]*ast.Node, 0, len(members)-1)
+		filtered = append(filtered, members[:index]...)
+		for _, remaining := range members[index+1:] {
+			if remaining.Kind != ast.KindSemicolonClassElement {
+				filtered = append(filtered, remaining)
+			}
+		}
+		return filtered
+	}
+	return members
 }
 
 // ESTreeParameters returns only parameters authored in source. tsgo prepends

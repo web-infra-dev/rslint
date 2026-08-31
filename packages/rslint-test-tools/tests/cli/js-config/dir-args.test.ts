@@ -238,7 +238,7 @@ describe('CLI multi-config (monorepo)', () => {
       // Both files find the same config — should work without issues
       const result = await runRslint(['src/a.ts', 'src/b.ts'], tempDir);
       expect(result.exitCode).not.toBe(0);
-      expect(result.stdout).toContain('linted 2 files');
+      expect(result.stdout).toContain('(2 files,');
     } finally {
       await cleanupTempDir(tempDir);
     }

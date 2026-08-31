@@ -28,7 +28,9 @@ rslint --type-check .         # lint + type-check
 rslint --type-check-only .    # type-check only
 ```
 
-When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. Set `project: []` to disable that fallback explicitly. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
+When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. An explicit `project: []` disables that fallback for the governing config. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
+
+An entry's [`basePath`](/config/base-path) becomes the anchor for its explicit project literals or globs. It does not move the implicit governing-directory `tsconfig.json` fallback or change Rslint's existing owner-wide project collection. Program-wide type checking still builds every explicit project declaration in the effective config catalog; `files`, `ignores`, `.gitignore`, and CLI target scope do not reduce that Program's TypeScript diagnostics.
 
 ## What gets type-checked
 
@@ -82,22 +84,25 @@ Chained errors indent the TypeScript message chain:
 
 Type errors appear in every output format (`default`, `jsonline`, `github`, `gitlab`).
 
-### Summary line
+### Lifecycle status
 
-Three templates depending on mode:
+The default format uses mode-specific start and completed status lines:
 
 ```
 # Plain lint
-Found 3 errors and 1 warning (linted 42 files with 5 rules in 120ms using 8 threads)
+start   Linting...
+error   Lint failed with 3 errors and 1 warning in 120ms (42 files, 5 rules, 8 threads)
 
 # --type-check
-Found 3 lint errors, 2 type errors and 1 warning (linted 42 files with 5 rules, type-checked 47 files in 120ms using 8 threads)
+start   Linting and type checking...
+error   Lint and type check failed with 3 lint errors, 2 TypeScript errors, and 1 warning in 120ms (47 files, 5 rules, 8 threads)
 
 # --type-check-only
-Found 2 type errors (type-checked 42 files in 80ms using 8 threads)
+start   Type checking...
+error   Type check failed with 2 TypeScript errors in 80ms (42 files, 8 threads)
 ```
 
-In combined mode, `linted` counts files visited by the lint phase, while `type-checked` counts unique root files across every real tsconfig Program. The counts can differ because lint targets and rslint ignores do not restrict program-wide type-check. In color-enabled terminals, the complete parenthesized execution details are rendered dim.
+In combined mode, the displayed file count is the canonical, deduplicated union of lint targets and root files from every compiler-capable tsconfig Program. It is not the larger of two counts: partially overlapping sets still contribute every distinct file. In color-enabled terminals, the complete parenthesized execution details are rendered dim.
 
 ### Exit codes
 
