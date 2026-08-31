@@ -141,16 +141,33 @@ func ascendThroughWrappers(node *ast.Node) *ast.Node {
 	return node
 }
 
+// isBindingAssignmentOperator reports whether an assignment operator stores the
+// right-hand value itself. Plain `=` always does, and the logical assignments
+// do whenever their right operand is evaluated at all. The arithmetic, shift
+// and bitwise compound assignments do not: they coerce the promise to a
+// primitive and store the result of the operation, so the promise is dropped
+// just as surely as if the assignment were not there.
+func isBindingAssignmentOperator(operator ast.Kind) bool {
+	switch operator {
+	case ast.KindEqualsToken,
+		ast.KindBarBarEqualsToken,
+		ast.KindAmpersandAmpersandEqualsToken,
+		ast.KindQuestionQuestionEqualsToken:
+		return true
+	}
+	return false
+}
+
 // isHandled reports whether node's parent does something with the promise the
 // assertion produced.
 //
 // NOTE: Unlike ESLint, which accepts only `await` and `return`, every position
 // below hands the promise to something that can settle it — a concise arrow
-// body returns it, an initializer, assignment or property binds it, a call
-// or constructor argument passes it on (which is how `Promise.all([...])`
-// and `Promise.allSettled([...])` are written), a JSX expression passes it
-// as a prop or child, a destructuring or parameter default binds it when the
-// default runs, and `yield` suspends on it.
+// body returns it, an initializer, a plain or logical assignment or a property
+// binds it, a call or constructor argument passes it on (which is how
+// `Promise.all([...])` and `Promise.allSettled([...])` are written), a JSX
+// expression passes it as a prop or child, a destructuring or parameter
+// default binds it when the default runs, and `yield` suspends on it.
 // Reporting those would be a false positive; the cost is that a promise stored
 // and then dropped goes unreported.
 func isHandled(node *ast.Node) bool {
@@ -183,7 +200,7 @@ func isHandled(node *ast.Node) bool {
 	case ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
 		return binary.OperatorToken != nil &&
-			ast.IsAssignmentOperator(binary.OperatorToken.Kind) &&
+			isBindingAssignmentOperator(binary.OperatorToken.Kind) &&
 			binary.Right == node
 	case ast.KindBindingElement:
 		// A destructuring declaration's own default value, e.g. `const [p =

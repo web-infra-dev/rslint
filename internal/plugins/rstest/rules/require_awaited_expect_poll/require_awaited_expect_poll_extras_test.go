@@ -36,6 +36,11 @@ func TestRequireAwaitedExpectPollExtras(t *testing.T) {
 			{Code: `const assertion = expect.poll(() => el).toBeVisible();`},
 			{Code: `let assertion; assertion = expect.poll(() => el).toBeVisible();`},
 			{Code: `let assertions = []; assertions[0] = expect.poll(() => el).toBeVisible();`},
+			// A logical assignment stores the right-hand promise itself
+			// whenever it evaluates its right operand at all.
+			{Code: `let pending; pending ||= expect.poll(() => el).toBeVisible();`},
+			{Code: `let pending; pending &&= expect.element(el).toBeVisible();`},
+			{Code: `let pending; pending ??= expect.poll(() => el).toBeVisible();`},
 			{Code: `const assertVisible = () => expect.element(el).toBeVisible();`},
 			{Code: `async function run() { await Promise.all([expect.poll(() => el).toBeVisible()]); }`},
 			{Code: `async function run() { await Promise.allSettled([expect.poll(() => el).toBeVisible(), expect.element(el).toBeVisible()]); }`},
@@ -369,6 +374,57 @@ expect.poll(() => el).toBeVisible();`,
 			{
 				Code:   `const ok = expect.poll(() => el).toBeVisible() && other;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 12, EndLine: 1, EndColumn: 23}},
+			},
+			{
+				// An arithmetic, shift or bitwise compound assignment coerces
+				// the promise to a primitive and stores the result of the
+				// operation, so the promise itself is dropped.
+				Code:   `let count = 0; count += expect.poll(() => el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 25, EndLine: 1, EndColumn: 36}},
+			},
+			{
+				Code:   `let count = 0; count -= expect.poll(() => el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 25, EndLine: 1, EndColumn: 36}},
+			},
+			{
+				Code:   `let count = 0; count *= expect.poll(() => el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 25, EndLine: 1, EndColumn: 36}},
+			},
+			{
+				Code:   `let count = 0; count /= expect.poll(() => el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 25, EndLine: 1, EndColumn: 36}},
+			},
+			{
+				Code:   `let count = 0; count %= expect.poll(() => el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 25, EndLine: 1, EndColumn: 36}},
+			},
+			{
+				Code:   `let count = 0; count **= expect.poll(() => el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 26, EndLine: 1, EndColumn: 37}},
+			},
+			{
+				Code:   `let bits = 0; bits <<= expect.element(el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 24, EndLine: 1, EndColumn: 38}},
+			},
+			{
+				Code:   `let bits = 0; bits >>= expect.element(el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 24, EndLine: 1, EndColumn: 38}},
+			},
+			{
+				Code:   `let bits = 0; bits >>>= expect.element(el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 25, EndLine: 1, EndColumn: 39}},
+			},
+			{
+				Code:   `let bits = 0; bits &= expect.element(el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 23, EndLine: 1, EndColumn: 37}},
+			},
+			{
+				Code:   `let bits = 0; bits |= expect.element(el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 23, EndLine: 1, EndColumn: 37}},
+			},
+			{
+				Code:   `let bits = 0; bits ^= expect.element(el).toBeVisible();`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notAwaited", Line: 1, Column: 23, EndLine: 1, EndColumn: 37}},
 			},
 			{
 				// A promise used as the condition is not the conditional result.
