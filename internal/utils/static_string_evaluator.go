@@ -504,11 +504,6 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 		if staticValueIsString(right.value) {
 			return staticEvaluator.concatStaticValues(left.value, right.value)
 		}
-	case ast.KindCommaToken:
-		// The comma operator's value is its right operand; the left operand
-		// is evaluated for side effects only, which static analysis has none
-		// of to lose, so whether it can itself be evaluated doesn't gate the result.
-		return staticEvaluator.evalValue(binary.Right)
 	}
 
 	return staticEvaluator.evalWithTsgo(node)
@@ -903,11 +898,11 @@ func staticStringMemberValue(s string, key string) staticEvalResult {
 		}
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(s))
+	units := ecmascript.StringCodeUnits(s)
 	if index >= len(units) {
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[index : index+1])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[index : index+1]), ok: true}
 }
 
 func staticObjectOwnProperty(object *staticObjectValue, key string) (any, bool) {
