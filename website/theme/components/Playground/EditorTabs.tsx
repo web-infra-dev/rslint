@@ -9,10 +9,17 @@ import {
 } from 'react';
 import * as monaco from 'monaco-editor';
 import { jsonDefaults } from 'monaco-editor/languages/features/json/register';
+import {
+  javascriptDefaults,
+  ModuleKind,
+  ModuleResolutionKind,
+  ScriptTarget,
+} from 'monaco-editor/languages/features/typescript/register';
 import { type Diagnostic } from '@rslint/core/service';
 import { useDark } from '@rspress/core/runtime';
 import { Button } from '@components/ui/button';
 import { evaluateConfig, type PlaygroundConfig } from './config';
+import { installRslintCoreTypes } from './config-types';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
 
@@ -185,11 +192,13 @@ export const EditorTabs = ({
   useImperativeHandle(ref, () => ({
     getValue: () => codeEditorRef.current?.getValue(),
     getCodeValue: () => codeEditorRef.current?.getValue(),
-    getRslintConfig: async (wasmVersion) =>
-      evaluateConfig(
+    getRslintConfig: async (wasmVersion) => {
+      await installRslintCoreTypes(wasmVersion);
+      return evaluateConfig(
         rslintEditorRef.current?.getValue() ?? DEFAULT_RSLINT_CONFIG,
         wasmVersion,
-      ),
+      );
+    },
     getTsConfig: () => {
       const content = tsconfigEditorRef.current?.getValue() || '';
       const parsed = parseJsonc(content);
@@ -400,9 +409,24 @@ export const EditorTabs = ({
   useEffect(() => {
     if (!rslintContainerRef.current) return;
 
+    javascriptDefaults.setCompilerOptions({
+      allowJs: true,
+      checkJs: true,
+      module: ModuleKind.ESNext,
+      moduleResolution: ModuleResolutionKind.NodeJs,
+      target: ScriptTarget.ESNext,
+    });
+    javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+    });
+    const model = monaco.editor.createModel(
+      DEFAULT_RSLINT_CONFIG,
+      'javascript',
+      monaco.Uri.parse('file:///rslint.config.js'),
+    );
     const editor = monaco.editor.create(rslintContainerRef.current, {
-      value: DEFAULT_RSLINT_CONFIG,
-      language: 'javascript',
+      model,
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
@@ -416,6 +440,7 @@ export const EditorTabs = ({
 
     return () => {
       editor.dispose();
+      model.dispose();
     };
   }, []);
 
