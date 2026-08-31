@@ -251,6 +251,38 @@ describe('CLI basePath product contract', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  test('ancestor basePath does not let a global ignore prune the config root', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-base-path-'));
+    try {
+      await writeFixture(root, {
+        'app/rslint.config.mjs': `export default [
+  { basePath: '..', ignores: ['*'] },
+  { files: ['**/*.js'], rules: { 'no-debugger': 'error' } },
+];\n`,
+        'app/root.js': 'debugger;\n',
+        'app/nested/child.js': 'debugger;\n',
+      });
+
+      const result = await runCLI(root, ['app']);
+      const expected = [
+        path.join(root, 'app', 'root.js'),
+        path.join(root, 'app', 'nested', 'child.js'),
+      ].sort();
+
+      expect(result.code).toBe(1);
+      expect(
+        absoluteDiagnosticPaths(
+          root,
+          parseDiagnostics(result.stdout),
+          'no-debugger',
+        ),
+      ).toEqual(expected);
+      expect(result.stderr).not.toContain('warning:');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('CLI lint target contracts', () => {
