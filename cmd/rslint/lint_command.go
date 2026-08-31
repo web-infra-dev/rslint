@@ -613,7 +613,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	counts := report.Counts()
 	outcome := lintReportOutcome(counts, maxWarnings)
 	outputOptions.ComparePaths = comparePathOptions
-	if err := output.Render(os.Stdout, report, outcome, outputOptions); err != nil {
+	if err := renderLintReport(ctx, os.Stdout, report, outcome, outputOptions); err != nil {
 		return abortRun(
 			"writing lint report: "+err.Error(),
 			fmt.Sprintf("error writing lint report: %v", err),

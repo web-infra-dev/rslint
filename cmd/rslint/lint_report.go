@@ -1,11 +1,43 @@
 package main
 
 import (
+	"context"
+	"io"
+
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/output"
 )
+
+type cancellationAwareWriter struct {
+	ctx context.Context
+	dst io.Writer
+}
+
+func (w cancellationAwareWriter) Write(p []byte) (int, error) {
+	if err := w.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return w.dst.Write(p)
+}
+
+// renderLintReport keeps cancellation policy in the command layer while the
+// output package remains responsible only for presentation. Besides checking
+// before rendering starts, the writer check prevents a cancellation observed
+// after diagnostics flush from being followed by a completed status.
+func renderLintReport(
+	ctx context.Context,
+	dst io.Writer,
+	report output.Report,
+	outcome output.Outcome,
+	options output.Options,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return output.Render(cancellationAwareWriter{ctx: ctx, dst: dst}, report, outcome, options)
+}
 
 // lintReportOutcome is the command-owned exit policy. The returned value is
 // also passed to the output renderer so the status line and exit code consume

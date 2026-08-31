@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/output"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type realpathSpyFS struct {
@@ -22,6 +25,17 @@ type realpathSpyFS struct {
 type gatedStartWriter struct {
 	entered chan<- string
 	release <-chan struct{}
+}
+
+type cancelAfterWriteWriter struct {
+	dst    *bytes.Buffer
+	cancel context.CancelFunc
+}
+
+func (w cancelAfterWriteWriter) Write(p []byte) (int, error) {
+	n, err := w.dst.Write(p)
+	w.cancel()
+	return n, err
 }
 
 func (w gatedStartWriter) Write(p []byte) (int, error) {
@@ -84,6 +98,60 @@ func TestLintReportOutcome(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderLintReportStopsBeforeCompletedStatusAfterCancellation(t *testing.T) {
+	t.Run("canceled before report", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		var dst bytes.Buffer
+		err := renderLintReport(
+			ctx,
+			&dst,
+			output.NewReport(nil, output.Metadata{Mode: output.ModeLint}),
+			output.Outcome{Kind: output.OutcomePassed},
+			output.Options{Format: output.FormatDefault},
+		)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("render error = %v, want context.Canceled", err)
+		}
+		if dst.Len() != 0 {
+			t.Fatalf("canceled report wrote output: %q", dst.String())
+		}
+	})
+
+	t.Run("canceled after diagnostics flush", func(t *testing.T) {
+		diagnostic, comparePaths := createTestDiagnostic(t, "debugger;\n", 0, 8)
+		report := output.NewReport([]rule.RuleDiagnostic{diagnostic}, output.Metadata{
+			Mode:      output.ModeLint,
+			Files:     1,
+			Rules:     1,
+			Threads:   1,
+			StartedAt: time.Now(),
+		})
+		ctx, cancel := context.WithCancel(context.Background())
+		var dst bytes.Buffer
+		err := renderLintReport(
+			ctx,
+			cancelAfterWriteWriter{dst: &dst, cancel: cancel},
+			report,
+			output.Outcome{Kind: output.OutcomeDiagnosticsFailed},
+			output.Options{
+				Format:       output.FormatDefault,
+				ComparePaths: comparePaths,
+			},
+		)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("render error = %v, want context.Canceled", err)
+		}
+		got := dst.String()
+		if !strings.Contains(got, "test-rule") {
+			t.Fatalf("test did not reach the diagnostics flush: %q", got)
+		}
+		if strings.Contains(got, "Lint failed") || strings.Contains(got, "success") {
+			t.Fatalf("canceled report committed a completed status: %q", got)
+		}
+	})
 }
 
 func TestCLIWarningLimitStatusAndMachineCompatibility(t *testing.T) {
