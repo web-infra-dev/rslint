@@ -34,7 +34,7 @@
     "lint": "rslint --config rslint.config.ts",
     "lint:go": "golangci-lint run ./cmd/... ./internal/...",
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
-    "prepare": "husky",
+    "prepare": "rs hooks",
     "migrate:tests": "sg scan -r ast-grep-rule.yml ./packages/rslint-test-tools/tests/typescript-eslint/rules/**/*.test.ts --update-all"
   },
   "devDependencies": {
@@ -42,20 +42,10 @@
     "@rstest/core": "catalog:",
     "@types/react": "catalog:",
     "ajv": "catalog:",
-    "husky": "catalog:",
-    "lint-staged": "catalog:",
     "rstack": "catalog:",
     "typescript": "catalog:",
     "@typescript/native-preview": "catalog:",
     "zx": "catalog:"
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "rs fmt"
-    ],
-    "*.{json,css,scss,md,yaml,yml}": [
-      "rs fmt"
-    ]
   },
   "packageManager": "pnpm@10.34.4",
   "engines": {
