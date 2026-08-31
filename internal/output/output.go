@@ -24,8 +24,8 @@ type formatter interface {
 	finish(w *bufio.Writer, report Report) error
 }
 
-func Render(dst io.Writer, report Report, options Options) error {
-	selected, err := newFormatter(options)
+func Render(dst io.Writer, report Report, outcome Outcome, options Options) error {
+	selected, err := newFormatter(options, outcome)
 	if err != nil {
 		return err
 	}
@@ -71,10 +71,13 @@ func isVisible(diagnostic rule.RuleDiagnostic, quiet bool) bool {
 	return !quiet || diagnostic.Severity == rule.SeverityError
 }
 
-func newFormatter(options Options) (formatter, error) {
+func newFormatter(options Options, outcome Outcome) (formatter, error) {
 	switch options.Format {
 	case FormatDefault:
-		return &defaultFormatter{colors: newColorScheme(options.ColorEnabled)}, nil
+		return &defaultFormatter{
+			colors:  newColorScheme(options.ColorEnabled),
+			outcome: outcome,
+		}, nil
 	case FormatJSONLine:
 		return jsonLineFormatter{}, nil
 	case FormatGitHub:

@@ -504,6 +504,11 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 		if staticValueIsString(right.value) {
 			return staticEvaluator.concatStaticValues(left.value, right.value)
 		}
+	case ast.KindCommaToken:
+		// The comma operator's value is its right operand; the left operand
+		// is evaluated for side effects only, which static analysis has none
+		// of to lose, so whether it can itself be evaluated doesn't gate the result.
+		return staticEvaluator.evalValue(binary.Right)
 	}
 
 	return staticEvaluator.evalWithTsgo(node)
@@ -844,13 +849,23 @@ func (staticEvaluator *StaticStringEvaluator) evalAccessExpressionKey(node *ast.
 	return staticValueToString(argument.value)
 }
 
-// staticMemberValue reads key off a folded object or array literal. Reading a
-// key that isn't there yields `undefined`, as it would at runtime. A key an
-// array inherits — `length`, `join` — stays unresolved, because folding it
-// would need a numeric or callable value representation this evaluator doesn't
-// carry.
+// staticMemberValue reads key off a folded object, array, or string literal.
+// Reading a key that isn't there yields `undefined`, as it would at runtime. A
+// key an array inherits — `length`, `join` — stays unresolved, because folding
+// it would need a numeric or callable value representation this evaluator
+// doesn't carry; string indexing is narrower (a canonical index only) and
+// returns the UTF-16 code unit at that index, matching how JavaScript indexes
+// a string.
 func staticMemberValue(object any, key string) staticEvalResult {
 	switch object := object.(type) {
+	case string:
+		return staticStringMemberValue(object, key)
+	case *staticStringNode:
+		str, ok := staticValueAsString(object)
+		if !ok {
+			return staticEvalResult{}
+		}
+		return staticStringMemberValue(str, key)
 	case *staticObjectValue:
 		if value, ok := staticObjectOwnProperty(object, key); ok {
 			return staticEvalResult{value: value, ok: true}
@@ -873,6 +888,26 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		return staticEvalResult{value: object.element(index), ok: true}
 	}
 	return staticEvalResult{}
+}
+
+// staticStringMemberValue indexes a string by a canonical array-index key, the
+// way JavaScript's string indexing does: by UTF-16 code unit, not by byte or
+// rune. A non-canonical numeric-shaped key (`"-1"`, `"01"`) yields `undefined`
+// like an absent array element; any other key stays unresolved, since this
+// evaluator carries no representation for `String.prototype` methods.
+func staticStringMemberValue(s string, key string) staticEvalResult {
+	index, ok := staticArrayIndex(key)
+	if !ok {
+		if staticNumberShapedKey(key) {
+			return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+		}
+		return staticEvalResult{}
+	}
+	units := utf16.Encode([]rune(s))
+	if index >= len(units) {
+		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
+	}
+	return staticEvalResult{value: string(utf16.Decode(units[index : index+1])), ok: true}
 }
 
 func staticObjectOwnProperty(object *staticObjectValue, key string) (any, bool) {

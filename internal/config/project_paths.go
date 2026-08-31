@@ -98,8 +98,11 @@ func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, confi
 }
 
 func expandProjectGlob(fsys vfs.FS, configDirectory string, pattern string) ([]string, error) {
-	resolvedPattern := normalizeGlobPath(tspath.ResolvePath(configDirectory, pattern))
-	searchRoot := globSearchRoot(resolvedPattern, normalizeGlobPath(configDirectory))
+	// The effective config base is a literal directory, not part of the authored glob.
+	normalizedPattern := normalizeGlobPath(pattern)
+	authoredSearchRoot := globSearchRoot(normalizedPattern, ".")
+	searchRoot := normalizeGlobPath(tspath.ResolvePath(configDirectory, authoredSearchRoot))
+	resolvedPattern := normalizeGlobPath(tspath.ResolvePath(configDirectory, normalizedPattern))
 
 	if !fsys.DirectoryExists(searchRoot) {
 		return nil, nil

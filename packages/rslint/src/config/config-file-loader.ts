@@ -258,6 +258,15 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
         `[rslint] Config entry at index ${index}: "name" must be a string`,
       );
     }
+    // ESLint intentionally uses property-presence semantics here. A basePath
+    // inherited from a config object's prototype is normalized and validated
+    // just like an own property.
+    const hasBasePath = 'basePath' in entry;
+    if (hasBasePath && typeof entry.basePath !== 'string') {
+      throw new Error(
+        `[rslint] Config entry at index ${index}: "basePath" must be a string`,
+      );
+    }
 
     // Extract ESLint-plugin metadata from the object-form `plugins`. Live
     // plugin objects carry functions and must NEVER reach the serializable
@@ -303,7 +312,7 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     // authored keys, including keys whose value is undefined. Preserve that
     // distinction when normalization omits an undefined or unsupported field.
     const authoredNonGlobalKey = Object.keys(entry).some(
-      (key) => key !== 'name' && key !== 'ignores',
+      (key) => key !== 'name' && key !== 'basePath' && key !== 'ignores',
     );
     const serializesNonGlobalKey =
       hasFiles ||
@@ -316,6 +325,7 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
 
     return {
       ...(entry.name !== undefined ? { name: entry.name } : {}),
+      ...(hasBasePath ? { basePath: entry.basePath } : {}),
       ...(hasFiles ? { files: entry.files } : {}),
       ...(entry.ignores !== undefined ? { ignores: entry.ignores } : {}),
       ...(entry.languageOptions !== undefined

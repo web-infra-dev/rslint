@@ -190,6 +190,7 @@ fieldset
 figcaption
 fileless
 finalizer
+firstname
 fixability
 fixall
 flaggable
@@ -229,7 +230,12 @@ gcflags
 GDSFP
 Geor
 getsp
+gimu
 gimuygimuygimuy
+gimv
+gimvy
+gimy
+gimyu
 github
 glossref
 gnored
@@ -299,6 +305,7 @@ Kore
 labelledby
 lalala
 Laoo
+Larcher
 ldflags
 ldquo
 libc
@@ -329,6 +336,7 @@ marginx
 marginy
 materialise
 materialised
+Matthieu
 McCabe
 memfs
 menuitemcheckbox

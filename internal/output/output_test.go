@@ -80,43 +80,160 @@ func TestSummaryText(t *testing.T) {
 	tests := []struct {
 		name     string
 		report   Report
+		outcome  Outcome
 		expected string
 	}{
 		{
-			name: "lint zero plural",
+			name: "lint passed",
 			report: NewReport(nil, Metadata{
-				Mode: ModeLint, LintedFiles: 2, Rules: 3, Threads: 4,
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4,
 			}),
-			expected: "Found 0 errors and 0 warnings (linted 2 files with 3 rules in 12ms using 4 threads)\n",
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint passed in 12ms (2 files, 3 rules, 4 threads)\n",
 		},
 		{
-			name: "lint singular with fix",
+			name: "lint passed with warnings",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint passed with 2 warnings in 12ms (2 files, 3 rules, 4 threads)\n",
+		},
+		{
+			name: "lint passed after applying fixes",
+			report: NewReport(nil, Metadata{
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4, FixedIssues: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint passed after applying 2 fixes in 12ms (2 files, 3 rules, 4 threads)\n",
+		},
+		{
+			name: "lint passed with warning and fix",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLint, Files: 1, Rules: 1, Threads: 1, FixedIssues: 1,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint passed with 1 warning after applying 1 fix in 12ms (1 file, 1 rule, 1 thread)\n",
+		},
+		{
+			name: "lint failed with fix",
 			report: NewReport([]rule.RuleDiagnostic{
 				{Severity: rule.SeverityError},
 				{Severity: rule.SeverityWarning},
 			}, Metadata{
-				Mode: ModeLint, LintedFiles: 1, Rules: 1, Threads: 1, FixedIssues: 1,
+				Mode: ModeLint, Files: 5, Rules: 7, Threads: 2, FixedIssues: 3,
 			}),
-			expected: "Found 1 error and 1 warning (linted 1 file with 1 rule in 12ms using 1 thread, fixed 1 issue)\n",
+			outcome:  Outcome{Kind: OutcomeDiagnosticsFailed},
+			expected: "error   Lint failed with 1 error and 1 warning after applying 3 fixes in 12ms (5 files, 7 rules, 2 threads)\n",
 		},
 		{
-			name: "lint and type-check",
+			name: "lint and type check failed",
 			report: NewReport([]rule.RuleDiagnostic{
-				{RuleName: "no-debugger", Severity: rule.SeverityError},
-				{RuleName: "TypeScript(TS2322)", Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+				{Severity: rule.SeverityError},
+				{Severity: rule.SeverityError},
+				{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+				{Severity: rule.SeverityWarning},
 			}, Metadata{
-				Mode: ModeLintAndTypeCheck, LintedFiles: 1, TypeCheckedFiles: 2, Rules: 0, Threads: 2,
+				Mode: ModeLintAndTypeCheck, Files: 9, Rules: 8, Threads: 2,
 			}),
-			expected: "Found 1 lint error, 1 type error and 0 warnings (linted 1 file with 0 rules, type-checked 2 files in 12ms using 2 threads)\n",
+			outcome:  Outcome{Kind: OutcomeDiagnosticsFailed},
+			expected: "error   Lint and type check failed with 2 lint errors, 1 TypeScript error, and 1 warning in 12ms (9 files, 8 rules, 2 threads)\n",
 		},
 		{
-			name: "type-check only",
-			report: NewReport([]rule.RuleDiagnostic{
-				{RuleName: "TypeScript(TS2322)", Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
-			}, Metadata{
-				Mode: ModeTypeCheckOnly, TypeCheckedFiles: 1, Threads: 2,
+			name: "lint and type check passed",
+			report: NewReport(nil, Metadata{
+				Mode: ModeLintAndTypeCheck, Files: 9, Rules: 8, Threads: 2,
 			}),
-			expected: "Found 1 type error (type-checked 1 file in 12ms using 2 threads)\n",
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Lint and type check passed in 12ms (9 files, 8 rules, 2 threads)\n",
+		},
+		{
+			name: "lint and type check failed after applying fixes",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityError},
+				{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+			}, Metadata{
+				Mode: ModeLintAndTypeCheck, Files: 9, Rules: 8, Threads: 2, FixedIssues: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomeDiagnosticsFailed},
+			expected: "error   Lint and type check failed with 1 lint error and 1 TypeScript error after applying 2 fixes in 12ms (9 files, 8 rules, 2 threads)\n",
+		},
+		{
+			name: "lint and type check warning limit exceeded",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLintAndTypeCheck, Files: 9, Rules: 8, Threads: 2,
+			}),
+			outcome: Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 1},
+			expected: "error   Lint and type check failed in 12ms: 2 warnings exceeded the configured limit of 1 " +
+				"(9 files, 8 rules, 2 threads)\n",
+		},
+		{
+			name: "type check only failed",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+			}, Metadata{
+				Mode: ModeTypeCheckOnly, Files: 1, Threads: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomeDiagnosticsFailed},
+			expected: "error   Type check failed with 1 TypeScript error in 12ms (1 file, 2 threads)\n",
+		},
+		{
+			name: "type check only passed",
+			report: NewReport(nil, Metadata{
+				Mode: ModeTypeCheckOnly, Files: 1, Threads: 2,
+			}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success Type check passed in 12ms (1 file, 2 threads)\n",
+		},
+		{
+			name: "warning limit exceeded",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4,
+			}),
+			outcome: Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 0},
+			expected: "error   Lint failed in 12ms: 2 warnings exceeded the configured limit of 0 " +
+				"(2 files, 3 rules, 4 threads)\n",
+		},
+		{
+			name: "warning limit exceeded after applying fixes",
+			report: NewReport([]rule.RuleDiagnostic{
+				{Severity: rule.SeverityWarning},
+				{Severity: rule.SeverityWarning},
+			}, Metadata{
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4, FixedIssues: 1,
+			}),
+			outcome: Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 0},
+			expected: "error   Lint failed after applying 1 fix in 12ms: 2 warnings exceeded the configured limit of 0 " +
+				"(2 files, 3 rules, 4 threads)\n",
+		},
+		{
+			name:     "empty lint",
+			report:   NewReport(nil, Metadata{Mode: ModeLint, Threads: 4}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success No files to lint in 12ms\n",
+		},
+		{
+			name:     "empty combined",
+			report:   NewReport(nil, Metadata{Mode: ModeLintAndTypeCheck, Threads: 4}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success No files to lint or type check in 12ms\n",
+		},
+		{
+			name:     "empty type check",
+			report:   NewReport(nil, Metadata{Mode: ModeTypeCheckOnly, Threads: 4}),
+			outcome:  Outcome{Kind: OutcomePassed},
+			expected: "success No files to type check in 12ms\n",
 		},
 	}
 
@@ -124,7 +241,7 @@ func TestSummaryText(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			w := bufio.NewWriter(&buf)
-			renderSummary(w, test.report, 12*time.Millisecond, newColorScheme(false))
+			renderSummary(w, test.report, test.outcome, 12*time.Millisecond, newColorScheme(false))
 			if err := w.Flush(); err != nil {
 				t.Fatal(err)
 			}
@@ -142,25 +259,25 @@ func TestSummaryDetailsAreOneDimSpan(t *testing.T) {
 		details string
 	}{
 		{
-			name: "lint and fixed details",
+			name: "lint details",
 			report: NewReport(nil, Metadata{
-				Mode: ModeLint, LintedFiles: 2, Rules: 3, Threads: 4, FixedIssues: 5,
+				Mode: ModeLint, Files: 2, Rules: 3, Threads: 4,
 			}),
-			details: "(linted 2 files with 3 rules in 12ms using 4 threads, fixed 5 issues)",
+			details: "(2 files, 3 rules, 4 threads)",
 		},
 		{
 			name: "lint and type-check details",
 			report: NewReport(nil, Metadata{
-				Mode: ModeLintAndTypeCheck, LintedFiles: 1, TypeCheckedFiles: 2, Rules: 3, Threads: 1,
+				Mode: ModeLintAndTypeCheck, Files: 2, Rules: 3, Threads: 1,
 			}),
-			details: "(linted 1 file with 3 rules, type-checked 2 files in 12ms using 1 thread)",
+			details: "(2 files, 3 rules, 1 thread)",
 		},
 		{
 			name: "type-check-only details",
 			report: NewReport(nil, Metadata{
-				Mode: ModeTypeCheckOnly, TypeCheckedFiles: 2, Threads: 4,
+				Mode: ModeTypeCheckOnly, Files: 2, Threads: 4,
 			}),
-			details: "(type-checked 2 files in 12ms using 4 threads)",
+			details: "(2 files, 4 threads)",
 		},
 	}
 
@@ -168,7 +285,7 @@ func TestSummaryDetailsAreOneDimSpan(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			w := bufio.NewWriter(&buf)
-			renderSummary(w, test.report, 12*time.Millisecond, newColorScheme(true))
+			renderSummary(w, test.report, Outcome{Kind: OutcomePassed}, 12*time.Millisecond, newColorScheme(true))
 			if err := w.Flush(); err != nil {
 				t.Fatal(err)
 			}
@@ -180,29 +297,185 @@ func TestSummaryDetailsAreOneDimSpan(t *testing.T) {
 	}
 }
 
-func TestMixedSummaryColorsErrorCountsIndependently(t *testing.T) {
-	report := NewReport([]rule.RuleDiagnostic{
-		{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
-	}, Metadata{
-		Mode: ModeLintAndTypeCheck, LintedFiles: 1, TypeCheckedFiles: 1, Threads: 1,
-	})
+func TestLifecycleColors(t *testing.T) {
 	colors := newColorScheme(true)
+	options := Options{Format: FormatDefault, ColorEnabled: true}
 	var buf bytes.Buffer
+	if err := RenderStart(&buf, ModeLint, options); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := buf.String(), colors.StartText("%s", "start")+"   Linting...\n"; got != want {
+		t.Fatalf("start output:\n got: %q\nwant: %q", got, want)
+	}
+	if got, want := buf.String(), "\x1b[36;1m"+"start"+"\x1b[0;22m   Linting...\n"; got != want {
+		t.Fatalf("start ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+
+	buf.Reset()
 	w := bufio.NewWriter(&buf)
-	renderSummary(w, report, 12*time.Millisecond, colors)
+	report := NewReport(nil, Metadata{Mode: ModeLint, Files: 2, Rules: 3, Threads: 4})
+	renderSummary(w, report, Outcome{Kind: OutcomePassed}, 12*time.Millisecond, colors)
 	if err := w.Flush(); err != nil {
 		t.Fatal(err)
 	}
+	want := colors.SuccessText("%s", "success") + " Lint passed in 12ms " +
+		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
+	if got := buf.String(); got != want {
+		t.Fatalf("completed output:\n got: %q\nwant: %q", got, want)
+	}
+	if got, want := buf.String(), "\x1b[32;1m"+"success"+"\x1b[0;22m Lint passed in 12ms "+
+		"\x1b[2m(2 files, 3 rules, 4 threads)\x1b[22m\n"; got != want {
+		t.Fatalf("success ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
 
-	got := buf.String()
-	if want := colors.SuccessText("%d", 0) + " lint errors"; !strings.Contains(got, want) {
-		t.Fatalf("zero lint-error count is not green:\n%s", got)
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	report = NewReport([]rule.RuleDiagnostic{{Severity: rule.SeverityError}}, Metadata{
+		Mode: ModeLint, Files: 2, Rules: 3, Threads: 4,
+	})
+	renderSummary(w, report, Outcome{Kind: OutcomeDiagnosticsFailed}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
 	}
-	if want := colors.ErrorText("%d", 1) + " type error"; !strings.Contains(got, want) {
-		t.Fatalf("non-zero type-error count is not red:\n%s", got)
+	if got, want := buf.String(), "\x1b[31;1m"+"error"+"\x1b[0;22m   Lint failed with "+
+		"\x1b[31;1m1\x1b[0;22m error in 12ms "+
+		"\x1b[2m(2 files, 3 rules, 4 threads)\x1b[22m\n"; got != want {
+		t.Fatalf("error ANSI contract:\n got: %q\nwant: %q", got, want)
 	}
-	if unwanted := colors.ErrorText("%d", 0) + " lint errors"; strings.Contains(got, unwanted) {
-		t.Fatalf("zero lint-error count is red:\n%s", got)
+
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	report = NewReport([]rule.RuleDiagnostic{
+		{Severity: rule.SeverityError},
+		{Severity: rule.SeverityError},
+		{Severity: rule.SeverityError, Origin: rule.DiagnosticOriginTypeScript},
+		{Severity: rule.SeverityWarning},
+	}, Metadata{Mode: ModeLintAndTypeCheck, Files: 2, Rules: 3, Threads: 4})
+	renderSummary(w, report, Outcome{Kind: OutcomeDiagnosticsFailed}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	want = colors.ErrorText("%s", "error") + "   Lint and type check failed with " +
+		colors.ErrorText("%d", 2) + " lint errors, " +
+		colors.ErrorText("%d", 1) + " TypeScript error, and " +
+		colors.WarnText("%d", 1) + " warning in 12ms " +
+		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
+	if got := buf.String(); got != want {
+		t.Fatalf("mixed diagnostics ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	report = NewReport([]rule.RuleDiagnostic{
+		{Severity: rule.SeverityWarning},
+		{Severity: rule.SeverityWarning},
+	}, Metadata{Mode: ModeLint, Files: 2, Rules: 3, Threads: 4})
+	renderSummary(w, report, Outcome{Kind: OutcomePassed}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	want = colors.SuccessText("%s", "success") + " Lint passed with " +
+		colors.WarnText("%d", 2) + " warnings in 12ms " +
+		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
+	if got := buf.String(); got != want {
+		t.Fatalf("warning success ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+
+	buf.Reset()
+	w = bufio.NewWriter(&buf)
+	renderSummary(w, report, Outcome{Kind: OutcomeWarningLimitExceeded, WarningLimit: 0}, 12*time.Millisecond, colors)
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	want = colors.ErrorText("%s", "error") + "   Lint failed in 12ms: " +
+		colors.WarnText("%d", 2) + " warnings exceeded the configured limit of 0 " +
+		colors.DimText("%s", "(2 files, 3 rules, 4 threads)") + "\n"
+	if got := buf.String(); got != want {
+		t.Fatalf("warning limit ANSI contract:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestLifecycleTextByMode(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		mode       Mode
+		start      string
+		abortStart string
+	}{
+		{name: "lint", mode: ModeLint, start: "start   Linting...\n", abortStart: "error   Linting failed in "},
+		{
+			name:       "combined",
+			mode:       ModeLintAndTypeCheck,
+			start:      "start   Linting and type checking...\n",
+			abortStart: "error   Linting and type checking failed in ",
+		},
+		{
+			name:       "type-check-only",
+			mode:       ModeTypeCheckOnly,
+			start:      "start   Type checking...\n",
+			abortStart: "error   Type checking failed in ",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			options := Options{Format: FormatDefault}
+			var buf bytes.Buffer
+			if err := RenderStart(&buf, test.mode, options); err != nil {
+				t.Fatal(err)
+			}
+			if got := buf.String(); got != test.start {
+				t.Fatalf("start output = %q, want %q", got, test.start)
+			}
+
+			buf.Reset()
+			if err := RenderAbort(&buf, test.mode, time.Now().Add(-12*time.Millisecond), "boom", options); err != nil {
+				t.Fatal(err)
+			}
+			if got := buf.String(); !strings.HasPrefix(got, test.abortStart) || !strings.HasSuffix(got, ": boom\n") {
+				t.Fatalf("abort output = %q", got)
+			}
+		})
+	}
+}
+
+func TestRenderValidationFailureLeavesLifecycleRecoverable(t *testing.T) {
+	options := Options{Format: FormatDefault}
+	var buf bytes.Buffer
+	if err := RenderStart(&buf, ModeLint, options); err != nil {
+		t.Fatal(err)
+	}
+	report := NewReport([]rule.RuleDiagnostic{{
+		RuleName: "broken",
+		FilePath: "index.ts",
+		Severity: rule.SeverityError,
+	}}, Metadata{Mode: ModeLint, StartedAt: time.Now()})
+	err := Render(&buf, report, Outcome{Kind: OutcomeDiagnosticsFailed}, options)
+	if err == nil {
+		t.Fatal("Render() succeeded for a diagnostic without a source file")
+	}
+	if got, want := buf.String(), "start   Linting...\n"; got != want {
+		t.Fatalf("validation failure partially rendered a report:\n got: %q\nwant: %q", got, want)
+	}
+	if err := RenderAbort(&buf, ModeLint, time.Now(), "writing lint report: "+err.Error(), options); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); !strings.Contains(got, "\nerror   Linting failed in <1ms: writing lint report: diagnostic") {
+		t.Fatalf("validation failure did not leave a terminal lifecycle status: %q", got)
+	}
+}
+
+func TestMachineFormatsHaveNoLifecycleOutput(t *testing.T) {
+	for _, format := range []Format{FormatJSONLine, FormatGitHub, FormatGitLab} {
+		options := Options{Format: format, ColorEnabled: true}
+		var buf bytes.Buffer
+		if err := RenderStart(&buf, ModeLint, options); err != nil {
+			t.Fatal(err)
+		}
+		if err := RenderAbort(&buf, ModeLint, time.Now(), "boom", options); err != nil {
+			t.Fatal(err)
+		}
+		if buf.Len() != 0 {
+			t.Fatalf("%s lifecycle output = %q, want empty", format, buf.String())
+		}
 	}
 }
 
@@ -213,7 +486,7 @@ func TestMachineFormatsHaveNoLeadingBlankLine(t *testing.T) {
 	for _, format := range []Format{FormatJSONLine, FormatGitHub, FormatGitLab} {
 		t.Run(format.String(), func(t *testing.T) {
 			var buf bytes.Buffer
-			if err := Render(&buf, report, Options{Format: format, ComparePaths: paths}); err != nil {
+			if err := Render(&buf, report, Outcome{Kind: OutcomePassed}, Options{Format: format, ComparePaths: paths}); err != nil {
 				t.Fatal(err)
 			}
 			if len(buf.Bytes()) == 0 || buf.Bytes()[0] == '\n' {
@@ -232,7 +505,7 @@ func TestGitHubEscapesEveryWorkflowCommandField(t *testing.T) {
 	diagnostic.Message.Description = "message%\r\n::error"
 
 	var buf bytes.Buffer
-	if err := Render(&buf, NewReport([]rule.RuleDiagnostic{diagnostic}, Metadata{}), Options{
+	if err := Render(&buf, NewReport([]rule.RuleDiagnostic{diagnostic}, Metadata{}), Outcome{Kind: OutcomePassed}, Options{
 		Format: FormatGitHub, ComparePaths: paths,
 	}); err != nil {
 		t.Fatal(err)
@@ -247,7 +520,7 @@ func TestGitHubEscapesEveryWorkflowCommandField(t *testing.T) {
 func TestJSONLineProtocol(t *testing.T) {
 	diagnostic, paths := createOutputTestDiagnostic(t, rule.SeverityWarning)
 	var buf bytes.Buffer
-	if err := Render(&buf, NewReport([]rule.RuleDiagnostic{diagnostic}, Metadata{}), Options{
+	if err := Render(&buf, NewReport([]rule.RuleDiagnostic{diagnostic}, Metadata{}), Outcome{Kind: OutcomePassed}, Options{
 		Format: FormatJSONLine, ComparePaths: paths,
 	}); err != nil {
 		t.Fatal(err)
@@ -276,7 +549,7 @@ func TestQuietFiltersRenderingButNotCounts(t *testing.T) {
 		{FormatGitLab, "[]\n"},
 	} {
 		var buf bytes.Buffer
-		if err := Render(&buf, report, Options{Format: test.format, Quiet: true}); err != nil {
+		if err := Render(&buf, report, Outcome{Kind: OutcomePassed}, Options{Format: test.format, Quiet: true}); err != nil {
 			t.Fatal(err)
 		}
 		if got := buf.String(); got != test.want {
@@ -285,7 +558,7 @@ func TestQuietFiltersRenderingButNotCounts(t *testing.T) {
 	}
 
 	var defaultBuf bytes.Buffer
-	if err := Render(&defaultBuf, report, Options{Format: FormatDefault, Quiet: true}); err != nil {
+	if err := Render(&defaultBuf, report, Outcome{Kind: OutcomePassed}, Options{Format: FormatDefault, Quiet: true}); err != nil {
 		t.Fatal(err)
 	}
 	if strings.HasPrefix(defaultBuf.String(), "\n") {
@@ -294,11 +567,27 @@ func TestQuietFiltersRenderingButNotCounts(t *testing.T) {
 	if !strings.Contains(defaultBuf.String(), "1 warning") {
 		t.Fatalf("summary lost hidden warning count: %q", defaultBuf.String())
 	}
+
+	var lifecycle bytes.Buffer
+	options := Options{Format: FormatDefault, Quiet: true}
+	if err := RenderStart(&lifecycle, ModeLint, options); err != nil {
+		t.Fatal(err)
+	}
+	if err := Render(&lifecycle, report, Outcome{
+		Kind:         OutcomeWarningLimitExceeded,
+		WarningLimit: 0,
+	}, options); err != nil {
+		t.Fatal(err)
+	}
+	if got := lifecycle.String(); strings.Contains(got, "\n\n") ||
+		!strings.Contains(got, "1 warning exceeded the configured limit of 0") {
+		t.Fatalf("quiet lifecycle output = %q", got)
+	}
 }
 
 func TestGitLabEmptyAndFingerprintCollisions(t *testing.T) {
 	var empty bytes.Buffer
-	if err := Render(&empty, NewReport(nil, Metadata{}), Options{Format: FormatGitLab}); err != nil {
+	if err := Render(&empty, NewReport(nil, Metadata{}), Outcome{Kind: OutcomePassed}, Options{Format: FormatGitLab}); err != nil {
 		t.Fatal(err)
 	}
 	if empty.String() != "[]\n" {
@@ -325,7 +614,7 @@ func TestGitLabEmptyAndFingerprintCollisions(t *testing.T) {
 
 	diagnostic, paths := createOutputTestDiagnostic(t, rule.SeverityError)
 	var rendered bytes.Buffer
-	if err := Render(&rendered, NewReport([]rule.RuleDiagnostic{diagnostic}, Metadata{}), Options{
+	if err := Render(&rendered, NewReport([]rule.RuleDiagnostic{diagnostic}, Metadata{}), Outcome{Kind: OutcomePassed}, Options{
 		Format: FormatGitLab, ComparePaths: paths,
 	}); err != nil {
 		t.Fatal(err)
@@ -357,7 +646,7 @@ func TestRenderValidatesAllDiagnosticsBeforeWriting(t *testing.T) {
 				bad := valid
 				test.mutate(&bad)
 				var buf bytes.Buffer
-				err := Render(&buf, NewReport([]rule.RuleDiagnostic{valid, bad}, Metadata{}), Options{
+				err := Render(&buf, NewReport([]rule.RuleDiagnostic{valid, bad}, Metadata{}), Outcome{Kind: OutcomePassed}, Options{
 					Format: format, ComparePaths: paths,
 				})
 				if err == nil {
@@ -373,14 +662,14 @@ func TestRenderValidatesAllDiagnosticsBeforeWriting(t *testing.T) {
 
 func TestRenderReturnsWriterError(t *testing.T) {
 	want := errors.New("write failed")
-	err := Render(failingWriter{err: want}, NewReport(nil, Metadata{}), Options{Format: FormatGitLab})
+	err := Render(failingWriter{err: want}, NewReport(nil, Metadata{}), Outcome{Kind: OutcomePassed}, Options{Format: FormatGitLab})
 	if !errors.Is(err, want) {
 		t.Fatalf("Render error = %v, want %v", err, want)
 	}
 }
 
 func TestRenderRejectsUnknownFormat(t *testing.T) {
-	err := Render(&bytes.Buffer{}, NewReport(nil, Metadata{}), Options{Format: Format(255)})
+	err := Render(&bytes.Buffer{}, NewReport(nil, Metadata{}), Outcome{Kind: OutcomePassed}, Options{Format: Format(255)})
 	if err == nil || !strings.Contains(err.Error(), "unsupported output format") {
 		t.Fatalf("Render error = %v", err)
 	}

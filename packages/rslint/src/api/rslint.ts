@@ -45,18 +45,24 @@ import type {
 
 export interface RslintOptions {
   /**
-   * Working directory for targets and discovery; also the base of inline
-   * `overrideConfig` paths.
+   * Working directory for targets and discovery. It is also the authored path
+   * base for relative fields in inline `overrideConfig` entries that omit
+   * `basePath`.
    */
   cwd?: string;
   /**
-   * Extra config appended after the resolved/discovered config. Relative
-   * `files`, `ignores`, and `parserOptions.project` paths resolve from `cwd`.
+   * Extra config appended to the selected config array. An authored `basePath`
+   * inherits that array's base (the discovered module directory in automatic
+   * mode, or `cwd` for an explicit/override-only array), matching ESLint.
+   * Relative fields in entries without `basePath` retain Rslint's existing
+   * `cwd`-relative behavior.
    */
   overrideConfig?: RslintConfigEntry | RslintConfig | null;
   /**
-   * `string` — use this JS/TS config module (no discovery); its relative
-   *            config paths resolve from the module's directory.
+   * `string` — use this JS/TS config module (no discovery); an authored
+   *            `basePath` resolves from `cwd`, matching ESLint's explicit
+   *            config behavior. Entries without `basePath` retain rslint's
+   *            existing module-directory-relative behavior.
    * `true`   — use only `overrideConfig` (no file, no discovery).
    * `null`/absent — auto-discover the nearest config (ESLint v10 semantics; no `false`).
    */
@@ -68,14 +74,15 @@ export interface RslintOptions {
    * put the `tsconfig.json` that `parserOptions.project` names plus any
    * dependency files here, then lint a buffer with `lintText`. Keys resolve
    * against `cwd` like a linted path (relative or absolute both work); a
-   * same-path `lintText` code entry wins. Inside the tsconfig (`files`) and
-   * `parserOptions.project`, use relative paths — the TS compiler resolves
-   * those, and a bare POSIX-absolute path there has no drive letter on Windows,
-   * so it won't match the overlay. The overlay permits filesystem fallback and
-   * is not a sandbox. rslint-only — ESLint has no in-memory file map.
+   * same-path `lintText` code entry wins. `parserOptions.project` resolves from
+   * the config entry's effective base, while paths inside the tsconfig resolve
+   * from that tsconfig's directory. Prefer relative paths for portability: a
+   * bare POSIX-absolute path has no drive letter on Windows. The overlay permits
+   * filesystem fallback and is not a sandbox. rslint-only — ESLint has no
+   * in-memory file map.
    *
    * Give the tsconfig explicit `files`, not a broad `include` glob: a glob is
-   * expanded against the real filesystem and would scan `cwd` on disk.
+   * expanded against the real filesystem from the tsconfig's directory.
    */
   virtualFiles?: Record<string, string>;
 }

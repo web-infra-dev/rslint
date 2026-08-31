@@ -70,6 +70,10 @@ new RegExp("[\\uD83D\\uDC4D]");  // surrogate pair in string literal
 - In rare edge cases where a character written as `\q{...}` or `\p{...}`
   escape appears outside its valid flag context (e.g. without the v flag),
   the scanner may still treat it as a breaker rather than a plain character.
+- TypeScript-only code that repeatedly merges the same name across namespace,
+  type-only, decorator, and parameter scopes can differ in whether an assigned
+  `RegExp` alias is considered local. Ordinary lexical bindings and namespace
+  shadowing are supported.
 
 ## Original Documentation
 
