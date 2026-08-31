@@ -327,13 +327,6 @@ func assertionIsInDestructuringDeclaration(node *ast.Node) bool {
 	return name != nil && (name.Kind == ast.KindObjectBindingPattern || name.Kind == ast.KindArrayBindingPattern)
 }
 
-func assertionIsInJsxAttribute(node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	jsxExpression := semanticNode.Parent
-	return jsxExpression != nil && jsxExpression.Kind == ast.KindJsxExpression &&
-		jsxExpression.Parent != nil && jsxExpression.Parent.Kind == ast.KindJsxAttribute
-}
-
 func assertionIsPropertyInProblematicContext(ctx rule.RuleContext, node *ast.Node) bool {
 	semanticNode := assertionWalkUpParentheses(node)
 	property := semanticNode.Parent
@@ -508,7 +501,6 @@ func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.N
 	}
 	if ast.IsArrayLiteralExpression(ast.SkipParentheses(node.Expression())) ||
 		assertionIsInDestructuringDeclaration(node) ||
-		assertionIsInJsxAttribute(node) ||
 		assertionIsPropertyInProblematicContext(ctx, node) ||
 		assertionIsAssignmentInNonStatementContext(node) ||
 		assertionIsRightHandSideOfLogicalAssignment(node) ||

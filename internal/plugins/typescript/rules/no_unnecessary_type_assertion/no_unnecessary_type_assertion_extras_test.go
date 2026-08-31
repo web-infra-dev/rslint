@@ -18,10 +18,6 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `const value = 5 as any;`},
 			{
-				Code: `declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x as string} />;`,
-				Tsx:  true,
-			},
-			{
 				Code:    `declare const x: number; x as /* comment */ number;`,
 				Options: []any{map[string]any{"typesToIgnore": []any{"number"}}},
 			},
@@ -56,6 +52,36 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x as string} />;`,
+				Output: []string{`declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x} />;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+				Tsx:    true,
+			},
+			{
+				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: 'a'; <div p={true ? x as string : null} />;`,
+				Output: []string{`declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: 'a'; <div p={true ? x : null} />;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+				Tsx:    true,
+			},
+			{
+				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: 'a'; <div p={(x as string) || null} />;`,
+				Output: []string{`declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: 'a'; <div p={(x) || null} />;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+				Tsx:    true,
+			},
+			{
+				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: string | null; <div p={x!} />;`,
+				Output: []string{`declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: string | null; <div p={x} />;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+				Tsx:    true,
+			},
+			{
+				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: 'a'; declare function f(value: string): string; <div p={f(x as string)} />;`,
+				Output: []string{`declare namespace JSX { interface IntrinsicElements { div: { p?: string | null } } } declare const x: 'a'; declare function f(value: string): string; <div p={f(x)} />;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+				Tsx:    true,
+			},
 			{
 				Code:   `declare const x: number; x  as number;`,
 				Output: []string{`declare const x: number; x;`},
