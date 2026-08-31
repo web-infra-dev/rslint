@@ -199,6 +199,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/radix"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_await"
+	"github.com/web-infra-dev/rslint/internal/rules/require_unicode_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/sort_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/sort_keys"
@@ -427,6 +428,7 @@ func coreRules() []rule.Rule {
 		no_useless_constructor.NoUselessConstructorRule,
 		no_prototype_builtins.NoPrototypeBuiltinsRule,
 		require_await.RequireAwaitRule,
+		require_unicode_regexp.RequireUnicodeRegexpRule,
 		require_yield.RequireYieldRule,
 		symbol_description.SymbolDescriptionRule,
 		no_unexpected_multiline.NoUnexpectedMultilineRule,
