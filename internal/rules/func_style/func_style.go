@@ -295,16 +295,16 @@ func isNamedExportedDeclarator(declarator *ast.Node) bool {
 // "is this name overloaded" answer by scanning siblings instead.
 //
 // A signature only counts when it is wrapped the same way the implementation
-// is: upstream matches `ExportNamedDeclaration > TSDeclareFunction` siblings
-// for an exported implementation and bare `TSDeclareFunction` siblings
-// otherwise, which the port reproduces by comparing the `export` modifier.
+// is: upstream distinguishes bare `TSDeclareFunction`,
+// `ExportNamedDeclaration > TSDeclareFunction`, and
+// `ExportDefaultDeclaration > TSDeclareFunction` siblings.
 func isOverloadedFunction(node *ast.Node) bool {
 	nameNode := node.Name()
 	if nameNode == nil {
 		return false
 	}
 	name := nameNode.Text()
-	exported := isNamedExport(node)
+	wrapper := exportWrapperForFunction(node)
 
 	parent := node.Parent
 	if parent == nil {
@@ -320,7 +320,7 @@ func isOverloadedFunction(node *ast.Node) bool {
 			return false
 		}
 		for _, clause := range caseBlock.AsCaseBlock().Clauses.Nodes {
-			if hasOverloadSignature(clause.Statements(), name, exported) {
+			if hasOverloadSignature(clause.Statements(), name, wrapper) {
 				return true
 			}
 		}
@@ -330,10 +330,28 @@ func isOverloadedFunction(node *ast.Node) bool {
 	if !parent.CanHaveStatements() {
 		return false
 	}
-	return hasOverloadSignature(parent.Statements(), name, exported)
+	return hasOverloadSignature(parent.Statements(), name, wrapper)
 }
 
-func hasOverloadSignature(statements []*ast.Node, name string, exported bool) bool {
+type functionExportWrapper uint8
+
+const (
+	bareFunction functionExportWrapper = iota
+	namedExportedFunction
+	defaultExportedFunction
+)
+
+func exportWrapperForFunction(node *ast.Node) functionExportWrapper {
+	if isDefaultExport(node) {
+		return defaultExportedFunction
+	}
+	if isNamedExport(node) {
+		return namedExportedFunction
+	}
+	return bareFunction
+}
+
+func hasOverloadSignature(statements []*ast.Node, name string, wrapper functionExportWrapper) bool {
 	for _, stmt := range statements {
 		if stmt.Kind != ast.KindFunctionDeclaration {
 			continue
@@ -342,7 +360,7 @@ func hasOverloadSignature(statements []*ast.Node, name string, exported bool) bo
 		if fd.Body != nil {
 			continue
 		}
-		if isNamedExport(stmt) != exported {
+		if exportWrapperForFunction(stmt) != wrapper {
 			continue
 		}
 		if stmt.Name() != nil && stmt.Name().Text() == name {

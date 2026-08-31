@@ -434,6 +434,14 @@ export default function test(a: unknown) { return a; }
 					{MessageId: "expression", Line: 2, Column: 8, EndLine: 2, EndColumn: 37},
 				},
 			},
+			// ---- A default-exported overload signature has a different ESTree
+			// wrapper from a bare implementation, so it must not exempt that
+			// implementation from the expression style ----
+			{
+				Code:    "export default function alpha(value: string): string;\nfunction alpha(value: unknown) { return value; }",
+				Options: []any{"expression"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expression"}},
+			},
 		},
 	)
 }
