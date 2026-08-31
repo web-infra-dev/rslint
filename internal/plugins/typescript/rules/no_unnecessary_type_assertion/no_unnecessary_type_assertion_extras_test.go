@@ -53,6 +53,16 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				Code:   `const x = ((1 as 1));`,
+				Output: []string{`const x = ((1));`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `class C { readonly x = (1 as 1); }`,
+				Output: []string{`class C { readonly x = (1); }`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
 				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x as string} />;`,
 				Output: []string{`declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x} />;`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},

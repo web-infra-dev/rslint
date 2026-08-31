@@ -669,8 +669,10 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			return (ast.IsVariableDeclaration(node.Parent) && ast.IsVariableDeclarationList(node.Parent.Parent) && node.Parent.Parent.Flags&ast.NodeFlagsConst != 0) ||
-				(ast.IsPropertyDeclaration(node.Parent) && node.Parent.ModifierFlags()&ast.ModifierFlagsReadonly != 0)
+			semanticNode := assertionWalkUpParentheses(node)
+			parent := semanticNode.Parent
+			return (ast.IsVariableDeclaration(parent) && ast.IsVariableDeclarationList(parent.Parent) && parent.Parent.Flags&ast.NodeFlagsConst != 0) ||
+				(ast.IsPropertyDeclaration(parent) && parent.ModifierFlags()&ast.ModifierFlagsReadonly != 0)
 
 		}
 
