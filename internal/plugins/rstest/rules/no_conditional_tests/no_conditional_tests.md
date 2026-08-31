@@ -15,15 +15,15 @@ time and is not reported. Only `if` is reported — conditional expressions,
 
 The rule does not carry an enclosing `if` through code that runs later. A
 registration in a function or method body, a parameter default, or an instance
-field initializer is attributed to the later call or construction rather than
-to an `if` around its declaration. Class static blocks, static field
-initializers, computed member names, and decorators run while the class is
-defined, so registrations in those positions remain conditional on an
-enclosing `if`.
+field initializer is left alone, because an `if` around the declaration does
+not decide whether that code runs — the later call or construction does. Class
+static blocks, static field initializers, computed member names, and decorators
+run while the class is defined, so registrations in those positions remain
+conditional on an enclosing `if`.
 
-A registration wrapped in a helper is therefore attributed to wherever that
-helper is called, not to an unrelated `if` the helper happens to sit under; the
-same boundary means a nested pair such as
+The rule does not follow a function to its call sites, so a registration in a
+helper is never reported, whether or not the helper is only ever called from
+inside an `if`. The same boundary means a nested pair such as
 `if (x) { describe('a', () => { test('b', fn) }) }` reports only the outer
 `describe`. Conditions written inside a test body are covered separately by
 `rstest/no-conditional-in-test`.

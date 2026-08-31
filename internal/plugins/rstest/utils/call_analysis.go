@@ -36,9 +36,13 @@ type rstestCallAnalysisFileCacheKey struct{}
 // lints the same file. Manually-constructed contexts without a file cache keep
 // the standalone behavior used by rule and parser tests.
 func GetRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
+	// Refs travels with SourceFile and TypeChecker because it is file-scoped
+	// like both: the parser uses it to resolve a registration's root binding
+	// when no checker is available (see resolveRstestRootSymbol).
 	analysisCtx := rule.RuleContext{
 		SourceFile:  ctx.SourceFile,
 		TypeChecker: ctx.TypeChecker,
+		Refs:        ctx.Refs,
 	}
 	return rule.CachedByFile(
 		ctx,
