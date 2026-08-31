@@ -1,3 +1,4 @@
+// cspell:ignore descr lobals
 package prefer_importing_jest_globals_test
 
 import (
