@@ -102,7 +102,7 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 
 The CLI, JavaScript API, and LSP automatically read `.gitignore` files and treat their patterns as additional global ignores. Automatically discovered configs and ordinary LSP files start collection at the governing config directory. An explicitly selected invocation-wide config (`--config`, API `overrideConfigFile`, or the LSP `configPath` setting) starts at the invocation or workspace-folder `cwd`, even when the config file is elsewhere. A requested directory outside `cwd` gets its own independent Git scope. Collection never searches a scope's parents. In the editor, saved `.gitignore` changes refresh diagnostics for open files.
 
-An entry's `basePath` does not move these `.gitignore` roots. It only scopes that authored entry and rebases its own `ignores` patterns.
+An entry's [`basePath`](/config/base-path) does not move these `.gitignore` roots. It only scopes that authored entry and rebases its own `ignores` patterns.
 
 - **Nested `.gitignore` files** inside one Git scope are supported — each one only affects its own directory subtree
 - **Parent patterns cascade** to child directories within that scope (e.g., root `dist/` also ignores `packages/app/dist/`)
