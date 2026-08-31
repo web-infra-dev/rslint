@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -899,11 +898,11 @@ func staticStringMemberValue(s string, key string) staticEvalResult {
 		}
 		return staticEvalResult{}
 	}
-	units := utf16.Encode([]rune(s))
+	units := ecmascript.StringCodeUnits(s)
 	if index >= len(units) {
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	}
-	return staticEvalResult{value: string(utf16.Decode(units[index : index+1])), ok: true}
+	return staticEvalResult{value: ecmascript.StringFromCodeUnits(units[index : index+1]), ok: true}
 }
 
 func staticObjectOwnProperty(object *staticObjectValue, key string) (any, bool) {
