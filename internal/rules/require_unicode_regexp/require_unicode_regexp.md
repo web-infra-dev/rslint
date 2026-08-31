@@ -88,13 +88,19 @@ const fooRegexp = new RegExp("foo", "v");
 
 ## Differences from ESLint
 
-- A pattern is judged against `u`-flag syntax when deciding whether the
-  suggestion is safe, so one written in `v`-flag set notation — the difference
-  operator (`[\d--[3]]`), a `\q{...}` string literal — is reported without a
-  suggestion that ESLint would offer.
-- Unicode property escapes are recognized by their short aliases, so
-  `/\p{L}/` is offered the flag while `/\p{Letter}/` and
-  `/\p{Script=Greek}/` are reported without a suggestion.
+- Suggestions are conservatively omitted for every duplicate named capture,
+  including the mutually exclusive alternatives that became valid in ES2025.
+  The diagnostic is still reported, and an added flag never depends on
+  duplicate-name control-flow acceptance.
+- When validating a `v` suggestion, a negated character class containing a
+  `\q{...}`, `\p{...}`, or `\P{...}` operand is conservatively treated as
+  unsafe, including through nested sets. This can omit suggestions for
+  single-code-point operands that ESLint proves safe, while preventing an
+  invalid suggestion for string-valued operands.
+- Static evaluation models RegExp literals and their stable properties, but it
+  does not construct a new RegExp object while folding an expression. For
+  example, `RegExp("g", "u").source` remains unknown even though ESLint can
+  fold it to `"g"`.
 - A suggested flag insertion into a template literal that interpolates an
   expression is refused whenever that template's cooked value already
   contains the opposite flag character, even when the interpolated

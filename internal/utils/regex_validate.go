@@ -7,112 +7,62 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
-// IsValidRegexPattern reports whether pattern parses cleanly under flags, the
-// way JavaScript's RegExp constructor would (a try/catch around parsing, not
-// a match attempt). Under the u/v flags this combines three checks:
+// IsValidRegexPattern reports whether pattern can be proven to parse cleanly
+// under flags, the way JavaScript's RegExp constructor would (a try/catch
+// around parsing, not a match attempt).
 //
-//   - IterateRegexCharacterClasses catches unterminated classes, including
-//     v-flag nested classes such as `[[a]` (valid `u` syntax, a SyntaxError
-//     under `v`).
-//   - regexp2 compile catches other structural errors (unclosed `(`, unmatched
-//     quantifier under Unicode mode, bad hex escapes, etc.). esregexp has no
-//     `v`-flag token, so `v` validation reuses the `u` compile — the two
-//     flags share the same non-class grammar.
-//   - A narrow u-flag identity-escape check for the handful of escapes
-//     regexp2 accepts but ES-u-mode rejects (`\a`, `\9`, …), a scan for the
-//     syntax characters regexp2 reads as literals, and a check that every
-//     `\k<name>` resolves to a group the pattern declares.
-//   - Under `v` alone, a scan of each character class for the
-//     ClassSetExpression rules that only the `v` grammar imposes — an
-//     unescaped `(`, `-`, `|`, … or a doubled reserved punctuator.
-//
-// If ANY check fails the pattern is treated as unparsable — matching
-// JavaScript's own parse-or-reject behavior.
+// Legacy patterns stay on the regexp runtime used by existing callers. Under
+// u/v, the TypeScript scanner is the grammar authority. The small adapter in
+// front of it carries constructor pattern text through a RegExp literal
+// without changing its UTF-16 semantics and replaces capture names with safe
+// ASCII placeholders because the scanner's general identifier reader does not
+// accept every RegExpIdentifierName escape spelling. Known scanner gaps fail
+// closed so callers never turn an invalid pattern into a suggested fix.
 func IsValidRegexPattern(pattern string, flags RegexFlags) bool {
-	if flags.UV() {
-		if !IterateRegexCharacterClasses(pattern, flags, func(int, int) {}) {
-			return false
-		}
-	}
-
-	compilePattern := pattern
-	compileFlags := ""
-	if flags.UV() {
-		compileFlags = "u"
-	}
-	if flags.UnicodeSets {
-		// The runtime compiler implements u grammar, where escapes such as
-		// `\&` are invalid even inside a class. In v grammar the reserved class
-		// punctuators may be escaped, so feed the compiler an equivalent hex
-		// escape and leave the original spelling to the v-specific scanner.
-		compilePattern = normalizeVClassPunctuatorEscapes(pattern)
-	}
-	if _, err := esregexp.Compile(compilePattern, compileFlags); err != nil {
-		return false
-	}
-
-	if flags.UV() {
-		if hasInvalidIdentityEscapeForUFlag(pattern) {
-			return false
-		}
-		if hasInvalidSyntaxCharForUFlag(pattern, flags) {
-			return false
-		}
-		if hasUnresolvedNamedBackreferenceForUFlag(pattern) {
-			return false
-		}
-	}
-	if flags.UnicodeSets && hasInvalidClassContentForVFlag(pattern) {
-		return false
-	}
-	return true
+	valid, hasDuplicateCaptureName, hasConservativeVCase := validateRegexPattern(pattern, flags)
+	return valid && !hasDuplicateCaptureName && !hasConservativeVCase
 }
 
 // IsValidRegexPatternForECMAVersion additionally rejects pattern features
 // that had not entered the configured ECMAScript edition yet.
 func IsValidRegexPatternForECMAVersion(pattern string, flags RegexFlags, ecmaVersion int) bool {
-	return IsValidRegexPattern(pattern, flags) && regexFeaturesAvailable(pattern, flags, ecmaVersion)
+	valid, hasDuplicateCaptureName, hasConservativeVCase := validateRegexPattern(pattern, flags)
+	if !valid || hasDuplicateCaptureName || hasConservativeVCase {
+		return false
+	}
+	return regexFeaturesAvailable(pattern, flags, ecmaVersion)
 }
 
-func normalizeVClassPunctuatorEscapes(pattern string) string {
-	var result strings.Builder
-	result.Grow(len(pattern))
-	classDepth := 0
-	for i := 0; i < len(pattern); {
-		if pattern[i] == '[' {
-			classDepth++
-			result.WriteByte(pattern[i])
-			i++
-			continue
-		}
-		if pattern[i] == ']' && classDepth > 0 {
-			classDepth--
-			result.WriteByte(pattern[i])
-			i++
-			continue
-		}
-		if pattern[i] == '\\' && i+1 < len(pattern) && classDepth > 0 &&
-			strings.IndexByte(reservedClassSetPunctuators, pattern[i+1]) >= 0 {
-			const hex = "0123456789abcdef"
-			c := pattern[i+1]
-			result.WriteString(`\x`)
-			result.WriteByte(hex[c>>4])
-			result.WriteByte(hex[c&0xf])
-			i += 2
-			continue
-		}
-		if pattern[i] == '\\' && i+1 < len(pattern) {
-			result.WriteString(pattern[i : i+2])
-			i += 2
-			continue
-		}
-		result.WriteByte(pattern[i])
-		i++
+func validateRegexPattern(pattern string, flags RegexFlags) (
+	valid bool,
+	hasDuplicateCaptureName bool,
+	hasConservativeVCase bool,
+) {
+	if !flags.UV() {
+		_, err := esregexp.Compile(pattern, "")
+		return err == nil, false, false
 	}
-	return result.String()
+	if flags.Unicode && flags.UnicodeSets {
+		return false, false, false
+	}
+	// JavaScript strings are sequences of UTF-16 code units. The compiler keeps
+	// lone surrogates in WTF-8, so join an adjacent pair before identifier-name
+	// validation just as the RegExp parser's CodePoint operation does.
+	pattern = ecmascript.CombineSurrogatePairs(pattern)
+
+	normalized, hasDuplicateCaptureName, hasConservativeVCase, ok := normalizeRegexCaptureNames(pattern, flags)
+	if !ok {
+		return false, hasDuplicateCaptureName, hasConservativeVCase
+	}
+	literal, ok := regexPatternLiteral(normalized, flags)
+	if !ok {
+		return false, hasDuplicateCaptureName, hasConservativeVCase
+	}
+	return ecmascript.IsValidRegexLiteral(literal), hasDuplicateCaptureName, hasConservativeVCase
 }
 
 func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) bool {
@@ -133,8 +83,8 @@ func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) b
 			if !ok {
 				return false
 			}
-			if ecmaVersion < 2018 && strings.Contains(pattern[i:end], `\p`) ||
-				ecmaVersion < 2018 && strings.Contains(pattern[i:end], `\P`) {
+			if ecmaVersion < 2018 && (strings.Contains(pattern[i:end], `\p`) ||
+				strings.Contains(pattern[i:end], `\P`)) {
 				return false
 			}
 			i = end
@@ -147,7 +97,11 @@ func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) b
 					return false
 				}
 			}
-			i++
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			if width == 0 {
+				width = 1
+			}
+			i += width
 		}
 	}
 	return true
@@ -174,362 +128,436 @@ func isInlineModifierGroup(suffix string) bool {
 	return false
 }
 
-// hasInvalidSyntaxCharForUFlag reports whether the pattern contains an
-// unescaped `{`, `}` or `]` outside a character class. Under the u/v flag all
-// three are SyntaxCharacters and legal only in their structural roles — `{`
-// and `}` as a `{n}` / `{n,}` / `{n,m}` quantifier, `]` as a class terminator
-// — but regexp2 accepts each as a literal (its .NET lineage). Escapes and
-// character classes are skipped wholesale through the flag-aware scanners, so
-// v-flag nested classes are not mistaken for a stray `]`.
-func hasInvalidSyntaxCharForUFlag(pattern string, flags RegexFlags) bool {
-	i := 0
+type regexCaptureNameReplacement struct {
+	start       int
+	end         int
+	placeholder string
+}
+
+// normalizeRegexCaptureNames rewrites every declaration and reference name to
+// a deterministic ASCII placeholder keyed by its decoded IdentifierName. This
+// preserves equality between raw and escaped spellings while allowing tsgo's
+// complete RegExp parser to validate the surrounding grammar. It also records
+// duplicate declarations for the fail-closed suggestion gate.
+func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool, bool, bool) {
+	var replacements []regexCaptureNameReplacement
+	var placeholders map[string]string
+	var declarations map[string]bool
+	hasDuplicate := false
+	hasConservativeVCase := false
+
+	addName := func(nameStart int, nameEnd int, declaration bool) bool {
+		name, ok := normalizeRegexCaptureName(pattern[nameStart:nameEnd])
+		if !ok {
+			return false
+		}
+		if placeholders == nil {
+			placeholders = make(map[string]string)
+		}
+		placeholder, ok := placeholders[name]
+		if !ok {
+			placeholder = "rslint" + strconv.Itoa(len(placeholders))
+			placeholders[name] = placeholder
+		}
+		if declaration {
+			if declarations == nil {
+				declarations = make(map[string]bool)
+			}
+			if declarations[name] {
+				hasDuplicate = true
+			}
+			declarations[name] = true
+		}
+		replacements = append(replacements, regexCaptureNameReplacement{
+			start:       nameStart,
+			end:         nameEnd,
+			placeholder: placeholder,
+		})
+		return true
+	}
+
+	for i := 0; i < len(pattern); {
+		switch pattern[i] {
+		case '[':
+			end := 0
+			if flags.UnicodeSets {
+				var content regexVClassContent
+				var ok bool
+				end, content, ok = analyzeRegexVClass(pattern, i)
+				if !ok {
+					return "", hasDuplicate, hasConservativeVCase, false
+				}
+				hasConservativeVCase = hasConservativeVCase || content.hasNegatedStringOperand
+			} else {
+				var ok bool
+				end, ok = ClassEnd(pattern, i, flags)
+				if !ok {
+					return "", hasDuplicate, hasConservativeVCase, false
+				}
+			}
+			i = end
+		case '\\':
+			if strings.HasPrefix(pattern[i:], `\k<`) {
+				_, next, ok := readAngleName(pattern, i+2)
+				if !ok || !addName(i+3, next-1, false) {
+					return "", hasDuplicate, hasConservativeVCase, false
+				}
+				i = next
+				continue
+			}
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				return "", hasDuplicate, hasConservativeVCase, false
+			}
+			i += step
+		case '(':
+			if strings.HasPrefix(pattern[i:], "(?<") &&
+				(i+3 >= len(pattern) || pattern[i+3] != '=' && pattern[i+3] != '!') {
+				_, next, ok := readAngleName(pattern, i+2)
+				if !ok || !addName(i+3, next-1, true) {
+					return "", hasDuplicate, hasConservativeVCase, false
+				}
+				i = next
+				continue
+			}
+			i++
+		default:
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			if width == 0 {
+				width = 1
+			}
+			i += width
+		}
+	}
+
+	if len(replacements) == 0 {
+		return pattern, hasDuplicate, hasConservativeVCase, true
+	}
+	var result strings.Builder
+	result.Grow(len(pattern))
+	last := 0
+	for _, replacement := range replacements {
+		result.WriteString(pattern[last:replacement.start])
+		result.WriteString(replacement.placeholder)
+		last = replacement.end
+	}
+	result.WriteString(pattern[last:])
+	return result.String(), hasDuplicate, hasConservativeVCase, true
+}
+
+type regexVClassContent struct {
+	mayContainStrings       bool
+	hasNegatedStringOperand bool
+}
+
+type regexVClassFrame struct {
+	content        regexVClassContent
+	negated        bool
+	trailingHyphen bool
+}
+
+// analyzeRegexVClass performs the narrow v-mode checks needed before carrying
+// a constructor pattern through a literal. One iterative pass covers nested
+// classes, raw slashes, tsgo's trailing-hyphen and doubled-^/$ gaps, and the
+// conservative string-operand bit used only by the suggestion gate. It is a
+// lexical adapter, not a second ClassSetExpression parser; tsgo remains the
+// grammar authority for every other production.
+func analyzeRegexVClass(pattern string, start int) (end int, content regexVClassContent, ok bool) {
+	if start >= len(pattern) || pattern[start] != '[' {
+		return start, regexVClassContent{}, false
+	}
+
+	flags := RegexFlags{UnicodeSets: true}
+	frames := []regexVClassFrame{{}}
+	i := start + 1
+	if i < len(pattern) && pattern[i] == '^' {
+		frames[0].negated = true
+		i++
+	}
+
 	for i < len(pattern) {
+		frame := &frames[len(frames)-1]
+		switch pattern[i] {
+		case '\\':
+			if strings.HasPrefix(pattern[i:], `\q{`) {
+				next, qOK := scanRegexVQString(pattern, i)
+				if !qOK {
+					return start, regexVClassContent{}, false
+				}
+				frame.content.mayContainStrings = true
+				frame.trailingHyphen = false
+				i = next
+				continue
+			}
+			if strings.HasPrefix(pattern[i:], `\p{`) || strings.HasPrefix(pattern[i:], `\P{`) {
+				frame.content.mayContainStrings = true
+			}
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				return start, regexVClassContent{}, false
+			}
+			frame.trailingHyphen = false
+			i += step
+		case '[':
+			frame.trailingHyphen = false
+			frames = append(frames, regexVClassFrame{})
+			i++
+			if i < len(pattern) && pattern[i] == '^' {
+				frames[len(frames)-1].negated = true
+				i++
+			}
+		case ']':
+			if frame.trailingHyphen {
+				return start, regexVClassContent{}, false
+			}
+			frame.content.hasNegatedStringOperand = frame.content.hasNegatedStringOperand ||
+				frame.negated && frame.content.mayContainStrings
+			completed := frame.content
+			frames = frames[:len(frames)-1]
+			i++
+			if len(frames) == 0 {
+				return i, completed, true
+			}
+			parent := &frames[len(frames)-1]
+			parent.content.mayContainStrings = parent.content.mayContainStrings || completed.mayContainStrings
+			parent.content.hasNegatedStringOperand = parent.content.hasNegatedStringOperand || completed.hasNegatedStringOperand
+			parent.trailingHyphen = false
+		case '/':
+			// `/` is a ClassSetSyntaxCharacter. Escaping it only in the
+			// carrier would make an invalid constructor pattern valid.
+			return start, regexVClassContent{}, false
+		case '^', '$':
+			if i+1 < len(pattern) && pattern[i+1] == pattern[i] {
+				return start, regexVClassContent{}, false
+			}
+			frame.trailingHyphen = false
+			i++
+		case '-':
+			frame.trailingHyphen = true
+			i++
+		default:
+			frame.trailingHyphen = false
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			if width == 0 {
+				width = 1
+			}
+			i += width
+		}
+	}
+	return start, regexVClassContent{}, false
+}
+
+func scanRegexVQString(pattern string, start int) (next int, ok bool) {
+	flags := RegexFlags{UnicodeSets: true}
+	for i := start + 3; i < len(pattern); {
 		switch pattern[i] {
 		case '\\':
 			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
-				// Unterminated escape — let compile/scan report it.
-				return false
+				return 0, false
 			}
 			i += step
-		case '[':
-			end, ok := ClassEnd(pattern, i, flags)
-			if !ok {
-				// Unterminated class — let compile/scan report it.
-				return false
+		case '}':
+			return i + 1, true
+		case '/':
+			return 0, false
+		case '^', '$':
+			if i+1 < len(pattern) && pattern[i+1] == pattern[i] {
+				return 0, false
 			}
-			i = end
-		case '{':
-			end, ok := quantifierEnd(pattern, i)
-			if !ok {
-				return true
-			}
-			i = end
-		case '}', ']':
-			return true
+			i++
 		default:
-			i++
-		}
-	}
-	return false
-}
-
-// quantifierEnd returns the byte index just past the `}` of the
-// `{n}` / `{n,}` / `{n,m}` quantifier opening at pattern[start], or ok=false
-// when the brace does not open one.
-func quantifierEnd(pattern string, start int) (int, bool) {
-	i := start + 1
-	digits := 0
-	for i < len(pattern) && pattern[i] >= '0' && pattern[i] <= '9' {
-		i++
-		digits++
-	}
-	if digits == 0 {
-		return start, false
-	}
-	if i < len(pattern) && pattern[i] == ',' {
-		i++
-		for i < len(pattern) && pattern[i] >= '0' && pattern[i] <= '9' {
-			i++
-		}
-	}
-	if i < len(pattern) && pattern[i] == '}' {
-		return i + 1, true
-	}
-	return start, false
-}
-
-// hasInvalidIdentityEscapeForUFlag scans for escapes that ECMAScript u/v mode
-// rejects but regexp2 accepts. Conservative: on malformed input it returns
-// false (i.e. defers to regexp2's verdict) rather than inventing an error.
-func hasInvalidIdentityEscapeForUFlag(pattern string) bool {
-	i := 0
-	for i < len(pattern) {
-		c := pattern[i]
-		if c != '\\' || i+1 >= len(pattern) {
-			i++
-			continue
-		}
-		next := pattern[i+1]
-		switch next {
-		// Recognized single-letter escapes.
-		case 'd', 'D', 'w', 'W', 's', 'S', 'b', 'B', 'n', 't', 'r', 'v', 'f', '0',
-			'x', 'u', 'c', 'p', 'P', 'k', 'q',
-			// SyntaxCharacter / `/` — legal identity escapes under u.
-			'^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '\\', '/':
-			i += 2
-			continue
-		}
-		// Decimal backreference (\1..\9) is legal.
-		if next >= '1' && next <= '9' {
-			i += 2
-			continue
-		}
-		// Any letter/digit identity escape not recognized above is illegal under u.
-		if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') {
-			return true
-		}
-		i += 2
-	}
-	return false
-}
-
-// classSetElementKind classifies one element of a v-flag class body for the
-// purposes of range validation: only a ClassSetCharacter may sit on either
-// side of a `-`.
-type classSetElementKind int
-
-const (
-	classSetPlainChar classSetElementKind = iota
-	classSetOperand
-)
-
-// reservedClassSetPunctuators are the characters ECMAScript reserves inside a
-// v-flag class when they appear doubled (`!!`, `##`, `..`, …). `&` is in the
-// set because `&&` is only legal as the intersection operator.
-const reservedClassSetPunctuators = "&!#$%*+,.:;<=>?@^`~"
-
-// hasInvalidClassContentForVFlag reports whether any character class in
-// pattern holds something the v-flag ClassSetExpression grammar rejects — an
-// unescaped ClassSetSyntaxCharacter, a doubled reserved punctuator, or a `-`
-// that isn't a range between two single characters. It is deliberately
-// conservative: set operators (`--`, and `&&` without operands on both sides)
-// count as invalid, because a pattern this scanner cannot prove legal must
-// not be offered the flag.
-func hasInvalidClassContentForVFlag(pattern string) bool {
-	flags := RegexFlags{UnicodeSets: true}
-	invalid := false
-	IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
-		if !invalid && hasInvalidClassBodyForVFlag(pattern, start, end, flags) {
-			invalid = true
-		}
-	})
-	return invalid
-}
-
-// hasInvalidClassBodyForVFlag checks the body of the single class spanning
-// [start, end). Nested classes are skipped whole — IterateRegexCharacterClasses
-// hands each of them to this function in its own right.
-func hasInvalidClassBodyForVFlag(pattern string, start, end int, flags RegexFlags) bool {
-	i := start + 1
-	last := end - 1
-	if i < last && pattern[i] == '^' {
-		i++
-	}
-
-	elements := 0
-	lastWasRange := false
-	sawOperator := false
-	for i < last {
-		c := pattern[i]
-		// A `-` here has no left-hand character to open a range with.
-		if c == '-' {
-			return true
-		}
-		if strings.IndexByte(reservedClassSetPunctuators, c) >= 0 && i+1 < last && pattern[i+1] == c {
-			// `&&` is the intersection operator, legal between two operands —
-			// and a range is not an operand. Every other doubled punctuator is
-			// reserved.
-			if c != '&' || elements != 1 || lastWasRange || i+2 >= last || pattern[i+2] == '&' {
-				return true
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			if width == 0 {
+				width = 1
 			}
-			i += 2
-			elements = 0
-			sawOperator = true
+			i += width
+		}
+	}
+	return 0, false
+}
+
+// regexPatternLiteral transports a u/v constructor pattern into a literal for
+// tsgo's parser. It reads JavaScript UTF-16 code units, escapes only lexical
+// delimiters, and rejects cases where encoding a line terminator or surrogate
+// would turn an invalid identity escape into valid syntax.
+func regexPatternLiteral(pattern string, flags RegexFlags) (string, bool) {
+	pattern = ecmascript.CombineSurrogatePairs(pattern)
+	units := ecmascript.StringCodeUnits(pattern)
+	if ecmascript.StringFromCodeUnits(units) != pattern {
+		return "", false
+	}
+
+	var literal strings.Builder
+	literal.Grow(len(pattern) + 4)
+	literal.WriteByte('/')
+	if len(units) == 0 {
+		literal.WriteString("(?:)")
+	}
+
+	escaped := false
+	for _, unit := range units {
+		if unit == '\\' {
+			literal.WriteByte('\\')
+			escaped = !escaped
 			continue
 		}
 
-		kind, next, ok := classSetElement(pattern, i, last, flags)
-		if !ok {
-			return true
-		}
-		i = next
-		elements++
-		lastWasRange = false
-
-		if i < last && pattern[i] == '-' {
-			// `--` is the difference operator, which this scanner doesn't
-			// track; refuse rather than read it as a range.
-			if kind != classSetPlainChar || sawOperator || i+1 >= last || pattern[i+1] == '-' {
-				return true
+		switch unit {
+		case '/':
+			if !escaped {
+				literal.WriteByte('\\')
 			}
-			i++
-			kind, next, ok = classSetElement(pattern, i, last, flags)
-			if !ok || kind != classSetPlainChar {
-				return true
+			literal.WriteByte('/')
+		case '\n':
+			if escaped {
+				return "", false
 			}
-			i = next
-			lastWasRange = true
-		}
-	}
-	return sawOperator && elements != 1
-}
-
-// classSetElement consumes one element of a v-flag class body at pattern[i],
-// returning its kind and the index just past it. ok is false for the
-// ClassSetSyntaxCharacters that must be escaped inside a v-flag class.
-func classSetElement(pattern string, i, last int, flags RegexFlags) (classSetElementKind, int, bool) {
-	switch c := pattern[i]; c {
-	case '\\':
-		step, ok := SkipPatternEscape(pattern, i, flags)
-		if !ok || i+step > last {
-			return classSetOperand, i, false
-		}
-		switch pattern[i+1] {
-		case 'd', 'D', 'w', 'W', 's', 'S', 'p', 'P', 'q':
-			return classSetOperand, i + step, true
-		}
-		return classSetPlainChar, i + step, true
-	case '[':
-		nestedEnd, ok := ClassEnd(pattern, i, flags)
-		if !ok || nestedEnd > last {
-			return classSetOperand, i, false
-		}
-		return classSetOperand, nestedEnd, true
-	case '(', ')', '{', '}', '/', '|', ']':
-		return classSetOperand, i, false
-	}
-	_, width := utf8.DecodeRuneInString(pattern[i:])
-	if width == 0 {
-		width = 1
-	}
-	return classSetPlainChar, i + width, true
-}
-
-// hasUnresolvedNamedBackreferenceForUFlag reports whether the pattern has a
-// `\k` that no `(?<name>…)` group in the same pattern can resolve. Without the
-// u/v flag such a `\k` reads as the literal characters `k<name>`; with it, an
-// unresolved reference is a SyntaxError.
-func hasUnresolvedNamedBackreferenceForUFlag(pattern string) bool {
-	names := make(map[string]struct{})
-	var refs []string
-	for i := 0; i < len(pattern); {
-		if pattern[i] == '[' {
-			end, ok := ClassEnd(pattern, i, RegexFlags{Unicode: true})
-			if !ok {
-				return false
+			literal.WriteString(`\n`)
+		case '\r':
+			if escaped {
+				return "", false
 			}
-			i = end
-			continue
-		}
-		if pattern[i] == '\\' {
-			if i+1 >= len(pattern) {
-				return false
+			literal.WriteString(`\r`)
+		case 0x2028, 0x2029:
+			if escaped {
+				return "", false
 			}
-			if pattern[i+1] == 'k' {
-				name, next, ok := readAngleName(pattern, i+2)
-				if !ok {
-					return true
+			writeRegexUnicodeEscape(&literal, unit)
+		default:
+			if unit >= 0xD800 && unit <= 0xDFFF {
+				if escaped {
+					return "", false
 				}
-				refs = append(refs, name)
-				i = next
-				continue
+				writeRegexUnicodeEscape(&literal, unit)
+			} else {
+				literal.WriteRune(rune(unit))
 			}
-			i += 2
-			continue
 		}
-		// `(?<name>` declares a group; `(?<=` and `(?<!` are lookbehinds.
-		if strings.HasPrefix(pattern[i:], "(?<") && i+3 < len(pattern) &&
-			pattern[i+3] != '=' && pattern[i+3] != '!' {
-			name, next, ok := readAngleName(pattern, i+2)
-			normalized, valid := normalizeRegexCaptureName(name)
-			if !ok || !valid {
-				return true
-			}
-			if _, duplicate := names[normalized]; duplicate {
-				return true
-			}
-			names[normalized] = struct{}{}
-			i = next
-			continue
-		}
-		i++
+		escaped = false
 	}
-	for _, ref := range refs {
-		normalized, valid := normalizeRegexCaptureName(ref)
-		if !valid {
-			return true
-		}
-		if _, exists := names[normalized]; !exists {
-			return true
-		}
+	if escaped {
+		return "", false
 	}
-	return false
+
+	literal.WriteByte('/')
+	if flags.UnicodeSets {
+		literal.WriteByte('v')
+	} else {
+		literal.WriteByte('u')
+	}
+	return literal.String(), true
 }
 
-// normalizeRegexCaptureName validates the IdentifierName grammar used by
-// named captures and returns its decoded value so escaped and literal spellings
-// compare alike.
+func writeRegexUnicodeEscape(builder *strings.Builder, unit uint16) {
+	const hex = "0123456789ABCDEF"
+	builder.WriteString(`\u`)
+	builder.WriteByte(hex[unit>>12])
+	builder.WriteByte(hex[unit>>8&0xF])
+	builder.WriteByte(hex[unit>>4&0xF])
+	builder.WriteByte(hex[unit&0xF])
+}
+
+// normalizeRegexCaptureName validates the RegExpIdentifierName grammar and
+// returns its decoded value so escaped and literal spellings compare alike.
 func normalizeRegexCaptureName(name string) (string, bool) {
 	if name == "" {
 		return "", false
 	}
 	var result strings.Builder
+	first := true
 	for i := 0; i < len(name); {
+		var value rune
 		if name[i] != '\\' {
 			r, width := utf8.DecodeRuneInString(name[i:])
 			if r == utf8.RuneError && width == 1 {
 				return "", false
 			}
-			result.WriteRune(r)
+			value = r
 			i += width
-			continue
-		}
-		value, width, ok := decodeRegexCaptureNameEscape(name, i)
-		if !ok {
-			return "", false
-		}
-		if value >= 0xD800 && value <= 0xDBFF {
-			next, nextWidth, ok := decodeRegexCaptureNameEscape(name, i+width)
-			if !ok || next < 0xDC00 || next > 0xDFFF {
-				return "", false
-			}
-			result.WriteRune(utf16.DecodeRune(rune(value), rune(next)))
-			width += nextWidth
 		} else {
-			if value >= 0xDC00 && value <= 0xDFFF {
+			decoded, width, fixed, ok := decodeRegexCaptureNameEscape(name, i)
+			if !ok {
 				return "", false
 			}
-			result.WriteRune(rune(value))
+			i += width
+			if decoded >= 0xD800 && decoded <= 0xDBFF {
+				if !fixed {
+					return "", false
+				}
+				low, lowWidth, lowFixed, ok := decodeRegexCaptureNameEscape(name, i)
+				if !ok || !lowFixed || low < 0xDC00 || low > 0xDFFF {
+					return "", false
+				}
+				value = utf16.DecodeRune(rune(decoded), rune(low))
+				i += lowWidth
+			} else {
+				if decoded >= 0xDC00 && decoded <= 0xDFFF {
+					return "", false
+				}
+				value = rune(decoded)
+			}
 		}
-		i += width
-	}
-	normalized := result.String()
-	for i, r := range normalized {
-		if (i == 0 && !scanner.IsIdentifierStart(r)) || (i != 0 && !scanner.IsIdentifierPart(r)) {
+
+		if first {
+			if !scanner.IsIdentifierStart(value) {
+				return "", false
+			}
+			first = false
+		} else if !scanner.IsIdentifierPart(value) {
 			return "", false
 		}
+		result.WriteRune(value)
 	}
-	return normalized, true
+	return result.String(), !first
 }
 
-func decodeRegexCaptureNameEscape(name string, start int) (uint32, int, bool) {
+// decodeRegexCaptureNameEscape decodes one `\u` escape. fixed is true only
+// for the four-digit form; the grammar permits a surrogate pair only when both
+// halves use that fixed form.
+func decodeRegexCaptureNameEscape(name string, start int) (value uint32, width int, fixed bool, ok bool) {
 	if start+2 >= len(name) || name[start] != '\\' || name[start+1] != 'u' {
-		return 0, 0, false
+		return 0, 0, false, false
 	}
-	if name[start+2] == '{' {
-		closeRel := strings.IndexByte(name[start+3:], '}')
-		if closeRel < 1 {
-			return 0, 0, false
+	if name[start+2] != '{' {
+		if start+6 > len(name) || !allHexStr(name[start+2:start+6]) {
+			return 0, 0, false, false
 		}
-		digits := name[start+3 : start+3+closeRel]
-		if len(digits) > 6 || !allHexStr(digits) {
-			return 0, 0, false
+		parsed, err := strconv.ParseUint(name[start+2:start+6], 16, 16)
+		if err != nil {
+			return 0, 0, false, false
 		}
-		value, err := strconv.ParseUint(digits, 16, 32)
-		if err != nil || value > utf8.MaxRune {
-			return 0, 0, false
+		return uint32(parsed), 6, true, true
+	}
+
+	value = 0
+	digits := 0
+	for i := start + 3; i < len(name) && name[i] != '}'; i++ {
+		digit, valid := regexHexValue(name[i])
+		if !valid || value > (utf8.MaxRune-digit)/16 {
+			return 0, 0, false, false
 		}
-		return uint32(value), closeRel + 4, true
+		value = value*16 + digit
+		digits++
 	}
-	if start+6 > len(name) || !allHexStr(name[start+2:start+6]) {
-		return 0, 0, false
+	end := start + 3 + digits
+	if digits == 0 || end >= len(name) || name[end] != '}' {
+		return 0, 0, false, false
 	}
-	value, err := strconv.ParseUint(name[start+2:start+6], 16, 16)
-	if err != nil {
-		return 0, 0, false
+	return value, end - start + 1, false, true
+}
+
+func regexHexValue(value byte) (uint32, bool) {
+	switch {
+	case value >= '0' && value <= '9':
+		return uint32(value - '0'), true
+	case value >= 'a' && value <= 'f':
+		return uint32(value-'a') + 10, true
+	case value >= 'A' && value <= 'F':
+		return uint32(value-'A') + 10, true
+	default:
+		return 0, false
 	}
-	return uint32(value), 6, true
 }
 
 // readAngleName reads a `<name>` starting at pattern[start], returning the

@@ -1,0 +1,218 @@
+package utils
+
+import (
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+)
+
+func TestRegexPatternLiteral(t *testing.T) {
+	high := ecmascript.StringFromCodeUnits([]uint16{0xD800})
+	tests := []struct {
+		name    string
+		pattern string
+		flags   RegexFlags
+		want    string
+		ok      bool
+	}{
+		{name: "empty u", flags: RegexFlags{Unicode: true}, want: `/(?:)/u`, ok: true},
+		{name: "empty v", flags: RegexFlags{UnicodeSets: true}, want: `/(?:)/v`, ok: true},
+		{name: "unescaped slash", pattern: `/`, flags: RegexFlags{Unicode: true}, want: `/\//u`, ok: true},
+		{name: "escaped slash", pattern: `\/`, flags: RegexFlags{Unicode: true}, want: `/\//u`, ok: true},
+		{name: "two backslashes and slash", pattern: `\\/`, flags: RegexFlags{Unicode: true}, want: `/\\\//u`, ok: true},
+		{name: "three backslashes and slash", pattern: `\\\/`, flags: RegexFlags{Unicode: true}, want: `/\\\//u`, ok: true},
+		{name: "line feed", pattern: "\n", flags: RegexFlags{Unicode: true}, want: `/\n/u`, ok: true},
+		{name: "carriage return", pattern: "\r", flags: RegexFlags{Unicode: true}, want: `/\r/u`, ok: true},
+		{name: "line separator", pattern: "\u2028", flags: RegexFlags{Unicode: true}, want: `/\u2028/u`, ok: true},
+		{name: "paragraph separator", pattern: "\u2029", flags: RegexFlags{Unicode: true}, want: `/\u2029/u`, ok: true},
+		{name: "two backslashes and line feed", pattern: "\\\\\n", flags: RegexFlags{Unicode: true}, want: `/\\\n/u`, ok: true},
+		{name: "escaped line feed", pattern: "\\\n", flags: RegexFlags{Unicode: true}},
+		{name: "lone surrogate", pattern: high, flags: RegexFlags{Unicode: true}, want: `/\uD800/u`, ok: true},
+		{name: "surrogate pair", pattern: "😀", flags: RegexFlags{Unicode: true}, want: `/\uD83D\uDE00/u`, ok: true},
+		{name: "escaped surrogate", pattern: `\` + high, flags: RegexFlags{Unicode: true}},
+		{name: "trailing backslash", pattern: `\`, flags: RegexFlags{Unicode: true}},
+		{name: "invalid utf8", pattern: string([]byte{0xFF}), flags: RegexFlags{Unicode: true}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := regexPatternLiteral(test.pattern, test.flags)
+			if got != test.want || ok != test.ok {
+				t.Fatalf("regexPatternLiteral(%q) = (%q, %v), want (%q, %v)", test.pattern, got, ok, test.want, test.ok)
+			}
+		})
+	}
+}
+
+func TestIsValidRegexPatternUnicode(t *testing.T) {
+	high := ecmascript.StringFromCodeUnits([]uint16{0xD800})
+	low := ecmascript.StringFromCodeUnits([]uint16{0xDC00})
+	u := RegexFlags{Unicode: true}
+	v := RegexFlags{UnicodeSets: true}
+	tests := []struct {
+		name    string
+		pattern string
+		flags   RegexFlags
+		want    bool
+	}{
+		{name: "simple", pattern: `abc`, flags: u, want: true},
+		{name: "empty", flags: u, want: true},
+		{name: "slash", pattern: `/`, flags: u, want: true},
+		{name: "escaped slash", pattern: `\/`, flags: u, want: true},
+		{name: "two backslashes and slash", pattern: `\\/`, flags: u, want: true},
+		{name: "line feed", pattern: "\n", flags: u, want: true},
+		{name: "escaped line feed", pattern: "\\\n", flags: u},
+		{name: "two backslashes and line feed", pattern: "\\\\\n", flags: u, want: true},
+		{name: "lone high surrogate", pattern: high, flags: u, want: true},
+		{name: "lone low surrogate", pattern: low, flags: u, want: true},
+		{name: "escaped lone surrogate", pattern: `\` + high, flags: u},
+		{name: "escaped astral", pattern: `\` + "😀", flags: u},
+		{name: "invalid identity escape", pattern: `\q`, flags: u},
+		{name: "class identity escape", pattern: `[\B]`, flags: u},
+		{name: "class named-looking escape", pattern: `[\k<a>]`, flags: u},
+		{name: "missing numeric backreference", pattern: `\1`, flags: u},
+		{name: "second numeric backreference missing", pattern: `(a)\2`, flags: u},
+		{name: "legacy octal", pattern: `\01`, flags: u},
+		{name: "escaped declaration name", pattern: `(?<\u0061>x)\k<a>`, flags: u, want: true},
+		{name: "escaped reference name", pattern: `(?<a>x)\k<\u0061>`, flags: u, want: true},
+		{name: "dollar name", pattern: `(?<\u0024>x)\k<$>`, flags: u, want: true},
+		{name: "astral escaped name", pattern: `(?<\uD835\uDC9C>x)\k<\u{1D49C}>`, flags: u, want: true},
+		{name: "astral raw surrogate-pair name", pattern: "(?<" + high + low + ">x)", flags: u, want: true},
+		{name: "braced leading zeros", pattern: `(?<\u{00000061}>x)\k<a>`, flags: u, want: true},
+		{name: "forward named reference", pattern: `\k<a>(?<a>x)`, flags: u, want: true},
+		{name: "unresolved named reference", pattern: `\k<a>`, flags: u},
+		{name: "sequential duplicate name", pattern: `(?<a>x)(?<a>y)`, flags: u},
+		{name: "braced surrogate halves", pattern: `(?<\u{D835}\u{DC9C}>x)`, flags: u},
+		{name: "mixed surrogate halves", pattern: `(?<\uD835\u{DC9C}>x)`, flags: u},
+		{name: "lone high surrogate name", pattern: `(?<\uD835>x)`, flags: u},
+		{name: "lone low surrogate name", pattern: `(?<\uDC9C>x)`, flags: u},
+		{name: "group text in class", pattern: `[(?<a>x)]\k<a>`, flags: u},
+		{name: "unicode property long alias", pattern: `\p{Letter}`, flags: u, want: true},
+		{name: "unicode property script", pattern: `\p{Script=Greek}`, flags: u, want: true},
+		{name: "unicode set subtraction", pattern: `[\d--[3]]`, flags: v, want: true},
+		{name: "unicode set string", pattern: `[\q{abc}]`, flags: v, want: true},
+		{name: "raw slash in u class", pattern: `[/]`, flags: u, want: true},
+		{name: "raw slash in v class", pattern: `[/]`, flags: v},
+		{name: "escaped slash in v class", pattern: `[\/]`, flags: v, want: true},
+		{name: "raw slash in v string", pattern: `[\q{a/b}]`, flags: v},
+		{name: "escaped slash in v string", pattern: `[\q{a\/b}]`, flags: v, want: true},
+		{name: "raw slash in nested v class", pattern: `[[/]]`, flags: v},
+		{name: "trailing hyphen in u class", pattern: `[a-]`, flags: u, want: true},
+		{name: "trailing hyphen in v class", pattern: `[a-]`, flags: v},
+		{name: "trailing hyphen in negated v class", pattern: `[^a-]`, flags: v},
+		{name: "trailing hyphen in nested v class", pattern: `[[a-]]`, flags: v},
+		{name: "escaped trailing hyphen in v class", pattern: `[a\-]`, flags: v, want: true},
+		{name: "subtraction hyphens in v class", pattern: `[a--b]`, flags: v, want: true},
+		{name: "escaped hyphen in v string", pattern: `[\q{a\-}]`, flags: v, want: true},
+		{name: "leading hyphen in v class", pattern: `[-a]`, flags: v},
+		{name: "escaped leading hyphen in v class", pattern: `[\-a]`, flags: v, want: true},
+		{name: "doubled caret in v class", pattern: `[a^^b]`, flags: v},
+		{name: "doubled dollar in nested v class", pattern: `[[a$$b]]`, flags: v},
+		{name: "negation caret is not a doubled punctuator", pattern: `[^^]`, flags: v, want: true},
+		{name: "escaped doubled caret in v class", pattern: `[\^\^]`, flags: v, want: true},
+		{name: "doubled dollar in v string", pattern: `[\q{a$$b}]`, flags: v},
+		{name: "doubled caret in nested v string", pattern: `[[\q{a^^b}]]`, flags: v},
+		{name: "escaped doubled dollar in v string", pattern: `[\q{\$\$}]`, flags: v, want: true},
+		{name: "string in positive v class", pattern: `[a\q{bc}]`, flags: v, want: true},
+		{name: "property in positive v class", pattern: `[a\p{Letter}]`, flags: v, want: true},
+		{name: "both unicode modes", pattern: `a`, flags: RegexFlags{Unicode: true, UnicodeSets: true}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsValidRegexPattern(test.pattern, test.flags); got != test.want {
+				t.Fatalf("IsValidRegexPattern(%q, %+v) = %v, want %v", test.pattern, test.flags, got, test.want)
+			}
+		})
+	}
+}
+
+func TestIsValidRegexPatternUnicodeSuggestionSafety(t *testing.T) {
+	v := RegexFlags{UnicodeSets: true}
+	for _, test := range []struct {
+		name    string
+		pattern string
+		want    bool
+	}{
+		{name: "single-code-point string in negated class is conservative", pattern: `[^a\q{b}]`},
+		{name: "later string in negated class", pattern: `[^a\q{bc}]`},
+		{name: "property in negated class is conservative", pattern: `[^a\p{Letter}]`},
+		{name: "nested string in negated class", pattern: `[^a[\q{bc}]]`},
+		{name: "string in positive class", pattern: `[a\q{bc}]`, want: true},
+		{name: "property in positive class", pattern: `[a\p{Letter}]`, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsValidRegexPatternForECMAVersion(test.pattern, v, 2024); got != test.want {
+				t.Fatalf("IsValidRegexPatternForECMAVersion(%q) = %v, want %v", test.pattern, got, test.want)
+			}
+		})
+	}
+}
+
+func TestIsValidRegexPatternFailsClosedOnScannerGaps(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		pattern string
+		flags   RegexFlags
+	}{
+		{
+			name:    "duplicate name control flow",
+			pattern: `(?=(?<a>x))(?<a>y)`,
+			flags:   RegexFlags{Unicode: true},
+		},
+		{
+			name:    "negated multi-code-point string",
+			pattern: `[^a\q{bc}]`,
+			flags:   RegexFlags{UnicodeSets: true},
+		},
+		{
+			name:    "negated ordinary property is conservative",
+			pattern: `[^a\p{Letter}]`,
+			flags:   RegexFlags{UnicodeSets: true},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if IsValidRegexPattern(test.pattern, test.flags) {
+				t.Fatalf("IsValidRegexPattern(%q) = true, want fail-closed false", test.pattern)
+			}
+		})
+	}
+}
+
+func TestIsValidRegexPatternECMAVersion(t *testing.T) {
+	u := RegexFlags{Unicode: true}
+	for _, test := range []struct {
+		name        string
+		pattern     string
+		ecmaVersion int
+		want        bool
+	}{
+		{name: "named capture before introduction", pattern: `(?<a>x)`, ecmaVersion: 2017},
+		{name: "named capture after introduction", pattern: `(?<a>x)`, ecmaVersion: 2018, want: true},
+		{name: "duplicate alternatives before relaxation", pattern: `(?<a>x)|(?<a>y)`, ecmaVersion: 2024},
+		{name: "duplicate alternatives after relaxation are conservative", pattern: `(?<a>x)|(?<a>y)`, ecmaVersion: 2025},
+		{name: "escaped duplicate alternatives before relaxation", pattern: `(?<\u0061>x)|(?<a>y)`, ecmaVersion: 2024},
+		{name: "escaped duplicate alternatives after relaxation are conservative", pattern: `(?<\u0061>x)|(?<a>y)`, ecmaVersion: 2025},
+		{name: "unsafe nested alternative duplicate", pattern: `(?:x|(?<a>y))(?<a>z)`, ecmaVersion: 2025},
+		{name: "unsafe lookahead duplicate", pattern: `(?=(?<a>x))(?<a>y)`, ecmaVersion: 2025},
+		{name: "sequential duplicate remains invalid", pattern: `(?<a>x)(?<a>y)`, ecmaVersion: 2025},
+		{name: "inline modifiers before introduction", pattern: `(?i:a)`, ecmaVersion: 2024},
+		{name: "inline modifiers after introduction", pattern: `(?i:a)`, ecmaVersion: 2025, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsValidRegexPatternForECMAVersion(test.pattern, u, test.ecmaVersion); got != test.want {
+				t.Fatalf("IsValidRegexPatternForECMAVersion(%q, %d) = %v, want %v", test.pattern, test.ecmaVersion, got, test.want)
+			}
+		})
+	}
+}
+
+func TestIsValidRegexPatternLegacyPath(t *testing.T) {
+	// Annex B accepts escapes that u/v reject. This locks in that the tsgo
+	// literal adapter is confined to the Unicode modes.
+	for _, pattern := range []string{"\\\n", `\q`, `\01`} {
+		if !IsValidRegexPattern(pattern, RegexFlags{}) {
+			t.Errorf("legacy IsValidRegexPattern(%q) = false, want true", pattern)
+		}
+	}
+}

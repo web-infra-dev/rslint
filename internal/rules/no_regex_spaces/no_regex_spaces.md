@@ -34,6 +34,14 @@ contains escape sequences that differ from the raw source (e.g.
 `new RegExp('\\d  ')`), the rule reports but does not autofix — the index into
 the parsed pattern would not map cleanly back to source positions.
 
+## Differences from ESLint
+
+- Pattern validation fails closed for duplicate named captures and for
+  `\q{...}` or Unicode-property operands below a negated `v` character class.
+  The rule can therefore omit a report for an ES2025 mutually exclusive
+  duplicate name or a negated single-code-point operand that ESLint proves
+  valid; this ensures a parser ambiguity never produces an unsafe autofix.
+
 ## Original Documentation
 
 - [ESLint: no-regex-spaces](https://eslint.org/docs/latest/rules/no-regex-spaces)

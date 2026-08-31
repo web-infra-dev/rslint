@@ -71,6 +71,11 @@ func TestNoRegexSpacesRule(t *testing.T) {
 			{Code: `var foo = new RegExp('[  ');`},
 			{Code: `var foo = new RegExp('{  ', 'u');`},
 			{Code: `var foo = new RegExp('{  ', 'v');`},
+			{Code: `RegExp("(?=(?<a>x))(?<a>y)  ", "u")`},
+			{Code: `RegExp("[^a\\q{bc}]  ", "v")`},
+			// The shared validator fails closed for v string-capability cases
+			// that tsgo cannot distinguish without ClassSet data flow.
+			{Code: `RegExp("[^a\\p{Letter}]  ", "v")`},
 
 			// ---- Flags cannot be determined ----
 			{Code: `new RegExp('  ', flags)`},
