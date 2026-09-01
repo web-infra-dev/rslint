@@ -81,5 +81,8 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `C[propTypes] = { z: PropTypes.string, a: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
 		// Shape detection does not cross TypeScript expression wrappers on the callee.
 		{Code: `(PropTypes.shape as any)({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
+		// Assignment detection does not cross TypeScript expression wrappers on the member.
+		{Code: `(Component.propTypes as any) = { z: PropTypes.string, a: PropTypes.string };`, Tsx: true},
+		{Code: `(Component.propTypes!) = { z: PropTypes.string, a: PropTypes.string };`, Tsx: true},
 	})
 }

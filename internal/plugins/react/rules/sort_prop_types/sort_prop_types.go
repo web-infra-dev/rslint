@@ -202,7 +202,9 @@ var SortPropTypesRule = rule.Rule{
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
-				left := reactutil.SkipExpressionWrappers(binary.Left)
+				// ESTree omits parentheses but keeps TypeScript expression
+				// wrappers around the member, so only skip parentheses here.
+				left := ast.SkipParentheses(binary.Left)
 				if left == nil {
 					return
 				}
