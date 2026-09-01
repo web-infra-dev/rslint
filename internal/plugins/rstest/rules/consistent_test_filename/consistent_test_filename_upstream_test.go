@@ -2,7 +2,7 @@
 // @vitest/eslint-plugin@v1.6.27 consistent-test-filename suite
 // (tests/consistent-test-filename.test.ts) 1:1. Every case is a filename, so
 // the code is irrelevant and stays as upstream wrote it. Position assertions
-// cover the file-start range that carries the diagnostic. Extension coverage,
+// cover the whole-file range that carries the diagnostic. Extension coverage,
 // path matching and option-parsing branches live in
 // consistent_test_filename_extras_test.go.
 package consistent_test_filename
@@ -39,7 +39,7 @@ func TestConsistentTestFilenameUpstream(t *testing.T) {
 						Line:      1,
 						Column:    1,
 						EndLine:   1,
-						EndColumn: 1,
+						EndColumn: 10,
 					},
 				},
 			},
@@ -57,7 +57,7 @@ func TestConsistentTestFilenameUpstream(t *testing.T) {
 						Line:      1,
 						Column:    1,
 						EndLine:   1,
-						EndColumn: 1,
+						EndColumn: 10,
 					},
 				},
 			},

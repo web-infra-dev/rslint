@@ -15,7 +15,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func expectedDefaultPatternError() []rule_tester.InvalidTestCaseError {
+// The diagnostic spans the whole file, so its end column depends on the code
+// under test: `endColumn` is the length of the single-line source plus one.
+func expectedDefaultPatternError(endColumn int) []rule_tester.InvalidTestCaseError {
 	return []rule_tester.InvalidTestCaseError{
 		{
 			MessageId: "consistentTestFilename",
@@ -23,7 +25,7 @@ func expectedDefaultPatternError() []rule_tester.InvalidTestCaseError {
 			Line:      1,
 			Column:    1,
 			EndLine:   1,
-			EndColumn: 1,
+			EndColumn: endColumn,
 		},
 	}
 }
@@ -67,12 +69,12 @@ func TestConsistentTestFilenameExtras(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- the convention the defaults enforce ----
-			{Code: `export {}`, FileName: "src/user-service.spec.ts", Errors: expectedDefaultPatternError()},
-			{Code: `export {}`, FileName: "src/user-service.spec.tsx", Errors: expectedDefaultPatternError()},
+			{Code: `export {}`, FileName: "src/user-service.spec.ts", Errors: expectedDefaultPatternError(10)},
+			{Code: `export {}`, FileName: "src/user-service.spec.tsx", Errors: expectedDefaultPatternError(10)},
 			// `.mts` and `.cts` are test files under Rstest's default glob, so
 			// a spec-named one is held to the same convention.
-			{Code: `export {}`, FileName: "src/user-service.spec.mts", Errors: expectedDefaultPatternError()},
-			{Code: `export {}`, FileName: "src/user-service.spec.cts", Errors: expectedDefaultPatternError()},
+			{Code: `export {}`, FileName: "src/user-service.spec.mts", Errors: expectedDefaultPatternError(10)},
+			{Code: `export {}`, FileName: "src/user-service.spec.cts", Errors: expectedDefaultPatternError(10)},
 
 			// ---- whole-path matching selects a directory ----
 			{
@@ -89,7 +91,7 @@ func TestConsistentTestFilenameExtras(t *testing.T) {
 						Line:      1,
 						Column:    1,
 						EndLine:   1,
-						EndColumn: 1,
+						EndColumn: 10,
 					},
 				},
 			},
@@ -106,7 +108,7 @@ func TestConsistentTestFilenameExtras(t *testing.T) {
 						Line:      1,
 						Column:    1,
 						EndLine:   1,
-						EndColumn: 1,
+						EndColumn: 10,
 					},
 				},
 			},
@@ -115,7 +117,7 @@ func TestConsistentTestFilenameExtras(t *testing.T) {
 			{
 				Code:     `export const users = []`,
 				FileName: "src/user-service.spec.ts",
-				Errors:   expectedDefaultPatternError(),
+				Errors:   expectedDefaultPatternError(24),
 			},
 		},
 	)

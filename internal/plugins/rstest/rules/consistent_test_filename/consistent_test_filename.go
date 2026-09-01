@@ -96,8 +96,11 @@ var ConsistentTestFilenameRule = rule.Rule{
 			return nil
 		}
 
+		// Upstream reports on the `Program` node, so the diagnostic spans the
+		// whole file. `ReportNode` would trim leading trivia off that range, so
+		// the source file's own range is built directly.
 		ctx.ReportRange(
-			core.NewTextRange(0, 0),
+			core.NewTextRange(0, ctx.SourceFile.End()),
 			buildConsistentTestFilenameMessage(opts.patternSource),
 		)
 		return nil
