@@ -97,7 +97,7 @@ async function moveArtifacts() {
     // artifact named `rule-schemas`, uploaded once from the `build` job's
     // linux-amd64 leg) to the fixed path
     // the generate-rule-option-types rslib plugin reads — see
-    // packages/rslint/rslib.config.ts's onAfterBuild hook, which runs during
+    // packages/rslint/rstack.config.ts's onAfterBuild hook, which runs during
     // publish-npm's `build:js` step.
     const ruleSchemasSrc = path.join(
       'binaries',

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from '@rstest/core';
+import { describe, test, expect, beforeAll, afterAll } from 'rstack/test';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';

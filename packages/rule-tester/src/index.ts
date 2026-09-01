@@ -1,7 +1,7 @@
 // Forked and modified from https://github.com/typescript-eslint/typescript-eslint/blob/16c344ec7d274ea542157e0f19682dd1930ab838/packages/rule-tester/src/RuleTester.ts#L4
 
 import path from 'node:path';
-import { test, describe, expect } from '@rstest/core';
+import { test, describe, expect } from 'rstack/test';
 import { lint, LintResponse, type Diagnostic } from '@rslint/core/internal';
 import { loadConfigFile, normalizeConfig } from '@rslint/core/config-loader';
 import assert from 'node:assert';

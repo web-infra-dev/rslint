@@ -14,7 +14,7 @@ A quick reference for common commands, file locations, and checklists when porti
 | Go unit test             | `go test -count=1 ./internal/rules/<rule_name>`                                                  |
 | Go related tests         | `go test -count=1 <changed package dirs and direct consumer package dirs>`                       |
 | Build binary             | `cd packages/rslint && pnpm run build:bin`                                                       |
-| JS unit test             | `cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>`                |
+| JS unit test             | `cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name>`             |
 | Type check               | `pnpm typecheck`                                                                                 |
 | Lint check               | `pnpm lint`                                                                                      |
 | Format check             | `pnpm format:check`                                                                              |
@@ -153,8 +153,8 @@ import (
 
 - [ ] Go tests pass for the rule package and any changed-related Go package directories (see Phase 4 Step 2 in `PORT_RULE.md`)
 - [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
-- [ ] JS snapshots generated (`npx rstest run <name> -u`)
-- [ ] JS tests pass (`cd packages/rslint-test-tools && npx rstest run <name>`)
+- [ ] JS snapshots generated (`pnpm exec rs test <name> -u`)
+- [ ] JS tests pass (`cd packages/rslint-test-tools && pnpm exec rs test <name>`)
 - [ ] Go/JS test coverage is semantically aligned (`JS ⊆ Go upstream`; extras remain Go-only)
 - [ ] Autofixes/suggestions use deferred report builders and have `Test<Rule>EditDemand` in the existing extras test file
 - [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
@@ -170,7 +170,7 @@ import (
 - [ ] Format check passes (`pnpm format:check`)
 - [ ] Changed-package Go lint passes (packages containing changed `.go` files under `cmd/` and `internal/`; see Phase 4 Step 7 in `PORT_RULE.md`)
 - [ ] Rule included in the catalog (in `internal/rules/all.go` for core, or the plugin's `all.go` otherwise)
-- [ ] Test file registered (`packages/rslint-test-tools/rstest.config.mts`)
+- [ ] Test file registered (`packages/rslint-test-tools/rstack.config.mts`)
 - [ ] Documentation created (`<rule_name>.md`)
 
 **Quick Fix Commands** (run before committing if checks fail):

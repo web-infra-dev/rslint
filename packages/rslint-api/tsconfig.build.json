@@ -11,7 +11,7 @@
     // No source file in `src/**` references `#enums/*`. The mapping exists
     // purely so api-extractor (rslib's d.ts bundler) can resolve the Node
     // subpath imports inside transitively pulled `_packages/native-preview`
-    // sources — `dts.alias` in rslib.config.ts is a no-op for `bundle: true`
+    // sources — `dts.alias` in rstack.config.mts is a no-op for `bundle: true`
     // because api-extractor reads its own tsconfig fresh from disk.
     "paths": {
       "#enums/*": [

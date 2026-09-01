@@ -7,7 +7,7 @@
  * expectation (espree can't parse TS; the values were verified against @typescript-eslint
  * /typescript-estree during the M3 spike).
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import * as espree from 'espree';
 import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 

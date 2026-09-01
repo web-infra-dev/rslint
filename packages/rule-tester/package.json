@@ -16,8 +16,8 @@
   "scripts": {
     "build": "tsgo -b tsconfig.build.json --force",
     "dev": "tsgo -b tsconfig.build.json --force --watch",
-    "test": "rstest run --testTimeout=0 --passWithNoTests",
-    "test:update": "rstest run -u --testTimeout=0 --passWithNoTests"
+    "test": "rs test --testTimeout=0 --passWithNoTests",
+    "test:update": "rs test -u --testTimeout=0 --passWithNoTests"
   },
   "files": [
     "dist"
