@@ -90,6 +90,62 @@ const DEFAULT_TSCONFIG = `{
   }
 }`;
 
+const DEFAULT_CODE = ['let a: any;', 'a.b = 10;'].join('\n');
+
+/**
+ * The config editors only take a URL param once their content differs from the
+ * default, so links that predate them (and links to unmodified configs) stay
+ * valid: a missing param means "the default".
+ */
+const CODE_PARAM = 'code';
+const RSLINT_CONFIG_PARAM = 'config';
+const TSCONFIG_PARAM = 'tsconfig';
+const HASH_PARAM_PATTERN = new RegExp(
+  `(?:^|&)(?:${CODE_PARAM}|${RSLINT_CONFIG_PARAM}|${TSCONFIG_PARAM})=`,
+);
+
+function readUrlParam(name: string): string | null {
+  if (typeof window === 'undefined') return null;
+  const { search, hash } = window.location;
+  const fromSearch = new URLSearchParams(search).get(name);
+  if (fromSearch != null) return fromSearch;
+  if (hash && hash.startsWith('#')) {
+    const fromHash = new URLSearchParams(hash.slice(1)).get(name);
+    if (fromHash != null) return fromHash;
+  }
+  return null;
+}
+
+function getInitialCode(): string {
+  return readUrlParam(CODE_PARAM) ?? DEFAULT_CODE;
+}
+
+function getInitialRslintConfig(): string {
+  return readUrlParam(RSLINT_CONFIG_PARAM) ?? DEFAULT_RSLINT_CONFIG;
+}
+
+function getInitialTsConfig(): string {
+  return readUrlParam(TSCONFIG_PARAM) ?? DEFAULT_TSCONFIG;
+}
+
+/**
+ * An editor that has not been created yet leaves its param untouched; an editor
+ * holding the default content drops its param entirely.
+ */
+function serializeParam(
+  url: URL,
+  name: string,
+  value: string | undefined,
+  defaultValue: string,
+) {
+  if (value === undefined) return;
+  if (value === defaultValue) {
+    url.searchParams.delete(name);
+  } else {
+    url.searchParams.set(name, value);
+  }
+}
+
 function parseJsonc(content: string): any | null {
   try {
     // Remove single-line comments
@@ -148,23 +204,7 @@ export const EditorTabs = ({
     onConfigChangeRef.current = onConfigChange;
   }, [onChange, onSelectionChange, onConfigChange]);
 
-  function getInitialCode(): string {
-    if (typeof window === 'undefined') {
-      return ['let a: any;', 'a.b = 10;'].join('\n');
-    }
-    const { search, hash } = window.location;
-    const searchParams = new URLSearchParams(search);
-    const fromSearch = searchParams.get('code');
-    if (fromSearch != null) return fromSearch;
-    if (hash && hash.startsWith('#')) {
-      const hashParams = new URLSearchParams(hash.slice(1));
-      const fromHash = hashParams.get('code');
-      if (fromHash != null) return fromHash;
-    }
-    return ['let a: any;', 'a.b = 10;'].join('\n');
-  }
-
-  function scheduleSerializeToUrl(value: string) {
+  function scheduleSerializeToUrl() {
     if (typeof window === 'undefined') return;
     if (urlUpdateTimer.current) {
       window.clearTimeout(urlUpdateTimer.current);
@@ -173,8 +213,23 @@ export const EditorTabs = ({
     urlUpdateTimer.current = window.setTimeout(() => {
       try {
         const url = new URL(window.location.href);
-        url.searchParams.set('code', value);
-        if (url.hash && url.hash.includes('code=')) {
+        const code = codeEditorRef.current?.getValue();
+        if (code !== undefined) {
+          url.searchParams.set(CODE_PARAM, code);
+        }
+        serializeParam(
+          url,
+          RSLINT_CONFIG_PARAM,
+          rslintEditorRef.current?.getValue(),
+          DEFAULT_RSLINT_CONFIG,
+        );
+        serializeParam(
+          url,
+          TSCONFIG_PARAM,
+          tsconfigEditorRef.current?.getValue(),
+          DEFAULT_TSCONFIG,
+        );
+        if (url.hash && HASH_PARAM_PATTERN.test(url.hash.slice(1))) {
           url.hash = '';
         }
         window.history.replaceState(null, '', url.toString());
@@ -186,7 +241,7 @@ export const EditorTabs = ({
 
   // Initialize the last valid tsconfig.
   useEffect(() => {
-    lastValidTsConfig.current = parseJsonc(DEFAULT_TSCONFIG);
+    lastValidTsConfig.current = parseJsonc(getInitialTsConfig());
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -337,12 +392,12 @@ export const EditorTabs = ({
     // Trigger initial onChange
     const initialVal = editor.getValue() || '';
     onChangeRef.current(initialVal);
-    scheduleSerializeToUrl(initialVal);
+    scheduleSerializeToUrl();
 
     editor.onDidChangeModelContent(() => {
       const val = editor.getValue() || '';
       onChangeRef.current(val);
-      scheduleSerializeToUrl(val);
+      scheduleSerializeToUrl();
 
       // Mark as editing to prevent AST tree selection during typing
       isEditingRef.current = true;
@@ -421,7 +476,7 @@ export const EditorTabs = ({
       noSyntaxValidation: false,
     });
     const model = monaco.editor.createModel(
-      DEFAULT_RSLINT_CONFIG,
+      getInitialRslintConfig(),
       'javascript',
       monaco.Uri.parse('file:///rslint.config.js'),
     );
@@ -436,6 +491,7 @@ export const EditorTabs = ({
 
     editor.onDidChangeModelContent(() => {
       onConfigChangeRef.current?.();
+      scheduleSerializeToUrl();
     });
 
     return () => {
@@ -449,7 +505,7 @@ export const EditorTabs = ({
     if (!tsconfigContainerRef.current) return;
 
     const editor = monaco.editor.create(tsconfigContainerRef.current, {
-      value: DEFAULT_TSCONFIG,
+      value: getInitialTsConfig(),
       language: 'json',
       theme: editorTheme,
       automaticLayout: true,
@@ -460,6 +516,7 @@ export const EditorTabs = ({
 
     editor.onDidChangeModelContent(() => {
       onConfigChangeRef.current?.();
+      scheduleSerializeToUrl();
     });
 
     return () => {
