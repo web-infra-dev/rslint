@@ -260,6 +260,9 @@ type sortableAttribute struct {
 
 func buildFixes(ctx rule.RuleContext, element *ast.Node, opts options, reserved []string) []rule.RuleFix {
 	attrs := reactutil.GetJsxElementAttributes(element)
+	if hasCommentAfterSpread(ctx, element, attrs) {
+		return nil
+	}
 	groups := sortableGroups(ctx, element, attrs)
 	text := ctx.SourceFile.Text()
 	var fixes []rule.RuleFix
@@ -275,6 +278,26 @@ func buildFixes(ctx rule.RuleContext, element *ast.Node, opts options, reserved 
 		}
 	}
 	return fixes
+}
+
+// hasCommentAfterSpread keeps an otherwise unattached comment from being
+// silently reassigned when the fixer reorders the group after a spread.
+func hasCommentAfterSpread(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) bool {
+	comments := ctx.Comments.All()
+	for index, attr := range attrs {
+		if attr.Kind != ast.KindJsxSpreadAttribute {
+			continue
+		}
+		r := utils.TrimNodeTextRange(ctx.SourceFile, attr)
+		limit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
+		if index+1 < len(attrs) {
+			limit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+1]).End()
+		}
+		if len(commentsInSpan(comments, r.End(), limit)) != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func compareAttributes(ctx rule.RuleContext, left, right sortableAttribute, opts options, reserved []string) int {
