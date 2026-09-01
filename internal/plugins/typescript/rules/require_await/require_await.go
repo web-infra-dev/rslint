@@ -6,6 +6,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -456,6 +458,172 @@ func isThenableType(typeChecker *checker.Checker, node *ast.Node, t *checker.Typ
 	return isThenableTypePart(typeChecker, node, t)
 }
 
+type unloadedAsyncExportsCacheKey struct{}
+
+type unloadedAsyncExportsCache struct {
+	files utils.LazyMap[string, map[string]struct{}]
+}
+
+func isThenableExpression(ctx rule.RuleContext, node *ast.Node, t *checker.Type) bool {
+	if !utils.IsTypeAnyType(t) {
+		return isThenableType(ctx.TypeChecker, node, t)
+	}
+	return isUnloadedImportedAsyncCall(ctx, node)
+}
+
+// isUnloadedImportedAsyncCall recovers the one piece of type information
+// require-await needs when a project reference redirects an imported
+// source file to a missing declaration output. TypeScript-eslint constructs
+// its lint Program without that redirect and sees the inferred Promise return;
+// tsgo keeps the import alias but gives the call `any` because the source is
+// outside this Program's universe.
+//
+// The fallback is deliberately narrower than treating `any` as thenable. It
+// accepts only a direct named-import call whose resolved module is unloaded and
+// whose TypeScript source directly exports an unannotated async function.
+// An explicit `any`, a synchronous export, a local `any`, or an async generator
+// therefore retains the upstream missing-await diagnostic.
+func isUnloadedImportedAsyncCall(ctx rule.RuleContext, node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := ast.SkipParentheses(node.Expression())
+	if callee == nil || callee.Kind != ast.KindIdentifier {
+		return false
+	}
+
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(callee)
+	if symbol == nil || symbol.Flags&ast.SymbolFlagsAlias == 0 {
+		return false
+	}
+
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil ||
+			declaration.Kind != ast.KindImportSpecifier ||
+			ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
+			continue
+		}
+		specifier := declaration.AsImportSpecifier()
+		if specifier == nil || specifier.IsTypeOnly {
+			return false
+		}
+		importDeclarationNode := ast.FindAncestorKind(declaration.Parent, ast.KindImportDeclaration)
+		if importDeclarationNode == nil {
+			return false
+		}
+		importDeclaration := importDeclarationNode.AsImportDeclaration()
+		if importDeclaration == nil || importDeclaration.ImportClause == nil || importDeclaration.ImportClause.IsTypeOnly() {
+			return false
+		}
+
+		resolvedPath, target, ok := ctx.Program().ResolveModule(ctx.SourceFile, importDeclaration.ModuleSpecifier)
+		if !ok || target != nil {
+			return false
+		}
+		importedName := specifier.PropertyName
+		if importedName == nil {
+			importedName = specifier.Name()
+		}
+		if importedName == nil || importedName.Kind != ast.KindIdentifier {
+			return false
+		}
+		_, ok = unloadedAsyncExports(ctx, resolvedPath)[importedName.Text()]
+		return ok
+	}
+	return false
+}
+
+func unloadedAsyncExports(ctx rule.RuleContext, fileName string) map[string]struct{} {
+	cache := rule.CachedByProgram(ctx, unloadedAsyncExportsCacheKey{}, func() *unloadedAsyncExportsCache {
+		return &unloadedAsyncExportsCache{}
+	})
+	return cache.files.Get(fileName, func() map[string]struct{} {
+		return collectUnannotatedAsyncExports(ctx, fileName)
+	})
+}
+
+func collectUnannotatedAsyncExports(ctx rule.RuleContext, fileName string) map[string]struct{} {
+	fileSystem := ctx.Program().FS()
+	if fileSystem == nil {
+		return nil
+	}
+	text, ok := fileSystem.ReadFile(fileName)
+	if !ok {
+		return nil
+	}
+	scriptKind := core.GetScriptKindFromFileName(fileName)
+	if scriptKind != core.ScriptKindTS && scriptKind != core.ScriptKindTSX {
+		return nil
+	}
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: fileName,
+		Path: tspath.ToPath(
+			fileName,
+			ctx.Program().CurrentDirectory(),
+			fileSystem.UseCaseSensitiveFileNames(),
+		),
+	}, text, scriptKind)
+	if len(sourceFile.Diagnostics()) != 0 {
+		return nil
+	}
+
+	var exports map[string]struct{}
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement == nil || !ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport) {
+			continue
+		}
+
+		switch statement.Kind {
+		case ast.KindVariableStatement:
+			declarationList := statement.AsVariableStatement().DeclarationList.AsVariableDeclarationList()
+			for _, declarationNode := range declarationList.Declarations.Nodes {
+				declaration := declarationNode.AsVariableDeclaration()
+				if declaration == nil || declaration.Type != nil || declaration.Initializer == nil {
+					continue
+				}
+				name := declaration.Name()
+				initializer := ast.SkipParentheses(declaration.Initializer)
+				if name == nil || name.Kind != ast.KindIdentifier ||
+					!isUnannotatedAsyncFunction(initializer) {
+					continue
+				}
+				if exports == nil {
+					exports = make(map[string]struct{})
+				}
+				exports[name.Text()] = struct{}{}
+			}
+
+		case ast.KindFunctionDeclaration:
+			if ast.HasSyntacticModifier(statement, ast.ModifierFlagsDefault) ||
+				!isUnannotatedAsyncFunction(statement) {
+				continue
+			}
+			name := statement.Name()
+			if name == nil || name.Kind != ast.KindIdentifier {
+				continue
+			}
+			if exports == nil {
+				exports = make(map[string]struct{})
+			}
+			exports[name.Text()] = struct{}{}
+		}
+	}
+	return exports
+}
+
+func isUnannotatedAsyncFunction(node *ast.Node) bool {
+	if node == nil || node.Type() != nil {
+		return false
+	}
+	if node.Kind != ast.KindArrowFunction &&
+		node.Kind != ast.KindFunctionExpression &&
+		node.Kind != ast.KindFunctionDeclaration {
+		return false
+	}
+	flags := ast.GetFunctionFlags(node)
+	return flags&ast.FunctionFlagsAsync != 0 && flags&ast.FunctionFlagsGenerator == 0
+}
+
 func hasAsyncIterator(typeChecker *checker.Checker, t *checker.Type) bool {
 	if utils.IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
 		for _, typePart := range t.Types() {
@@ -515,7 +683,7 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 				body := ast.SkipParentheses(node.Body())
 				if !ast.IsBlock(body) &&
 					!ast.IsAwaitExpression(body) &&
-					isThenableType(ctx.TypeChecker, body, ctx.TypeChecker.GetTypeAtLocation(body)) {
+					isThenableExpression(ctx, body, ctx.TypeChecker.GetTypeAtLocation(body)) {
 					scope.hasAwait = true
 				}
 			}
@@ -576,7 +744,7 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 				}
 
 				if node.AsYieldExpression().AsteriskToken == nil {
-					if isThenableType(ctx.TypeChecker, argument, ctx.TypeChecker.GetTypeAtLocation(argument)) {
+					if isThenableExpression(ctx, argument, ctx.TypeChecker.GetTypeAtLocation(argument)) {
 						scope.isAsyncYield = true
 					}
 					return
@@ -597,7 +765,7 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 				}
 
 				expr := node.Expression()
-				if expr != nil && isThenableType(ctx.TypeChecker, expr, ctx.TypeChecker.GetTypeAtLocation(expr)) {
+				if expr != nil && isThenableExpression(ctx, expr, ctx.TypeChecker.GetTypeAtLocation(expr)) {
 					scope.hasAwait = true
 				}
 			},

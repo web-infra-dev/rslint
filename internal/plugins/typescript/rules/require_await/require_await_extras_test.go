@@ -10,14 +10,19 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -816,6 +821,61 @@ const caseIntersection = null as GoodThenable & { tag: string };
 	for name := range expected {
 		if !seen[name] {
 			t.Errorf("test case %s was not visited", name)
+		}
+	}
+}
+
+func TestRequireAwaitMissingProjectReferenceOutput(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/missing_project_reference_output.txtar")
+	root := tspath.NormalizePath(archive.Materialize(t, "missing-project-reference-output"))
+	appRoot := tspath.ResolvePath(root, "app")
+	entryPath := tspath.ResolvePath(appRoot, "src/main.ts")
+	dependencyPath := tspath.ResolvePath(root, "fixture-lib/src/index.ts")
+	fs := bundled.WrapFS(osvfs.FS())
+	compilerProgram, err := utils.CreateProgram(
+		true,
+		fs,
+		appRoot,
+		"tsconfig.json",
+		utils.CreateCompilerHost(appRoot, fs),
+	)
+	if err != nil {
+		t.Fatalf("CreateProgram: %v", err)
+	}
+	if compilerProgram.GetSourceFile(dependencyPath) != nil {
+		t.Fatalf("fixture precondition failed: project-reference source %q was loaded despite its missing declaration output", dependencyPath)
+	}
+
+	sourceProgram := lintprogram.NewFromCompiler(compilerProgram)
+	var diagnostics []rule.RuleDiagnostic
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program:                sourceProgram,
+		Files:                  []string{entryPath},
+		ExcludedPathSubstrings: []string{},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:             RequireAwaitRule.Name,
+				Environment:      &rule.RuleEnvironment{},
+				Severity:         rule.SeverityError,
+				RequiresTypeInfo: true,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return RequireAwaitRule.Run(ctx, nil)
+				},
+			}}
+		},
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	})
+
+	wantLines := []int{21, 22, 23, 24, 25, 27, 29}
+	if len(diagnostics) != len(wantLines) {
+		t.Fatalf("diagnostics = %d (%v), want %d at lines %v", len(diagnostics), diagnostics, len(wantLines), wantLines)
+	}
+	for index, diagnostic := range diagnostics {
+		line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
+		if line+1 != wantLines[index] {
+			t.Errorf("diagnostic %d line = %d, want %d", index+1, line+1, wantLines[index])
 		}
 	}
 }

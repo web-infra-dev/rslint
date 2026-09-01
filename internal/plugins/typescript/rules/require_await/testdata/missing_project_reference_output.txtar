@@ -1,0 +1,76 @@
+-- missing-project-reference-output/app/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableSourceOfProjectReferenceRedirect": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "fixture-lib": ["../fixture-lib/src/index.ts"]
+    },
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ESNext"
+  },
+  "include": ["src"],
+  "references": [{ "path": "../fixture-lib" }]
+}
+-- missing-project-reference-output/app/src/main.ts --
+import {
+  asyncDeclaration,
+  asyncGenerator,
+  asyncValue,
+  asyncValue as renamedAsyncValue,
+  returnAny,
+  returnAnyDeclaration,
+  syncValue,
+  typedAny,
+} from "fixture-lib";
+
+const concise = async () => asyncValue();
+const declaration = async () => asyncDeclaration();
+const block = async () => {
+  return renamedAsyncValue();
+};
+async function* generated() {
+  yield asyncValue();
+}
+
+const explicitAny = async () => typedAny();
+const returnAnnotatedAny = async () => returnAny();
+const declarationReturnAnnotatedAny = async () => returnAnyDeclaration();
+const synchronous = async () => syncValue();
+const generatorResult = async () => asyncGenerator();
+declare const localAny: any;
+const unresolvedLocal = async () => localAny();
+function shadow(asyncValue: any) {
+  return async () => asyncValue();
+}
+-- missing-project-reference-output/fixture-lib/tsconfig.json --
+{
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "outDir": "dist",
+    "rootDir": ".",
+    "strict": true,
+    "target": "ESNext"
+  },
+  "include": ["src"]
+}
+-- missing-project-reference-output/fixture-lib/src/index.ts --
+export const asyncValue = async () => "ok";
+export async function asyncDeclaration() {
+  return "ok";
+}
+export const typedAny: any = async () => "ok";
+export const returnAny = async (): any => "ok";
+export async function returnAnyDeclaration(): any {
+  return "ok";
+}
+export const syncValue = () => "ok";
+export const asyncGenerator = async function* () {
+  yield "ok";
+};
