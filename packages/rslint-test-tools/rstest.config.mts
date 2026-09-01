@@ -608,6 +608,7 @@ export default defineConfig({
     './tests/rstest/rules/no-commented-out-tests.test.ts',
     './tests/rstest/rules/no-conditional-expect.test.ts',
     './tests/rstest/rules/no-conditional-in-test.test.ts',
+    './tests/rstest/rules/no-conditional-tests.test.ts',
     './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-focused-tests.test.ts',
     './tests/rstest/rules/no-hooks.test.ts',
