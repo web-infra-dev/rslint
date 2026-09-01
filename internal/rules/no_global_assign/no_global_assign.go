@@ -84,6 +84,14 @@ func hasStackedTypeWrappers(node *ast.Node) bool {
 // other rules inspect ESTree AssignmentExpression nodes and must not treat the
 // same wrappers as transparent.
 func isDefaultValueInDestructuringAssignment(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	binary := node.AsBinaryExpression()
+	if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+		return false
+	}
+
 	assignmentTargetNode := node
 	for parent := assignmentTargetNode.Parent; parent != nil; parent = assignmentTargetNode.Parent {
 		switch parent.Kind {
@@ -94,10 +102,26 @@ func isDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 			ast.KindSatisfiesExpression:
 			assignmentTargetNode = parent
 		default:
-			return utils.IsDefaultValueInDestructuringAssignment(assignmentTargetNode)
+			target := ast.GetAssignmentTarget(assignmentTargetNode)
+			if target == nil {
+				return false
+			}
+			if ast.IsDestructuringAssignment(target) {
+				return true
+			}
+			if !ast.IsForInOrOfStatement(target) {
+				return false
+			}
+			statement := target.AsForInOrOfStatement()
+			if statement == nil || statement.Initializer == nil {
+				return false
+			}
+			initializer := ast.SkipParentheses(statement.Initializer)
+			return initializer != nil &&
+				(initializer.Kind == ast.KindArrayLiteralExpression || initializer.Kind == ast.KindObjectLiteralExpression)
 		}
 	}
-	return utils.IsDefaultValueInDestructuringAssignment(assignmentTargetNode)
+	return false
 }
 
 func buildGlobalShouldNotBeModifiedMessage(name string) rule.RuleMessage {
