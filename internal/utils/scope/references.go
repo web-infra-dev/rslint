@@ -3,6 +3,7 @@ package scope
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // IsReferenceIdentifier reports whether id reads or writes a binding, as
@@ -25,6 +26,13 @@ func IsReferenceIdentifier(id *ast.Node) bool {
 	// `typeof import('m').a.b` names exports of another module, not bindings
 	// in this file.
 	if isImportTypeQualifier(id) {
+		return false
+	}
+	// eslint-scope's JSXElement visitor only visits the opening tag. The
+	// typescript-eslint visitor deliberately visits both opening and closing
+	// tags, so preserve the parser split for every direct, member, and
+	// namespaced JSX name shape.
+	if ast.IsInJSFile(id) && isPartOfJsxClosingTagName(id) {
 		return false
 	}
 
@@ -90,14 +98,49 @@ func IsReferenceIdentifier(id *ast.Node) bool {
 		// the predicate. `this is T` uses a ThisType node, not an Identifier.
 		return true
 
-	case ast.KindJsxAttribute, ast.KindJsxNamespacedName:
+	case ast.KindJsxAttribute:
 		return false
 
+	case ast.KindJsxNamespacedName:
+		// typescript-eslint visits both pieces of a namespaced TSX tag as
+		// value references; Espree visits neither piece in JSX. Namespaced
+		// attribute names are excluded above by their JsxAttribute owner.
+		return !ast.IsInJSFile(id) && ast.IsJsxTagName(parent)
+
 	case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement, ast.KindJsxClosingElement:
-		return isJsxComponentName(id)
+		if ast.IsInJSFile(id) && id.Text() == "this" {
+			return false
+		}
+		return IsJsxComponentName(id.Text())
 	}
 
 	return !ast.IsDeclarationName(id)
+}
+
+// isPartOfJsxClosingTagName climbs a tag-name chain from any identifier piece
+// to its JSX closing element. Property-access member names are included here
+// even though IsReferenceIdentifier later rejects every piece except the
+// root; the parser-level opening/closing decision applies to the whole chain.
+func isPartOfJsxClosingTagName(id *ast.Node) bool {
+	current := id
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindPropertyAccessExpression:
+			access := parent.AsPropertyAccessExpression()
+			if access == nil || (access.Expression != current && access.Name() != current) {
+				return false
+			}
+			current = parent
+		case ast.KindJsxNamespacedName:
+			current = parent
+		case ast.KindJsxClosingElement:
+			return ast.IsJsxTagName(current)
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // ReferenceSpace is the pair of independent reference capabilities exposed by
@@ -316,14 +359,26 @@ func isImportTypeQualifier(id *ast.Node) bool {
 	return importType != nil && importType.Qualifier == current
 }
 
-// isJsxComponentName reports whether a JSX tag name refers to a binding.
-// A tag name starting with a lower-case letter is an intrinsic element
-// (`<div/>` is the string "div"), matching how JSX transforms resolve names.
-func isJsxComponentName(id *ast.Node) bool {
-	text := id.Text()
-	if text == "" {
+// IsJsxComponentName reports whether a bare JSXIdentifier passes the shared
+// JavaScript first-UTF-16-code-unit casing test. Astral letters therefore pass
+// because their first code unit is an unchanged high surrogate. The special
+// `this` result is consumed by typescript-eslint; the AST-aware caller excludes
+// it for Espree, whose JSX visitor never creates a `this` reference.
+func IsJsxComponentName(name string) bool {
+	if name == "" {
 		return false
 	}
-	first := text[0]
-	return first < 'a' || first > 'z'
+	if name == "this" {
+		return true
+	}
+	firstByte := name[0]
+	if firstByte < 0x80 {
+		return firstByte < 'a' || firstByte > 'z'
+	}
+	firstRune, width := ecmascript.DecodeStringRune(name)
+	if firstRune > 0xffff {
+		return true
+	}
+	first := name[:width]
+	return ecmascript.StringToUpperCase(first) == first
 }

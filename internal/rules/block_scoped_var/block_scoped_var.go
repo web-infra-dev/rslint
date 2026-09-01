@@ -121,8 +121,8 @@ func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	}
 
 	// TSESTree treats both pieces of a namespaced TSX tag as value references;
-	// Espree does not. RefStore deliberately follows Espree, so collect the TSX
-	// nodes here for rule-local TSESTree parity.
+	// Espree does not. Keep the explicit TSX collection for the rule's indexed
+	// ordering pass; addOrdinaryReference deduplicates the shared RefStore view.
 	if ctx.SourceFile.ScriptKind == core.ScriptKindTSX {
 		listeners[ast.KindJsxOpeningElement] = state.collectJSX
 		listeners[ast.KindJsxSelfClosingElement] = state.collectJSX
