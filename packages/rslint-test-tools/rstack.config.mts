@@ -604,6 +604,7 @@ define.test({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/consistent-each-for.test.ts',
     './tests/rstest/rules/consistent-rstest-namespace.test.ts',
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/hoisted-apis-on-top.test.ts',
