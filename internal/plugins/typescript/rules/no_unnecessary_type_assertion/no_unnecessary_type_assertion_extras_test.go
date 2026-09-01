@@ -27,8 +27,9 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 			{Code: `declare const source: unknown; const { value } = source as { value: string };`},
 			{Code: `declare let x: number | undefined; x ??= 1 as number;`},
 			{Code: `declare let x: number; const y = (x = 1 as number);`},
-			{Code: `declare const value: string | undefined; (value as string | undefined)?.toLowerCase();`},
-			{Code: `declare const value: string | undefined; const result = (value as string | undefined) || 'fallback';`},
+			{Code: `declare const x: object | string; let y = x as {} | string; y = 1;`},
+			{Code: `declare const x: object | string; let y = x as {} | string; y = 1;`},
+			{Code: `type T = [any]; declare const x: T; declare function f(x: object): void; f(x as object);`},
 			{Code: `declare const value: 'a'; const result = true ? (value as string) : 'b';`},
 			{Code: `declare const value: 'a'; const result = true ? false ? value as string : 'b' : 'c';`},
 			{Code: `declare const value: 'a'; switch (value as string) { case 'a': break; }`},
@@ -71,6 +72,36 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `declare const x: string | undefined; (x as string | undefined)?.trim();`,
+				Output: []string{`declare const x: string | undefined; (x)?.trim();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const x: string | undefined; (x as string | undefined)?.[0];`,
+				Output: []string{`declare const x: string | undefined; (x)?.[0];`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const x: (() => string) | undefined; (x as (() => string) | undefined)?.();`,
+				Output: []string{`declare const x: (() => string) | undefined; (x)?.();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const x: string | undefined; (x as string | undefined) || 'fallback';`,
+				Output: []string{`declare const x: string | undefined; (x) || 'fallback';`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const x: string | undefined; (x as string | undefined) && x.trim();`,
+				Output: []string{`declare const x: string | undefined; (x) && x.trim();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const x: string | undefined; (x as string | undefined) ?? 'fallback';`,
+				Output: []string{`declare const x: string | undefined; (x) ?? 'fallback';`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
 			{
 				Code:   `declare const value: boolean; !(value as boolean);`,
 				Output: []string{`declare const value: boolean; !(value);`},

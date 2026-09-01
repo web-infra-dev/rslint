@@ -106,7 +106,7 @@ func assertionIsStartOfArrowFunctionBody(sourceFile *ast.SourceFile, node *ast.N
 }
 
 func assertionTypeArguments(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
-	if alias := checker.Type_alias(t); alias != nil {
+	if alias := checker.Type_alias(t); alias != nil && len(alias.TypeArguments()) > 0 {
 		return alias.TypeArguments()
 	}
 	if utils.IsTypeReference(t) {
@@ -387,12 +387,6 @@ func assertionIsRightHandSideOfLogicalAssignment(node *ast.Node) bool {
 	binary := parent.AsBinaryExpression()
 	return binary.Right == semanticNode && binary.OperatorToken != nil &&
 		ast.IsLogicalOrCoalescingAssignmentOperator(binary.OperatorToken.Kind)
-}
-
-func assertionIsInOptionalOrLogicalContext(node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	return ast.IsOptionalChain(parent) || ast.IsLogicalOrCoalescingBinaryExpression(parent)
 }
 
 func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type {
@@ -739,7 +733,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				return areUnionPartsEquivalentIgnoringUndefined(uncast, cast)
 			}
 
-			if (utils.IsTypeFlagSet(uncast, checker.TypeFlagsNonPrimitive) && !utils.IsTypeFlagSet(cast, checker.TypeFlagsNonPrimitive)) ||
+			if (utils.IsTypeFlagSetWithUnion(uncast, checker.TypeFlagsNonPrimitive) && !utils.IsTypeFlagSetWithUnion(cast, checker.TypeFlagsNonPrimitive)) ||
 				(assertionHasIndexSignature(ctx.TypeChecker, uncast) && !assertionHasIndexSignature(ctx.TypeChecker, cast)) ||
 				assertionTypeContainsAny(ctx.TypeChecker, uncast) ||
 				assertionTypeContainsAny(ctx.TypeChecker, cast) ||
@@ -890,11 +884,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			if castTypeIsLiteral {
 				wouldSameTypeBeInferred = isImplicitlyNarrowedLiteralDeclaration(node)
 			}
-			isControlFlowSensitiveUndefinedUnion :=
-				getUnionTypeFlags(uncastType)&checker.TypeFlagsUndefined != 0 &&
-					getUnionTypeFlags(castType)&checker.TypeFlagsUndefined != 0 &&
-					assertionIsInOptionalOrLogicalContext(node)
-			if typeIsUnchanged && wouldSameTypeBeInferred && !isControlFlowSensitiveUndefinedUnion {
+			if typeIsUnchanged && wouldSameTypeBeInferred {
 				reportAssertion(buildUnnecessaryAssertionMessage())
 				return
 			}
