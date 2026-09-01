@@ -1,11 +1,11 @@
-import { RuleTester } from "../rule-tester";
+import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
-const error = "useState call is not destructured into value + setter pair";
+const error = 'useState call is not destructured into value + setter pair';
 const destructuredError =
   'useState call is not destructured into value + setter pair (you can allow destructuring by enabling "allowDestructuredState" option)';
 
-ruleTester.run("hook-use-state", {} as never, {
+ruleTester.run('hook-use-state', {} as never, {
   valid: [
     {
       code: `import { useState } from 'react'; const [color, setColor] = useState()`,
@@ -54,7 +54,7 @@ ruleTester.run("hook-use-state", {} as never, {
           message: error,
           suggestions: [
             {
-              messageId: "suggestPair",
+              messageId: 'suggestPair',
               output: `import { useState } from 'react'; const [color, setColor] = useState()`,
             },
           ],
@@ -68,11 +68,11 @@ ruleTester.run("hook-use-state", {} as never, {
           message: error,
           suggestions: [
             {
-              messageId: "suggestMemo",
+              messageId: 'suggestMemo',
               output: `import { useState, useMemo } from 'react'; const color = useMemo(() => initialColor, [])`,
             },
             {
-              messageId: "suggestPair",
+              messageId: 'suggestPair',
               output: `import { useState } from 'react'; const [color, setColor] = useState(initialColor)`,
             },
           ],
