@@ -14,7 +14,6 @@ type regexpCallTracker struct {
 	ctx               rule.RuleContext
 	identifiersByName map[string][]*ast.Node
 	propertyEvaluator *utils.StaticStringEvaluator
-	disabledRoots     map[string]bool
 	tracedVariables   map[regexpTraceVariable]bool
 	tracedGlobals     map[regexpTraceGlobal]bool
 	calls             map[*ast.Node]bool
@@ -38,6 +37,25 @@ type regexpTraceGlobal struct {
 }
 
 var regexpGlobalObjectNames = [...]string{"globalThis", "window", "self", "global"}
+
+// sourceMayUseRegexpConstructor reports whether the file spells one of the
+// syntactic roots from which this tracker can reach the built-in constructor.
+// SourceFile.Identifiers stores normalized names, so escaped identifiers such
+// as R\u0065gExp remain observable. A nil table is treated conservatively.
+func sourceMayUseRegexpConstructor(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.Identifiers == nil {
+		return true
+	}
+	if _, ok := sourceFile.Identifiers["RegExp"]; ok {
+		return true
+	}
+	for _, name := range regexpGlobalObjectNames {
+		if _, ok := sourceFile.Identifiers[name]; ok {
+			return true
+		}
+	}
+	return false
+}
 
 func newRegexpCallTracker(ctx rule.RuleContext) *regexpCallTracker {
 	tracker := &regexpCallTracker{
@@ -75,10 +93,6 @@ func (tracker *regexpCallTracker) trackGlobalRoot(name string, value regexpTrace
 	references := tracker.globalReferences(name)
 	for _, reference := range references {
 		if utils.IsWriteReference(reference) {
-			if tracker.disabledRoots == nil {
-				tracker.disabledRoots = make(map[string]bool)
-			}
-			tracker.disabledRoots[name] = true
 			return
 		}
 	}
@@ -102,9 +116,7 @@ func (tracker *regexpCallTracker) isGlobalReference(identifier *ast.Node, name s
 		return false
 	}
 	if tracker.ctx.Refs != nil {
-		if symbol := tracker.ctx.Refs.Resolve(identifier); symbol != nil {
-			return !utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile)
-		}
+		return tracker.ctx.Refs.IsGlobalReference(identifier)
 	}
 	return !utils.IsShadowed(identifier, name)
 }
@@ -317,7 +329,7 @@ func (tracker *regexpCallTracker) staticPropertyName(node *ast.Node) (string, bo
 }
 
 func regexpValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
-	if ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) {
+	if ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments) {
 		return parent.Expression() == node
 	}
 	if parent.Kind == ast.KindConditionalExpression {

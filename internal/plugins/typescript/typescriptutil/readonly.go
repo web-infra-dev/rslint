@@ -35,6 +35,11 @@ func IsTypeReadonly(
 	return isTypeReadonly(typeChecker, t, options, sourceProgram, make(map[*checker.Type]struct{})) == readonlynessReadonly
 }
 
+// IsPropertyReadonlyInType reports whether the named property is readonly in t.
+func IsPropertyReadonlyInType(typeChecker *checker.Checker, t *checker.Type, name string) bool {
+	return isPropertyReadonly(typeChecker, t, name)
+}
+
 func isTypeReadonly(
 	typeChecker *checker.Checker,
 	t *checker.Type,
