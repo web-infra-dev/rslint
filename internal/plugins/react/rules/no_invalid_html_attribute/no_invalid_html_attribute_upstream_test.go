@@ -217,7 +217,9 @@ func TestNoInvalidHtmlAttributeRuleUpstream(t *testing.T) {
 		{Code: `<html rel></html>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Output: `<html ></html>`}}}}},
 		{Code: `React.createElement("html", { rel: 1 })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor"}}},
 		{Code: `<a rel></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyIsMeaningless", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveEmpty", Output: `<a ></a>`}}}}},
-		{Code: `React.createElement("a", { rel: 1 })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", { rel:  })`}}}}},
+		// SKIP: upstream incorrectly treats this non-string Literal as a rel
+		// string and offers a malformed suggestion; rslint intentionally skips it.
+		{Code: `React.createElement("a", { rel: 1 })`, Tsx: true, Skip: true},
 		{Code: `React.createElement("a", { rel() { return 1; } })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMethod"}}},
 		{Code: `<span rel></span>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Output: `<span ></span>`}}}}},
 		{Code: `<a rel={null}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `<a ></a>`}}}}},

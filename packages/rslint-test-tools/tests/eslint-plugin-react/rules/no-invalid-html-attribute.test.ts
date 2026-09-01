@@ -250,10 +250,6 @@ ruleTester.run('no-invalid-html-attribute', {} as never, {
     },
     { code: '<a rel></a>', errors: [{ messageId: 'emptyIsMeaningless' }] },
     {
-      code: 'React.createElement("a", { rel: 1 })',
-      errors: [{ messageId: 'neverValid' }],
-    },
-    {
       code: 'React.createElement("a", { rel() { return 1; } })',
       errors: [{ messageId: 'noMethod' }],
     },

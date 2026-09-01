@@ -11,7 +11,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
-	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_invalid_html_attribute.schema.json
@@ -146,20 +145,8 @@ func sourceText(ctx rule.RuleContext, node *ast.Node) string {
 }
 
 func removeStaticValue(ctx rule.RuleContext, node *ast.Node, value string) rule.RuleFix {
-	// Upstream uses `value.raw.replace(value.value, '')`, including its
-	// source-text quirks for numeric, BigInt, and regexp literals.
 	raw := sourceText(ctx, node)
-	if node != nil && node.Kind == ast.KindRegularExpressionLiteral {
-		pattern, flags := utils.ExtractRegexPatternAndFlags(raw)
-		if re, err := esregexp.Compile(pattern, flags); err == nil {
-			if match, err := re.Unwrap().FindStringMatch(raw); err == nil && match != nil {
-				runes := []rune(raw)
-				raw = string(runes[:match.Index]) + string(runes[match.Index+match.Length:])
-			}
-		}
-	} else {
-		raw = strings.Replace(raw, value, "", 1)
-	}
+	raw = strings.Replace(raw, value, "", 1)
 	return rule.RuleFixReplace(ctx.SourceFile, node, raw)
 }
 
@@ -373,11 +360,10 @@ func reportCreateElementValue(ctx rule.RuleContext, value *ast.Node, element str
 		return
 	}
 	value = ast.SkipParentheses(value)
-	// ESTree's Literal covers scalar literals but not template literals. Keep
-	// that boundary rather than using GetStaticExpressionValue unconditionally.
-	switch value.Kind {
-	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral:
-	default:
+	// The upstream createElement branch assumes every ESTree Literal is a
+	// string. Do not reproduce that bug: non-string values must not enter the
+	// string lookup or suggestion path.
+	if value.Kind != ast.KindStringLiteral {
 		return
 	}
 	text, ok := utils.GetStaticExpressionValue(value)

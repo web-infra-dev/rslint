@@ -25,6 +25,11 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		// ---- Dimension 4: object members, arrays, spread, computed and shorthand ----
 		{Code: `React.createElement("a", {rel: [call(), {value: "invalid"}]})`, Tsx: true},
 		{Code: `React.createElement("a", {rel})`, Tsx: true},
+		// createElement values are checked only when they are strings. This
+		// prevents numeric and regexp literals from reaching string fixes.
+		{Code: `React.createElement("a", {rel: 1})`, Tsx: true},
+		{Code: `React.createElement("a", {rel: 1n})`, Tsx: true},
+		{Code: `React.createElement("a", {rel: /invalid/})`, Tsx: true},
 		// ---- Dimension 4: option shape ----
 		{Code: `var x = <a rel="invalid"/>`, Options: []any{[]interface{}{}}, Tsx: true},
 		// N/A: optional chains, type wrappers, and computed JSX attributes cannot
@@ -47,11 +52,9 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		{Code: `React.createElement("a", {[rel]() { return 1; }})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMethod"}}},
 		{Code: `React.createElement("a", {rel: ("invalid")})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", {rel: ("")})`}}}}},
 		{Code: `React.createElement("a", {rel: (["invalid"])})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", {rel: ([""])})`}}}}},
-		{Code: `React.createElement("a", {rel: 1n})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", {rel: n})`}}}}},
 		{Code: `React.createElement("a", {rel: "canonical"})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notValidFor", Message: `“"canonical"” is not a valid “rel” attribute value for <a>.`}}},
 		{Code: `React.createElement("a", {rel: "canonical"})`, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h"}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notValidFor", Message: `“"canonical"” is not a valid “rel” attribute value for <a>.`}}},
 		{Code: `var x = <a rel={/invalid/}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `var x = <a />`}}}}},
-		{Code: `React.createElement("a", {rel: /invalid/})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", {rel: //})`}}}}},
 		{Code: `var x = <a rel={1n}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `var x = <a />`}}}}},
 		{Code: `var x = <a rel={("invalid")}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <a rel={("")}/>`}}}}},
 		{Code: `var x = <a rel={"invalid"}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Line: 1, Column: 17, EndLine: 1, EndColumn: 26, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <a rel={""}/>`}}}}},
