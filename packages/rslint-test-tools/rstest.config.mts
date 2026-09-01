@@ -229,6 +229,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-did-update-set-state.test.ts',
     './tests/eslint-plugin-react/rules/no-direct-mutation-state.test.ts',
     './tests/eslint-plugin-react/rules/no-find-dom-node.test.ts',
+    './tests/eslint-plugin-react/rules/no-invalid-html-attribute.test.ts',
     './tests/eslint-plugin-react/rules/no-is-mounted.test.ts',
     './tests/eslint-plugin-react/rules/no-redundant-should-component-update.test.ts',
     './tests/eslint-plugin-react/rules/no-render-return-value.test.ts',
