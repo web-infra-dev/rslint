@@ -33,7 +33,7 @@ func TestSortPropTypesExtras(t *testing.T) {
 		// ---- Dimension 4: TS expression wrappers on the propTypes object ----
 		{Code: `Component.propTypes = ({ a: PropTypes.string, z: PropTypes.string } as any);`, Tsx: true},
 		// N/A: private keys and element access do not participate in upstream's static key sort.
-		// An unkeyed TypeScript member breaks the comparison chain.
+		// An unnamed TypeScript member breaks the comparison chain.
 		{Code: `type Props = { z: string; (): void; a: string }; function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
 		// A wrapper configured as Object.assign matches the bare callee name,
 		// but not the member expression itself, as in the upstream rule.
@@ -70,5 +70,16 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `const C = { [propTypes]: { z: PropTypes.string, a: PropTypes.string } };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
 		// An object/property wrapper entry also matches the bare property name.
 		{Code: `Component.propTypes = assign({ z: PropTypes.string, a: PropTypes.string });`, Settings: map[string]interface{}{"propWrapperFunctions": []any{map[string]interface{}{"object": "Object", "property": "assign"}}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// A dotted string setting is compared as authored by upstream and does not
+		// become a bare `assign` wrapper after shared normalization.
+		{Code: `Component.propTypes = assign({ z: PropTypes.string, a: PropTypes.string });`, Settings: map[string]interface{}{"propWrapperFunctions": []any{"Object.assign"}}, Tsx: true},
+		// Computed class names follow the authored identifier rule: quoted strings
+		// are ignored, while computed identifiers are checked.
+		{Code: `class C { static ["propTypes"] = { z: PropTypes.string, a: PropTypes.string }; }`, Tsx: true},
+		{Code: `class C { static [propTypes] = { z: PropTypes.string, a: PropTypes.string }; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// The assignment listener also recognizes a computed identifier member.
+		{Code: `C[propTypes] = { z: PropTypes.string, a: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Shape detection does not cross TypeScript expression wrappers on the callee.
+		{Code: `(PropTypes.shape as any)({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
 	})
 }

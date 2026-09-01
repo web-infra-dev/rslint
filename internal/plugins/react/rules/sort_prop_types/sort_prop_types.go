@@ -79,9 +79,9 @@ var SortPropTypesRule = rule.Rule{
 				}
 				name, ok := declarationName(ctx.SourceFile, current)
 				if !ok {
-					// An unkeyed declaration breaks the comparison chain. Keep it
+					// An unnamed declaration breaks the comparison chain. Keep it
 					// as the previous node so the next keyed declaration is not
-					// compared with the declaration before the unkeyed one.
+					// compared with the declaration before the unnamed one.
 					previous = current
 					continue
 				}
@@ -196,19 +196,26 @@ var SortPropTypesRule = rule.Rule{
 					checkValue(property.Initializer)
 					return
 				}
-				name, ok := utils.GetStaticPropertyName(property.Name())
-				if ok && name == "propTypes" {
+				if isAuthoredPropertyName(property.Name(), "propTypes") {
 					checkValue(property.Initializer)
 				}
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				left := reactutil.SkipExpressionWrappers(binary.Left)
-				if left == nil || left.Kind != ast.KindPropertyAccessExpression {
+				if left == nil {
 					return
 				}
-				name := left.AsPropertyAccessExpression().Name()
-				if name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "propTypes" {
+				isPropTypes := false
+				switch left.Kind {
+				case ast.KindPropertyAccessExpression:
+					name := left.AsPropertyAccessExpression().Name()
+					isPropTypes = name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "propTypes"
+				case ast.KindElementAccessExpression:
+					argument := ast.SkipParentheses(left.AsElementAccessExpression().ArgumentExpression)
+					isPropTypes = argument != nil && argument.Kind == ast.KindIdentifier && argument.AsIdentifier().Text == "propTypes"
+				}
+				if isPropTypes {
 					checkValue(binary.Right)
 				}
 			},
@@ -216,7 +223,7 @@ var SortPropTypesRule = rule.Rule{
 		if opts.sortShapeProp {
 			listeners[ast.KindCallExpression] = func(node *ast.Node) {
 				call := node.AsCallExpression()
-				callee := reactutil.SkipExpressionWrappers(call.Expression)
+				callee := ast.SkipParentheses(call.Expression)
 				if !isShapeCall(callee) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 					return
 				}
@@ -370,7 +377,7 @@ func isPropWrapperCallByCalleeName(call *ast.Node, wrappers []reactutil.PropWrap
 	}
 	name := callee.AsIdentifier().Text
 	for _, wrapper := range wrappers {
-		if wrapper.Property == name {
+		if (wrapper.FromString && wrapper.Raw == name) || (!wrapper.FromString && wrapper.Property == name) {
 			return true
 		}
 	}
