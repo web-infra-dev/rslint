@@ -88,19 +88,14 @@ const fooRegexp = new RegExp("foo", "v");
 
 ## Differences from ESLint
 
-- Suggestions are conservatively omitted for every duplicate named capture,
-  including the mutually exclusive alternatives that became valid in ES2025.
-  The diagnostic is still reported, and an added flag never depends on
-  duplicate-name control-flow acceptance.
-- When validating a `v` suggestion, a negated character class containing a
-  `\q{...}`, `\p{...}`, or `\P{...}` operand is conservatively treated as
-  unsafe, including through nested sets. This can omit suggestions for
-  single-code-point operands that ESLint proves safe, while preventing an
-  invalid suggestion for string-valued operands.
-- Static evaluation models RegExp literals and their stable properties, but it
-  does not construct a new RegExp object while folding an expression. For
-  example, `RegExp("g", "u").source` remains unknown even though ESLint can
-  fold it to `"g"`.
+- When flags come from a newly constructed RegExp object's property, such as
+  `RegExp("g", "u").source`, rslint may skip a call that ESLint reports.
+- With computed `['__proto__']` properties in constant objects, rslint follows
+  own-property semantics and can report a constructor call that ESLint skips.
+- Capture names or Unicode properties newer than the bundled TypeScript
+  parser's Unicode data can receive a diagnostic without a flag suggestion.
+- For a negated `v` class where a range is followed by a string-valued operand,
+  rslint omits ESLint's suggestion because JavaScript would reject the result.
 
 ## Original Documentation
 

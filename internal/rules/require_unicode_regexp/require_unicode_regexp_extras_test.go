@@ -593,7 +593,18 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 			{
 				Code:            `/(?<a>x)|(?<a>y)/`,
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
-				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/(?<a>x)|(?<a>y)/u`}},
+				}},
+			},
+			{
+				Code:            `/(?:(?<a>x)|(?:y|(?<a>z)))/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/(?:(?<a>x)|(?:y|(?<a>z)))/u`}},
+				}},
 			},
 			{
 				Code:            `/(?:x|(?<a>y))(?<a>z)/`,
@@ -631,6 +642,45 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 			},
 			{
 				Code:            `/[^a\q{ab}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireVFlag"}},
+			},
+			{
+				Code:            `/[^a\q{b|c}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireVFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[^a\q{b|c}]/v`}},
+				}},
+			},
+			{
+				Code:            `/[^a\p{Letter}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireVFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[^a\p{Letter}]/v`}},
+				}},
+			},
+			{
+				Code:            `/[^\q{ab}&&a]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireVFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[^\q{ab}&&a]/v`}},
+				}},
+			},
+			{
+				Code:            `/[^a\p{Basic_Emoji}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireVFlag"}},
+			},
+			{
+				Code:            `/[^a-z\q{bc}]/`,
 				Options:         []any{map[string]any{"requireFlag": "v"}},
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
 				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireVFlag"}},

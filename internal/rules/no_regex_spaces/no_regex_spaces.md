@@ -36,11 +36,11 @@ the parsed pattern would not map cleanly back to source positions.
 
 ## Differences from ESLint
 
-- Pattern validation fails closed for duplicate named captures and for
-  `\q{...}` or Unicode-property operands below a negated `v` character class.
-  The rule can therefore omit a report for an ES2025 mutually exclusive
-  duplicate name or a negated single-code-point operand that ESLint proves
-  valid; this ensures a parser ambiguity never produces an unsafe autofix.
+- Constructor patterns using capture names or Unicode properties newer than
+  the bundled TypeScript parser's Unicode data can be skipped.
+- For a constructor pattern with a negated `v` class where a range is followed
+  by a string-valued operand, rslint skips a report that ESLint may emit because
+  JavaScript rejects the pattern.
 
 ## Original Documentation
 

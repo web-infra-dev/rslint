@@ -23,53 +23,78 @@ import (
 // accept every RegExpIdentifierName escape spelling. Known scanner gaps fail
 // closed so callers never turn an invalid pattern into a suggested fix.
 func IsValidRegexPattern(pattern string, flags RegexFlags) bool {
-	valid, hasDuplicateCaptureName, hasConservativeVCase := validateRegexPattern(pattern, flags)
-	return valid && !hasDuplicateCaptureName && !hasConservativeVCase
+	return isValidRegexPattern(pattern, flags, 2025)
 }
 
 // IsValidRegexPatternForECMAVersion additionally rejects pattern features
 // that had not entered the configured ECMAScript edition yet.
 func IsValidRegexPatternForECMAVersion(pattern string, flags RegexFlags, ecmaVersion int) bool {
-	valid, hasDuplicateCaptureName, hasConservativeVCase := validateRegexPattern(pattern, flags)
-	if !valid || hasDuplicateCaptureName || hasConservativeVCase {
+	if !isValidRegexPattern(pattern, flags, ecmaVersion) {
 		return false
 	}
 	return regexFeaturesAvailable(pattern, flags, ecmaVersion)
 }
 
-func validateRegexPattern(pattern string, flags RegexFlags) (
-	valid bool,
-	hasDuplicateCaptureName bool,
-	hasConservativeVCase bool,
-) {
-	if !flags.UV() {
-		_, err := esregexp.Compile(pattern, "")
-		return err == nil, false, false
+type regexPatternValidation struct {
+	valid                               bool
+	hasDuplicateCaptureName             bool
+	hasNonExclusiveDuplicateCaptureName bool
+}
+
+func isValidRegexPattern(pattern string, flags RegexFlags, ecmaVersion int) bool {
+	validation := validateRegexPattern(pattern, flags)
+	if !validation.valid || validation.hasNonExclusiveDuplicateCaptureName {
+		return false
 	}
+	return ecmaVersion >= 2025 || !validation.hasDuplicateCaptureName
+}
+
+func validateRegexPattern(pattern string, flags RegexFlags) regexPatternValidation {
 	if flags.Unicode && flags.UnicodeSets {
-		return false, false, false
+		return regexPatternValidation{}
+	}
+	if !flags.UV() && !hasRegexNamedCapture(pattern, flags) {
+		_, err := esregexp.Compile(pattern, "")
+		return regexPatternValidation{valid: err == nil}
 	}
 	// JavaScript strings are sequences of UTF-16 code units. The compiler keeps
 	// lone surrogates in WTF-8, so join an adjacent pair before identifier-name
 	// validation just as the RegExp parser's CodePoint operation does.
 	pattern = ecmascript.CombineSurrogatePairs(pattern)
 
-	normalized, hasDuplicateCaptureName, hasConservativeVCase, ok := normalizeRegexCaptureNames(pattern, flags)
+	normalized, captureNames, ok := normalizeRegexCaptureNames(pattern, flags)
 	if !ok {
-		return false, hasDuplicateCaptureName, hasConservativeVCase
+		return regexPatternValidation{
+			hasDuplicateCaptureName:             captureNames.hasDuplicate,
+			hasNonExclusiveDuplicateCaptureName: captureNames.hasNonExclusiveDuplicate,
+		}
 	}
-	literal, ok := regexPatternLiteral(normalized, flags)
-	if !ok {
-		return false, hasDuplicateCaptureName, hasConservativeVCase
+	valid := false
+	if !flags.UV() {
+		_, err := esregexp.Compile(normalized, "")
+		valid = err == nil
+	} else {
+		literal, literalOK := regexPatternLiteral(normalized, flags)
+		valid = literalOK && ecmascript.IsValidRegexLiteral(literal)
 	}
-	return ecmascript.IsValidRegexLiteral(literal), hasDuplicateCaptureName, hasConservativeVCase
+	return regexPatternValidation{
+		valid:                               valid,
+		hasDuplicateCaptureName:             captureNames.hasDuplicate,
+		hasNonExclusiveDuplicateCaptureName: captureNames.hasNonExclusiveDuplicate,
+	}
 }
 
 func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) bool {
+	if flags.Unicode && ecmaVersion < 2015 {
+		return false
+	}
+	if flags.UnicodeSets && ecmaVersion < 2024 {
+		return false
+	}
 	for i := 0; i < len(pattern); {
 		switch pattern[i] {
 		case '\\':
-			if i+1 < len(pattern) && ecmaVersion < 2018 &&
+			if flags.UV() && i+1 < len(pattern) && ecmaVersion < 2018 &&
 				(pattern[i+1] == 'p' || pattern[i+1] == 'P' || pattern[i+1] == 'k') {
 				return false
 			}
@@ -83,8 +108,7 @@ func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) b
 			if !ok {
 				return false
 			}
-			if ecmaVersion < 2018 && (strings.Contains(pattern[i:end], `\p`) ||
-				strings.Contains(pattern[i:end], `\P`)) {
+			if flags.UV() && ecmaVersion < 2018 && regexClassUsesUnicodeProperty(pattern, i, end, flags) {
 				return false
 			}
 			i = end
@@ -105,6 +129,28 @@ func regexFeaturesAvailable(pattern string, flags RegexFlags, ecmaVersion int) b
 		}
 	}
 	return true
+}
+
+func regexClassUsesUnicodeProperty(pattern string, start int, end int, flags RegexFlags) bool {
+	for i := start + 1; i < end-1; {
+		if pattern[i] == '\\' {
+			if i+1 < end && (pattern[i+1] == 'p' || pattern[i+1] == 'P') {
+				return true
+			}
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				return false
+			}
+			i += step
+			continue
+		}
+		_, width := utf8.DecodeRuneInString(pattern[i:])
+		if width == 0 {
+			width = 1
+		}
+		i += width
+	}
+	return false
 }
 
 func isInlineModifierGroup(suffix string) bool {
@@ -134,17 +180,152 @@ type regexCaptureNameReplacement struct {
 	placeholder string
 }
 
+// hasRegexNamedCapture is a cheap legacy-mode guard. Patterns without a named
+// declaration stay on the existing regexp runtime, preserving Annex B escape
+// handling without paying for capture-name normalization.
+func hasRegexNamedCapture(pattern string, flags RegexFlags) bool {
+	for i := 0; i < len(pattern); {
+		switch pattern[i] {
+		case '[':
+			end, ok := ClassEnd(pattern, i, flags)
+			if !ok {
+				return false
+			}
+			i = end
+		case '\\':
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				return false
+			}
+			i += step
+		case '(':
+			if strings.HasPrefix(pattern[i:], "(?<") &&
+				(i+3 >= len(pattern) || pattern[i+3] != '=' && pattern[i+3] != '!') {
+				return true
+			}
+			i++
+		default:
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			if width == 0 {
+				width = 1
+			}
+			i += width
+		}
+	}
+	return false
+}
+
+type regexCaptureNameAnalysis struct {
+	hasDuplicate             bool
+	hasNonExclusiveDuplicate bool
+}
+
+type regexBranch struct {
+	parent int
+	base   int
+	depth  int
+}
+
+// regexBranchTracker mirrors regexpp's ES2025 BranchID model. Every node is
+// one Alternative; siblings share a base. Two declarations are mutually
+// exclusive exactly when their ancestor paths choose different siblings of
+// the same Disjunction.
+type regexBranchTracker struct {
+	branches []regexBranch
+	current  int
+}
+
+func newRegexBranchTracker(pattern string) regexBranchTracker {
+	const (
+		minimumCapacity = 8
+		maximumCapacity = 256
+	)
+	capacity := minimumCapacity
+	if len(pattern) >= 64 {
+		estimate := 2
+		for i := 0; i < len(pattern) && estimate < maximumCapacity; i++ {
+			if pattern[i] == '(' || pattern[i] == '|' {
+				estimate++
+			}
+		}
+		if estimate > capacity {
+			capacity = estimate
+		}
+	}
+	branches := make([]regexBranch, 1, capacity)
+	branches[0] = regexBranch{parent: -1, base: 0}
+	tracker := regexBranchTracker{branches: branches}
+	tracker.enterDisjunction()
+	return tracker
+}
+
+func (t *regexBranchTracker) enterDisjunction() {
+	id := len(t.branches)
+	depth := t.branches[t.current].depth + 1
+	t.branches = append(t.branches, regexBranch{parent: t.current, base: id, depth: depth})
+	t.current = id
+}
+
+func (t *regexBranchTracker) enterAlternative() {
+	branch := t.branches[t.current]
+	id := len(t.branches)
+	t.branches = append(t.branches, branch)
+	t.current = id
+}
+
+func (t *regexBranchTracker) leaveDisjunction() {
+	if t.branches[t.current].depth > 1 {
+		t.current = t.branches[t.current].parent
+	}
+}
+
+func (t *regexBranchTracker) separatedFrom(left int, right int) bool {
+	for t.branches[left].depth > t.branches[right].depth {
+		left = t.branches[left].parent
+	}
+	for t.branches[right].depth > t.branches[left].depth {
+		right = t.branches[right].parent
+	}
+	for left >= 0 && right >= 0 {
+		leftBranch := t.branches[left]
+		rightBranch := t.branches[right]
+		if left != right && leftBranch.base == rightBranch.base {
+			return true
+		}
+		left = leftBranch.parent
+		right = rightBranch.parent
+	}
+	return false
+}
+
 // normalizeRegexCaptureNames rewrites every declaration and reference name to
 // a deterministic ASCII placeholder keyed by its decoded IdentifierName. This
-// preserves equality between raw and escaped spellings while allowing tsgo's
-// complete RegExp parser to validate the surrounding grammar. It also records
-// duplicate declarations for the fail-closed suggestion gate.
-func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool, bool, bool) {
+// preserves equality between raw and escaped spellings while allowing the
+// grammar authority to validate the surrounding pattern. Duplicate
+// declarations get distinct placeholders because ES2025 permits them when
+// their Alternatives are mutually exclusive; references use the first
+// declaration's placeholder.
+func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, regexCaptureNameAnalysis, bool) {
 	var replacements []regexCaptureNameReplacement
 	var placeholders map[string]string
-	var declarations map[string]bool
-	hasDuplicate := false
-	hasConservativeVCase := false
+	var lastDeclarationBranch map[string]int
+	analysis := regexCaptureNameAnalysis{}
+	placeholderCount := 0
+	// A duplicate declaration requires at least two declaration-looking
+	// prefixes. Avoid allocating the persistent branch tree for the common
+	// zero/one-capture case; false positives such as lookbehinds only cause the
+	// conservative tracking path to run.
+	trackBranches := strings.Count(pattern, "(?<") > 1
+	var branches regexBranchTracker
+	if trackBranches {
+		branches = newRegexBranchTracker(pattern)
+	}
+
+	newPlaceholder := func() string {
+		placeholder := "rslint" + strconv.Itoa(placeholderCount)
+		placeholderCount++
+		return placeholder
+	}
 
 	addName := func(nameStart int, nameEnd int, declaration bool) bool {
 		name, ok := normalizeRegexCaptureName(pattern[nameStart:nameEnd])
@@ -156,17 +337,28 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool,
 		}
 		placeholder, ok := placeholders[name]
 		if !ok {
-			placeholder = "rslint" + strconv.Itoa(len(placeholders))
+			placeholder = newPlaceholder()
 			placeholders[name] = placeholder
 		}
 		if declaration {
-			if declarations == nil {
-				declarations = make(map[string]bool)
+			if lastDeclarationBranch == nil {
+				lastDeclarationBranch = make(map[string]int)
 			}
-			if declarations[name] {
-				hasDuplicate = true
+			previous, exists := lastDeclarationBranch[name]
+			if exists {
+				analysis.hasDuplicate = true
+				placeholder = newPlaceholder()
+				// Declarations arrive in source/DFS order. For three ordered
+				// declarations p < q < r, separation of p/q and q/r implies
+				// separation of p/r: well-nested Disjunction intervals cannot
+				// return to p's earlier Alternative. Checking adjacent declarations
+				// is therefore equivalent to regexpp's all-pairs test.
+				if !analysis.hasNonExclusiveDuplicate &&
+					(!trackBranches || !branches.separatedFrom(previous, branches.current)) {
+					analysis.hasNonExclusiveDuplicate = true
+				}
 			}
-			declarations[name] = true
+			lastDeclarationBranch[name] = branches.current
 		}
 		replacements = append(replacements, regexCaptureNameReplacement{
 			start:       nameStart,
@@ -181,18 +373,16 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool,
 		case '[':
 			end := 0
 			if flags.UnicodeSets {
-				var content regexVClassContent
 				var ok bool
-				end, content, ok = analyzeRegexVClass(pattern, i)
+				end, ok = analyzeRegexVClass(pattern, i)
 				if !ok {
-					return "", hasDuplicate, hasConservativeVCase, false
+					return "", analysis, false
 				}
-				hasConservativeVCase = hasConservativeVCase || content.hasNegatedStringOperand
 			} else {
 				var ok bool
 				end, ok = ClassEnd(pattern, i, flags)
 				if !ok {
-					return "", hasDuplicate, hasConservativeVCase, false
+					return "", analysis, false
 				}
 			}
 			i = end
@@ -200,14 +390,14 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool,
 			if strings.HasPrefix(pattern[i:], `\k<`) {
 				_, next, ok := readAngleName(pattern, i+2)
 				if !ok || !addName(i+3, next-1, false) {
-					return "", hasDuplicate, hasConservativeVCase, false
+					return "", analysis, false
 				}
 				i = next
 				continue
 			}
 			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
-				return "", hasDuplicate, hasConservativeVCase, false
+				return "", analysis, false
 			}
 			i += step
 		case '(':
@@ -215,10 +405,23 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool,
 				(i+3 >= len(pattern) || pattern[i+3] != '=' && pattern[i+3] != '!') {
 				_, next, ok := readAngleName(pattern, i+2)
 				if !ok || !addName(i+3, next-1, true) {
-					return "", hasDuplicate, hasConservativeVCase, false
+					return "", analysis, false
 				}
 				i = next
-				continue
+			} else {
+				i++
+			}
+			if trackBranches {
+				branches.enterDisjunction()
+			}
+		case '|':
+			if trackBranches {
+				branches.enterAlternative()
+			}
+			i++
+		case ')':
+			if trackBranches {
+				branches.leaveDisjunction()
 			}
 			i++
 		default:
@@ -231,7 +434,7 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool,
 	}
 
 	if len(replacements) == 0 {
-		return pattern, hasDuplicate, hasConservativeVCase, true
+		return pattern, analysis, true
 	}
 	var result strings.Builder
 	result.Grow(len(pattern))
@@ -242,29 +445,54 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, bool,
 		last = replacement.end
 	}
 	result.WriteString(pattern[last:])
-	return result.String(), hasDuplicate, hasConservativeVCase, true
-}
-
-type regexVClassContent struct {
-	mayContainStrings       bool
-	hasNegatedStringOperand bool
+	return result.String(), analysis, true
 }
 
 type regexVClassFrame struct {
-	content        regexVClassContent
+	operator       regexVClassOperator
+	operandCount   int
+	mayHaveStrings bool
 	negated        bool
 	trailingHyphen bool
 }
 
+type regexVClassOperator uint8
+
+const (
+	regexVClassUnion regexVClassOperator = iota
+	regexVClassIntersection
+	regexVClassSubtraction
+)
+
+func (f *regexVClassFrame) addOperand(mayHaveStrings bool) {
+	if f.operandCount == 0 {
+		f.mayHaveStrings = mayHaveStrings
+	} else {
+		switch f.operator {
+		case regexVClassUnion:
+			// Preserve later string operands even when the union starts with a
+			// range. regexpp 4.12.2 drops that bit and can offer a v suggestion
+			// which JavaScript then rejects.
+			f.mayHaveStrings = f.mayHaveStrings || mayHaveStrings
+		case regexVClassIntersection:
+			f.mayHaveStrings = f.mayHaveStrings && mayHaveStrings
+		case regexVClassSubtraction:
+			// ClassSubtraction inherits only its left operand's value.
+		}
+	}
+	f.operandCount++
+	f.trailingHyphen = false
+}
+
 // analyzeRegexVClass performs the narrow v-mode checks needed before carrying
 // a constructor pattern through a literal. One iterative pass covers nested
-// classes, raw slashes, tsgo's trailing-hyphen and doubled-^/$ gaps, and the
-// conservative string-operand bit used only by the suggestion gate. It is a
-// lexical adapter, not a second ClassSetExpression parser; tsgo remains the
-// grammar authority for every other production.
-func analyzeRegexVClass(pattern string, start int) (end int, content regexVClassContent, ok bool) {
+// classes, raw slashes, tsgo's trailing-hyphen and doubled-^/$ gaps. It also
+// mirrors the ClassSetExpression MayContainStrings reduction because the
+// pinned tsgo scanner does not propagate later union operands. tsgo remains
+// the grammar authority for every other production.
+func analyzeRegexVClass(pattern string, start int) (end int, ok bool) {
 	if start >= len(pattern) || pattern[start] != '[' {
-		return start, regexVClassContent{}, false
+		return start, false
 	}
 
 	flags := RegexFlags{UnicodeSets: true}
@@ -280,23 +508,20 @@ func analyzeRegexVClass(pattern string, start int) (end int, content regexVClass
 		switch pattern[i] {
 		case '\\':
 			if strings.HasPrefix(pattern[i:], `\q{`) {
-				next, qOK := scanRegexVQString(pattern, i)
+				next, mayHaveStrings, qOK := scanRegexVQString(pattern, i)
 				if !qOK {
-					return start, regexVClassContent{}, false
+					return start, false
 				}
-				frame.content.mayContainStrings = true
-				frame.trailingHyphen = false
+				frame.addOperand(mayHaveStrings)
 				i = next
 				continue
 			}
-			if strings.HasPrefix(pattern[i:], `\p{`) || strings.HasPrefix(pattern[i:], `\P{`) {
-				frame.content.mayContainStrings = true
-			}
+			mayHaveStrings := regexVPropertyMayContainStrings(pattern, i)
 			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
-				return start, regexVClassContent{}, false
+				return start, false
 			}
-			frame.trailingHyphen = false
+			frame.addOperand(mayHaveStrings)
 			i += step
 		case '[':
 			frame.trailingHyphen = false
@@ -308,35 +533,49 @@ func analyzeRegexVClass(pattern string, start int) (end int, content regexVClass
 			}
 		case ']':
 			if frame.trailingHyphen {
-				return start, regexVClassContent{}, false
+				return start, false
 			}
-			frame.content.hasNegatedStringOperand = frame.content.hasNegatedStringOperand ||
-				frame.negated && frame.content.mayContainStrings
-			completed := frame.content
+			if frame.negated && frame.mayHaveStrings {
+				return start, false
+			}
+			completedMayHaveStrings := !frame.negated && frame.mayHaveStrings
 			frames = frames[:len(frames)-1]
 			i++
 			if len(frames) == 0 {
-				return i, completed, true
+				return i, true
 			}
 			parent := &frames[len(frames)-1]
-			parent.content.mayContainStrings = parent.content.mayContainStrings || completed.mayContainStrings
-			parent.content.hasNegatedStringOperand = parent.content.hasNegatedStringOperand || completed.hasNegatedStringOperand
-			parent.trailingHyphen = false
+			parent.addOperand(completedMayHaveStrings)
 		case '/':
 			// `/` is a ClassSetSyntaxCharacter. Escaping it only in the
 			// carrier would make an invalid constructor pattern valid.
-			return start, regexVClassContent{}, false
+			return start, false
 		case '^', '$':
 			if i+1 < len(pattern) && pattern[i+1] == pattern[i] {
-				return start, regexVClassContent{}, false
+				return start, false
 			}
-			frame.trailingHyphen = false
+			frame.addOperand(false)
+			i++
+		case '&':
+			if i+1 < len(pattern) && pattern[i+1] == '&' {
+				frame.operator = regexVClassIntersection
+				frame.trailingHyphen = false
+				i += 2
+				continue
+			}
+			frame.addOperand(false)
 			i++
 		case '-':
+			if i+1 < len(pattern) && pattern[i+1] == '-' {
+				frame.operator = regexVClassSubtraction
+				frame.trailingHyphen = false
+				i += 2
+				continue
+			}
 			frame.trailingHyphen = true
 			i++
 		default:
-			frame.trailingHyphen = false
+			frame.addOperand(false)
 			_, width := utf8.DecodeRuneInString(pattern[i:])
 			if width == 0 {
 				width = 1
@@ -344,37 +583,81 @@ func analyzeRegexVClass(pattern string, start int) (end int, content regexVClass
 			i += width
 		}
 	}
-	return start, regexVClassContent{}, false
+	return start, false
 }
 
-func scanRegexVQString(pattern string, start int) (next int, ok bool) {
+func scanRegexVQString(pattern string, start int) (next int, mayHaveStrings bool, ok bool) {
 	flags := RegexFlags{UnicodeSets: true}
+	characterCount := 0
 	for i := start + 3; i < len(pattern); {
 		switch pattern[i] {
 		case '\\':
 			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
-				return 0, false
+				return 0, false, false
+			}
+			characterCount++
+			if high, fixed := regexFixedUnicodeEscape(pattern, i); fixed && high >= 0xD800 && high <= 0xDBFF {
+				if low, lowFixed := regexFixedUnicodeEscape(pattern, i+step); lowFixed && low >= 0xDC00 && low <= 0xDFFF {
+					step += 6
+				}
 			}
 			i += step
+		case '|':
+			mayHaveStrings = mayHaveStrings || characterCount != 1
+			characterCount = 0
+			i++
 		case '}':
-			return i + 1, true
+			return i + 1, mayHaveStrings || characterCount != 1, true
 		case '/':
-			return 0, false
+			return 0, false, false
 		case '^', '$':
 			if i+1 < len(pattern) && pattern[i+1] == pattern[i] {
-				return 0, false
+				return 0, false, false
 			}
+			characterCount++
 			i++
 		default:
-			_, width := utf8.DecodeRuneInString(pattern[i:])
+			characterCount++
+			_, width := ecmascript.DecodeStringRune(pattern[i:])
 			if width == 0 {
 				width = 1
 			}
 			i += width
 		}
 	}
-	return 0, false
+	return 0, false, false
+}
+
+func regexFixedUnicodeEscape(pattern string, start int) (uint32, bool) {
+	if start < 0 || start+6 > len(pattern) || pattern[start] != '\\' || pattern[start+1] != 'u' ||
+		!allHexStr(pattern[start+2:start+6]) {
+		return 0, false
+	}
+	value, err := strconv.ParseUint(pattern[start+2:start+6], 16, 16)
+	return uint32(value), err == nil
+}
+
+func regexVPropertyMayContainStrings(pattern string, start int) bool {
+	if !strings.HasPrefix(pattern[start:], `\p{`) {
+		return false
+	}
+	closeRel := strings.IndexByte(pattern[start+3:], '}')
+	if closeRel < 0 {
+		return false
+	}
+	switch pattern[start+3 : start+3+closeRel] {
+	case "Basic_Emoji",
+		"Emoji_Keycap_Sequence",
+		"RGI_Emoji",
+		"RGI_Emoji_Flag_Sequence",
+		"RGI_Emoji_Modifier_Sequence",
+		"RGI_Emoji_Tag_Sequence",
+		"RGI_Emoji_ZWJ_Sequence":
+		return true
+	default:
+		return false
+	}
 }
 
 // regexPatternLiteral transports a u/v constructor pattern into a literal for
