@@ -58,6 +58,9 @@ var SortPropTypesRule = rule.Rule{
 		}
 
 		checkSorted := func(declarations []*ast.Node) {
+			callbackPropsLastSeen := map[*ast.Node]bool{}
+			requiredPropsFirstSeen := map[*ast.Node]bool{}
+			propsNotSortedSeen := map[*ast.Node]bool{}
 			var previous *ast.Node
 			for _, current := range declarations {
 				if current == nil {
@@ -83,7 +86,10 @@ var SortPropTypesRule = rule.Rule{
 						continue
 					}
 					if !isRequired(previous) && isRequired(current) {
-						report(current, "requiredPropsFirst", requiredPropsFirstText)
+						if !requiredPropsFirstSeen[current] {
+							requiredPropsFirstSeen[current] = true
+							report(current, "requiredPropsFirst", requiredPropsFirstText)
+						}
 						previous = current
 						continue
 					}
@@ -96,7 +102,10 @@ var SortPropTypesRule = rule.Rule{
 						continue
 					}
 					if previousCallback && !currentCallback {
-						report(previous, "callbackPropsLast", callbackPropsLastText)
+						if !callbackPropsLastSeen[previous] {
+							callbackPropsLastSeen[previous] = true
+							report(previous, "callbackPropsLast", callbackPropsLastText)
+						}
 						continue
 					}
 				}
@@ -106,7 +115,10 @@ var SortPropTypesRule = rule.Rule{
 					right = ecmascript.StringToLowerCase(right)
 				}
 				if !opts.noSortAlphabetically && right < left {
-					report(current, "propsNotSorted", propsNotSortedText)
+					if !propsNotSortedSeen[current] {
+						propsNotSortedSeen[current] = true
+						report(current, "propsNotSorted", propsNotSortedText)
+					}
 					continue
 				}
 				previous = current
@@ -115,6 +127,9 @@ var SortPropTypesRule = rule.Rule{
 
 		var checkValue func(*ast.Node)
 		checkValue = func(value *ast.Node) {
+			if value == nil {
+				return
+			}
 			// ESTree removes parentheses, but keeps TypeScript expression wrappers.
 			value = ast.SkipParentheses(value)
 			if value == nil {

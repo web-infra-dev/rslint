@@ -20,12 +20,16 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `any.shape(({ z: PropTypes.string, a: PropTypes.string } as any));`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
 		// A defaulted parameter is an ESTree AssignmentPattern without a direct annotation.
 		{Code: `type Props = { z: string; a: string }; function Component(p: Props = {} as Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
+		// Locks in upstream checkNode()'s nil-value early return for a declaration without an initializer.
+		{Code: `class Component { propTypes: unknown; }`, Tsx: true},
 		// ---- Dimension 4: spread resets the ordering group ----
 		{Code: `Component.propTypes = { z: PropTypes.string, ...shared, a: PropTypes.string };`, Tsx: true},
 		// ---- Dimension 4: TS expression wrappers on the propTypes object ----
 		{Code: `Component.propTypes = ({ a: PropTypes.string, z: PropTypes.string } as any);`, Tsx: true},
 		// N/A: private keys and element access do not participate in upstream's static key sort.
 	}, []rule_tester.InvalidTestCase{
+		// Locks in upstream callbackPropsLastSeen: report a misplaced callback only once.
+		{Code: `Component.propTypes = { onChange: PropTypes.func, a: PropTypes.string, b: PropTypes.string };`, Options: map[string]any{"callbacksLast": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "callbackPropsLast", Line: 1, Column: 25}}},
 		// Upstream falls back to the authored text of computed keys when sorting.
 		{Code: `Component.propTypes = { [z]: PropTypes.string, a: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted", Line: 1, Column: 48}}},
 		// Locks in upstream checkSorted() required-first arm: a required prop after an optional prop.
