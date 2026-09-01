@@ -53,15 +53,26 @@ func TestConsistentTupleLabelsExtras(t *testing.T) {
 				expectedError(`type Mixed = [label: string, number, boolean];`, `boolean`, 0),
 			),
 
-			// ---- Dimension 4: parenthesized and union element types stay
-			// unlabeled and are reported across their complete type ranges. ----
+			// ---- Dimension 4: parenthesized element types stay unlabeled, but
+			// their diagnostic ranges omit the parentheses like TSESTree. ----
 			tsInvalid(
 				`type Parenthesized = [label: string, (number)];`,
-				expectedError(`type Parenthesized = [label: string, (number)];`, `(number)`, 0),
+				expectedError(`type Parenthesized = [label: string, (number)];`, `number`, 0),
 			),
+			tsInvalid(
+				`type DeeplyParenthesized = [label: string, (((number)))];`,
+				expectedError(`type DeeplyParenthesized = [label: string, (((number)))];`, `number`, 0),
+			),
+
+			// ---- Dimension 4: compound element types are reported across their
+			// complete type ranges. ----
 			tsInvalid(
 				`type UnionElement = [label: string, number | undefined];`,
 				expectedError(`type UnionElement = [label: string, number | undefined];`, `number | undefined`, 0),
+			),
+			tsInvalid(
+				`type ParenthesizedUnion = [label: string, ((number | undefined))];`,
+				expectedError(`type ParenthesizedUnion = [label: string, ((number | undefined))];`, `number | undefined`, 0),
 			),
 
 			// ---- Dimension 4: nested mixed tuples report at both tuple levels

@@ -47,7 +47,10 @@ var ConsistentTupleLabelsRule = rule.Rule{
 
 				for _, element := range tuple.Elements.Nodes {
 					if !isLabeledElement(element) {
-						ctx.ReportNode(element, message)
+						// TSESTree omits type parentheses from the tuple element node's
+						// range. Keep the original node for label classification, but
+						// report the innermost type so diagnostic ranges match upstream.
+						ctx.ReportNode(ast.SkipTypeParentheses(element), message)
 					}
 				}
 			},
