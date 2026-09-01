@@ -7,8 +7,8 @@ import (
 )
 
 // These live-filesystem helpers reconcile compiler-owned paths from TypeScript
-// diagnostics and Program roots. Frozen target/config paths use
-// config.ExactPathID directly.
+// diagnostics. Frozen target/config paths use config.ExactPathID directly;
+// Program-root projection belongs to the loader.
 func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {

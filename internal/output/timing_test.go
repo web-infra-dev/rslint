@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
 func TestFormatRuleTimingTableEmpty(t *testing.T) {
@@ -15,9 +13,9 @@ func TestFormatRuleTimingTableEmpty(t *testing.T) {
 }
 
 func TestFormatRuleTimingTable(t *testing.T) {
-	table := FormatRuleTimingTable(map[string]linter.RuleTiming{
-		"no-console":                {Kind: linter.RuleKindNative, Time: 500 * time.Microsecond, Files: 3},
-		"@typescript-eslint/no-var": {Kind: linter.RuleKindJS, Time: 1500 * time.Microsecond, Files: 2},
+	table := FormatRuleTimingTable(map[string]RuleTiming{
+		"no-console":                {Kind: "native", Time: 500 * time.Microsecond, Files: 3},
+		"@typescript-eslint/no-var": {Kind: "js", Time: 1500 * time.Microsecond, Files: 2},
 	}, 0)
 
 	lines := strings.Split(strings.TrimSuffix(table, "\n"), "\n")
@@ -50,9 +48,9 @@ func TestFormatRuleTimingTable(t *testing.T) {
 }
 
 func TestFormatRuleTimingTableLimit(t *testing.T) {
-	table := FormatRuleTimingTable(map[string]linter.RuleTiming{
-		"no-console":                {Kind: linter.RuleKindNative, Time: 500 * time.Microsecond, Files: 3},
-		"@typescript-eslint/no-var": {Kind: linter.RuleKindJS, Time: 1500 * time.Microsecond, Files: 2},
+	table := FormatRuleTimingTable(map[string]RuleTiming{
+		"no-console":                {Kind: "native", Time: 500 * time.Microsecond, Files: 3},
+		"@typescript-eslint/no-var": {Kind: "js", Time: 1500 * time.Microsecond, Files: 2},
 	}, 1)
 
 	if strings.Contains(table, "no-console") {

@@ -6,14 +6,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/web-infra-dev/rslint/internal/linter"
 )
+
+type RuleTiming struct {
+	Kind  string
+	Time  time.Duration
+	Files int
+}
 
 // FormatRuleTimingTable renders the per-rule timing table, sorted by total
 // time descending. Relative is each rule's share of the summed rule time
 // across ALL rules, even when limit > 0 truncates the table to the top N.
-func FormatRuleTimingTable(timings map[string]linter.RuleTiming, limit int) string {
+func FormatRuleTimingTable(timings map[string]RuleTiming, limit int) string {
 	if len(timings) == 0 {
 		return ""
 	}
