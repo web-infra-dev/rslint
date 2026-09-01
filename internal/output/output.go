@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 const outputBufferSize = 4096 * 100
@@ -24,8 +23,11 @@ type formatter interface {
 	finish(w *bufio.Writer, report Report) error
 }
 
-func Render(dst io.Writer, report Report, outcome Outcome, options Options) error {
-	selected, err := newFormatter(options, outcome)
+func Render(dst io.Writer, report Report, options Options) error {
+	if options.Format == FormatDefault && !report.hasSummary {
+		return errors.New("default output requires a report summary")
+	}
+	selected, err := newFormatter(options)
 	if err != nil {
 		return err
 	}
@@ -38,7 +40,11 @@ func Render(dst io.Writer, report Report, outcome Outcome, options Options) erro
 		if !isVisible(diagnostic, options.Quiet) {
 			continue
 		}
-		view, err := newDiagnosticView(diagnostic, options.ComparePaths)
+		view, err := newDiagnosticView(
+			diagnostic,
+			options.ComparePaths,
+			options.Format == FormatDefault,
+		)
 		if err != nil {
 			return err
 		}
@@ -67,17 +73,14 @@ func Render(dst io.Writer, report Report, outcome Outcome, options Options) erro
 	return w.Flush()
 }
 
-func isVisible(diagnostic rule.RuleDiagnostic, quiet bool) bool {
-	return !quiet || diagnostic.Severity == rule.SeverityError
+func isVisible(diagnostic Diagnostic, quiet bool) bool {
+	return !quiet || diagnostic.Severity == SeverityError
 }
 
-func newFormatter(options Options, outcome Outcome) (formatter, error) {
+func newFormatter(options Options) (formatter, error) {
 	switch options.Format {
 	case FormatDefault:
-		return &defaultFormatter{
-			colors:  newColorScheme(options.ColorEnabled),
-			outcome: outcome,
-		}, nil
+		return &defaultFormatter{colors: newColorScheme(options.ColorEnabled)}, nil
 	case FormatJSONLine:
 		return jsonLineFormatter{}, nil
 	case FormatGitHub:
