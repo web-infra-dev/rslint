@@ -277,7 +277,7 @@ type sortableAttribute struct {
 
 func buildFixes(ctx rule.RuleContext, element *ast.Node, opts options, reserved []string) []rule.RuleFix {
 	attrs := reactutil.GetJsxElementAttributes(element)
-	if hasCommentAfterSpread(ctx, element, attrs) {
+	if hasUnsortableCommentLayout(ctx, attrs) {
 		return nil
 	}
 	groups := sortableGroups(ctx, element, attrs)
@@ -297,20 +297,22 @@ func buildFixes(ctx rule.RuleContext, element *ast.Node, opts options, reserved 
 	return fixes
 }
 
-// hasCommentAfterSpread keeps an otherwise unattached comment from being
-// silently reassigned when the fixer reorders the group after a spread.
-func hasCommentAfterSpread(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) bool {
+// hasUnsortableCommentLayout mirrors the upstream rule's conservative handling
+// of comment layouts it cannot associate with an attribute.
+func hasUnsortableCommentLayout(ctx rule.RuleContext, attrs []*ast.Node) bool {
 	comments := ctx.Comments.All()
 	for index, attr := range attrs {
-		if attr.Kind != ast.KindJsxSpreadAttribute {
+		if attr.Kind != ast.KindJsxAttribute || index+1 >= len(attrs) || attrs[index+1].Kind != ast.KindJsxAttribute {
 			continue
 		}
-		r := utils.TrimNodeTextRange(ctx.SourceFile, attr)
-		limit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
-		if index+1 < len(attrs) {
-			limit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+1]).End()
+		current := utils.TrimNodeTextRange(ctx.SourceFile, attr)
+		next := utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+1])
+		between := commentsInSpan(comments, current.End(), next.Pos())
+		if len(between) <= 1 {
+			continue
 		}
-		if len(commentsInSpan(comments, r.End(), limit)) != 0 {
+		line := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), current.Pos())
+		if line+1 != scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[1].Pos()) {
 			return true
 		}
 	}
@@ -409,7 +411,7 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 		nextIsAttribute := next != nil && next.Kind == ast.KindJsxAttribute
 		limit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
 		if next != nil {
-			limit = utils.TrimNodeTextRange(ctx.SourceFile, next).End()
+			limit = utils.TrimNodeTextRange(ctx.SourceFile, next).Pos()
 		}
 		between := commentsInSpan(comments, r.End(), limit)
 		line := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), r.Pos())
@@ -434,7 +436,7 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 			item.end = nextRange.End()
 			afterNextLimit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
 			if index+2 < len(attrs) {
-				afterNextLimit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+2]).End()
+				afterNextLimit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+2]).Pos()
 			}
 			nextComments := commentsInSpan(comments, item.end, afterNextLimit)
 			if len(nextComments) == 1 && scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextRange.Pos()) == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextComments[0].Pos()) {

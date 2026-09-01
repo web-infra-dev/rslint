@@ -22,6 +22,11 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		// ---- Real-user: issue #1632 gives reserved props precedence over callbacks. ----
 		{Code: `<App key={1} a onClick={fn} />`, Tsx: true, Options: map[string]any{"reservedFirst": true, "callbacksLast": true}},
 	}, []rule_tester.InvalidTestCase{
+		// A comment after a spread stays outside the sortable group that follows it.
+		{Code: `<App {...p} /* gap */ d c />`, Tsx: true, Output: []string{`<App {...p} /* gap */ c d />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 25)}},
+		{Code: "<App {...p}\n /* gap */\n d c />", Tsx: true, Output: []string{"<App {...p}\n /* gap */\n c d />"}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 3, 4)}},
+		// Comments within the next attribute's initializer are not inter-attribute comments.
+		{Code: `<App c a={/* inside */ 1} b />`, Tsx: true, Output: []string{`<App a={/* inside */ 1} b c />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 8), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 27)}},
 		// Reports from one JSX element follow source order, as ESLint's diagnostics do.
 		{Code: `<App onClick onBlur a />`, Tsx: true, Options: map[string]any{"callbacksLast": true}, Output: []string{`<App a onBlur onClick />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("listCallbacksLast", "Callbacks must be listed after all other props", 1, 6), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 14)}},
 		// Locks in upstream alphabetic arm: errors are evaluated independently for each inversion.
