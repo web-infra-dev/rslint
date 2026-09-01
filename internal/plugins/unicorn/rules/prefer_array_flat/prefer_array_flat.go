@@ -165,7 +165,7 @@ func matchesSpreadReducer(body *ast.Node, firstParameter *ast.Node, secondParame
 
 func matchEmptyArrayConcat(node *ast.Node) (flattenMatch, bool) {
 	oneArgument := 1
-	_, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
+	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 		Method:          "concat",
 		ArgumentsLength: &oneArgument,
 	})
@@ -173,9 +173,7 @@ func matchEmptyArrayConcat(node *ast.Node) (flattenMatch, bool) {
 		return flattenMatch{}, false
 	}
 
-	call := node.AsCallExpression()
-	callee := ast.SkipParentheses(call.Expression)
-	object := ast.SkipParentheses(callee.AsPropertyAccessExpression().Expression)
+	object := ast.SkipParentheses(call.Object)
 	if !ast.IsEmptyArrayLiteral(object) {
 		return flattenMatch{}, false
 	}
