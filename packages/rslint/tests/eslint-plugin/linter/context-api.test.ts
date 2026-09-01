@@ -14,7 +14,7 @@
  * the same code path real plugin rules hit — not just the helper in
  * isolation.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';

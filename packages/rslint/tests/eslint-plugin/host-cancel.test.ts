@@ -1,4 +1,4 @@
-import { describe, test, expect, rs } from '@rstest/core';
+import { describe, test, expect, rs } from 'rstack/test';
 
 import { createPluginLintHost } from '../../src/eslint-plugin/host.js';
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';

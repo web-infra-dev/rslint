@@ -225,6 +225,7 @@ fsys
 fullwidth
 funcs
 funcw
+Gara
 Garay
 gcflags
 GDSFP
@@ -294,6 +295,7 @@ jsxtransforms
 jsxtx
 justforcheck
 kase
+keycap
 keygen
 keyshortcuts
 keytar
@@ -718,3 +720,4 @@ ZWSP
 πfoo
 Дelta
 дelta
+Keycap

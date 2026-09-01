@@ -49,6 +49,27 @@ func TestStringCodeUnits(t *testing.T) {
 	}
 }
 
+func TestDecodeStringRune(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		value string
+		want  rune
+		width int
+	}{
+		{name: "ASCII", value: "a", want: 'a', width: 1},
+		{name: "astral", value: "😀", want: '😀', width: 4},
+		{name: "lone high surrogate", value: loneSurrogate(0xD800), want: 0xD800, width: 3},
+		{name: "lone low surrogate", value: loneSurrogate(0xDFFF), want: 0xDFFF, width: 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, width := DecodeStringRune(test.value)
+			if got != test.want || width != test.width {
+				t.Fatalf("DecodeStringRune(%q) = (%U, %d), want (%U, %d)", test.value, got, width, test.want, test.width)
+			}
+		})
+	}
+}
+
 func TestStringFromCodeUnits(t *testing.T) {
 	tests := []struct {
 		name  string

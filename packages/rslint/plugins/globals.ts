@@ -1,4 +1,4 @@
-import type { RsbuildPlugin, Rspack } from '@rslib/core';
+import type { RsbuildPlugin, Rspack } from 'rstack/lib';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import { createRequire } from 'node:module';

@@ -12,7 +12,7 @@
  * the wrapper) fails here and forces a review.
  */
 
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 
 import {

@@ -32,6 +32,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/func_name_matching"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
+	"github.com/web-infra-dev/rslint/internal/rules/func_style"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/grouped_accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
@@ -187,6 +188,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_exponentiation_operator"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_named_capture_group"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_numeric_literals"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_has_own"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_spread"
@@ -258,6 +260,7 @@ func coreRules() []rule.Rule {
 		for_direction.ForDirectionRule,
 		func_name_matching.FuncNameMatchingRule,
 		func_names.FuncNamesRule,
+		func_style.FuncStyleRule,
 		getter_return.GetterReturnRule,
 		grouped_accessor_pairs.GroupedAccessorPairsRule,
 		guard_for_in.GuardForInRule,
@@ -374,6 +377,7 @@ func coreRules() []rule.Rule {
 		prefer_const.PreferConstRule,
 		prefer_destructuring.PreferDestructuringRule,
 		prefer_exponentiation_operator.PreferExponentiationOperatorRule,
+		prefer_named_capture_group.PreferNamedCaptureGroupRule,
 		prefer_numeric_literals.PreferNumericLiteralsRule,
 		prefer_object_has_own.PreferObjectHasOwnRule,
 		prefer_object_spread.PreferObjectSpreadRule,

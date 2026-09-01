@@ -1,6 +1,6 @@
-import { defineConfig } from '@rstest/core';
+import { define } from 'rstack';
 
-export default defineConfig({
+define.test({
   testEnvironment: 'node',
   globals: true,
   // Normal completion is event-driven. This is only the final in-process
@@ -78,6 +78,7 @@ export default defineConfig({
     './tests/eslint/rules/dot-notation.test.ts',
     './tests/eslint/rules/func-name-matching.test.ts',
     './tests/eslint/rules/func-names.test.ts',
+    './tests/eslint/rules/func-style.test.ts',
     './tests/eslint/rules/grouped-accessor-pairs.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',
@@ -149,6 +150,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-const.test.ts',
     './tests/eslint/rules/prefer-destructuring.test.ts',
     './tests/eslint/rules/prefer-exponentiation-operator.test.ts',
+    './tests/eslint/rules/prefer-named-capture-group.test.ts',
     './tests/eslint/rules/prefer-numeric-literals.test.ts',
     './tests/eslint/rules/prefer-object-has-own.test.ts',
     './tests/eslint/rules/prefer-object-spread.test.ts',
@@ -388,7 +390,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unnecessary-qualifier.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-template-expression.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-arguments.test.ts',
-    // './tests/typescript-eslint/rules/no-unnecessary-type-assertion.test.ts',
+    './tests/typescript-eslint/rules/no-unnecessary-type-assertion.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-constraint.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-conversion.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-parameters.test.ts',
@@ -601,6 +603,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/consistent-rstest-namespace.test.ts',
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
@@ -608,6 +611,7 @@ export default defineConfig({
     './tests/rstest/rules/no-commented-out-tests.test.ts',
     './tests/rstest/rules/no-conditional-expect.test.ts',
     './tests/rstest/rules/no-conditional-in-test.test.ts',
+    './tests/rstest/rules/no-conditional-tests.test.ts',
     './tests/rstest/rules/no-disabled-tests.test.ts',
     './tests/rstest/rules/no-focused-tests.test.ts',
     './tests/rstest/rules/no-hooks.test.ts',
@@ -624,6 +628,7 @@ export default defineConfig({
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-import-in-mock.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
+    './tests/rstest/rules/require-awaited-expect-poll.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
     './tests/rstest/rules/require-mock-type-parameters.test.ts',
     './tests/rstest/rules/require-test-timeout.test.ts',
@@ -650,6 +655,7 @@ export default defineConfig({
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
+    './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
@@ -662,6 +668,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-magic-array-flat-depth.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-nested-ternary.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-object-as-default-parameter.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-thenable.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-this-assignment.test.ts',
@@ -674,6 +681,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-then-catch.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',

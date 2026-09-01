@@ -1,6 +1,6 @@
 import { Rslint } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';

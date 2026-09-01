@@ -61,6 +61,8 @@ func TestParseRstestFnCallHooks(t *testing.T) {
 			{Code: `import { beforeAll } from 'vitest'; beforeAll(() => {});`},
 			{Code: `import { beforeEach } from '@jest/globals'; beforeEach(() => {});`},
 			{Code: `const beforeAll = createHookRegistry(); beforeAll(() => {});`},
+			// Only comma expressions are transparent callee wrappers.
+			{Code: `(flag && test)("case", () => {});`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// All four hooks as globals.
@@ -124,6 +126,12 @@ func TestParseRstestFnCallHooks(t *testing.T) {
 			// Test and describe parsing is unchanged.
 			{Code: `test("case", () => {});`, Errors: parsedHookError("test", "test")},
 			{Code: `describe("suite", () => {});`, Errors: parsedHookError("describe", "describe")},
+			// A comma expression evaluates to its right operand before the call.
+			{Code: `(0, test)("case", () => {});`, Errors: parsedHookError("test", "test")},
+			{Code: `(sideEffect(), describe.only)("suite", () => {});`, Errors: parsedHookError("describe", "describe")},
+			{Code: `(0, beforeEach)(() => {});`, Errors: parsedHookError("hook", "beforeEach")},
+			{Code: `(0, import.meta.rstest.test)("case", () => {});`, Errors: parsedHookError("test", "test")},
+			{Code: `const wrapped = (0, test); wrapped("case", () => {});`, Errors: parsedHookError("test", "test")},
 		},
 	)
 }

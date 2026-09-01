@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { defineConfig, globalIgnores } from '../src/config/define-config.js';
 import type { RuleEntry, RulesRecord } from '../src/config/define-config.js';
 
