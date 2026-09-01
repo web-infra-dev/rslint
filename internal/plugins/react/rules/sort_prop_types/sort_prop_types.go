@@ -24,6 +24,12 @@ type options struct {
 	requiredFirst, callbacksLast, ignoreCase, noSortAlphabetically, sortShapeProp, checkTypes bool
 }
 
+type propName struct {
+	text     string
+	number   float64
+	isNumber bool
+}
+
 func parseOptions(input []any) options {
 	if len(input) == 0 {
 		return options{}
@@ -95,8 +101,8 @@ var SortPropTypesRule = rule.Rule{
 					}
 				}
 				if opts.callbacksLast {
-					previousCallback := isCallback(previousName)
-					currentCallback := isCallback(name)
+					previousCallback := isCallback(previousName.text)
+					currentCallback := isCallback(name.text)
 					if !previousCallback && currentCallback {
 						previous = current
 						continue
@@ -109,12 +115,16 @@ var SortPropTypesRule = rule.Rule{
 						continue
 					}
 				}
-				left, right := previousName, name
+				left, right := previousName.text, name.text
 				if opts.ignoreCase {
 					left = ecmascript.StringToLowerCase(left)
 					right = ecmascript.StringToLowerCase(right)
 				}
-				if !opts.noSortAlphabetically && right < left {
+				outOfOrder := right < left
+				if !opts.ignoreCase {
+					outOfOrder = isPropNameBefore(name, previousName)
+				}
+				if !opts.noSortAlphabetically && outOfOrder {
 					if !propsNotSortedSeen[current] {
 						propsNotSortedSeen[current] = true
 						report(current, "propsNotSorted", propsNotSortedText)
@@ -224,21 +234,56 @@ var SortPropTypesRule = rule.Rule{
 	},
 }
 
-func declarationName(sourceFile *ast.SourceFile, node *ast.Node) (string, bool) {
+func declarationName(sourceFile *ast.SourceFile, node *ast.Node) (propName, bool) {
 	if node == nil {
-		return "", false
+		return propName{}, false
 	}
 	name := node.Name()
 	if name == nil {
-		return "", false
+		return propName{}, false
+	}
+	if numeric := numericPropertyName(name); numeric != nil {
+		text := utils.TrimmedNodeText(sourceFile, numeric)
+		if value, ok := ecmascript.StringToNumber(utils.NormalizeNumericLiteral(numeric.AsNumericLiteral().Text)); ok && value != 0 {
+			return propName{text: utils.NormalizeNumericLiteral(numeric.AsNumericLiteral().Text), number: value, isNumber: true}, true
+		}
+		return propName{text: text}, true
 	}
 	if value, ok := utils.GetStaticPropertyName(name); ok {
-		return value, true
+		return propName{text: value}, true
 	}
 	if name.Kind == ast.KindComputedPropertyName {
-		return utils.TrimmedNodeText(sourceFile, name.AsComputedPropertyName().Expression), true
+		return propName{text: utils.TrimmedNodeText(sourceFile, name.AsComputedPropertyName().Expression)}, true
 	}
-	return utils.TrimmedNodeText(sourceFile, name), true
+	return propName{text: utils.TrimmedNodeText(sourceFile, name)}, true
+}
+
+func numericPropertyName(name *ast.Node) *ast.Node {
+	if name.Kind == ast.KindNumericLiteral {
+		return name
+	}
+	if name.Kind == ast.KindComputedPropertyName {
+		expression := ast.SkipParentheses(name.AsComputedPropertyName().Expression)
+		if expression != nil && expression.Kind == ast.KindNumericLiteral {
+			return expression
+		}
+	}
+	return nil
+}
+
+func isPropNameBefore(current, previous propName) bool {
+	if current.isNumber && previous.isNumber {
+		return current.number < previous.number
+	}
+	if current.isNumber {
+		previousNumber, ok := ecmascript.StringToNumber(previous.text)
+		return ok && current.number < previousNumber
+	}
+	if previous.isNumber {
+		currentNumber, ok := ecmascript.StringToNumber(current.text)
+		return ok && currentNumber < previous.number
+	}
+	return current.text < previous.text
 }
 
 // firstParamType mirrors upstream's direct ESTree `param.typeAnnotation`
@@ -274,9 +319,6 @@ func isCallback(name string) bool {
 func isShapeCall(callee *ast.Node) bool {
 	if callee == nil {
 		return false
-	}
-	if callee.Kind == ast.KindIdentifier {
-		return callee.AsIdentifier().Text == "shape"
 	}
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return false

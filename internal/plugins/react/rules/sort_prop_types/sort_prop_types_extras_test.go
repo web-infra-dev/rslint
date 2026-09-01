@@ -18,6 +18,8 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `const props = { z: PropTypes.string, a: PropTypes.string }; const x = { propTypes: props };`, Tsx: true},
 		// The shape listener likewise leaves TypeScript assertions opaque.
 		{Code: `any.shape(({ z: PropTypes.string, a: PropTypes.string } as any));`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
+		// Upstream only recognizes a property access named `shape`, not a bare call.
+		{Code: `shape({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
 		// A defaulted parameter is an ESTree AssignmentPattern without a direct annotation.
 		{Code: `type Props = { z: string; a: string }; function Component(p: Props = {} as Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
 		// Upstream checks only a direct, already-seen type-literal alias.
@@ -40,6 +42,8 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `Component.propTypes = { a: PropTypes.string, b: PropTypes.string.isRequired };`, Options: map[string]any{"requiredFirst": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requiredPropsFirst", Line: 1, Column: 46}}},
 		// Locks in upstream CallExpression listener: shape properties are checked independently.
 		{Code: `Component.propTypes = { item: PropTypes.shape({ z: PropTypes.string, a: PropTypes.string }) };`, Options: map[string]any{"sortShapeProp": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted", Line: 1, Column: 70}}},
+		// Upstream compares numeric keys as numbers instead of lexicographic strings.
+		{Code: `C.propTypes = { 2: T, 10: T, 1: T };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted", Line: 1, Column: 30}}},
 		// ---- Real-user: #2702 TypeScript alias used by a function component ----
 		{Code: `type Props = { z: string; a: string }; function Component(props: Props) { return null; }`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted", Line: 1, Column: 27}}},
 		// ---- Real-user: #3578 inline TypeScript component props ----
