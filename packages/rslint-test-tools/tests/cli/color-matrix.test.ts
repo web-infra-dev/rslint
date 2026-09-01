@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from '@rstest/core';
+import { describe, test, expect, beforeAll, afterAll } from 'rstack/test';
 import { RSLINT_BIN, createTempDir, cleanupTempDir } from './js-config/helpers';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 

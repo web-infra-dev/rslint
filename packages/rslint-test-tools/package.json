@@ -5,8 +5,8 @@
   "main": "src/index.ts",
   "private": true,
   "scripts": {
-    "test": "rstest run",
-    "test:update": "rstest run -u"
+    "test": "rs test",
+    "test:update": "rs test -u"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +15,6 @@
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "catalog:",
     "@rslint/core": "workspace:*",
-    "@rstest/core": "catalog:",
     "@stylistic/eslint-plugin": "catalog:",
     "@types/node": "catalog:",
     "@typescript-eslint/parser": "catalog:",

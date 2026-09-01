@@ -18,7 +18,7 @@
  * plus both ends of the file) so boundary-off-by-one is not representable.
  */
 
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 

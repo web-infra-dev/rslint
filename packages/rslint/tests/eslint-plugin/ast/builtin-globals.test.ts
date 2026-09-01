@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, expect, test } from '@rstest/core';
+import { describe, expect, test } from 'rstack/test';
 import { fileURLToPath } from 'node:url';
 import {
   ECMASCRIPT_GLOBALS,

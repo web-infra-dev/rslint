@@ -1,3 +1,7 @@
+// TestNoUnnecessaryTemplateExpressionUpstream migrates the full valid/invalid
+// suite from upstream packages/eslint-plugin/tests/rules/no-unnecessary-template-expression.test.ts
+// 1:1. rslint-specific autofix and edge-shape lock-ins live in
+// no_unnecessary_template_expression_extras_test.go.
 package no_unnecessary_template_expression
 
 import (
@@ -7,7 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoUnnecessaryTemplateExpressionRule(t *testing.T) {
+func TestNoUnnecessaryTemplateExpressionUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTemplateExpressionRule, []rule_tester.ValidTestCase{
 		{Code: "const string = 'a';"},
 		{Code: "const string = `a`;"},
@@ -255,9 +259,8 @@ function foo<T extends string>() {
 		{Code: "type T<A extends string> = `${A}`;"},
 	}, []rule_tester.InvalidTestCase{
 		{
-			Code: "`${1}`;",
-			//       Output: []string{"`1`;",
-			// },
+			Code:   "`${1}`;",
+			Output: []string{"`1`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -268,9 +271,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${1n}`;",
-			//       Output: []string{"`1`;",
-			// },
+			Code:   "`${1n}`;",
+			Output: []string{"`1`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -281,9 +283,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${0o25}`;",
-			//       Output: []string{"`21`;",
-			// },
+			Code:   "`${0o25}`;",
+			Output: []string{"`21`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -294,9 +295,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${0b1010} ${0b1111}`;",
-			//       Output: []string{"`10 15`;",
-			// },
+			Code:   "`${0b1010} ${0b1111}`;",
+			Output: []string{"`10 15`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -313,9 +313,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${0x25}`;",
-			//       Output: []string{"`37`;",
-			// },
+			Code:   "`${0x25}`;",
+			Output: []string{"`37`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -326,9 +325,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${/a/}`;",
-			//       Output: []string{"`/a/`;",
-			// },
+			Code:   "`${/a/}`;",
+			Output: []string{"`/a/`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -339,9 +337,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${/a/gim}`;",
-			//       Output: []string{"`/a/gim`;",
-			// },
+			Code:   "`${/a/gim}`;",
+			Output: []string{"`/a/gim`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -352,9 +349,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${    1    }`;",
-			//       Output: []string{"`1`;",
-			// },
+			Code:   "`${    1    }`;",
+			Output: []string{"`1`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -362,9 +358,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${    'a'    }`;",
-			//       Output: []string{"'a';",
-			// },
+			Code:   "`${    'a'    }`;",
+			Output: []string{"'a';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -372,9 +367,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${    \"a\"    }`;",
-			//       Output: []string{"\"a\";",
-			// },
+			Code:   "`${    \"a\"    }`;",
+			Output: []string{"\"a\";"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -382,9 +376,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${    'a' + 'b'    }`;",
-			//       Output: []string{"'a' + 'b';",
-			// },
+			Code:   "`${    'a' + 'b'    }`;",
+			Output: []string{"'a' + 'b';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -392,9 +385,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${true}`;",
-			//       Output: []string{"`true`;",
-			// },
+			Code:   "`${true}`;",
+			Output: []string{"`true`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -405,9 +397,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${    true    }`;",
-			//       Output: []string{"`true`;",
-			// },
+			Code:   "`${    true    }`;",
+			Output: []string{"`true`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -415,9 +406,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${null}`;",
-			//       Output: []string{"`null`;",
-			// },
+			Code:   "`${null}`;",
+			Output: []string{"`null`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -428,9 +418,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${    null    }`;",
-			//       Output: []string{"`null`;",
-			// },
+			Code:   "`${    null    }`;",
+			Output: []string{"`null`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -438,9 +427,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${undefined}`;",
-			//       Output: []string{"`undefined`;",
-			// },
+			Code:   "`${undefined}`;",
+			Output: []string{"`undefined`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -451,9 +439,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${    undefined    }`;",
-			//       Output: []string{"`undefined`;",
-			// },
+			Code:   "`${    undefined    }`;",
+			Output: []string{"`undefined`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -461,9 +448,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${Infinity}`;",
-			//       Output: []string{"`Infinity`;",
-			// },
+			Code:   "`${Infinity}`;",
+			Output: []string{"`Infinity`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -474,9 +460,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${NaN}`;",
-			//       Output: []string{"`NaN`;",
-			// },
+			Code:   "`${NaN}`;",
+			Output: []string{"`NaN`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -487,9 +472,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${'a'} ${'b'}`;",
-			//       Output: []string{"`a b`;",
-			// },
+			Code:   "`${'a'} ${'b'}`;",
+			Output: []string{"`a b`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -506,9 +490,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${   'a'   } ${   'b'   }`;",
-			//       Output: []string{"`a b`;",
-			// },
+			Code:   "`${   'a'   } ${   'b'   }`;",
+			Output: []string{"`a b`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -519,9 +502,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`use${'less'}`;",
-			//       Output: []string{"`useless`;",
-			// },
+			Code:   "`use${'less'}`;",
+			Output: []string{"`useless`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -530,9 +512,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`use${`less`}`;",
-			//       Output: []string{"`useless`;",
-			// },
+			Code:   "`use${`less`}`;",
+			Output: []string{"`useless`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -550,21 +531,21 @@ function foo<T extends string>() {
   ` + "`" + `le${  ` + "`" + `ss` + "`" + `  }` + "`" + `
 }` + "`" + `;
       `,
-			//       Output: []string{`
-			// ` + "`" + `u${
-			//   // hopefully this comment is not needed.
-			//   'se'
-			//
-			// }le${  ` + "`" + `ss` + "`" + `  }` + "`" + `;
-			//       `,
-			// `
-			// ` + "`" + `u${
-			//   // hopefully this comment is not needed.
-			//   'se'
-			//
-			// }less` + "`" + `;
-			//       `,
-			// },
+			Output: []string{`
+` + "`" + `u${
+  // hopefully this comment is not needed.
+  'se'
+
+}le${  ` + "`" + `ss` + "`" + `  }` + "`" + `;
+      `,
+				`
+` + "`" + `u${
+  // hopefully this comment is not needed.
+  'se'
+
+}less` + "`" + `;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -588,10 +569,10 @@ function foo<T extends string>() {
   ` + "`" + `less` + "`" + `
 }` + "`" + `;
       `,
-			//       Output: []string{`
-			// ` + "`" + `useless` + "`" + `;
-			//       `,
-			// },
+			Output: []string{`
+` + "`" + `useless` + "`" + `;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -603,9 +584,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${'1 + 1 ='} ${2}`;",
-			//       Output: []string{"`1 + 1 = 2`;",
-			// },
+			Code:   "`${'1 + 1 ='} ${2}`;",
+			Output: []string{"`1 + 1 = 2`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -622,9 +602,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${'a'} ${true}`;",
-			//       Output: []string{"`a true`;",
-			// },
+			Code:   "`${'a'} ${true}`;",
+			Output: []string{"`a true`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -641,9 +620,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${String(Symbol.for('test'))}`;",
-			//       Output: []string{"String(Symbol.for('test'));",
-			// },
+			Code:   "`${String(Symbol.for('test'))}`;",
+			Output: []string{"String(Symbol.for('test'));"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -654,9 +632,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${'`'}`;",
-			//       Output: []string{"'`';",
-			// },
+			Code:   "`${'`'}`;",
+			Output: []string{"'`';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -664,9 +641,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`back${'`'}tick`;",
-			//       Output: []string{"`back\\`tick`;",
-			// },
+			Code:   "`back${'`'}tick`;",
+			Output: []string{"`back\\`tick`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -674,9 +650,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`dollar${'${`this is test`}'}sign`;",
-			//       Output: []string{"`dollar\\${\\`this is test\\`}sign`;",
-			// },
+			Code:   "`dollar${'${`this is test`}'}sign`;",
+			Output: []string{"`dollar\\${\\`this is test\\`}sign`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -684,9 +659,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`complex${'`${\"`${test}`\"}`'}case`;",
-			//       Output: []string{"`complex\\`\\${\"\\`\\${test}\\`\"}\\`case`;",
-			// },
+			Code:   "`complex${'`${\"`${test}`\"}`'}case`;",
+			Output: []string{"`complex\\`\\${\"\\`\\${test}\\`\"}\\`case`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -694,9 +668,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${'\\\\${test}'} string`;",
-			//       Output: []string{"`some \\\\\\${test} string`;",
-			// },
+			Code:   "`some ${'\\\\${test}'} string`;",
+			Output: []string{"`some \\\\\\${test} string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -704,9 +677,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${'\\\\`'} string`;",
-			//       Output: []string{"`some \\\\\\` string`;",
-			// },
+			Code:   "`some ${'\\\\`'} string`;",
+			Output: []string{"`some \\\\\\` string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -714,9 +686,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/`/} string`;",
-			//       Output: []string{"`some /\\`/ string`;",
-			// },
+			Code:   "`some ${/`/} string`;",
+			Output: []string{"`some /\\`/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -724,9 +695,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/\\`/} string`;",
-			//       Output: []string{"`some /\\\\\\`/ string`;",
-			// },
+			Code:   "`some ${/\\`/} string`;",
+			Output: []string{"`some /\\\\\\`/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -734,9 +704,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/\\\\`/} string`;",
-			//       Output: []string{"`some /\\\\\\\\\\`/ string`;",
-			// },
+			Code:   "`some ${/\\\\`/} string`;",
+			Output: []string{"`some /\\\\\\\\\\`/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -744,9 +713,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/\\\\\\`/} string`;",
-			//       Output: []string{"`some /\\\\\\\\\\\\\\`/ string`;",
-			// },
+			Code:   "`some ${/\\\\\\`/} string`;",
+			Output: []string{"`some /\\\\\\\\\\\\\\`/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -754,9 +722,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/${}/} string`;",
-			//       Output: []string{"`some /\\${}/ string`;",
-			// },
+			Code:   "`some ${/${}/} string`;",
+			Output: []string{"`some /\\${}/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -764,9 +731,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/$ {}/} string`;",
-			//       Output: []string{"`some /$ {}/ string`;",
-			// },
+			Code:   "`some ${/$ {}/} string`;",
+			Output: []string{"`some /$ {}/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -774,9 +740,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/\\\\/} string`;",
-			//       Output: []string{"`some /\\\\\\\\/ string`;",
-			// },
+			Code:   "`some ${/\\\\/} string`;",
+			Output: []string{"`some /\\\\\\\\/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -784,9 +749,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/\\\\\\b/} string`;",
-			//       Output: []string{"`some /\\\\\\\\\\\\b/ string`;",
-			// },
+			Code:   "`some ${/\\\\\\b/} string`;",
+			Output: []string{"`some /\\\\\\\\\\\\b/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -794,9 +758,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`some ${/\\\\\\\\/} string`;",
-			//       Output: []string{"`some /\\\\\\\\\\\\\\\\/ string`;",
-			// },
+			Code:   "`some ${/\\\\\\\\/} string`;",
+			Output: []string{"`some /\\\\\\\\\\\\\\\\/ string`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -804,9 +767,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${''} `;",
-			//       Output: []string{"`  `;",
-			// },
+			Code:   "` ${''} `;",
+			Output: []string{"`  `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -814,9 +776,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${\"\"} `;",
-			//       Output: []string{"`  `;",
-			// },
+			Code:   "` ${\"\"} `;",
+			Output: []string{"`  `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -824,9 +785,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${``} `;",
-			//       Output: []string{"`  `;",
-			// },
+			Code:   "` ${``} `;",
+			Output: []string{"`  `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -834,9 +794,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\`'} `;",
-			//       Output: []string{"` \\` `;",
-			// },
+			Code:   "` ${'\\`'} `;",
+			Output: []string{"` \\` `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -844,9 +803,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\\\`'} `;",
-			//       Output: []string{"` \\\\\\` `;",
-			// },
+			Code:   "` ${'\\\\`'} `;",
+			Output: []string{"` \\\\\\` `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -854,9 +812,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'$'}{} `;",
-			//       Output: []string{"` \\${} `;",
-			// },
+			Code:   "` ${'$'}{} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -864,9 +821,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\$'}{} `;",
-			//       Output: []string{"` \\${} `;",
-			// },
+			Code:   "` ${'\\$'}{} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -874,9 +830,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\\\$'}{} `;",
-			//       Output: []string{"` \\\\\\${} `;",
-			// },
+			Code:   "` ${'\\\\$'}{} `;",
+			Output: []string{"` \\\\\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -884,9 +839,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\\\$ '}{} `;",
-			//       Output: []string{"` \\\\$ {} `;",
-			// },
+			Code:   "` ${'\\\\$ '}{} `;",
+			Output: []string{"` \\\\$ {} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -894,9 +848,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\\\\\$'}{} `;",
-			//       Output: []string{"` \\\\\\${} `;",
-			// },
+			Code:   "` ${'\\\\\\$'}{} `;",
+			Output: []string{"` \\\\\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -904,9 +857,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` \\\\${'\\\\$'}{} `;",
-			//       Output: []string{"` \\\\\\\\\\${} `;",
-			// },
+			Code:   "` \\\\${'\\\\$'}{} `;",
+			Output: []string{"` \\\\\\\\\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -914,9 +866,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${'{$'}{} `;",
-			//       Output: []string{"` \\${\\${} `;",
-			// },
+			Code:   "` $${'{$'}{} `;",
+			Output: []string{"` \\${\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -924,9 +875,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${'${$'}{} `;",
-			//       Output: []string{"` $\\${\\${} `;",
-			// },
+			Code:   "` $${'${$'}{} `;",
+			Output: []string{"` $\\${\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -934,9 +884,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'foo$'}{} `;",
-			//       Output: []string{"` foo\\${} `;",
-			// },
+			Code:   "` ${'foo$'}{} `;",
+			Output: []string{"` foo\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -944,9 +893,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${`$`} `;",
-			//       Output: []string{"` $ `;",
-			// },
+			Code:   "` ${`$`} `;",
+			Output: []string{"` $ `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -954,9 +902,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${`$`}{} `;",
-			//       Output: []string{"` \\${} `;",
-			// },
+			Code:   "` ${`$`}{} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -964,9 +911,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${`$`} {} `;",
-			//       Output: []string{"` $ {} `;",
-			// },
+			Code:   "` ${`$`} {} `;",
+			Output: []string{"` $ {} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -974,10 +920,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${`$`}${undefined}{} `;",
-			//       Output: []string{"` $${undefined}{} `;",
-			// "` $undefined{} `;",
-			// },
+			Code:   "` ${`$`}${undefined}{} `;",
+			Output: []string{"` $undefined{} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -988,9 +932,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${`foo$`}{} `;",
-			//       Output: []string{"` foo\\${} `;",
-			// },
+			Code:   "` ${`foo$`}{} `;",
+			Output: []string{"` foo\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -998,24 +941,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'$'}${''}{} `;",
-			//       Output: []string{"` \\$${''}{} `;",
-			// "` \\${} `;",
-			// },
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "noUnnecessaryTemplateExpression",
-				},
-				{
-					MessageId: "noUnnecessaryTemplateExpression",
-				},
-			},
-		},
-		{
-			Code: "` ${'$'}${``}{} `;",
-			//       Output: []string{"` \\$${``}{} `;",
-			// "` \\${} `;",
-			// },
+			Code:   "` ${'$'}${''}{} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1026,10 +953,20 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'foo$'}${''}${``}{} `;",
-			//       Output: []string{"` foo\\$${''}{} `;",
-			// "` foo\\${} `;",
-			// },
+			Code:   "` ${'$'}${``}{} `;",
+			Output: []string{"` \\${} `;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noUnnecessaryTemplateExpression",
+				},
+				{
+					MessageId: "noUnnecessaryTemplateExpression",
+				},
+			},
+		},
+		{
+			Code:   "` ${'foo$'}${''}${``}{} `;",
+			Output: []string{"` foo\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1043,9 +980,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${'{}'} `;",
-			//       Output: []string{"` \\${} `;",
-			// },
+			Code:   "` $${'{}'} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1053,10 +989,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${undefined}${'{}'} `;",
-			//       Output: []string{"` $undefined${'{}'} `;",
-			// "` $undefined{} `;",
-			// },
+			Code:   "` $${undefined}${'{}'} `;",
+			Output: []string{"` $undefined{} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1067,10 +1001,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${''}${undefined}${'{}'} `;",
-			//       Output: []string{"` $${undefined}{} `;",
-			// "` $undefined{} `;",
-			// },
+			Code:   "` $${''}${undefined}${'{}'} `;",
+			Output: []string{"` $undefined{} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1084,9 +1016,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` \\$${'{}'} `;",
-			//       Output: []string{"` \\${} `;",
-			// },
+			Code:   "` \\$${'{}'} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1094,24 +1025,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${'foo'}${'{'} `;",
-			//       Output: []string{"` $foo${'{'} `;",
-			// "` $foo{ `;",
-			// },
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "noUnnecessaryTemplateExpression",
-				},
-				{
-					MessageId: "noUnnecessaryTemplateExpression",
-				},
-			},
-		},
-		{
-			Code: "` $${'{ foo'}${'{'} `;",
-			//       Output: []string{"` \\${ foo${'{'} `;",
-			// "` \\${ foo{ `;",
-			// },
+			Code:   "` $${'foo'}${'{'} `;",
+			Output: []string{"` $foo{ `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1122,40 +1037,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` \\\\$${'{}'} `;",
-			//       Output: []string{"` \\\\\\${} `;",
-			// },
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "noUnnecessaryTemplateExpression",
-				},
-			},
-		},
-		{
-			Code: "` \\\\\\$${'{}'} `;",
-			//       Output: []string{"` \\\\\\${} `;",
-			// },
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "noUnnecessaryTemplateExpression",
-				},
-			},
-		},
-		{
-			Code: "` foo$${'{}'} `;",
-			//       Output: []string{"` foo\\${} `;",
-			// },
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "noUnnecessaryTemplateExpression",
-				},
-			},
-		},
-		{
-			Code: "` $${''}${'{}'} `;",
-			//       Output: []string{"` \\$${'{}'} `;",
-			// "` \\${} `;",
-			// },
+			Code:   "` $${'{ foo'}${'{'} `;",
+			Output: []string{"` \\${ foo{ `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1166,9 +1049,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${''} `;",
-			//       Output: []string{"` $ `;",
-			// },
+			Code:   "` \\\\$${'{}'} `;",
+			Output: []string{"` \\\\\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1176,9 +1058,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${`{}`} `;",
-			//       Output: []string{"` \\${} `;",
-			// },
+			Code:   "` \\\\\\$${'{}'} `;",
+			Output: []string{"` \\\\\\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1186,10 +1067,17 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${``}${`{}`} `;",
-			//       Output: []string{"` \\$${`{}`} `;",
-			// "` \\${} `;",
-			// },
+			Code:   "` foo$${'{}'} `;",
+			Output: []string{"` foo\\${} `;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noUnnecessaryTemplateExpression",
+				},
+			},
+		},
+		{
+			Code:   "` $${''}${'{}'} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1200,10 +1088,38 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${``}${`foo{}`} `;",
-			//       Output: []string{"` $${`foo{}`} `;",
-			// "` $foo{} `;",
-			// },
+			Code:   "` $${''} `;",
+			Output: []string{"` $ `;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noUnnecessaryTemplateExpression",
+				},
+			},
+		},
+		{
+			Code:   "` $${`{}`} `;",
+			Output: []string{"` \\${} `;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noUnnecessaryTemplateExpression",
+				},
+			},
+		},
+		{
+			Code:   "` $${``}${`{}`} `;",
+			Output: []string{"` \\${} `;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noUnnecessaryTemplateExpression",
+				},
+				{
+					MessageId: "noUnnecessaryTemplateExpression",
+				},
+			},
+		},
+		{
+			Code:   "` $${``}${`foo{}`} `;",
+			Output: []string{"` $foo{} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1215,10 +1131,10 @@ function foo<T extends string>() {
 		},
 		{
 			Code: "` $${`${''}${`${``}`}`}${`{a}`} `;",
-			//       Output: []string{"` \\$${''}${`${``}`}${`{a}`} `;",
-			// "` \\$${``}{a} `;",
-			// "` \\${a} `;",
-			// },
+			Output: []string{"` \\$${''}${`${``}`}{a} `;",
+				"` \\$${``}{a} `;",
+				"` \\${a} `;",
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1238,10 +1154,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${''}${`{}`} `;",
-			//       Output: []string{"` \\$${`{}`} `;",
-			// "` \\${} `;",
-			// },
+			Code:   "` $${''}${`{}`} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1252,10 +1166,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${``}${'{}'} `;",
-			//       Output: []string{"` \\$${'{}'} `;",
-			// "` \\${} `;",
-			// },
+			Code:   "` $${``}${'{}'} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1266,10 +1178,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` $${''}${``}${'{}'} `;",
-			//       Output: []string{"` \\$${``}{} `;",
-			// "` \\${} `;",
-			// },
+			Code:   "` $${''}${``}${'{}'} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1283,9 +1193,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'$'} `;",
-			//       Output: []string{"` $ `;",
-			// },
+			Code:   "` ${'$'} `;",
+			Output: []string{"` $ `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1293,10 +1202,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'$'}${'{}'} `;",
-			//       Output: []string{"` \\$${'{}'} `;",
-			// "` \\${} `;",
-			// },
+			Code:   "` ${'$'}${'{}'} `;",
+			Output: []string{"` \\${} `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1307,10 +1214,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'$'}${''}${'{'} `;",
-			//       Output: []string{"` \\$${''}{ `;",
-			// "` \\${ `;",
-			// },
+			Code:   "` ${'$'}${''}${'{'} `;",
+			Output: []string{"` \\${ `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1326,9 +1231,9 @@ function foo<T extends string>() {
 		{
 			Code: `` + "`" + ` ${` + "`" + `
 \$` + "`" + `}{} ` + "`" + `;`,
-			//       Output: []string{`` + "`" + `
-			// \${} ` + "`" + `;`,
-			// },
+			Output: []string{`` + "`" + " " + `
+\${} ` + "`" + `;`,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1338,9 +1243,9 @@ function foo<T extends string>() {
 		{
 			Code: `` + "`" + ` ${` + "`" + `
 \\$` + "`" + `}{} ` + "`" + `;`,
-			//       Output: []string{`` + "`" + `
-			// \\\${} ` + "`" + `;`,
-			// },
+			Output: []string{`` + "`" + " " + `
+\\\${} ` + "`" + `;`,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1348,9 +1253,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${'\\u00E5'}`;",
-			//       Output: []string{"'\\u00E5';",
-			// },
+			Code:   "`${'\\u00E5'}`;",
+			Output: []string{"'\\u00E5';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1358,9 +1262,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "`${'\\n'}`;",
-			//       Output: []string{"'\\n';",
-			// },
+			Code:   "`${'\\n'}`;",
+			Output: []string{"'\\n';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1368,9 +1271,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\u00E5'} `;",
-			//       Output: []string{"` \\u00E5 `;",
-			// },
+			Code:   "` ${'\\u00E5'} `;",
+			Output: []string{"` \\u00E5 `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1378,9 +1280,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\n'} `;",
-			//       Output: []string{"` \\n `;",
-			// },
+			Code:   "` ${'\\n'} `;",
+			Output: []string{"` \\n `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1388,9 +1289,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${\"\\n\"} `;",
-			//       Output: []string{"` \\n `;",
-			// },
+			Code:   "` ${\"\\n\"} `;",
+			Output: []string{"` \\n `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1398,9 +1298,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${`\\n`} `;",
-			//       Output: []string{"` \\n `;",
-			// },
+			Code:   "` ${`\\n`} `;",
+			Output: []string{"` \\n `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1408,9 +1307,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${ 'A\\u0307\\u0323' } `;",
-			//       Output: []string{"` A\\u0307\\u0323 `;",
-			// },
+			Code:   "` ${ 'A\\u0307\\u0323' } `;",
+			Output: []string{"` A\\u0307\\u0323 `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1418,9 +1316,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'👨‍👩‍👧‍👦'} `;",
-			//       Output: []string{"` 👨‍👩‍👧‍👦 `;",
-			// },
+			Code:   "` ${'👨‍👩‍👧‍👦'} `;",
+			Output: []string{"` 👨‍👩‍👧‍👦 `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1428,9 +1325,8 @@ function foo<T extends string>() {
 			},
 		},
 		{
-			Code: "` ${'\\ud83d\\udc68'} `;",
-			//       Output: []string{"` \\ud83d\\udc68 `;",
-			// },
+			Code:   "` ${'\\ud83d\\udc68'} `;",
+			Output: []string{"` \\ud83d\\udc68 `;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1442,11 +1338,11 @@ function foo<T extends string>() {
 ` + "`" + `
 this code does not have trailing whitespace: ${' '}\n even though it might look it.` + "`" + `;
     `,
-			//       Output: []string{`
-			// ` + "`" + `
-			// this code does not have trailing whitespace:  \n even though it might look it.` + "`" + `;
-			//     `,
-			// },
+			Output: []string{`
+` + "`" + `
+this code does not have trailing whitespace:  \n even though it might look it.` + "`" + `;
+    `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1459,12 +1355,12 @@ this code does not have trailing whitespace: ${' '}\n even though it might look 
 this code has trailing position template expression ${'but it isn\'t whitespace'}
     ` + "`" + `;
     `,
-			//       Output: []string{`
-			// ` + "`" + `
-			// this code has trailing position template expression but it isn\'t whitespace
-			//     ` + "`" + `;
-			//     `,
-			// },
+			Output: []string{`
+` + "`" + `
+this code has trailing position template expression but it isn\'t whitespace
+    ` + "`" + `;
+    `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1475,10 +1371,10 @@ this code has trailing position template expression ${'but it isn\'t whitespace'
 			Code: `
 ` + "`" + `trailing whitespace followed by escaped windows newline: ${' '}\r\n` + "`" + `;
     `,
-			//       Output: []string{`
-			// ` + "`" + `trailing whitespace followed by escaped windows newline:  \r\n` + "`" + `;
-			//     `,
-			// },
+			Output: []string{`
+` + "`" + `trailing whitespace followed by escaped windows newline:  \r\n` + "`" + `;
+    `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1490,15 +1386,15 @@ this code has trailing position template expression ${'but it isn\'t whitespace'
 ` + "`" + `template literal with interpolations followed by newline: ${` + "`" + ` ${'interpolation'} ` + "`" + `}
 ` + "`" + `;
     `,
-			//       Output: []string{`
-			// ` + "`" + `template literal with interpolations followed by newline:  ${'interpolation'}
-			// ` + "`" + `;
-			//     `,
-			// `
-			// ` + "`" + `template literal with interpolations followed by newline:  interpolation
-			// ` + "`" + `;
-			//     `,
-			// },
+			Output: []string{`
+` + "`" + `template literal with interpolations followed by newline:  ${'interpolation'}` + " " + `
+` + "`" + `;
+    `,
+				`
+` + "`" + `template literal with interpolations followed by newline:  interpolation` + " " + `
+` + "`" + `;
+    `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1514,12 +1410,12 @@ this code has trailing position template expression ${'but it isn\'t whitespace'
           ` + "`" + `${arg}` + "`" + `;
         }
       `,
-			//       Output: []string{`
-			//         function func<T extends string>(arg: T) {
-			//           arg;
-			//         }
-			//       `,
-			// },
+			Output: []string{`
+        function func<T extends string>(arg: T) {
+          arg;
+        }
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1534,11 +1430,11 @@ this code has trailing position template expression ${'but it isn\'t whitespace'
         declare const b: 'b';
         ` + "`" + `a${b}${'c'}` + "`" + `;
       `,
-			//       Output: []string{`
-			//         declare const b: 'b';
-			//         ` + "`" + `a${b}c` + "`" + `;
-			//       `,
-			// },
+			Output: []string{`
+        declare const b: 'b';
+        ` + "`" + `a${b}c` + "`" + `;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1553,11 +1449,11 @@ this code has trailing position template expression ${'but it isn\'t whitespace'
 declare const nested: string, interpolation: string;
 ` + "`" + `use${` + "`" + `less${nested}${interpolation}` + "`" + `}` + "`" + `;
       `,
-			//       Output: []string{`
-			// declare const nested: string, interpolation: string;
-			// ` + "`" + `useless${nested}${interpolation}` + "`" + `;
-			//       `,
-			// },
+			Output: []string{`
+declare const nested: string, interpolation: string;
+` + "`" + `useless${nested}${interpolation}` + "`" + `;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1569,11 +1465,11 @@ declare const nested: string, interpolation: string;
         declare const string: 'a';
         ` + "`" + `${   string   }` + "`" + `;
       `,
-			//       Output: []string{`
-			//         declare const string: 'a';
-			//         string;
-			//       `,
-			// },
+			Output: []string{`
+        declare const string: 'a';
+        string;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1585,11 +1481,11 @@ declare const nested: string, interpolation: string;
         declare const string: 'a';
         ` + "`" + `${string}` + "`" + `;
       `,
-			//       Output: []string{`
-			//         declare const string: 'a';
-			//         string;
-			//       `,
-			// },
+			Output: []string{`
+        declare const string: 'a';
+        string;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1604,11 +1500,11 @@ declare const nested: string, interpolation: string;
         declare const intersection: string & { _brand: 'test-brand' };
         ` + "`" + `${intersection}` + "`" + `;
       `,
-			//       Output: []string{`
-			//         declare const intersection: string & { _brand: 'test-brand' };
-			//         intersection;
-			//       `,
-			// },
+			Output: []string{`
+        declare const intersection: string & { _brand: 'test-brand' };
+        intersection;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1619,9 +1515,8 @@ declare const nested: string, interpolation: string;
 			},
 		},
 		{
-			Code: "true ? `${'test' || ''}`.trim() : undefined;",
-			//       Output: []string{"true ? ('test' || '').trim() : undefined;",
-			// },
+			Code:   "true ? `${'test' || ''}`.trim() : undefined;",
+			Output: []string{"true ? ('test' || '').trim() : undefined;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1629,9 +1524,8 @@ declare const nested: string, interpolation: string;
 			},
 		},
 		{
-			Code: "type Foo = `${1}`;",
-			//       Output: []string{"type Foo = `1`;",
-			// },
+			Code:   "type Foo = `${1}`;",
+			Output: []string{"type Foo = `1`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1639,9 +1533,8 @@ declare const nested: string, interpolation: string;
 			},
 		},
 		{
-			Code: "type Foo = `${null}`;",
-			//       Output: []string{"type Foo = `null`;",
-			// },
+			Code:   "type Foo = `${null}`;",
+			Output: []string{"type Foo = `null`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1649,9 +1542,8 @@ declare const nested: string, interpolation: string;
 			},
 		},
 		{
-			Code: "type Foo = `${undefined}`;",
-			//       Output: []string{"type Foo = `undefined`;",
-			// },
+			Code:   "type Foo = `${undefined}`;",
+			Output: []string{"type Foo = `undefined`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1659,9 +1551,8 @@ declare const nested: string, interpolation: string;
 			},
 		},
 		{
-			Code: "type Foo = `${'foo'}`;",
-			//       Output: []string{"type Foo = 'foo';",
-			// },
+			Code:   "type Foo = `${'foo'}`;",
+			Output: []string{"type Foo = 'foo';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1673,11 +1564,11 @@ declare const nested: string, interpolation: string;
 type Foo = 'A' | 'B';
 type Bar = ` + "`" + `${Foo}` + "`" + `;
       `,
-			//       Output: []string{`
-			// type Foo = 'A' | 'B';
-			// type Bar = Foo;
-			//       `,
-			// },
+			Output: []string{`
+type Foo = 'A' | 'B';
+type Bar = Foo;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1693,15 +1584,15 @@ type Bar = ` + "`" + `${Foo}` + "`" + `;
 type Foo = 'A' | 'B';
 type Bar = ` + "`" + `${` + "`" + `${Foo}` + "`" + `}` + "`" + `;
       `,
-			//       Output: []string{`
-			// type Foo = 'A' | 'B';
-			// type Bar = ` + "`" + `${Foo}` + "`" + `;
-			//       `,
-			// `
-			// type Foo = 'A' | 'B';
-			// type Bar = Foo;
-			//       `,
-			// },
+			Output: []string{`
+type Foo = 'A' | 'B';
+type Bar = ` + "`" + `${Foo}` + "`" + `;
+      `,
+				`
+type Foo = 'A' | 'B';
+type Bar = Foo;
+      `,
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1720,9 +1611,8 @@ type Bar = ` + "`" + `${` + "`" + `${Foo}` + "`" + `}` + "`" + `;
 			},
 		},
 		{
-			Code: "type FooBarBaz = `foo${'bar'}baz`;",
-			//       Output: []string{"type FooBarBaz = `foobarbaz`;",
-			// },
+			Code:   "type FooBarBaz = `foo${'bar'}baz`;",
+			Output: []string{"type FooBarBaz = `foobarbaz`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1730,9 +1620,8 @@ type Bar = ` + "`" + `${` + "`" + `${Foo}` + "`" + `}` + "`" + `;
 			},
 		},
 		{
-			Code: "type FooBar = `foo${`bar`}`;",
-			//       Output: []string{"type FooBar = `foobar`;",
-			// },
+			Code:   "type FooBar = `foo${`bar`}`;",
+			Output: []string{"type FooBar = `foobar`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
@@ -1740,9 +1629,8 @@ type Bar = ` + "`" + `${` + "`" + `${Foo}` + "`" + `}` + "`" + `;
 			},
 		},
 		{
-			Code: "type FooBar = `${'foo' | 'bar'}`;",
-			//       Output: []string{"type FooBar = 'foo' | 'bar';",
-			// },
+			Code:   "type FooBar = `${'foo' | 'bar'}`;",
+			Output: []string{"type FooBar = 'foo' | 'bar';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noUnnecessaryTemplateExpression",
