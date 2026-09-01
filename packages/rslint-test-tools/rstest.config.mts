@@ -149,6 +149,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-const.test.ts',
     './tests/eslint/rules/prefer-destructuring.test.ts',
     './tests/eslint/rules/prefer-exponentiation-operator.test.ts',
+    './tests/eslint/rules/prefer-named-capture-group.test.ts',
     './tests/eslint/rules/prefer-numeric-literals.test.ts',
     './tests/eslint/rules/prefer-object-has-own.test.ts',
     './tests/eslint/rules/prefer-object-spread.test.ts',
