@@ -22,6 +22,7 @@ import {
   RelativePattern,
   Uri,
   type DocumentFilter,
+  type OutputChannel,
   type WorkspaceFolder,
 } from 'vscode';
 
@@ -37,11 +38,27 @@ suite('initial config refresh retry classification', () => {
       name: 'second-root',
       uri: Uri.file('/workspace/second-root'),
     };
-    const firstOptions = createLanguageClientOptions(firstFolder, undefined);
-    const secondOptions = createLanguageClientOptions(secondFolder, undefined);
+    // The helper retains this channel by identity but does not call it. A
+    // sentinel avoids racing VS Code's asynchronous output-channel creation in
+    // a synchronous options-only test.
+    const traceOutputChannel = {
+      name: 'Rslint language client options test',
+    } as OutputChannel;
+    const firstOptions = createLanguageClientOptions(
+      firstFolder,
+      undefined,
+      traceOutputChannel,
+    );
+    const secondOptions = createLanguageClientOptions(
+      secondFolder,
+      undefined,
+      traceOutputChannel,
+    );
 
     assert.strictEqual(firstOptions.workspaceFolder, firstFolder);
     assert.strictEqual(secondOptions.workspaceFolder, secondFolder);
+    assert.strictEqual(firstOptions.traceOutputChannel, traceOutputChannel);
+    assert.strictEqual(secondOptions.traceOutputChannel, traceOutputChannel);
     for (const [options, folder] of [
       [firstOptions, firstFolder],
       [secondOptions, secondFolder],
