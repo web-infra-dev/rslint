@@ -12,14 +12,22 @@ import (
 
 func TestSortPropTypesExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &SortPropTypesRule, []rule_tester.ValidTestCase{
-		// ---- Dimension 4: computed keys are not statically sortable ----
-		{Code: `Component.propTypes = { a: PropTypes.string, [key]: PropTypes.string, z: PropTypes.string };`, Tsx: true},
+		// Upstream keeps TypeScript assertions opaque in this path.
+		{Code: `const x = { propTypes: ({ z: PropTypes.string, a: PropTypes.string } as any) };`, Tsx: true},
+		// Identifier resolution does not apply to object-literal propTypes properties.
+		{Code: `const props = { z: PropTypes.string, a: PropTypes.string }; const x = { propTypes: props };`, Tsx: true},
+		// The shape listener likewise leaves TypeScript assertions opaque.
+		{Code: `any.shape(({ z: PropTypes.string, a: PropTypes.string } as any));`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
+		// A defaulted parameter is an ESTree AssignmentPattern without a direct annotation.
+		{Code: `type Props = { z: string; a: string }; function Component(p: Props = {} as Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
 		// ---- Dimension 4: spread resets the ordering group ----
 		{Code: `Component.propTypes = { z: PropTypes.string, ...shared, a: PropTypes.string };`, Tsx: true},
 		// ---- Dimension 4: TS expression wrappers on the propTypes object ----
 		{Code: `Component.propTypes = ({ a: PropTypes.string, z: PropTypes.string } as any);`, Tsx: true},
 		// N/A: private keys and element access do not participate in upstream's static key sort.
 	}, []rule_tester.InvalidTestCase{
+		// Upstream falls back to the authored text of computed keys when sorting.
+		{Code: `Component.propTypes = { [z]: PropTypes.string, a: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted", Line: 1, Column: 48}}},
 		// Locks in upstream checkSorted() required-first arm: a required prop after an optional prop.
 		{Code: `Component.propTypes = { a: PropTypes.string, b: PropTypes.string.isRequired };`, Options: map[string]any{"requiredFirst": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requiredPropsFirst", Line: 1, Column: 46}}},
 		// Locks in upstream CallExpression listener: shape properties are checked independently.

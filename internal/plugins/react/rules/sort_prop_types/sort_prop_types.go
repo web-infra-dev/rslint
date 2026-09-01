@@ -68,7 +68,7 @@ var SortPropTypesRule = rule.Rule{
 					previous = nil
 					continue
 				}
-				name, ok := declarationName(current)
+				name, ok := declarationName(ctx.SourceFile, current)
 				if !ok {
 					continue
 				}
@@ -76,7 +76,7 @@ var SortPropTypesRule = rule.Rule{
 					previous = current
 					continue
 				}
-				previousName, _ := declarationName(previous)
+				previousName, _ := declarationName(ctx.SourceFile, previous)
 				if opts.requiredFirst {
 					if isRequired(previous) && !isRequired(current) {
 						previous = current
@@ -115,7 +115,8 @@ var SortPropTypesRule = rule.Rule{
 
 		var checkValue func(*ast.Node)
 		checkValue = func(value *ast.Node) {
-			value = reactutil.SkipExpressionWrappers(value)
+			// ESTree removes parentheses, but keeps TypeScript expression wrappers.
+			value = ast.SkipParentheses(value)
 			if value == nil {
 				return
 			}
@@ -148,7 +149,12 @@ var SortPropTypesRule = rule.Rule{
 					assignment := prop.AsPropertyAssignment()
 					name, ok := utils.GetStaticPropertyName(assignment.Name())
 					if ok && name == "propTypes" {
-						checkValue(assignment.Initializer)
+						// Upstream only examines an inline object in this path; identifier
+						// resolution belongs to assignment and class-property declarations.
+						value := ast.SkipParentheses(assignment.Initializer)
+						if value != nil && value.Kind == ast.KindObjectLiteralExpression {
+							checkSorted(value.AsObjectLiteralExpression().Properties.Nodes)
+						}
 					}
 				}
 			},
@@ -183,7 +189,7 @@ var SortPropTypesRule = rule.Rule{
 		}
 		if opts.checkTypes {
 			checkFunction := func(node *ast.Node) {
-				typeNode := reactutil.FirstParamType(node)
+				typeNode := firstParamType(node)
 				checkTypeNode(typeNode, typeAliases, checkSorted)
 			}
 			listeners[ast.KindFunctionDeclaration] = checkFunction
@@ -193,7 +199,7 @@ var SortPropTypesRule = rule.Rule{
 	},
 }
 
-func declarationName(node *ast.Node) (string, bool) {
+func declarationName(sourceFile *ast.SourceFile, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}
@@ -201,7 +207,28 @@ func declarationName(node *ast.Node) (string, bool) {
 	if name == nil {
 		return "", false
 	}
-	return utils.GetStaticPropertyName(name)
+	if value, ok := utils.GetStaticPropertyName(name); ok {
+		return value, true
+	}
+	if name.Kind == ast.KindComputedPropertyName {
+		return utils.TrimmedNodeText(sourceFile, name.AsComputedPropertyName().Expression), true
+	}
+	return utils.TrimmedNodeText(sourceFile, name), true
+}
+
+// firstParamType mirrors upstream's direct ESTree `param.typeAnnotation`
+// lookup. A defaulted parameter becomes an AssignmentPattern there, so it
+// must not expose the inner identifier's annotation.
+func firstParamType(node *ast.Node) *ast.Node {
+	params := reactutil.FunctionParameters(node)
+	if len(params) == 0 {
+		return nil
+	}
+	param := params[0].AsParameterDeclaration()
+	if param == nil || param.Initializer != nil {
+		return nil
+	}
+	return param.Type
 }
 
 func isRequired(node *ast.Node) bool {
