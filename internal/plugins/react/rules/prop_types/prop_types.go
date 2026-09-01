@@ -128,8 +128,10 @@ func propMapSeen(n *ast.Node, customValidators []string, seen map[*ast.Node]bool
 				continue
 			}
 			k := keyName(name)
+			if k == "" && name != nil && name.Kind == ast.KindComputedPropertyName {
+				k = keyName(name.AsComputedPropertyName().Expression)
+			}
 			if k == "" {
-				out["__ANY_KEY__"] = propType{any: true}
 				continue
 			}
 			validator := validatorTypeSeen(value, customValidators, seen)
@@ -215,19 +217,31 @@ func validatorTypeSeen(n *ast.Node, customValidators []string, seen map[*ast.Nod
 }
 
 func declared(n *ast.Node, customValidators []string, propWrappers []reactutil.PropWrapperEntry) (map[string]propType, bool) {
+	return declaredSeen(n, customValidators, propWrappers, map[*ast.Node]bool{})
+}
+
+func declaredSeen(n *ast.Node, customValidators []string, propWrappers []reactutil.PropWrapperEntry, seen map[*ast.Node]bool) (map[string]propType, bool) {
 	n = unwrap(n)
 	if n != nil && n.Kind == ast.KindIdentifier {
-		if initializer := reactutil.ResolveIdentifierInitializer(n, nil); initializer != nil && initializer != n {
-			return declared(initializer, customValidators, propWrappers)
+		if seen[n] {
+			return map[string]propType{}, true
 		}
+		seen[n] = true
+		if initializer := reactutil.ResolveIdentifierInitializer(n, nil); initializer != nil && initializer != n {
+			return declaredSeen(initializer, customValidators, propWrappers, seen)
+		}
+		return map[string]propType{"__ANY_KEY__": {any: true}}, true
 	}
 	if n != nil && n.Kind == ast.KindCallExpression && reactutil.IsPropWrapperCall(n, propWrappers) {
 		call := n.AsCallExpression()
 		if call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-			return declared(call.Arguments.Nodes[0], customValidators, propWrappers)
+			return declaredSeen(call.Arguments.Nodes[0], customValidators, propWrappers, seen)
 		}
 	}
 	m, ok := propMap(n, customValidators)
+	if !ok && n != nil {
+		return map[string]propType{}, true
+	}
 	return m, ok
 }
 
@@ -308,6 +322,23 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		}
 		name := reactutil.EntityNameRightmost(n.AsTypeReferenceNode().TypeName)
 		if name != nil {
+			// TypeScript declaration merging exposes one symbol for every interface
+			// declaration. Preserve all same-name interface members, as upstream does.
+			var interfaces []*ast.Node
+			for _, candidate := range aliases[name.AsIdentifier().Text] {
+				if candidate != nil && candidate.Kind == ast.KindInterfaceDeclaration {
+					interfaces = append(interfaces, candidate)
+				}
+			}
+			if len(interfaces) > 1 {
+				merged := map[string]propType{}
+				for _, candidate := range interfaces {
+					if members, ok := declaredType(candidate, aliases, aliasesBySymbol, depth-1); ok {
+						mergeDeclared(merged, members)
+					}
+				}
+				return merged, true
+			}
 			if symbol := name.Symbol(); symbol != nil {
 				if declaration := aliasesBySymbol[symbol]; declaration != nil {
 					return declaredType(declaration, aliases, aliasesBySymbol, depth-1)
@@ -359,7 +390,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		}
 		return declared, found
 	default:
-		return nil, false
+		return map[string]propType{"__ANY_KEY__": {any: true}}, true
 	}
 	if members == nil {
 		return map[string]propType{}, true
@@ -423,9 +454,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 }
 
 func propTypeFromType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, depth int) propType {
-	if children, ok := declaredType(n, aliases, aliasesBySymbol, depth); ok {
-		return propType{children: children}
-	}
+	// Upstream validates TypeScript props at the declared property boundary only.
 	return propType{open: true}
 }
 
@@ -633,7 +662,7 @@ func forwardRefPropsType(n *ast.Node) *ast.Node {
 				return nil
 			}
 			callee := unwrap(call.Expression)
-			isForwardRef := callee != nil && callee.Kind == ast.KindIdentifier && callee.AsIdentifier().Text == "forwardRef"
+			isForwardRef := callee != nil && callee.Kind == ast.KindIdentifier && importedReactTypeName(callee) == "forwardRef"
 			if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
 				isForwardRef = keyName(callee.AsPropertyAccessExpression().Name()) == "forwardRef"
 			}
@@ -998,11 +1027,16 @@ func memberNames(n *ast.Node) (*ast.Node, []string, bool) {
 				return nil, nil, false
 			}
 			names = append([]string{k}, names...)
-			report = pa.Name()
+			if report == nil {
+				report = pa.Name()
+			}
 			cur = unwrap(pa.Expression)
 		case ast.KindElementAccessExpression:
 			ea := cur.AsElementAccessExpression()
 			k := elementName(ea.ArgumentExpression)
+			if argument := unwrap(ea.ArgumentExpression); argument != nil && argument.Kind == ast.KindNumericLiteral {
+				k = "__NUMERIC_PROP__:" + k
+			}
 			if k == "" {
 				if argument := unwrap(ea.ArgumentExpression); argument != nil && argument.Kind == ast.KindBigIntLiteral {
 					return nil, nil, false
@@ -1010,9 +1044,20 @@ func memberNames(n *ast.Node) (*ast.Node, []string, bool) {
 				k = "__COMPUTED_PROP__"
 			}
 			names = append([]string{k}, names...)
-			report = ea.ArgumentExpression
+			if report == nil {
+				report = ea.ArgumentExpression
+			}
 			cur = unwrap(ea.Expression)
 		default:
+			if len(names) > 1 {
+				for i, name := range names {
+					if strings.HasPrefix(name, "__NUMERIC_PROP__:") {
+						names[i] = "__COMPUTED_PROP__"
+					}
+				}
+			} else if len(names) == 1 && strings.HasPrefix(names[0], "__NUMERIC_PROP__:") {
+				names[0] = strings.TrimPrefix(names[0], "__NUMERIC_PROP__:")
+			}
 			return cur, names, true
 		}
 	}
@@ -1212,7 +1257,7 @@ var PropTypesRule = rule.Rule{
 					if c.binding != nil {
 						byBinding[c.binding] = c
 					}
-					if declared, ok := declaredType(classPropsType(n), typeAliases, typeAliasesBySymbol, 8); ok {
+					if declared, ok := declaredType(classPropsType(n), typeAliases, typeAliasesBySymbol, 64); ok {
 						c.declared = declared
 						c.declaredBlock = true
 					}
@@ -1247,20 +1292,20 @@ var PropTypesRule = rule.Rule{
 					if len(ps) > 0 && ps[0].Kind == ast.KindParameter {
 						parameter := ps[0].AsParameterDeclaration()
 						name := parameter.Name()
-						if name != nil && name.Kind == ast.KindIdentifier {
+						if name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "props" {
 							c.props = name.AsIdentifier().Text
 						} else if name != nil && name.Kind == ast.KindObjectBindingPattern {
 							addDestructured(c, name, nil, true)
 						}
 						if parameter.Type != nil {
-							if declared, ok := declaredType(parameter.Type.AsNode(), typeAliases, typeAliasesBySymbol, 8); ok {
+							if declared, ok := declaredType(parameter.Type.AsNode(), typeAliases, typeAliasesBySymbol, 64); ok {
 								c.declared = declared
 								c.declaredBlock = true
 							}
-						} else if declared, ok := declaredType(reactComponentTypeArgument(componentVariableType(n)), typeAliases, typeAliasesBySymbol, 8); ok {
+						} else if declared, ok := declaredType(reactComponentTypeArgument(componentVariableType(n)), typeAliases, typeAliasesBySymbol, 64); ok {
 							c.declared = declared
 							c.declaredBlock = true
-						} else if declared, ok := declaredType(forwardRefPropsType(n), typeAliases, typeAliasesBySymbol, 8); ok {
+						} else if declared, ok := declaredType(forwardRefPropsType(n), typeAliases, typeAliasesBySymbol, 64); ok {
 							c.declared = declared
 							c.declaredBlock = true
 						}
@@ -1302,7 +1347,7 @@ var PropTypesRule = rule.Rule{
 				pd := n.AsPropertyDeclaration()
 				if keyName(pd.Name()) == "props" && !ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) {
 					if c := componentFor(n.Parent, comps); c != nil && pd.Type != nil {
-						if declared, ok := declaredType(pd.Type.AsNode(), typeAliases, typeAliasesBySymbol, 8); ok {
+						if declared, ok := declaredType(pd.Type.AsNode(), typeAliases, typeAliasesBySymbol, 64); ok {
 							c.declared = declared
 							c.declaredBlock = true
 						}
@@ -1336,7 +1381,9 @@ var PropTypesRule = rule.Rule{
 								case ast.KindObjectBindingPattern:
 									addDestructured(c, vd.Name(), path, c.node.Kind == ast.KindClassDeclaration || c.node.Kind == ast.KindClassExpression)
 								case ast.KindIdentifier:
-									c.destructured[vd.Name().AsIdentifier().Text] = path
+									if len(path) > 0 {
+										c.destructured[vd.Name().AsIdentifier().Text] = path
+									}
 								}
 							}
 						}
