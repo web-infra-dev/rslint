@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { test, describe, expect } from '@rstest/core';
+import { test, describe, expect } from 'rstack/test';
 import type { RslintConfigEntry } from '@rslint/core';
 import { lint, type LintResponse } from '@rslint/core/internal';
 import assert from 'node:assert';

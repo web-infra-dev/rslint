@@ -89,7 +89,7 @@ var NoLoneBlocksRule = rule.Rule{
 				}
 			},
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
-				if utils.IsInStrictMode(node, ctx.SourceFile) {
+				if utils.IsInStrictModeWithSourceType(node, ctx.SourceFile, ctx.LanguageOptions.EffectiveSourceType()) {
 					markLoneBlock(node)
 				}
 			},

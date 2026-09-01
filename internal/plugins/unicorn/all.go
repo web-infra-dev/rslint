@@ -2,6 +2,7 @@ package unicorn_plugin
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
@@ -21,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_add_event_listener_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
@@ -38,6 +40,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		catch_error_name.CatchErrorNameRule,
+		consistent_date_clone.ConsistentDateCloneRule,
 		error_message.ErrorMessageRule,
 		filename_case.FilenameCaseRule,
 		new_for_builtins.NewForBuiltinsRule,
@@ -57,6 +60,7 @@ func GetAllRules() []rule.Rule {
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,
+		prefer_add_event_listener_options.PreferAddEventListenerOptionsRule,
 		prefer_array_flat.PreferArrayFlatRule,
 		prefer_array_flat_map.PreferArrayFlatMapRule,
 		prefer_array_some.PreferArraySomeRule,

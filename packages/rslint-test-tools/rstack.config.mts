@@ -1,6 +1,6 @@
-import { defineConfig } from '@rstest/core';
+import { define } from 'rstack';
 
-export default defineConfig({
+define.test({
   testEnvironment: 'node',
   globals: true,
   // Normal completion is event-driven. This is only the final in-process
@@ -71,6 +71,7 @@ export default defineConfig({
     './tests/eslint/rules/accessor-pairs.test.ts',
     './tests/eslint/rules/arrow-body-style.test.ts',
     './tests/eslint/rules/block-scoped-var.test.ts',
+    './tests/eslint/rules/camelcase.test.ts',
     './tests/eslint/rules/capitalized-comments.test.ts',
     './tests/eslint/rules/class-methods-use-this.test.ts',
     './tests/eslint/rules/curly.test.ts',
@@ -97,6 +98,7 @@ export default defineConfig({
     './tests/eslint/rules/no-eq-null.test.ts',
     './tests/eslint/rules/no-eval.test.ts',
     './tests/eslint/rules/no-implicit-coercion.test.ts',
+    './tests/eslint/rules/no-implicit-globals.test.ts',
     './tests/eslint/rules/no-implied-eval.test.ts',
     './tests/eslint/rules/no-void.test.ts',
     './tests/eslint/rules/no-iterator.test.ts',
@@ -655,6 +657,7 @@ export default defineConfig({
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
+    './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
@@ -674,6 +677,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-xor-as-exponentiation.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-add-event-listener-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',

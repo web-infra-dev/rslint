@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -43,6 +44,10 @@ func TestNoLoneBlocksRule(t *testing.T) {
 			{Code: `{ class Bar {} }`},
 			{Code: `'use strict'; { function bar() {} }`},
 			{Code: `export {}; { function bar() {} }`},
+			{
+				Code:            `{ function bar() {} }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			},
 			{Code: `{ let x; var y; }`},
 			{Code: `{ var x; let y; }`},
 			{Code: `{ let x; const y = 1; class Z {} }`},
@@ -135,6 +140,11 @@ async function f() {
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `export {}; { function bar() {} }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "redundantBlock"}},
+			},
 			// ---- Trivial program-scope lone blocks ----
 			{
 				Code: `{}`,
@@ -260,7 +270,8 @@ async function f() {
 			// ---- Even in ES6+, a function declaration in a non-strict block does not
 			// justify the block. ----
 			{
-				Code: `{ function bar() {} }`,
+				Code:            `{ function bar() {} }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redundantBlock", Line: 1, Column: 1, EndLine: 1, EndColumn: 22},
 				},

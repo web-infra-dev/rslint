@@ -21,7 +21,7 @@
  * v10. Plugins now read `context.languageOptions.parserOptions`.
  */
 
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
