@@ -101,6 +101,7 @@ const fooRegexp = new RegExp("foo", "v");
   does not construct a new RegExp object while folding an expression. For
   example, `RegExp("g", "u").source` remains unknown even though ESLint can
   fold it to `"g"`.
+
 ## Original Documentation
 
 - [ESLint: require-unicode-regexp](https://eslint.org/docs/latest/rules/require-unicode-regexp)
