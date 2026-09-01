@@ -9,9 +9,17 @@ import {
 } from 'react';
 import * as monaco from 'monaco-editor';
 import { jsonDefaults } from 'monaco-editor/languages/features/json/register';
+import {
+  javascriptDefaults,
+  ModuleKind,
+  ModuleResolutionKind,
+  ScriptTarget,
+} from 'monaco-editor/languages/features/typescript/register';
 import { type Diagnostic } from '@rslint/core/service';
 import { useDark } from '@rspress/core/runtime';
 import { Button } from '@components/ui/button';
+import { evaluateConfig, type PlaygroundConfig } from './config';
+import { installRslintCoreTypes } from './config-types';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
 
@@ -38,7 +46,7 @@ export type EditorTabType = 'code' | 'rslint' | 'tsconfig';
 export interface EditorTabsRef {
   getValue: () => string | undefined;
   getCodeValue: () => string | undefined;
-  getRslintConfig: () => any | null;
+  getRslintConfig: (wasmVersion: string) => Promise<PlaygroundConfig>;
   getTsConfig: () => any | null;
   attachDiag: (diags: Diagnostic[]) => void;
   revealRangeByOffset: (start: number, end: number) => void;
@@ -56,19 +64,22 @@ interface EditorTabsProps {
   toolbarEnd?: ReactNode;
 }
 
-const DEFAULT_RSLINT_CONFIG = `[
+const DEFAULT_RSLINT_CONFIG = `import { defineConfig, js, ts } from '@rslint/core';
+
+export default defineConfig([
+  js.configs.recommended,
+  ts.configs.recommendedTypeChecked,
   {
-    "languageOptions": {
-      "parserOptions": {
-        "project": ["./tsconfig.json"]
-      }
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.json'],
+      },
     },
-    "rules": {
-      "@typescript-eslint/no-unsafe-member-access": "error"
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'error',
     },
-    "plugins": ["@typescript-eslint"]
-  }
-]`;
+  },
+]);`;
 
 const DEFAULT_TSCONFIG = `{
   "compilerOptions": {
@@ -127,8 +138,6 @@ export const EditorTabs = ({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onConfigChangeRef = useRef(onConfigChange);
 
-  // Store last valid parsed configs
-  const lastValidRslintConfig = useRef<any>(null);
   const lastValidTsConfig = useRef<any>(null);
 
   // Monaco keeps these subscriptions for the editor lifetime, so forward them
@@ -175,22 +184,20 @@ export const EditorTabs = ({
     }, 300);
   }
 
-  // Initialize last valid configs
+  // Initialize the last valid tsconfig.
   useEffect(() => {
-    lastValidRslintConfig.current = parseJsonc(DEFAULT_RSLINT_CONFIG);
     lastValidTsConfig.current = parseJsonc(DEFAULT_TSCONFIG);
   }, []);
 
   useImperativeHandle(ref, () => ({
     getValue: () => codeEditorRef.current?.getValue(),
     getCodeValue: () => codeEditorRef.current?.getValue(),
-    getRslintConfig: () => {
-      const content = rslintEditorRef.current?.getValue() || '';
-      const parsed = parseJsonc(content);
-      if (parsed !== null) {
-        lastValidRslintConfig.current = parsed;
-      }
-      return lastValidRslintConfig.current;
+    getRslintConfig: async (wasmVersion) => {
+      await installRslintCoreTypes(wasmVersion);
+      return evaluateConfig(
+        rslintEditorRef.current?.getValue() ?? DEFAULT_RSLINT_CONFIG,
+        wasmVersion,
+      );
     },
     getTsConfig: () => {
       const content = tsconfigEditorRef.current?.getValue() || '';
@@ -398,13 +405,28 @@ export const EditorTabs = ({
     });
   }, []);
 
-  // Create the serialized config editor used by the low-level API.
+  // Create rslint.config.js editor.
   useEffect(() => {
     if (!rslintContainerRef.current) return;
 
+    javascriptDefaults.setCompilerOptions({
+      allowJs: true,
+      checkJs: true,
+      module: ModuleKind.ESNext,
+      moduleResolution: ModuleResolutionKind.NodeJs,
+      target: ScriptTarget.ESNext,
+    });
+    javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+    });
+    const model = monaco.editor.createModel(
+      DEFAULT_RSLINT_CONFIG,
+      'javascript',
+      monaco.Uri.parse('file:///rslint.config.js'),
+    );
     const editor = monaco.editor.create(rslintContainerRef.current, {
-      value: DEFAULT_RSLINT_CONFIG,
-      language: 'json',
+      model,
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
@@ -418,6 +440,7 @@ export const EditorTabs = ({
 
     return () => {
       editor.dispose();
+      model.dispose();
     };
   }, []);
 
@@ -450,8 +473,8 @@ export const EditorTabs = ({
 
   const tabs: { key: EditorTabType; label: string }[] = [
     { key: 'code', label: 'Code' },
-    { key: 'rslint', label: 'Config (JSON)' },
-    { key: 'tsconfig', label: 'tsconfig' },
+    { key: 'rslint', label: 'rslint.config.js' },
+    { key: 'tsconfig', label: 'tsconfig.json' },
   ];
 
   return (
