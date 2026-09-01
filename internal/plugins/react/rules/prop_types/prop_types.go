@@ -522,9 +522,10 @@ func extendsComponent(class *ast.Node) bool {
 		}
 	}
 	var clauses *ast.HeritageClauseList
-	if class.Kind == ast.KindClassDeclaration {
+	switch class.Kind {
+	case ast.KindClassDeclaration:
 		clauses = class.AsClassDeclaration().HeritageClauses
-	} else if class.Kind == ast.KindClassExpression {
+	case ast.KindClassExpression:
 		clauses = class.AsClassExpression().HeritageClauses
 	}
 	if clauses == nil {
