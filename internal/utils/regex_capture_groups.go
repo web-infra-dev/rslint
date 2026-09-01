@@ -10,11 +10,6 @@ import (
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
-// reservedClassSetPunctuators are the characters ECMAScript reserves inside a
-// v-flag class when they appear doubled (`!!`, `##`, `..`, …). `&` is in the
-// set because `&&` is only legal as the intersection operator.
-const reservedClassSetPunctuators = "&!#$%*+,.:;<=>?@^`~"
-
 // RegexCapturingGroup is one capturing group found by RegexCapturingGroups:
 // either a plain `(...)` group or a named `(?<name>...)` group. Start is the
 // byte offset of the group's opening `(` within the pattern; End is one past

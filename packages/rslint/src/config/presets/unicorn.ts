@@ -26,7 +26,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/consistent-class-member-order': 'error', // not implemented
     // 'unicorn/consistent-compound-words': 'error', // not implemented
     // 'unicorn/consistent-conditional-object-spread': 'error', // not implemented
-    // 'unicorn/consistent-date-clone': 'error', // not implemented
+    'unicorn/consistent-date-clone': 'error',
     // 'unicorn/consistent-destructuring': 'off', // not implemented
     // 'unicorn/consistent-empty-array-spread': 'error', // not implemented
     // 'unicorn/consistent-existence-index-check': 'error', // not implemented
