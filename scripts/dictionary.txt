@@ -729,3 +729,5 @@ noframes
 nobr
 pingback
 prerender
+reparses
+batgo

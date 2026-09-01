@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 //go:embed no_invalid_html_attribute.schema.json
@@ -148,7 +149,18 @@ func removeStaticValue(ctx rule.RuleContext, node *ast.Node, value string) rule.
 	// Upstream uses `value.raw.replace(value.value, '')`, including its
 	// source-text quirks for numeric, BigInt, and regexp literals.
 	raw := sourceText(ctx, node)
-	return rule.RuleFixReplace(ctx.SourceFile, node, strings.Replace(raw, value, "", 1))
+	if node != nil && node.Kind == ast.KindRegularExpressionLiteral {
+		pattern, flags := utils.ExtractRegexPatternAndFlags(raw)
+		if re, err := esregexp.Compile(pattern, flags); err == nil {
+			if match, err := re.Unwrap().FindStringMatch(raw); err == nil && match != nil {
+				runes := []rune(raw)
+				raw = string(runes[:match.Index]) + string(runes[match.Index+match.Length:])
+			}
+		}
+	} else {
+		raw = strings.Replace(raw, value, "", 1)
+	}
+	return rule.RuleFixReplace(ctx.SourceFile, node, raw)
 }
 
 func literalRange(ctx rule.RuleContext, node *ast.Node, offset [2]int) core.TextRange {
@@ -305,16 +317,26 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				return
 			}
 			for _, property := range props.AsObjectLiteralExpression().Properties.Nodes {
-				if property.Kind != ast.KindPropertyAssignment && property.Kind != ast.KindMethodDeclaration {
-					continue
-				}
 				var key, value *ast.Node
-				method := property.Kind == ast.KindMethodDeclaration
-				if method {
+				method := false
+				shorthand := false
+				computed := false
+				switch property.Kind {
+				case ast.KindMethodDeclaration:
+					method = true
 					key = property.AsMethodDeclaration().Name()
-				} else {
+				case ast.KindPropertyAssignment:
 					p := property.AsPropertyAssignment()
 					key, value = p.Name(), p.Initializer
+				case ast.KindShorthandPropertyAssignment:
+					shorthand = true
+					key = property.AsShorthandPropertyAssignment().Name()
+				default:
+					continue
+				}
+				if key != nil && key.Kind == ast.KindComputedPropertyName {
+					computed = true
+					key = ast.SkipParentheses(key.AsComputedPropertyName().Expression)
 				}
 				if key == nil || key.Kind != ast.KindIdentifier || key.AsIdentifier().Text != "rel" {
 					continue
@@ -325,6 +347,9 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				}
 				if method {
 					ctx.ReportNode(property, message("noMethod", "The ”rel“ attribute cannot be a method.", map[string]string{"attributeName": "rel"}))
+					continue
+				}
+				if shorthand || computed {
 					continue
 				}
 				value = ast.SkipParentheses(value)
