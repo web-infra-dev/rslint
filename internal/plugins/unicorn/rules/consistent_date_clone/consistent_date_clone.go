@@ -43,6 +43,9 @@ var ConsistentDateCloneRule = rule.Rule{
 				}
 
 				argument := ast.SkipParentheses(node.Arguments()[0])
+				if argument == nil || ast.IsOptionalChain(argument) {
+					return
+				}
 				getTimeCall, ok := unicornutil.MatchDotMethodCall(argument, unicornutil.DotMethodCallOptions{
 					Method:          "getTime",
 					ArgumentsLength: &zeroArguments,

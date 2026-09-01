@@ -40,6 +40,10 @@ func TestConsistentDateCloneExtras(t *testing.T) {
 			// non-optional, non-computed, zero-argument getTime method call.
 			{Code: `new Date(date.getTime?.())`, FileName: "file.js"},
 			{Code: `new Date((date?.getTime)())`, FileName: "file.js"},
+			// An optional chain may start below the final getTime call. ESTree wraps
+			// the complete argument in ChainExpression, so upstream ignores it.
+			{Code: `new Date(date?.value.getTime())`, FileName: "file.js"},
+			{Code: `new Date((date?.value.getTime)())`, FileName: "file.js"},
 			{Code: `new Date(date["getTime"]())`, FileName: "file.js"},
 			{Code: `new Date(date.getTime(...[]))`, FileName: "file.js"},
 			{Code: `new Date(date.getTime)`, FileName: "file.js"},
@@ -91,6 +95,14 @@ func TestConsistentDateCloneExtras(t *testing.T) {
 				FileName: "file.js",
 				Output:   []string{`new Date(((date)))`},
 				Errors:   []rule_tester.InvalidTestCaseError{expectedError(`new Date(((date)).getTime /* call */ ())`, `getTime /* call */ ()`, 0)},
+			},
+			// Parentheses end the optional chain, so the outer getTime call is an
+			// ordinary call that upstream reports and fixes.
+			{
+				Code:     `new Date((date?.value).getTime())`,
+				FileName: "file.js",
+				Output:   []string{`new Date((date?.value))`},
+				Errors:   []rule_tester.InvalidTestCaseError{expectedError(`new Date((date?.value).getTime())`, `getTime()`, 0)},
 			},
 
 			// The property diagnostic starts after receiver-side comments, while the
