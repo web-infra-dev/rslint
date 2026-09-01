@@ -1,5 +1,5 @@
 import { lint } from '@rslint/core/internal';
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import { RemoteSourceFile } from '@rslint/api';
 

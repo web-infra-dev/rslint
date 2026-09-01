@@ -739,7 +739,7 @@ Assert that diagnostic count, message, and range are identical in all four modes
 
 ### Step 3: Register Test File
 
-**File**: `packages/rslint-test-tools/rstest.config.mts`
+**File**: `packages/rslint-test-tools/rstack.config.mts`
 
 Add the new test file path to the `include` array.
 
@@ -805,10 +805,10 @@ Follow this **strict order** — each step depends on the previous one:
 
    ```bash
    # First run for new test cases: generate snapshots with -u flag
-   cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name> -u
+   cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name> -u
 
    # Subsequent runs: verify against existing snapshots
-   cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
+   cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name>
    ```
 
 5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
@@ -1085,7 +1085,7 @@ If JS tests fail with 0 diagnostics found:
 
 1. **Did you rebuild the binary?** Run `cd packages/rslint && pnpm run build:bin`
 2. **Is the rule catalogued?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `coreRules()` or the plugin's `GetAllRules()` are present.
-3. **Are test files included?** Check `rstest.config.mts`
+3. **Are test files included?** Check `rstack.config.mts`
 4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
 5. **Debug Mode**: Use `fmt.Fprintf(os.Stderr, "DEBUG: ...")` in Go code
 

@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { runRslint, createTempDir, cleanupTempDir, TS_CONFIG } from './helpers';
 
 // End-to-end coverage for the `--type-check-only` mode (PR #905) and the
