@@ -1,6 +1,6 @@
-import { defineConfig } from '@rstest/core';
+import { define } from 'rstack';
 
-export default defineConfig({
+define.test({
   testEnvironment: 'node',
   globals: true,
   // Normal completion is event-driven. This is only the final in-process
@@ -149,6 +149,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-const.test.ts',
     './tests/eslint/rules/prefer-destructuring.test.ts',
     './tests/eslint/rules/prefer-exponentiation-operator.test.ts',
+    './tests/eslint/rules/prefer-named-capture-group.test.ts',
     './tests/eslint/rules/prefer-numeric-literals.test.ts',
     './tests/eslint/rules/prefer-object-has-own.test.ts',
     './tests/eslint/rules/prefer-object-spread.test.ts',
@@ -389,7 +390,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unnecessary-qualifier.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-template-expression.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-arguments.test.ts',
-    // './tests/typescript-eslint/rules/no-unnecessary-type-assertion.test.ts',
+    './tests/typescript-eslint/rules/no-unnecessary-type-assertion.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-constraint.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-conversion.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-type-parameters.test.ts',
@@ -654,6 +655,7 @@ export default defineConfig({
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
+    './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
@@ -679,6 +681,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-then-catch.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',

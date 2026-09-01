@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { EventEmitter } from 'node:events';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';

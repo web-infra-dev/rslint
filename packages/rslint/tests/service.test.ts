@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@rstest/core';
+import { describe, expect, test } from 'rstack/test';
 
 import { RSLintService } from '../src/service/service.js';
 import { API_REVERSE_CONFIG_LOAD_CAPABILITY } from '../src/service/protocol.js';

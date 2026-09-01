@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NodeRslintService } from '../src/internal/node.js';
