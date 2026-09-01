@@ -36,6 +36,14 @@ var JsxSortPropsRule = rule.Rule{
 			if len(attrs) == 0 {
 				return
 			}
+			type pendingReport struct {
+				attr           *ast.Node
+				id             string
+				description    string
+				data           map[string]string
+				wholeAttribute bool
+			}
+			var pending []pendingReport
 			reserved := opts.reservedList
 			if opts.reservedFirst && !reactutil.IsDOMComponent(element) {
 				reserved = slices.DeleteFunc(slices.Clone(reserved), func(name string) bool {
@@ -56,13 +64,7 @@ var JsxSortPropsRule = rule.Rule{
 					return
 				}
 				ids[id] = true
-				reportNode := attr.AsJsxAttribute().Name()
-				if wholeAttribute {
-					reportNode = attr
-				}
-				ctx.ReportNodeWithDeferredFixes(reportNode, rule.RuleMessage{Id: id, Description: description, Data: data}, func() []rule.RuleFix {
-					return buildFixes(ctx, element, opts, reserved)
-				})
+				pending = append(pending, pendingReport{attr, id, description, data, wholeAttribute})
 			}
 
 			memo := attrs[0]
@@ -169,6 +171,21 @@ var JsxSortPropsRule = rule.Rule{
 					continue
 				}
 				memo = current
+			}
+			sort.SliceStable(pending, func(i, j int) bool {
+				left := utils.TrimNodeTextRange(ctx.SourceFile, pending[i].attr)
+				right := utils.TrimNodeTextRange(ctx.SourceFile, pending[j].attr)
+				return left.Pos() < right.Pos()
+			})
+			for _, report := range pending {
+				report := report
+				reportNode := report.attr.AsJsxAttribute().Name()
+				if report.wholeAttribute {
+					reportNode = report.attr
+				}
+				ctx.ReportNodeWithDeferredFixes(reportNode, rule.RuleMessage{Id: report.id, Description: report.description, Data: report.data}, func() []rule.RuleFix {
+					return buildFixes(ctx, element, opts, reserved)
+				})
 			}
 		}
 

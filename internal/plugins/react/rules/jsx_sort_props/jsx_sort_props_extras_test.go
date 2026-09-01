@@ -22,6 +22,8 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		// ---- Real-user: issue #1632 gives reserved props precedence over callbacks. ----
 		{Code: `<App key={1} a onClick={fn} />`, Tsx: true, Options: map[string]any{"reservedFirst": true, "callbacksLast": true}},
 	}, []rule_tester.InvalidTestCase{
+		// Reports from one JSX element follow source order, as ESLint's diagnostics do.
+		{Code: `<App onClick onBlur a />`, Tsx: true, Options: map[string]any{"callbacksLast": true}, Output: []string{`<App a onBlur onClick />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("listCallbacksLast", "Callbacks must be listed after all other props", 1, 6), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 14)}},
 		// Locks in upstream alphabetic arm: errors are evaluated independently for each inversion.
 		{Code: `<App c a b />`, Tsx: true, Output: []string{`<App a b c />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 8), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 10)}},
 		// Locks in upstream custom-reserved-list branch and the user-visible data substitution.
