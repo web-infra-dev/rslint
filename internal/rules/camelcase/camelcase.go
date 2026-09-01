@@ -263,11 +263,11 @@ func bindingReportIdentifier(node *ast.Node) *ast.Node {
 // TypeScript keeps as distinct error symbols, such as duplicate parameters or
 // conflicting var/function declarations.
 func bindingScope(node *ast.Node, name string) *ast.Node {
-	// ESLint gives a named function expression's self-binding its own scope,
-	// separate from the function scope that owns its parameters and body
-	// bindings. Keep the two scope-manager variables distinct when they share a
-	// name.
-	if node != nil && node.Parent != nil && node.Parent.Kind == ast.KindFunctionExpression && node.Parent.Name() == node {
+	// ESLint gives a named function or class expression's self-binding its own
+	// scope. Keep it distinct from same-named outer, parameter, and body bindings.
+	if node != nil && node.Parent != nil &&
+		(node.Parent.Kind == ast.KindFunctionExpression || node.Parent.Kind == ast.KindClassExpression) &&
+		node.Parent.Name() == node {
 		return node
 	}
 	symbol := utils.BindingNameSymbol(node)
@@ -531,7 +531,7 @@ func isExportedName(node *ast.Node) bool {
 		return false
 	}
 	switch node.Parent.Kind {
-	case ast.KindExportSpecifier, ast.KindNamespaceExport:
+	case ast.KindExportSpecifier, ast.KindNamespaceExport, ast.KindNamespaceExportDeclaration:
 		return node.Parent.Name() == node
 	}
 	return false
@@ -555,6 +555,9 @@ func isRuntimeReference(node *ast.Node) bool {
 	if utils.IsImportTypeSyntax(node) {
 		return false
 	}
+	if isAliasedTypeExportSource(node) {
+		return true
+	}
 	if ast.IsPartOfTypeQuery(node) {
 		return isTypeQueryValueReference(node)
 	}
@@ -562,6 +565,21 @@ func isRuntimeReference(node *ast.Node) bool {
 		return scope.IsReferenceIdentifier(node)
 	}
 	return node != nil && !ast.IsPartOfTypeNode(node) && !utils.IsNonReferenceIdentifier(node)
+}
+
+// isAliasedTypeExportSource recognizes the local side of
+// `export type { local_name as exportedName }`. scope-manager exposes that
+// identifier through the Program scope, even though the generic
+// non-reference helper excludes type-only export specifiers.
+func isAliasedTypeExportSource(node *ast.Node) bool {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindExportSpecifier {
+		return false
+	}
+	specifier := node.Parent.AsExportSpecifier()
+	if specifier == nil || specifier.PropertyName != node || specifier.Name() == node {
+		return false
+	}
+	return ast.IsTypeOnlyImportOrExportDeclaration(node.Parent) && !utils.IsReExportSpecifier(node.Parent)
 }
 
 func isJsxNamespacedAttributeName(node *ast.Node) bool {

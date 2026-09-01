@@ -70,12 +70,55 @@ func TestCamelcaseExtras(t *testing.T) {
 			{Code: `this.data.nested.variable_from_backend = "value"`, Options: map[string]any{"properties": "never"}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Review regression: class-expression names have a separate binding scope ----
+			{
+				Code: `const snake_case = class snake_case {};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+				},
+			},
+			// ---- Review regression: an aliased type export retains its local reference ----
+			{
+				Code: `export type { type_ref as exportedName };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'type_ref' is not in camel case."},
+				},
+			},
+			// ---- Review regression: aliased type re-exports have no local reference ----
+			{Code: `export type { type_ref as exportedName } from "pkg";`},
+			// ---- Review regression: TypeScript namespace-export declarations are exported names ----
+			{
+				Code:     `export {}; export as namespace namespace_name;`,
+				FileName: "global.d.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'namespace_name' is not in camel case."},
+				},
+			},
+			// ---- Review regression: namespace exports are also checked inside ambient modules ----
+			{
+				Code:     `declare module "pkg" { export as namespace namespace_name; }`,
+				FileName: "ambient.d.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'namespace_name' is not in camel case."},
+				},
+			},
 			// ---- Review regression: function-expression names have a separate binding scope ----
 			{
 				Code: `const f = function snake_case(snake_case) { return snake_case; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
 					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+				},
+			},
+			// ---- Review regression: a class self-reference uses the expression-name binding ----
+			{
+				Code: `const snake_case = class snake_case { static field_name = snake_case; };`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
+					{MessageId: "notCamelCase", Message: "Identifier 'field_name' is not in camel case."},
 					{MessageId: "notCamelCase", Message: "Identifier 'snake_case' is not in camel case."},
 				},
 			},
