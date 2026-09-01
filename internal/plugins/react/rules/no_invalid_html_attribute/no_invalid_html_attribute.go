@@ -190,7 +190,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				}
 				if id != "" {
 					partRange := literalRange(ctx, valueNode, part)
-					ctx.ReportRangeWithDeferredSuggestions(partRange, message(id, desc, data), func() []rule.RuleSuggestion {
+					ctx.ReportNodeWithDeferredSuggestions(valueNode, message(id, desc, data), func() []rule.RuleSuggestion {
 						return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+word+"”", rule.RuleFixRemoveRange(partRange))
 					})
 				}
@@ -198,16 +198,19 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 			parts := stringParts(value)
 			for i, part := range parts {
 				if value[part[0]:part[1]] == "shortcut" {
-					if i+1 >= len(parts) || value[parts[i+1][0]:parts[i+1][1]] != "icon" {
-						second := ""
-						if i+1 < len(parts) {
-							second = value[parts[i+1][0]:parts[i+1][1]]
-							// Upstream's pair matcher treats a run of ASCII spaces
-							// following "shortcut" as an empty second value.
-							if value[part[1]:parts[i+1][0]] != " " {
-								second = ""
-							}
+					second := ""
+					last := value[part[0]:part[1]]
+					first := last
+					if i+1 < len(parts) {
+						pairText := value[part[0]:parts[i+1][1]]
+						pairParts := strings.Split(pairText, " ")
+						first = pairParts[0]
+						last = pairParts[len(pairParts)-1]
+						if len(pairParts) > 1 {
+							second = pairParts[1]
 						}
+					}
+					if first == "shortcut" && last != "icon" {
 						id, desc := "notAlone", "“shortcut” must be directly followed by “icon”."
 						if second != "" {
 							id, desc = "notPaired", "“shortcut” can not be directly followed by “"+second+"” without “icon”."
@@ -224,7 +227,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					if part[0] == 0 || part[1] == len(value) {
 						replacement = ""
 					}
-					ctx.ReportRangeWithDeferredSuggestions(r, message("spaceDelimited", "”rel“ attribute values should be space delimited.", map[string]string{"attributeName": "rel"}), func() []rule.RuleSuggestion {
+					ctx.ReportNodeWithDeferredSuggestions(valueNode, message("spaceDelimited", "”rel“ attribute values should be space delimited.", map[string]string{"attributeName": "rel"}), func() []rule.RuleSuggestion {
 						return suggestion("suggestRemoveWhitespaces", "remove whitespaces in “rel”", rule.RuleFixReplaceRange(r, replacement))
 					})
 				}
@@ -324,6 +327,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					ctx.ReportNode(property, message("noMethod", "The ”rel“ attribute cannot be a method.", map[string]string{"attributeName": "rel"}))
 					continue
 				}
+				value = ast.SkipParentheses(value)
 				if value != nil && value.Kind == ast.KindArrayLiteralExpression {
 					for _, item := range value.AsArrayLiteralExpression().Elements.Nodes {
 						if item != nil {
