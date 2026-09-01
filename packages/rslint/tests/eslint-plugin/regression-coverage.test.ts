@@ -11,7 +11,7 @@
  * 1-2 line "before this contract held" note so a future maintainer
  * reading a failure understands the regression risk being guarded.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import * as espree from 'espree';
 

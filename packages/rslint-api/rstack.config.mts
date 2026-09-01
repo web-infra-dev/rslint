@@ -1,14 +1,10 @@
-import { defineConfig } from '@rslib/core';
+import { define } from 'rstack';
 
-export default defineConfig({
-  lib: [
-    {
-      format: 'esm',
-      dts: {
-        bundle: true,
-      },
-    },
-  ],
+define.lib({
+  format: 'esm',
+  dts: {
+    bundle: true,
+  },
   source: {
     tsconfigPath: './tsconfig.build.json',
   },

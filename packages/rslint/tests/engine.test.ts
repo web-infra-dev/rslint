@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

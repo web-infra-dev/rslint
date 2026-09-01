@@ -9,7 +9,7 @@
  * register zero listeners and silently report nothing. These tests pin the
  * exact predicate (the Program / non-Program split), not just a truthy value.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { createSourceCode } from '../../../src/eslint-plugin/source-code/source-code.js';
 import type { ESTreeNode } from '../../../src/eslint-plugin/source-code/source-code.js';
