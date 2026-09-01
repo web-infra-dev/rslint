@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
@@ -380,6 +381,26 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		programs = loadedPrograms.Programs
 	}
 
+	// Only the default formatter consumes the completed-run summary. Freeze
+	// type-capable Program root identities before execution, while the loader
+	// generation is authoritative, then immediately reduce them with the
+	// already-frozen lint targets so identity storage does not outlive this
+	// projection.
+	var summaryFileCount int
+	if format == output.FormatDefault && mode != output.ModeLint {
+		summaryFileCount, err = freezeLintReportFileCount(
+			ctx,
+			mode,
+			programSession,
+			programs,
+			targetPlan.Files,
+			singleThreaded,
+		)
+		if err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		}
+	}
+
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
@@ -583,37 +604,46 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// emission order.
 	linter.StableSortDiagnosticsByFileAndStart(allDiags)
 
-	// Phase 3: Build one report from the final post-fix diagnostics, then let
-	// the CLI output subsystem own format dispatch, colors, and status text.
-	var typeCheckedRoots []string
-	if typeCheck {
-		// Compiler-capable Program roots represent the user-authored type-check
-		// set; transitive declarations are intentionally excluded.
-		for _, prog := range programs {
-			if !prog.CanProvideProgramDiagnostics() {
-				continue
-			}
-			typeCheckedRoots = append(typeCheckedRoots, prog.RootFileNames()...)
+	// Phase 3: Project the completed core result into one immutable CLI report.
+	// Machine formats deliberately omit Summary and its upstream identity work.
+	var summary *output.Summary
+	if format == output.FormatDefault {
+		if mode == output.ModeLint {
+			// Keep lint-only's target-union allocation after execution, matching
+			// its established pipeline allocation timing.
+			summaryFileCount = lintReportFileCount(mode, targetPlan.Files, nil)
+		}
+		threadsCount := 1
+		if !singleThreaded {
+			threadsCount = runtime.GOMAXPROCS(0)
+		}
+		summary = &output.Summary{
+			Files:       summaryFileCount,
+			Rules:       len(lintResult.ExecutedRules),
+			Threads:     threadsCount,
+			FixedIssues: fixedCount,
+			StartedAt:   timeBefore,
 		}
 	}
-
-	threadsCount := 1
-	if !singleThreaded {
-		threadsCount = runtime.GOMAXPROCS(0)
+	if err := ctx.Err(); err != nil {
+		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 	}
-
-	report := output.NewReport(allDiags, output.Metadata{
-		Mode:        mode,
-		Files:       lintReportFileCount(mode, targetPlan.Files, typeCheckedRoots, fs),
-		Rules:       len(lintResult.ExecutedRules),
-		Threads:     threadsCount,
-		FixedIssues: fixedCount,
-		StartedAt:   timeBefore,
+	report, err := assembleLintReport(lintReportInput{
+		Mode:          mode,
+		Diagnostics:   allDiags,
+		Summary:       summary,
+		MaxWarnings:   maxWarnings,
+		IncludeSource: format == output.FormatDefault,
 	})
-	counts := report.Counts()
-	outcome := lintReportOutcome(counts, maxWarnings)
+	if err != nil {
+		return abortRun(
+			"assembling lint report: "+err.Error(),
+			fmt.Sprintf("error assembling lint report: %v", err),
+		)
+	}
+	outcome := report.Outcome()
 	outputOptions.ComparePaths = comparePathOptions
-	if err := renderLintReport(ctx, os.Stdout, report, outcome, outputOptions); err != nil {
+	if err := renderLintReport(ctx, os.Stdout, report, outputOptions); err != nil {
 		return abortRun(
 			"writing lint report: "+err.Error(),
 			fmt.Sprintf("error writing lint report: %v", err),
@@ -630,7 +660,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// (jsonline/github/gitlab) stay parseable with --timing enabled. It is
 	// deliberately emitted after every result message so it remains last.
 	if timingCollector != nil {
-		table := output.FormatRuleTimingTable(timingCollector.Timings(), timingLimit)
+		table := output.FormatRuleTimingTable(
+			projectLintRuleTimings(timingCollector.Timings()),
+			timingLimit,
+		)
 		if args.DeferTimingTable != nil {
 			args.DeferTimingTable(table)
 		} else {
@@ -638,8 +671,37 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
-	if outcome.Kind != output.OutcomePassed {
+	if outcome.Failed() {
 		return 1
 	}
 	return 0
+}
+
+// freezeLintReportFileCount isolates default-format, type-check summary
+// work from the lint command's hot orchestration path. The loader owns root
+// identity resolution; the command immediately reduces its operation-scoped
+// result into the presentation scalar.
+func freezeLintReportFileCount(
+	ctx context.Context,
+	mode output.Mode,
+	session *loader.Session,
+	programs []*program.Program,
+	lintTargets []target.File,
+	singleThreaded bool,
+) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	typeCheckedRootIDs, err := session.FreezeProgramRootIdentities(
+		programs,
+		lintTargets,
+		singleThreaded,
+	)
+	if err != nil {
+		return 0, err
+	}
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	return lintReportFileCount(mode, lintTargets, typeCheckedRootIDs), nil
 }
