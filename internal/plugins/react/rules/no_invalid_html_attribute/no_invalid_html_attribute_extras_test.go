@@ -16,6 +16,9 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		// ---- Dimension 4: parenthesized expression ----
 		// Parentheses are transparent in ESTree at createElement call sites.
 		{Code: `((React).createElement)(("a"), ({rel: "alternate"}))`, Tsx: true},
+		{Code: `React.createElement(tag, {rel: "alternate"})`, Tsx: true},
+		{Code: "React.createElement(`a`, {rel: \"alternate\"})", Tsx: true},
+		{Code: `h.createElement("a", {rel: "invalid"})`, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h"}}, Tsx: true},
 		// ---- Dimension 4: JSX member and namespace tag names ----
 		{Code: `var x = <Foo.Bar rel="invalid"/>`, Tsx: true},
 		{Code: `var x = <svg:a rel="invalid"/>`, Tsx: true},
@@ -39,6 +42,13 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		{Code: `var x = <a rel={undefined}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Output: `var x = <a />`}}}}},
 		// Locks in upstream checkCreateProps() arm: method takes precedence over values.
 		{Code: `React.createElement("a", {rel() {}})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMethod"}}},
+		{Code: `React.createElement("a", {rel: ("invalid")})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", {rel: ("")})`}}}}},
+		{Code: `React.createElement("a", {rel: 1n})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", {rel: n})`}}}}},
+		{Code: `React.createElement("a", {rel: "canonical"})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notValidFor", Message: `“"canonical"” is not a valid “rel” attribute value for <a>.`}}},
+		{Code: `React.createElement("a", {rel: "canonical"})`, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h"}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notValidFor", Message: `“"canonical"” is not a valid “rel” attribute value for <a>.`}}},
+		{Code: `var x = <a rel={/invalid/}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `var x = <a />`}}}}},
+		{Code: `var x = <a rel={1n}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `var x = <a />`}}}}},
+		{Code: `var x = <a rel={("invalid")}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <a rel={("")}/>`}}}}},
 		// Locks in upstream checkLiteralValueNode() pair branch with a second token.
 		{Code: `var x = <link rel="shortcut nope"/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <link rel="shortcut "/>`}}}, {MessageId: "notPaired"}}},
 		// ---- Real-user: eslint-plugin-react#3172 ----

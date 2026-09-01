@@ -2,6 +2,7 @@ package no_invalid_html_attribute
 
 import (
 	_ "embed"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -115,6 +116,39 @@ func literalString(node *ast.Node) (string, bool) {
 		return node.AsStringLiteral().Text, true
 	}
 	return "", false
+}
+
+func isESTreeLiteral(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral,
+		ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword,
+		ast.KindRegularExpressionLiteral:
+		return true
+	default:
+		return false
+	}
+}
+
+func sourceText(ctx rule.RuleContext, node *ast.Node) string {
+	if node == nil || ctx.SourceFile == nil {
+		return ""
+	}
+	r := utils.TrimNodeTextRange(ctx.SourceFile, node)
+	return ctx.SourceFile.Text()[r.Pos():r.End()]
+}
+
+func removeStaticValue(ctx rule.RuleContext, node *ast.Node, value string) rule.RuleFix {
+	// Upstream uses `value.raw.replace(value.value, '')`, including its
+	// source-text quirks for numeric, BigInt, and regexp literals.
+	raw := sourceText(ctx, node)
+	return rule.RuleFixReplace(ctx.SourceFile, node, strings.Replace(raw, value, "", 1))
 }
 
 func literalRange(ctx rule.RuleContext, node *ast.Node, offset [2]int) core.TextRange {
@@ -231,11 +265,11 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 			if init.Kind != ast.KindJsxExpression {
 				return
 			}
-			expr := init.AsJsxExpression().Expression
+			expr := ast.SkipParentheses(init.AsJsxExpression().Expression)
 			if expr == nil {
 				return
 			}
-			if expr.Kind == ast.KindStringLiteral || expr.Kind == ast.KindNumericLiteral || expr.Kind == ast.KindTrueKeyword || expr.Kind == ast.KindFalseKeyword || expr.Kind == ast.KindNullKeyword {
+			if expr.Kind == ast.KindStringLiteral || expr.Kind == ast.KindNumericLiteral || expr.Kind == ast.KindBigIntLiteral || expr.Kind == ast.KindTrueKeyword || expr.Kind == ast.KindFalseKeyword || expr.Kind == ast.KindNullKeyword || expr.Kind == ast.KindRegularExpressionLiteral {
 				reportLiteral(expr, node, element)
 				return
 			}
@@ -247,10 +281,13 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 		}
 		checkCall := func(node *ast.Node) {
 			call := node.AsCallExpression()
-			if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings)) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+			if !reactutil.IsCreateElementCall(call.Expression, reactutil.DefaultReactPragma) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 				return
 			}
 			tagNode := ast.SkipParentheses(call.Arguments.Nodes[0])
+			if !isESTreeLiteral(tagNode) {
+				return
+			}
 			element, isString := literalString(tagNode)
 			if isString {
 				if _, ok := htmlElements[element]; !ok {
@@ -306,10 +343,11 @@ func reportCreateElementValue(ctx rule.RuleContext, value *ast.Node, element str
 	if value == nil {
 		return
 	}
+	value = ast.SkipParentheses(value)
 	// ESTree's Literal covers scalar literals but not template literals. Keep
 	// that boundary rather than using GetStaticExpressionValue unconditionally.
 	switch value.Kind {
-	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral:
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral:
 	default:
 		return
 	}
@@ -320,11 +358,12 @@ func reportCreateElementValue(ctx rule.RuleContext, value *ast.Node, element str
 	tags, exists := relValues[text]
 	if !exists {
 		ctx.ReportNodeWithDeferredSuggestions(value, message("neverValid", "“"+text+"” is never a valid “rel” attribute value.", map[string]string{"attributeName": "rel", "reportingValue": text}), func() []rule.RuleSuggestion {
-			return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+text+"”", rule.RuleFixReplace(ctx.SourceFile, value, "\"\""))
+			return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+text+"”", removeStaticValue(ctx, value, text))
 		})
 		return
 	}
 	if _, allowed := tags[element]; !allowed {
-		ctx.ReportNode(value, message("notValidFor", "“"+text+"” is not a valid “rel” attribute value for <"+element+">.", map[string]string{"attributeName": "rel", "reportingValue": text, "elementName": element}))
+		raw := sourceText(ctx, value)
+		ctx.ReportNode(value, message("notValidFor", "“"+raw+"” is not a valid “rel” attribute value for <"+element+">.", map[string]string{"attributeName": "rel", "reportingValue": raw, "elementName": element}))
 	}
 }
