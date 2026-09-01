@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { runRslint, createTempDir, cleanupTempDir, TS_CONFIG } from './helpers';
 
 // `ignores` controls the LINT phase only. `--type-check` is program-level

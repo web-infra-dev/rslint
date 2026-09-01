@@ -83,6 +83,11 @@ func (value staticNumberValue) IsNaN() bool {
 // nested aggregate evaluation doesn't allocate an interface box per literal.
 type staticStringNode ast.Node
 
+// staticRegExpNode keeps a regular-expression literal backed by its AST node.
+// It is private because callers only observe its static properties or String
+// conversion, never a host-language regexp object.
+type staticRegExpNode ast.Node
+
 // staticObjectValue and staticArrayValue hold folded object and array literals
 // so member access and JavaScript's default string coercion can be modeled.
 type staticObjectValue struct {
@@ -248,6 +253,8 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		return staticEvalResult{value: (*staticStringNode)(node), ok: true}
+	case ast.KindRegularExpressionLiteral:
+		return staticEvalResult{value: (*staticRegExpNode)(node), ok: true}
 	case ast.KindTrueKeyword:
 		return staticEvalResult{value: true, ok: true}
 	case ast.KindFalseKeyword:
@@ -337,7 +344,9 @@ func (staticEvaluator *StaticStringEvaluator) evalIdentifier(node *ast.Node) sta
 
 func isAggregateLiteral(node *ast.Node) bool {
 	node = SkipAssertionsAndParens(node)
-	return node != nil && (node.Kind == ast.KindObjectLiteralExpression || node.Kind == ast.KindArrayLiteralExpression)
+	return node != nil && (node.Kind == ast.KindObjectLiteralExpression ||
+		node.Kind == ast.KindArrayLiteralExpression ||
+		node.Kind == ast.KindRegularExpressionLiteral)
 }
 
 // ResolveIdentifierInitializer resolves an identifier to a stable variable
@@ -615,7 +624,7 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteral(node *ast.Node) 
 				return staticEvalResult{}
 			}
 			switch propertyValue.value.(type) {
-			case *staticObjectValue, *staticArrayValue:
+			case *staticRegExpNode, *staticObjectValue, *staticArrayValue:
 				value.prototype = propertyValue.value
 				value.prototypeSet = true
 			case staticNullValue:
@@ -679,9 +688,6 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 			prototypeNode := SkipAssertionsAndParens(valueNode)
 			if prototypeNode != nil && prototypeNode.Kind == ast.KindObjectLiteralExpression {
 				prototypeValue = staticEvaluator.evalObjectLiteralMember(prototypeNode, key)
-				if !prototypeValue.ok {
-					return staticEvalResult{}
-				}
 				prototypeSet = true
 				continue
 			}
@@ -691,11 +697,8 @@ func (staticEvaluator *StaticStringEvaluator) evalObjectLiteralMember(node *ast.
 				return staticEvalResult{}
 			}
 			switch value.value.(type) {
-			case *staticObjectValue, *staticArrayValue:
-				prototypeValue = staticMemberValue(value.value, key)
-				if !prototypeValue.ok {
-					return staticEvalResult{}
-				}
+			case *staticRegExpNode, *staticObjectValue, *staticArrayValue:
+				prototypeValue = staticPrototypeMemberValue(value.value, key)
 				prototypeSet = true
 			case staticNullValue:
 				prototypeValue = staticEvalResult{value: staticUndefinedValue{}, ok: true}
@@ -861,12 +864,14 @@ func staticMemberValue(object any, key string) staticEvalResult {
 			return staticEvalResult{}
 		}
 		return staticStringMemberValue(str, key)
+	case *staticRegExpNode:
+		return staticRegExpMemberValue((*ast.Node)(object), key)
 	case *staticObjectValue:
 		if value, ok := staticObjectOwnProperty(object, key); ok {
 			return staticEvalResult{value: value, ok: true}
 		}
 		if object.prototypeSet && object.prototype != nil {
-			return staticMemberValue(object.prototype, key)
+			return staticPrototypeMemberValue(object.prototype, key)
 		}
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	case *staticArrayValue:
@@ -883,6 +888,54 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		return staticEvalResult{value: object.element(index), ok: true}
 	}
 	return staticEvalResult{}
+}
+
+// staticPrototypeMemberValue reads a property through an authored __proto__
+// setter. RegExp's lastIndex is an own data property and is safe to inherit,
+// but its standard getters live on RegExp.prototype and brand-check the
+// original receiver. Calling one with the outer object would throw, so those
+// reads remain unknown instead of reusing direct-literal getter evaluation.
+func staticPrototypeMemberValue(prototype any, key string) staticEvalResult {
+	if _, ok := prototype.(*staticRegExpNode); ok {
+		if key == "lastIndex" {
+			return staticEvalResult{value: staticNumberValue(0), ok: true}
+		}
+		return staticEvalResult{}
+	}
+	return staticMemberValue(prototype, key)
+}
+
+// staticRegExpMemberValue models the stable own property and getter subset
+// eslint-utils exposes for a newly-created RegExp literal. `unicodeSets` is
+// deliberately absent because eslint-utils 4.10.1 does not whitelist that
+// getter yet.
+func staticRegExpMemberValue(node *ast.Node, key string) staticEvalResult {
+	pattern, flags := ExtractRegexPatternAndFlags(node.Text())
+	switch key {
+	case "source":
+		return staticEvalResult{value: pattern, ok: true}
+	case "flags":
+		_, canonicalFlags := ExtractRegexPatternAndFlags(RegExpLiteralStringValue(node.Text()))
+		return staticEvalResult{value: canonicalFlags, ok: true}
+	case "dotAll":
+		return staticEvalResult{value: strings.Contains(flags, "s"), ok: true}
+	case "global":
+		return staticEvalResult{value: strings.Contains(flags, "g"), ok: true}
+	case "hasIndices":
+		return staticEvalResult{value: strings.Contains(flags, "d"), ok: true}
+	case "ignoreCase":
+		return staticEvalResult{value: strings.Contains(flags, "i"), ok: true}
+	case "multiline":
+		return staticEvalResult{value: strings.Contains(flags, "m"), ok: true}
+	case "sticky":
+		return staticEvalResult{value: strings.Contains(flags, "y"), ok: true}
+	case "unicode":
+		return staticEvalResult{value: strings.Contains(flags, "u"), ok: true}
+	case "lastIndex":
+		return staticEvalResult{value: staticNumberValue(0), ok: true}
+	default:
+		return staticEvalResult{}
+	}
 }
 
 // staticStringMemberValue indexes a string by a canonical array-index key, the
@@ -1695,7 +1748,7 @@ func isMutatingArrayMethod(name string) bool {
 
 func staticValueIsTsgoSafe(value any) bool {
 	switch value.(type) {
-	case bool, staticNullValue, staticUndefinedValue, staticNumberValue, *staticStringNode, *staticObjectValue, *staticArrayValue:
+	case bool, staticNullValue, staticUndefinedValue, staticNumberValue, *staticStringNode, *staticRegExpNode, *staticObjectValue, *staticArrayValue:
 		return false
 	default:
 		return value != nil
@@ -1808,7 +1861,7 @@ func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {
 
 func staticValueIsAggregate(value any) bool {
 	switch value.(type) {
-	case *staticObjectValue, *staticArrayValue:
+	case *staticRegExpNode, *staticObjectValue, *staticArrayValue:
 		return true
 	default:
 		return false
@@ -1828,7 +1881,7 @@ func staticValueTruthy(value any) (truthy bool, ok bool) {
 		return value, true
 	case staticNullValue, staticUndefinedValue:
 		return false, true
-	case *staticObjectValue, *staticArrayValue:
+	case *staticRegExpNode, *staticObjectValue, *staticArrayValue:
 		return true, true
 	default:
 		return evaluatorBool(func() bool { return evaluator.IsTruthy(value) })
@@ -1843,6 +1896,8 @@ func staticValueToString(value any) (string, bool) {
 		return ecmascript.NumberToString(float64(value)), true
 	case *staticStringNode:
 		return staticValueAsString(value)
+	case *staticRegExpNode:
+		return RegExpLiteralStringValue((*ast.Node)(value).Text()), true
 	case bool:
 		if value {
 			return "true", true

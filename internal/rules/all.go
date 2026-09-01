@@ -188,6 +188,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_exponentiation_operator"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_named_capture_group"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_numeric_literals"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_has_own"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_spread"
@@ -376,6 +377,7 @@ func coreRules() []rule.Rule {
 		prefer_const.PreferConstRule,
 		prefer_destructuring.PreferDestructuringRule,
 		prefer_exponentiation_operator.PreferExponentiationOperatorRule,
+		prefer_named_capture_group.PreferNamedCaptureGroupRule,
 		prefer_numeric_literals.PreferNumericLiteralsRule,
 		prefer_object_has_own.PreferObjectHasOwnRule,
 		prefer_object_spread.PreferObjectSpreadRule,

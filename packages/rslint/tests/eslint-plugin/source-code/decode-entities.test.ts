@@ -5,7 +5,7 @@
  * by normalize-ast (JSX node values), so their edge cases — especially `decodeJsxAttributeValue`,
  * which only the AST path uses — stay pinned directly here.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import {
   decodeJsxText,

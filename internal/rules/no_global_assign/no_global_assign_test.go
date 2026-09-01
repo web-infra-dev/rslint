@@ -144,6 +144,20 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			{Code: `Object!! = 1;`},
 			{Code: `((Object as any) as any) += 1;`},
 			{Code: `((Object as any) as any)++;`},
+			{Code: `Object!! += 1;`},
+			{Code: `++(Object!!);`},
+
+			// An outer destructuring pattern does not turn evaluation-only children
+			// into writes, and wrapping the pattern root prevents PatternVisitor
+			// from recognizing it as a pattern.
+			{Code: `[x = (Object!! += 1)] = arr;`},
+			{Code: `({[(Object!! += 1)]: x} = src);`},
+			{Code: `[foo(Object!! += 1)] = arr;`},
+			{Code: `[((Object!! += 1).x)] = arr;`},
+			{Code: `([(Object!! += 1)] as any) = arr;`},
+			{Code: `([(Object!! += 1)]) = arr;`},
+			{Code: `(([(Object!! += 1)])) = arr;`},
+			{Code: `(({x: (Object!! += 1)})) = src;`},
 
 			// Satisfies expression write is NOT detected by ESLint scope analysis
 			{Code: `(Object satisfies any) = 1;`},
@@ -642,8 +656,52 @@ func TestNoGlobalAssignRule(t *testing.T) {
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
 				},
 			},
+			// Compound assignments and updates remain writes when an enclosing
+			// destructuring pattern visits them.
+			{
+				Code: `[(Object!! += 1)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `[(Object!!)++] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `[++(Object!!)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 5},
+				},
+			},
+			{
+				Code: `({x: (Object!! += 1)} = src);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 7},
+				},
+			},
+			{
+				Code: `[{x: [(Object!! += 1)]}] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `for ([(Object!! += 1)] of rows) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `for ([(Object!! += 1)] in rows) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
 			// TypeScript wrappers around a destructuring default are transparent
-			// when finding the enclosing pattern.
+			// throughout the path to the enclosing pattern.
 			{
 				Code: `[(Object!! = 0) as any] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -666,6 +724,75 @@ func TestNoGlobalAssignRule(t *testing.T) {
 				Code: `[(Object!! = 0) satisfies any] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `[[Object!! = 0] as any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `[[Object!! = 0] satisfies any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `[...([Object!! = 0] as any)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 7},
+				},
+			},
+			{
+				Code: `[((Object as any)! += 1)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 4},
+				},
+			},
+
+			// PatternVisitor-specific child edges remain distinct from ordinary
+			// assignment-target edges.
+			{
+				Code: `[((Object!! += 1)())] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 4},
+				},
+			},
+			{
+				Code: `[new foo(Object!! += 1)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 10},
+				},
+			},
+			{
+				Code: `[((Object!! += 1) ? x : y)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 4},
+				},
+			},
+			{
+				Code: `[(0, Object!! += 1)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 6},
+				},
+			},
+			{
+				Code: `[void (Object!! += 1)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `[((Object!! += 1) = x)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 4},
+				},
+			},
+			{
+				Code: `[(([(Object!! += 1)] as any) as any) = rhs] = top;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 6},
 				},
 			},
 			{
