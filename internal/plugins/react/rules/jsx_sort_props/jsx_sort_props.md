@@ -157,6 +157,9 @@ locale-aware ordering even without `ignoreCase`.
 - With `locale: "auto"`, rslint uses a deterministic default collation instead
   of the host environment's locale. Set an explicit locale such as `"de"` when
   locale-specific ordering is required.
+- rslint accepts only strings in a `reservedFirst` array. ESLint accepts other
+  values and reports them as invalid rule options during linting; rslint rejects
+  those configurations during schema validation.
 
 ## When Not To Use It
 

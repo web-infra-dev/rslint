@@ -42,6 +42,7 @@ var JsxSortPropsRule = rule.Rule{
 				description    string
 				data           map[string]string
 				wholeAttribute bool
+				fixable        bool
 			}
 			var pending []pendingReport
 			reserved := opts.reservedList
@@ -64,22 +65,22 @@ var JsxSortPropsRule = rule.Rule{
 					return
 				}
 				ids[id] = true
-				pending = append(pending, pendingReport{attr, id, description, data, wholeAttribute})
+				pending = append(pending, pendingReport{attr, id, description, data, wholeAttribute, opts.reservedError == ""})
 			}
 
 			memo := attrs[0]
 			for index, current := range attrs {
-				if index == 0 {
-					if opts.reservedFirst && opts.reservedError != "" && current.Kind == ast.KindJsxAttribute {
-						reportAttr(current, opts.reservedError, opts.reservedDescription, opts.reservedData, true)
-					}
-					continue
-				}
 				if current.Kind == ast.KindJsxSpreadAttribute {
 					if index+1 < len(attrs) {
 						memo = attrs[index+1]
 					} else {
 						memo = nil
+					}
+					continue
+				}
+				if index == 0 || memo == current {
+					if opts.reservedFirst && opts.reservedError != "" && current.Kind == ast.KindJsxAttribute {
+						reportAttr(current, opts.reservedError, opts.reservedDescription, opts.reservedData, true)
 					}
 					continue
 				}
@@ -176,13 +177,18 @@ var JsxSortPropsRule = rule.Rule{
 				left := utils.TrimNodeTextRange(ctx.SourceFile, pending[i].attr)
 				right := utils.TrimNodeTextRange(ctx.SourceFile, pending[j].attr)
 				return left.Pos() < right.Pos()
-		})
-		for _, report := range pending {
-			reportNode := report.attr.AsJsxAttribute().Name()
+			})
+			for _, report := range pending {
+				reportNode := report.attr.AsJsxAttribute().Name()
 				if report.wholeAttribute {
 					reportNode = report.attr
 				}
-				ctx.ReportNodeWithDeferredFixes(reportNode, rule.RuleMessage{Id: report.id, Description: report.description, Data: report.data}, func() []rule.RuleFix {
+				message := rule.RuleMessage{Id: report.id, Description: report.description, Data: report.data}
+				if !report.fixable {
+					ctx.ReportNode(reportNode, message)
+					continue
+				}
+				ctx.ReportNodeWithDeferredFixes(reportNode, message, func() []rule.RuleFix {
 					return buildFixes(ctx, element, opts, reserved)
 				})
 			}
@@ -217,7 +223,7 @@ func parseOptions(raw []any) options {
 	if value, ok := config["multiline"].(string); ok {
 		opts.multiline = value
 	}
-	if value, ok := config["locale"].(string); ok {
+	if value, ok := config["locale"].(string); ok && value != "" {
 		opts.locale = value
 	}
 	switch value := config["reservedFirst"].(type) {
@@ -263,7 +269,12 @@ func isMultiline(ctx rule.RuleContext, node *ast.Node) bool {
 
 func compareNames(left, right string, opts options) int {
 	if opts.ignoreCase || opts.locale != "auto" {
-		return collate.New(language.Make(opts.locale)).CompareString(left, right)
+		locale := language.Make(opts.locale)
+		base, _ := locale.Base()
+		if base.String() == "da" && ecmascript.StringToLowerCase(left) == ecmascript.StringToLowerCase(right) {
+			return ecmascript.CompareStrings(left, right)
+		}
+		return collate.New(locale).CompareString(left, right)
 	}
 	return ecmascript.CompareStrings(left, right)
 }

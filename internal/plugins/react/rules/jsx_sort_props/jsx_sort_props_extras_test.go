@@ -35,6 +35,10 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: `<App c a b />`, Tsx: true, Output: []string{`<App a b c />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 8), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 10)}},
 		// Locks in upstream custom-reserved-list branch and the user-visible data substitution.
 		{Code: `<App ref={ref} key={key} />`, Tsx: true, Options: map[string]any{"reservedFirst": []any{"key"}}, Output: []string{`<App key={key} ref={ref} />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("listReservedPropsFirst", "Reserved props must be listed before all other props", 1, 16)}},
+		// An empty locale follows upstream's falsy fallback to "auto".
+		{Code: `<App Z a />`, Tsx: true, Options: map[string]any{"locale": ""}},
+		// ICU's Danish collation puts the uppercase spelling first for equal letters.
+		{Code: `<App cH ch />`, Tsx: true, Options: map[string]any{"locale": "da"}},
 		// ---- Dimension 4: comments move with the preceding prop in an autofix. ----
 		{Code: `<App b /* b comment */ a />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 24)}},
 		// ---- Dimension 4: member and intrinsic tag forms use the same attribute order. ----
@@ -46,5 +50,9 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: `<App b /* b */ {...p} d c />`, Tsx: true, Output: []string{`<App b /* b */ {...p} c d />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 25)}},
 		// A trailing comment on the attribute absorbed by a preceding comment stays with that attribute.
 		{Code: "<App\n b /* b */\n // leading a\n a // a\n c\n/>", Tsx: true, Output: []string{"<App\n c\n b /* b */\n // leading a\n a // a\n/>"}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 4, 2)}},
+		// Invalid custom lists report every ordinary prop without applying the sorter.
+		{Code: `<App b a />`, Tsx: true, Options: map[string]any{"reservedFirst": []any{}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "listIsEmpty"}, {MessageId: "listIsEmpty"}}},
+		// A leading spread does not hide the following ordinary prop from validation.
+		{Code: `<App {...p} key={1} />`, Tsx: true, Options: map[string]any{"reservedFirst": []any{}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "listIsEmpty"}}},
 	})
 }
