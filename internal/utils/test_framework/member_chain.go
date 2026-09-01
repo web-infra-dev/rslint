@@ -190,8 +190,9 @@ func MemberEntriesRange(sourceFile *ast.SourceFile, entries []MemberEntry) (core
 	return core.NewTextRange(start.Pos(), entries[len(entries)-1].Node.End()), true
 }
 
-// ResolveFirstIdentifier walks the left side of a call/member chain and
-// returns its first identifier, if any.
+// ResolveFirstIdentifier walks the effective callee of a call/member chain and
+// returns its first identifier, if any. A comma expression contributes only
+// its right operand because that is the value JavaScript calls.
 func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
@@ -212,6 +213,12 @@ func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 		return ResolveFirstIdentifier(node.AsElementAccessExpression().Expression)
 	case ast.KindTaggedTemplateExpression:
 		return ResolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken {
+			return ResolveFirstIdentifier(binary.Right)
+		}
+		return nil
 	default:
 		return nil
 	}

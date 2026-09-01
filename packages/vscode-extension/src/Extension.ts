@@ -54,7 +54,7 @@ export class Extension {
           workspaceFolder: resolved.workspaceFolder,
           installation: resolved.installation,
           outputChannel,
-          lspOutputChannel,
+          traceOutputChannel: lspOutputChannel,
           router,
         }),
       this.logger,
