@@ -136,8 +136,14 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			// Let destructuring in for-of is a declaration (not global write)
 			{Code: `for (let {Object} of [{}]) {}`},
 
-			// Type assertion write is NOT detected by ESLint scope analysis
+			// Stacked type wrappers are NOT detected by ESLint scope analysis:
+			// it unwraps a plain `=` target exactly once, so a second wrapper
+			// leaves what remains unrecognized as an assignment pattern.
 			{Code: `((Object as any) as any) = 1;`},
+			{Code: `(Object as any)! = 1;`},
+			{Code: `Object!! = 1;`},
+			{Code: `((Object as any) as any) += 1;`},
+			{Code: `((Object as any) as any)++;`},
 
 			// Satisfies expression write is NOT detected by ESLint scope analysis
 			{Code: `(Object satisfies any) = 1;`},
@@ -585,6 +591,85 @@ func TestNoGlobalAssignRule(t *testing.T) {
 			// Non-null assertion write
 			{
 				Code: `(Object!) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
+				},
+			},
+
+			// A single `as` or `<T>` wrapper is unwrapped by ESLint's scope
+			// analysis, so the target underneath is still a write.
+			{
+				Code: `(Object as any) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
+				},
+			},
+			{
+				Code: `(<any>Object) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 7},
+				},
+			},
+			// A destructuring element remains a write through its wrappers, while
+			// direct assignment and update targets are unwrapped only once.
+			{
+				Code: `[Object as any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
+				},
+			},
+			{
+				Code: `[Object!! = 0] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
+				},
+			},
+			{
+				Code: `[(Object!! = 0)] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `({x: (Object!! = 0)} = src);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 7},
+				},
+			},
+			{
+				Code: `for ([(Object!! = 0)] of rows) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
+			// TypeScript wrappers around a destructuring default are transparent
+			// when finding the enclosing pattern.
+			{
+				Code: `[(Object!! = 0) as any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `({x: (<any>(Object!! = 0))} = src);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 13},
+				},
+			},
+			{
+				Code: `for ([(Object!! = 0)!] of rows) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `[(Object!! = 0) satisfies any] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
+				},
+			},
+			{
+				Code: `(Object as any) += 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
 				},
