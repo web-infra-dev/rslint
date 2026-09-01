@@ -15,6 +15,7 @@ func TestHookUseStateUpstream(t *testing.T) {
 		{Code: `import { useState } from 'react'; const [rgb, setRGB] = useState()`, Tsx: true},
 		{Code: `import { useState } from 'react'; const [rgbValue, setRGBValue] = useState()`, Tsx: true},
 		{Code: `import { useState } from 'react'; const [customColorValue, setCustomColorValue] = useState()`, Tsx: true},
+		{Code: `import { useState } from 'react'; const [color, setColor] = useState('#ffffff')`, Tsx: true},
 		{Code: `import { useState } from 'react'; const [color1, setColor1] = useState()`, Tsx: true},
 		{Code: `import React from 'react'; const [color, setColor] = React.useState()`, Tsx: true},
 		{Code: `import React from 'react'; import useState from 'some-other-use-state'; const [color, setFlavor] = useState()`, Tsx: true},
@@ -22,6 +23,7 @@ func TestHookUseStateUpstream(t *testing.T) {
 		{Code: `const result = React.useState()`, Tsx: true},
 		{Code: `useState()`, Tsx: true},
 		{Code: `const result = useState()`, Tsx: true},
+		{Code: `const [color, setFlavor] = useState()`, Tsx: true},
 		{Code: `import { useState as alternative } from 'react'; const [color, setColor] = alternative()`, Tsx: true},
 		{Code: `import { useState } from 'react'; function useColor() { return useState() }`, Tsx: true},
 		{Code: `import { useState } from 'react'; function useColor() { function useState() {} const result = useState() }`, Tsx: true},
@@ -37,10 +39,18 @@ func TestHookUseStateUpstream(t *testing.T) {
 const result = useState()`, useStateErrorText, 2, 16),
 		hookUseStateError(`import { useState as alternative } from 'react';
 const result = alternative()`, useStateErrorText, 2, 16),
+		hookUseStateError(`import { useState } from 'react';
+function useColor() { const result = useState(); return result }`, useStateErrorText, 2, 38),
+		hookUseStateError(`import { useState as alternative } from 'react';
+function useColor() { const result = alternative(); return result }`, useStateErrorText, 2, 38),
 		hookUseStateError(`import React from 'react';
 const result = React.useState()`, useStateErrorText, 2, 16),
+		hookUseStateError(`import React from 'react';
+function useColor() { const result = React.useState(); return result }`, useStateErrorText, 2, 38),
 		hookUseStateError(`import ReactAlternative from 'react';
 const result = ReactAlternative.useState()`, useStateErrorText, 2, 16),
+		hookUseStateError(`import ReactAlternative from 'react';
+function useColor() { const result = ReactAlternative.useState(); return result }`, useStateErrorText, 2, 38),
 		hookUseStateError(`import { useState } from 'react';
 const [, setColor] = useState()`, useStateErrorText, 2, 7),
 		hookUseStateError(`import { useState } from 'react';
@@ -112,6 +122,20 @@ const [color, setColor] = useState()`}},
 		},
 		{
 			Code: `import { useState } from 'react';
+const [color, setColor, extra1, extra2, extra3] = useState()`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
+const [color, setColor] = useState()`}}}}, Tsx: true,
+		},
+		{
+			Code: `import { useState } from 'react';
+const [color, setFlavor] = useState()`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
+const [color, setColor] = useState()`}}}}, Tsx: true,
+		},
+		{
+			Code: `import { useState } from 'react';
 const [color, setFlavor, extra] = useState()`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
@@ -134,6 +158,20 @@ const [color, setFlavor] = useState<string>()`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
 const [color, setColor] = useState<string>()`}}}}, Tsx: true,
+		},
+		{
+			Code: `import { useState } from 'react';
+function useColor() { const [color, setFlavor] = useState<string>('#ffffff'); return [color, setFlavor] }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 29,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
+function useColor() { const [color, setColor] = useState<string>('#ffffff'); return [color, setFlavor] }`}}}}, Tsx: true,
+		},
+		{
+			Code: `import React from 'react';
+function useColor() { const [color, setFlavor] = React.useState<string>('#ffffff'); return [color, setFlavor] }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 29,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import React from 'react';
+function useColor() { const [color, setColor] = React.useState<string>('#ffffff'); return [color, setFlavor] }`}}}}, Tsx: true,
 		},
 	})
 }
