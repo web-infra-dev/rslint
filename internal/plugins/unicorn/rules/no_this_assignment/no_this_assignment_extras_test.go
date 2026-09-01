@@ -61,6 +61,10 @@ func TestNoThisAssignmentExtras(t *testing.T) {
 			{Code: `for ([[self = this] = fallback] in source) {}`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Review regression: a TypeScript wrapper around an ordinary assignment
+			// remains an AssignmentExpression, not an AssignmentPattern.
+			invalid(`[(foo = this) as any] = arr`, `foo = this`, "foo"),
+
 			// ---- Dimension 4: ESTree erases parenthesized expressions ----
 			invalid(`const self = (this);`, `self = (this)`, "self"),
 			invalid(`self = ((this));`, `self = ((this))`, "self"),

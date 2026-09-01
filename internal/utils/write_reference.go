@@ -259,7 +259,18 @@ func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
 	if node.Parent == nil {
 		return false
 	}
-	target := ast.GetAssignmentTarget(node)
+	assignmentTargetNode := node
+transparentWrappers:
+	for parent := assignmentTargetNode.Parent; parent != nil; parent = assignmentTargetNode.Parent {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			assignmentTargetNode = parent
+		default:
+			break transparentWrappers
+		}
+	}
+
+	target := ast.GetAssignmentTarget(assignmentTargetNode)
 	if target == nil {
 		return false
 	}
