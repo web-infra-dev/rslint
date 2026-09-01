@@ -78,6 +78,12 @@ func TestIsInStrictMode(t *testing.T) {
 			kind:     ast.KindFunctionDeclaration,
 			expected: true,
 		},
+		{
+			name:     "escaped use strict at file level",
+			code:     `"use\x20strict"; if (true) function f() {}`,
+			kind:     ast.KindFunctionDeclaration,
+			expected: false,
+		},
 
 		// === "use strict" in function body → strict inside that function ===
 		{
@@ -85,6 +91,12 @@ func TestIsInStrictMode(t *testing.T) {
 			code:     `function outer() { "use strict"; if (true) { var x = 1; } }`,
 			kind:     ast.KindVariableStatement,
 			expected: true,
+		},
+		{
+			name:     "escaped use strict in enclosing function",
+			code:     `function outer() { "use\x20strict"; if (true) { var x = 1; } }`,
+			kind:     ast.KindVariableStatement,
+			expected: false,
 		},
 
 		// === Class body (implicit strict) ===
@@ -151,19 +163,86 @@ func TestHasUseStrictDirective(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "file with use strict",
+			name:     "double-quoted directive",
 			code:     `"use strict"; var x = 1;`,
 			expected: true,
 		},
 		{
-			name:     "file without use strict",
+			name:     "single-quoted directive",
+			code:     `'use strict'; var x = 1;`,
+			expected: true,
+		},
+		{
+			name:     "directive after another prologue directive",
+			code:     `"use asm"; "use strict"; var x = 1;`,
+			expected: true,
+		},
+		{
+			name: "directive after comments",
+			code: `/* before */ // still before
+"use strict"; var x = 1;`,
+			expected: true,
+		},
+		{
+			name:     "directive after byte order mark",
+			code:     "\ufeff\"use strict\"; var x = 1;",
+			expected: true,
+		},
+		{
+			name:     "directive after hashbang",
+			code:     "#!/usr/bin/env node\n\"use strict\"; var x = 1;",
+			expected: true,
+		},
+		{
+			name:     "no directive",
 			code:     `var x = 1;`,
 			expected: false,
 		},
 		{
-			name:     "file with other string directive",
+			name:     "other directive only",
 			code:     `"use asm"; var x = 1;`,
 			expected: false,
+		},
+		{
+			name:     "directive after prologue ends",
+			code:     `0; "use strict"; var x = 1;`,
+			expected: false,
+		},
+		{
+			name:     "parenthesized string is not a directive",
+			code:     `("use strict"); var x = 1;`,
+			expected: false,
+		},
+		{
+			name:     "hex escape",
+			code:     `"use\x20strict"; var x = 1;`,
+			expected: false,
+		},
+		{
+			name:     "unicode escape",
+			code:     `"use\u0020strict"; var x = 1;`,
+			expected: false,
+		},
+		{
+			name:     "escaped first character",
+			code:     `"\x75se strict"; var x = 1;`,
+			expected: false,
+		},
+		{
+			name:     "identity escape",
+			code:     `"use\ strict"; var x = 1;`,
+			expected: false,
+		},
+		{
+			name: "line continuation",
+			code: `"use\
+ strict"; var x = 1;`,
+			expected: false,
+		},
+		{
+			name:     "exact directive after escaped lookalike",
+			code:     `"use\x20strict"; "use strict"; var x = 1;`,
+			expected: true,
 		},
 		{
 			name:     "empty file",
@@ -184,5 +263,48 @@ func TestHasUseStrictDirective(t *testing.T) {
 			result := HasUseStrictDirective(sourceFile.AsNode())
 			assert.Equal(t, result, tt.expected, "HasUseStrictDirective mismatch for: %s", tt.code)
 		})
+	}
+}
+
+func TestHasUseStrictDirectiveInFunctionBody(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		code     string
+		expected bool
+	}{
+		{
+			name:     "exact directive",
+			code:     `function f() { "use strict"; work(); }`,
+			expected: true,
+		},
+		{
+			name:     "escaped lookalike",
+			code:     `function f() { "use\x20strict"; work(); }`,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			body, _ := parseAndFindNode(t, tt.code, ast.KindBlock)
+			assert.Equal(t, HasUseStrictDirective(body), tt.expected)
+		})
+	}
+}
+
+func TestHasUseStrictDirectiveWithoutSourceFile(t *testing.T) {
+	t.Parallel()
+
+	if HasUseStrictDirective(nil) {
+		t.Fatal("HasUseStrictDirective(nil) = true, want false")
+	}
+
+	body, _ := parseAndFindNode(t, `function f() { "use strict"; }`, ast.KindBlock)
+	body.Parent = nil
+	if HasUseStrictDirective(body) {
+		t.Fatal("HasUseStrictDirective(detached block) = true, want false")
 	}
 }

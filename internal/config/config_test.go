@@ -581,7 +581,7 @@ func TestConfiguredRulesPropagatesLanguageOptions(t *testing.T) {
 			"sourceType":  "script",
 		}},
 		Rules: Rules{"probe": "error"},
-	}}, "file.js", "", false)
+	}}, "file.js", "")
 	if len(configured) != 1 {
 		t.Fatalf("configured rules = %d, want 1", len(configured))
 	}

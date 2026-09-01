@@ -11,7 +11,7 @@
         },
         "ignore": {
           "type": "array",
-          "items": { "type": "string", "format": "regex" },
+          "items": { "type": "string", "format": "regex-u" },
           "uniqueItems": true,
           "description": "Patterns to ignore."
         }

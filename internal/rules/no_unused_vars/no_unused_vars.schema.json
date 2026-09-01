@@ -14,7 +14,7 @@
             },
             "varsIgnorePattern": {
               "type": "string",
-              "format": "regex"
+              "format": "regex-u"
             },
             "args": {
               "enum": ["all", "after-used", "none"]
@@ -24,18 +24,18 @@
             },
             "argsIgnorePattern": {
               "type": "string",
-              "format": "regex"
+              "format": "regex-u"
             },
             "caughtErrors": {
               "enum": ["all", "none"]
             },
             "caughtErrorsIgnorePattern": {
               "type": "string",
-              "format": "regex"
+              "format": "regex-u"
             },
             "destructuredArrayIgnorePattern": {
               "type": "string",
-              "format": "regex"
+              "format": "regex-u"
             },
             "ignoreClassWithStaticInitBlock": {
               "type": "boolean"

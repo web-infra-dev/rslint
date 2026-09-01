@@ -342,3 +342,51 @@ func ReturnedJSXRootTagName(fn *ast.Node) string {
 	}
 	return JSXRootTagName(body)
 }
+
+// IsFragmentTag mirrors eslint-plugin-react's `jsxUtil.isFragment(node,
+// reactPragma, fragmentPragma)`: a purely name-based test for the two long
+// fragment spellings, `<Fragment>` and `<React.Fragment>`. It deliberately
+// does NOT follow import aliases or variable initializers — upstream's shared
+// helper doesn't either, and rules that need the wider notion (jsx-fragments)
+// carry their own matcher.
+//
+// `element` may be a JsxElement, JsxSelfClosingElement, or JsxOpeningElement.
+func IsFragmentTag(element *ast.Node, reactPragma, fragmentPragma string) bool {
+	if element != nil && element.Kind == ast.KindJsxElement {
+		element = element.AsJsxElement().OpeningElement
+	}
+	tagName := GetJsxTagName(element)
+	if tagName == nil {
+		return false
+	}
+
+	// <Fragment>. tsgo preserves the otherwise JSXIdentifier-shaped `this`
+	// tag as a ThisKeyword, so it needs the same name comparison here.
+	switch tagName.Kind {
+	case ast.KindIdentifier:
+		return tagName.AsIdentifier().Text == fragmentPragma
+	case ast.KindThisKeyword:
+		return fragmentPragma == "this"
+	}
+
+	// <React.Fragment> — only a single-level member access qualifies, matching
+	// ESTree's JSXMemberExpression-with-JSXIdentifier-object shape. A deeper
+	// `<A.B.C>` chain has a member-expression object and does not match.
+	if tagName.Kind == ast.KindPropertyAccessExpression {
+		access := tagName.AsPropertyAccessExpression()
+		object := access.Expression
+		property := access.Name()
+		if property == nil || property.Kind != ast.KindIdentifier ||
+			property.AsIdentifier().Text != fragmentPragma || object == nil {
+			return false
+		}
+		switch object.Kind {
+		case ast.KindIdentifier:
+			return object.AsIdentifier().Text == reactPragma
+		case ast.KindThisKeyword:
+			return reactPragma == "this"
+		}
+	}
+
+	return false
+}

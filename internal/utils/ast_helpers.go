@@ -134,6 +134,70 @@ func IsGlobalParseIntCallee(callee *ast.Node, override func(string) GlobalAccess
 	return override == nil || override("Number") != GlobalAccessOff
 }
 
+// globalObjectAliasNames are the well-known references to the global object
+// through which a built-in constructor can also be reached (`globalThis.Foo`,
+// `window.Foo`, …).
+var globalObjectAliasNames = [...]string{"globalThis", "window", "self", "global"}
+
+// IsBuiltinGlobalCallee reports whether callee references the built-in global
+// named name — either directly (an unshadowed identifier) or through one of
+// the well-known global-object aliases (`globalThis.RegExp`, `window.RegExp`,
+// `self.RegExp`, `global.RegExp`). Outer parentheses and TS assertion
+// wrappers are transparent on both the callee and the alias receiver.
+//
+// isDeclaredGlobal reports whether a name resolves to a known global (i.e.
+// hasn't been turned `off` by a `/* global name: off */` comment or
+// languageOptions.globals entry); pass ctx.Globals.Access(name).IsDeclared.
+func IsBuiltinGlobalCallee(callee *ast.Node, name string, isDeclaredGlobal func(string) bool) bool {
+	callee = SkipAssertionsAndParens(callee)
+	if callee == nil {
+		return false
+	}
+
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		if callee.AsIdentifier().Text != name || IsShadowed(callee, name) {
+			return false
+		}
+		return isDeclaredGlobal(name)
+	case ast.KindPropertyAccessExpression:
+		access := callee.AsPropertyAccessExpression()
+		if access == nil || access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
+			return false
+		}
+		if access.Name().AsIdentifier().Text != name {
+			return false
+		}
+		return isGlobalObjectAlias(access.Expression, isDeclaredGlobal)
+	case ast.KindElementAccessExpression:
+		access := callee.AsElementAccessExpression()
+		if access == nil || access.ArgumentExpression == nil {
+			return false
+		}
+		value, ok := GetStaticExpressionValue(SkipAssertionsAndParens(access.ArgumentExpression))
+		if !ok || value != name {
+			return false
+		}
+		return isGlobalObjectAlias(access.Expression, isDeclaredGlobal)
+	}
+
+	return false
+}
+
+func isGlobalObjectAlias(node *ast.Node, isDeclaredGlobal func(string) bool) bool {
+	node = SkipAssertionsAndParens(node)
+	if node == nil || node.Kind != ast.KindIdentifier {
+		return false
+	}
+	name := node.AsIdentifier().Text
+	for _, alias := range globalObjectAliasNames {
+		if name == alias {
+			return !IsShadowed(node, name) && isDeclaredGlobal(name)
+		}
+	}
+	return false
+}
+
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference
 // (i.e., it's a declaration name, property key, label, or module specifier name
 // rather than a reference to a variable).
@@ -404,6 +468,9 @@ func IsJSDocTypeCastWrapper(node *ast.Node) bool {
 func ESTreeRuntimeExpression(node *ast.Node) *ast.Node {
 	for node != nil {
 		node = ast.SkipParentheses(node)
+		if node.Kind != ast.KindAsExpression && node.Kind != ast.KindSatisfiesExpression {
+			return node
+		}
 		expression := JSDocTypeCastExpression(node)
 		if expression == nil {
 			return node
@@ -420,11 +487,41 @@ func ESTreeParent(node *ast.Node) *ast.Node {
 		return nil
 	}
 	parent := node.Parent
-	for parent != nil &&
-		(parent.Kind == ast.KindParenthesizedExpression || IsJSDocTypeCastWrapper(parent)) {
-		parent = parent.Parent
+	for parent != nil {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			parent = parent.Parent
+		case ast.KindAsExpression, ast.KindSatisfiesExpression:
+			if !IsJSDocTypeCastWrapper(parent) {
+				return parent
+			}
+			parent = parent.Parent
+		default:
+			return parent
+		}
 	}
-	return parent
+	return nil
+}
+
+// ESTreeMembers removes empty class elements, which tsgo exposes as
+// SemicolonClassElement nodes but ESTree omits from ClassBody.body. The common
+// no-semicolon path returns the AST-owned slice without allocating; filtering
+// clones into a separate backing array so callers cannot rewrite that list.
+func ESTreeMembers(members []*ast.Node) []*ast.Node {
+	for index, member := range members {
+		if member.Kind != ast.KindSemicolonClassElement {
+			continue
+		}
+		filtered := make([]*ast.Node, 0, len(members)-1)
+		filtered = append(filtered, members[:index]...)
+		for _, remaining := range members[index+1:] {
+			if remaining.Kind != ast.KindSemicolonClassElement {
+				filtered = append(filtered, remaining)
+			}
+		}
+		return filtered
+	}
+	return members
 }
 
 // ESTreeParameters returns only parameters authored in source. tsgo prepends

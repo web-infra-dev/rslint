@@ -25,6 +25,59 @@ func StringCodeUnits(s string) []uint16 {
 	return units
 }
 
+// StringFromCodeUnits writes the UTF-16 code units JavaScript stores as a
+// string. Adjacent surrogate pairs use their ordinary UTF-8 spelling; an
+// unpaired surrogate uses the WTF-8 spelling the compiler uses to preserve it.
+func StringFromCodeUnits(units []uint16) string {
+	var result strings.Builder
+	result.Grow(len(units))
+	for i := 0; i < len(units); i++ {
+		unit := units[i]
+		if unit >= 0xD800 && unit <= 0xDBFF && i+1 < len(units) {
+			next := units[i+1]
+			if next >= 0xDC00 && next <= 0xDFFF {
+				result.WriteRune(utf16.DecodeRune(rune(unit), rune(next)))
+				i++
+				continue
+			}
+		}
+		if unit >= 0xD800 && unit <= 0xDFFF {
+			result.WriteByte(byte(0xE0 | unit>>12))
+			result.WriteByte(byte(0x80 | unit>>6&0x3F))
+			result.WriteByte(byte(0x80 | unit&0x3F))
+			continue
+		}
+		result.WriteRune(rune(unit))
+	}
+	return result.String()
+}
+
+// CombineSurrogatePairs canonicalizes a JavaScript string assembled from
+// separately scanned pieces. A high surrogate at the end of one piece and a
+// low surrogate at the start of the next become one ordinary supplementary
+// code point, while every unpaired surrogate keeps its compiler WTF-8 bytes.
+func CombineSurrogatePairs(s string) string {
+	if strings.IndexByte(s, 0xED) < 0 {
+		return s
+	}
+	var result strings.Builder
+	result.Grow(len(s))
+	for i := 0; i < len(s); {
+		r, size := decodeStringRune(s[i:])
+		if r >= 0xD800 && r <= 0xDBFF {
+			low, lowSize := decodeStringRune(s[i+size:])
+			if low >= 0xDC00 && low <= 0xDFFF {
+				result.WriteRune(utf16.DecodeRune(r, low))
+				i += size + lowSize
+				continue
+			}
+		}
+		result.WriteString(s[i : i+size])
+		i += size
+	}
+	return result.String()
+}
+
 // StringCodeUnitCount reports s's length in the UTF-16 code units counted by
 // JavaScript String#length. Unlike core.UTF16Len, it also preserves lone
 // surrogates in the WTF-8 form used by compiler string values.

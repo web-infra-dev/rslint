@@ -965,6 +965,12 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 				},
 			},
 			{
+				Code: `{ namespace RegExp {} RegExp("[Á]", ""); } RegExp("[Á]", "");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "combiningClass"},
+				},
+			},
+			{
 				Code:    `{ const window = { RegExp() {} }; window.RegExp("[Á]", ""); } window.RegExp("[Á]", "");`,
 				Globals: map[string]any{"window": "readonly"},
 				Errors: []rule_tester.InvalidTestCaseError{

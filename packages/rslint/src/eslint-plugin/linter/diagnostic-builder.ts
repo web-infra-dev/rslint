@@ -51,9 +51,10 @@ function interpolateMessage(
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * Suggestion descriptor as returned to Go. `fixes` is null in `'off'`
- * mode (we record the descriptor but didn't run `fix(fixer)`); a
- * populated array in `'eager'` mode.
+ * Suggestion descriptor as returned to Go. `fixes` is null only in `'off'`
+ * mode, where the descriptor is retained without invoking `fix(fixer)`.
+ * In `'eager'` mode suggestions whose fixer produces no edit are omitted,
+ * matching ESLint's `FileReport.mapSuggestions()` behavior.
  */
 export interface SuggestionDescriptor {
   messageId?: string;
@@ -321,12 +322,11 @@ export function buildDiagnostic(args: BuildDiagnosticArgs): Diagnostic | null {
     );
   }
 
-  // ── fix(fixer) — only when the caller asked us to collect fixes. ──
+  // ── fix(fixer) — only when the consumer requested the edit payload. ──
   //
-  // collectFixes is true when the consumer (CLI --fix, LSP code-actions)
-  // intends to surface the fix payload to the user. `false` skips the
-  // descriptor.fix(fixer) call entirely so a plugin whose fix() is
-  // expensive doesn't pay the cost on plain lint passes.
+  // Applying edits is a separate pipeline decision. For example, the
+  // ESLint-compatible Node API collects this payload even with `fix:false`.
+  // `false` skips descriptor.fix(fixer) for consumers that do not expose edits.
   let fixes: Fix[] | undefined;
   if (collectFixes && typeof descriptor.fix === 'function') {
     try {
@@ -380,7 +380,7 @@ export function buildDiagnostic(args: BuildDiagnosticArgs): Diagnostic | null {
         );
       }
     }
-    suggestions = descriptor.suggest.map((s) => {
+    const builtSuggestions = descriptor.suggest.map((s) => {
       let suggestionMessage = s.desc;
       if (!suggestionMessage && s.messageId) {
         suggestionMessage = messages[s.messageId] ?? `(${s.messageId})`;
@@ -401,6 +401,16 @@ export function buildDiagnostic(args: BuildDiagnosticArgs): Diagnostic | null {
       }
       return { messageId: s.messageId, desc: suggestionMessage, fixes: sFixes };
     });
+    if (suggestionsMode === 'eager') {
+      const materializedSuggestions = builtSuggestions.filter(
+        (suggestion) => suggestion.fixes !== null,
+      );
+      if (materializedSuggestions.length > 0) {
+        suggestions = materializedSuggestions;
+      }
+    } else {
+      suggestions = builtSuggestions;
+    }
   }
 
   return {

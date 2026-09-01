@@ -15,6 +15,7 @@ import (
 type configTargetResolver struct {
 	config             RslintConfig
 	fs                 vfs.FS
+	useCaseSensitive   bool
 	bases              []configTargetBase
 	entries            []configTargetEntry
 	globalEntryIndexes []int
@@ -28,10 +29,11 @@ type configTargetBase struct {
 }
 
 type configTargetEntry struct {
-	baseIndex           int
-	ignorePatterns      []IgnorePattern
-	gitScopes           []collectedGitignoreScope
-	ignorePatternGroups []ignorePatternCoordinateGroup
+	baseIndex            int
+	configArrayBaseIndex int
+	ignorePatterns       []IgnorePattern
+	gitScopes            []collectedGitignoreScope
+	ignorePatternGroups  []ignorePatternCoordinateGroup
 }
 
 // ignorePatternCoordinateGroup is one contiguous ignore-pattern segment whose
@@ -48,6 +50,138 @@ type configTargetMatch struct {
 	path      string
 	directory string
 	matcher   fileMatchPath
+}
+
+func (resolver *configTargetResolver) entryAppliesTo(
+	entry configTargetEntry,
+	matches []configTargetMatch,
+	directory bool,
+) bool {
+	match := &matches[entry.baseIndex]
+	configArrayMatch := &matches[entry.configArrayBaseIndex]
+	return resolver.entryMatchesScope(match, configArrayMatch, directory)
+}
+
+func (resolver *configTargetResolver) entryMatchesScope(
+	match *configTargetMatch,
+	configArrayMatch *configTargetMatch,
+	directory bool,
+) bool {
+	withinBase, atBase := resolver.configTargetMatchWithinBase(match)
+	if !withinBase || (directory && atBase) {
+		return false
+	}
+	if directory {
+		_, atConfigArrayBase := resolver.configTargetMatchWithinBase(configArrayMatch)
+		if atConfigArrayBase {
+			return false
+		}
+	}
+	return true
+}
+
+// entryDirectoryCandidateDepthFloor locates the ConfigArray root in the exact
+// path spelling received by the existing ignore matcher. Subtracting the
+// directory's depth below that root from the matcher path's depth gives the
+// root's depth in the entry's path space. This remains valid across aliases and
+// filesystem-free case variants without replacing the original matcher.
+func (resolver *configTargetResolver) entryDirectoryCandidateDepthFloor(
+	matcherPath string,
+	entryMatch *configTargetMatch,
+	configArrayMatch *configTargetMatch,
+) int {
+	entryRelative, withinEntry := RelativePathWithinConfigRoot(
+		entryMatch.path,
+		entryMatch.directory,
+		resolver.scopeUseCaseSensitive(entryMatch.directory),
+	)
+	configArrayRelative, withinConfigArray := RelativePathWithinConfigRoot(
+		configArrayMatch.path,
+		configArrayMatch.directory,
+		resolver.scopeUseCaseSensitive(configArrayMatch.directory),
+	)
+	if !withinEntry || !withinConfigArray {
+		return 0
+	}
+	configArrayDepth := relativePathDepth(configArrayRelative)
+	if relativePathDepth(entryRelative) <= configArrayDepth {
+		return 0
+	}
+	matcherDepth := relativePathDepth(matcherPath)
+	if matcherDepth <= configArrayDepth {
+		return 0
+	}
+	return matcherDepth - configArrayDepth
+}
+
+func relativePathDepth(path string) int {
+	if path == "" {
+		return 0
+	}
+	return 1 + strings.Count(path, "/")
+}
+
+type scopedDirectoryRelation uint8
+
+const (
+	scopedDirectoryOutside scopedDirectoryRelation = iota
+	// The current directory is outside the entry, but a descendant may enter
+	// its base. Pruning must therefore account for scoped negations below it.
+	scopedDirectoryDescendantsOnly
+	scopedDirectoryInside
+)
+
+func (resolver *configTargetResolver) entryDirectoryRelation(
+	entry configTargetEntry,
+	matches []configTargetMatch,
+	target configTargetIdentity,
+) scopedDirectoryRelation {
+	match := &matches[entry.baseIndex]
+	withinBase, atBase := resolver.configTargetMatchWithinBase(match)
+	if withinBase {
+		if atBase {
+			return scopedDirectoryDescendantsOnly
+		}
+		configArrayMatch := &matches[entry.configArrayBaseIndex]
+		withinConfigArray, atConfigArrayBase := resolver.configTargetMatchWithinBase(configArrayMatch)
+		if atConfigArrayBase || (!withinConfigArray && resolver.targetContainsBase(
+			configArrayMatch,
+			entry.configArrayBaseIndex,
+			target,
+		)) {
+			return scopedDirectoryDescendantsOnly
+		}
+		return scopedDirectoryInside
+	}
+	if resolver.targetContainsBase(match, entry.baseIndex, target) {
+		return scopedDirectoryDescendantsOnly
+	}
+	return scopedDirectoryOutside
+}
+
+func (resolver *configTargetResolver) targetContainsBase(
+	match *configTargetMatch,
+	baseIndex int,
+	target configTargetIdentity,
+) bool {
+	if _, containsBase := RelativePathWithinConfigRoot(
+		match.directory,
+		match.path,
+		resolver.scopeUseCaseSensitive(match.directory),
+	); containsBase {
+		return true
+	}
+	if target.canonicalMatchPath != "" {
+		physicalBase := resolver.bases[baseIndex].physicalDirectory
+		if _, containsPhysicalBase := RelativePathWithinConfigRoot(
+			physicalBase,
+			target.canonicalMatchPath,
+			true,
+		); containsPhysicalBase {
+			return true
+		}
+	}
+	return false
 }
 
 // configTargetIdentity is the immutable caller-visible/canonical pair for one
@@ -77,28 +211,39 @@ func newConfigTargetResolverWithBases(
 	frozenBases map[string]configTargetBase,
 ) *configTargetResolver {
 	resolver := &configTargetResolver{
-		config:  config,
-		fs:      fsys,
-		entries: make([]configTargetEntry, len(config)),
+		config:           config,
+		fs:               fsys,
+		useCaseSensitive: fsys == nil || fsys.UseCaseSensitiveFileNames(),
+		entries:          make([]configTargetEntry, len(config)),
 	}
 	baseIndexByDirectory := make(map[string]int)
-	for index, entry := range config {
-		directory := normalizeAuthoredBase(configEntryBaseDirectory(entry, defaultDirectory))
+	addBase := func(directory string) int {
+		directory = normalizeAuthoredBase(directory)
 		baseID := authoredBaseID(directory)
-		baseIndex, exists := baseIndexByDirectory[baseID]
-		if !exists {
-			base, frozen := frozenBases[baseID]
-			if !frozen {
-				base = freezeConfigTargetBase(directory, fsys)
-			}
-			baseIndex = len(resolver.bases)
-			baseIndexByDirectory[baseID] = baseIndex
-			resolver.bases = append(resolver.bases, base)
+		if baseIndex, exists := baseIndexByDirectory[baseID]; exists {
+			return baseIndex
+		}
+		frozenBase, frozen := frozenBases[baseID]
+		if !frozen {
+			frozenBase = freezeConfigTargetBase(directory, fsys)
+		}
+		baseIndex := len(resolver.bases)
+		baseIndexByDirectory[baseID] = baseIndex
+		resolver.bases = append(resolver.bases, frozenBase)
+		return baseIndex
+	}
+	for index, entry := range config {
+		origin := configEntryPathOrigin(entry, defaultDirectory)
+		baseIndex := addBase(origin.directory)
+		configArrayBaseIndex := -1
+		if origin.basePathScoped {
+			configArrayBaseIndex = addBase(origin.configArrayBase)
 		}
 		patterns := configEntryIgnorePatterns(entry)
 		resolver.entries[index] = configTargetEntry{
-			baseIndex:      baseIndex,
-			ignorePatterns: patterns,
+			baseIndex:            baseIndex,
+			configArrayBaseIndex: configArrayBaseIndex,
+			ignorePatterns:       patterns,
 		}
 		if entry.collectedGitignore != nil {
 			resolver.entries[index].gitScopes = entry.collectedGitignore.scopes
@@ -201,6 +346,9 @@ func (resolver *configTargetResolver) resolveTarget(
 		}
 		prepared := resolver.entries[index]
 		match := &matches[prepared.baseIndex]
+		if prepared.configArrayBaseIndex >= 0 && !resolver.entryAppliesTo(prepared, matches, false) {
+			continue
+		}
 		if hasFileSelectors(entry) && !match.matcher.matchesConfigEntry(entry) {
 			continue
 		}
@@ -295,6 +443,31 @@ func (resolver *configTargetResolver) resolvePathSpacesWithCanonicalParent(
 	return target, matches
 }
 
+func (resolver *configTargetResolver) configTargetMatchWithinBase(
+	match *configTargetMatch,
+) (within bool, atBase bool) {
+	relative, within := RelativePathWithinConfigRoot(
+		match.path,
+		match.directory,
+		resolver.scopeUseCaseSensitive(match.directory),
+	)
+	return within, within && relative == ""
+}
+
+func (resolver *configTargetResolver) scopeUseCaseSensitive(directory string) bool {
+	if resolver.filesystemFreeCaseInsensitivePath(directory) {
+		// Filesystem-free compatibility APIs still accept Windows drive and UNC
+		// paths on every host. Their lexical containment is case-insensitive.
+		return false
+	}
+	return resolver.useCaseSensitive
+}
+
+func (resolver *configTargetResolver) filesystemFreeCaseInsensitivePath(directory string) bool {
+	return resolver.fs == nil && (strings.HasPrefix(directory, "//") ||
+		(len(directory) >= 2 && directory[1] == ':'))
+}
+
 // needsCanonicalPath reports whether lexical containment alone cannot resolve
 // every authored config base and collected Git scope. Directory walks normally
 // stay inside both, so they avoid a redundant filesystem Realpath per node;
@@ -368,6 +541,9 @@ func (resolver *configTargetResolver) globallyIgnores(
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]
 		match := &matches[entry.baseIndex]
+		if entry.configArrayBaseIndex >= 0 && !resolver.entryAppliesTo(entry, matches, true) {
+			continue
+		}
 		ignored = target.applyIgnorePatternGroups(
 			match,
 			entry.ignorePatternGroups,
@@ -470,6 +646,17 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 				matcher:   newFileMatchPath(path, match.directory),
 			}
 		}
+		minimumDirectoryDepth := 0
+		configArrayMatch := configTargetMatch{}
+		if entry.configArrayBaseIndex >= 0 {
+			configArrayMatch = matches[entry.configArrayBaseIndex]
+			if fileTarget {
+				configArrayMatch.path = tspath.GetDirectoryPath(configArrayMatch.path)
+			}
+			if !resolver.entryMatchesScope(directoryMatch, &configArrayMatch, true) {
+				continue
+			}
+		}
 		for _, group := range entry.ignorePatternGroups {
 			relative, ok := targetPathForPatternGroup(
 				target,
@@ -477,7 +664,23 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 				group.patterns,
 				selectedGitScope,
 			)
-			if ok && isDirAbsolutelyBlocked(relative, group.patterns) {
+			if !ok {
+				continue
+			}
+			if entry.configArrayBaseIndex >= 0 {
+				minimumDirectoryDepth = resolver.entryDirectoryCandidateDepthFloor(
+					relative,
+					directoryMatch,
+					&configArrayMatch,
+				)
+			}
+			if minimumDirectoryDepth == 0 {
+				if isDirAbsolutelyBlocked(relative, group.patterns) {
+					return true
+				}
+				continue
+			}
+			if isDirAbsolutelyBlockedAboveFloor(relative, group.patterns, minimumDirectoryDepth) {
 				return true
 			}
 		}
@@ -495,6 +698,21 @@ func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPa
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]
 		match := &matches[entry.baseIndex]
+		if entry.configArrayBaseIndex >= 0 {
+			relation := resolver.entryDirectoryRelation(entry, matches, target)
+			if relation == scopedDirectoryOutside {
+				continue
+			}
+			if relation == scopedDirectoryDescendantsOnly {
+				for _, group := range entry.ignorePatternGroups {
+					if len(group.negationReach.prefixes) > 0 {
+						negationCanReach = true
+						break
+					}
+				}
+				continue
+			}
+		}
 		selectedGitScope := entry.selectGitScope(target)
 		for _, group := range entry.ignorePatternGroups {
 			relative, ok := targetPathForPatternGroup(
@@ -506,7 +724,23 @@ func (resolver *configTargetResolver) canPruneDirectory(path string, canonicalPa
 			if !ok {
 				continue
 			}
-			if isDirAbsolutelyBlocked(relative, group.patterns) {
+			minimumDirectoryDepth := 0
+			if entry.configArrayBaseIndex >= 0 {
+				minimumDirectoryDepth = resolver.entryDirectoryCandidateDepthFloor(
+					relative,
+					match,
+					&matches[entry.configArrayBaseIndex],
+				)
+			}
+			if minimumDirectoryDepth == 0 {
+				if isDirAbsolutelyBlocked(relative, group.patterns) {
+					return true
+				}
+			} else if isDirAbsolutelyBlockedAboveFloor(
+				relative,
+				group.patterns,
+				minimumDirectoryDepth,
+			) {
 				return true
 			}
 			if !negationCanReach && group.negationReach.overlaps(relative) {
@@ -560,6 +794,9 @@ func (resolver *configTargetResolver) reopensDirectory(path string, canonicalPat
 	for _, entryIndex := range resolver.globalEntryIndexes {
 		entry := resolver.entries[entryIndex]
 		match := &matches[entry.baseIndex]
+		if entry.configArrayBaseIndex >= 0 && !resolver.entryAppliesTo(entry, matches, true) {
+			continue
+		}
 		selectedGitScope := entry.selectGitScope(target)
 		for _, group := range entry.ignorePatternGroups {
 			relativePath, ok := targetPathForPatternGroup(

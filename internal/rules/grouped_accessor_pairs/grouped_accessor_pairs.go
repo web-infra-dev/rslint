@@ -1,0 +1,170 @@
+package grouped_accessor_pairs
+
+import (
+	_ "embed"
+	"fmt"
+
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/accessorutil"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+//go:embed grouped_accessor_pairs.schema.json
+var schemaJSON []byte
+
+type Options struct {
+	Order             string
+	EnforceForTSTypes bool
+}
+
+func parseOptions(options []any) Options {
+	opts := Options{Order: "anyOrder"}
+	if len(options) > 0 {
+		if order, ok := options[0].(string); ok {
+			opts.Order = order
+		}
+	}
+	if len(options) > 1 {
+		if object, ok := options[1].(map[string]any); ok {
+			if enforce, ok := object["enforceForTSTypes"].(bool); ok {
+				opts.EnforceForTSTypes = enforce
+			}
+		}
+	}
+	return opts
+}
+
+type accessorGroup struct {
+	key         accessorutil.Key
+	getterIndex int
+	setterIndex int
+	getterCount int
+	setterCount int
+}
+
+func accessorName(node *ast.Node) string {
+	name := utils.GetFunctionNameWithKindCore(node)
+	parent := node.Parent
+	if parent == nil || (parent.Kind != ast.KindInterfaceDeclaration && parent.Kind != ast.KindTypeLiteral) {
+		return name
+	}
+	nameNode := node.Name()
+	if nameNode == nil || nameNode.Kind != ast.KindComputedPropertyName {
+		return name
+	}
+	if _, ok := utils.GetStaticPropertyName(nameNode); !ok {
+		return name + " 'null'"
+	}
+	return name
+}
+
+func reportPair(ctx rule.RuleContext, headLocator *utils.FunctionHeadRangeLocator, messageID string, former *ast.Node, latter *ast.Node) {
+	formerName := accessorName(former)
+	latterName := accessorName(latter)
+	message := fmt.Sprintf("Accessor pair %s and %s should be grouped.", formerName, latterName)
+	if messageID == "invalidOrder" {
+		message = fmt.Sprintf("Expected %s to be before %s.", latterName, formerName)
+	}
+	ctx.ReportRange(headLocator.Range(latter), rule.RuleMessage{
+		Id:          messageID,
+		Description: message,
+	})
+}
+
+func checkList(ctx rule.RuleContext, headLocator *utils.FunctionHeadRangeLocator, members []*ast.Node, opts Options, include func(*ast.Node) bool) {
+	groups := make([]accessorGroup, 0)
+	for index, member := range members {
+		if !include(member) || (member.Kind != ast.KindGetAccessor && member.Kind != ast.KindSetAccessor) {
+			continue
+		}
+		key := accessorutil.MakeKey(member)
+		groupIndex := -1
+		for index := range groups {
+			if accessorutil.KeysEqual(ctx.SourceFile, groups[index].key, key) {
+				groupIndex = index
+				break
+			}
+		}
+		if groupIndex < 0 {
+			groups = append(groups, accessorGroup{key: key})
+			groupIndex = len(groups) - 1
+		}
+		if member.Kind == ast.KindGetAccessor {
+			if groups[groupIndex].getterCount == 0 {
+				groups[groupIndex].getterIndex = index
+			}
+			groups[groupIndex].getterCount++
+		} else {
+			if groups[groupIndex].setterCount == 0 {
+				groups[groupIndex].setterIndex = index
+			}
+			groups[groupIndex].setterCount++
+		}
+	}
+
+	for _, group := range groups {
+		if group.getterCount != 1 || group.setterCount != 1 {
+			continue
+		}
+		getterIndex := group.getterIndex
+		setterIndex := group.setterIndex
+		formerIndex, latterIndex := getterIndex, setterIndex
+		if setterIndex < getterIndex {
+			formerIndex, latterIndex = setterIndex, getterIndex
+		}
+		if latterIndex-formerIndex > 1 {
+			reportPair(ctx, headLocator, "notGrouped", members[formerIndex], members[latterIndex])
+			continue
+		}
+		if (opts.Order == "getBeforeSet" && getterIndex > setterIndex) ||
+			(opts.Order == "setBeforeGet" && setterIndex > getterIndex) {
+			reportPair(ctx, headLocator, "invalidOrder", members[formerIndex], members[latterIndex])
+		}
+	}
+}
+
+func concreteAccessor(member *ast.Node) bool {
+	return (member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor) &&
+		!ast.HasSyntacticModifier(member, ast.ModifierFlagsAbstract)
+}
+
+func typeAccessor(member *ast.Node) bool {
+	return member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor
+}
+
+var GroupedAccessorPairsRule = rule.Rule{
+	Name:   "grouped-accessor-pairs",
+	Schema: rule.NewSchema(schemaJSON),
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options)
+		headLocator := utils.NewFunctionHeadRangeLocator(ctx.SourceFile)
+		listeners := rule.RuleListeners{
+			ast.KindObjectLiteralExpression: func(node *ast.Node) {
+				object := node.AsObjectLiteralExpression()
+				if object != nil && object.Properties != nil {
+					checkList(ctx, headLocator, object.Properties.Nodes, opts, typeAccessor)
+				}
+			},
+			ast.KindClassDeclaration: func(node *ast.Node) {
+				members := utils.ESTreeMembers(node.Members())
+				checkList(ctx, headLocator, members, opts, func(member *ast.Node) bool {
+					return concreteAccessor(member) && !ast.IsStatic(member)
+				})
+				checkList(ctx, headLocator, members, opts, func(member *ast.Node) bool {
+					return concreteAccessor(member) && ast.IsStatic(member)
+				})
+			},
+		}
+		listeners[ast.KindClassExpression] = listeners[ast.KindClassDeclaration]
+		if opts.EnforceForTSTypes {
+			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
+				checkList(ctx, headLocator, node.Members(), opts, typeAccessor)
+			}
+			listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
+				checkList(ctx, headLocator, node.Members(), opts, typeAccessor)
+			}
+		}
+		return listeners
+	},
+}

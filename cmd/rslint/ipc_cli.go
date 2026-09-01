@@ -13,14 +13,14 @@
 //	│  stdin/stdout = bidirectional IPC frames (ipc.Channel)    │
 //	│  stderr       = inherited                                 │
 //	│  sends `init`; awaits `response{ok:true}`                 │
-//	│  forwards `output` notifications to its real stdout       │
+//	│  forwards `output` requests/notifications to real stdout  │
 //	└───────────────────────────────────────────────────────────┘
 //
 // Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
 // wait `init` (or signal) → redirect stdout through `output` frames →
 // dispatch on intent (--help / --init / lint) → run the shared
-// handleLintCommand (using either a typed Go-discovered catalog or the
-// native JSON/JSONC loader) → drain output, send `shutdown`, exit.
+// handleLintCommand with a typed Go-discovered catalog → drain output, send
+// `shutdown`, exit.
 //
 // Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
 // disconnect, init/transport error) · 130 interrupted.
@@ -60,7 +60,7 @@ import (
 const (
 	kindInit            ipc.MessageKind = "init"            // Node → Go: handshake payload
 	kindShutdown        ipc.MessageKind = "shutdown"        // Go → Node: lint done
-	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text
+	kindOutput          ipc.MessageKind = "output"          // Go → Node: forwarded stdout text (request = acknowledged)
 	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: run ESLint-plugin rules in a worker
 	kindLoadConfigs     ipc.MessageKind = "loadConfigs"     // Go → Node: evaluate one config frontier
 	kindActivateConfigs ipc.MessageKind = "activateConfigs" // Go → Node: prepare the effective config/plugin set
@@ -81,8 +81,8 @@ type initPayload struct {
 	Format           string   `json:"format,omitempty"`
 	FixMode          bool     `json:"fixMode,omitempty"`
 
-	// ConfigDiscovery asks Go to own JS/TS config discovery. It is ignored for
-	// help/init and disabled for the native JSON/JSONC configuration path.
+	// ConfigDiscovery asks Go to own config discovery. Every lint invocation
+	// supplies it; help and init intentionally bypass discovery.
 	ConfigDiscovery *configDiscoveryPayload `json:"configDiscovery,omitempty"`
 }
 
@@ -315,9 +315,14 @@ func runCLI(args []string) int {
 
 	// The host sends only discovery intent. Go scans the reachable staged
 	// frontier, asks Node to evaluate exact candidates, and converts the final
-	// catalog into the shared lint pipeline input. Help/init and an
-	// explicit JSON --config do not need the JavaScript module host.
-	if !help && !baseArgs.Init && payload.ConfigDiscovery != nil {
+	// catalog into the shared lint pipeline input. Every lint invocation uses
+	// this path; --init is the only configuration operation that bypasses it.
+	if !help && !baseArgs.Init {
+		if payload.ConfigDiscovery == nil {
+			fmt.Fprintln(os.Stderr, "error: CLI host did not provide config discovery intent")
+			_ = ch.Close()
+			return 2
+		}
 		if err := discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch); err != nil {
 			// Discovery now includes the potentially long Go walk and reverse
 			// Node loads. A signal can cancel either before the mirror goroutine
@@ -341,9 +346,10 @@ func runCLI(args []string) int {
 	// The peer holds the real stdout for IPC frames, so any plain-text write
 	// (usage banner, "Created rslint.config.*", lint output) would corrupt the
 	// frame stream if it shared the fd. Redirect through `output`
-	// notifications, which the peer concatenates into its real stdout. Ordinary
-	// stderr stays inherited; deferred final stderr waits for Node's shutdown
-	// acknowledgement before using that inherited stream.
+	// notifications, which the peer concatenates into its real stdout. The
+	// default lifecycle start uses one acknowledged output request instead, so
+	// post-start inherited stderr cannot overtake it. Deferred final stderr
+	// waits for Node's shutdown acknowledgement as before.
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
 		_ = ch.Close()
@@ -392,10 +398,14 @@ func runCLI(args []string) int {
 	// sufficient ordering edge because Node's Writable writes are asynchronous.
 	var timingTable string
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
+	baseArgs.StartWriter = acknowledgedOutputWriter{ctx: lintCtx, channel: ch}
 
 	exitCode := handleLintCommand(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
+	// Publish cancellation synchronously before deciding whether to perform the
+	// shutdown handshake. The signal-mirroring goroutine may not have run yet.
+	markCLIInterrupted(lintCtx, state)
 	stdoutFlushed := shutdownPeer(ch, state)
 	if stdoutFlushed && !state.signalled.Load() && timingTable != "" {
 		fmt.Fprint(os.Stderr, timingTable)
@@ -432,6 +442,30 @@ func shutdownPeer(ch *ipc.Channel, state *runCLIState) bool {
 	defer cancel()
 	_, err := ch.SendRequest(ctx, kindShutdown, struct{}{})
 	return err == nil
+}
+
+// acknowledgedOutputWriter sends the default lifecycle start as an output
+// request rather than a notification. The Node host responds only after its
+// real stdout write callback completes, making Write the boundary between
+// preflight and post-start work even though ordinary child stderr is inherited.
+// Later report output keeps using the batched notification path below.
+type acknowledgedOutputWriter struct {
+	ctx     context.Context
+	channel *ipc.Channel
+}
+
+func (w acknowledgedOutputWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	_, err := w.channel.SendRequest(w.ctx, kindOutput, map[string]any{
+		"stream": "stdout",
+		"text":   string(p),
+	})
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 // classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
@@ -515,6 +549,9 @@ func discoverCLIConfigCatalog(
 		return err
 	}
 	printConfigDiscoveryFailures(catalog.Failures)
+	if !catalog.Explicit && len(catalog.Configs) == 0 {
+		return errors.New("no rslint config found; run `rslint --init` to create one")
+	}
 	args.ConfigCatalog = catalog
 	return nil
 }
@@ -535,7 +572,8 @@ const stdoutDrainMinFlushBytes = 8 * 1024
 //  2. Frame-count overhead. Each SendNotification is one JSON frame; for 100K+
 //     diagnostic lines that's 100K frames of CPU + syscall overhead. We
 //     coalesce up to stdoutDrainMinFlushBytes per frame; the close path always
-//     flushes the remainder.
+//     flushes the remainder. The lifecycle start bypasses this drain through
+//     acknowledgedOutputWriter.
 //
 // On the first SendNotification failure (peer closed its end) we flip into
 // discard mode: keep draining r so the lint pipeline's writes don't block on a

@@ -170,13 +170,21 @@ func TestCLIAndAPIIgnoreConformance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			configPath := filepath.Join(configDir, "rslint.json")
-			if err := os.WriteFile(configPath, configJSON, 0o644); err != nil {
+			var cliConfig rslintconfig.RslintConfig
+			if err := json.Unmarshal(configJSON, &cliConfig); err != nil {
 				t.Fatal(err)
 			}
+			cliConfig = rslintconfig.ConfigWithGitignoreForTargetsFromRoot(
+				cliConfig,
+				configDir,
+				configDir,
+				osvfs.FS(),
+				[]string{tspath.NormalizePath(target)},
+				nil,
+			)
 
 			code, stdout, stderr := runLintCommandForTest(t, configDir, lintArgs{
-				Config:         configPath,
+				ConfigCatalog:  explicitConfigCatalogForTest(configDir, cliConfig),
 				AllowFiles:     []string{tspath.NormalizePath(target)},
 				Format:         "default",
 				NoColor:        true,

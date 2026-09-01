@@ -32,7 +32,11 @@ const strArray: string[] = [];
 baz(...strArray);
 ```
 
+## Differences from typescript-eslint
+
+rslint also checks the element type of non-tuple iterable spreads, including ordinary arrays and type parameters constrained to `Iterable` or an array type. typescript-eslint currently ignores these spread arguments.
+
 ## Original Documentation
 
 - [typescript-eslint: no-unsafe-argument](https://typescript-eslint.io/rules/no-unsafe-argument)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unsafe-argument.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.68.0/packages/eslint-plugin/src/rules/no-unsafe-argument.ts)

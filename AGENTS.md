@@ -6,7 +6,7 @@ This document summarizes how to work on rslint effectively and consistently.
 
 - `architecture.md`: Current high-level architecture, major runtime flows, and subsystem relationships.
 - `cmd/rslint/`: CLI entry (default), IPC API (`--api`), LSP (`--lsp`).
-- `internal/config/`: Config types/loader, authored path-space matching, merging, and configured-rule resolution.
+- `internal/config/`: Config types, authored path-space matching, merging, project-path resolution, and configured-rule resolution.
 - `internal/config/target/`: Lint-target planning, explicit file outcomes, directory walking, and config-owner routing.
 - `internal/program/`: Unified source Program, module resolution/graph, and generation-scoped derived caches.
 - `internal/linter/`: Linter engine, traversal, and fix application.
@@ -30,14 +30,14 @@ This document summarizes how to work on rslint effectively and consistently.
 - Lint Go: `pnpm run lint:go`
 - Lint JS: `pnpm run lint`
 - Format JS/TS/MD: `pnpm run format`
-- CLI: `go run ./cmd/rslint --help`
-  - Examples: `go run ./cmd/rslint --config rslint.jsonc`, `--fix`, `--format default|jsonline|github|gitlab`, `--quiet`, `--max-warnings 0`
+- CLI help: `go run ./cmd/rslint --help`
+  - Built-package examples: `pnpm exec rslint --config rslint.config.ts`, `--fix`, `--format default|jsonline|github|gitlab`, `--quiet`, `--max-warnings 0`
 - LSP: `go run ./cmd/rslint --lsp` | IPC API: `go run ./cmd/rslint --api`
 
 ## Coding Style & Naming Conventions
 
 - Go uses gofmt/goimports; keep functions focused and small.
-- TS/JS/MD/CSS use Prettier via `pnpm run format`.
+- TS/JS/MD/CSS use Rstack CLI's formatter via `pnpm run format`.
 - Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
 - Prefer table-driven tests. Keep package-specific helpers beside their tests; put reusable test infrastructure in `internal/testutil`, not production utility packages.
 - A value that came from JavaScript — a string to trim or case, a character to classify, a number to print, a regexp or glob out of a rule option — is read through `internal/utils/ecmascript`, `ecmascript/regexp`, `unicode17`, `minimatch3`, or `isglob`, never through `strings.TrimSpace`, `strings.ToLower`, the `unicode` package, the stdlib `regexp`, or `doublestar`. An identifier question goes to tsgo's `scanner`, so a rule and the parser never disagree. `depguard` and `forbidigo` enforce this under `internal/rules/**` and `internal/plugins/**`.
@@ -64,7 +64,7 @@ This document summarizes how to work on rslint effectively and consistently.
 
 - Read `architecture.md` before making broad changes that touch module boundaries, entrypoints, or cross-package flows.
 - If a change affects the high-level architecture, runtime data flow, or major integration paths, update `architecture.md` in the same change.
-- rslint loads `rslint.json`/`rslint.jsonc`; rules accept ESLint-style levels/options.
+- rslint loads JS/TS module configs; `--init` can migrate legacy `rslint.json`/`rslint.jsonc` files.
 - The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
 - Use `--format github` in CI to emit GitHub workflow annotations, or `--format gitlab` to emit a Code Quality report (`codequality` artifact) for GitLab CI merge requests.
 

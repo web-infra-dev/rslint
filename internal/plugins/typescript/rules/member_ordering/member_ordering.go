@@ -985,48 +985,6 @@ func validateWithOptionality(ctx rule.RuleContext, members []*ast.Node, cfg *par
 	}
 }
 
-// isSyntacticMember returns whether a node is a real member that participates in ordering.
-// TS-Go AST includes SemicolonClassElement (standalone `;`) in Members.Nodes,
-// but ESTree parsers strip these. We filter them out to match ESLint behavior.
-func isSyntacticMember(node *ast.Node) bool {
-	return node.Kind != ast.KindSemicolonClassElement
-}
-
-// getClassMembers extracts member nodes from a class/interface/type literal,
-// filtering out non-semantic nodes like SemicolonClassElement.
-func getClassMembers(node *ast.Node) []*ast.Node {
-	var raw []*ast.Node
-	switch node.Kind {
-	case ast.KindClassDeclaration:
-		classDecl := node.AsClassDeclaration()
-		if classDecl == nil || classDecl.Members == nil {
-			return nil
-		}
-		raw = classDecl.Members.Nodes
-	case ast.KindClassExpression:
-		classExpr := node.AsClassExpression()
-		if classExpr == nil || classExpr.Members == nil {
-			return nil
-		}
-		raw = classExpr.Members.Nodes
-	case ast.KindInterfaceDeclaration:
-		interfaceDecl := node.AsInterfaceDeclaration()
-		if interfaceDecl == nil || interfaceDecl.Members == nil {
-			return nil
-		}
-		raw = interfaceDecl.Members.Nodes
-	case ast.KindTypeLiteral:
-		typeLiteral := node.AsTypeLiteralNode()
-		if typeLiteral == nil || typeLiteral.Members == nil {
-			return nil
-		}
-		raw = typeLiteral.Members.Nodes
-	default:
-		return nil
-	}
-	return utils.Filter(raw, isSyntacticMember)
-}
-
 // --- Rule definition ---
 
 var MemberOrderingRule = rule.CreateRule(rule.Rule{
@@ -1062,7 +1020,7 @@ var MemberOrderingRule = rule.CreateRule(rule.Rule{
 		}
 
 		validate := func(node *ast.Node) {
-			members := getClassMembers(node)
+			members := utils.ESTreeMembers(node.Members())
 			if members == nil {
 				return
 			}
