@@ -718,3 +718,4 @@ ZWSP
 πfoo
 Дelta
 дelta
+Keycap
