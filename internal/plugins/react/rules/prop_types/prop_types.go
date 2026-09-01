@@ -269,6 +269,23 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 	case ast.KindTypeAliasDeclaration:
 		return declaredType(n.AsTypeAliasDeclaration().Type, aliases, aliasesBySymbol, depth-1)
 	case ast.KindTypeReference:
+		ref := n.AsTypeReferenceNode()
+		if ref.TypeName != nil && reactutil.EntityNameRightmost(ref.TypeName) != nil && reactutil.EntityNameRightmost(ref.TypeName).AsIdentifier().Text == "ReturnType" && ref.TypeArguments != nil && len(ref.TypeArguments.Nodes) == 1 {
+			query := ref.TypeArguments.Nodes[0]
+			if query != nil && query.Kind == ast.KindTypeQuery {
+				expr := query.AsTypeQueryNode().ExprName
+				if expr != nil && expr.Kind == ast.KindIdentifier {
+					if initializer := reactutil.ResolveIdentifierInitializer(expr, nil); initializer != nil {
+						initializer = unwrap(initializer)
+						if initializer != nil && (initializer.Kind == ast.KindArrowFunction || initializer.Kind == ast.KindFunctionExpression) {
+							if body := initializer.Body(); body != nil && body.Kind == ast.KindObjectLiteralExpression {
+								return propMap(body, nil)
+							}
+						}
+					}
+				}
+			}
+		}
 		name := reactutil.EntityNameRightmost(n.AsTypeReferenceNode().TypeName)
 		if name != nil {
 			if symbol := name.Symbol(); symbol != nil {
@@ -303,6 +320,20 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 				for name, prop := range members {
 					declared[name] = prop
 				}
+				found = true
+			}
+		}
+		return declared, found
+	case ast.KindUnionType:
+		// A property present in any member of a union is a declared prop. This
+		// is deliberately merged like an intersection: prop-types only decides
+		// whether a read has a declaration, not which discriminated branch is
+		// active at runtime.
+		declared := map[string]propType{}
+		found := false
+		for _, part := range n.AsUnionTypeNode().Types.Nodes {
+			if members, ok := declaredType(part, aliases, aliasesBySymbol, depth-1); ok {
+				mergeDeclared(declared, members)
 				found = true
 			}
 		}
@@ -345,6 +376,10 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 				if heritage != nil && heritage.Kind == ast.KindExpressionWithTypeArguments {
 					if base, ok := declaredType(heritage.AsExpressionWithTypeArguments().Expression, aliases, aliasesBySymbol, depth-1); ok {
 						mergeDeclared(declared, base)
+					} else {
+						// Imported base interfaces such as React.HTMLAttributes are
+						// intentionally opaque, so their additional props are valid.
+						declared["__ANY_KEY__"] = propType{any: true}
 					}
 				}
 			}
@@ -397,6 +432,65 @@ func classPropsType(class *ast.Node) *ast.Node {
 	return nil
 }
 
+// extendsComponent accepts the pragma-independent `Foo.Component` form and
+// JSDoc's explicit component marker, both of which eslint-plugin-react treats
+// as React component classes.
+func extendsComponent(class *ast.Node) bool {
+	if class == nil {
+		return false
+	}
+	for _, doc := range class.JSDoc(nil) {
+		jd := doc.AsJSDoc()
+		if jd == nil || jd.Tags == nil {
+			continue
+		}
+		for _, tag := range jd.Tags.Nodes {
+			if ast.IsJSDocAugmentsTag(tag) {
+				aug := tag.AsJSDocAugmentsTag()
+				if aug != nil && jsDocComponentName(aug.ClassName) {
+					return true
+				}
+			}
+		}
+	}
+	var clauses *ast.HeritageClauseList
+	if class.Kind == ast.KindClassDeclaration {
+		clauses = class.AsClassDeclaration().HeritageClauses
+	} else if class.Kind == ast.KindClassExpression {
+		clauses = class.AsClassExpression().HeritageClauses
+	}
+	if clauses == nil {
+		return false
+	}
+	for _, clause := range clauses.Nodes {
+		if clause == nil || clause.Kind != ast.KindHeritageClause {
+			continue
+		}
+		for _, typ := range clause.AsHeritageClause().Types.Nodes {
+			if typ != nil && typ.Kind == ast.KindExpressionWithTypeArguments && jsDocComponentName(typ.AsExpressionWithTypeArguments().Expression) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func jsDocComponentName(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindExpressionWithTypeArguments {
+		return jsDocComponentName(node.AsExpressionWithTypeArguments().Expression)
+	}
+	if node.Kind == ast.KindPropertyAccessExpression {
+		return keyName(node.AsPropertyAccessExpression().Name()) == "Component" || keyName(node.AsPropertyAccessExpression().Name()) == "PureComponent"
+	}
+	if node.Kind == ast.KindIdentifier {
+		return node.AsIdentifier().Text == "Component" || node.AsIdentifier().Text == "PureComponent"
+	}
+	return false
+}
+
 func componentVariableType(n *ast.Node) *ast.Node {
 	for current := n; current != nil && current.Parent != nil; {
 		parent := current.Parent
@@ -426,13 +520,74 @@ func reactComponentTypeArgument(typeNode *ast.Node) *ast.Node {
 	if arguments == nil || len(arguments.Nodes) == 0 {
 		return nil
 	}
-	if name.AsIdentifier().Text == "ForwardRefRenderFunction" && len(arguments.Nodes) >= 2 {
+	typeName := importedReactTypeName(name)
+	// An unqualified component type is React-specific only when it is a
+	// named import.  A project-local `FC<Props>` must not suppress this rule.
+	if typeName == "" && typeNode.AsTypeReferenceNode().TypeName.Kind == ast.KindIdentifier {
+		return nil
+	}
+	if typeName == "" {
+		qualified := typeNode.AsTypeReferenceNode().TypeName
+		if qualified == nil || qualified.Kind != ast.KindQualifiedName || qualified.AsQualifiedName().Left == nil || qualified.AsQualifiedName().Left.Kind != ast.KindIdentifier {
+			return nil
+		}
+		qualifier := qualified.AsQualifiedName().Left.AsIdentifier().Text
+		if qualifier != "React" {
+			root := ast.GetSourceFileOfNode(name)
+			if root == nil || !strings.Contains(root.Text(), "* as "+qualifier) || (!strings.Contains(root.Text(), `"react"`) && !strings.Contains(root.Text(), `'react'`)) {
+				return nil
+			}
+		}
+		typeName = name.AsIdentifier().Text
+	}
+	if typeName == "ForwardRefRenderFunction" && len(arguments.Nodes) >= 2 {
 		return arguments.Nodes[1]
 	}
-	if !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "ComponentType", "VFC", "VoidFunctionComponent"}, name.AsIdentifier().Text) {
+	if !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "ComponentType", "VFC", "VoidFunctionComponent"}, typeName) {
 		return nil
 	}
 	return arguments.Nodes[0]
+}
+
+// importedReactTypeName returns the exported name for a locally aliased React
+// type (for example `import { FC as X } from "react"`).
+func importedReactTypeName(name *ast.Node) string {
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return ""
+	}
+	localName := name.AsIdentifier().Text
+	root := ast.GetSourceFileOfNode(name)
+	if root == nil {
+		return ""
+	}
+	var imported string
+	var visit ast.Visitor
+	visit = func(n *ast.Node) bool {
+		if n == nil || imported != "" {
+			return false
+		}
+		if n.Kind == ast.KindImportSpecifier {
+			specifier := n.AsImportSpecifier()
+			if specifier.Name() != nil && specifier.Name().Kind == ast.KindIdentifier && specifier.Name().AsIdentifier().Text == localName {
+				for parent := n.Parent; parent != nil; parent = parent.Parent {
+					if parent.Kind == ast.KindImportDeclaration {
+						module := parent.AsImportDeclaration().ModuleSpecifier
+						if module != nil && module.Kind == ast.KindStringLiteral && module.Text() == "react" {
+							imported = localName
+							if specifier.PropertyName != nil && specifier.PropertyName.Kind == ast.KindIdentifier {
+								imported = specifier.PropertyName.AsIdentifier().Text
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+		n.ForEachChild(visit)
+		return false
+	}
+	root.Node.ForEachChild(visit)
+	return imported
 }
 
 func forwardRefPropsType(n *ast.Node) *ast.Node {
@@ -576,6 +731,11 @@ func addDestructured(c *component, pattern *ast.Node, prefix []string) {
 		if be.DotDotDotToken != nil {
 			continue
 		}
+		// A dynamic computed key has no statically knowable prop name. ESLint
+		// does not turn its local binding into a validation requirement.
+		if be.PropertyName != nil && be.PropertyName.Kind == ast.KindComputedPropertyName {
+			continue
+		}
 		key := keyName(be.PropertyName)
 		if key == "" {
 			key = keyName(be.Name())
@@ -584,14 +744,15 @@ func addDestructured(c *component, pattern *ast.Node, prefix []string) {
 			continue
 		}
 		path := append(append([]string{}, prefix...), key)
-		// eslint-plugin-react records a destructuring binding as a props use even
-		// when its local name is never read afterwards. Keep the authored property
-		// node so the diagnostic uses the same terminal range as an ESTree pattern.
-		report := be.Name()
-		if be.PropertyName != nil {
-			report = be.PropertyName
+		// A nested pattern validates its leaves, not the intermediate object.
+		// Direct bindings are uses even when their local binding is never read.
+		if be.Name().Kind != ast.KindObjectBindingPattern {
+			report := be.Name()
+			if be.PropertyName != nil {
+				report = be.PropertyName
+			}
+			appendUse(c, report, path)
 		}
-		appendUse(c, report, path)
 		if be.Name().Kind == ast.KindIdentifier {
 			c.destructured[be.Name().AsIdentifier().Text] = path
 		} else if be.Name().Kind == ast.KindObjectBindingPattern {
@@ -684,6 +845,10 @@ func isSetStatePropsParameter(fn, ident *ast.Node) bool {
 	if len(params) < 2 || params[1] == nil || params[1].Kind != ast.KindParameter || functionParameterName(params[1]) != ident.AsIdentifier().Text {
 		return false
 	}
+	return isSetStateCallback(fn)
+}
+
+func isSetStateCallback(fn *ast.Node) bool {
 	call := reactutil.SkipExpressionWrappersUp(fn)
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
@@ -902,6 +1067,9 @@ func isDeclared(m map[string]propType, names []string) bool {
 }
 
 func propTypeDeclares(p propType, remaining []string) bool {
+	if p.invalid {
+		return false
+	}
 	if len(remaining) == 0 || p.any || p.open {
 		return true
 	}
@@ -981,7 +1149,7 @@ var PropTypesRule = rule.Rule{
 			}
 			switch n.Kind {
 			case ast.KindClassDeclaration, ast.KindClassExpression:
-				if reactutil.ExtendsReactComponent(n, pragma) {
+				if reactutil.ExtendsReactComponent(n, pragma) || extendsComponent(n) {
 					c := &component{node: n, declared: map[string]propType{}, destructured: map[string][]string{}}
 					comps = append(comps, c)
 					c.binding = componentBinding(n)
@@ -1053,6 +1221,17 @@ var PropTypesRule = rule.Rule{
 									addDestructured(c, pattern, nil)
 								}
 							}
+						}
+					}
+				}
+				// setState's second callback parameter is the current props object.
+				// It also appears in arrow functions stored in class fields, which
+				// are not MethodDeclarations in TypeScript's AST.
+				if c := componentFor(n, comps); c != nil {
+					params := reactutil.FunctionParameters(n)
+					if len(params) >= 2 && params[1] != nil && params[1].Kind == ast.KindParameter && isSetStateCallback(n) {
+						if pattern := params[1].AsParameterDeclaration().Name(); pattern != nil && pattern.Kind == ast.KindObjectBindingPattern {
+							addDestructured(c, pattern, nil)
 						}
 					}
 				}
@@ -1166,6 +1345,9 @@ var PropTypesRule = rule.Rule{
 				if len(names) == 0 {
 					break
 				}
+				if slices.Contains(names, "__COMPUTED_PROP__") {
+					break
+				}
 				// A nested component may capture its enclosing component's props.
 				// Attribute a use to every containing component whose own props
 				// binding matches the member root, rather than only the nearest one.
@@ -1178,6 +1360,14 @@ var PropTypesRule = rule.Rule{
 						}
 					}
 					if contains && rootMatches(root, c) {
+						parent := n.Parent
+						nestedMember := parent != nil && ((parent.Kind == ast.KindPropertyAccessExpression && parent.AsPropertyAccessExpression().Expression == n) || (parent.Kind == ast.KindElementAccessExpression && parent.AsElementAccessExpression().Expression == n))
+						// When the root prop is declared, only the complete access is
+						// relevant. An undeclared root, on the other hand, is reported
+						// at every member level by eslint-plugin-react.
+						if nestedMember && isDeclared(c.declared, names[:1]) {
+							continue
+						}
 						if path, ok := propsPath(root, names, c); ok {
 							appendUse(c, memberReportNode(n), path)
 						}
