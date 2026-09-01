@@ -101,13 +101,6 @@ const fooRegexp = new RegExp("foo", "v");
   does not construct a new RegExp object while folding an expression. For
   example, `RegExp("g", "u").source` remains unknown even though ESLint can
   fold it to `"g"`.
-- A suggested flag insertion into a template literal that interpolates an
-  expression is refused whenever that template's cooked value already
-  contains the opposite flag character, even when the interpolated
-  expression's source text has no escape sequence of its own — ESLint only
-  inspects the template's literal quasis for that escape check, this rule
-  inspects the whole template source.
-
 ## Original Documentation
 
 - [ESLint: require-unicode-regexp](https://eslint.org/docs/latest/rules/require-unicode-regexp)
