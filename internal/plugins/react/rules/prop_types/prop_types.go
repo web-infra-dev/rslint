@@ -238,6 +238,11 @@ func declaredSeen(n *ast.Node, customValidators []string, propWrappers []reactut
 			return declaredSeen(call.Arguments.Nodes[0], customValidators, propWrappers, seen)
 		}
 	}
+	if n != nil && n.Kind == ast.KindPropertyAccessExpression {
+		// External declarations are commonly accessed through a namespace, such
+		// as `RcSlider.propTypes`; upstream leaves those declarations opaque.
+		return map[string]propType{"__ANY_KEY__": {any: true}}, true
+	}
 	m, ok := propMap(n, customValidators)
 	if !ok && n != nil {
 		return map[string]propType{}, true
@@ -1381,7 +1386,7 @@ var PropTypesRule = rule.Rule{
 								case ast.KindObjectBindingPattern:
 									addDestructured(c, vd.Name(), path, c.node.Kind == ast.KindClassDeclaration || c.node.Kind == ast.KindClassExpression)
 								case ast.KindIdentifier:
-									if len(path) > 0 {
+									if len(path) > 0 || c.node.Kind == ast.KindClassDeclaration || c.node.Kind == ast.KindClassExpression {
 										c.destructured[vd.Name().AsIdentifier().Text] = path
 									}
 								}
