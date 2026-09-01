@@ -176,10 +176,9 @@ var JsxSortPropsRule = rule.Rule{
 				left := utils.TrimNodeTextRange(ctx.SourceFile, pending[i].attr)
 				right := utils.TrimNodeTextRange(ctx.SourceFile, pending[j].attr)
 				return left.Pos() < right.Pos()
-			})
-			for _, report := range pending {
-				report := report
-				reportNode := report.attr.AsJsxAttribute().Name()
+		})
+		for _, report := range pending {
+			reportNode := report.attr.AsJsxAttribute().Name()
 				if report.wholeAttribute {
 					reportNode = report.attr
 				}
@@ -277,9 +276,6 @@ type sortableAttribute struct {
 
 func buildFixes(ctx rule.RuleContext, element *ast.Node, opts options, reserved []string) []rule.RuleFix {
 	attrs := reactutil.GetJsxElementAttributes(element)
-	if hasUnsortableCommentLayout(ctx, attrs) {
-		return nil
-	}
 	groups := sortableGroups(ctx, element, attrs)
 	text := ctx.SourceFile.Text()
 	var fixes []rule.RuleFix
@@ -295,28 +291,6 @@ func buildFixes(ctx rule.RuleContext, element *ast.Node, opts options, reserved 
 		}
 	}
 	return fixes
-}
-
-// hasUnsortableCommentLayout mirrors the upstream rule's conservative handling
-// of comment layouts it cannot associate with an attribute.
-func hasUnsortableCommentLayout(ctx rule.RuleContext, attrs []*ast.Node) bool {
-	comments := ctx.Comments.All()
-	for index, attr := range attrs {
-		if attr.Kind != ast.KindJsxAttribute || index+1 >= len(attrs) || attrs[index+1].Kind != ast.KindJsxAttribute {
-			continue
-		}
-		current := utils.TrimNodeTextRange(ctx.SourceFile, attr)
-		next := utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+1])
-		between := commentsInSpan(comments, current.End(), next.Pos())
-		if len(between) <= 1 {
-			continue
-		}
-		line := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), current.Pos())
-		if line+1 != scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[1].Pos()) {
-			return true
-		}
-	}
-	return false
 }
 
 func compareAttributes(ctx rule.RuleContext, left, right sortableAttribute, opts options, reserved []string) int {
@@ -430,8 +404,13 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 					item.end = between[0].End()
 					item.pinned = between[0].Kind == ast.KindMultiLineCommentTrivia
 				}
+			} else {
+				continue
 			}
-		} else if len(between) > 1 && nextIsAttribute && line+1 == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[1].Pos()) {
+		} else if len(between) > 1 {
+			if !nextIsAttribute || line+1 != scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[1].Pos()) {
+				continue
+			}
 			nextRange := utils.TrimNodeTextRange(ctx.SourceFile, next)
 			item.end = nextRange.End()
 			afterNextLimit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()

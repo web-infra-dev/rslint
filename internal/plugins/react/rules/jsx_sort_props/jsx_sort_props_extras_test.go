@@ -27,6 +27,8 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: "<App {...p}\n /* gap */\n d c />", Tsx: true, Output: []string{"<App {...p}\n /* gap */\n c d />"}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 3, 4)}},
 		// Comments within the next attribute's initializer are not inter-attribute comments.
 		{Code: `<App c a={/* inside */ 1} b />`, Tsx: true, Output: []string{`<App a={/* inside */ 1} b c />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 8), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 27)}},
+		// A comment sequence that cannot be grouped excludes only its own attribute from fixing.
+		{Code: "<App c a={1} /* one */ // two\n b />", Tsx: true, Output: []string{"<App b a={1} /* one */ // two\n c />"}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 8), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 2, 2)}},
 		// Reports from one JSX element follow source order, as ESLint's diagnostics do.
 		{Code: `<App onClick onBlur a />`, Tsx: true, Options: map[string]any{"callbacksLast": true}, Output: []string{`<App a onBlur onClick />`}, Errors: []rule_tester.InvalidTestCaseError{jsxSortError("listCallbacksLast", "Callbacks must be listed after all other props", 1, 6), jsxSortError("sortPropsByAlpha", "Props should be sorted alphabetically", 1, 14)}},
 		// Locks in upstream alphabetic arm: errors are evaluated independently for each inversion.
