@@ -538,6 +538,7 @@ export default defineConfig({
     './tests/eslint/rules/radix.test.ts',
     './tests/eslint/rules/require-atomic-updates.test.ts',
     './tests/eslint/rules/require-await.test.ts',
+    './tests/eslint/rules/require-unicode-regexp.test.ts',
     './tests/eslint/rules/require-yield.test.ts',
     './tests/eslint/rules/symbol-description.test.ts',
     './tests/eslint/rules/unicode-bom.test.ts',
@@ -599,6 +600,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/consistent-rstest-namespace.test.ts',
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
@@ -622,6 +624,7 @@ export default defineConfig({
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-import-in-mock.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
+    './tests/rstest/rules/require-awaited-expect-poll.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
     './tests/rstest/rules/require-mock-type-parameters.test.ts',
     './tests/rstest/rules/require-test-timeout.test.ts',
