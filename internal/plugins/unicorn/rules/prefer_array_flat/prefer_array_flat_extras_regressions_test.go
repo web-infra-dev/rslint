@@ -471,6 +471,82 @@ Items.flat();`,
 	suite.run(t)
 }
 
+// TestPreferArrayFlatJSDocCalleeRegression verifies that JavaScript JSDoc
+// wrappers stay transparent like they are in ESTree without making authored
+// TypeScript wrappers or optional/computed calls transparent.
+func TestPreferArrayFlatJSDocCalleeRegression(t *testing.T) {
+	var suite upstreamSuite
+
+	for _, testCase := range []struct {
+		fileName string
+		code     string
+		target   string
+		output   string
+	}{
+		{
+			fileName: "file.js",
+			code:     `/** @type {any} */ ([].concat)(...array)`,
+			target:   `([].concat)(...array)`,
+			output:   `/** @type {any} */ array.flat()`,
+		},
+		{
+			fileName: "file.js",
+			code:     `/** @satisfies {any} */ ([].concat)(array)`,
+			target:   `([].concat)(array)`,
+			output:   `/** @satisfies {any} */ [array].flat()`,
+		},
+		{
+			fileName: "file.jsx",
+			code:     `const view = <div>{/** @type {any} */ ([].concat)(...array)}</div>;`,
+			target:   `([].concat)(...array)`,
+			output:   `const view = <div>{/** @type {any} */ array.flat()}</div>;`,
+		},
+	} {
+		suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
+			Code:     testCase.code,
+			FileName: testCase.fileName,
+			Output:   []string{testCase.output},
+			Errors: []rule_tester.InvalidTestCaseError{
+				upstreamError(testCase.code, testCase.target, `[].concat()`, 0),
+			},
+		})
+	}
+
+	const internalJSDoc = `((/** @type {any} */ ([].concat)))(...array)`
+	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
+		Code:     internalJSDoc,
+		FileName: "file.js",
+		Errors: []rule_tester.InvalidTestCaseError{
+			upstreamError(internalJSDoc, internalJSDoc, `[].concat()`, 0),
+		},
+	})
+
+	for _, code := range []string{
+		`/** @type {any} */ (value.concat)(...array)`,
+		`/** @type {any} */ ([]?.concat)(...array)`,
+		`/** @type {any} */ ([].concat)?.(...array)`,
+		`/** @type {any} */ ([]["concat"])(...array)`,
+	} {
+		suite.valid = append(suite.valid, rule_tester.ValidTestCase{
+			Code:     code,
+			FileName: "file.js",
+		})
+	}
+
+	for _, code := range []string{
+		`([].concat as any)(...array)`,
+		`([].concat satisfies any)(...array)`,
+		`([].concat!)(...array)`,
+	} {
+		suite.valid = append(suite.valid, rule_tester.ValidTestCase{
+			Code:     code,
+			FileName: "file.ts",
+		})
+	}
+
+	suite.run(t)
+}
+
 // TestPreferArrayFlatSchemaParity locks the public option schema to unicorn
 // v64. In particular, upstream leaves array item types unconstrained while
 // still enforcing tuple length, uniqueness, and additionalProperties.
