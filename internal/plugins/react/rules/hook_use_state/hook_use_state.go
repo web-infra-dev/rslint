@@ -37,6 +37,7 @@ func suggestMemoMessage() rule.RuleMessage {
 // hook-use-state uses for its suggestions and call recognition.
 type importInfo struct {
 	defaultName       string
+	defaultSpecifier  *ast.Node
 	useStateSpecifier *ast.Node
 	useMemoSpecifier  *ast.Node
 	useMemoName       string
@@ -81,6 +82,7 @@ func reactImportInfo(node *ast.Node) importInfo {
 	clause := decl.ImportClause.AsImportClause()
 	if clause.Name() != nil && clause.Name().Kind == ast.KindIdentifier {
 		info.defaultName = clause.Name().AsIdentifier().Text
+		info.defaultSpecifier = decl.ImportClause
 	}
 	if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
 		return info
@@ -116,9 +118,10 @@ func resolvesToNamedUseState(ctx rule.RuleContext, ident *ast.Node) bool {
 	if ctx.Refs == nil || ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
-	// Components#isReactHookCall recognizes the local useState spelling, rather
-	// than a renamed named import.
-	if ident.AsIdentifier().Text != "useState" {
+	// Components#isReactHookCall requires the local hook spelling to match
+	// /^use[A-Z]/, even when it is imported under another name.
+	name := ident.AsIdentifier().Text
+	if len(name) < 4 || name[:3] != "use" || name[3] < 'A' || name[3] > 'Z' {
 		return false
 	}
 	symbol := ctx.Refs.Resolve(ident)
@@ -126,15 +129,17 @@ func resolvesToNamedUseState(ctx rule.RuleContext, ident *ast.Node) bool {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if decl != nil && decl.Kind == ast.KindImportSpecifier && importedName(decl) == "useState" && isReactImportDeclaration(decl) {
+		if decl != nil && decl.Kind == ast.KindImportSpecifier && decl.Pos() < ident.Pos() &&
+			importedName(decl) == "useState" && isReactImportDeclaration(decl) {
 			return true
 		}
 	}
 	return false
 }
 
-func resolvesToDefaultReactImport(ctx rule.RuleContext, ident *ast.Node) bool {
-	if ctx.Refs == nil || ident == nil || ident.Kind != ast.KindIdentifier {
+func resolvesToDefaultReactImport(ctx rule.RuleContext, defaultSpecifier, ident *ast.Node) bool {
+	if ctx.Refs == nil || defaultSpecifier == nil || ident == nil || ident.Kind != ast.KindIdentifier ||
+		defaultSpecifier.Pos() >= ident.Pos() {
 		return false
 	}
 	symbol := ctx.Refs.Resolve(ident)
@@ -142,11 +147,7 @@ func resolvesToDefaultReactImport(ctx rule.RuleContext, ident *ast.Node) bool {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if decl == nil || decl.Kind != ast.KindImportClause || !isReactImportDeclaration(decl) {
-			continue
-		}
-		clause := decl.AsImportClause()
-		if clause.Name() != nil && clause.Name().Kind == ast.KindIdentifier && clause.Name().AsIdentifier().Text == ident.AsIdentifier().Text {
+		if decl == defaultSpecifier {
 			return true
 		}
 	}
@@ -156,7 +157,7 @@ func resolvesToDefaultReactImport(ctx rule.RuleContext, ident *ast.Node) bool {
 // isReactUseStateCall ports Components#isReactHookCall(node, ["useState"]).
 // Parentheses are transparent because ESTree drops them; TS assertion wrappers
 // deliberately are not, matching the upstream parser's explicit TS nodes.
-func isReactUseStateCall(ctx rule.RuleContext, node *ast.Node) bool {
+func isReactUseStateCall(ctx rule.RuleContext, imports importInfo, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -175,7 +176,7 @@ func isReactUseStateCall(ctx rule.RuleContext, node *ast.Node) bool {
 	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "useState" {
 		return false
 	}
-	return resolvesToDefaultReactImport(ctx, ast.SkipParentheses(access.Expression))
+	return resolvesToDefaultReactImport(ctx, imports.defaultSpecifier, ast.SkipParentheses(access.Expression))
 }
 
 func isDestructuringBinding(node *ast.Node) bool {
@@ -247,6 +248,7 @@ var HookUseStateRule = rule.Rule{
 				info := reactImportInfo(node)
 				if imports.defaultName == "" && info.defaultName != "" {
 					imports.defaultName = info.defaultName
+					imports.defaultSpecifier = info.defaultSpecifier
 				}
 				if imports.useStateSpecifier == nil && info.useStateSpecifier != nil {
 					imports.useStateSpecifier = info.useStateSpecifier
@@ -257,12 +259,13 @@ var HookUseStateRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if !isReactUseStateCall(ctx, node) {
+				if !isReactUseStateCall(ctx, imports, node) {
 					return
 				}
 				// ESTree wraps an optional call in ChainExpression, so it is not
 				// directly initialized by the variable declarator upstream.
-				if node.AsCallExpression().QuestionDotToken != nil {
+				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+				if ast.IsOptionalChain(node) || ast.IsOptionalChain(callee) {
 					ctx.ReportNode(node, useStateErrorMessage())
 					return
 				}

@@ -29,10 +29,21 @@ func TestHookUseStateExtras(t *testing.T) {
 		{Code: `import { useState as useStore } from 'react'; const [data, setData] = useStore({})`, Tsx: true},
 		// Components#isReactHookCall does not recognize renamed named imports.
 		{Code: `import { useState as state } from 'react'; const [color] = state(value)`, Tsx: true},
+		// Components sees only the first default React import.
+		{Code: `import A from 'react'; import B from 'react'; const result = B.useState()`, Tsx: true},
+		// Components has not seen an import declared after the call yet.
+		{Code: `const result = useState(); import { useState } from 'react'`, Tsx: true},
+		{Code: `const result = React.useState(); import React from 'react'`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// Locks in upstream CallExpression arm 1: an immediate return is ignored; non-return expression reports.
 		hookUseStateError(`import { useState } from 'react';
 useState()`, useStateErrorText, 2, 1),
+		// A hook-shaped local alias remains recognized upstream.
+		hookUseStateError(`import { useState as useStore } from 'react';
+const result = useStore()`, useStateErrorText, 2, 16),
+		// An optional member access is a ChainExpression upstream.
+		hookUseStateError(`import React from 'react';
+const [value, setValue] = React?.useState()`, useStateErrorText, 2, 27),
 		// Locks in upstream symmetric-pair arm: a transposed acronym setter is rejected.
 		{
 			Code: `import { useState } from 'react';
