@@ -419,11 +419,17 @@ func reactComponentTypeArgument(typeNode *ast.Node) *ast.Node {
 		return nil
 	}
 	name := reactutil.EntityNameRightmost(typeNode.AsTypeReferenceNode().TypeName)
-	if name == nil || !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "ComponentType"}, name.AsIdentifier().Text) {
+	if name == nil {
 		return nil
 	}
 	arguments := typeNode.AsTypeReferenceNode().TypeArguments
 	if arguments == nil || len(arguments.Nodes) == 0 {
+		return nil
+	}
+	if name.AsIdentifier().Text == "ForwardRefRenderFunction" && len(arguments.Nodes) >= 2 {
+		return arguments.Nodes[1]
+	}
+	if !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "ComponentType", "VFC", "VoidFunctionComponent"}, name.AsIdentifier().Text) {
 		return nil
 	}
 	return arguments.Nodes[0]
@@ -438,7 +444,11 @@ func forwardRefPropsType(n *ast.Node) *ast.Node {
 				return nil
 			}
 			callee := unwrap(call.Expression)
-			if callee == nil || callee.Kind != ast.KindPropertyAccessExpression || keyName(callee.AsPropertyAccessExpression().Name()) != "forwardRef" {
+			isForwardRef := callee != nil && callee.Kind == ast.KindIdentifier && callee.AsIdentifier().Text == "forwardRef"
+			if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
+				isForwardRef = keyName(callee.AsPropertyAccessExpression().Name()) == "forwardRef"
+			}
+			if !isForwardRef {
 				return nil
 			}
 			arguments := call.TypeArguments
@@ -574,6 +584,14 @@ func addDestructured(c *component, pattern *ast.Node, prefix []string) {
 			continue
 		}
 		path := append(append([]string{}, prefix...), key)
+		// eslint-plugin-react records a destructuring binding as a props use even
+		// when its local name is never read afterwards. Keep the authored property
+		// node so the diagnostic uses the same terminal range as an ESTree pattern.
+		report := be.Name()
+		if be.PropertyName != nil {
+			report = be.PropertyName
+		}
+		appendUse(c, report, path)
 		if be.Name().Kind == ast.KindIdentifier {
 			c.destructured[be.Name().AsIdentifier().Text] = path
 		} else if be.Name().Kind == ast.KindObjectBindingPattern {
@@ -698,6 +716,21 @@ func functionParameterName(param *ast.Node) string {
 	return name.AsIdentifier().Text
 }
 
+func isGeneratorFunction(n *ast.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind {
+	case ast.KindFunctionDeclaration:
+		return n.AsFunctionDeclaration().AsteriskToken != nil
+	case ast.KindFunctionExpression:
+		return n.AsFunctionExpression().AsteriskToken != nil
+	case ast.KindMethodDeclaration:
+		return n.AsMethodDeclaration().AsteriskToken != nil
+	}
+	return false
+}
+
 func getterReturn(body *ast.Node) *ast.Node {
 	if body == nil || body.Kind != ast.KindBlock {
 		return nil
@@ -736,6 +769,24 @@ func appendUse(c *component, node *ast.Node, names []string) {
 	}
 }
 
+// memberReportNode matches the ESTree MemberExpression report range used by
+// eslint-plugin-react: diagnostics attach to the terminal property, rather
+// than to the complete member chain.
+func memberReportNode(n *ast.Node) *ast.Node {
+	n = unwrap(n)
+	if n == nil {
+		return n
+	}
+	switch n.Kind {
+	case ast.KindPropertyAccessExpression:
+		return n.AsPropertyAccessExpression().Name()
+	case ast.KindElementAccessExpression:
+		return n.AsElementAccessExpression().ArgumentExpression
+	default:
+		return n
+	}
+}
+
 func memberNames(n *ast.Node) (*ast.Node, []string, bool) {
 	var names []string
 	cur := unwrap(n)
@@ -755,7 +806,10 @@ func memberNames(n *ast.Node) (*ast.Node, []string, bool) {
 			ea := cur.AsElementAccessExpression()
 			k := elementName(ea.ArgumentExpression)
 			if k == "" {
-				return nil, nil, false
+				if argument := unwrap(ea.ArgumentExpression); argument != nil && argument.Kind == ast.KindBigIntLiteral {
+					return nil, nil, false
+				}
+				k = "__COMPUTED_PROP__"
 			}
 			names = append([]string{k}, names...)
 			report = ea.ArgumentExpression
@@ -955,7 +1009,7 @@ var PropTypesRule = rule.Rule{
 					}
 				}
 			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
-				if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, ctx.TypeChecker, wrappers) {
+				if !isGeneratorFunction(n) && reactutil.IsStatelessReactComponentWithWrappers(n, pragma, ctx.TypeChecker, wrappers) {
 					c := &component{node: n, declared: map[string]propType{}, destructured: map[string][]string{}}
 					comps = append(comps, c)
 					c.binding = componentBinding(n)
@@ -985,6 +1039,20 @@ var PropTypesRule = rule.Rule{
 						} else if declared, ok := declaredType(forwardRefPropsType(n), typeAliases, typeAliasesBySymbol, 8); ok {
 							c.declared = declared
 							c.declaredBlock = true
+						}
+					}
+				}
+				if n.Kind == ast.KindMethodDeclaration {
+					if c := componentFor(n.Parent, comps); c != nil {
+						name := keyName(n.AsMethodDeclaration().Name())
+						switch name {
+						case "componentWillReceiveProps", "shouldComponentUpdate", "componentWillUpdate", "componentDidUpdate", "getDerivedStateFromProps", "getSnapshotBeforeUpdate", "UNSAFE_componentWillReceiveProps", "UNSAFE_componentWillUpdate":
+							params := reactutil.FunctionParameters(n)
+							if len(params) > 0 && params[0] != nil && params[0].Kind == ast.KindParameter {
+								if pattern := params[0].AsParameterDeclaration().Name(); pattern != nil && pattern.Kind == ast.KindObjectBindingPattern {
+									addDestructured(c, pattern, nil)
+								}
+							}
 						}
 					}
 				}
@@ -1111,18 +1179,9 @@ var PropTypesRule = rule.Rule{
 					}
 					if contains && rootMatches(root, c) {
 						if path, ok := propsPath(root, names, c); ok {
-							appendUse(c, n, path)
+							appendUse(c, memberReportNode(n), path)
 						}
 					}
-				}
-			case ast.KindIdentifier:
-				c := componentFor(n, comps)
-				if c == nil {
-					break
-				}
-				memberBase := n.Parent != nil && (n.Parent.Kind == ast.KindPropertyAccessExpression && n.Parent.AsPropertyAccessExpression().Expression == n || n.Parent.Kind == ast.KindElementAccessExpression && n.Parent.AsElementAccessExpression().Expression == n)
-				if path, ok := c.destructured[n.AsIdentifier().Text]; ok && n != c.node && !ast.IsPartOfParameterDeclaration(n) && !isBindingName(n) && !memberBase {
-					appendUse(c, n, path)
 				}
 			}
 			n.ForEachChild(walk)
