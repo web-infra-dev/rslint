@@ -360,13 +360,14 @@ func failureStringStart(otherLine int) string {
 }
 
 func (a *overloadAnalyzer) unifiedTypeText(left, right *ast.Node) string {
-	// typescript-eslint returns the sole annotated type node's authored text
-	// unchanged when its peer parameter has no annotation.
+	// A sole annotated type still passes through the same formatting as a
+	// union member: transparent parentheses are removed, while function-like
+	// types are wrapped to preserve their union spelling.
 	if left == nil {
-		return utils.TrimmedNodeText(a.ctx.SourceFile, right)
+		return unionMemberText(a.ctx.SourceFile, right)
 	}
 	if right == nil {
-		return utils.TrimmedNodeText(a.ctx.SourceFile, left)
+		return unionMemberText(a.ctx.SourceFile, left)
 	}
 	members := append(unionMembers(left), unionMembers(right)...)
 	unique := make([]*ast.Node, 0, len(members))
@@ -387,14 +388,18 @@ func (a *overloadAnalyzer) unifiedTypeText(left, right *ast.Node) string {
 		if i > 0 {
 			text.WriteString(" | ")
 		}
-		member = skipParenthesizedType(member)
-		memberText := utils.TrimmedNodeText(a.ctx.SourceFile, member)
-		if member.Kind == ast.KindConditionalType || member.Kind == ast.KindConstructorType || member.Kind == ast.KindFunctionType {
-			memberText = "(" + memberText + ")"
-		}
-		text.WriteString(memberText)
+		text.WriteString(unionMemberText(a.ctx.SourceFile, member))
 	}
 	return text.String()
+}
+
+func unionMemberText(sourceFile *ast.SourceFile, member *ast.Node) string {
+	member = skipParenthesizedType(member)
+	text := utils.TrimmedNodeText(sourceFile, member)
+	if member.Kind == ast.KindConditionalType || member.Kind == ast.KindConstructorType || member.Kind == ast.KindFunctionType {
+		return "(" + text + ")"
+	}
+	return text
 }
 
 func unionMembers(node *ast.Node) []*ast.Node {

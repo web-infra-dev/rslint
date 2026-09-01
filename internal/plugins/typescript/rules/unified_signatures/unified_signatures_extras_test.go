@@ -380,6 +380,25 @@ declare function plain(value: string|number): void;`,
 				Line:      2,
 			}},
 		},
+		// A sole annotation uses the same union-member formatting as paired annotations.
+		{
+			Code: `declare function functionType(value): void;
+declare function functionType(value: () => void): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `(() => void)`.",
+				Line:      2,
+			}},
+		},
+		{
+			Code: `declare function parenthesized(value): void;
+declare function parenthesized(value: (string)): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `string`.",
+				Line:      2,
+			}},
+		},
 		// Locks in upstream computed-key grouping arm.
 		{
 			Code: `declare const key: unique symbol;
