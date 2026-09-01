@@ -357,6 +357,29 @@ function (x: string): void;`,
 				Line:      3, Column: 5, EndLine: 3, EndColumn: 14,
 			}},
 		},
+		// In larger groups, a single-parameter difference cites the first
+		// differing parameter rather than the signature's first token.
+		{
+			Code: `declare function f(
+  x: string): void;
+declare function f(x: number): void;
+declare function f(x: boolean): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "singleParameterDifference", Message: "This overload and the one on line 2 can be combined into one signature taking `string | number`.", Line: 3},
+				{MessageId: "singleParameterDifference", Message: "This overload and the one on line 2 can be combined into one signature taking `string | boolean`.", Line: 4},
+				{MessageId: "singleParameterDifference", Message: "This overload and the one on line 3 can be combined into one signature taking `number | boolean`.", Line: 4},
+			},
+		},
+		// A missing peer annotation preserves the annotated type's exact text.
+		{
+			Code: `declare function plain(value): void;
+declare function plain(value: string|number): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `string|number`.",
+				Line:      2,
+			}},
+		},
 		// Locks in upstream computed-key grouping arm.
 		{
 			Code: `declare const key: unique symbol;

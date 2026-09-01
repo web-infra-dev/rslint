@@ -304,7 +304,7 @@ func (a *overloadAnalyzer) report(result unifyResult, onlyTwo bool) {
 	switch result.kind {
 	case unifySingleParameterDifference:
 		if !onlyTwo {
-			otherLine = lineOfRange(a.ctx.SourceFile, signatureReportRange(a.ctx.SourceFile, result.signature0))
+			otherLine = lineOfRange(a.ctx.SourceFile, utils.TrimNodeTextRange(a.ctx.SourceFile, result.parameter0))
 		}
 		a.ctx.ReportNode(result.parameter1, rule.RuleMessage{
 			Id:          "singleParameterDifference",
@@ -360,6 +360,14 @@ func failureStringStart(otherLine int) string {
 }
 
 func (a *overloadAnalyzer) unifiedTypeText(left, right *ast.Node) string {
+	// typescript-eslint returns the sole annotated type node's authored text
+	// unchanged when its peer parameter has no annotation.
+	if left == nil {
+		return utils.TrimmedNodeText(a.ctx.SourceFile, right)
+	}
+	if right == nil {
+		return utils.TrimmedNodeText(a.ctx.SourceFile, left)
+	}
 	members := append(unionMembers(left), unionMembers(right)...)
 	unique := make([]*ast.Node, 0, len(members))
 	for _, member := range members {
