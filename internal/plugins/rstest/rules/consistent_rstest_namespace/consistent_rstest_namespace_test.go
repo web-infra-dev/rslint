@@ -319,3 +319,77 @@ rstest.mock('./service');`,
 		},
 	)
 }
+
+// `rstack/test` re-exports the Rstest core API, so the two namespace spellings
+// arrive through it as well and the fix rewrites them the same way — including
+// the import specifier itself, which is rewritten in place rather than
+// repointed at another module.
+func TestConsistentRstestNamespaceRstackTestModule(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&ConsistentRstestNamespaceRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { rs } from 'rstack/test';
+rs.mock('./service');`},
+			{Code: `import { rstest } from 'rstack/test';
+rstest.mock('./service');`, Options: rstestOption},
+			// A namespace import is the receiver, not the disallowed spelling.
+			{Code: `import * as rstest from 'rstack/test';
+rstest.rs.mock('./service');`},
+			// Type-only imports bind nothing to rewrite.
+			{Code: `import type { rstest } from 'rstack/test';`},
+			// A sibling subpath is a different API.
+			{Code: `import { rstest } from 'rstack/lib';
+rstest.mock('./service');`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import { rstest } from 'rstack/test';
+rstest.mock('./service');
+rstest.clearAllMocks();`,
+				Output: []string{`import { rs } from 'rstack/test';
+rs.mock('./service');
+rs.clearAllMocks();`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 2, 1, 7),
+					namespaceError("rs", "rstest", 3, 1, 7),
+				},
+			},
+			{
+				Code:   `import { expect, rs, rstest } from 'rstack/test';`,
+				Output: []string{`import { expect, rs } from 'rstack/test';`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 22, 28),
+				},
+			},
+			{
+				Code: `import { rs } from 'rstack/test';
+rs.mock('./service');`,
+				Output: []string{`import { rstest } from 'rstack/test';
+rstest.mock('./service');`},
+				Options: rstestOption,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rstest", "rs", 1, 10, 12),
+					namespaceError("rstest", "rs", 2, 1, 3),
+				},
+			},
+			// The two specifiers may name the two spellings in one file; each
+			// import is rewritten against the module it was written on.
+			{
+				Code: `import { rstest } from 'rstack/test';
+import { expect } from '@rstest/core';
+rstest.mock('./service');`,
+				Output: []string{`import { rs } from 'rstack/test';
+import { expect } from '@rstest/core';
+rs.mock('./service');`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 1, 10, 16),
+					namespaceError("rs", "rstest", 3, 1, 7),
+				},
+			},
+		},
+	)
+}

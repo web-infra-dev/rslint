@@ -4,22 +4,150 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const (
 	nodeTestModule     = "node:test"
-	replacementModule  = "@rstest/core"
 	nodeTestSubpathPfx = nodeTestModule + "/"
 )
 
 // isNodeTestModule reports whether a module specifier resolves to Node's test
 // runner: `node:test` itself, or one of its sub-paths such as
 // `node:test/reporters`. Only the exact `node:test` specifier has a candidate
-// replacement in `@rstest/core`, but every form is reported.
+// replacement in the Rstest API, but every form is reported.
 func isNodeTestModule(specifier string) bool {
 	return specifier == nodeTestModule || strings.HasPrefix(specifier, nodeTestSubpathPfx)
+}
+
+// replacementModuleForFile picks the specifier the fix writes.
+//
+// The same test API is reachable as `@rstest/core` and as `rstack/test`, and a
+// project set up through the Rstack CLI depends on `rstack` alone: writing
+// `@rstest/core` into such a file produces an import that need not resolve.
+// The file's own spelling is therefore what the fix follows, and only a file
+// that says `rstack/test` and never says `@rstest/core` gets the Rstack
+// spelling. A file with no Rstest reference at all — one relying on the test
+// globals without a type reference, say — keeps `@rstest/core`, the specifier
+// that resolves in every project that depends on Rstest directly.
+func replacementModuleForFile(sourceFile *ast.SourceFile) string {
+	if sourceFile == nil {
+		return rstestUtils.RstestImportModule
+	}
+
+	sawRstack := false
+	for _, directive := range sourceFile.TypeReferenceDirectives {
+		if directive == nil {
+			continue
+		}
+		switch {
+		case directive.FileName == rstestUtils.RstestImportModule ||
+			strings.HasPrefix(directive.FileName, rstestUtils.RstestImportModule+"/"):
+			return rstestUtils.RstestImportModule
+		case directive.FileName == rstestUtils.RstackTestImportModule ||
+			strings.HasPrefix(directive.FileName, rstestUtils.RstackTestImportModule+"/"):
+			sawRstack = true
+		}
+	}
+
+	for _, statement := range sourceFile.Statements.Nodes {
+		specifier, ok := importedModuleSpecifier(statement)
+		if !ok {
+			continue
+		}
+		if specifier == rstestUtils.RstestImportModule {
+			return rstestUtils.RstestImportModule
+		}
+		if specifier == rstestUtils.RstackTestImportModule {
+			sawRstack = true
+		}
+	}
+
+	if sawRstack {
+		return rstestUtils.RstackTestImportModule
+	}
+	return rstestUtils.RstestImportModule
+}
+
+// importedModuleSpecifier returns the module a top-level statement imports, in
+// any of the three static forms a test file writes: `import ... from 'm'`,
+// `import x = require('m')`, and a variable statement whose initializer is
+// `require('m')`.
+func importedModuleSpecifier(statement *ast.Node) (string, bool) {
+	if statement == nil {
+		return "", false
+	}
+
+	switch statement.Kind {
+	case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
+		declaration := statement.AsImportDeclaration()
+		if declaration == nil || declaration.ModuleSpecifier == nil ||
+			!isStringNode(declaration.ModuleSpecifier) {
+			return "", false
+		}
+		return declaration.ModuleSpecifier.Text(), true
+
+	case ast.KindImportEqualsDeclaration:
+		declaration := statement.AsImportEqualsDeclaration()
+		if declaration == nil || declaration.ModuleReference == nil ||
+			declaration.ModuleReference.Kind != ast.KindExternalModuleReference {
+			return "", false
+		}
+		reference := declaration.ModuleReference.AsExternalModuleReference()
+		if reference == nil || reference.Expression == nil {
+			return "", false
+		}
+		specifier := ast.SkipParentheses(reference.Expression)
+		if specifier == nil || !isStringNode(specifier) {
+			return "", false
+		}
+		return specifier.Text(), true
+
+	case ast.KindVariableStatement:
+		variableStatement := statement.AsVariableStatement()
+		if variableStatement == nil || variableStatement.DeclarationList == nil {
+			return "", false
+		}
+		list := variableStatement.DeclarationList.AsVariableDeclarationList()
+		if list == nil || list.Declarations == nil {
+			return "", false
+		}
+		for _, declaration := range list.Declarations.Nodes {
+			variable := declaration.AsVariableDeclaration()
+			if variable == nil {
+				continue
+			}
+			if specifier, ok := requiredModuleSpecifier(variable.Initializer); ok {
+				return specifier, true
+			}
+		}
+		return "", false
+
+	default:
+		return "", false
+	}
+}
+
+// requiredModuleSpecifier returns the module a `require('m')` call names.
+func requiredModuleSpecifier(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	node = ast.SkipParentheses(node)
+	if node == nil || !ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
+		return "", false
+	}
+	arguments := node.Arguments()
+	if len(arguments) == 0 || arguments[0] == nil {
+		return "", false
+	}
+	specifier := ast.SkipParentheses(arguments[0])
+	if specifier == nil || !isStringNode(specifier) {
+		return "", false
+	}
+	return specifier.Text(), true
 }
 
 var safeImportedNames = map[string]bool{
@@ -69,7 +197,7 @@ func canSafelyReplaceModule(declaration *ast.ImportDeclaration) bool {
 	return true
 }
 
-func replacementForModuleSpecifier(sourceFile *ast.SourceFile, node *ast.Node) (string, bool) {
+func replacementForModuleSpecifier(sourceFile *ast.SourceFile, node *ast.Node, replacementModule string) (string, bool) {
 	if sourceFile == nil || node == nil {
 		return "", false
 	}
@@ -111,7 +239,11 @@ var NoImportNodeTestRule = rule.Rule{
 					ctx.ReportNode(node, message)
 					return
 				}
-				replacement, ok := replacementForModuleSpecifier(ctx.SourceFile, declaration.ModuleSpecifier)
+				replacement, ok := replacementForModuleSpecifier(
+					ctx.SourceFile,
+					declaration.ModuleSpecifier,
+					replacementModuleForFile(ctx.SourceFile),
+				)
 				if !ok {
 					ctx.ReportNode(node, message)
 					return
