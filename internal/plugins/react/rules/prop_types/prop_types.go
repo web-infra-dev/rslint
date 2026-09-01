@@ -165,7 +165,7 @@ func validatorTypeSeen(n *ast.Node, customValidators []string, seen map[*ast.Nod
 		return propType{open: true}
 	}
 	if n.Kind == ast.KindPropertyAccessExpression && keyName(n.AsPropertyAccessExpression().Name()) == "isRequired" {
-		n = unwrap(n.AsPropertyAccessExpression().Expression)
+		return validatorTypeSeen(n.AsPropertyAccessExpression().Expression, customValidators, seen)
 	}
 	if n.Kind != ast.KindCallExpression {
 		// Primitive and broad validators (for example PropTypes.object and
@@ -256,6 +256,29 @@ func visibleTypeAlias(use *ast.Node, candidates []*ast.Node) *ast.Node {
 	return best
 }
 
+func returnTypePropMap(query *ast.Node) (map[string]propType, bool) {
+	if query == nil || query.Kind != ast.KindTypeQuery {
+		return nil, false
+	}
+	expr := query.AsTypeQueryNode().ExprName
+	if expr == nil || expr.Kind != ast.KindIdentifier {
+		return nil, false
+	}
+	initializer := reactutil.ResolveIdentifierInitializer(expr, nil)
+	if initializer == nil {
+		return nil, false
+	}
+	initializer = unwrap(initializer)
+	if initializer == nil || (initializer.Kind != ast.KindArrowFunction && initializer.Kind != ast.KindFunctionExpression) {
+		return nil, false
+	}
+	body := unwrap(initializer.Body())
+	if body == nil || body.Kind != ast.KindObjectLiteralExpression {
+		return nil, false
+	}
+	return propMap(body, nil)
+}
+
 func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, depth int) (map[string]propType, bool) {
 	if n == nil || depth == 0 {
 		return nil, false
@@ -271,19 +294,8 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 	case ast.KindTypeReference:
 		ref := n.AsTypeReferenceNode()
 		if ref.TypeName != nil && reactutil.EntityNameRightmost(ref.TypeName) != nil && reactutil.EntityNameRightmost(ref.TypeName).AsIdentifier().Text == "ReturnType" && ref.TypeArguments != nil && len(ref.TypeArguments.Nodes) == 1 {
-			query := ref.TypeArguments.Nodes[0]
-			if query != nil && query.Kind == ast.KindTypeQuery {
-				expr := query.AsTypeQueryNode().ExprName
-				if expr != nil && expr.Kind == ast.KindIdentifier {
-					if initializer := reactutil.ResolveIdentifierInitializer(expr, nil); initializer != nil {
-						initializer = unwrap(initializer)
-						if initializer != nil && (initializer.Kind == ast.KindArrowFunction || initializer.Kind == ast.KindFunctionExpression) {
-							if body := initializer.Body(); body != nil && body.Kind == ast.KindObjectLiteralExpression {
-								return propMap(body, nil)
-							}
-						}
-					}
-				}
+			if declared, ok := returnTypePropMap(ref.TypeArguments.Nodes[0]); ok {
+				return declared, true
 			}
 		}
 		name := reactutil.EntityNameRightmost(n.AsTypeReferenceNode().TypeName)
@@ -352,9 +364,15 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		switch member.Kind {
 		case ast.KindPropertySignature:
 			property := member.AsPropertySignatureDeclaration()
-			if property != nil && property.Type != nil {
+			if property != nil {
 				if name := keyName(property.Name()); name != "" {
-					declared[name] = propTypeFromType(property.Type.AsNode(), aliases, aliasesBySymbol, depth-1)
+					if property.Type != nil {
+						declared[name] = propTypeFromType(property.Type.AsNode(), aliases, aliasesBySymbol, depth-1)
+					} else {
+						// TypeScript permits a property signature without an annotation.
+						// It is still a declared prop, but its nested shape is unknown.
+						declared[name] = propType{open: true}
+					}
 				}
 			}
 		case ast.KindMethodSignature:
@@ -374,7 +392,15 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 			}
 			for _, heritage := range clause.AsHeritageClause().Types.Nodes {
 				if heritage != nil && heritage.Kind == ast.KindExpressionWithTypeArguments {
-					if base, ok := declaredType(heritage.AsExpressionWithTypeArguments().Expression, aliases, aliasesBySymbol, depth-1); ok {
+					entry := heritage.AsExpressionWithTypeArguments()
+					var base map[string]propType
+					var ok bool
+					if name := reactutil.EntityNameRightmost(entry.Expression); name != nil && name.AsIdentifier().Text == "ReturnType" && entry.TypeArguments != nil && len(entry.TypeArguments.Nodes) == 1 {
+						base, ok = returnTypePropMap(entry.TypeArguments.Nodes[0])
+					} else {
+						base, ok = declaredType(entry.Expression, aliases, aliasesBySymbol, depth-1)
+					}
+					if ok {
 						mergeDeclared(declared, base)
 					} else {
 						// Imported base interfaces such as React.HTMLAttributes are
@@ -719,10 +745,11 @@ func mergeDeclared(dst, src map[string]propType) {
 	}
 }
 
-func addDestructured(c *component, pattern *ast.Node, prefix []string) {
+func addDestructured(c *component, pattern *ast.Node, prefix []string, includeIntermediate ...bool) {
 	if c == nil || pattern == nil || pattern.Kind != ast.KindObjectBindingPattern {
 		return
 	}
+	recordIntermediate := len(includeIntermediate) > 0 && includeIntermediate[0]
 	for _, e := range pattern.AsBindingPattern().Elements.Nodes {
 		if e == nil || e.Kind != ast.KindBindingElement {
 			continue
@@ -744,19 +771,19 @@ func addDestructured(c *component, pattern *ast.Node, prefix []string) {
 			continue
 		}
 		path := append(append([]string{}, prefix...), key)
-		// A nested pattern validates its leaves, not the intermediate object.
-		// Direct bindings are uses even when their local binding is never read.
-		if be.Name().Kind != ast.KindObjectBindingPattern {
-			report := be.Name()
-			if be.PropertyName != nil {
-				report = be.PropertyName
-			}
+		// Every direct binding is a prop use. Function-parameter nested patterns
+		// also use their intermediate object; local destructuring does not.
+		report := be.Name()
+		if be.PropertyName != nil {
+			report = be.PropertyName
+		}
+		if be.Name().Kind != ast.KindObjectBindingPattern || recordIntermediate {
 			appendUse(c, report, path)
 		}
 		if be.Name().Kind == ast.KindIdentifier {
 			c.destructured[be.Name().AsIdentifier().Text] = path
 		} else if be.Name().Kind == ast.KindObjectBindingPattern {
-			addDestructured(c, be.Name(), path)
+			addDestructured(c, be.Name(), path, recordIntermediate)
 		}
 	}
 }
@@ -1194,7 +1221,7 @@ var PropTypesRule = rule.Rule{
 						if name != nil && name.Kind == ast.KindIdentifier {
 							c.props = name.AsIdentifier().Text
 						} else if name != nil && name.Kind == ast.KindObjectBindingPattern {
-							addDestructured(c, name, nil)
+							addDestructured(c, name, nil, true)
 						}
 						if parameter.Type != nil {
 							if declared, ok := declaredType(parameter.Type.AsNode(), typeAliases, typeAliasesBySymbol, 8); ok {
@@ -1290,7 +1317,7 @@ var PropTypesRule = rule.Rule{
 							if path, ok := propsPath(root, names, c); ok {
 								switch vd.Name().Kind {
 								case ast.KindObjectBindingPattern:
-									addDestructured(c, vd.Name(), path)
+									addDestructured(c, vd.Name(), path, c.node.Kind == ast.KindClassDeclaration || c.node.Kind == ast.KindClassExpression)
 								case ast.KindIdentifier:
 									c.destructured[vd.Name().AsIdentifier().Text] = path
 								}
@@ -1345,9 +1372,6 @@ var PropTypesRule = rule.Rule{
 				if len(names) == 0 {
 					break
 				}
-				if slices.Contains(names, "__COMPUTED_PROP__") {
-					break
-				}
 				// A nested component may capture its enclosing component's props.
 				// Attribute a use to every containing component whose own props
 				// binding matches the member root, rather than only the nearest one.
@@ -1369,6 +1393,16 @@ var PropTypesRule = rule.Rule{
 							continue
 						}
 						if path, ok := propsPath(root, names, c); ok {
+							if n.Kind == ast.KindElementAccessExpression {
+								// A lone dynamic lookup has no prop name to validate. Once an
+								// earlier segment is already missing, reporting a trailing
+								// array/object index adds only a duplicate diagnostic.
+								argument := unwrap(n.AsElementAccessExpression().ArgumentExpression)
+								if (len(path) == 1 && path[0] == "__COMPUTED_PROP__") ||
+									(len(path) > 1 && (argument == nil || argument.Kind != ast.KindStringLiteral) && !isDeclared(c.declared, path[:len(path)-1])) {
+									continue
+								}
+							}
 							appendUse(c, memberReportNode(n), path)
 						}
 					}
