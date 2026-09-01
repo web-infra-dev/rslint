@@ -323,7 +323,7 @@ rstest.mock('./service');`,
 // `rstack/test` re-exports the Rstest core API, so the two namespace spellings
 // arrive through it as well and the fix rewrites them the same way — including
 // the import specifier itself, which is rewritten in place rather than
-// repointed at another module.
+// pointed at another module.
 func TestConsistentRstestNamespaceRstackTestModule(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),

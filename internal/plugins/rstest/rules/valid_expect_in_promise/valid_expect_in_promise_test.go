@@ -371,8 +371,8 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 	)
 }
 
-// The rule treats a floating promise as unasserted only when it carries an
-// Rstest assertion, so `expect` and `assert` have to resolve through
+// The rule reports a floating promise only when it carries an Rstest
+// assertion, so `expect` and `assert` have to resolve through
 // `rstack/test` — the Rstack CLI's re-export of the Rstest core API — as well.
 func TestValidExpectInPromiseRstackTestModule(t *testing.T) {
 	rule_tester.RunRuleTester(

@@ -15,7 +15,7 @@ func TestParseRstestFnCallRstackTestModule(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(), "tsconfig.json", t, &hookParseProbe,
 		[]rule_tester.ValidTestCase{
-			// Only the `test` subpath re-exports the API. The sibling subpaths
+			// Only the `test` subpath re-exports the API. Its sibling sub-paths
 			// carry the build, app and lint APIs, and the bare package carries
 			// the config helper, so a same-named binding out of any of them is
 			// not a registration.
