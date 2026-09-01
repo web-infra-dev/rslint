@@ -34,7 +34,6 @@ type component struct {
 	declared      map[string]propType
 	used          []use
 	declaredBlock bool
-	ignore        bool
 	props         string
 	destructured  map[string][]string
 }
@@ -230,6 +229,15 @@ func declared(n *ast.Node, customValidators []string, propWrappers []reactutil.P
 	}
 	m, ok := propMap(n, customValidators)
 	return m, ok
+}
+
+func setComponentDeclared(c *component, n *ast.Node, customValidators []string, propWrappers []reactutil.PropWrapperEntry) {
+	if m, ok := declared(n, customValidators, propWrappers); ok {
+		c.declared = m
+	} else {
+		c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
+	}
+	c.declaredBlock = true
 }
 
 func visibleTypeAlias(use *ast.Node, candidates []*ast.Node) *ast.Node {
@@ -645,10 +653,8 @@ func forwardRefPropsType(n *ast.Node) *ast.Node {
 	return nil
 }
 
-func className(n *ast.Node) string { return reactutil.BindingIdentifierName(n) }
-
 func componentName(n *ast.Node) string {
-	if name := className(n); name != "" {
+	if name := reactutil.BindingIdentifierName(n); name != "" {
 		return name
 	}
 	var suffix []string
@@ -1066,19 +1072,6 @@ func rootMatches(n *ast.Node, c *component) bool {
 	return ok
 }
 
-func isBindingName(n *ast.Node) bool {
-	if n == nil || n.Parent == nil {
-		return false
-	}
-	switch n.Parent.Kind {
-	case ast.KindBindingElement:
-		return n.Parent.AsBindingElement().Name() == n
-	case ast.KindVariableDeclaration:
-		return n.Parent.AsVariableDeclaration().Name() == n
-	}
-	return false
-}
-
 func isDeclared(m map[string]propType, names []string) bool {
 	if len(names) == 0 {
 		return true
@@ -1169,6 +1162,42 @@ var PropTypesRule = rule.Rule{
 		byName := map[string]*component{}
 		byBinding := map[*ast.Symbol]*component{}
 		var propTypeAssignments []*ast.Node
+		applyPropTypeAssignment := func(assignment *ast.Node) {
+			binary := assignment.AsBinaryExpression()
+			root, names, ok := memberNames(binary.Left)
+			if !ok || root == nil || root.Kind != ast.KindIdentifier {
+				return
+			}
+			propTypesIndex := slices.Index(names, "propTypes")
+			if propTypesIndex < 0 {
+				return
+			}
+			componentParts := append([]string{root.AsIdentifier().Text}, names[:propTypesIndex]...)
+			c := byName[strings.Join(componentParts, ".")]
+			if propTypesIndex == 0 {
+				symbol := root.Symbol()
+				if symbol == nil && ctx.TypeChecker != nil {
+					symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
+				}
+				if bySymbol := byBinding[symbol]; bySymbol != nil {
+					c = bySymbol
+				}
+			}
+			if c == nil {
+				return
+			}
+			propNames := names[propTypesIndex+1:]
+			if len(propNames) == 0 {
+				if m, ok := declared(binary.Right, o.customValidators, propWrappers); ok {
+					mergeDeclared(c.declared, m)
+				} else {
+					c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
+				}
+			} else {
+				setDeclared(c.declared, propNames, validatorType(binary.Right, o.customValidators))
+			}
+			c.declaredBlock = true
+		}
 		var walk ast.Visitor
 		walk = func(n *ast.Node) bool {
 			if n == nil {
@@ -1266,13 +1295,7 @@ var PropTypesRule = rule.Rule{
 				pa := n.AsPropertyAssignment()
 				if keyName(pa.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(pa.Initializer, o.customValidators, propWrappers); ok {
-							c.declared = m
-							c.declaredBlock = true
-						} else {
-							c.declaredBlock = true
-							c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
-						}
+						setComponentDeclared(c, pa.Initializer, o.customValidators, propWrappers)
 					}
 				}
 			case ast.KindPropertyDeclaration:
@@ -1287,13 +1310,7 @@ var PropTypesRule = rule.Rule{
 				}
 				if keyName(pd.Name()) == "propTypes" {
 					if c := componentFor(n.Parent, comps); c != nil {
-						if m, ok := declared(pd.Initializer, o.customValidators, propWrappers); ok {
-							c.declared = m
-							c.declaredBlock = true
-						} else {
-							c.declaredBlock = true
-							c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
-						}
+						setComponentDeclared(c, pd.Initializer, o.customValidators, propWrappers)
 					}
 				}
 			case ast.KindGetAccessor:
@@ -1335,30 +1352,7 @@ var PropTypesRule = rule.Rule{
 							break
 						}
 						propTypeAssignments = append(propTypeAssignments, n)
-						componentParts := append([]string{root.AsIdentifier().Text}, names[:propTypesIndex]...)
-						c := byName[strings.Join(componentParts, ".")]
-						if propTypesIndex == 0 {
-							symbol := root.Symbol()
-							if symbol == nil && ctx.TypeChecker != nil {
-								symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
-							}
-							if bySymbol := byBinding[symbol]; bySymbol != nil {
-								c = bySymbol
-							}
-						}
-						if c != nil {
-							propNames := names[propTypesIndex+1:]
-							if len(propNames) == 0 {
-								if m, ok := declared(b.Right, o.customValidators, propWrappers); ok {
-									mergeDeclared(c.declared, m)
-								} else {
-									c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
-								}
-							} else {
-								setDeclared(c.declared, propNames, validatorType(b.Right, o.customValidators))
-							}
-							c.declaredBlock = true
-						}
+						applyPropTypeAssignment(n)
 					}
 				}
 			case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
@@ -1416,43 +1410,10 @@ var PropTypesRule = rule.Rule{
 		// Replay assignments after collection so declaration order does not decide
 		// whether the component is known.
 		for _, assignmentNode := range propTypeAssignments {
-			assignment := assignmentNode.AsBinaryExpression()
-			root, names, ok := memberNames(assignment.Left)
-			if !ok || root == nil || root.Kind != ast.KindIdentifier {
-				continue
-			}
-			propTypesIndex := slices.Index(names, "propTypes")
-			if propTypesIndex < 0 {
-				continue
-			}
-			componentParts := append([]string{root.AsIdentifier().Text}, names[:propTypesIndex]...)
-			c := byName[strings.Join(componentParts, ".")]
-			if propTypesIndex == 0 {
-				symbol := root.Symbol()
-				if symbol == nil && ctx.TypeChecker != nil {
-					symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
-				}
-				if bySymbol := byBinding[symbol]; bySymbol != nil {
-					c = bySymbol
-				}
-			}
-			if c == nil {
-				continue
-			}
-			propNames := names[propTypesIndex+1:]
-			if len(propNames) == 0 {
-				if m, ok := declared(assignment.Right, o.customValidators, propWrappers); ok {
-					mergeDeclared(c.declared, m)
-				} else {
-					c.declared = map[string]propType{"__ANY_KEY__": {any: true}}
-				}
-			} else {
-				setDeclared(c.declared, propNames, validatorType(assignment.Right, o.customValidators))
-			}
-			c.declaredBlock = true
+			applyPropTypeAssignment(assignmentNode)
 		}
 		for _, c := range comps {
-			if c.ignore || len(c.used) == 0 || !c.declaredBlock && o.skipUndeclared {
+			if len(c.used) == 0 || !c.declaredBlock && o.skipUndeclared {
 				continue
 			}
 			slices.SortFunc(c.used, func(a, b use) int {
