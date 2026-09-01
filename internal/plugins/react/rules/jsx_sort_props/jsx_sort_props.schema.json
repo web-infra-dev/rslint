@@ -13,7 +13,10 @@
         },
         "ignoreCase": { "type": "boolean" },
         "noSortAlphabetically": { "type": "boolean" },
-        "reservedFirst": { "type": ["array", "boolean"], "items": { "type": "string" } },
+        "reservedFirst": {
+          "type": ["array", "boolean"],
+          "items": { "type": "string" }
+        },
         "locale": { "type": "string", "default": "auto" }
       },
       "additionalProperties": false
