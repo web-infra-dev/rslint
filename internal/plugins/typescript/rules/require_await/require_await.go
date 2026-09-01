@@ -568,13 +568,32 @@ func collectUnannotatedAsyncExports(ctx rule.RuleContext, fileName string) map[s
 	}
 
 	functionDeclarationCounts := make(map[string]int)
+	firstVariableDeclarations := make(map[string]*ast.Node)
 	for _, statement := range sourceFile.Statements.Nodes {
-		if statement == nil || statement.Kind != ast.KindFunctionDeclaration {
+		if statement == nil {
 			continue
 		}
-		name := statement.Name()
-		if name != nil && name.Kind == ast.KindIdentifier {
-			functionDeclarationCounts[name.Text()]++
+		switch statement.Kind {
+		case ast.KindFunctionDeclaration:
+			name := statement.Name()
+			if name != nil && name.Kind == ast.KindIdentifier {
+				functionDeclarationCounts[name.Text()]++
+			}
+		case ast.KindVariableStatement:
+			declarationList := statement.AsVariableStatement().DeclarationList.AsVariableDeclarationList()
+			for _, declarationNode := range declarationList.Declarations.Nodes {
+				declaration := declarationNode.AsVariableDeclaration()
+				if declaration == nil {
+					continue
+				}
+				name := declaration.Name()
+				if name == nil || name.Kind != ast.KindIdentifier {
+					continue
+				}
+				if _, seen := firstVariableDeclarations[name.Text()]; !seen {
+					firstVariableDeclarations[name.Text()] = declarationNode
+				}
+			}
 		}
 	}
 
@@ -594,7 +613,11 @@ func collectUnannotatedAsyncExports(ctx rule.RuleContext, fileName string) map[s
 				}
 				name := declaration.Name()
 				initializer := ast.SkipParentheses(declaration.Initializer)
-				if name == nil || name.Kind != ast.KindIdentifier ||
+				if name == nil || name.Kind != ast.KindIdentifier {
+					continue
+				}
+				if firstVariableDeclarations[name.Text()] != declarationNode ||
+					functionDeclarationCounts[name.Text()] != 0 ||
 					!isUnannotatedAsyncFunction(initializer) {
 					continue
 				}
@@ -616,7 +639,7 @@ func collectUnannotatedAsyncExports(ctx rule.RuleContext, fileName string) map[s
 			// Overload signatures determine the imported call type. Do not infer
 			// a thenable return from the async implementation when another declaration
 			// for the same binding may expose `any` or a non-thenable return.
-			if functionDeclarationCounts[name.Text()] != 1 {
+			if functionDeclarationCounts[name.Text()] != 1 || firstVariableDeclarations[name.Text()] != nil {
 				continue
 			}
 			if exports == nil {

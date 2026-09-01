@@ -18,8 +18,10 @@
 import {
   asyncDeclaration,
   asyncGenerator,
+  asyncThenAny,
   asyncValue,
   asyncValue as renamedAsyncValue,
+  anyThenAsync,
   overloaded,
   returnAny,
   returnAnyDeclaration,
@@ -29,6 +31,7 @@ import {
 
 const concise = async () => asyncValue();
 const declaration = async () => asyncDeclaration();
+const redeclared = async () => asyncThenAny();
 const block = async () => {
   return renamedAsyncValue();
 };
@@ -40,6 +43,7 @@ const explicitAny = async () => typedAny();
 const returnAnnotatedAny = async () => returnAny();
 const declarationReturnAnnotatedAny = async () => returnAnyDeclaration();
 const overloadedResult = async () => overloaded();
+const redeclaredAny = async () => anyThenAsync();
 const synchronous = async () => syncValue();
 const generatorResult = async () => asyncGenerator();
 declare const localAny: any;
@@ -64,6 +68,10 @@ function shadow(asyncValue: any) {
 }
 -- missing-project-reference-output/fixture-lib/src/index.ts --
 export const asyncValue = async () => "ok";
+export var asyncThenAny = async () => "ok";
+export var asyncThenAny: any;
+export var anyThenAsync: any;
+export var anyThenAsync = async () => "ok";
 export async function asyncDeclaration() {
   return "ok";
 }

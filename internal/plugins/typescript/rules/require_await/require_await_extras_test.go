@@ -868,7 +868,7 @@ func TestRequireAwaitMissingProjectReferenceOutput(t *testing.T) {
 		},
 	})
 
-	wantLines := []int{22, 23, 24, 25, 26, 27, 29, 31}
+	wantLines := []int{25, 26, 27, 28, 29, 30, 31, 33, 35}
 	if len(diagnostics) != len(wantLines) {
 		t.Fatalf("diagnostics = %d (%v), want %d at lines %v", len(diagnostics), diagnostics, len(wantLines), wantLines)
 	}
