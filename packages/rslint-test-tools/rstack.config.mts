@@ -1,6 +1,6 @@
-import { defineConfig } from '@rstest/core';
+import { define } from 'rstack';
 
-export default defineConfig({
+define.test({
   testEnvironment: 'node',
   globals: true,
   // Normal completion is event-driven. This is only the final in-process

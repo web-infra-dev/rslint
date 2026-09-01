@@ -23,7 +23,7 @@
  * result) would be caught by one of the two.
  */
 
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { createRequire } from 'node:module';
 
 import {

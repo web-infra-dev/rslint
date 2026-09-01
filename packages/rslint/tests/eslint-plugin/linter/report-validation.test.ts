@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { buildDiagnostic } from '../../../src/eslint-plugin/linter/diagnostic-builder.js';
 import { makeFixer } from '../../../src/eslint-plugin/linter/fixer.js';
