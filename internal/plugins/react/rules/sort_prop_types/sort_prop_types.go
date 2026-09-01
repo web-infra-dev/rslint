@@ -79,13 +79,21 @@ var SortPropTypesRule = rule.Rule{
 				}
 				name, ok := declarationName(ctx.SourceFile, current)
 				if !ok {
+					// An unkeyed declaration breaks the comparison chain. Keep it
+					// as the previous node so the next keyed declaration is not
+					// compared with the declaration before the unkeyed one.
+					previous = current
 					continue
 				}
 				if previous == nil {
 					previous = current
 					continue
 				}
-				previousName, _ := declarationName(ctx.SourceFile, previous)
+				previousName, previousOK := declarationName(ctx.SourceFile, previous)
+				if !previousOK {
+					previous = current
+					continue
+				}
 				if opts.requiredFirst {
 					if isRequired(previous) && !isRequired(current) {
 						previous = current
@@ -120,7 +128,7 @@ var SortPropTypesRule = rule.Rule{
 					left = ecmascript.StringToLowerCase(left)
 					right = ecmascript.StringToLowerCase(right)
 				}
-				outOfOrder := right < left
+				outOfOrder := ecmascript.CompareStrings(right, left) < 0
 				if !opts.ignoreCase {
 					outOfOrder = isPropNameBefore(name, previousName)
 				}
@@ -155,7 +163,7 @@ var SortPropTypesRule = rule.Rule{
 					checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes)
 				}
 			case ast.KindCallExpression:
-				if !reactutil.IsPropWrapperCall(value, wrappers) {
+				if !isPropWrapperCallByCalleeName(value, wrappers) {
 					return
 				}
 				args := value.AsCallExpression().Arguments
@@ -172,8 +180,7 @@ var SortPropTypesRule = rule.Rule{
 						continue
 					}
 					assignment := prop.AsPropertyAssignment()
-					name, ok := utils.GetStaticPropertyName(assignment.Name())
-					if ok && name == "propTypes" {
+					if isAuthoredPropertyName(assignment.Name(), "propTypes") {
 						// Upstream only examines an inline object in this path; identifier
 						// resolution belongs to assignment and class-property declarations.
 						value := ast.SkipParentheses(assignment.Initializer)
@@ -185,6 +192,10 @@ var SortPropTypesRule = rule.Rule{
 			},
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				property := node.AsPropertyDeclaration()
+				if property.Type != nil && isAuthoredPropertyName(property.Name(), "props") {
+					checkValue(property.Initializer)
+					return
+				}
 				name, ok := utils.GetStaticPropertyName(property.Name())
 				if ok && name == "propTypes" {
 					checkValue(property.Initializer)
@@ -209,7 +220,15 @@ var SortPropTypesRule = rule.Rule{
 				if !isShapeCall(callee) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 					return
 				}
-				checkValue(call.Arguments.Nodes[0])
+				firstArg := ast.SkipParentheses(call.Arguments.Nodes[0])
+				switch firstArg.Kind {
+				case ast.KindObjectLiteralExpression:
+					checkSorted(firstArg.AsObjectLiteralExpression().Properties.Nodes)
+				case ast.KindIdentifier:
+					if decl := declarationObject(ctx.Refs.Resolve(firstArg)); decl != nil {
+						checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes)
+					}
+				}
 			}
 		}
 		if opts.checkTypes {
@@ -283,7 +302,7 @@ func isPropNameBefore(current, previous propName) bool {
 		currentNumber, ok := ecmascript.StringToNumber(current.text)
 		return ok && currentNumber < previous.number
 	}
-	return current.text < previous.text
+	return ecmascript.CompareStrings(current.text, previous.text) < 0
 }
 
 // firstParamType mirrors upstream's direct ESTree `param.typeAnnotation`
@@ -305,7 +324,7 @@ func isRequired(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindPropertyAssignment {
 		return false
 	}
-	value := reactutil.SkipExpressionWrappers(node.AsPropertyAssignment().Initializer)
+	value := ast.SkipParentheses(node.AsPropertyAssignment().Initializer)
 	return value != nil && value.Kind == ast.KindPropertyAccessExpression &&
 		value.AsPropertyAccessExpression().Name() != nil &&
 		value.AsPropertyAccessExpression().Name().Kind == ast.KindIdentifier &&
@@ -325,6 +344,37 @@ func isShapeCall(callee *ast.Node) bool {
 	}
 	name := callee.AsPropertyAccessExpression().Name()
 	return name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "shape"
+}
+
+func isAuthoredPropertyName(name *ast.Node, expected string) bool {
+	if name == nil {
+		return false
+	}
+	if name.Kind == ast.KindIdentifier {
+		return name.AsIdentifier().Text == expected
+	}
+	if name.Kind == ast.KindComputedPropertyName {
+		expression := ast.SkipParentheses(name.AsComputedPropertyName().Expression)
+		return expression != nil && expression.Kind == ast.KindIdentifier && expression.AsIdentifier().Text == expected
+	}
+	return false
+}
+
+func isPropWrapperCallByCalleeName(call *ast.Node, wrappers []reactutil.PropWrapperEntry) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
+	if callee == nil || callee.Kind != ast.KindIdentifier {
+		return false
+	}
+	name := callee.AsIdentifier().Text
+	for _, wrapper := range wrappers {
+		if wrapper.Property == name {
+			return true
+		}
+	}
+	return false
 }
 
 func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func([]*ast.Node)) {
@@ -352,7 +402,7 @@ func declarationObject(symbol *ast.Symbol) *ast.Node {
 	if decl.Kind != ast.KindVariableDeclaration {
 		return nil
 	}
-	value := reactutil.SkipExpressionWrappers(decl.AsVariableDeclaration().Initializer)
+	value := ast.SkipParentheses(decl.AsVariableDeclaration().Initializer)
 	if value != nil && value.Kind == ast.KindObjectLiteralExpression {
 		return value
 	}

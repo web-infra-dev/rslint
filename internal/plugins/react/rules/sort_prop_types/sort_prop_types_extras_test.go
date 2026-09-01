@@ -33,6 +33,22 @@ func TestSortPropTypesExtras(t *testing.T) {
 		// ---- Dimension 4: TS expression wrappers on the propTypes object ----
 		{Code: `Component.propTypes = ({ a: PropTypes.string, z: PropTypes.string } as any);`, Tsx: true},
 		// N/A: private keys and element access do not participate in upstream's static key sort.
+		// An unkeyed TypeScript member breaks the comparison chain.
+		{Code: `type Props = { z: string; (): void; a: string }; function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
+		// A wrapper configured as Object.assign matches the bare callee name,
+		// but not the member expression itself, as in the upstream rule.
+		{Code: `Component.propTypes = Object.assign({ z: PropTypes.string, a: PropTypes.string });`, Settings: map[string]interface{}{"propWrapperFunctions": []any{map[string]interface{}{"object": "Object", "property": "assign"}}}, Tsx: true},
+		// Object-literal propTypes detection uses the authored identifier key,
+		// not a static string key.
+		{Code: `const C = { "propTypes": { z: PropTypes.string, a: PropTypes.string } };`, Tsx: true},
+		// Required detection does not cross a TypeScript assertion wrapper.
+		{Code: `Component.propTypes = { a: PropTypes.string, b: (PropTypes.string.isRequired as any) };`, Options: map[string]any{"requiredFirst": true}, Tsx: true},
+		// Identifier resolution likewise keeps TypeScript assertions opaque.
+		{Code: `const p = ({ z: PropTypes.string, a: PropTypes.string } as const); Component.propTypes = p;`, Tsx: true},
+		// Shape sorting only examines a direct object or identifier argument.
+		{Code: `PropTypes.shape(forbidExtraProps({ z: PropTypes.string, a: PropTypes.string }));`, Options: map[string]any{"sortShapeProp": true}, Settings: map[string]interface{}{"propWrapperFunctions": []any{"forbidExtraProps"}}, Tsx: true},
+		// JavaScript relational string ordering compares UTF-16 code units.
+		{Code: `Component.propTypes = { "\u{10000}": PropTypes.string, "\uE000": PropTypes.string };`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// Locks in upstream callbackPropsLastSeen: report a misplaced callback only once.
 		{Code: `Component.propTypes = { onChange: PropTypes.func, a: PropTypes.string, b: PropTypes.string };`, Options: map[string]any{"callbacksLast": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "callbackPropsLast", Line: 1, Column: 25}}},
@@ -48,5 +64,11 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `type Props = { z: string; a: string }; function Component(props: Props) { return null; }`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted", Line: 1, Column: 27}}},
 		// ---- Real-user: #3578 inline TypeScript component props ----
 		{Code: `const Component = (props: { z: string; a: string }) => null;`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted", Line: 1, Column: 40}}},
+		// Typed class fields named `props` are checked by the upstream rule.
+		{Code: `class Component { static props: unknown = { z: PropTypes.string, a: PropTypes.string }; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Computed identifier keys are recognized, while quoted keys are not.
+		{Code: `const C = { [propTypes]: { z: PropTypes.string, a: PropTypes.string } };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// An object/property wrapper entry also matches the bare property name.
+		{Code: `Component.propTypes = assign({ z: PropTypes.string, a: PropTypes.string });`, Settings: map[string]interface{}{"propWrapperFunctions": []any{map[string]interface{}{"object": "Object", "property": "assign"}}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
 	})
 }
