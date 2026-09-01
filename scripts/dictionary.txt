@@ -230,7 +230,12 @@ gcflags
 GDSFP
 Geor
 getsp
+gimu
 gimuygimuygimuy
+gimv
+gimvy
+gimy
+gimyu
 github
 glossref
 gnored
