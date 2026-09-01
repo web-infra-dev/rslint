@@ -14,6 +14,10 @@ func TestHookUseStateExtras(t *testing.T) {
 		// ---- Dimension 4: parenthesized receiver and callee ----
 		{Code: `import React from 'react'; const [value, setValue] = (React).useState()`, Tsx: true},
 		{Code: `import { useState } from 'react'; const [value, setValue] = (useState)()`, Tsx: true},
+		// ESTree elides parentheses around the call expression itself too.
+		{Code: `import { useState } from 'react'; const [value, setValue] = (useState())`, Tsx: true},
+		// eslint-plugin-react under ESLint 10 does not recognize renamed named imports.
+		{Code: `import { useState as state } from 'react'; const result = state()`, Tsx: true},
 		// ---- Dimension 4: element access does not match the identifier-property gate ----
 		{Code: `import React from 'react'; const result = React['useState']()`, Tsx: true},
 		// ---- Dimension 4: TS wrappers are explicit and remain non-destructured ----
@@ -44,6 +48,21 @@ const [value, {setValue}] = useState()`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
 const [value, setValue] = useState()`}}}}, Tsx: true,
+		},
+		// Optional calls are still React hook calls upstream.
+		hookUseStateError(`import { useState } from 'react';
+const [value, setValue] = useState?.()`, useStateErrorText, 2, 27),
+		// ESTree represents either defaulted binding element as an AssignmentPattern.
+		hookUseStateError(`import { useState } from 'react';
+const [value = initialValue, setValue] = useState()`, useStateErrorText, 2, 7),
+		{
+			Code: `import { useState } from 'react';
+const [value, setValue = initialSetter] = useState()`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
+const [value, setValue] = useState()`}},
+			}}, Tsx: true,
 		},
 		// ---- Dimension 4: nested array value has option-specific diagnostic ----
 		hookUseStateError(`import { useState } from 'react';

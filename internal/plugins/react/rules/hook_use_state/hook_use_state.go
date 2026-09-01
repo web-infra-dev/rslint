@@ -121,7 +121,9 @@ func resolvesToNamedUseState(ctx rule.RuleContext, ident *ast.Node) bool {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if decl != nil && decl.Kind == ast.KindImportSpecifier && importedName(decl) == "useState" && isReactImportDeclaration(decl) {
+		if decl != nil && decl.Kind == ast.KindImportSpecifier &&
+			importedName(decl) == "useState" && localName(decl) == "useState" &&
+			isReactImportDeclaration(decl) {
 			return true
 		}
 	}
@@ -173,20 +175,27 @@ func isReactUseStateCall(ctx rule.RuleContext, node *ast.Node) bool {
 	return resolvesToDefaultReactImport(ctx, ast.SkipParentheses(access.Expression))
 }
 
-func bindingElementName(node *ast.Node) *ast.Node {
-	if node == nil || node.Kind != ast.KindBindingElement {
-		return nil
-	}
-	return node.AsBindingElement().Name()
-}
-
 func isDestructuringBinding(node *ast.Node) bool {
-	name := bindingElementName(node)
+	if node == nil || node.Kind != ast.KindBindingElement {
+		return false
+	}
+	element := node.AsBindingElement()
+	if element.Initializer != nil || element.DotDotDotToken != nil {
+		return false
+	}
+	name := element.Name()
 	return name != nil && (name.Kind == ast.KindArrayBindingPattern || name.Kind == ast.KindObjectBindingPattern)
 }
 
 func identifierBindingName(node *ast.Node) string {
-	name := bindingElementName(node)
+	if node == nil || node.Kind != ast.KindBindingElement {
+		return ""
+	}
+	element := node.AsBindingElement()
+	if element.Initializer != nil || element.DotDotDotToken != nil {
+		return ""
+	}
+	name := element.Name()
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return ""
 	}
@@ -248,7 +257,16 @@ var HookUseStateRule = rule.Rule{
 				if !isReactUseStateCall(ctx, node) {
 					return
 				}
+				// ESTree wraps an optional call in ChainExpression, so it is not
+				// directly initialized by the variable declarator upstream.
+				if node.AsCallExpression().QuestionDotToken != nil {
+					ctx.ReportNode(node, useStateErrorMessage())
+					return
+				}
 				parent := node.Parent
+				for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+					parent = parent.Parent
+				}
 				if parent != nil && parent.Kind == ast.KindReturnStatement {
 					return
 				}

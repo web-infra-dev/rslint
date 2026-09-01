@@ -12,6 +12,7 @@ import (
 func TestHookUseStateUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &HookUseStateRule, []rule_tester.ValidTestCase{
 		{Code: `import { useState } from 'react'; const [color, setColor] = useState()`, Tsx: true},
+		{Code: `import { useState as alternative } from 'react'; const result = alternative()`, Tsx: true},
 		{Code: `import { useState } from 'react'; const [rgb, setRGB] = useState()`, Tsx: true},
 		{Code: `import { useState } from 'react'; const [rgbValue, setRGBValue] = useState()`, Tsx: true},
 		{Code: `import React from 'react'; const [color, setColor] = React.useState()`, Tsx: true},
@@ -27,8 +28,6 @@ func TestHookUseStateUpstream(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{
 		hookUseStateError(`import { useState } from 'react';
 const result = useState()`, useStateErrorText, 2, 16),
-		hookUseStateError(`import { useState as alternative } from 'react';
-const result = alternative()`, useStateErrorText, 2, 16),
 		hookUseStateError(`import React from 'react';
 const result = React.useState()`, useStateErrorText, 2, 16),
 		hookUseStateError(`import { useState } from 'react';
