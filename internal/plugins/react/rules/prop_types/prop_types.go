@@ -260,27 +260,50 @@ func setComponentDeclared(c *component, n *ast.Node, customValidators []string, 
 }
 
 func visibleTypeAlias(use *ast.Node, candidates []*ast.Node) *ast.Node {
-	var best *ast.Node
+	visible := visibleTypeAliases(use, candidates)
+	if len(visible) == 0 {
+		return nil
+	}
+	return visible[0]
+}
+
+func visibleTypeAliases(use *ast.Node, candidates []*ast.Node) []*ast.Node {
 	bestDepth := -1
+	var visible []*ast.Node
 	for _, candidate := range candidates {
 		if candidate == nil {
+			continue
+		}
+		declarationScope := typeDeclarationScope(candidate)
+		if declarationScope == nil {
 			continue
 		}
 		for scope, depth := use, 0; scope != nil; scope, depth = scope.Parent, depth+1 {
 			if scope.Kind != ast.KindBlock && scope.Kind != ast.KindSourceFile && scope.Kind != ast.KindModuleBlock {
 				continue
 			}
-			for declarationScope := candidate.Parent; declarationScope != nil; declarationScope = declarationScope.Parent {
-				if declarationScope == scope {
-					if best == nil || depth < bestDepth {
-						best, bestDepth = candidate, depth
-					}
-					break
+			if declarationScope == scope {
+				if bestDepth < 0 || depth < bestDepth {
+					bestDepth = depth
+					visible = []*ast.Node{candidate}
+				} else if depth == bestDepth {
+					visible = append(visible, candidate)
 				}
+				break
 			}
 		}
 	}
-	return best
+	return visible
+}
+
+func typeDeclarationScope(n *ast.Node) *ast.Node {
+	for parent := n.Parent; parent != nil; parent = parent.Parent {
+		switch parent.Kind {
+		case ast.KindBlock, ast.KindSourceFile, ast.KindModuleBlock:
+			return parent
+		}
+	}
+	return nil
 }
 
 func returnTypePropMap(query *ast.Node) (map[string]propType, bool) {
@@ -306,10 +329,15 @@ func returnTypePropMap(query *ast.Node) (map[string]propType, bool) {
 	return propMap(body, nil)
 }
 
-func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, depth int) (map[string]propType, bool) {
-	if n == nil || depth == 0 {
+func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, seen map[*ast.Node]bool) (map[string]propType, bool) {
+	if n == nil {
 		return nil, false
 	}
+	if seen[n] {
+		return map[string]propType{"__ANY_KEY__": {any: true}}, true
+	}
+	seen[n] = true
+	defer delete(seen, n)
 	var members *ast.TypeElementList
 	switch n.Kind {
 	case ast.KindTypeLiteral:
@@ -317,7 +345,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 	case ast.KindInterfaceDeclaration:
 		members = n.AsInterfaceDeclaration().Members
 	case ast.KindTypeAliasDeclaration:
-		return declaredType(n.AsTypeAliasDeclaration().Type, aliases, aliasesBySymbol, depth-1)
+		return declaredType(n.AsTypeAliasDeclaration().Type, aliases, aliasesBySymbol, seen)
 	case ast.KindTypeReference:
 		ref := n.AsTypeReferenceNode()
 		if ref.TypeName != nil && reactutil.EntityNameRightmost(ref.TypeName) != nil && reactutil.EntityNameRightmost(ref.TypeName).AsIdentifier().Text == "ReturnType" && ref.TypeArguments != nil && len(ref.TypeArguments.Nodes) == 1 {
@@ -329,8 +357,9 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		if name != nil {
 			// TypeScript declaration merging exposes one symbol for every interface
 			// declaration. Preserve all same-name interface members, as upstream does.
+			visible := visibleTypeAliases(n, aliases[name.AsIdentifier().Text])
 			var interfaces []*ast.Node
-			for _, candidate := range aliases[name.AsIdentifier().Text] {
+			for _, candidate := range visible {
 				if candidate != nil && candidate.Kind == ast.KindInterfaceDeclaration {
 					interfaces = append(interfaces, candidate)
 				}
@@ -338,19 +367,22 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 			if len(interfaces) > 1 {
 				merged := map[string]propType{}
 				for _, candidate := range interfaces {
-					if members, ok := declaredType(candidate, aliases, aliasesBySymbol, depth-1); ok {
+					if members, ok := declaredType(candidate, aliases, aliasesBySymbol, seen); ok {
 						mergeDeclared(merged, members)
 					}
 				}
 				return merged, true
 			}
+			if len(visible) == 1 {
+				return declaredType(visible[0], aliases, aliasesBySymbol, seen)
+			}
 			if symbol := name.Symbol(); symbol != nil {
 				if declaration := aliasesBySymbol[symbol]; declaration != nil {
-					return declaredType(declaration, aliases, aliasesBySymbol, depth-1)
+					return declaredType(declaration, aliases, aliasesBySymbol, seen)
 				}
 			}
 			if declaration := visibleTypeAlias(n, aliases[name.AsIdentifier().Text]); declaration != nil {
-				return declaredType(declaration, aliases, aliasesBySymbol, depth-1)
+				return declaredType(declaration, aliases, aliasesBySymbol, seen)
 			}
 		}
 		// Imported or otherwise unresolved annotations are opaque upstream and
@@ -359,20 +391,20 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 	case ast.KindIdentifier:
 		if symbol := n.Symbol(); symbol != nil {
 			if declaration := aliasesBySymbol[symbol]; declaration != nil {
-				return declaredType(declaration, aliases, aliasesBySymbol, depth-1)
+				return declaredType(declaration, aliases, aliasesBySymbol, seen)
 			}
 		}
 		if declaration := visibleTypeAlias(n, aliases[n.AsIdentifier().Text]); declaration != nil {
-			return declaredType(declaration, aliases, aliasesBySymbol, depth-1)
+			return declaredType(declaration, aliases, aliasesBySymbol, seen)
 		}
 		return map[string]propType{"__ANY_KEY__": {any: true}}, true
 	case ast.KindParenthesizedType:
-		return declaredType(n.AsParenthesizedTypeNode().Type, aliases, aliasesBySymbol, depth-1)
+		return declaredType(n.AsParenthesizedTypeNode().Type, aliases, aliasesBySymbol, seen)
 	case ast.KindIntersectionType:
 		declared := map[string]propType{}
 		found := false
 		for _, part := range n.AsIntersectionTypeNode().Types.Nodes {
-			if members, ok := declaredType(part, aliases, aliasesBySymbol, depth-1); ok {
+			if members, ok := declaredType(part, aliases, aliasesBySymbol, seen); ok {
 				for name, prop := range members {
 					declared[name] = prop
 				}
@@ -388,7 +420,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		declared := map[string]propType{}
 		found := false
 		for _, part := range n.AsUnionTypeNode().Types.Nodes {
-			if members, ok := declaredType(part, aliases, aliasesBySymbol, depth-1); ok {
+			if members, ok := declaredType(part, aliases, aliasesBySymbol, seen); ok {
 				mergeDeclared(declared, members)
 				found = true
 			}
@@ -411,7 +443,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 			if property != nil {
 				if name := keyName(property.Name()); name != "" {
 					if property.Type != nil {
-						declared[name] = propTypeFromType(property.Type.AsNode(), aliases, aliasesBySymbol, depth-1)
+						declared[name] = propTypeFromType(property.Type.AsNode(), aliases, aliasesBySymbol, seen)
 					} else {
 						// TypeScript permits a property signature without an annotation.
 						// It is still a declared prop, but its nested shape is unknown.
@@ -442,7 +474,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 					if name := reactutil.EntityNameRightmost(entry.Expression); name != nil && name.AsIdentifier().Text == "ReturnType" && entry.TypeArguments != nil && len(entry.TypeArguments.Nodes) == 1 {
 						base, ok = returnTypePropMap(entry.TypeArguments.Nodes[0])
 					} else {
-						base, ok = declaredType(entry.Expression, aliases, aliasesBySymbol, depth-1)
+						base, ok = declaredType(entry.Expression, aliases, aliasesBySymbol, seen)
 					}
 					if ok {
 						mergeDeclared(declared, base)
@@ -458,7 +490,7 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 	return declared, true
 }
 
-func propTypeFromType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, depth int) propType {
+func propTypeFromType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, seen map[*ast.Node]bool) propType {
 	// Upstream validates TypeScript props at the declared property boundary only.
 	return propType{open: true}
 }
@@ -601,11 +633,8 @@ func reactComponentTypeArgument(typeNode *ast.Node) *ast.Node {
 			return nil
 		}
 		qualifier := qualified.AsQualifiedName().Left.AsIdentifier().Text
-		if qualifier != "React" {
-			root := ast.GetSourceFileOfNode(name)
-			if root == nil || !strings.Contains(root.Text(), "* as "+qualifier) || (!strings.Contains(root.Text(), `"react"`) && !strings.Contains(root.Text(), `'react'`)) {
-				return nil
-			}
+		if qualifier != "React" && !importedReactNamespace(name, qualifier) {
+			return nil
 		}
 		typeName = name.AsIdentifier().Text
 	}
@@ -616,6 +645,40 @@ func reactComponentTypeArgument(typeNode *ast.Node) *ast.Node {
 		return nil
 	}
 	return arguments.Nodes[0]
+}
+
+func importedReactNamespace(name *ast.Node, localName string) bool {
+	if name == nil || localName == "" {
+		return false
+	}
+	root := ast.GetSourceFileOfNode(name)
+	if root == nil {
+		return false
+	}
+	found := false
+	var visit ast.Visitor
+	visit = func(n *ast.Node) bool {
+		if n == nil || found {
+			return false
+		}
+		if n.Kind == ast.KindNamespaceImport {
+			ns := n.AsNamespaceImport()
+			if ns != nil && ns.Name() != nil && ns.Name().Kind == ast.KindIdentifier && ns.Name().AsIdentifier().Text == localName {
+				for parent := n.Parent; parent != nil; parent = parent.Parent {
+					if parent.Kind != ast.KindImportDeclaration {
+						continue
+					}
+					module := parent.AsImportDeclaration().ModuleSpecifier
+					found = module != nil && module.Kind == ast.KindStringLiteral && module.Text() == "react"
+					break
+				}
+			}
+		}
+		n.ForEachChild(visit)
+		return false
+	}
+	root.Node.ForEachChild(visit)
+	return found
 }
 
 // importedReactTypeName returns the exported name for a locally aliased React
@@ -1263,7 +1326,7 @@ var PropTypesRule = rule.Rule{
 					if c.binding != nil {
 						byBinding[c.binding] = c
 					}
-					if declared, ok := declaredType(classPropsType(n), typeAliases, typeAliasesBySymbol, 64); ok {
+					if declared, ok := declaredType(classPropsType(n), typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}); ok {
 						c.declared = declared
 						c.declaredBlock = true
 					}
@@ -1304,14 +1367,14 @@ var PropTypesRule = rule.Rule{
 							addDestructured(c, name, nil, true)
 						}
 						if parameter.Type != nil {
-							if declared, ok := declaredType(parameter.Type.AsNode(), typeAliases, typeAliasesBySymbol, 64); ok {
+							if declared, ok := declaredType(parameter.Type.AsNode(), typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}); ok {
 								c.declared = declared
 								c.declaredBlock = true
 							}
-						} else if declared, ok := declaredType(reactComponentTypeArgument(componentVariableType(n)), typeAliases, typeAliasesBySymbol, 64); ok {
+						} else if declared, ok := declaredType(reactComponentTypeArgument(componentVariableType(n)), typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}); ok {
 							c.declared = declared
 							c.declaredBlock = true
-						} else if declared, ok := declaredType(forwardRefPropsType(n), typeAliases, typeAliasesBySymbol, 64); ok {
+						} else if declared, ok := declaredType(forwardRefPropsType(n), typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}); ok {
 							c.declared = declared
 							c.declaredBlock = true
 						}
@@ -1353,7 +1416,7 @@ var PropTypesRule = rule.Rule{
 				pd := n.AsPropertyDeclaration()
 				if keyName(pd.Name()) == "props" && !ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) {
 					if c := componentFor(n.Parent, comps); c != nil && pd.Type != nil {
-						if declared, ok := declaredType(pd.Type.AsNode(), typeAliases, typeAliasesBySymbol, 64); ok {
+						if declared, ok := declaredType(pd.Type.AsNode(), typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}); ok {
 							c.declared = declared
 							c.declaredBlock = true
 						}

@@ -1,6 +1,8 @@
 package prop_types
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
@@ -8,6 +10,12 @@ import (
 )
 
 func TestPropTypesRuleExtras(t *testing.T) {
+	var longAlias strings.Builder
+	for i := range 65 {
+		fmt.Fprintf(&longAlias, "type A%02d = A%02d; ", i, i+1)
+	}
+	longAlias.WriteString("type A65 = { name: string }; function Hello(props: A00) { return <div>{props.name}</div>; }")
+
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PropTypesRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.shape({ name: PropTypes.string }) };`, Tsx: true},
@@ -53,6 +61,7 @@ func TestPropTypesRuleExtras(t *testing.T) {
 			{Code: `function Hello(props) { return <div>{props[1n]}</div>; }`, Tsx: true},
 			{Code: `const Hello: React.FC<{ name: string }> = props => <div>{props.name}</div>;`, Tsx: true},
 			{Code: `const Hello = React.forwardRef<HTMLDivElement, { name: string }>((props, ref) => <div ref={ref}>{props.name}</div>);`, Tsx: true},
+			{Code: longAlias.String(), Tsx: true},
 			{Code: `Hello.propTypes = { name: PropTypes.string }; function Hello(props) { return <div>{props.name}</div>; }`, Tsx: true},
 			{Code: `interface Props { outer: string } { interface Props { inner: string } function Inner(props: Props) { return <div>{props.inner}</div>; } } function Outer(props: Props) { return <div>{props.outer}</div>; }`, Tsx: true},
 			{Code: `function Hello(props) { return <div>{props.outer}</div>; } Hello.propTypes = { outer: PropTypes.string }; { function Hello(props) { return <div>{props.inner}</div>; } Hello.propTypes = { inner: PropTypes.string }; }`, Tsx: true},
@@ -92,5 +101,7 @@ func TestPropTypesRuleExtras(t *testing.T) {
 			{Code: `type Props = {}; namespace Fake { export type FC<T> = T } const Hello: Fake.FC<Props> = props => <div>{props.name}</div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
 			{Code: `function Outer({ outer }) { function Inner() { return <span>{outer}</span>; } return <Inner />; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'outer' is missing in props validation`}}},
 			{Code: `const key = 'other'; function Hello(props) { return <div>{props.name}</div>; } Hello.propTypes = { [key]: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `interface Props { outer: string } { interface Props { inner: string } function Inner(props: Props) { return <div>{props.inner}</div>; } } function Outer(props: Props) { return <div>{props.inner}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'inner' is missing in props validation`}}},
+			{Code: `import * as R from 'not-react'; import React from 'react'; type Props = { name: string }; const Hello: R.FC<Props> = props => <div>{props.name}</div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
 		})
 }

@@ -1,5 +1,7 @@
 package prop_types
 
+// cspell:ignore lastname stri salut libdef rollbar Ifoo iconfont notok formik
+
 import (
 	"testing"
 
