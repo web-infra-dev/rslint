@@ -61,7 +61,7 @@ func (ctx *RuleContext) IsExportedGlobalBinding(decl *ast.Node, name string) boo
 	if ctx == nil || decl == nil || ctx.SourceFile == nil || !ctx.Exported.Has(name) {
 		return false
 	}
-	if ast.IsExternalModule(ctx.SourceFile) || (ctx.Refs != nil && ctx.Refs.HasNonGlobalTopLevelScope()) {
+	if ast.IsExternalModule(ctx.SourceFile) || (ctx.Refs != nil && ctx.Refs.HasNonGlobalProgramScope()) {
 		return false
 	}
 	return bindingScopeContainer(decl) == ctx.SourceFile.AsNode()

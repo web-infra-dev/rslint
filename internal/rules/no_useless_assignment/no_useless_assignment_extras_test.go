@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -194,9 +195,9 @@ class C { handler(@Body(pipe) _b: unknown) {} }`},
 			{Code: `/* exported v */
 let v = 1;
 console.log(v);
-v = 2;`},
+v = 2;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 			{Code: `/* exported v */
-{ var v = 1; console.log(v); v = 2; }`},
+{ var v = 1; console.log(v); v = 2; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- `/* exported */` names the global scope, so a block or

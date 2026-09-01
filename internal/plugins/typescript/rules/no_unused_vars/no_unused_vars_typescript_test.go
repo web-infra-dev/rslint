@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -525,16 +526,16 @@ export interface Constructable {
 // file can bind at its top level.
 func TestNoUnusedVarsExportedDirective(t *testing.T) {
 	validTestCases := []rule_tester.ValidTestCase{
-		{Code: `/* exported publicValue */ var publicValue = 1;`},
-		{Code: `/* exported publicFn */ function publicFn() {}`},
-		{Code: `/* exported PublicClass */ class PublicClass {}`},
-		{Code: `/* exported PublicInterface */ interface PublicInterface { a: string }`},
-		{Code: `/* exported PublicType */ type PublicType = string;`},
-		{Code: `/* exported PublicEnum */ enum PublicEnum { A }`},
-		{Code: `/* exported PublicNS */ namespace PublicNS { export const a = 1; }`},
-		{Code: `/* exported ambient */ declare var ambient: number;`},
+		{Code: `/* exported publicValue */ var publicValue = 1;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported publicFn */ function publicFn() {}`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicClass */ class PublicClass {}`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicInterface */ interface PublicInterface { a: string }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicType */ type PublicType = string;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicEnum */ enum PublicEnum { A }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicNS */ namespace PublicNS { export const a = 1; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported ambient */ declare var ambient: number;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 		// A `var` reaches the global scope from inside a block.
-		{Code: `/* exported hoisted */ { var hoisted = 1; }`},
+		{Code: `/* exported hoisted */ { var hoisted = 1; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 	}
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
@@ -543,11 +544,13 @@ func TestNoUnusedVarsExportedDirective(t *testing.T) {
 		{
 			Code: `/* exported param */ function outer(param: number) {}
 outer(1);`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 37}},
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 37}},
 		},
 		{
-			Code: `/* exported blockScoped */ { let blockScoped = 1; }`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 34}},
+			Code:            `/* exported blockScoped */ { let blockScoped = 1; }`,
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 34}},
 		},
 		{
 			Code: `/* exported moduleValue */ var moduleValue = 1;

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -306,11 +307,12 @@ func TestPreferConstRule(t *testing.T) {
 			// A global listed by `/* exported */` may be reassigned from another
 			// file, so it is never a const candidate — which also holds a
 			// destructuring group back under destructuring: "all".
-			{Code: `/* exported exportedLet */ let exportedLet = 1;`},
-			{Code: `/* exported exportedLet */ let exportedLet; exportedLet = 1;`},
+			{Code: `/* exported exportedLet */ let exportedLet = 1;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `/* exported exportedLet */ let exportedLet; exportedLet = 1;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 			{
-				Code:    `/* exported a */ let { a, b } = source;`,
-				Options: map[string]interface{}{"destructuring": "all"},
+				Code:            `/* exported a */ let { a, b } = source;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Options:         map[string]interface{}{"destructuring": "all"},
 			},
 		},
 		// Invalid cases
@@ -1247,7 +1249,8 @@ func TestPreferConstRule(t *testing.T) {
 			// Only the listed name is spared; the rest of the declaration is
 			// still judged, and the partial group blocks the fix.
 			{
-				Code: `/* exported a */ let { a, b } = source;`,
+				Code:            `/* exported a */ let { a, b } = source;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 27, EndLine: 1, EndColumn: 28},
 				},
