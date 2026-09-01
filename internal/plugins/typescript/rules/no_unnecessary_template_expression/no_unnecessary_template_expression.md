@@ -2,9 +2,13 @@
 
 ## Rule Details
 
-Disallow unnecessary template expressions.
+Disallow unnecessary expressions inside template literals and template literal
+types.
 
-Template literals that contain only a single string variable or simple literal values can be simplified. If a template literal contains a single interpolation with a string-typed expression and nothing else, the template wrapper is unnecessary.
+Literal interpolations can be written directly into the surrounding template.
+When a template contains only one string-typed expression, the template wrapper
+can be removed entirely. The rule provides an autofix for both forms while
+preserving template escapes.
 
 Examples of **incorrect** code for this rule:
 
@@ -13,6 +17,7 @@ const ab = `${'a'}`;
 const greeting = `${name}`; // when name is typed as string
 const value = `${true}`;
 const num = `${100}`;
+type EventName = `on${'Click'}`;
 ```
 
 Examples of **correct** code for this rule:
@@ -22,6 +27,7 @@ const ab = 'a';
 const greeting = name;
 const combined = `Hello, ${name}!`;
 const tagged = tag`${value}`;
+type EventName = 'onClick';
 ```
 
 ## Original Documentation
