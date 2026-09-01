@@ -1,6 +1,7 @@
 package rstest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/consistent_rstest_namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/hoisted_apis_on_top"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/max_expects"
@@ -8,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_expect"
 	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_hooks"
@@ -24,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_awaited_expect_poll"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_mock_type_parameters"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_test_timeout"
@@ -36,6 +39,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		consistent_rstest_namespace.ConsistentRstestNamespaceRule,
 		expect_expect.ExpectExpectRule,
 		hoisted_apis_on_top.HoistedApisOnTopRule,
 		max_expects.MaxExpectsRule,
@@ -43,6 +47,7 @@ func GetAllRules() []rule.Rule {
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_conditional_expect.NoConditionalExpectRule,
 		no_conditional_in.NoConditionalInTestRule,
+		no_conditional_tests.NoConditionalTestsRule,
 		no_disabled_tests.NoDisabledTestsRule,
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
@@ -59,6 +64,7 @@ func GetAllRules() []rule.Rule {
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_import_in_mock.PreferImportInMockRule,
 		prefer_todo.PreferTodoRule,
+		require_awaited_expect_poll.RequireAwaitedExpectPollRule,
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
 		require_mock_type_parameters.RequireMockTypeParametersRule,
 		require_test_timeout.RequireTestTimeoutRule,

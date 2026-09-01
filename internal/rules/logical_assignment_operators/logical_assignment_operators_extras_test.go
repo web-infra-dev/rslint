@@ -119,6 +119,15 @@ func TestLogicalAssignmentOperatorsExtras(t *testing.T) {
 			{Code: `a = b || a`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Review regression: a TypeScript wrapper around an ordinary assignment
+			// remains an AssignmentExpression, not an AssignmentPattern.
+			{
+				Code:   `[(foo = foo || bar) as any] = arr`,
+				Output: []string{`[(foo ||= bar) as any] = arr`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `assignment`, Message: `Assignment (=) can be replaced with operator assignment (||=).`, Line: 1, Column: 3, EndLine: 1, EndColumn: 19},
+				},
+			},
 			{
 				Code: `export {}; with (object) a = a || b`,
 				Errors: []rule_tester.InvalidTestCaseError{

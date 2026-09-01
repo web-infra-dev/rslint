@@ -33,6 +33,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/func_name_matching"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
+	"github.com/web-infra-dev/rslint/internal/rules/func_style"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/grouped_accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
@@ -259,6 +260,7 @@ func coreRules() []rule.Rule {
 		for_direction.ForDirectionRule,
 		func_name_matching.FuncNameMatchingRule,
 		func_names.FuncNamesRule,
+		func_style.FuncStyleRule,
 		getter_return.GetterReturnRule,
 		grouped_accessor_pairs.GroupedAccessorPairsRule,
 		guard_for_in.GuardForInRule,

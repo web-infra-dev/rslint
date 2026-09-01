@@ -754,6 +754,7 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidSaveInfo, (*Server).handleDidSave)
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidCloseInfo, (*Server).handleDidClose)
 	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
+	registerNotificationHandler(handlers, lsproto.SetTraceInfo, (*Server).handleSetTrace)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
 
 	handlers[methodConfigRefresh] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
@@ -774,6 +775,12 @@ var handlers = sync.OnceValue(func() handlerMap {
 
 	return handlers
 })
+
+func (s *Server) handleSetTrace(_ context.Context, _ *lsproto.SetTraceParams) error {
+	// vscode-languageclient generates Rslint's protocol trace on the client.
+	// Accept this standard notification without coupling server logging to it.
+	return nil
+}
 
 func registerNotificationHandler[Req any](handlers handlerMap, info lsproto.NotificationInfo[Req], fn func(*Server, context.Context, Req) error) {
 	handlers[info.Method] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {

@@ -104,6 +104,17 @@ func TestResolveFirstIdentifier(t *testing.T) {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.AsIdentifier().Text != "test" {
 		t.Fatalf("first identifier = %#v, want test", identifier)
 	}
+
+	_, commaCall := parseFirstCall(t, "(ignored, test)()")
+	identifier = ResolveFirstIdentifier(commaCall.AsCallExpression().Expression)
+	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.AsIdentifier().Text != "test" {
+		t.Fatalf("comma expression identifier = %#v, want test", identifier)
+	}
+
+	_, logicalCall := parseFirstCall(t, "(ignored || test)()")
+	if identifier := ResolveFirstIdentifier(logicalCall.AsCallExpression().Expression); identifier != nil {
+		t.Fatalf("logical expression identifier = %#v, want nil", identifier)
+	}
 }
 
 func TestCalleeChainName(t *testing.T) {

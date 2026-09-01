@@ -35,20 +35,90 @@ func parseOptions(rawOptions []any) options {
 	return opts
 }
 
-// isWriteThroughTypeAssertion checks if the identifier reaches its assignment target
-// through an AsExpression or TypeAssertionExpression. ESLint's scope analysis does not
-// track writes through these TS-specific wrappers, so we skip them to match ESLint.
-func isWriteThroughTypeAssertion(node *ast.Node) bool {
-	current := node.Parent
-	for current != nil {
-		switch current.Kind {
-		case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression:
-			return true
-		case ast.KindParenthesizedExpression, ast.KindNonNullExpression:
-			current = current.Parent
-			continue
+// hasStackedTypeWrappers reports whether the identifier reaches a direct
+// assignment or update target through more than one TypeScript expression
+// wrapper. ESLint's scope analysis unwraps such a target exactly once — an
+// AsExpression, TypeAssertionExpression or NonNullExpression — so
+// `(Object as any) = 1` is a write while `((Object as any) as any) = 1` is not.
+// Parentheses never count because the ESTree AST has no node for them.
+// Destructuring defaults are AssignmentPattern nodes in ESTree rather than
+// direct assignment targets, so their inner `=` must not stop this walk. A
+// `satisfies` target is not a write at any depth, which IsWriteReference already
+// answers.
+func hasStackedTypeWrappers(node *ast.Node) bool {
+	wrappers := 0
+	current := node
+	for parent := current.Parent; parent != nil; parent = current.Parent {
+		switch parent.Kind {
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindNonNullExpression:
+			wrappers++
+		case ast.KindParenthesizedExpression:
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary == nil || binary.OperatorToken == nil || binary.Left != current {
+				return false
+			}
+			if isDefaultValueInDestructuringAssignment(parent) {
+				return false
+			}
+			return wrappers > 1 && ast.IsAssignmentOperator(binary.OperatorToken.Kind)
+		case ast.KindPrefixUnaryExpression:
+			prefix := parent.AsPrefixUnaryExpression()
+			return wrappers > 1 && prefix != nil && prefix.Operand == current &&
+				(prefix.Operator == ast.KindPlusPlusToken || prefix.Operator == ast.KindMinusMinusToken)
+		case ast.KindPostfixUnaryExpression:
+			postfix := parent.AsPostfixUnaryExpression()
+			return wrappers > 1 && postfix != nil && postfix.Operand == current &&
+				(postfix.Operator == ast.KindPlusPlusToken || postfix.Operator == ast.KindMinusMinusToken)
 		default:
 			return false
+		}
+		current = parent
+	}
+	return false
+}
+
+// isDefaultValueInDestructuringAssignment extends the shared assignment-pattern
+// check only for this rule's scope-reference emulation. ESLint's scope walk
+// sees the TypeScript wrappers here before it reaches the enclosing pattern;
+// other rules inspect ESTree AssignmentExpression nodes and must not treat the
+// same wrappers as transparent.
+func isDefaultValueInDestructuringAssignment(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	binary := node.AsBinaryExpression()
+	if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+		return false
+	}
+
+	assignmentTargetNode := node
+	for parent := assignmentTargetNode.Parent; parent != nil; parent = assignmentTargetNode.Parent {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindTypeAssertionExpression,
+			ast.KindNonNullExpression,
+			ast.KindSatisfiesExpression:
+			assignmentTargetNode = parent
+		default:
+			target := ast.GetAssignmentTarget(assignmentTargetNode)
+			if target == nil {
+				return false
+			}
+			if ast.IsDestructuringAssignment(target) {
+				return true
+			}
+			if !ast.IsForInOrOfStatement(target) {
+				return false
+			}
+			statement := target.AsForInOrOfStatement()
+			if statement == nil || statement.Initializer == nil {
+				return false
+			}
+			initializer := ast.SkipParentheses(statement.Initializer)
+			return initializer != nil &&
+				(initializer.Kind == ast.KindArrayLiteralExpression || initializer.Kind == ast.KindObjectLiteralExpression)
 		}
 	}
 	return false
@@ -96,7 +166,7 @@ var NoGlobalAssignRule = rule.Rule{
 					return
 				}
 
-				if isWriteThroughTypeAssertion(node) {
+				if hasStackedTypeWrappers(node) {
 					return
 				}
 
