@@ -326,7 +326,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		// identical outcome for shorthand `{ a }`: key and value are the same
 		// node, so both branches reduce to "properties enabled and this is
 		// that node". See id_length.md analysis in the package doc.
-		return opts.properties && !isImportAttributeKey(node)
+		return opts.properties && !utils.IsImportAttributeKey(node)
 
 	case ast.KindImportSpecifier:
 		return isValidImportSpecifier(effectiveParent, wrapped)
@@ -409,7 +409,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		// non-pattern branch and is therefore gated on `properties`.
 		switch effectiveParent.Parent.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return isPlainClassMember(effectiveParent)
+			return utils.IsPlainClassMember(effectiveParent)
 		case ast.KindObjectLiteralExpression:
 			return isValidPlainProperty(opts, effectiveParent.Name(), node)
 		}
@@ -418,7 +418,7 @@ func isValidPosition(opts idLengthOptions, node *ast.Node) bool {
 		return false
 
 	case ast.KindPropertyDeclaration:
-		if !isPlainClassMember(effectiveParent) {
+		if !utils.IsPlainClassMember(effectiveParent) {
 			return false
 		}
 		pd := effectiveParent.AsPropertyDeclaration()
@@ -625,7 +625,7 @@ func unwrapParens(node *ast.Node) *ast.Node {
 // the key's text is also flagged (`{ a: a }` flags both `a`s in an ordinary
 // object literal). isValidPlainProperty preserves that.
 func isValidPlainProperty(opts idLengthOptions, keyNode, node *ast.Node) bool {
-	if !opts.properties || isImportAttributeKey(node) {
+	if !opts.properties || utils.IsImportAttributeKey(node) {
 		return false
 	}
 	// Upstream's non-pattern branch guards on `!parent.computed`, so a computed
@@ -703,23 +703,13 @@ func isValidComputedPropertyNameOwner(owner *ast.Node) bool {
 		// ESTree Property, whose non-pattern branch requires `!parent.computed`.
 		switch owner.Parent.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return isPlainClassMember(owner)
+			return utils.IsPlainClassMember(owner)
 		}
 		return false
 	case ast.KindPropertyDeclaration:
-		return isPlainClassMember(owner)
+		return utils.IsPlainClassMember(owner)
 	}
 	return false
-}
-
-// isPlainClassMember reports whether a class member maps to ESTree's
-// MethodDefinition/PropertyDefinition — the two unconditional entries in
-// upstream's dispatch. An `abstract` or `accessor` member does not: it
-// becomes a TSAbstractMethodDefinition, TSAbstractPropertyDefinition,
-// TSAbstractAccessorProperty or AccessorProperty instead, none of which are
-// supported parents, so their names go unchecked.
-func isPlainClassMember(member *ast.Node) bool {
-	return !ast.HasSyntacticModifier(member, ast.ModifierFlagsAbstract|ast.ModifierFlagsAccessor)
 }
 
 // isValidMemberExpressionTarget reports whether a non-computed
@@ -781,70 +771,6 @@ func isValidMemberExpressionTarget(pae *ast.Node) bool {
 		be := ggp.AsBinaryExpression()
 		return ast.IsAssignmentOperator(be.OperatorToken.Kind) && be.Left == container
 	}
-	return false
-}
-
-// isImportAttributeKey ports ESLint's ast-utils.isImportAttributeKey: is node
-// used as an import attribute key, either in a static
-// `import ... with { key: ... }` / `export ... from ... with { key: ... }`,
-// or a dynamic `import(specifier, { with: { key: ... } })`. Import attribute
-// keys are syntactic and not names the developer is free to choose, so
-// id-length exempts them the same way ESLint does.
-func isImportAttributeKey(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-
-	// static import/re-export: import ... with { key: value }
-	if parent.Kind == ast.KindImportAttribute && parent.AsImportAttribute().Name() == node {
-		return true
-	}
-
-	// dynamic import: import(specifier, { with: { key: value } })
-	//
-	// Methods and accessors are Property nodes in ESTree just like `key:
-	// value` pairs, so their key counts here too.
-	switch parent.Kind {
-	case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-	default:
-		return false
-	}
-	if parent.Name() != node {
-		return false
-	}
-	objectExpression := parent.Parent
-	if objectExpression == nil || objectExpression.Kind != ast.KindObjectLiteralExpression {
-		return false
-	}
-	// ESLint's AST has no parentheses, so an options object written as
-	// `import("m", ({ with: ... }))` or `{ with: ({ ... }) }` still reaches the
-	// call / the outer property directly.
-	outer := skipParens(objectExpression)
-	objectExpressionParent := outer.Parent
-	if objectExpressionParent == nil {
-		return false
-	}
-
-	if objectExpressionParent.Kind == ast.KindCallExpression {
-		call := objectExpressionParent.AsCallExpression()
-		if call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword &&
-			call.Arguments != nil && len(call.Arguments.Nodes) > 1 && call.Arguments.Nodes[1] == outer {
-			return true
-		}
-	}
-
-	// nested key: import(specifier, { with: { key: value } }) — recurse on
-	// the outer "with" key once we've confirmed this object is that
-	// property's value.
-	if objectExpressionParent.Kind == ast.KindPropertyAssignment {
-		outerPa := objectExpressionParent.AsPropertyAssignment()
-		if outerPa.Initializer == outer {
-			return isImportAttributeKey(objectExpressionParent.Name())
-		}
-	}
-
 	return false
 }
 

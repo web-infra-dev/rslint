@@ -10,17 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
-
-type realpathSpyFS struct {
-	vfs.FS
-	calls []string
-}
 
 type gatedStartWriter struct {
 	entered chan<- string
@@ -42,11 +36,6 @@ func (w gatedStartWriter) Write(p []byte) (int, error) {
 	w.entered <- string(p)
 	<-w.release
 	return len(p), nil
-}
-
-func (fsys *realpathSpyFS) Realpath(path string) string {
-	fsys.calls = append(fsys.calls, path)
-	return path
 }
 
 func TestLintReportOutcome(t *testing.T) {
@@ -100,16 +89,113 @@ func TestLintReportOutcome(t *testing.T) {
 	}
 }
 
+func TestAssembleLintReportProjectsCountsAndOutcomeOnce(t *testing.T) {
+	errorDiagnostic, comparePaths := createTestDiagnostic(t, "const value = 1;\n", 6, 11)
+	errorDiagnostic.Origin = rule.DiagnosticOriginTypeScript
+	warningDiagnostic := errorDiagnostic
+	warningDiagnostic.RuleName = "warning-rule"
+	warningDiagnostic.Message.Description = "warning message"
+	warningDiagnostic.Severity = rule.SeverityWarning
+	warningDiagnostic.Origin = rule.DiagnosticOriginLint
+
+	report, err := assembleLintReport(lintReportInput{
+		Mode:        output.ModeLintAndTypeCheck,
+		Diagnostics: []rule.RuleDiagnostic{errorDiagnostic, warningDiagnostic},
+		MaxWarnings: 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := report.Counts(), (output.Counts{
+		Errors: 1, Warnings: 1, TypeErrors: 1,
+	}); got != want {
+		t.Fatalf("counts = %+v, want %+v", got, want)
+	}
+	if got := report.Outcome(); got.Kind != output.OutcomeDiagnosticsFailed {
+		t.Fatalf("outcome = %+v, want diagnostic failure precedence", got)
+	}
+
+	var rendered bytes.Buffer
+	if err := output.Render(&rendered, report, output.Options{
+		Format:       output.FormatJSONLine,
+		ComparePaths: comparePaths,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got := rendered.String()
+	if !strings.Contains(got, `"message":"Test diagnostic"`) ||
+		!strings.Contains(got, `"message":"warning message"`) ||
+		!strings.Contains(got, `"line":1`) {
+		t.Fatalf("projected machine report = %q", got)
+	}
+}
+
+func TestAssembleLintReportRejectsIncompleteDomainDiagnostic(t *testing.T) {
+	_, err := assembleLintReport(lintReportInput{
+		Mode: output.ModeLint,
+		Diagnostics: []rule.RuleDiagnostic{{
+			RuleName: "broken",
+			FilePath: "/repo/broken.ts",
+			Severity: rule.SeverityError,
+		}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "has no source file") {
+		t.Fatalf("assemble error = %v, want missing source rejection", err)
+	}
+}
+
+func TestAssembleLintReportRejectsUnknownDiagnosticClassifications(t *testing.T) {
+	diagnostic, _ := createTestDiagnostic(t, "const value = 1;\n", 6, 11)
+	for _, test := range []struct {
+		name   string
+		mutate func(*rule.RuleDiagnostic)
+		want   string
+	}{
+		{
+			name: "severity",
+			mutate: func(diagnostic *rule.RuleDiagnostic) {
+				diagnostic.Severity = rule.DiagnosticSeverity(255)
+			},
+			want: "invalid diagnostic severity 255",
+		},
+		{
+			name: "origin",
+			mutate: func(diagnostic *rule.RuleDiagnostic) {
+				diagnostic.Origin = rule.DiagnosticOrigin(255)
+			},
+			want: "invalid diagnostic origin 255",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			invalid := diagnostic
+			test.mutate(&invalid)
+			_, err := assembleLintReport(lintReportInput{
+				Mode:        output.ModeLint,
+				Diagnostics: []rule.RuleDiagnostic{invalid},
+			})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("assemble error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestRenderLintReportStopsBeforeCompletedStatusAfterCancellation(t *testing.T) {
 	t.Run("canceled before report", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		var dst bytes.Buffer
+		report, reportErr := assembleLintReport(lintReportInput{
+			Mode:    output.ModeLint,
+			Summary: &output.Summary{},
+		})
+		if reportErr != nil {
+			t.Fatal(reportErr)
+		}
 		err := renderLintReport(
 			ctx,
 			&dst,
-			output.NewReport(nil, output.Metadata{Mode: output.ModeLint}),
-			output.Outcome{Kind: output.OutcomePassed},
+			report,
 			output.Options{Format: output.FormatDefault},
 		)
 		if !errors.Is(err, context.Canceled) {
@@ -122,20 +208,27 @@ func TestRenderLintReportStopsBeforeCompletedStatusAfterCancellation(t *testing.
 
 	t.Run("canceled after diagnostics flush", func(t *testing.T) {
 		diagnostic, comparePaths := createTestDiagnostic(t, "debugger;\n", 0, 8)
-		report := output.NewReport([]rule.RuleDiagnostic{diagnostic}, output.Metadata{
-			Mode:      output.ModeLint,
-			Files:     1,
-			Rules:     1,
-			Threads:   1,
-			StartedAt: time.Now(),
+		report, reportErr := assembleLintReport(lintReportInput{
+			Mode:        output.ModeLint,
+			Diagnostics: []rule.RuleDiagnostic{diagnostic},
+			Summary: &output.Summary{
+				Files:     1,
+				Rules:     1,
+				Threads:   1,
+				StartedAt: time.Now(),
+			},
+			MaxWarnings:   -1,
+			IncludeSource: true,
 		})
+		if reportErr != nil {
+			t.Fatal(reportErr)
+		}
 		ctx, cancel := context.WithCancel(context.Background())
 		var dst bytes.Buffer
 		err := renderLintReport(
 			ctx,
 			cancelAfterWriteWriter{dst: &dst, cancel: cancel},
 			report,
-			output.Outcome{Kind: output.OutcomeDiagnosticsFailed},
 			output.Options{
 				Format:       output.FormatDefault,
 				ComparePaths: comparePaths,
@@ -391,7 +484,11 @@ func TestLintReportFileCountUsesCanonicalUnion(t *testing.T) {
 		// A second lexical spelling of the same physical target must not count.
 		{PathIdentity: rslintconfig.PathIdentity{Path: "/alias/a.ts", CanonicalPath: "/physical/a.ts"}},
 	}
-	roots := []string{"/physical/b.ts", "/physical/c.ts", "/physical/c.ts"}
+	roots := []string{
+		rslintconfig.ExactPathID("/physical/b.ts"),
+		rslintconfig.ExactPathID("/physical/c.ts"),
+		rslintconfig.ExactPathID("/physical/c.ts"),
+	}
 
 	tests := []struct {
 		name string
@@ -404,16 +501,8 @@ func TestLintReportFileCountUsesCanonicalUnion(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fsys := &realpathSpyFS{}
-			if got := lintReportFileCount(test.mode, targets, roots, fsys); got != test.want {
+			if got := lintReportFileCount(test.mode, targets, roots); got != test.want {
 				t.Fatalf("lintReportFileCount() = %d, want %d", got, test.want)
-			}
-			wantRealpathCalls := 0
-			if test.mode != output.ModeLint {
-				wantRealpathCalls = len(roots)
-			}
-			if len(fsys.calls) != wantRealpathCalls {
-				t.Fatalf("Realpath calls = %v, want %d type-check root calls and no frozen-target calls", fsys.calls, wantRealpathCalls)
 			}
 		})
 	}

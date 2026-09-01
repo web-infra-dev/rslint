@@ -1,6 +1,9 @@
 package unicornutil
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import (
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
 
 // DotMethodCall is a non-computed method call matched by MatchDotMethodCall.
 type DotMethodCall struct {
@@ -32,8 +35,9 @@ type DotMethodCallOptions struct {
 
 // MatchDotMethodCall matches a dot-property CallExpression. Static bracket
 // access is intentionally excluded because unicorn's isMethodCall defaults to
-// computed:false. Parentheses are transparent except around optional-chain
-// callees, matching the upstream helper's semantics.
+// computed:false. Parentheses and JavaScript JSDoc casts are transparent
+// except around optional-chain callees, matching the ESTree view upstream.
+// Authored TypeScript assertions remain visible and therefore unmatched.
 func MatchDotMethodCall(node *ast.Node, options DotMethodCallOptions) (DotMethodCall, bool) {
 	if node == nil || !ast.IsCallExpression(node) {
 		return DotMethodCall{}, false
@@ -74,7 +78,7 @@ func MatchDotMethodCall(node *ast.Node, options DotMethodCallOptions) (DotMethod
 	}
 
 	rawCallee := call.Expression
-	callee := ast.SkipParentheses(rawCallee)
+	callee := utils.ESTreeRuntimeExpression(rawCallee)
 	if callee == nil || (rawCallee != callee && ast.IsOptionalChain(callee)) ||
 		!ast.IsPropertyAccessExpression(callee) {
 		return DotMethodCall{}, false

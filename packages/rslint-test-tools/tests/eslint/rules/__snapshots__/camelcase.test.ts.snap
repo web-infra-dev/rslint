@@ -1,0 +1,2543 @@
+// Rstest Snapshot v1
+
+exports[`camelcase > invalid 1`] = `
+{
+  "code": "first_name = "Nicholas"",
+  "diagnostics": [
+    {
+      "message": "Identifier 'first_name' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 2`] = `
+{
+  "code": "__private_first_name = "Patrick"",
+  "diagnostics": [
+    {
+      "message": "Identifier '__private_first_name' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 3`] = `
+{
+  "code": "function foo_bar(){}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo_bar' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 4`] = `
+{
+  "code": "obj.foo_bar = function(){};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo_bar' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 5`] = `
+{
+  "code": "bar_baz.foo = function(){};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar_baz' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 6`] = `
+{
+  "code": "[foo_bar.baz]",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo_bar' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 7`] = `
+{
+  "code": "if (foo.bar_baz === boom.bam_pow) { [foo_bar.baz] }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'foo_bar' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 8`] = `
+{
+  "code": "foo.bar_baz = boom.bam_pow",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar_baz' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 9`] = `
+{
+  "code": "var foo = { bar_baz: boom.bam_pow }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar_baz' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 10`] = `
+{
+  "code": "var foo = { bar_baz: boom.bam_pow }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar_baz' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 11`] = `
+{
+  "code": "foo.qux.boom_pow = { bar: boom.bam_pow }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'boom_pow' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 12`] = `
+{
+  "code": "var o = {bar_baz: 1}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar_baz' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 13`] = `
+{
+  "code": "obj.a_b = 2;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_b' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 14`] = `
+{
+  "code": "var { category_id: category_alias } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_alias' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 15`] = `
+{
+  "code": "var { category_id: category_alias } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_alias' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 16`] = `
+{
+  "code": "var { [category_id]: categoryId } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_id' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 17`] = `
+{
+  "code": "var { [category_id]: categoryId } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_id' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 18`] = `
+{
+  "code": "var { category_id: categoryId, ...other_props } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'other_props' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 19`] = `
+{
+  "code": "var { category_id } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_id' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 20`] = `
+{
+  "code": "var { category_id: category_id } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_id' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 21`] = `
+{
+  "code": "var { category_id = 1 } = query;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'category_id' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 22`] = `
+{
+  "code": "import no_camelcased from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 23`] = `
+{
+  "code": "import * as no_camelcased from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 24`] = `
+{
+  "code": "import { no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 25`] = `
+{
+  "code": "import { no_camelcased as no_camel_cased } from "external module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camel_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 26`] = `
+{
+  "code": "import { camelCased as no_camel_cased } from "external module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camel_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 27`] = `
+{
+  "code": "import { 'snake_cased' as snake_cased } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 28`] = `
+{
+  "code": "import { 'snake_cased' as another_snake_cased } from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'another_snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 29`] = `
+{
+  "code": "import { camelCased, no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 30`] = `
+{
+  "code": "import { no_camelcased as camelCased, another_no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'another_no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 31`] = `
+{
+  "code": "import camelCased, { no_camelcased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 32`] = `
+{
+  "code": "import no_camelcased, { another_no_camelcased as camelCased } from "external-module";",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 33`] = `
+{
+  "code": "import snake_cased from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 34`] = `
+{
+  "code": "import * as snake_cased from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 35`] = `
+{
+  "code": "import snake_cased from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 36`] = `
+{
+  "code": "import * as snake_cased from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 37`] = `
+{
+  "code": "var camelCased = snake_cased",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 38`] = `
+{
+  "code": "a_global_variable.foo()",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 39`] = `
+{
+  "code": "a_global_variable[undefined]",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 40`] = `
+{
+  "code": "var camelCased = snake_cased",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 41`] = `
+{
+  "code": "var camelCased = snake_cased",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 42`] = `
+{
+  "code": "foo.a_global_variable = bar",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 43`] = `
+{
+  "code": "var foo = { a_global_variable: bar }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 44`] = `
+{
+  "code": "var foo = { a_global_variable: a_global_variable }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 45`] = `
+{
+  "code": "var foo = { a_global_variable() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 46`] = `
+{
+  "code": "class Foo { a_global_variable() {} }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 47`] = `
+{
+  "code": "a_global_variable: for (;;);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 48`] = `
+{
+  "code": "if (foo) { let a_global_variable; a_global_variable = bar; }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 49`] = `
+{
+  "code": "function foo(a_global_variable) { foo = a_global_variable; }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 50`] = `
+{
+  "code": "var a_global_variable",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 51`] = `
+{
+  "code": "function a_global_variable () {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 52`] = `
+{
+  "code": "const a_global_variable = foo; bar = a_global_variable",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 53`] = `
+{
+  "code": "bar = a_global_variable; var a_global_variable;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 54`] = `
+{
+  "code": "var foo = { a_global_variable }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'a_global_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 55`] = `
+{
+  "code": "undefined_variable;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'undefined_variable' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 56`] = `
+{
+  "code": "implicit_global = 1;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'implicit_global' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 57`] = `
+{
+  "code": "export * as snake_cased from 'mod'",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_cased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 58`] = `
+{
+  "code": "function foo({ no_camelcased }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 59`] = `
+{
+  "code": "function foo({ no_camelcased = 'default value' }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 60`] = `
+{
+  "code": "const no_camelcased = 0; function foo({ camelcased_value = no_camelcased}) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+    {
+      "message": "Identifier 'camelcased_value' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 61`] = `
+{
+  "code": "const { bar: no_camelcased } = foo;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 62`] = `
+{
+  "code": "function foo({ value_1: my_default }) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier 'my_default' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 63`] = `
+{
+  "code": "function foo({ isCamelcased: no_camelcased }) {};",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 64`] = `
+{
+  "code": "var { foo: bar_baz = 1 } = quz;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'bar_baz' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 65`] = `
+{
+  "code": "const { no_camelcased = false } = bar;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 66`] = `
+{
+  "code": "const { no_camelcased = foo_bar } = bar;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'no_camelcased' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 67`] = `
+{
+  "code": "not_ignored_foo = 0;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'not_ignored_foo' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 68`] = `
+{
+  "code": "not_ignored_foo = 0;",
+  "diagnostics": [
+    {
+      "message": "Identifier 'not_ignored_foo' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 69`] = `
+{
+  "code": "foo = { [computed_bar]: 0 };",
+  "diagnostics": [
+    {
+      "message": "Identifier 'computed_bar' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 70`] = `
+{
+  "code": "({ a: obj.fo_o } = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 71`] = `
+{
+  "code": "({ a: obj.fo_o } = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 72`] = `
+{
+  "code": "({ a: obj.fo_o.b_ar } = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'b_ar' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 73`] = `
+{
+  "code": "({ a: { b: { c: obj.fo_o } } } = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 74`] = `
+{
+  "code": "({ a: { b: { c: obj.fo_o.b_ar } } } = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'b_ar' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 75`] = `
+{
+  "code": "([obj.fo_o] = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 76`] = `
+{
+  "code": "([obj.fo_o] = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 77`] = `
+{
+  "code": "([obj.fo_o = 1] = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 78`] = `
+{
+  "code": "({ a: [obj.fo_o] } = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 79`] = `
+{
+  "code": "({ a: { b: [obj.fo_o] } } = bar);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 80`] = `
+{
+  "code": "([obj.fo_o.ba_r] = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'ba_r' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 81`] = `
+{
+  "code": "({...obj.fo_o} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 82`] = `
+{
+  "code": "({...obj.fo_o.ba_r} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'ba_r' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 83`] = `
+{
+  "code": "({c: {...obj.fo_o }} = baz);",
+  "diagnostics": [
+    {
+      "message": "Identifier 'fo_o' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 84`] = `
+{
+  "code": "obj.o_k.non_camelcase = 0",
+  "diagnostics": [
+    {
+      "message": "Identifier 'non_camelcase' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 85`] = `
+{
+  "code": "(obj?.o_k).non_camelcase = 0",
+  "diagnostics": [
+    {
+      "message": "Identifier 'non_camelcase' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 86`] = `
+{
+  "code": "class C { snake_case; }",
+  "diagnostics": [
+    {
+      "message": "Identifier 'snake_case' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 87`] = `
+{
+  "code": "class C { #snake_case; foo() { this.#snake_case; } }",
+  "diagnostics": [
+    {
+      "message": "#snake_case is not in camel case.",
+      "messageId": "notCamelCasePrivate",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 88`] = `
+{
+  "code": "class C { #snake_case() {} }",
+  "diagnostics": [
+    {
+      "message": "#snake_case is not in camel case.",
+      "messageId": "notCamelCasePrivate",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 89`] = `
+{
+  "code": "
+            const { some_property } = obj;
+            doSomething({ some_property });
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'some_property' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 90`] = `
+{
+  "code": "
+            const { some_property } = obj;
+            doSomething({ some_property });
+            doSomething({ [some_property]: "bar" });
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'some_property' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 28,
+          "line": 4,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 91`] = `
+{
+  "code": "
+            const { some_property } = obj;
+
+            const bar = { some_property };
+
+            obj.some_property = 10;
+
+            const xyz = { some_property: obj.some_property };
+
+            const foo = ({ some_property }) => {
+                console.log(some_property)
+            };
+            ",
+  "diagnostics": [
+    {
+      "message": "Identifier 'some_property' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 4,
+        },
+        "start": {
+          "column": 27,
+          "line": 4,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+    {
+      "message": "Identifier 'some_property' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 6,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+    {
+      "message": "Identifier 'some_property' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 8,
+        },
+        "start": {
+          "column": 27,
+          "line": 8,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 92`] = `
+{
+  "code": "import('foo.json', { my_with: { [my_type]: 'json' } })",
+  "diagnostics": [
+    {
+      "message": "Identifier 'my_type' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`camelcase > invalid 93`] = `
+{
+  "code": "import('foo.json', { my_with: { my_type: my_json } })",
+  "diagnostics": [
+    {
+      "message": "Identifier 'my_json' is not in camel case.",
+      "messageId": "notCamelCase",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "camelcase",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

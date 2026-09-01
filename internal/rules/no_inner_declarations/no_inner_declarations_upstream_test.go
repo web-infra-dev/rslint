@@ -13,7 +13,7 @@ import (
 )
 
 func noInnerLanguage(ecmaVersion int) rule.LanguageOptions {
-	return rule.LanguageOptions{ECMAVersion: ecmaVersion}
+	return rule.LanguageOptions{ECMAVersion: ecmaVersion, SourceType: "script"}
 }
 
 func noInnerValid(code string, options any, ecmaVersion int) rule_tester.ValidTestCase {
@@ -101,13 +101,18 @@ func TestNoInnerDeclarationsUpstream(t *testing.T) {
 					"functions",
 					map[string]any{"blockScopedFunctions": "allow"},
 				},
-				LanguageOptions: noInnerLanguage(2022),
-				Skip:            true, // SKIP: rslint does not support an authored sourceType: module override for native rules.
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022, SourceType: "module"},
 			},
 			noInnerValid(`class C { method() { if(test) { function somethingElse() { } } } }`, []any{"functions", map[string]any{"blockScopedFunctions": "allow"}}, 2022),
 			noInnerValid(`const C = class { method() { if(test) { function somethingElse() { } } } }`, []any{"functions", map[string]any{"blockScopedFunctions": "allow"}}, 2022),
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:            `export {}; function foo() { { function bar() { } } }`,
+				Options:         []any{"functions", map[string]any{"blockScopedFunctions": "allow"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2022, SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{noInnerError("Move function declaration to function body root.", 1, 31, 1, 49)},
+			},
 			noInnerInvalid(
 				`if (test) { function doSomething() { } }`,
 				[]any{"both"},
