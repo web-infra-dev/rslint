@@ -67,3 +67,20 @@ const [value, setValue] = useState()`}},
 const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 	})
 }
+
+func hookUseStateError(code, message string, line, column int) rule_tester.InvalidTestCase {
+	messageID := "useStateErrorMessage"
+	if message == destructuredStateErrorText {
+		messageID = "useStateErrorMessageOrAddOption"
+	}
+	return rule_tester.InvalidTestCase{
+		Code: code,
+		Tsx:  true,
+		Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: messageID,
+			Message:   message,
+			Line:      line,
+			Column:    column,
+		}},
+	}
+}
