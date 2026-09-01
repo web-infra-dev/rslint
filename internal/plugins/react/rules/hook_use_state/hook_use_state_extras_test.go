@@ -27,6 +27,8 @@ func TestHookUseStateExtras(t *testing.T) {
 		{Code: `import R from 'react'; const [data, setData] = R.useState({})`, Tsx: true},
 		// ---- Real-user: an alias imported from react ----
 		{Code: `import { useState as useStore } from 'react'; const [data, setData] = useStore({})`, Tsx: true},
+		// Components#isReactHookCall does not recognize renamed named imports.
+		{Code: `import { useState as state } from 'react'; const [color] = state(value)`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// Locks in upstream CallExpression arm 1: an immediate return is ignored; non-return expression reports.
 		hookUseStateError(`import { useState } from 'react';
@@ -65,6 +67,30 @@ const [value, setValue] = useState()`}},
 		// ---- Dimension 4: nested array value has option-specific diagnostic ----
 		hookUseStateError(`import { useState } from 'react';
 const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
+		// Components chooses the first default React import for the memo suggestion.
+		{
+			Code: `import A from 'react'; import B from 'react'; import { useState } from 'react'; const [color] = useState(value)`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestMemo", Output: `import A from 'react'; import B from 'react'; import { useState, useMemo } from 'react'; const color = A.useMemo(() => value, [])`},
+					{MessageId: "suggestPair", Output: `import A from 'react'; import B from 'react'; import { useState } from 'react'; const [color, setColor] = useState(value)`},
+				},
+			}},
+		},
+		// Upstream inserts useMemo even when the default React import is used.
+		{
+			Code: `import React, { useState } from 'react'; const [color] = useState(value)`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestMemo", Output: `import React, { useState, useMemo } from 'react'; const color = React.useMemo(() => value, [])`},
+					{MessageId: "suggestPair", Output: `import React, { useState } from 'react'; const [color, setColor] = useState(value)`},
+				},
+			}},
+		},
 	})
 }
 

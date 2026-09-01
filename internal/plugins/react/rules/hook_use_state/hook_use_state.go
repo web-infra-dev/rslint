@@ -116,6 +116,11 @@ func resolvesToNamedUseState(ctx rule.RuleContext, ident *ast.Node) bool {
 	if ctx.Refs == nil || ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
+	// Components#isReactHookCall recognizes the local useState spelling, rather
+	// than a renamed named import.
+	if ident.AsIdentifier().Text != "useState" {
+		return false
+	}
 	symbol := ctx.Refs.Resolve(ident)
 	if symbol == nil {
 		return false
@@ -240,13 +245,13 @@ var HookUseStateRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				info := reactImportInfo(node)
-				if info.defaultName != "" {
+				if imports.defaultName == "" && info.defaultName != "" {
 					imports.defaultName = info.defaultName
 				}
-				if info.useStateSpecifier != nil {
+				if imports.useStateSpecifier == nil && info.useStateSpecifier != nil {
 					imports.useStateSpecifier = info.useStateSpecifier
 				}
-				if info.useMemoSpecifier != nil {
+				if imports.useMemoSpecifier == nil && info.useMemoSpecifier != nil {
 					imports.useMemoSpecifier = info.useMemoSpecifier
 					imports.useMemoName = info.useMemoName
 				}
@@ -312,11 +317,11 @@ var HookUseStateRule = rule.Rule{
 								memoName = imports.defaultName + ".useMemo"
 							} else {
 								memoName = "useMemo"
-								if imports.useStateSpecifier != nil {
-									fix := rule.RuleFixInsertAfter(imports.useStateSpecifier, ", useMemo")
-									importFix = &fix
-								}
 							}
+						}
+						if imports.useStateSpecifier != nil && (imports.useMemoSpecifier == nil || imports.defaultName != "") {
+							fix := rule.RuleFixInsertAfter(imports.useStateSpecifier, ", useMemo")
+							importFix = &fix
 						}
 						fixes := make([]rule.RuleFix, 0, 3)
 						if importFix != nil {
