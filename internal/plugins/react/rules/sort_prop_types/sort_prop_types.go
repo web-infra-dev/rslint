@@ -51,7 +51,7 @@ var SortPropTypesRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, input []any) rule.RuleListeners {
 		opts := parseOptions(input)
 		wrappers := reactutil.GetPropWrapperFunctions(ctx.Settings)
-		typeAliases := collectTypeAliases(ctx.SourceFile.AsNode())
+		typeAliases := map[string]*ast.Node{}
 
 		report := func(node *ast.Node, id, description string) {
 			ctx.ReportNode(node, rule.RuleMessage{Id: id, Description: description})
@@ -203,6 +203,16 @@ var SortPropTypesRule = rule.Rule{
 			}
 		}
 		if opts.checkTypes {
+			listeners[ast.KindTypeAliasDeclaration] = func(node *ast.Node) {
+				decl := node.AsTypeAliasDeclaration()
+				if decl.Name() == nil || decl.Name().Kind != ast.KindIdentifier || decl.Type == nil || decl.Type.Kind != ast.KindTypeLiteral {
+					return
+				}
+				name := decl.Name().AsIdentifier().Text
+				if _, exists := typeAliases[name]; !exists {
+					typeAliases[name] = decl.Type
+				}
+			}
 			checkFunction := func(node *ast.Node) {
 				typeNode := firstParamType(node)
 				checkTypeNode(typeNode, typeAliases, checkSorted)
@@ -275,26 +285,6 @@ func isShapeCall(callee *ast.Node) bool {
 	return name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "shape"
 }
 
-func collectTypeAliases(root *ast.Node) map[string]*ast.Node {
-	aliases := map[string]*ast.Node{}
-	var visit ast.Visitor
-	visit = func(node *ast.Node) bool {
-		if node == nil {
-			return false
-		}
-		if node.Kind == ast.KindTypeAliasDeclaration {
-			decl := node.AsTypeAliasDeclaration()
-			if decl.Name() != nil && decl.Name().Kind == ast.KindIdentifier && decl.Type != nil {
-				aliases[decl.Name().AsIdentifier().Text] = decl.Type
-			}
-		}
-		node.ForEachChild(visit)
-		return false
-	}
-	visit(root)
-	return aliases
-}
-
 func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func([]*ast.Node)) {
 	if typeNode == nil {
 		return
@@ -303,9 +293,11 @@ func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func(
 	case ast.KindTypeLiteral:
 		check(typeNode.AsTypeLiteralNode().Members.Nodes)
 	case ast.KindTypeReference:
-		name := reactutil.EntityNameRightmost(typeNode.AsTypeReferenceNode().TypeName)
-		if name != nil {
-			checkTypeNode(aliases[name.AsIdentifier().Text], aliases, check)
+		name := typeNode.AsTypeReferenceNode().TypeName
+		if name != nil && name.Kind == ast.KindIdentifier {
+			if alias := aliases[name.AsIdentifier().Text]; alias != nil && alias.Kind == ast.KindTypeLiteral {
+				check(alias.AsTypeLiteralNode().Members.Nodes)
+			}
 		}
 	}
 }

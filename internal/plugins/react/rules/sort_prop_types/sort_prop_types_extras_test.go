@@ -20,6 +20,10 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `any.shape(({ z: PropTypes.string, a: PropTypes.string } as any));`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
 		// A defaulted parameter is an ESTree AssignmentPattern without a direct annotation.
 		{Code: `type Props = { z: string; a: string }; function Component(p: Props = {} as Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
+		// Upstream checks only a direct, already-seen type-literal alias.
+		{Code: `type Props = { z: string; a: string }; type Alias = Props; function Component(p: Alias) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
+		{Code: `type Props = { z: string; a: string }; function Component(p: Namespace.Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
+		{Code: `function Component(p: Props) {} type Props = { z: string; a: string };`, Options: map[string]any{"checkTypes": true}, Tsx: true},
 		// Locks in upstream checkNode()'s nil-value early return for a declaration without an initializer.
 		{Code: `class Component { propTypes: unknown; }`, Tsx: true},
 		// ---- Dimension 4: spread resets the ordering group ----
