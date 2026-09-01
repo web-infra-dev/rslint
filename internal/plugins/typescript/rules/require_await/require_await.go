@@ -567,6 +567,17 @@ func collectUnannotatedAsyncExports(ctx rule.RuleContext, fileName string) map[s
 		return nil
 	}
 
+	functionDeclarationCounts := make(map[string]int)
+	for _, statement := range sourceFile.Statements.Nodes {
+		if statement == nil || statement.Kind != ast.KindFunctionDeclaration {
+			continue
+		}
+		name := statement.Name()
+		if name != nil && name.Kind == ast.KindIdentifier {
+			functionDeclarationCounts[name.Text()]++
+		}
+	}
+
 	var exports map[string]struct{}
 	for _, statement := range sourceFile.Statements.Nodes {
 		if statement == nil || !ast.HasSyntacticModifier(statement, ast.ModifierFlagsExport) {
@@ -600,6 +611,12 @@ func collectUnannotatedAsyncExports(ctx rule.RuleContext, fileName string) map[s
 			}
 			name := statement.Name()
 			if name == nil || name.Kind != ast.KindIdentifier {
+				continue
+			}
+			// Overload signatures determine the imported call type. Do not infer
+			// a thenable return from the async implementation when another declaration
+			// for the same binding may expose `any` or a non-thenable return.
+			if functionDeclarationCounts[name.Text()] != 1 {
 				continue
 			}
 			if exports == nil {

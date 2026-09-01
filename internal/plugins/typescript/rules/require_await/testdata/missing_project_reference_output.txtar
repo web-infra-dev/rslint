@@ -20,6 +20,7 @@ import {
   asyncGenerator,
   asyncValue,
   asyncValue as renamedAsyncValue,
+  overloaded,
   returnAny,
   returnAnyDeclaration,
   syncValue,
@@ -38,6 +39,7 @@ async function* generated() {
 const explicitAny = async () => typedAny();
 const returnAnnotatedAny = async () => returnAny();
 const declarationReturnAnnotatedAny = async () => returnAnyDeclaration();
+const overloadedResult = async () => overloaded();
 const synchronous = async () => syncValue();
 const generatorResult = async () => asyncGenerator();
 declare const localAny: any;
@@ -68,6 +70,10 @@ export async function asyncDeclaration() {
 export const typedAny: any = async () => "ok";
 export const returnAny = async (): any => "ok";
 export async function returnAnyDeclaration(): any {
+  return "ok";
+}
+export function overloaded(): any;
+export async function overloaded() {
   return "ok";
 }
 export const syncValue = () => "ok";
