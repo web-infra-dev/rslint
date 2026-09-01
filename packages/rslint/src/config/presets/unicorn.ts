@@ -206,7 +206,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-abort-signal-any': 'error', // not implemented
     // 'unicorn/prefer-abort-signal-timeout': 'error', // not implemented
     // 'unicorn/prefer-add-event-listener': 'error', // not implemented
-    // 'unicorn/prefer-add-event-listener-options': 'error', // not implemented
+    'unicorn/prefer-add-event-listener-options': 'error',
     // 'unicorn/prefer-aggregate-error': 'error', // not implemented
     // 'unicorn/prefer-array-find': 'error', // not implemented
     'unicorn/prefer-array-flat': 'error',
