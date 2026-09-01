@@ -258,6 +258,11 @@ func isUnicodeSetsStringProperty(escape string) bool {
 	}
 }
 
+// reservedClassSetPunctuators are the characters ECMAScript reserves inside a
+// v-flag class when they appear doubled (`!!`, `##`, `..`, …). `&` is in the
+// set because `&&` is only legal as the intersection operator.
+const reservedClassSetPunctuators = "&!#$%*+,.:;<=>?@^`~"
+
 // classHasInvalidUnicodeEscape validates the strict escape forms ClassEnd
 // deliberately treats permissively to find a closing bracket. In u/v classes,
 // an identity escape is not a fallback: incomplete hex escapes, legacy octal
