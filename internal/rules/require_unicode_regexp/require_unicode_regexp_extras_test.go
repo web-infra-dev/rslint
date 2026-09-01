@@ -34,6 +34,25 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 		t,
 		&RequireUnicodeRegexpRule,
 		[]rule_tester.ValidTestCase{
+			// ReferenceTracker treats authored program-scope type declarations
+			// as modifications of a script global, but not of a module global.
+			{Code: "interface RegExp {}\nRegExp('x')", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: "type RegExp = unknown;\nRegExp('x')", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: "interface globalThis {}\nglobalThis.RegExp('x')", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// Namespace and type-only import declarations own their scope variable
+			// in both declaration spaces, so neither reference is the builtin.
+			{Code: "namespace RegExp {}\nRegExp('x')", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			{Code: "import type { RegExp } from 'x';\nRegExp('x')", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// Static RegExp-literal properties that already carry u suppress the
+			// report; mutation makes an alias unknown and conservatively skipped.
+			{Code: `new RegExp("x", /u/u.source)`},
+			{Code: `new RegExp("x", /x/u.flags)`},
+			{Code: `const re = /g/u; re.lastIndex = 1; new RegExp("x", re.source)`},
+			// eslint-utils 4.10.1 does not whitelist the unicodeSets getter.
+			{Code: `new RegExp("x", /x/v.unicodeSets)`, Options: []any{map[string]any{"requireFlag": "v"}}},
+			// A RegExp used as __proto__ supplies branded getters that throw for
+			// the outer object, so its String value is not statically known.
+			{Code: `new RegExp("x", String({__proto__: /u/u}))`},
 			// ---- Locks in upstream trackMap arm: patternNode SpreadElement skips
 			// the whole call, even with further arguments present ----
 			{Code: "RegExp(...args, 'gi')"},
@@ -51,6 +70,93 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 			{Code: "RegExp = custom; RegExp('foo')"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// A top-level type declaration in a module does not replace the
+			// runtime global, while the same declaration in script mode does.
+			{
+				Code:            "interface RegExp {}\nRegExp('x')",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "interface RegExp {}\nRegExp('x', \"u\")"}},
+				}},
+			},
+			{
+				Code:            "type RegExp = unknown;\nRegExp('x')",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "type RegExp = unknown;\nRegExp('x', \"u\")"}},
+				}},
+			},
+			{
+				Code:            "{ interface RegExp {} RegExp('x') }",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "{ interface RegExp {} RegExp('x', \"u\") }"}},
+				}},
+			},
+			{
+				Code:            "interface RegExp {}\nglobalThis.RegExp('x')",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "interface RegExp {}\nglobalThis.RegExp('x', \"u\")"}},
+				}},
+			},
+			{
+				Code:            "interface globalThis {}\nglobalThis.RegExp('x')",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "interface globalThis {}\nglobalThis.RegExp('x', \"u\")"}},
+				}},
+			},
+			// TSInstantiationExpression is transparent in eslint-utils' tracker.
+			{
+				Code: `(RegExp<string>)("x")`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `(RegExp<string>)("x", "u")`}},
+				}},
+			},
+			{
+				Code: `const R = RegExp<string>; R("x")`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `const R = RegExp<string>; R("x", "u")`}},
+				}},
+			},
+			{
+				Code: `const R = globalThis.RegExp<string>; new R("x")`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `const R = globalThis.RegExp<string>; new R("x", "u")`}},
+				}},
+			},
+			// SourceFile.Identifiers normalizes escaped identifier spellings, so
+			// the constructor fast path cannot hide this global reference.
+			{
+				Code: `R\u0065gExp("x")`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `R\u0065gExp("x", "u")`}},
+				}},
+			},
+			// RegExp-literal properties participate in shared static evaluation.
+			// Member-expression flags are reportable but intentionally not fixed.
+			{
+				Code:   `new RegExp("x", /g/u.source)`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
+			{
+				Code:   `const re = /g/u; new RegExp("x", re["source"])`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
+			{
+				Code:   `new RegExp("x", ({__proto__: /g/u}).lastIndex)`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
 			// ReferenceTracker follows a stable local alias of the builtin.
 			{
 				Code: "const R = RegExp; R('foo')",
@@ -438,6 +544,146 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: "/(?<a>x)\\k<a>/u"}},
 					},
 				},
+			},
+			// Escaped RegExpIdentifierName spellings normalize before the full
+			// ECMAScript grammar gate, including escaped references and `$`.
+			{
+				Code: `/(?<\u0061>x)\k<a>/`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/(?<\u0061>x)\k<a>/u`}},
+				}},
+			},
+			{
+				Code: `/(?<a>x)\k<\u0061>/`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/(?<a>x)\k<\u0061>/u`}},
+				}},
+			},
+			{
+				Code: `/(?<\u0024>x)\k<$>/`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/(?<\u0024>x)\k<$>/u`}},
+				}},
+			},
+			{
+				Code: `new RegExp("(?<\\u{00000061}>x)\\k<a>")`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `new RegExp("(?<\\u{00000061}>x)\\k<a>", "u")`}},
+				}},
+			},
+			// The tsgo grammar gate rejects unsafe u-mode conversions that the
+			// previous regexp2-plus-hand-scanner path accepted.
+			{Code: `new RegExp("\\q")`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}}},
+			{Code: `/[\k<a>]/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}}},
+			{Code: `/[\B]/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}}},
+			{Code: `/\1/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}}},
+			{Code: `/(a)\2/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}}},
+			{Code: `/\01/`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}}},
+			{Code: `new RegExp("(?<\\u{D835}\\u{DC9C}>x)")`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}}},
+			// Relaxed duplicate names only became valid in ES2025.
+			{
+				Code:            `/(?<a>x)|(?<a>y)/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
+			{
+				Code:            `/(?<a>x)|(?<a>y)/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/(?<a>x)|(?<a>y)/u`}},
+				}},
+			},
+			{
+				Code:            `/(?:(?<a>x)|(?:y|(?<a>z)))/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/(?:(?<a>x)|(?:y|(?<a>z)))/u`}},
+				}},
+			},
+			{
+				Code:            `/(?:x|(?<a>y))(?<a>z)/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
+			{
+				Code:            `/(?=(?<a>x))(?<a>y)/`,
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireUFlag"}},
+			},
+			// Full positive-set v grammar and canonical property names are
+			// delegated to tsgo after the adapter's narrow safety checks.
+			{
+				Code:            `/[\q{abc}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireVFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[\q{abc}]/v`}},
+				}},
+			},
+			{
+				Code: `/\p{Script=Greek}/`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireUFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `/\p{Script=Greek}/u`}},
+				}},
+			},
+			{
+				Code:            `/[a^^b]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireVFlag"}},
+			},
+			{
+				Code:            `/[^a\q{ab}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireVFlag"}},
+			},
+			{
+				Code:            `/[^a\q{b|c}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireVFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[^a\q{b|c}]/v`}},
+				}},
+			},
+			{
+				Code:            `/[^a\p{Letter}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireVFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[^a\p{Letter}]/v`}},
+				}},
+			},
+			{
+				Code:            `/[^\q{ab}&&a]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId:   "requireVFlag",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addVFlag", Output: `/[^\q{ab}&&a]/v`}},
+				}},
+			},
+			{
+				Code:            `/[^a\p{Basic_Emoji}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireVFlag"}},
+			},
+			{
+				Code:            `/[^a-z\q{bc}]/`,
+				Options:         []any{map[string]any{"requireFlag": "v"}},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "requireVFlag"}},
 			},
 			// Group-like text inside a character class does not declare a named
 			// capture for an external backreference.

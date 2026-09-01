@@ -141,6 +141,24 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const ownProtoMessage = ({__proto__: {message: \"message\"}, message: \"\"}).message;\n" +
 		"const computedProtoMessage = ({[\"__proto__\"]: {message: \"message\"}}).message;\n" +
 		"const nullProtoString = String(({__proto__: null}));\n" +
+		"const regexSource = /g/u.source;\n" +
+		"const regexComputedSource = /gi/u[\"source\"];\n" +
+		"const regexFlags = /x/mi.flags;\n" +
+		"const regexGlobal = String(/x/g.global);\n" +
+		"const regexHasIndices = String(/x/d.hasIndices);\n" +
+		"const regexUnicode = String(/x/u.unicode);\n" +
+		"const regexLastIndex = String(/x/g.lastIndex);\n" +
+		"const regexString = String(/x/mi);\n" +
+		"const regexAlias = /alias/u;\n" +
+		"const regexAliasSource = regexAlias.source;\n" +
+		"const mutatedRegex = /before/u;\n" +
+		"mutatedRegex.lastIndex = 1;\n" +
+		"const mutatedRegexSource = mutatedRegex.source;\n" +
+		"const regexUnicodeSets = /x/v.unicodeSets;\n" +
+		"const regexProtoSource = ({__proto__: /u/u}).source;\n" +
+		"const regexProtoLastIndex = String(({__proto__: /g/u}).lastIndex);\n" +
+		"const regexProtoOwnSource = ({__proto__: /u/u, source: \"own\"}).source;\n" +
+		"const regexProtoString = String({__proto__: /u/u});\n" +
 		"const emptyJoin = [].join();\n" +
 		"const joined = [\"error\", \"message\"].join(\": \");\n" +
 		"const nestedEmptyJoin = [[]].join();\n" +
@@ -265,6 +283,21 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "ownProtoMessage", want: "", ok: true},
 		{name: "computedProtoMessage"},
 		{name: "nullProtoString"},
+		{name: "regexSource", want: "g", ok: true},
+		{name: "regexComputedSource", want: "gi", ok: true},
+		{name: "regexFlags", want: "im", ok: true},
+		{name: "regexGlobal", want: "true", ok: true},
+		{name: "regexHasIndices", want: "true", ok: true},
+		{name: "regexUnicode", want: "true", ok: true},
+		{name: "regexLastIndex", want: "0", ok: true},
+		{name: "regexString", want: "/x/im", ok: true},
+		{name: "regexAliasSource", want: "alias", ok: true},
+		{name: "mutatedRegexSource"},
+		{name: "regexUnicodeSets"},
+		{name: "regexProtoSource"},
+		{name: "regexProtoLastIndex", want: "0", ok: true},
+		{name: "regexProtoOwnSource", want: "own", ok: true},
+		{name: "regexProtoString"},
 		{name: "emptyJoin", want: "", ok: true},
 		{name: "joined", want: "error: message", ok: true},
 		{name: "nestedEmptyJoin", want: "", ok: true},
@@ -360,6 +393,9 @@ const astralUpper = ('\uD801' + '\uDC28').toUpperCase();
 const astralLower = ('\uD801' + '\uDC00').toLowerCase();
 const strictPair = ('\uD83D' + '\uDE00') === '😀' ? 'yes' : 'no';
 const objectPair = ({['\uD83D' + '\uDE00']: 'yes'})['😀'];
+const indexedHigh = '😀'[0];
+const indexedLow = '😀'[1];
+const indexedLone = '\uD800'[0];
 `
 	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
 	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
@@ -403,6 +439,9 @@ const objectPair = ({['\uD83D' + '\uDE00']: 'yes'})['😀'];
 		{name: "astralLower", want: "𐐨"},
 		{name: "strictPair", want: "yes"},
 		{name: "objectPair", want: "yes"},
+		{name: "indexedHigh", want: high},
+		{name: "indexedLow", want: low},
+		{name: "indexedLone", want: ecmascript.StringFromCodeUnits([]uint16{0xD800})},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
