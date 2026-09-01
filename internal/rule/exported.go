@@ -61,8 +61,22 @@ func (ctx *RuleContext) IsExportedGlobalBinding(decl *ast.Node, name string) boo
 	if ctx == nil || decl == nil || ctx.SourceFile == nil || !ctx.Exported.Has(name) {
 		return false
 	}
-	if ast.IsExternalModule(ctx.SourceFile) || (ctx.Refs != nil && ctx.Refs.HasNonGlobalProgramScope()) {
-		return false
+	if ctx.Refs != nil {
+		// RefStore carries the effective source-goal decision. In particular,
+		// sourceType: "script" keeps TypeScript's `import x = require()` in the
+		// global program scope even though ts-go marks it as an external module
+		// indicator based on syntax alone.
+		if ctx.Refs.HasNonGlobalProgramScope() {
+			return false
+		}
+	} else {
+		// Manually assembled contexts may omit RefStore. Use the normalized
+		// source goal as the fallback, including the JS-only CommonJS wrapper.
+		sourceType := ctx.LanguageOptions.EffectiveSourceType()
+		if sourceType == "module" ||
+			(sourceType == "commonjs" && isJavaScriptSourceExtension(ctx.SourceFile.FileName())) {
+			return false
+		}
 	}
 	return bindingScopeContainer(decl) == ctx.SourceFile.AsNode()
 }

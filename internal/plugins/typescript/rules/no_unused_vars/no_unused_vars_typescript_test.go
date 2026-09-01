@@ -534,6 +534,7 @@ func TestNoUnusedVarsExportedDirective(t *testing.T) {
 		{Code: `/* exported PublicEnum */ enum PublicEnum { A }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 		{Code: `/* exported PublicNS */ namespace PublicNS { export const a = 1; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 		{Code: `/* exported ambient */ declare var ambient: number;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported external */ import external = require("external");`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 		// A `var` reaches the global scope from inside a block.
 		{Code: `/* exported hoisted */ { var hoisted = 1; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 	}
