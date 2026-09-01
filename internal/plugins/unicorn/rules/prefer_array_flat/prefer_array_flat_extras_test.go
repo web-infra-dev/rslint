@@ -60,13 +60,7 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		`Array#flatMap()`,
 		nil,
 	)
-	suite.addFixed(
-		`[].concat((maybeArray as unknown))`,
-		`[].concat((maybeArray as unknown))`,
-		`[(maybeArray as unknown)].flat()`,
-		`[].concat()`,
-		nil,
-	)
+	suite.addValid(nil, `[].concat((maybeArray as unknown))`)
 	suite.addFixed(
 		`_.flatten(array!)`,
 		`_.flatten(array!)`,
@@ -140,8 +134,8 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		nil,
 	)
 	suite.addNoFix(
-		`[].concat(((foo /* keep */)))`,
-		`[].concat(((foo /* keep */)))`,
+		`[].concat(...((foo /* keep */)))`,
+		`[].concat(...((foo /* keep */)))`,
 		`[].concat()`,
 		nil,
 	)
@@ -162,9 +156,9 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		nil,
 	)
 	suite.addFixed(
-		`[].concat(getMaybeArray())`,
-		`[].concat(getMaybeArray())`,
-		`[getMaybeArray()].flat()`,
+		`[].concat(...getArray())`,
+		`[].concat(...getArray())`,
+		`getArray().flat()`,
 		`[].concat()`,
 		nil,
 	)
@@ -172,9 +166,9 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 	// ---- Dimension 4: ASI handling must not detach an embedded statement ----
 	suite.addFixed(
 		`if (condition)
-			Array.prototype.concat.call([], value)`,
-		`Array.prototype.concat.call([], value)`,
-		`[value].flat()`,
+			Array.prototype.concat.call([], ...value)`,
+		`Array.prototype.concat.call([], ...value)`,
+		`value.flat()`,
 		`Array.prototype.concat()`,
 		nil,
 	)
@@ -215,23 +209,11 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		(randomObject).flatMap(value => value);
 	`)
 
-	// ---- Real-user: #1316 union input must be wrapped before `.flat()` ----
-	suite.addFixed(
+	// ---- Real-user: v74 leaves plain concat normalization to prefer-spread ----
+	suite.addValid(nil,
 		`declare const subAppLoads: SubAppLoad | SubAppLoad[];
 		const loads: SubAppLoad[] = [].concat(subAppLoads);`,
-		`[].concat(subAppLoads)`,
-		`[subAppLoads].flat()`,
-		`[].concat()`,
-		nil,
-	)
-
-	// ---- Real-user: #2470 v64 still reports the first concat in a chain ----
-	suite.addFixed(
 		`const values = [].concat([1]).concat([2]);`,
-		`[].concat([1])`,
-		`[[1]].flat()`,
-		`[].concat()`,
-		nil,
 	)
 
 	// Locks in upstream arrayFlatMap.testFunction() arm 1: PascalCase unknowns
@@ -270,6 +252,46 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		nil,
 	)
 
+	// v74 skips only receivers proven non-array. An all-non-array union and an
+	// asserted Set are skipped; unknown and mixed unions remain reportable.
+	suite.addValid(nil,
+		`function f(foo: Set<number[]> | Uint8Array) { foo.reduce((a, b) => a.concat(b), []); }`,
+		`declare const foo: unknown; (foo as Set<number[]>).reduce((a, b) => a.concat(b), []);`,
+		`function f(foo: Set<number[]>) { foo!.reduce((a, b) => [...a, ...b], []); }`,
+	)
+	suite.addFixed(
+		`function f(foo: Set<number[]> | number[][]) { foo.reduce((a, b) => a.concat(b), []); }`,
+		`foo.reduce((a, b) => a.concat(b), [])`,
+		`foo.flat()`,
+		`Array#reduce()`,
+		nil,
+	)
+	suite.addFixed(
+		`declare const foo: unknown; (foo satisfies Set<number[]>).reduce((a, b) => a.concat(b), []);`,
+		`(foo satisfies Set<number[]>).reduce((a, b) => a.concat(b), [])`,
+		`(foo satisfies Set<number[]>).flat()`,
+		`Array#reduce()`,
+		nil,
+	)
+	suite.valid = append(suite.valid, rule_tester.ValidTestCase{
+		Code:     `const foo = {}; foo.reduce((a, b) => a.concat(b), []);`,
+		FileName: "file.js",
+	})
+	const unknownReduce = `let foo; foo.reduce((a, b) => a.concat(b), []);`
+	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
+		Code:     unknownReduce,
+		FileName: "file.js",
+		Output:   []string{`let foo; foo.flat();`},
+		Errors: []rule_tester.InvalidTestCaseError{
+			upstreamError(
+				unknownReduce,
+				`foo.reduce((a, b) => a.concat(b), [])`,
+				`Array#reduce()`,
+				0,
+			),
+		},
+	})
+
 	// Locks in upstream arrayReduce.testFunction() arm 3: default/rest
 	// parameters are not plain identifiers.
 	suite.addValid(nil,
@@ -277,15 +299,9 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		`items.reduce((...values) => values[0].concat(values[1]), [])`,
 	)
 
-	// Locks in upstream emptyArrayConcat.getArrayNode(): non-spread arguments
-	// switch to `[argument].flat()`, spread arguments do not.
-	suite.addFixed(
-		`[].concat(value)`,
-		`[].concat(value)`,
-		`[value].flat()`,
-		`[].concat()`,
-		nil,
-	)
+	// Locks in upstream emptyArrayConcat: only a spread argument is a
+	// flattening pattern; plain concat normalization remains valid.
+	suite.addValid(nil, `[].concat(value)`)
 	suite.addFixed(
 		`[].concat(...values)`,
 		`[].concat(...values)`,
@@ -294,15 +310,11 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		nil,
 	)
 
-	// Locks in upstream arrayPrototypeConcat.testFunction() arms: apply rejects
-	// a spread second argument; call accepts both spread and non-spread forms.
-	suite.addValid(nil, `Array.prototype.concat.apply([], ...values)`)
-	suite.addFixed(
+	// Locks in upstream arrayPrototypeConcat.testFunction() arms: apply accepts
+	// only a non-spread second argument, while call accepts only spread.
+	suite.addValid(nil,
+		`Array.prototype.concat.apply([], ...values)`,
 		`Array.prototype.concat.call([], value)`,
-		`Array.prototype.concat.call([], value)`,
-		`[value].flat()`,
-		`Array.prototype.concat()`,
-		nil,
 	)
 	suite.addFixed(
 		`Array.prototype.concat.call([], ...values)`,
@@ -337,6 +349,20 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 		pathOptions,
 	)
 	suite.addFixed(
+		`function flatten(array) { this(array) }`,
+		`this(array)`,
+		`array.flat()`,
+		`this()`,
+		map[string]interface{}{"functions": []interface{}{"this"}},
+	)
+	suite.addFixed(
+		`class A extends B { constructor(array) { super(array) } }`,
+		`super(array)`,
+		`array.flat()`,
+		`super()`,
+		map[string]interface{}{"functions": []interface{}{"super"}},
+	)
+	suite.addFixed(
 		`const values = import.meta.flatten(input);`,
 		`import.meta.flatten(input)`,
 		`input.flat()`,
@@ -354,8 +380,8 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 	// Locks in upstream create() comment branch: comments outside the selected
 	// array suppress the fix, but the diagnostic remains.
 	suite.addNoFix(
-		`[] /* receiver */.concat(value)`,
-		`[] /* receiver */.concat(value)`,
+		`[] /* receiver */.concat(...value)`,
+		`[] /* receiver */.concat(...value)`,
 		`[].concat()`,
 		nil,
 	)
@@ -459,39 +485,39 @@ func TestPreferArrayFlatExtras(t *testing.T) {
 	// ---- Dimension 3: ASI-sensitive embedded statement bodies ----
 	embeddedCases := []string{
 		`while (condition)
-	Array.prototype.concat.call([], value)`,
+	Array.prototype.concat.call([], ...value)`,
 		`for (;;)
-	Array.prototype.concat.call([], value)`,
+	Array.prototype.concat.call([], ...value)`,
 		`for (const item of items)
-	Array.prototype.concat.call([], value)`,
+	Array.prototype.concat.call([], ...value)`,
 		`do
-	Array.prototype.concat.call([], value)
+	Array.prototype.concat.call([], ...value)
 while (condition)`,
 		`with (object)
-	Array.prototype.concat.call([], value)`,
+	Array.prototype.concat.call([], ...value)`,
 	}
 	for _, code := range embeddedCases {
 		suite.addFixed(
 			code,
-			`Array.prototype.concat.call([], value)`,
-			`[value].flat()`,
+			`Array.prototype.concat.call([], ...value)`,
+			`value.flat()`,
 			`Array.prototype.concat()`,
 			nil,
 		)
 	}
 	suite.addFixed(
 		`before()
-Array.prototype.concat.call([], value)`,
-		`Array.prototype.concat.call([], value)`,
-		`;[value].flat()`,
+Array.prototype.concat.call([], ...value)`,
+		`Array.prototype.concat.call([], ...value)`,
+		`value.flat()`,
 		`Array.prototype.concat()`,
 		nil,
 	)
 	suite.addFixed(
 		`value = {}
-Array.prototype.concat.call([], item)`,
-		`Array.prototype.concat.call([], item)`,
-		`;[item].flat()`,
+Array.prototype.concat.call([], ...item)`,
+		`Array.prototype.concat.call([], ...item)`,
+		`item.flat()`,
 		`Array.prototype.concat()`,
 		nil,
 	)

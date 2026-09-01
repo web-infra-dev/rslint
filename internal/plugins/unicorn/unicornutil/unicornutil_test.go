@@ -16,6 +16,13 @@ func parseTestSource(code string) *ast.SourceFile {
 	}, code, core.ScriptKindTS)
 }
 
+func parseTestJavaScript(code string) *ast.SourceFile {
+	return parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.js",
+		Path:     "/test.js",
+	}, code, core.ScriptKindJS)
+}
+
 func findTestNode(t *testing.T, sourceFile *ast.SourceFile, text string) *ast.Node {
 	t.Helper()
 	var found *ast.Node
@@ -123,6 +130,36 @@ utils["deep"].flat(value);
 		if got := NodeMatchesPath(node, "utils.deep.flat"); got != test.want {
 			t.Fatalf("NodeMatchesPath(%q) = %v, want %v", test.text, got, test.want)
 		}
+	}
+}
+
+func TestJSDocWrappersAreTransparentInMemberPaths(t *testing.T) {
+	sourceFile := parseTestJavaScript(`
+(/** @type {any} */ utils).deep.flat(value);
+(/** @type {typeof Array} */ Array).prototype.concat.apply([], value);
+`)
+
+	flattenCall := findTestCall(
+		t,
+		sourceFile,
+		`(/** @type {any} */ utils).deep.flat(value)`,
+	)
+	if !NodeMatchesPath(flattenCall.AsCallExpression().Expression, "utils.deep.flat") {
+		t.Fatal("JSDoc wrapper in a configured-function path should be transparent")
+	}
+
+	applyCall := findTestCall(
+		t,
+		sourceFile,
+		`(/** @type {typeof Array} */ Array).prototype.concat.apply([], value)`,
+	)
+	twoArguments := 2
+	matched, ok := MatchDotMethodCall(applyCall, DotMethodCallOptions{
+		Method:          "apply",
+		ArgumentsLength: &twoArguments,
+	})
+	if !ok || !IsArrayPrototypeProperty(matched.Object, "concat") {
+		t.Fatal("JSDoc wrapper in Array.prototype.concat should be transparent")
 	}
 }
 

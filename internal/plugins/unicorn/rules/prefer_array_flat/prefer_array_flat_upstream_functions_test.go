@@ -177,10 +177,25 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 		)
 	}
 
-	// ---- Existing `.flat()` calls ----
+	// ---- Existing `.flat()` calls and v74 plain-concat exclusions ----
 	suite.addValid(nil,
 		`array.flat()`,
 		`array.flat(1)`,
+		`before()
+			Array.prototype.concat.call([], +1)`,
+		`Array.prototype.concat.call([], (0, array))`,
+		`async function a() { return [].concat(await getArray()); }`,
+		`before()
+			Array.prototype.concat.call([], 1)`,
+		`before()
+			Array.prototype.concat.call([], 1.)`,
+		`before()
+			Array.prototype.concat.call([], .1)`,
+		`before()
+			Array.prototype.concat.call([], 1.0)`,
+		`[].concat(some./**/array)`,
+		`[/**/].concat(some./**/array)`,
+		`[/**/].concat(some.array)`,
 	)
 
 	// ---- ASI ----
@@ -206,17 +221,6 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 			description: `Array.prototype.concat()`,
 		},
 	)
-	suite.addFixedOutput(
-		`before()
-			Array.prototype.concat.call([], +1)`,
-		`before()
-			;[+1].flat()`,
-		nil,
-		expectedDiagnostic{
-			target:      `Array.prototype.concat.call([], +1)`,
-			description: `Array.prototype.concat()`,
-		},
-	)
 
 	// ---- Parentheses and await ----
 	for _, testCase := range []struct {
@@ -230,18 +234,6 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 			`Array.prototype.concat.apply([], (0, array))`,
 			`(0, array).flat()`,
 			`Array.prototype.concat()`,
-		},
-		{
-			`Array.prototype.concat.call([], (0, array))`,
-			`Array.prototype.concat.call([], (0, array))`,
-			`[(0, array)].flat()`,
-			`Array.prototype.concat()`,
-		},
-		{
-			`async function a() { return [].concat(await getArray()); }`,
-			`[].concat(await getArray())`,
-			`[await getArray()].flat()`,
-			`[].concat()`,
 		},
 		{
 			`_.flatten((0, array))`,
@@ -284,21 +276,9 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 		},
 		{
 			`before()
-			Array.prototype.concat.call([], 1)`,
-			`before()
-			;[1].flat()`,
-		},
-		{
-			`before()
 			Array.prototype.concat.apply([], 1.)`,
 			`before()
 			1..flat()`,
-		},
-		{
-			`before()
-			Array.prototype.concat.call([], 1.)`,
-			`before()
-			;[1.].flat()`,
 		},
 		{
 			`before()
@@ -308,21 +288,9 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 		},
 		{
 			`before()
-			Array.prototype.concat.call([], .1)`,
-			`before()
-			;[.1].flat()`,
-		},
-		{
-			`before()
 			Array.prototype.concat.apply([], 1.0)`,
 			`before()
 			1.0.flat()`,
-		},
-		{
-			`before()
-			Array.prototype.concat.call([], 1.0)`,
-			`before()
-			;[1.0].flat()`,
 		},
 	} {
 		target := testCase.code[len("before()\n\t\t\t"):]
@@ -336,27 +304,6 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 			},
 		)
 	}
-
-	// ---- Comments ----
-	suite.addFixed(
-		`[].concat(some./**/array)`,
-		`[].concat(some./**/array)`,
-		`[some./**/array].flat()`,
-		`[].concat()`,
-		nil,
-	)
-	suite.addNoFix(
-		`[/**/].concat(some./**/array)`,
-		`[/**/].concat(some./**/array)`,
-		`[].concat()`,
-		nil,
-	)
-	suite.addNoFix(
-		`[/**/].concat(some.array)`,
-		`[/**/].concat(some.array)`,
-		`[].concat()`,
-		nil,
-	)
 
 	suite.run(t)
 }
