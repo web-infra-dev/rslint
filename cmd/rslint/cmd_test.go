@@ -43,6 +43,26 @@ type commandReadCountingFS struct {
 	reads map[string]int
 }
 
+type commandRealpathCountingFS struct {
+	vfs.FS
+	mu    sync.Mutex
+	calls map[string]int
+}
+
+func (fsys *commandRealpathCountingFS) Realpath(fileName string) string {
+	fileName = tspath.NormalizePath(fileName)
+	fsys.mu.Lock()
+	fsys.calls[fileName]++
+	fsys.mu.Unlock()
+	return fsys.FS.Realpath(fileName)
+}
+
+func (fsys *commandRealpathCountingFS) callCount(fileName string) int {
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	return fsys.calls[tspath.NormalizePath(fileName)]
+}
+
 func (fsys *commandReadCountingFS) ReadFile(fileName string) (string, bool) {
 	fileName = tspath.NormalizePath(fileName)
 	fsys.mu.Lock()
@@ -296,12 +316,20 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts tspath.ComparePathsOptions) string {
 	t.Helper()
 	var buf bytes.Buffer
-	report := output.NewReport([]rule.RuleDiagnostic{d}, output.Metadata{
-		Mode:      output.ModeLint,
-		Threads:   1,
-		StartedAt: time.Now(),
+	report, err := assembleLintReport(lintReportInput{
+		Mode:        output.ModeLint,
+		Diagnostics: []rule.RuleDiagnostic{d},
+		Summary: &output.Summary{
+			Threads:   1,
+			StartedAt: time.Now(),
+		},
+		MaxWarnings:   -1,
+		IncludeSource: true,
 	})
-	if err := output.Render(&buf, report, output.Outcome{Kind: output.OutcomeDiagnosticsFailed}, output.Options{
+	if err != nil {
+		t.Fatalf("assemble diagnostic report: %v", err)
+	}
+	if err := output.Render(&buf, report, output.Options{
 		Format:       output.FormatDefault,
 		ComparePaths: opts,
 	}); err != nil {
@@ -806,6 +834,55 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 	})
 	if code != 0 {
 		t.Fatalf("type-check-only exit = %d, stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
+	directory := t.TempDir()
+	rootPath := filepath.Join(directory, "index.ts")
+	if err := os.WriteFile(rootPath, []byte("export const value: number = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(`{"files":["index.ts"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configEntries := rslintconfig.RslintConfig{{
+		LanguageOptions: &rslintconfig.LanguageOptions{
+			ParserOptions: &rslintconfig.ParserOptions{
+				Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+			},
+		},
+	}}
+
+	run := func(format string) int {
+		t.Helper()
+		fsys := &commandRealpathCountingFS{
+			FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+			calls: make(map[string]int),
+		}
+		code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
+			ConfigCatalog:  explicitConfigCatalogForTest(directory, configEntries),
+			FS:             fsys,
+			TypeCheck:      true,
+			TypeCheckOnly:  true,
+			Format:         format,
+			NoColor:        true,
+			SingleThreaded: true,
+		})
+		if code != 0 {
+			t.Fatalf("%s type-check exit = %d, stdout=%q stderr=%q", format, code, stdout, stderr)
+		}
+		return fsys.callCount(rootPath)
+	}
+
+	machineCalls := run("jsonline")
+	defaultCalls := run("default")
+	if defaultCalls != machineCalls+1 {
+		t.Fatalf(
+			"root Realpath calls: machine=%d default=%d, want exactly one default-only report identity lookup",
+			machineCalls,
+			defaultCalls,
+		)
 	}
 }
 
@@ -1955,8 +2032,11 @@ func findProgramFileForTest(t *testing.T, program *compiler.Program, suffix stri
 // diagnostics still produces a valid (empty) JSON array, not an empty file.
 func TestGitlabReportState_EmptyProducesEmptyArray(t *testing.T) {
 	var buf bytes.Buffer
-	report := output.NewReport(nil, output.Metadata{})
-	if err := output.Render(&buf, report, output.Outcome{Kind: output.OutcomePassed}, output.Options{Format: output.FormatGitLab}); err != nil {
+	report, err := assembleLintReport(lintReportInput{Mode: output.ModeLint, MaxWarnings: -1})
+	if err != nil {
+		t.Fatalf("assemble empty GitLab report: %v", err)
+	}
+	if err := output.Render(&buf, report, output.Options{Format: output.FormatGitLab}); err != nil {
 		t.Fatalf("render empty GitLab report: %v", err)
 	}
 
@@ -1982,8 +2062,15 @@ func TestPrintDiagnosticGitLab(t *testing.T) {
 	diagError.Message = rule.RuleMessage{Id: "test", Description: "Use const."}
 
 	var buf bytes.Buffer
-	report := output.NewReport([]rule.RuleDiagnostic{diagWarning, diagError}, output.Metadata{})
-	if err := output.Render(&buf, report, output.Outcome{Kind: output.OutcomeDiagnosticsFailed}, output.Options{
+	report, err := assembleLintReport(lintReportInput{
+		Mode:        output.ModeLint,
+		Diagnostics: []rule.RuleDiagnostic{diagWarning, diagError},
+		MaxWarnings: -1,
+	})
+	if err != nil {
+		t.Fatalf("assemble GitLab report: %v", err)
+	}
+	if err := output.Render(&buf, report, output.Options{
 		Format:       output.FormatGitLab,
 		ComparePaths: opts,
 	}); err != nil {

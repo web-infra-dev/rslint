@@ -71,6 +71,7 @@ define.test({
     './tests/eslint/rules/accessor-pairs.test.ts',
     './tests/eslint/rules/arrow-body-style.test.ts',
     './tests/eslint/rules/block-scoped-var.test.ts',
+    './tests/eslint/rules/camelcase.test.ts',
     './tests/eslint/rules/capitalized-comments.test.ts',
     './tests/eslint/rules/class-methods-use-this.test.ts',
     './tests/eslint/rules/curly.test.ts',
@@ -97,6 +98,7 @@ define.test({
     './tests/eslint/rules/no-eq-null.test.ts',
     './tests/eslint/rules/no-eval.test.ts',
     './tests/eslint/rules/no-implicit-coercion.test.ts',
+    './tests/eslint/rules/no-implicit-globals.test.ts',
     './tests/eslint/rules/no-implied-eval.test.ts',
     './tests/eslint/rules/no-void.test.ts',
     './tests/eslint/rules/no-iterator.test.ts',
@@ -602,7 +604,9 @@ define.test({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/consistent-each-for.test.ts',
     './tests/rstest/rules/consistent-rstest-namespace.test.ts',
+    './tests/rstest/rules/consistent-test-filename.test.ts',
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
@@ -674,6 +678,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-xor-as-exponentiation.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-add-event-listener-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',

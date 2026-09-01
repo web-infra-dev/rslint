@@ -115,42 +115,7 @@ func assertionTypeArguments(typeChecker *checker.Checker, t *checker.Type) []*ch
 	return nil
 }
 
-func assertionSignatureReturnsContainingAlias(signature *checker.Signature) bool {
-	declaration := signature.Declaration()
-	if declaration == nil || declaration.Type() == nil {
-		return false
-	}
-	var alias *ast.Node
-	for current := declaration.Parent; current != nil; current = current.Parent {
-		if current.Kind == ast.KindTypeAliasDeclaration {
-			alias = current
-			break
-		}
-	}
-	if alias == nil || alias.Name() == nil || !ast.IsIdentifier(alias.Name()) {
-		return false
-	}
-	aliasName := alias.Name().AsIdentifier().Text
-	found := false
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if found || node == nil {
-			return
-		}
-		if ast.IsIdentifier(node) && node.AsIdentifier().Text == aliasName {
-			found = true
-			return
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return found
-		})
-	}
-	visit(declaration.Type())
-	return found
-}
-
-func assertionTypeContains(typeChecker *checker.Checker, root *checker.Type, predicate func(*checker.Type) bool, skipRecursiveCallReturns bool) bool {
+func assertionTypeContains(typeChecker *checker.Checker, root *checker.Type, predicate func(*checker.Type) bool) bool {
 	if root == nil {
 		return false
 	}
@@ -172,9 +137,7 @@ func assertionTypeContains(typeChecker *checker.Checker, root *checker.Type, pre
 		}
 		stack = append(stack, assertionTypeArguments(typeChecker, t)...)
 		for _, signature := range utils.GetCallSignatures(typeChecker, t) {
-			if !skipRecursiveCallReturns || !assertionSignatureReturnsContainingAlias(signature) {
-				stack = append(stack, checker.Checker_getReturnTypeOfSignature(typeChecker, signature))
-			}
+			stack = append(stack, checker.Checker_getReturnTypeOfSignature(typeChecker, signature))
 			for _, parameter := range checker.Signature_parameters(signature) {
 				stack = append(stack, checker.Checker_getTypeOfSymbol(typeChecker, parameter))
 			}
@@ -183,17 +146,131 @@ func assertionTypeContains(typeChecker *checker.Checker, root *checker.Type, pre
 	return false
 }
 
+type assertionSignatureIdentity struct {
+	declaration *ast.Node
+	signature   *checker.Signature
+}
+
+func assertionGetSignatureIdentity(signature *checker.Signature) assertionSignatureIdentity {
+	if declaration := signature.Declaration(); declaration != nil {
+		return assertionSignatureIdentity{declaration: declaration}
+	}
+	for signature.Target() != nil && signature.Target() != signature {
+		signature = signature.Target()
+		if declaration := signature.Declaration(); declaration != nil {
+			return assertionSignatureIdentity{declaration: declaration}
+		}
+	}
+	return assertionSignatureIdentity{signature: signature}
+}
+
+type assertionContainsAnyFrameKind uint8
+
+const (
+	assertionContainsAnyFrameType assertionContainsAnyFrameKind = iota
+	assertionContainsAnyFrameSignature
+	assertionContainsAnyFrameSignatureExit
+)
+
+type assertionContainsAnyFrame struct {
+	kind      assertionContainsAnyFrameKind
+	typeValue *checker.Type
+	signature *checker.Signature
+	identity  assertionSignatureIdentity
+}
+
+const assertionContainsAnySignatureLimit = 10_000
+
 func assertionTypeContainsAny(typeChecker *checker.Checker, root *checker.Type) bool {
-	// Upstream catches stack overflow from recursively instantiated call return
-	// types and treats them as not containing any. Avoid asking tsgo to expand
-	// that same unbounded return type in the first place.
-	return assertionTypeContains(typeChecker, root, utils.IsTypeAnyType, true)
+	if root == nil {
+		return false
+	}
+	seen := make(map[*checker.Type]bool)
+	activeSignatures := make(map[assertionSignatureIdentity]bool)
+	stack := []assertionContainsAnyFrame{{
+		kind:      assertionContainsAnyFrameType,
+		typeValue: root,
+	}}
+	expandedSignatures := 0
+	for len(stack) > 0 {
+		frame := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		switch frame.kind {
+		case assertionContainsAnyFrameSignatureExit:
+			delete(activeSignatures, frame.identity)
+		case assertionContainsAnyFrameSignature:
+			identity := assertionGetSignatureIdentity(frame.signature)
+			if activeSignatures[identity] {
+				// Recursive generic signatures can keep producing fresh types. A
+				// partial search cannot prove that a later instantiation excludes
+				// any, so preserve the assertion instead of offering an unsafe fix.
+				return true
+			}
+			expandedSignatures++
+			if expandedSignatures > assertionContainsAnySignatureLimit {
+				// Source-declared recursion is caught by the stable declaration
+				// identity above. This is a final guard for synthetic signatures
+				// that have neither a declaration nor a reusable target.
+				return true
+			}
+			activeSignatures[identity] = true
+			stack = append(stack, assertionContainsAnyFrame{
+				kind:     assertionContainsAnyFrameSignatureExit,
+				identity: identity,
+			})
+			parameters := checker.Signature_parameters(frame.signature)
+			for index := len(parameters) - 1; index >= 0; index-- {
+				stack = append(stack, assertionContainsAnyFrame{
+					kind:      assertionContainsAnyFrameType,
+					typeValue: checker.Checker_getTypeOfSymbol(typeChecker, parameters[index]),
+				})
+			}
+			stack = append(stack, assertionContainsAnyFrame{
+				kind:      assertionContainsAnyFrameType,
+				typeValue: checker.Checker_getReturnTypeOfSignature(typeChecker, frame.signature),
+			})
+		case assertionContainsAnyFrameType:
+			t := frame.typeValue
+			if t == nil || seen[t] {
+				continue
+			}
+			seen[t] = true
+			if utils.IsTypeAnyType(t) {
+				return true
+			}
+			if t.IsUnion() || t.IsIntersection() {
+				types := t.Types()
+				for index := len(types) - 1; index >= 0; index-- {
+					stack = append(stack, assertionContainsAnyFrame{
+						kind:      assertionContainsAnyFrameType,
+						typeValue: types[index],
+					})
+				}
+				continue
+			}
+			signatures := utils.GetCallSignatures(typeChecker, t)
+			for index := len(signatures) - 1; index >= 0; index-- {
+				stack = append(stack, assertionContainsAnyFrame{
+					kind:      assertionContainsAnyFrameSignature,
+					signature: signatures[index],
+				})
+			}
+			typeArguments := assertionTypeArguments(typeChecker, t)
+			for index := len(typeArguments) - 1; index >= 0; index-- {
+				stack = append(stack, assertionContainsAnyFrame{
+					kind:      assertionContainsAnyFrameType,
+					typeValue: typeArguments[index],
+				})
+			}
+		}
+	}
+	return false
 }
 
 func assertionTypeContainsTypeVariable(typeChecker *checker.Checker, root *checker.Type) bool {
 	return assertionTypeContains(typeChecker, root, func(t *checker.Type) bool {
 		return utils.IsTypeFlagSet(t, checker.TypeFlagsTypeVariable|checker.TypeFlagsIndex)
-	}, false)
+	})
 }
 
 func assertionIsTypeLiteral(t *checker.Type) bool {
@@ -476,7 +553,8 @@ func assertionIsEmptyObjectType(typeChecker *checker.Checker, t *checker.Type) b
 		(len(typeChecker.GetPropertiesOfType(t)) == 0 &&
 			len(utils.GetCallSignatures(typeChecker, t)) == 0 &&
 			len(utils.GetConstructSignatures(typeChecker, t)) == 0 &&
-			len(checker.Checker_getIndexInfosOfType(typeChecker, t)) == 0)
+			typeChecker.GetStringIndexType(t) == nil &&
+			typeChecker.GetNumberIndexType(t) == nil)
 }
 
 func assertionHasPhantomTypeArguments(typeChecker *checker.Checker, t *checker.Type) bool {

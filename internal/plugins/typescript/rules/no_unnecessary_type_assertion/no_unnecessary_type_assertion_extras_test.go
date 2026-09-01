@@ -265,3 +265,148 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 		},
 	)
 }
+
+func TestNoUnnecessaryTypeAssertionInferenceGuards(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+namespace N { export type R = any }
+type R = () => N.R;
+declare const x: R;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type R = () => R | any;
+declare const x: R;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type R = () => [R, any];
+declare const x: R;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type R = () => [any, R];
+declare const x: R;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type R = (value: any) => R;
+declare const x: R;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type Sig<T> = () => T;
+type X = Sig<any>;
+type A = Sig<X>;
+type Root = A | X;
+declare const x: Root;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type Prev = [never, 0, 1, 2];
+type R<N extends 0 | 1 | 2 | 3> = N extends 0 ? any : () => R<Prev[N]>;
+declare const x: R<2>;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type Prev = [never, 0, 1, 2];
+type R<N extends 0 | 1 | 2 | 3> = N extends 0 ? string : () => R<Prev[N]>;
+declare const x: R<2>;
+declare function infer<T>(input: { value: T }): T;
+let y = infer({ value: x as object });
+y = {};
+`},
+			{Code: `
+type A<T> = () => B<T & { a: true }>;
+type B<T> = () => A<T & { b: true }>;
+declare const recursive: A<{}>;
+declare const value: object;
+value as unknown as typeof recursive;
+`},
+			{Code: `
+type R<T = {}> = (next: R<T & { next: true }>) => number;
+declare const recursive: R;
+declare const value: object;
+value as unknown as typeof recursive;
+`},
+			{Code: `
+type Test<T> = { [key: symbol]: never };
+declare function inferred<T extends Test<never>[]>(input: { addons?: T }): {
+  options: T[number] extends Test<infer U> ? U : unknown;
+};
+const test = inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
+test.options.parameters.potato;
+`},
+			{Code: `
+type Pattern<T> = { [key: ` + "`data-${string}`" + `]: never };
+declare function inferred<T extends Pattern<never>[]>(input: { addons?: T }): {
+  options: T[number] extends Pattern<infer U> ? U : unknown;
+};
+const test = inferred({ addons: [{} as Pattern<{ parameters: { potato: boolean } }>] });
+test.options.parameters.potato;
+`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+type Wrapper<T> = () => T;
+declare const x: Wrapper<string> & Wrapper<number>;
+declare function consume(value: object): void;
+consume(x as object);
+`,
+				Output: []string{`
+type Wrapper<T> = () => T;
+declare const x: Wrapper<string> & Wrapper<number>;
+declare function consume(value: object): void;
+consume(x);
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+			{
+				Code: `
+type Test<T> = { [key: string]: never };
+declare function inferred<T extends Test<never>[]>(input: { addons?: T }): void;
+inferred({ addons: [{} as Test<{ parameter: boolean }>] });
+`,
+				Output: []string{`
+type Test<T> = { [key: string]: never };
+declare function inferred<T extends Test<never>[]>(input: { addons?: T }): void;
+inferred({ addons: [{}] });
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+			{
+				Code: `
+type Test<T> = { [key: number]: never };
+declare function inferred<T extends Test<never>[]>(input: { addons?: T }): void;
+inferred({ addons: [{} as Test<{ parameter: boolean }>] });
+`,
+				Output: []string{`
+type Test<T> = { [key: number]: never };
+declare function inferred<T extends Test<never>[]>(input: { addons?: T }): void;
+inferred({ addons: [{}] });
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+		},
+	)
+}
