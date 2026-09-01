@@ -244,7 +244,7 @@ func previousComma(sourceFile *ast.SourceFile, pos int) int {
 		case ch == '/' && i > 0 && text[i-1] == '*':
 			// block comment — find its start
 			j := i - 2
-			for j >= 1 && !(text[j] == '*' && text[j-1] == '/') {
+			for j >= 1 && (text[j] != '*' || text[j-1] != '/') {
 				j--
 			}
 			i = j - 1

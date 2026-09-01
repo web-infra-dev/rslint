@@ -20,7 +20,6 @@ const (
 )
 
 const messageText = "Prefer `.then(…).catch(…)` over passing a rejection handler to `.then()`."
-const suggestionText = "Move the rejection handler to `.catch()`."
 
 func TestPreferThenCatchUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(
