@@ -43,6 +43,14 @@ reload the VS Code window so its Node-loaded code and binary refresh together.
 - **Default:** `"off"`
 
 Traces the communication between VS Code and the language server.
+The level applies to every Rslint runtime in the current VS Code window,
+including runtimes backed by different workspace folders or physical
+`@rslint/core` installations. Changing the value takes effect immediately and
+does not restart the language servers. All runtimes write to the shared
+`Rslint Language Server(LSP)` output channel.
+
+Keep tracing off unless it is needed for diagnosis. In particular, `verbose`
+output can include source text and file paths.
 
 ## 🔧 Auto-fix on Save
 
