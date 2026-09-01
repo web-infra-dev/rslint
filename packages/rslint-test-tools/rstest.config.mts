@@ -189,6 +189,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/self-closing-comp.test.ts',
     './tests/eslint-plugin-react/rules/void-dom-elements-no-children.test.ts',
     './tests/eslint-plugin-react/rules/style-prop-object.test.ts',
+    './tests/eslint-plugin-react/rules/sort-prop-types.test.ts',
     './tests/eslint-plugin-react/rules/jsx-boolean-value.test.ts',
     './tests/eslint-plugin-react/rules/jsx-equals-spacing.test.ts',
     './tests/eslint-plugin-react/rules/jsx-filename-extension.test.ts',
