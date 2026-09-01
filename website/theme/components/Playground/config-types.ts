@@ -38,9 +38,9 @@ async function loadTypeLibraries(
 
 /** Install exact-version @rslint/core declarations for rslint.config.js. */
 export async function installRslintCoreTypes(version: string) {
+  const currentRequestId = ++requestId;
   if (installedVersion === version) return;
 
-  const currentRequestId = ++requestId;
   const libraries: Array<{ content: string; path: string }> = [];
   await loadTypeLibraries(typeUrl(version), CORE_TYPES_PATH, libraries);
   if (currentRequestId !== requestId) return;
