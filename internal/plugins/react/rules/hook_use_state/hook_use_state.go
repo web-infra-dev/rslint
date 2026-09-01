@@ -165,11 +165,15 @@ func isReactUseStateCall(ctx rule.RuleContext, imports importInfo, node *ast.Nod
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
-	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+	rawCallee := node.AsCallExpression().Expression
+	callee := ast.SkipParentheses(rawCallee)
 	if callee == nil {
 		return false
 	}
-	if ast.IsOptionalChain(callee) {
+	// A direct optional member call is still a MemberExpression to ESTree,
+	// while parentheses around the optional member make the callee a
+	// ChainExpression and prevent the upstream hook matcher from recognizing it.
+	if ast.IsOptionalChain(callee) && rawCallee != callee {
 		return false
 	}
 	if callee.Kind == ast.KindIdentifier {

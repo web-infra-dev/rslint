@@ -16,10 +16,9 @@ func TestHookUseStateExtras(t *testing.T) {
 		{Code: `import { useState } from 'react'; const [value, setValue] = (useState)()`, Tsx: true},
 		// ESTree elides parentheses around the call expression itself too.
 		{Code: `import { useState } from 'react'; const [value, setValue] = (useState())`, Tsx: true},
-		// ESTree keeps an optional member callee in ChainExpression, so the
-		// upstream hook matcher does not recognize either spelling.
+		// ESTree keeps an optional member callee in ChainExpression when it is
+		// parenthesized, so the upstream hook matcher does not recognize it.
 		{Code: `import React from 'react'; const result = (React?.useState)()`, Tsx: true},
-		{Code: `import React from 'react'; const result = React?.useState()`, Tsx: true},
 		// ---- Dimension 4: element access does not match the identifier-property gate ----
 		{Code: `import React from 'react'; const result = React['useState']()`, Tsx: true},
 		// ---- Dimension 4: TS wrappers are explicit and remain non-destructured ----
@@ -64,6 +63,9 @@ const [value, setValue] = useState()`}}}}, Tsx: true,
 		// Optional calls are still React hook calls upstream.
 		hookUseStateError(`import { useState } from 'react';
 const [value, setValue] = useState?.()`, useStateErrorText, 2, 27),
+		// Direct optional member calls are also React hook calls upstream.
+		hookUseStateError(`import React from 'react';
+const result = React?.useState()`, useStateErrorText, 2, 16),
 		// ESTree represents either defaulted binding element as an AssignmentPattern.
 		hookUseStateError(`import { useState } from 'react';
 const [value = initialValue, setValue] = useState()`, useStateErrorText, 2, 7),
