@@ -16,6 +16,10 @@ func TestHookUseStateExtras(t *testing.T) {
 		{Code: `import { useState } from 'react'; const [value, setValue] = (useState)()`, Tsx: true},
 		// ESTree elides parentheses around the call expression itself too.
 		{Code: `import { useState } from 'react'; const [value, setValue] = (useState())`, Tsx: true},
+		// ESTree keeps an optional member callee in ChainExpression, so the
+		// upstream hook matcher does not recognize either spelling.
+		{Code: `import React from 'react'; const result = (React?.useState)()`, Tsx: true},
+		{Code: `import React from 'react'; const result = React?.useState()`, Tsx: true},
 		// ---- Dimension 4: element access does not match the identifier-property gate ----
 		{Code: `import React from 'react'; const result = React['useState']()`, Tsx: true},
 		// ---- Dimension 4: TS wrappers are explicit and remain non-destructured ----
@@ -41,9 +45,6 @@ useState()`, useStateErrorText, 2, 1),
 		// A hook-shaped local alias remains recognized upstream.
 		hookUseStateError(`import { useState as useStore } from 'react';
 const result = useStore()`, useStateErrorText, 2, 16),
-		// An optional member access is a ChainExpression upstream.
-		hookUseStateError(`import React from 'react';
-const [value, setValue] = React?.useState()`, useStateErrorText, 2, 27),
 		// Locks in upstream symmetric-pair arm: a transposed acronym setter is rejected.
 		{
 			Code: `import { useState } from 'react';
@@ -99,6 +100,42 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestMemo", Output: `import React, { useState, useMemo } from 'react'; const color = React.useMemo(() => value, [])`},
 					{MessageId: "suggestPair", Output: `import React, { useState } from 'react'; const [color, setColor] = useState(value)`},
+				},
+			}},
+		},
+		// Components#detect keeps the first matching named import for insertion.
+		{
+			Code: `import { useState as useFirst, useState as useSecond } from 'react'; const [value] = useSecond(initial)`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestMemo", Output: `import { useState as useFirst, useMemo, useState as useSecond } from 'react'; const value = useMemo(() => initial, [])`},
+					{MessageId: "suggestPair", Output: `import { useState as useFirst, useState as useSecond } from 'react'; const [value, setValue] = useSecond(initial)`},
+				},
+			}},
+		},
+		// Components#detect also keeps the first matching useMemo alias.
+		{
+			Code: `import { useState, useMemo as memo1, useMemo as memo2 } from 'react'; const [value] = useState(initial)`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestMemo", Output: `import { useState, useMemo as memo1, useMemo as memo2 } from 'react'; const value = memo1(() => initial, [])`},
+					{MessageId: "suggestPair", Output: `import { useState, useMemo as memo1, useMemo as memo2 } from 'react'; const [value, setValue] = useState(initial)`},
+				},
+			}},
+		},
+		// ESTree drops redundant argument parentheses before getText is called.
+		{
+			Code: `import { useState } from 'react'; const [value] = useState((initial))`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "suggestMemo", Output: `import { useState, useMemo } from 'react'; const value = useMemo(() => initial, [])`},
+					{MessageId: "suggestPair", Output: `import { useState } from 'react'; const [value, setValue] = useState((initial))`},
 				},
 			}},
 		},

@@ -90,10 +90,14 @@ func reactImportInfo(node *ast.Node) importInfo {
 	for _, spec := range clause.NamedBindings.AsNamedImports().Elements.Nodes {
 		switch importedName(spec) {
 		case "useState":
-			info.useStateSpecifier = spec
+			if info.useStateSpecifier == nil {
+				info.useStateSpecifier = spec
+			}
 		case "useMemo":
-			info.useMemoSpecifier = spec
-			info.useMemoName = localName(spec)
+			if info.useMemoSpecifier == nil {
+				info.useMemoSpecifier = spec
+				info.useMemoName = localName(spec)
+			}
 		}
 	}
 	return info
@@ -163,6 +167,9 @@ func isReactUseStateCall(ctx rule.RuleContext, imports importInfo, node *ast.Nod
 	}
 	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
 	if callee == nil {
+		return false
+	}
+	if ast.IsOptionalChain(callee) {
 		return false
 	}
 	if callee.Kind == ast.KindIdentifier {
@@ -332,7 +339,8 @@ var HookUseStateRule = rule.Rule{
 						}
 						fixes = append(fixes,
 							rule.RuleFixReplace(ctx.SourceFile, pattern, valueName),
-							rule.RuleFixReplace(ctx.SourceFile, node, memoName+"(() => "+utils.TrimmedNodeText(ctx.SourceFile, argument)+", [])"),
+							rule.RuleFixReplace(ctx.SourceFile, node, memoName+"(() => "+utils.TrimmedNodeText(ctx.SourceFile, ast.SkipParentheses(argument))+
+								", [])"),
 						)
 						suggestions = append(suggestions, rule.RuleSuggestion{Message: suggestMemoMessage(), FixesArr: fixes})
 					}
