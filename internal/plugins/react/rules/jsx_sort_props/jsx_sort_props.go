@@ -43,7 +43,7 @@ var JsxSortPropsRule = rule.Rule{
 				})
 			}
 
-			reportAttr := func(attr *ast.Node, id, description string, data map[string]string) {
+			reportAttr := func(attr *ast.Node, id, description string, data map[string]string, wholeAttribute bool) {
 				if attr == nil || attr.Kind != ast.KindJsxAttribute {
 					return
 				}
@@ -56,8 +56,11 @@ var JsxSortPropsRule = rule.Rule{
 					return
 				}
 				ids[id] = true
-				name := attr.AsJsxAttribute().Name()
-				ctx.ReportNodeWithDeferredFixes(name, rule.RuleMessage{Id: id, Description: description, Data: data}, func() []rule.RuleFix {
+				reportNode := attr.AsJsxAttribute().Name()
+				if wholeAttribute {
+					reportNode = attr
+				}
+				ctx.ReportNodeWithDeferredFixes(reportNode, rule.RuleMessage{Id: id, Description: description, Data: data}, func() []rule.RuleFix {
 					return buildFixes(ctx, element, opts, reserved)
 				})
 			}
@@ -66,7 +69,7 @@ var JsxSortPropsRule = rule.Rule{
 			for index, current := range attrs {
 				if index == 0 {
 					if opts.reservedFirst && opts.reservedError != "" && current.Kind == ast.KindJsxAttribute {
-						reportAttr(current, opts.reservedError, opts.reservedDescription, opts.reservedData)
+						reportAttr(current, opts.reservedError, opts.reservedDescription, opts.reservedData, true)
 					}
 					continue
 				}
@@ -96,7 +99,7 @@ var JsxSortPropsRule = rule.Rule{
 
 				if opts.reservedFirst {
 					if opts.reservedError != "" {
-						reportAttr(current, opts.reservedError, opts.reservedDescription, opts.reservedData)
+						reportAttr(current, opts.reservedError, opts.reservedDescription, opts.reservedData, true)
 						continue
 					}
 					previousReserved := contains(reserved, previousName)
@@ -106,7 +109,7 @@ var JsxSortPropsRule = rule.Rule{
 						continue
 					}
 					if !previousReserved && currentReserved {
-						reportAttr(current, "listReservedPropsFirst", "Reserved props must be listed before all other props", nil)
+						reportAttr(current, "listReservedPropsFirst", "Reserved props must be listed before all other props", nil, false)
 						continue
 					}
 				}
@@ -116,7 +119,7 @@ var JsxSortPropsRule = rule.Rule{
 						continue
 					}
 					if previousCallback && !currentCallback {
-						reportAttr(memo, "listCallbacksLast", "Callbacks must be listed after all other props", nil)
+						reportAttr(memo, "listCallbacksLast", "Callbacks must be listed after all other props", nil, false)
 						continue
 					}
 				}
@@ -126,7 +129,7 @@ var JsxSortPropsRule = rule.Rule{
 						continue
 					}
 					if !currentValue && previousValue {
-						reportAttr(current, "listShorthandFirst", "Shorthand props must be listed before all other props", nil)
+						reportAttr(current, "listShorthandFirst", "Shorthand props must be listed before all other props", nil, false)
 						continue
 					}
 				}
@@ -136,7 +139,7 @@ var JsxSortPropsRule = rule.Rule{
 						continue
 					}
 					if currentValue && !previousValue {
-						reportAttr(memo, "listShorthandLast", "Shorthand props must be listed after all other props", nil)
+						reportAttr(memo, "listShorthandLast", "Shorthand props must be listed after all other props", nil, false)
 						continue
 					}
 				}
@@ -148,7 +151,7 @@ var JsxSortPropsRule = rule.Rule{
 						continue
 					}
 					if !previousMultiline && currentMultiline {
-						reportAttr(current, "listMultilineFirst", "Multiline props must be listed before all other props", nil)
+						reportAttr(current, "listMultilineFirst", "Multiline props must be listed before all other props", nil, false)
 						continue
 					}
 				} else if opts.multiline == "last" {
@@ -157,12 +160,12 @@ var JsxSortPropsRule = rule.Rule{
 						continue
 					}
 					if previousMultiline && !currentMultiline {
-						reportAttr(memo, "listMultilineLast", "Multiline props must be listed after all other props", nil)
+						reportAttr(memo, "listMultilineLast", "Multiline props must be listed after all other props", nil, false)
 						continue
 					}
 				}
 				if !opts.noSortAlphabetically && compareNames(previousName, currentName, opts) > 0 {
-					reportAttr(current, "sortPropsByAlpha", "Props should be sorted alphabetically", nil)
+					reportAttr(current, "sortPropsByAlpha", "Props should be sorted alphabetically", nil, false)
 					continue
 				}
 				memo = current
@@ -363,6 +366,7 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 		if index+1 < len(attrs) {
 			next = attrs[index+1]
 		}
+		nextIsAttribute := next != nil && next.Kind == ast.KindJsxAttribute
 		limit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
 		if next != nil {
 			limit = utils.TrimNodeTextRange(ctx.SourceFile, next).End()
@@ -371,12 +375,12 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 		line := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), r.Pos())
 		if len(between) == 1 {
 			commentLine := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[0].Pos())
-			if next != nil && line+1 == commentLine {
+			if nextIsAttribute && line+1 == commentLine {
 				item.end = utils.TrimNodeTextRange(ctx.SourceFile, next).End()
 				item.pinned = true
 				index++
 			} else if line == commentLine {
-				if between[0].Kind == ast.KindMultiLineCommentTrivia && next != nil {
+				if between[0].Kind == ast.KindMultiLineCommentTrivia && nextIsAttribute {
 					item.end = utils.TrimNodeTextRange(ctx.SourceFile, next).End()
 					item.pinned = true
 					index++
@@ -385,8 +389,17 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 					item.pinned = between[0].Kind == ast.KindMultiLineCommentTrivia
 				}
 			}
-		} else if len(between) > 1 && next != nil && line+1 == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[1].Pos()) {
-			item.end = utils.TrimNodeTextRange(ctx.SourceFile, next).End()
+		} else if len(between) > 1 && nextIsAttribute && line+1 == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[1].Pos()) {
+			nextRange := utils.TrimNodeTextRange(ctx.SourceFile, next)
+			item.end = nextRange.End()
+			afterNextLimit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
+			if index+2 < len(attrs) {
+				afterNextLimit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+2]).End()
+			}
+			nextComments := commentsInSpan(comments, item.end, afterNextLimit)
+			if len(nextComments) == 1 && scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextRange.Pos()) == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextComments[0].Pos()) {
+				item.end = nextComments[0].End()
+			}
 			item.pinned = true
 			index++
 		}
