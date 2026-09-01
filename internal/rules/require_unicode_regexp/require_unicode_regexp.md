@@ -88,19 +88,14 @@ const fooRegexp = new RegExp("foo", "v");
 
 ## Differences from ESLint
 
-- A pattern is judged against `u`-flag syntax when deciding whether the
-  suggestion is safe, so one written in `v`-flag set notation — the difference
-  operator (`[\d--[3]]`), a `\q{...}` string literal — is reported without a
-  suggestion that ESLint would offer.
-- Unicode property escapes are recognized by their short aliases, so
-  `/\p{L}/` is offered the flag while `/\p{Letter}/` and
-  `/\p{Script=Greek}/` are reported without a suggestion.
-- A suggested flag insertion into a template literal that interpolates an
-  expression is refused whenever that template's cooked value already
-  contains the opposite flag character, even when the interpolated
-  expression's source text has no escape sequence of its own — ESLint only
-  inspects the template's literal quasis for that escape check, this rule
-  inspects the whole template source.
+- When flags come from a newly constructed RegExp object's property, such as
+  `RegExp("g", "u").source`, rslint may skip a call that ESLint reports.
+- With computed `['__proto__']` properties in constant objects, rslint follows
+  own-property semantics and can report a constructor call that ESLint skips.
+- Capture names or Unicode properties newer than the bundled TypeScript
+  parser's Unicode data can receive a diagnostic without a flag suggestion.
+- For a negated `v` class where a range is followed by a string-valued operand,
+  rslint omits ESLint's suggestion because JavaScript would reject the result.
 
 ## Original Documentation
 

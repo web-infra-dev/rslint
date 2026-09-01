@@ -176,8 +176,36 @@ var RequireUnicodeRegexpRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		requireFlag := parseOptions(options)
-		evaluator := utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+		listeners := rule.RuleListeners{
+			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
+				pattern, flags := utils.ExtractRegexPatternAndFlags(node.Text())
+				if !checkFlags(requireFlag, flags) {
+					return
+				}
+				ctx.ReportNodeWithDeferredSuggestions(node, requireMessage(requireFlag), func() []rule.RuleSuggestion {
+					if !isValidWithUnicodeFlag(ctx.LanguageOptions.EffectiveECMAVersion(), pattern, requireFlag) {
+						return nil
+					}
+					fix, ok := buildLiteralFix(ctx, node, requireFlag)
+					if !ok {
+						return nil
+					}
+					return []rule.RuleSuggestion{{Message: addMessage(requireFlag), FixesArr: []rule.RuleFix{fix}}}
+				})
+			},
+		}
+		if !sourceMayUseRegexpConstructor(ctx.SourceFile) {
+			return listeners
+		}
+
 		callTracker := newRegexpCallTracker(ctx)
+		var evaluator *utils.StaticStringEvaluator
+		getEvaluator := func() *utils.StaticStringEvaluator {
+			if evaluator == nil {
+				evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+			}
+			return evaluator
+		}
 
 		checkCall := func(node *ast.Node, argsList *ast.NodeList) {
 			if !callTracker.isCall(node) {
@@ -204,7 +232,10 @@ var RequireUnicodeRegexpRule = rule.Rule{
 			// value (not just an already-string one) is coerced to its String()
 			// form before the flag check, so e.g. a literal `false` or `1`
 			// flags argument is compared as the text "false" / "1".
-			flagsValue, flagsOk := evaluator.EvalToString(flagsNode)
+			flagsValue, flagsOk := "", false
+			if flagsNode != nil {
+				flagsValue, flagsOk = getEvaluator().EvalToString(flagsNode)
+			}
 			missingFlag := flagsNode == nil
 			if flagsOk {
 				missingFlag = checkFlags(requireFlag, flagsValue)
@@ -214,7 +245,7 @@ var RequireUnicodeRegexpRule = rule.Rule{
 			}
 
 			ctx.ReportNodeWithDeferredSuggestions(node, requireMessage(requireFlag), func() []rule.RuleSuggestion {
-				patternValue, patternOk := evaluator.EvalToString(patternNode)
+				patternValue, patternOk := getEvaluator().EvalToString(patternNode)
 				if !patternOk {
 					return nil
 				}
@@ -229,31 +260,14 @@ var RequireUnicodeRegexpRule = rule.Rule{
 			})
 		}
 
-		return rule.RuleListeners{
-			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				pattern, flags := utils.ExtractRegexPatternAndFlags(node.Text())
-				if !checkFlags(requireFlag, flags) {
-					return
-				}
-				ctx.ReportNodeWithDeferredSuggestions(node, requireMessage(requireFlag), func() []rule.RuleSuggestion {
-					if !isValidWithUnicodeFlag(ctx.LanguageOptions.EffectiveECMAVersion(), pattern, requireFlag) {
-						return nil
-					}
-					fix, ok := buildLiteralFix(ctx, node, requireFlag)
-					if !ok {
-						return nil
-					}
-					return []rule.RuleSuggestion{{Message: addMessage(requireFlag), FixesArr: []rule.RuleFix{fix}}}
-				})
-			},
-			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				checkCall(node, call.Arguments)
-			},
-			ast.KindNewExpression: func(node *ast.Node) {
-				newExpr := node.AsNewExpression()
-				checkCall(node, newExpr.Arguments)
-			},
+		listeners[ast.KindCallExpression] = func(node *ast.Node) {
+			call := node.AsCallExpression()
+			checkCall(node, call.Arguments)
 		}
+		listeners[ast.KindNewExpression] = func(node *ast.Node) {
+			newExpr := node.AsNewExpression()
+			checkCall(node, newExpr.Arguments)
+		}
+		return listeners
 	},
 }
