@@ -16,8 +16,6 @@ func TestHookUseStateExtras(t *testing.T) {
 		{Code: `import { useState } from 'react'; const [value, setValue] = (useState)()`, Tsx: true},
 		// ESTree elides parentheses around the call expression itself too.
 		{Code: `import { useState } from 'react'; const [value, setValue] = (useState())`, Tsx: true},
-		// eslint-plugin-react under ESLint 10 does not recognize renamed named imports.
-		{Code: `import { useState as state } from 'react'; const result = state()`, Tsx: true},
 		// ---- Dimension 4: element access does not match the identifier-property gate ----
 		{Code: `import React from 'react'; const result = React['useState']()`, Tsx: true},
 		// ---- Dimension 4: TS wrappers are explicit and remain non-destructured ----

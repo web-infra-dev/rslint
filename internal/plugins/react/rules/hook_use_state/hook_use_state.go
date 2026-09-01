@@ -121,9 +121,7 @@ func resolvesToNamedUseState(ctx rule.RuleContext, ident *ast.Node) bool {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if decl != nil && decl.Kind == ast.KindImportSpecifier &&
-			importedName(decl) == "useState" && localName(decl) == "useState" &&
-			isReactImportDeclaration(decl) {
+		if decl != nil && decl.Kind == ast.KindImportSpecifier && importedName(decl) == "useState" && isReactImportDeclaration(decl) {
 			return true
 		}
 	}
