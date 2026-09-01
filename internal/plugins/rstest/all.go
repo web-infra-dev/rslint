@@ -2,6 +2,7 @@ package rstest
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/consistent_rstest_namespace"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/consistent_test_filename"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/hoisted_apis_on_top"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/max_expects"
@@ -40,6 +41,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		consistent_rstest_namespace.ConsistentRstestNamespaceRule,
+		consistent_test_filename.ConsistentTestFilenameRule,
 		expect_expect.ExpectExpectRule,
 		hoisted_apis_on_top.HoistedApisOnTopRule,
 		max_expects.MaxExpectsRule,
