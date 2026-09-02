@@ -208,6 +208,18 @@ function Hello(props: Props) {
 			Output: []string{`type Props = { name: string } & { readonly name: number }; function Hello(props: Props) { return <div/>; }`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
+		{
+			Code:   `const Hello = (props: ReturnType<() => { name: string }>) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`const Hello = (props: ReturnType<() => { readonly name: string }>) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `interface Props extends ReturnType<() => { name: string }> {} const Hello = (props: Props) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`interface Props extends ReturnType<() => { readonly name: string }> {} const Hello = (props: Props) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
 	})
 }
 

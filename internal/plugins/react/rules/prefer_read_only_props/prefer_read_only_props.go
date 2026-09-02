@@ -379,6 +379,13 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImp
 					if extends == nil {
 						continue
 					}
+					if extends.Expression != nil && extends.Expression.Kind == ast.KindIdentifier &&
+						extends.Expression.AsIdentifier().Text == "ReturnType" {
+						if extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) == 1 {
+							validateTypeNode(returnTypeFromTypeArgument(extends.TypeArguments.Nodes[0]), aliases, genericImports, report, seen)
+						}
+						continue
+					}
 					if extends.Expression == nil || extends.Expression.Kind != ast.KindIdentifier {
 						continue
 					}
@@ -402,6 +409,12 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImp
 			validateTypeNode(propsType, aliases, genericImports, report, seen)
 			return
 		}
+		if ref.TypeName != nil && ref.TypeName.Kind == ast.KindIdentifier &&
+			ref.TypeName.AsIdentifier().Text == "ReturnType" &&
+			ref.TypeArguments != nil && len(ref.TypeArguments.Nodes) == 1 {
+			validateTypeNode(returnTypeFromTypeArgument(ref.TypeArguments.Nodes[0]), aliases, genericImports, report, seen)
+			return
+		}
 		if ref.TypeName == nil || ref.TypeName.Kind != ast.KindIdentifier {
 			return
 		}
@@ -421,6 +434,22 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImp
 			}
 		}
 	}
+}
+
+func returnTypeFromTypeArgument(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedType {
+		node = node.AsParenthesizedTypeNode().Type
+	}
+	if node == nil {
+		return nil
+	}
+	switch node.Kind {
+	case ast.KindFunctionType:
+		if function := node.AsFunctionTypeNode(); function != nil {
+			return function.Type
+		}
+	}
+	return nil
 }
 
 func checkPropertySignature(node *ast.Node, report func(*ast.Node, string, bool)) {
