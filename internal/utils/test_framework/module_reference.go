@@ -147,6 +147,45 @@ func ResolveFunctionIdentifierReferenceFromSymbolModules(
 	sourceFile *ast.SourceFile,
 	importModules []string,
 ) (string, *ast.Node, ReferenceMode) {
+	return resolveIdentifierReferenceFromSymbolModules(
+		localName,
+		identifier,
+		symbol,
+		sourceFile,
+		importModules,
+		false,
+	)
+}
+
+// ResolveTypeIdentifierReferenceFromSymbolModules resolves an identifier used
+// in a type position against every specifier that exports the same type
+// surface. Unlike the function-reference resolver, it accepts an inline
+// type-only specifier such as `import { type Mock } from "@rstest/core"`.
+func ResolveTypeIdentifierReferenceFromSymbolModules(
+	localName string,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+	sourceFile *ast.SourceFile,
+	importModules []string,
+) (string, *ast.Node, ReferenceMode) {
+	return resolveIdentifierReferenceFromSymbolModules(
+		localName,
+		identifier,
+		symbol,
+		sourceFile,
+		importModules,
+		true,
+	)
+}
+
+func resolveIdentifierReferenceFromSymbolModules(
+	localName string,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+	sourceFile *ast.SourceFile,
+	importModules []string,
+	allowTypeOnlySpecifier bool,
+) (string, *ast.Node, ReferenceMode) {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier {
 		return localName, identifier, ReferenceModeGlobal
 	}
@@ -160,7 +199,7 @@ func ResolveFunctionIdentifierReferenceFromSymbolModules(
 			continue
 		}
 
-		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules); ok {
+		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules, allowTypeOnlySpecifier); ok {
 			return name, originalNode, ReferenceModeImport
 		}
 		if name, originalNode, ok := resolveModuleRequireBinding(declaration, importModules); ok {
@@ -226,7 +265,7 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 	return false
 }
 
-func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string) (string, *ast.Node, bool) {
+func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string, allowTypeOnly bool) (string, *ast.Node, bool) {
 	if declaration == nil || declaration.Kind != ast.KindImportSpecifier {
 		return "", nil, false
 	}
@@ -239,7 +278,7 @@ func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string)
 	}
 
 	specifier := declaration.AsImportSpecifier()
-	if specifier == nil || specifier.IsTypeOnly {
+	if specifier == nil || (specifier.IsTypeOnly && !allowTypeOnly) {
 		return "", nil, false
 	}
 	if specifier.PropertyName != nil {
