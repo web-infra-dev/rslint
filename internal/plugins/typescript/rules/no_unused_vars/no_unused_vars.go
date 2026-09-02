@@ -2147,6 +2147,15 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		}
 	}
 
+	// An `/* exported */` global is consumed by a separately loaded file, so
+	// upstream counts the directive itself as a use. reportUsedIgnorePattern
+	// still sees it as used, which is what turns a directive on an ignored name
+	// into a usedIgnoredVar report.
+	if !varInfo.Used && ctx.IsExportedGlobalBinding(definition, name) {
+		varInfo.Used = true
+		varInfo.OnlyUsedAsType = false
+	}
+
 	// vars: "local" — skip top-level (global scope) variable declarations.
 	if opts.Vars == "local" && !isParameterNode(definition) && !isCaughtErrorNode(definition) {
 		if definition != nil && definition.Parent != nil {

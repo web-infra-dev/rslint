@@ -91,15 +91,22 @@ For example, this configuration allows underscore-prefixed parameters:
 }
 ```
 
-## Differences from ESLint
+## The `/* exported */` comment
 
-- With an `/* exported publicValue */` comment, rslint still reports an
-  otherwise unused top-level `publicValue`; ESLint treats it as used.
+A script shares its globals with the other scripts loaded alongside it, where
+this rule cannot see them being read. An `/* exported name */` block comment
+declares that such a global is consumed elsewhere, and the rule counts the
+comment itself as a use:
 
 ```javascript
 /* exported publicValue */
 var publicValue = 1;
 ```
+
+The comment resolves each name against the global scope, so it applies to a
+file whose top level is that scope — a `.ts` script, or any file with no
+`import`/`export` of its own. A module's top-level binding, a block binding, and
+a function's locals live in their own scopes and are still reported.
 
 ## Original Documentation
 

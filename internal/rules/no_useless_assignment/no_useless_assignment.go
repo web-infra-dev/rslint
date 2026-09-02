@@ -211,7 +211,7 @@ func analyzeRoot(
 	for _, raw := range raws {
 		tracked, known := trackedState[raw.sym]
 		if !known {
-			tracked = isTrackable(raw.sym, root, isModule, exportedSymbols)
+			tracked = isTrackable(ctx, raw.sym, root, isModule, exportedSymbols)
 			if tracked {
 				// The variable is only usable when every read of it happens in
 				// this same code path: a read from a nested function may run at
@@ -271,8 +271,10 @@ func analyzeRoot(
 
 // isTrackable reports whether assignments to sym can be proven unused: the
 // variable must be declared in this very code path and must not be reachable
-// from outside the file through an export.
+// from outside the file through an export — either ES module syntax or an
+// `/* exported */` comment naming a global.
 func isTrackable(
+	ctx *rule.RuleContext,
 	sym *ast.Symbol,
 	root *ast.Node,
 	isModule bool,
@@ -280,6 +282,13 @@ func isTrackable(
 ) bool {
 	if len(sym.Declarations) == 0 {
 		return false
+	}
+	if ctx.Exported.Has(sym.Name) {
+		for _, decl := range sym.Declarations {
+			if ctx.IsExportedGlobalBinding(decl, sym.Name) {
+				return false
+			}
+		}
 	}
 	declaredHere := false
 	for _, decl := range sym.Declarations {
