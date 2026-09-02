@@ -24,11 +24,16 @@ Examples of **correct** code for this rule:
 
 ```javascript
 const first = array.flat();
-const second = [maybeArray].flat();
+const second = [].concat(maybeArray);
+const third = Array.prototype.concat.call([], maybeArray);
 ```
 
-`[maybeArray].flat()` preserves the behavior of `[].concat(maybeArray)` when
-the value may be either a single item or an array.
+Plain concat normalization does not consume an array of concat arguments, so
+this rule intentionally leaves it to `prefer-spread`.
+
+A matching `reduce()` is also ignored when its receiver is known not to be an
+array, including a typed array, because the proposed `.flat()` replacement
+does not exist on that receiver. Unknown receivers are still reported.
 
 ## Options
 
@@ -62,5 +67,5 @@ const second = utils.flat(array);
 
 ## Original Documentation
 
-- [eslint-plugin-unicorn: prefer-array-flat](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-array-flat.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/rules/prefer-array-flat.js)
+- [eslint-plugin-unicorn: prefer-array-flat](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v74.0.0/docs/rules/prefer-array-flat.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v74.0.0/rules/prefer-array-flat.js)

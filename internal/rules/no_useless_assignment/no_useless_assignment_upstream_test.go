@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -118,9 +119,7 @@ func TestNoUselessAssignmentUpstream(t *testing.T) {
 			{Code: `/* exported foo */
             let foo = 'used';
             console.log(foo);
-            foo = 'unused like but exported with directive';`,
-				// SKIP: rslint does not support ESLint's `/* exported */` directive comment.
-				Skip: true},
+            foo = 'unused like but exported with directive';`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 			{Code: `/*eslint test/use-a:1*/
         let a = 'used';
         console.log(a);
