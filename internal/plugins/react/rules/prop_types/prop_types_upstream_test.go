@@ -172,15 +172,8 @@ func TestPropTypesRuleUpstream(t *testing.T) {
 			{Code: "\n        type Props = { foo: string }\n        function higherOrderComponent<Props>() {\n          return class extends React.Component<Props> {\n            render() {\n              return <div>{this.props.foo}</div>\n            }\n          }\n        }\n      ", Tsx: true, Skip: true},
 			{Code: "\n        function higherOrderComponent<P: { foo: string }>() {\n          return class extends React.Component<P> {\n            render() {\n              return <div>{this.props.foo}</div>\n            }\n          }\n        }\n      ", Tsx: true, Skip: true},
 			{Code: "\n        const withOverlayState = <P: { foo: string }>(WrappedComponent: ComponentType<P>): ComponentType<P> => (\n          class extends React.Component<P> {\n            constructor(props) {\n              super(props);\n              this.state = { foo: props.foo };\n            }\n            render() {\n              return <div>Hello World</div>;\n            }\n          }\n        )\n      ", Tsx: true, Skip: true},
-			{Code: `function Foo() {
-      const props = {};
-      props.bar = 'bar';
-      return <div {...props} />;
-    }`, Tsx: true},
-			{Code: `function Foo(props) {
-      props.bar = 'bar';
-      return <div {...props} />;
-    }`, Tsx: true},
+			{Code: "\n        function Foo() {\n          const props = {};\n          props.bar = 'bar';\n          return <div {...props} />;\n        }\n      ", Tsx: true},
+			{Code: "\n        function Foo(props) {\n          props.bar = 'bar';\n          return <div {...props} />;\n        }\n      ", Tsx: true},
 			{Code: "\n      import React from 'react';\n      import SharedPropTypes from './SharedPropTypes';\n\n      export default class A extends React.Component {\n        render() {\n          return (\n            <span\n              a={this.props.a}\n              b={this.props.b}\n              c={this.props.c}>\n              {this.props.children}\n            </span>\n          );\n        }\n      }\n\n      A.propTypes = {\n        a: React.PropTypes.string,\n        ...SharedPropTypes // eslint-disable-line object-shorthand\n      };\n    ", Tsx: true, Skip: true},
 			{Code: "\n      // @flow\n      import * as React from 'react';\n\n      type Props = {};\n\n      const func = <OP: *>(arg) => arg;\n\n      const hoc = <OP>() => () => {\n        class Inner extends React.Component<Props & OP> {\n          render() {\n            return <div />;\n          }\n        }\n      };\n    ", Tsx: true, Skip: true},
 			{Code: "\n        const Slider = props => (\n          <RcSlider {...props} />\n        );\n\n        Slider.propTypes = RcSlider.propTypes;\n      ", Tsx: true},
