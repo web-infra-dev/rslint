@@ -1,0 +1,117 @@
+// TestPreferReadOnlyPropsExtras covers tsgo/ESTree edge shapes, real-user
+// regressions, and branch lock-ins. The upstream mirror is kept separately in
+// prefer_read_only_props_upstream_test.go.
+package prefer_read_only_props
+
+import (
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestPreferReadOnlyPropsExtras(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferReadOnlyPropsRule, []rule_tester.ValidTestCase{
+		// ---- Dimension 4: parenthesized type wrappers ----
+		{Code: `type Props = (({ readonly name: string })); class Hello extends React.Component<Props> { render() { return <div/>; } }`, Tsx: true},
+		{Code: `const Hello = (props: ((({ readonly name: string })))) => <div/>;`, Tsx: true},
+
+		// ---- Dimension 4: property key equivalence classes ----
+		{Code: `class Hello extends React.Component<{ readonly "name": string; readonly 0: string; readonly [key: string]: string }> { render() { return <div/>; } }`, Tsx: true},
+		{Code: `class Hello extends React.Component<{ [name: string]: string; method(): void; readonly name?: string }> { render() { return <div/>; } }`, Tsx: true},
+		// Computed keys and private names are not TSPropertySignature names that
+		// eslint-plugin-react can turn into a declared prop key.
+		{Code: `type Props = { ["name"]: string }; const Hello = (props: Props) => <div/>;`, Tsx: true},
+
+		// ---- Dimension 4: declaration/container forms ----
+		{Code: `const Hello = class extends React.Component<{ readonly name: string }> { render() { return <div/>; } };`, Tsx: true},
+		{Code: `abstract class Hello extends React.Component<{ readonly name: string }> { abstract render(): React.ReactNode; }`, Tsx: true},
+		{Code: `class Hello extends React.Component<{ readonly name: string }> { static readonly value = 1; render() { return <div/>; } }`, Tsx: true},
+
+		// ---- Dimension 4: graceful degradation ----
+		{Code: `type Props = { readonly name: string } & OtherProps; const Hello = (props: Props) => <div/>;`, Tsx: true},
+		{Code: `type Props = {}; const Hello = ({}: Props) => <div/>;`, Tsx: true},
+		{Code: `class Hello extends React.Component {} const value = (props: { name: string }) => null;`, Tsx: true},
+		{Code: `declare function Hello(props: { name: string }): JSX.Element;`, Tsx: true},
+
+		// ---- Branch lock-ins: component classification and type selection ----
+		// Locks in upstream isSuperTypeParameterPropsDeclaration()'s no-type-args arm.
+		{Code: `class Hello extends React.Component { render() { return <div/>; } }`, Tsx: true},
+		// Locks in upstream isES6Component()'s bare Component / PureComponent arms.
+		{Code: `class Hello extends Component<{ readonly name: string }> { render() { return <div/>; } }`, Tsx: true},
+		{Code: `class Hello extends React.PureComponent<{ readonly name: string }> { render() { return <div/>; } }`, Tsx: true},
+		// Locks in upstream isValidReactGenericTypeAnnotation()'s rejected generic arm.
+		{Code: `import React from "react"; type Props = { name: string }; const notAComponent: MyFC<Props> = (props) => <div/>;`, Tsx: true},
+		// The released upstream rule requires a React generic import for this arm.
+		// Real-user #3650: the modern JSX runtime leaves React unimported, so the
+		// released rule intentionally produces no diagnostic for this shape.
+		{Code: `type Props = { name: string }; const Chip: React.FC<Props> = ({name}) => <div>{name}</div>;`, Tsx: true},
+		// Locks in the TS visitor's union fallback: unions are not traversed.
+		{Code: `import React from "react"; type Props = { name: string } | { other: string }; const Hello: React.FC<Props> = (props) => <div/>;`, Tsx: true},
+		// Locks in the function-without-props branch.
+		{Code: `const Hello = () => <div/>;`, Tsx: true},
+
+		// ---- Real-user: #3786 namespace-qualified props type ----
+		// v7.37.5 searches only top-level declarations, so a namespace member is
+		// not resolved and remains silent, matching the released implementation.
+		{Code: `namespace ItemsListElementSkeleton { export interface Props { name?: string } } function ItemsListElementSkeleton({name}: ItemsListElementSkeleton.Props) { return <div>{name}</div>; }`, Tsx: true},
+		// ---- Real-user: #3650 implicit React reference ----
+		{Code: `interface ChipProps { chipColor: string; label: string } const Chip: React.FC<ChipProps> = ({chipColor, label}) => <div>{chipColor}{label}</div>;`, Tsx: true},
+
+		// N/A: receiver/member access and element access — the rule inspects type
+		// declarations, not JavaScript expressions.
+		// N/A: RestElement bindings — function parameter binding shape is irrelevant
+		// once its type annotation has been collected.
+	}, []rule_tester.InvalidTestCase{
+		// ---- Dimension 4: optional property and multiline diagnostic range ----
+		{
+			Code: `type Props = {
+  name?: string;
+  title: string;
+};
+function Hello(props: Props) {
+  return <div>{props.name}{props.title}</div>;
+}`,
+			Tsx: true,
+			Output: []string{`type Props = {
+  readonly name?: string;
+  readonly title: string;
+};
+function Hello(props: Props) {
+  return <div>{props.name}{props.title}</div>;
+}`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only.", Line: 2, Column: 3, EndLine: 2, EndColumn: 17},
+				{MessageId: "readOnlyProp", Message: "Prop 'title' should be read-only.", Line: 3, Column: 3, EndLine: 3, EndColumn: 17},
+			},
+		},
+		// ---- Branch lock-in: class expression report ----
+		{
+			Code:   `const Hello = class extends React.Component<{ name: string }> { render() { return <div/>; } };`,
+			Tsx:    true,
+			Output: []string{`const Hello = class extends React.Component<{ readonly name: string }> { render() { return <div/>; } };`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		// ---- Branch lock-in: imported named generic arm ----
+		{
+			Code:   `import { FC } from "react"; type Props = { name: string }; const Hello: FC<Props> = (props) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`import { FC } from "react"; type Props = { readonly name: string }; const Hello: FC<Props> = (props) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		// ---- Real-user: #3653 async server component ----
+		{
+			Code:   `type Props = { enabled: boolean }; const AsyncComponent = async ({enabled}: Props) => <div>{enabled}</div>;`,
+			Tsx:    true,
+			Output: []string{`type Props = { readonly enabled: boolean }; const AsyncComponent = async ({enabled}: Props) => <div>{enabled}</div>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'enabled' should be read-only."}},
+		},
+		// ---- Branch lock-in: forwardRef props type argument ----
+		{
+			Code:   `import React from "react"; type Props = { name: string }; const Hello = React.forwardRef<HTMLDivElement, Props>((props, ref) => <div ref={ref}>{props.name}</div>);`,
+			Tsx:    true,
+			Output: []string{`import React from "react"; type Props = { readonly name: string }; const Hello = React.forwardRef<HTMLDivElement, Props>((props, ref) => <div ref={ref}>{props.name}</div>);`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+	})
+}

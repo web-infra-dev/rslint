@@ -62,6 +62,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_read_only_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
@@ -144,6 +145,7 @@ func GetAllRules() []rule.Rule {
 		no_unsafe.NoUnsafeRule,
 		no_will_update_set_state.NoWillUpdateSetStateRule,
 		prefer_es6_class.PreferEs6ClassRule,
+		prefer_read_only_props.PreferReadOnlyPropsRule,
 		prefer_stateless_function.PreferStatelessFunctionRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		require_optimization.RequireOptimizationRule,
