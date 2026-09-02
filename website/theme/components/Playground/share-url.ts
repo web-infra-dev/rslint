@@ -57,6 +57,25 @@ const SHARE_VERSION = '1';
  */
 const LEGACY_CODE_PARAM = 'code';
 
+/**
+ * A URL is attacker-controlled input, and inflating one is the first thing a
+ * page load does with it, so both ends of the decompression are bounded.
+ *
+ * DEFLATE cannot expand its input by more than about 1032:1, so capping the
+ * compressed payload caps the work an inflate can be made to perform: 64 KiB
+ * in can yield at most ~64 MiB out, on the order of 150ms. That covers the CPU
+ * side, but not memory — fflate keeps inflating past a full output buffer and
+ * discards the overflow — so the decompressed size is capped as well.
+ *
+ * Neither cap is reachable by hand: real source compresses about 4:1, so the
+ * compressed cap sits around 270 KiB of editor text, an 87,000-character
+ * fragment. Links stop surviving mail and chat clients two orders of magnitude
+ * before that.
+ */
+const MAX_COMPRESSED_BYTES = 64 * 1024;
+const MAX_DECOMPRESSED_BYTES = 1024 * 1024;
+const MAX_DEFLATE_EXPANSION = 1032;
+
 const FLAG_CODE = 1;
 const FLAG_RSLINT_CONFIG = 2;
 const FLAG_TSCONFIG = 4;
@@ -209,6 +228,9 @@ export function encodeShareState(state: ShareState): string | null {
     mem: 12,
     dictionary: getDictionary(),
   });
+  if (compressed.length > MAX_COMPRESSED_BYTES) {
+    throw new Error('This playground state is too large to put in a link.');
+  }
   return SHARE_VERSION + toBase64Url(compressed);
 }
 
@@ -219,11 +241,23 @@ export function encodeShareState(state: ShareState): string | null {
 export function decodeShareState(payload: string): ShareState | null {
   if (payload[0] !== SHARE_VERSION) return null;
   try {
-    return decodeFrame(
-      inflateSync(fromBase64Url(payload.slice(1)), {
-        dictionary: getDictionary(),
-      }),
-    );
+    const compressed = fromBase64Url(payload.slice(1));
+    if (compressed.length > MAX_COMPRESSED_BYTES) return null;
+    // Only ever allocate what this payload could actually expand into, and one
+    // byte beyond the cap so that hitting the cap is distinguishable from
+    // landing exactly on it: fflate reports the real length when the output
+    // fits and the buffer's own length when it had to truncate.
+    const frame = inflateSync(compressed, {
+      dictionary: getDictionary(),
+      out: new Uint8Array(
+        Math.min(
+          MAX_DECOMPRESSED_BYTES + 1,
+          compressed.length * MAX_DEFLATE_EXPANSION + 1,
+        ),
+      ),
+    });
+    if (frame.length > MAX_DECOMPRESSED_BYTES) return null;
+    return decodeFrame(frame);
   } catch {
     return null;
   }
@@ -258,7 +292,10 @@ export function readShareState(): ShareState {
 /**
  * Rewrites the current URL to carry `state`. Nothing but the fragment is left
  * behind: an unmodified playground gets a bare URL, and a link opened in the
- * legacy plain-text form is upgraded in place on the first edit.
+ * legacy plain-text form is upgraded in place on the first edit. A state too
+ * large to encode leaves the URL as it stands, which is a staler link than the
+ * editors deserve but a truthful one, rather than a bare URL claiming the
+ * defaults are on screen.
  */
 export function writeShareState(state: ShareState) {
   if (typeof window === 'undefined') return;
