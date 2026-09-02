@@ -252,7 +252,7 @@ func (a *overloadAnalyzer) signaturesCanBeUnified(left, right *ast.Node, outerTy
 		return false
 	}
 	return typesAreEqual(a.ctx.SourceFile, left.Type(), right.Type()) &&
-		typeParametersAreEqual(left.TypeParameters(), right.TypeParameters()) &&
+		typeParametersAreEqual(a.ctx.SourceFile, left.TypeParameters(), right.TypeParameters()) &&
 		signatureUsesOuterTypeParameter(left, outerTypeParameters) == signatureUsesOuterTypeParameter(right, outerTypeParameters)
 }
 
@@ -350,13 +350,14 @@ func signatureReportRange(sourceFile *ast.SourceFile, signature *ast.Node) core.
 			start = scanner.SkipTrivia(sourceFile.Text(), start+len("default"))
 		}
 	}
-	if (signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindConstructor) && signature.ParameterList() != nil {
-		start = signature.ParameterList().Pos() - 1
-	}
-	// For generic class members, typescript-eslint reports the type-parameter
-	// list rather than the member key or opening parenthesis.
-	if signature.Kind == ast.KindMethodDeclaration && len(signature.TypeParameters()) > 0 {
-		start = signature.TypeParameters()[0].Pos() - 1
+	if signature.Kind == ast.KindMethodDeclaration || signature.Kind == ast.KindConstructor {
+		if typeParameters := signature.TypeParameterList(); typeParameters != nil && len(typeParameters.Nodes) > 0 {
+			// For generic class members, typescript-eslint reports the function
+			// value, which starts at the type-parameter list's opening token.
+			start = typeParameters.Pos() - 1
+		} else if parameters := signature.ParameterList(); parameters != nil {
+			start = parameters.Pos() - 1
+		}
 	}
 	return core.NewTextRange(start, trimmed.End())
 }
@@ -527,34 +528,37 @@ func staticParameterName(parameter *ast.Node) string {
 
 func typesAreEqual(sourceFile *ast.SourceFile, left, right *ast.Node) bool {
 	left, right = skipParenthesizedType(left), skipParenthesizedType(right)
-	return left == right || left != nil && right != nil && utils.TrimmedNodeText(sourceFile, left) == utils.TrimmedNodeText(sourceFile, right)
+	if left == right {
+		return true
+	}
+	if left == nil || right == nil {
+		return false
+	}
+	// Preserve TrimNodeTextRange's scanner-based recovery and JSDoc behavior
+	// where GetTokenPosOfNode intentionally uses different trivia rules.
+	if ast.NodeIsMissing(left) || ast.NodeIsMissing(right) ||
+		ast.NodeIsSynthesized(left) || ast.NodeIsSynthesized(right) ||
+		left.Flags&ast.NodeFlagsJSDoc != 0 || right.Flags&ast.NodeFlagsJSDoc != 0 ||
+		ast.IsJSDocNode(left) || ast.IsJSDocNode(right) {
+		return utils.TrimmedNodeText(sourceFile, left) == utils.TrimmedNodeText(sourceFile, right)
+	}
+	text := sourceFile.Text()
+	leftStart := scanner.GetTokenPosOfNode(left, sourceFile, false)
+	rightStart := scanner.GetTokenPosOfNode(right, sourceFile, false)
+	return text[leftStart:left.End()] == text[rightStart:right.End()]
 }
 
-func typeParametersAreEqual(left, right []*ast.Node) bool {
+func typeParametersAreEqual(sourceFile *ast.SourceFile, left, right []*ast.Node) bool {
 	if len(left) != len(right) {
 		return false
 	}
 	for i := range left {
 		leftParam, rightParam := left[i].AsTypeParameterDeclaration(), right[i].AsTypeParameterDeclaration()
-		if left[i].Name().Text() != right[i].Name().Text() || !constraintsAreEqual(leftParam.Constraint, rightParam.Constraint) {
+		if left[i].Name().Text() != right[i].Name().Text() || !typesAreEqual(sourceFile, leftParam.Constraint, rightParam.Constraint) {
 			return false
 		}
 	}
 	return true
-}
-
-func constraintsAreEqual(left, right *ast.Node) bool {
-	left, right = skipParenthesizedType(left), skipParenthesizedType(right)
-	return left == right || left != nil && right != nil && estreeConstraintKind(left) == estreeConstraintKind(right)
-}
-
-func estreeConstraintKind(node *ast.Node) ast.Kind {
-	if node.Kind == ast.KindLiteralType {
-		if literal := node.AsLiteralTypeNode().Literal; literal != nil && literal.Kind == ast.KindNullKeyword {
-			return ast.KindNullKeyword
-		}
-	}
-	return node.Kind
 }
 
 func skipParenthesizedType(node *ast.Node) *ast.Node {

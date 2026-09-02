@@ -258,3 +258,48 @@ const save = rs.fn();`,
 		},
 	)
 }
+
+// The `rs` / `rstest` utility object is the same object through `rstack/test`,
+// which re-exports the Rstest core API, so every receiver form resolves there
+// too.
+func TestRequireMockTypeParametersRstackTestModule(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&RequireMockTypeParametersRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { rs } from 'rstack/test'; rs.fn<() => void>();`},
+			// A sibling subpath exports no utility object.
+			{Code: `import { rs } from 'rstack/lib'; rs.fn();`},
+			// The namespace itself is not the utility object.
+			{Code: `import * as core from 'rstack/test'; core.fn();`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `import { rs } from 'rstack/test'; rs.fn();`,
+				Errors: missing("fn", 1, 38, 40),
+			},
+			{
+				Code:   `import { rs as vi } from 'rstack/test'; vi.fn();`,
+				Errors: missing("fn", 1, 44, 46),
+			},
+			{
+				Code:   `import { rstest as mocker } from 'rstack/test'; mocker.fn();`,
+				Errors: missing("fn", 1, 56, 58),
+			},
+			{
+				Code:   `const { rs } = require('rstack/test'); rs.fn();`,
+				Errors: missing("fn", 1, 43, 45),
+			},
+			{
+				Code:   `import * as core from 'rstack/test'; core.rs.fn();`,
+				Errors: missing("fn", 1, 46, 48),
+			},
+			{
+				Code:   `const core = require('rstack/test'); core.rstest.fn();`,
+				Errors: missing("fn", 1, 50, 52),
+			},
+		},
+	)
+}
