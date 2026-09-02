@@ -38,6 +38,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_access_state_in_setstate"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_array_index_key"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_arrow_function_lifecycle"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_children_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger_with_children"
@@ -120,6 +121,7 @@ func GetAllRules() []rule.Rule {
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
 		no_access_state_in_setstate.NoAccessStateInSetstateRule,
 		no_array_index_key.NoArrayIndexKeyRule,
+		no_arrow_function_lifecycle.NoArrowFunctionLifecycleRule,
 		no_children_prop.NoChildrenPropRule,
 		no_danger.NoDangerRule,
 		no_danger_with_children.NoDangerWithChildrenRule,
