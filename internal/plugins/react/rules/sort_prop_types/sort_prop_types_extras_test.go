@@ -4,19 +4,15 @@
 package sort_prop_types
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -122,26 +118,23 @@ func TestSortPropTypesExtras(t *testing.T) {
 }
 
 func TestSortPropTypesDoesNotResolveObjectsAcrossFiles(t *testing.T) {
-	dir := tspath.NormalizePath(t.TempDir())
-	declarationFile := tspath.NormalizePath(filepath.Join(dir, "global.ts"))
-	usageFile := tspath.NormalizePath(filepath.Join(dir, "cross-file.ts"))
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+	root := fixtures.GetRootDir()
+	declarationFile := tspath.ResolvePath(root.Dir, "file.ts")
+	usageFile := tspath.ResolvePath(root.Dir, "react.tsx")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{
 		declarationFile: `const sharedProps = { z: PropTypes.string, a: PropTypes.string };`,
 		usageFile:       `C.propTypes = sharedProps;`,
 	})
-	host := utils.CreateCompilerHost(dir, fs)
-	program, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{
-		Target: core.ScriptTargetESNext,
-	}, []string{declarationFile, usageFile}, host)
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
 	if err != nil {
-		t.Fatalf("create typed program: %v", err)
+		t.Fatalf("create fixture program: %v", err)
 	}
 
 	var diagnostics []rule.RuleDiagnostic
-	linter.LintSingleFile(linter.LintSingleFileOptions{
-		Program:     lintprogram.NewFromCompiler(program),
-		File:        usageFile,
-		HasTypeInfo: true,
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program: lintprogram.NewFromCompiler(program),
+		Files:   []string{usageFile},
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
 				Name:     SortPropTypesRule.Name,
@@ -151,9 +144,9 @@ func TestSortPropTypesDoesNotResolveObjectsAcrossFiles(t *testing.T) {
 				},
 			}}
 		},
-		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
-		}},
+		},
 	})
 
 	if len(diagnostics) != 0 {
