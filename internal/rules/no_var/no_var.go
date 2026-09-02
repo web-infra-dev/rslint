@@ -1,6 +1,8 @@
 package no_var
 
 import (
+	"slices"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 
@@ -171,7 +173,8 @@ func canFix(node *ast.Node, ctx *rule.RuleContext) bool {
 		// Collect references only after the cheap blockers above. A reference
 		// can only resolve to this symbol from within its variable scope, so the
 		// file-wide list is identical to a bounded scope walk.
-		refs := filterSafeAmbientNamespaceReferences(v.nameNode, ctx.Refs.References(v.sym))
+		refs := filterSafeNamespaceExportReferences(ctx.Refs.References(v.sym))
+		refs = filterSafeAmbientNamespaceReferences(v.nameNode, refs)
 
 		// Condition 2: self-reference in TDZ
 		if hasTDZIssue(v.nameNode, refs) {
@@ -352,6 +355,15 @@ func bindingContainsName(binding *ast.Node, target string) bool {
 		}
 	})
 	return found
+}
+
+// filterSafeNamespaceExportReferences removes `export as namespace Name`.
+// It names the UMD module in the global namespace but does not read the local
+// value at runtime, so it cannot make a var-to-let replacement unsafe.
+func filterSafeNamespaceExportReferences(refs []*ast.Node) []*ast.Node {
+	return slices.DeleteFunc(slices.Clone(refs), func(ref *ast.Node) bool {
+		return ref != nil && ref.Parent != nil && ref.Parent.Kind == ast.KindNamespaceExportDeclaration
+	})
 }
 
 // filterSafeAmbientNamespaceReferences removes type-only reads contributed by

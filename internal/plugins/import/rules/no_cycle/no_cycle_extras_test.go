@@ -18,7 +18,7 @@ func TestNoCycleExtras(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&no_cycle.NoCycleRule,
-		[]rule_tester.ValidTestCase{
+		withDefaultNoCycleValidFileName([]rule_tester.ValidTestCase{
 			// ---- JSDoc import types are comments, not module-graph edges ----
 			// @typescript-eslint/parser exposes these through comments / parser
 			// services rather than ESTree import nodes, so import/no-cycle ignores
@@ -85,8 +85,8 @@ func TestNoCycleExtras(t *testing.T) {
 
 			// A json.Number maxDepth is schema-valid and must limit traversal like a plain number.
 			{Code: `import { depthThree } from "./no-cycle/depth-three"; export const rootValue = depthThree; export type RootType = string;`, Options: []interface{}{map[string]interface{}{"maxDepth": json.Number("2")}}},
-		},
-		[]rule_tester.InvalidTestCase{
+		}),
+		withDefaultNoCycleInvalidFileName([]rule_tester.InvalidTestCase{
 			// Control for the JSDoc cases above: with the same JavaScript filename,
 			// tsconfig, and target, an authored import is a graph edge and closes
 			// the cycle through no-cycle/depth-one.ts.
@@ -268,6 +268,6 @@ export const realValue = realBarrel.run || run;`,
 					cycleError(messageDetected),
 				},
 			},
-		},
+		}),
 	)
 }
