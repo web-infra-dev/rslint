@@ -76,6 +76,16 @@ Examples of **correct** code with `"non-jsx"`:
 <App>Hello {<Hello />} there!</App>
 ```
 
+## Differences from ESLint
+
+- For member-expression tags, rslint uses the complete authored tag name in
+  diagnostics, such as `Foo.Bar`. ESLint's v7.37.5 implementation reads a
+  missing `name` property and reports `undefined` instead.
+- For namespaced tags, rslint uses the complete namespace-qualified name,
+  such as `svg:path`. ESLint's v7.37.5 implementation coerces the AST object
+  and reports `[object Object]` instead. These readable descriptors are an
+  intentional divergence from those upstream artifacts.
+
 ## Original Documentation
 
 - [eslint-plugin-react: jsx-one-expression-per-line](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-one-expression-per-line.md)
