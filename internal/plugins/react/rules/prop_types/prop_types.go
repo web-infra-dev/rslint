@@ -38,6 +38,12 @@ type component struct {
 	destructured  map[string][]string
 }
 
+type componentKey struct {
+	name    string
+	binding *ast.Symbol
+	scope   *ast.Node
+}
+
 func parseOptions(raw []any) options {
 	o := options{}
 	if len(raw) == 0 {
@@ -348,6 +354,25 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 		return declaredType(n.AsTypeAliasDeclaration().Type, aliases, aliasesBySymbol, seen)
 	case ast.KindTypeReference:
 		ref := n.AsTypeReferenceNode()
+		if ref.TypeName != nil && ref.TypeArguments != nil && len(ref.TypeArguments.Nodes) > 0 {
+			name := reactutil.EntityNameRightmost(ref.TypeName)
+			if name != nil {
+				typeName := importedReactTypeName(name)
+				if typeName == "" && ref.TypeName.Kind == ast.KindQualifiedName {
+					qualified := ref.TypeName.AsQualifiedName()
+					if qualified.Left != nil && qualified.Left.Kind == ast.KindIdentifier && importedReactNamespace(name, qualified.Left.AsIdentifier().Text) {
+						typeName = name.AsIdentifier().Text
+					}
+				}
+				if typeName == "PropsWithChildren" {
+					declared, ok := declaredType(ref.TypeArguments.Nodes[0], aliases, aliasesBySymbol, seen)
+					if ok {
+						declared["children"] = propType{open: true}
+					}
+					return declared, ok
+				}
+			}
+		}
 		if ref.TypeName != nil && reactutil.EntityNameRightmost(ref.TypeName) != nil && reactutil.EntityNameRightmost(ref.TypeName).AsIdentifier().Text == "ReturnType" && ref.TypeArguments != nil && len(ref.TypeArguments.Nodes) == 1 {
 			if declared, ok := returnTypePropMap(ref.TypeArguments.Nodes[0]); ok {
 				return declared, true
@@ -512,7 +537,7 @@ func classPropsType(class *ast.Node) *ast.Node {
 		return nil
 	}
 	for _, clause := range clauses.Nodes {
-		if clause == nil || clause.Kind != ast.KindHeritageClause {
+		if clause == nil || clause.Kind != ast.KindHeritageClause || clause.AsHeritageClause().Token != ast.KindExtendsKeyword {
 			continue
 		}
 		types := clause.AsHeritageClause().Types
@@ -633,7 +658,7 @@ func reactComponentTypeArgument(typeNode *ast.Node) *ast.Node {
 			return nil
 		}
 		qualifier := qualified.AsQualifiedName().Left.AsIdentifier().Text
-		if qualifier != "React" && !importedReactNamespace(name, qualifier) {
+		if !importedReactNamespace(name, qualifier) {
 			return nil
 		}
 		typeName = name.AsIdentifier().Text
@@ -641,7 +666,7 @@ func reactComponentTypeArgument(typeNode *ast.Node) *ast.Node {
 	if typeName == "ForwardRefRenderFunction" && len(arguments.Nodes) >= 2 {
 		return arguments.Nodes[1]
 	}
-	if !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "ComponentType", "VFC", "VoidFunctionComponent"}, typeName) {
+	if !slices.Contains([]string{"FC", "FunctionComponent", "SFC", "StatelessComponent", "VFC", "VoidFunctionComponent"}, typeName) {
 		return nil
 	}
 	return arguments.Nodes[0]
@@ -661,17 +686,22 @@ func importedReactNamespace(name *ast.Node, localName string) bool {
 		if n == nil || found {
 			return false
 		}
-		if n.Kind == ast.KindNamespaceImport {
-			ns := n.AsNamespaceImport()
-			if ns != nil && ns.Name() != nil && ns.Name().Kind == ast.KindIdentifier && ns.Name().AsIdentifier().Text == localName {
-				for parent := n.Parent; parent != nil; parent = parent.Parent {
-					if parent.Kind != ast.KindImportDeclaration {
-						continue
-					}
-					module := parent.AsImportDeclaration().ModuleSpecifier
-					found = module != nil && module.Kind == ast.KindStringLiteral && module.Text() == "react"
-					break
-				}
+		if n.Kind == ast.KindImportDeclaration {
+			importDecl := n.AsImportDeclaration()
+			module := importDecl.ModuleSpecifier
+			if module == nil || module.Kind != ast.KindStringLiteral || module.Text() != "react" || importDecl.ImportClause == nil {
+				n.ForEachChild(visit)
+				return false
+			}
+			clause := importDecl.ImportClause.AsImportClause()
+			defaultName := clause.Name()
+			if defaultName != nil && defaultName.Kind == ast.KindIdentifier && defaultName.AsIdentifier().Text == localName {
+				found = true
+				return false
+			}
+			if clause.NamedBindings != nil && clause.NamedBindings.Kind == ast.KindNamespaceImport {
+				ns := clause.NamedBindings.AsNamespaceImport()
+				found = ns != nil && ns.Name() != nil && ns.Name().Kind == ast.KindIdentifier && ns.Name().AsIdentifier().Text == localName
 			}
 		}
 		n.ForEachChild(visit)
@@ -733,7 +763,9 @@ func forwardRefPropsType(n *ast.Node) *ast.Node {
 			callee := unwrap(call.Expression)
 			isForwardRef := callee != nil && callee.Kind == ast.KindIdentifier && importedReactTypeName(callee) == "forwardRef"
 			if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
-				isForwardRef = keyName(callee.AsPropertyAccessExpression().Name()) == "forwardRef"
+				property := callee.AsPropertyAccessExpression()
+				receiver := unwrap(property.Expression)
+				isForwardRef = keyName(property.Name()) == "forwardRef" && receiver != nil && receiver.Kind == ast.KindIdentifier && receiver.AsIdentifier().Text == "React"
 			}
 			if !isForwardRef {
 				return nil
@@ -806,18 +838,42 @@ func componentBinding(n *ast.Node) *ast.Symbol {
 	if n.Kind == ast.KindFunctionDeclaration || n.Kind == ast.KindClassDeclaration {
 		return n.Symbol()
 	}
+	return componentRootBinding(n)
+}
+
+func componentRootBinding(n *ast.Node) *ast.Symbol {
 	for current := n; current != nil && current.Parent != nil; {
 		parent := current.Parent
 		switch parent.Kind {
-		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression:
+		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression, ast.KindPropertyAssignment, ast.KindObjectLiteralExpression:
 			current = parent
+			continue
 		case ast.KindVariableDeclaration:
 			if parent.AsVariableDeclaration().Initializer == current {
-				return parent.Symbol()
+				name := parent.AsVariableDeclaration().Name()
+				if name != nil && name.Kind == ast.KindIdentifier {
+					return name.Symbol()
+				}
 			}
-			return nil
-		default:
-			return nil
+		case ast.KindBinaryExpression:
+			assignment := parent.AsBinaryExpression()
+			if assignment.OperatorToken != nil && assignment.OperatorToken.Kind == ast.KindEqualsToken && assignment.Right == current {
+				root, _, ok := memberNames(assignment.Left)
+				if ok && root != nil && root.Kind == ast.KindIdentifier {
+					return root.Symbol()
+				}
+			}
+		}
+		return nil
+	}
+	return nil
+}
+
+func componentScope(n *ast.Node) *ast.Node {
+	for current := n; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindBlock, ast.KindSourceFile, ast.KindModuleBlock:
+			return current
 		}
 	}
 	return nil
@@ -1274,7 +1330,27 @@ var PropTypesRule = rule.Rule{
 		ctx.SourceFile.Node.ForEachChild(collectTypeAliases)
 		var comps []*component
 		byName := map[string]*component{}
+		byComponentKey := map[componentKey]*component{}
 		byBinding := map[*ast.Symbol]*component{}
+		registerComponent := func(c *component, name string) {
+			if name == "" {
+				return
+			}
+			byName[name] = c
+			if c.binding != nil {
+				byComponentKey[componentKey{name: name, binding: c.binding, scope: componentScope(c.node)}] = c
+			} else {
+				byComponentKey[componentKey{name: name, scope: componentScope(c.node)}] = c
+			}
+		}
+		lookupComponent := func(root *ast.Node, name string) *component {
+			if root != nil && root.Kind == ast.KindIdentifier {
+				if c := byComponentKey[componentKey{name: name, binding: root.Symbol(), scope: componentScope(root)}]; c != nil {
+					return c
+				}
+			}
+			return byName[name]
+		}
 		var propTypeAssignments []*ast.Node
 		applyPropTypeAssignment := func(assignment *ast.Node) {
 			binary := assignment.AsBinaryExpression()
@@ -1287,15 +1363,17 @@ var PropTypesRule = rule.Rule{
 				return
 			}
 			componentParts := append([]string{root.AsIdentifier().Text}, names[:propTypesIndex]...)
-			c := byName[strings.Join(componentParts, ".")]
-			if propTypesIndex == 0 {
-				symbol := root.Symbol()
-				if symbol == nil && ctx.TypeChecker != nil {
-					symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
-				}
-				if bySymbol := byBinding[symbol]; bySymbol != nil {
-					c = bySymbol
-				}
+			componentName := strings.Join(componentParts, ".")
+			symbol := root.Symbol()
+			if symbol == nil && ctx.TypeChecker != nil {
+				symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
+			}
+			c := byComponentKey[componentKey{name: componentName, binding: symbol, scope: componentScope(root)}]
+			if c == nil {
+				c = lookupComponent(root, componentName)
+			}
+			if c == nil && propTypesIndex == 0 {
+				c = byBinding[symbol]
 			}
 			if c == nil {
 				return
@@ -1331,7 +1409,7 @@ var PropTypesRule = rule.Rule{
 						c.declaredBlock = true
 					}
 					if name := componentName(n); name != "" {
-						byName[name] = c
+						registerComponent(c, name)
 					}
 				}
 			case ast.KindObjectLiteralExpression:
@@ -1343,7 +1421,7 @@ var PropTypesRule = rule.Rule{
 						byBinding[c.binding] = c
 					}
 					if name := componentName(n); name != "" {
-						byName[name] = c
+						registerComponent(c, name)
 					}
 				}
 			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
@@ -1355,7 +1433,7 @@ var PropTypesRule = rule.Rule{
 						byBinding[c.binding] = c
 					}
 					if name := componentName(n); name != "" {
-						byName[name] = c
+						registerComponent(c, name)
 					}
 					ps := n.Parameters()
 					if len(ps) > 0 && ps[0].Kind == ast.KindParameter {
