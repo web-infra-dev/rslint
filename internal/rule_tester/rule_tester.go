@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"sync"
@@ -54,8 +55,10 @@ type InvalidTestCaseError struct {
 }
 
 type InvalidTestCaseSuggestion struct {
-	MessageId string `json:"messageId"`
-	Output    string `json:"output"`
+	MessageId   string            `json:"messageId"`
+	Description string            `json:"description,omitempty"`
+	Data        map[string]string `json:"data,omitempty"`
+	Output      string            `json:"output"`
 }
 
 type InvalidTestCase struct {
@@ -372,6 +375,12 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 						if expectedSuggestion.MessageId != suggestion.Message.Id {
 							t.Errorf("Invalid suggestion message id %v. Expected %v", suggestion.Message.Id, expectedSuggestion.MessageId)
 						} else {
+							if expectedSuggestion.Description != "" && expectedSuggestion.Description != suggestion.Message.Description {
+								t.Errorf("Invalid suggestion description %q. Expected %q", suggestion.Message.Description, expectedSuggestion.Description)
+							}
+							if expectedSuggestion.Data != nil && !reflect.DeepEqual(expectedSuggestion.Data, suggestion.Message.Data) {
+								t.Errorf("Invalid suggestion data %#v. Expected %#v", suggestion.Message.Data, expectedSuggestion.Data)
+							}
 							output, _, _ := linter.ApplyRuleFixes(testCase.Code, []rule.RuleSuggestion{suggestion})
 
 							assert.Equal(t, expectedSuggestion.Output, output, "Expected code after suggestion fix")

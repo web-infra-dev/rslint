@@ -44,3 +44,23 @@ func TestJSXTextTokenValuesEqual(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeJSXEntities(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name, raw, want string
+	}{
+		{name: "named entity", raw: "no&amp;pener", want: "no&pener"},
+		{name: "hex entity", raw: "no&#x6f;pener", want: "noopener"},
+		{name: "invalid entity", raw: "no&#xZZ;pener", want: "no&#xZZ;pener"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := DecodeJSXEntities(tt.raw); got != tt.want {
+				t.Errorf("DecodeJSXEntities(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}

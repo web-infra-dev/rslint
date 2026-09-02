@@ -1,10 +1,40 @@
 package ecmascript
 
 import (
+	"strings"
 	"unicode/utf16"
 
 	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 )
+
+// DecodeJSXEntities decodes the character references that JSX parsers expose
+// as decoded text in direct attribute values. Invalid or unterminated
+// references remain in the result, matching the JSX token reader.
+func DecodeJSXEntities(raw string) string {
+	var decoded strings.Builder
+	for pos := 0; pos < len(raw); {
+		if raw[pos] == '&' {
+			first, second, count, next, ok := decodeJSXTextEntity(raw, pos)
+			if ok {
+				if count == 2 {
+					decoded.WriteRune(utf16.DecodeRune(rune(first), rune(second)))
+				} else {
+					decoded.WriteRune(rune(first))
+				}
+				pos = next
+				continue
+			}
+			decoded.WriteByte('&')
+			pos++
+			continue
+		}
+
+		_, size := decodeStringRune(raw[pos:])
+		decoded.WriteString(raw[pos : pos+size])
+		pos += size
+	}
+	return decoded.String()
+}
 
 // JSXTextTokenValuesEqual reports whether two raw JSX text spans produce the
 // same token value in Espree. acorn-jsx decodes XHTML entities and folds source

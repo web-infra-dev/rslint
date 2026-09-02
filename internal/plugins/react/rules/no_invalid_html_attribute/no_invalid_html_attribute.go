@@ -57,8 +57,8 @@ func message(id, description string, data map[string]string) rule.RuleMessage {
 	return rule.RuleMessage{Id: id, Description: description, Data: data}
 }
 
-func suggestion(id, description string, fix rule.RuleFix) []rule.RuleSuggestion {
-	return []rule.RuleSuggestion{{Message: message(id, description, nil), FixesArr: []rule.RuleFix{fix}}}
+func suggestion(id, description string, data map[string]string, fix rule.RuleFix) []rule.RuleSuggestion {
+	return []rule.RuleSuggestion{{Message: message(id, description, data), FixesArr: []rule.RuleFix{fix}}}
 }
 
 // stringParts is the JS /\\S+/g equivalent with byte offsets. JavaScript's
@@ -118,6 +118,95 @@ func literalString(node *ast.Node) (string, bool) {
 	return "", false
 }
 
+func jsxLiteralString(ctx rule.RuleContext, node *ast.Node) (string, bool) {
+	value, ok := literalString(node)
+	if !ok {
+		return "", false
+	}
+	raw := sourceText(ctx, node)
+	if len(raw) >= 2 && ((raw[0] == '"' && raw[len(raw)-1] == '"') || (raw[0] == '\'' && raw[len(raw)-1] == '\'')) {
+		return ecmascript.DecodeJSXEntities(raw[1 : len(raw)-1]), true
+	}
+	return value, true
+}
+
+func isCreateElementCall(callee *ast.Node) bool {
+	if reactutil.IsCreateElementCall(callee, reactutil.DefaultReactPragma) {
+		return true
+	}
+	if callee == nil {
+		return false
+	}
+	wasParenthesized := callee.Kind == ast.KindParenthesizedExpression
+	callee = ast.SkipParentheses(callee)
+	if callee == nil || (wasParenthesized && ast.IsOptionalChain(callee)) || callee.Kind != ast.KindElementAccessExpression {
+		return false
+	}
+	access := callee.AsElementAccessExpression()
+	object := ast.SkipParentheses(access.Expression)
+	property := ast.SkipParentheses(access.ArgumentExpression)
+	return object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == reactutil.DefaultReactPragma &&
+		property != nil && property.Kind == ast.KindIdentifier && property.AsIdentifier().Text == "createElement"
+}
+
+func reportShortcutPairs(ctx rule.RuleContext, node *ast.Node, value string) {
+	for start := 0; start < len(value); start++ {
+		if !isASCIIWord(value[start]) || (start > 0 && isASCIIWord(value[start-1])) {
+			continue
+		}
+		firstEnd := start
+		for firstEnd < len(value) {
+			r, size := utf8.DecodeRuneInString(value[firstEnd:])
+			if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
+				break
+			}
+			firstEnd += size
+		}
+		pairEnd := firstEnd
+		secondStart := firstEnd
+		for secondStart < len(value) {
+			r, size := utf8.DecodeRuneInString(value[secondStart:])
+			if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
+				break
+			}
+			secondStart += size
+		}
+		if secondStart < len(value) {
+			pairEnd = secondStart
+			for pairEnd < len(value) {
+				r, size := utf8.DecodeRuneInString(value[pairEnd:])
+				if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
+					break
+				}
+				pairEnd += size
+			}
+		}
+		pairText := value[start:pairEnd]
+		pairParts := strings.Split(pairText, " ")
+		first := pairParts[0]
+		if first != "shortcut" {
+			continue
+		}
+		last := pairParts[len(pairParts)-1]
+		second := ""
+		if len(pairParts) > 1 {
+			second = pairParts[1]
+		}
+		if last == "icon" {
+			continue
+		}
+		id, desc := "notAlone", "“shortcut” must be directly followed by “icon”."
+		if second != "" {
+			id, desc = "notPaired", "“shortcut” can not be directly followed by “"+second+"” without “icon”."
+		}
+		ctx.ReportNode(node, message(id, desc, map[string]string{"reportingValue": "shortcut", "secondValue": second, "missingValue": "icon"}))
+	}
+}
+
+func isASCIIWord(value byte) bool {
+	return value >= 'A' && value <= 'Z' || value >= 'a' && value <= 'z' || value >= '0' && value <= '9' || value == '_'
+}
+
 func isESTreeLiteral(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -162,17 +251,22 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 		if !configured(options) {
 			return rule.RuleListeners{}
 		}
-		reportLiteral := func(valueNode, removeNode *ast.Node, element string) {
+		reportLiteral := func(valueNode, nonStringRemoveNode, emptyRemoveNode *ast.Node, element string, decodeJSX bool) {
 			value, isString := literalString(valueNode)
+			if decodeJSX {
+				value, isString = jsxLiteralString(ctx, valueNode)
+			}
 			if !isString {
-				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("onlyStrings", "“rel” attribute only supports strings.", map[string]string{"attributeName": "rel"}), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveNonString", "remove non-string value in “rel”", rule.RuleFixRemove(ctx.SourceFile, removeNode))
+				data := map[string]string{"attributeName": "rel"}
+				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("onlyStrings", "“rel” attribute only supports strings.", data), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveNonString", "remove non-string value in “rel”", data, rule.RuleFixRemove(ctx.SourceFile, nonStringRemoveNode))
 				})
 				return
 			}
 			if ecmascript.IsBlank(value) {
-				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("noEmpty", "An empty “rel” attribute is meaningless.", map[string]string{"attributeName": "rel", "reportingValue": value}), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveEmpty", "remove empty attribute rel", rule.RuleFixRemove(ctx.SourceFile, removeNode))
+				data := map[string]string{"attributeName": "rel", "reportingValue": value}
+				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("noEmpty", "An empty “rel” attribute is meaningless.", data), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveEmpty", "\"remove empty attribute rel\"", data, rule.RuleFixRemove(ctx.SourceFile, emptyRemoveNode))
 				})
 				return
 			}
@@ -190,34 +284,11 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				if id != "" {
 					partRange := literalRange(ctx, valueNode, part)
 					ctx.ReportNodeWithDeferredSuggestions(valueNode, message(id, desc, data), func() []rule.RuleSuggestion {
-						return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+word+"”", rule.RuleFixRemoveRange(partRange))
+						return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+word+"”", data, rule.RuleFixRemoveRange(partRange))
 					})
 				}
 			}
-			parts := stringParts(value)
-			for i, part := range parts {
-				if value[part[0]:part[1]] == "shortcut" {
-					second := ""
-					last := value[part[0]:part[1]]
-					first := last
-					if i+1 < len(parts) {
-						pairText := value[part[0]:parts[i+1][1]]
-						pairParts := strings.Split(pairText, " ")
-						first = pairParts[0]
-						last = pairParts[len(pairParts)-1]
-						if len(pairParts) > 1 {
-							second = pairParts[1]
-						}
-					}
-					if first == "shortcut" && last != "icon" {
-						id, desc := "notAlone", "“shortcut” must be directly followed by “icon”."
-						if second != "" {
-							id, desc = "notPaired", "“shortcut” can not be directly followed by “"+second+"” without “icon”."
-						}
-						ctx.ReportNode(valueNode, message(id, desc, map[string]string{"reportingValue": "shortcut", "secondValue": second, "missingValue": "icon"}))
-					}
-				}
-			}
+			reportShortcutPairs(ctx, valueNode, value)
 			for _, part := range whitespaceParts(value) {
 				r := literalRange(ctx, valueNode, part)
 				whitespace := value[part[0]:part[1]]
@@ -226,8 +297,9 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					if part[0] == 0 || part[1] == len(value) {
 						replacement = ""
 					}
-					ctx.ReportNodeWithDeferredSuggestions(valueNode, message("spaceDelimited", "”rel“ attribute values should be space delimited.", map[string]string{"attributeName": "rel"}), func() []rule.RuleSuggestion {
-						return suggestion("suggestRemoveWhitespaces", "remove whitespaces in “rel”", rule.RuleFixReplaceRange(r, replacement))
+					data := map[string]string{"attributeName": "rel"}
+					ctx.ReportNodeWithDeferredSuggestions(valueNode, message("spaceDelimited", "”rel“ attribute values should be space delimited.", data), func() []rule.RuleSuggestion {
+						return suggestion("suggestRemoveWhitespaces", "remove whitespaces in “rel”", data, rule.RuleFixReplaceRange(r, replacement))
 					})
 				}
 			}
@@ -248,20 +320,22 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				return
 			}
 			if _, ok := relElements[element]; !ok {
-				ctx.ReportNodeWithDeferredSuggestions(name, message("onlyMeaningfulFor", "The ”rel“ attribute only has meaning on the tags: \"<link>\", \"<a>\", \"<area>\", \"<form>\"", map[string]string{"attributeName": "rel", "tagNames": "\"<link>\", \"<a>\", \"<area>\", \"<form>\""}), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveDefault", "remove rel", rule.RuleFixRemove(ctx.SourceFile, node))
+				data := map[string]string{"attributeName": "rel", "tagNames": "\"<link>\", \"<a>\", \"<area>\", \"<form>\""}
+				ctx.ReportNodeWithDeferredSuggestions(name, message("onlyMeaningfulFor", "The ”rel“ attribute only has meaning on the tags: \"<link>\", \"<a>\", \"<area>\", \"<form>\"", data), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveDefault", "\"remove rel\"", data, rule.RuleFixRemove(ctx.SourceFile, node))
 				})
 				return
 			}
 			init := attr.Initializer
 			if init == nil {
-				ctx.ReportNodeWithDeferredSuggestions(name, message("emptyIsMeaningless", "An empty “rel” attribute is meaningless.", map[string]string{"attributeName": "rel"}), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveEmpty", "remove empty attribute rel", rule.RuleFixRemove(ctx.SourceFile, node))
+				data := map[string]string{"attributeName": "rel"}
+				ctx.ReportNodeWithDeferredSuggestions(name, message("emptyIsMeaningless", "An empty “rel” attribute is meaningless.", data), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveEmpty", "\"remove empty attribute rel\"", data, rule.RuleFixRemove(ctx.SourceFile, node))
 				})
 				return
 			}
 			if init.Kind == ast.KindStringLiteral {
-				reportLiteral(init, node, element)
+				reportLiteral(init, node, node, element, true)
 				return
 			}
 			if init.Kind != ast.KindJsxExpression {
@@ -272,18 +346,19 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				return
 			}
 			if expr.Kind == ast.KindStringLiteral || expr.Kind == ast.KindNumericLiteral || expr.Kind == ast.KindBigIntLiteral || expr.Kind == ast.KindTrueKeyword || expr.Kind == ast.KindFalseKeyword || expr.Kind == ast.KindNullKeyword || expr.Kind == ast.KindRegularExpressionLiteral {
-				reportLiteral(expr, node, element)
+				reportLiteral(expr, node, init, element, false)
 				return
 			}
 			if expr.Kind == ast.KindObjectLiteralExpression || (expr.Kind == ast.KindIdentifier && expr.AsIdentifier().Text == "undefined") {
-				ctx.ReportNodeWithDeferredSuggestions(init, message("onlyStrings", "“rel” attribute only supports strings.", map[string]string{"attributeName": "rel"}), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveDefault", "remove rel", rule.RuleFixRemove(ctx.SourceFile, node))
+				data := map[string]string{"attributeName": "rel"}
+				ctx.ReportNodeWithDeferredSuggestions(init, message("onlyStrings", "“rel” attribute only supports strings.", data), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveDefault", "\"remove rel\"", data, rule.RuleFixRemove(ctx.SourceFile, node))
 				})
 			}
 		}
 		checkCall := func(node *ast.Node) {
 			call := node.AsCallExpression()
-			if !reactutil.IsCreateElementCall(call.Expression, reactutil.DefaultReactPragma) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+			if !isCreateElementCall(call.Expression) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 				return
 			}
 			tagNode := ast.SkipParentheses(call.Arguments.Nodes[0])
@@ -308,6 +383,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				method := false
 				shorthand := false
 				computed := false
+				accessor := false
 				switch property.Kind {
 				case ast.KindMethodDeclaration:
 					method = true
@@ -318,6 +394,9 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				case ast.KindShorthandPropertyAssignment:
 					shorthand = true
 					key = property.AsShorthandPropertyAssignment().Name()
+				case ast.KindGetAccessor, ast.KindSetAccessor:
+					accessor = true
+					key = property.Name()
 				default:
 					continue
 				}
@@ -336,7 +415,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					ctx.ReportNode(property, message("noMethod", "The ”rel“ attribute cannot be a method.", map[string]string{"attributeName": "rel"}))
 					continue
 				}
-				if shorthand || computed {
+				if shorthand || computed || accessor {
 					continue
 				}
 				value = ast.SkipParentheses(value)
@@ -372,8 +451,9 @@ func reportCreateElementValue(ctx rule.RuleContext, value *ast.Node, element str
 	}
 	tags, exists := relValues[text]
 	if !exists {
-		ctx.ReportNodeWithDeferredSuggestions(value, message("neverValid", "“"+text+"” is never a valid “rel” attribute value.", map[string]string{"attributeName": "rel", "reportingValue": text}), func() []rule.RuleSuggestion {
-			return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+text+"”", removeStaticValue(ctx, value, text))
+		data := map[string]string{"attributeName": "rel", "reportingValue": text}
+		ctx.ReportNodeWithDeferredSuggestions(value, message("neverValid", "“"+text+"” is never a valid “rel” attribute value.", data), func() []rule.RuleSuggestion {
+			return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+text+"”", data, removeStaticValue(ctx, value, text))
 		})
 		return
 	}
