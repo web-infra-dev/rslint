@@ -112,25 +112,45 @@ func getExtendsClause(interfaceDecl *ast.InterfaceDeclaration) *ast.HeritageClau
 	return nil
 }
 
-// isMergedWithClassDeclaration reports whether the interface's name resolves
-// to a symbol that also has a class declaration in the same scope (TypeScript
-// declaration merging). Mirrors upstream's
-// `scope.set.get(name).defs.some(def => def.type === 'ClassDeclaration')`
-// check via the tsgo TypeChecker.
-func isMergedWithClassDeclaration(ctx rule.RuleContext, nameNode *ast.Node) bool {
-	if ctx.TypeChecker == nil || nameNode == nil {
+// isMergedWithOtherDeclaration reports whether an interface participates in
+// TypeScript declaration merging with another interface or a class. Replacing
+// one declaration with a type alias would make the resulting program invalid,
+// so those diagnostics must not carry replacement suggestions.
+//
+// The binder handles ordinary same-file bindings without a checker lookup and
+// naturally distinguishes unrelated lexical bindings. The checker fallback is
+// still required for global and ambient bindings assembled across source files.
+func isMergedWithOtherDeclaration(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node) bool {
+	if node == nil || nameNode == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+	binderSymbol := node.Symbol()
+	if hasOtherInterfaceOrClassDeclaration(binderSymbol, node) {
+		return true
+	}
+	if ctx.TypeChecker == nil {
+		return false
+	}
+	return hasOtherInterfaceOrClassDeclaration(ctx.TypeChecker.GetSymbolAtLocation(nameNode), node)
+}
+
+func hasOtherInterfaceOrClassDeclaration(symbol *ast.Symbol, node *ast.Node) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
-		if decl.Kind == ast.KindClassDeclaration {
+		if decl != node && (decl.Kind == ast.KindClassDeclaration || decl.Kind == ast.KindInterfaceDeclaration) {
 			return true
 		}
 	}
 	return false
+}
+
+func canSuggestInterfaceReplacement(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node) bool {
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) && ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault) {
+		return false
+	}
+	return !isMergedWithOtherDeclaration(ctx, node, nameNode)
 }
 
 // typeParametersText returns the bracketed type-parameter clause text
@@ -214,42 +234,43 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				mergedWithClass := isMergedWithClassDeclaration(ctx, nameNode)
-
-				nameText := utils.TrimmedNodeText(ctx.SourceFile, nameNode)
-				typeParam := typeParametersText(ctx, interfaceDecl)
-				fixRange := interfaceFixRange(ctx, interfaceDecl, node)
-
 				if extendCount == 0 {
-					if mergedWithClass {
-						ctx.ReportNode(nameNode, buildNoEmptyInterfaceMessage("allowInterfaces"))
-						return
-					}
-					suggestions := make([]rule.RuleSuggestion, 0, 2)
-					for _, replacement := range []string{"object", "unknown"} {
-						suggestions = append(suggestions, rule.RuleSuggestion{
-							Message: buildReplaceEmptyInterfaceMessage(replacement),
-							FixesArr: []rule.RuleFix{
-								rule.RuleFixReplaceRange(fixRange, fmt.Sprintf("type %s%s = %s", nameText, typeParam, replacement)),
-							},
-						})
-					}
-					ctx.ReportNodeWithSuggestions(nameNode, buildNoEmptyInterfaceMessage("allowInterfaces"), suggestions...)
+					ctx.ReportNodeWithDeferredSuggestions(nameNode, buildNoEmptyInterfaceMessage("allowInterfaces"), func() []rule.RuleSuggestion {
+						if !canSuggestInterfaceReplacement(ctx, node, nameNode) {
+							return nil
+						}
+						nameText := utils.TrimmedNodeText(ctx.SourceFile, nameNode)
+						typeParam := typeParametersText(ctx, interfaceDecl)
+						fixRange := interfaceFixRange(ctx, interfaceDecl, node)
+						suggestions := make([]rule.RuleSuggestion, 0, 2)
+						for _, replacement := range []string{"object", "unknown"} {
+							suggestions = append(suggestions, rule.RuleSuggestion{
+								Message: buildReplaceEmptyInterfaceMessage(replacement),
+								FixesArr: []rule.RuleFix{
+									rule.RuleFixReplaceRange(fixRange, fmt.Sprintf("type %s%s = %s", nameText, typeParam, replacement)),
+								},
+							})
+						}
+						return suggestions
+					})
 					return
 				}
 
 				// extendCount == 1 here.
-				if mergedWithClass {
-					ctx.ReportNode(nameNode, buildNoEmptyInterfaceWithSuperMessage())
-					return
-				}
-
-				extendedTypeText := utils.TrimmedNodeText(ctx.SourceFile, extendClause.Types.Nodes[0])
-				ctx.ReportNodeWithSuggestions(nameNode, buildNoEmptyInterfaceWithSuperMessage(), rule.RuleSuggestion{
-					Message: buildReplaceEmptyInterfaceWithSuperMessage(),
-					FixesArr: []rule.RuleFix{
-						rule.RuleFixReplaceRange(fixRange, fmt.Sprintf("type %s%s = %s", nameText, typeParam, extendedTypeText)),
-					},
+				ctx.ReportNodeWithDeferredSuggestions(nameNode, buildNoEmptyInterfaceWithSuperMessage(), func() []rule.RuleSuggestion {
+					if !canSuggestInterfaceReplacement(ctx, node, nameNode) {
+						return nil
+					}
+					nameText := utils.TrimmedNodeText(ctx.SourceFile, nameNode)
+					typeParam := typeParametersText(ctx, interfaceDecl)
+					fixRange := interfaceFixRange(ctx, interfaceDecl, node)
+					extendedTypeText := utils.TrimmedNodeText(ctx.SourceFile, extendClause.Types.Nodes[0])
+					return []rule.RuleSuggestion{{
+						Message: buildReplaceEmptyInterfaceWithSuperMessage(),
+						FixesArr: []rule.RuleFix{
+							rule.RuleFixReplaceRange(fixRange, fmt.Sprintf("type %s%s = %s", nameText, typeParam, extendedTypeText)),
+						},
+					}}
 				})
 			}
 		}
@@ -279,16 +300,18 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				suggestions := make([]rule.RuleSuggestion, 0, 2)
-				for _, replacement := range []string{"object", "unknown"} {
-					suggestions = append(suggestions, rule.RuleSuggestion{
-						Message: buildReplaceEmptyObjectTypeMessage(replacement),
-						FixesArr: []rule.RuleFix{
-							rule.RuleFixReplace(ctx.SourceFile, node, replacement),
-						},
-					})
-				}
-				ctx.ReportNodeWithSuggestions(node, buildNoEmptyObjectMessage("allowObjectTypes"), suggestions...)
+				ctx.ReportNodeWithDeferredSuggestions(node, buildNoEmptyObjectMessage("allowObjectTypes"), func() []rule.RuleSuggestion {
+					suggestions := make([]rule.RuleSuggestion, 0, 2)
+					for _, replacement := range []string{"object", "unknown"} {
+						suggestions = append(suggestions, rule.RuleSuggestion{
+							Message: buildReplaceEmptyObjectTypeMessage(replacement),
+							FixesArr: []rule.RuleFix{
+								rule.RuleFixReplace(ctx.SourceFile, node, replacement),
+							},
+						})
+					}
+					return suggestions
+				})
 			}
 		}
 
