@@ -438,7 +438,7 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 		if next != nil {
 			limit = utils.TrimNodeTextRange(ctx.SourceFile, next).Pos()
 		}
-		between := commentsInSpan(comments, r.End(), limit)
+		between := utils.CommentsInSpan(comments, r.End(), limit)
 		line := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), r.Pos())
 		absorbNext := func() {
 			nextRange := utils.TrimNodeTextRange(ctx.SourceFile, next)
@@ -449,7 +449,7 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 			if index+2 < len(attrs) {
 				afterNextLimit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+2]).Pos()
 			}
-			nextComments := commentsInSpan(comments, item.end, afterNextLimit)
+			nextComments := utils.CommentsInSpan(comments, item.end, afterNextLimit)
 			if len(nextComments) == 1 && scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextRange.Pos()) == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextComments[0].Pos()) {
 				item.end = nextComments[0].End()
 				if nextComments[0].Kind == ast.KindSingleLineCommentTrivia {
@@ -546,13 +546,4 @@ func preservesDuplicateOrder(attrs []*ast.Node, original, sorted []sortableAttri
 		}
 	}
 	return true
-}
-
-func commentsInSpan(comments []*ast.CommentRange, start, end int) []*ast.CommentRange {
-	index := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= start })
-	var result []*ast.CommentRange
-	for ; index < len(comments) && comments[index].Pos() < end; index++ {
-		result = append(result, comments[index])
-	}
-	return result
 }
