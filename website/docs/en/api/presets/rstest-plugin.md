@@ -31,6 +31,14 @@ export default defineConfig([rstestPlugin.configs.recommended]);
 
 No additional Rslint globals are required for `import.meta.rstest`.
 
+### Rstack CLI projects
+
+Projects driven by the [Rstack CLI](https://rstack.rs/) import the test API from `rstack/test`, which re-exports it. Every rule recognizes that specifier alongside `@rstest/core`, so the preset needs no extra configuration and a file may use either or both:
+
+```ts
+import { describe, expect, test } from 'rstack/test';
+```
+
 ### Configure test types separately
 
 To use different rule settings for dedicated test files and in-source tests, create a configuration item for each group. Use `files` to match test and spec filenames in one item, and the source patterns from Rstest's [`includeSource`](https://rstest.rs/config/test/include-source) configuration in the other.

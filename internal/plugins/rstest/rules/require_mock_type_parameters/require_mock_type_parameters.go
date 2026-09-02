@@ -231,12 +231,12 @@ func isUtilitiesObject(ctx rule.RuleContext, receiver *ast.Node) bool {
 		// ctx.Refs.Resolve places an import and a local declaration from the
 		// binder alone, so a file that declares the name is recognized whether
 		// or not a TypeChecker is configured.
-		name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
+		name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
 			receiver.AsIdentifier().Text,
 			receiver,
 			ctx.Refs.Resolve(receiver),
 			ctx.SourceFile,
-			rstestUtils.RstestImportModule,
+			rstestUtils.RstestCoreImportModules,
 		)
 		return name == "rs" || name == "rstest"
 	}
@@ -251,9 +251,9 @@ func isUtilitiesObject(ctx rule.RuleContext, receiver *ast.Node) bool {
 	if namespace == nil || namespace.Kind != ast.KindIdentifier {
 		return false
 	}
-	return testFramework.IsModuleNamespaceSymbol(
+	return testFramework.IsModuleNamespaceSymbolModules(
 		ctx.Refs.Resolve(namespace),
-		rstestUtils.RstestImportModule,
+		rstestUtils.RstestCoreImportModules,
 	)
 }
 
