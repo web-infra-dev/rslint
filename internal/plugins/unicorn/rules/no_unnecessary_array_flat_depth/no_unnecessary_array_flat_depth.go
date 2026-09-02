@@ -24,37 +24,97 @@ func removeDepthArgumentFix(sourceFile *ast.SourceFile, argument *ast.Node) []ru
 	return []rule.RuleFix{rule.RuleFixRemoveRange(removalRange)}
 }
 
+type staticPassThroughEvaluatorCacheKey struct{}
+
+func staticPassThroughEvaluator(ctx rule.RuleContext) *utils.StaticStringEvaluator {
+	return rule.CachedByFile(ctx, staticPassThroughEvaluatorCacheKey{}, func() *utils.StaticStringEvaluator {
+		return utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+	})
+}
+
 func shouldSkipFlatReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
 	// For source-only JavaScript, Unicorn leaves CallExpression receivers unknown.
 	// The exception does not cover safe Object pass-through calls, whose static
 	// result Unicorn still classifies.
 	runtimeReceiver := utils.ESTreeRuntimeExpression(receiver)
-	if runtimeReceiver != nil && ast.IsInJSFile(runtimeReceiver) && ast.IsCallExpression(runtimeReceiver) &&
-		!isPotentialStaticObjectPassThroughCall(runtimeReceiver) {
-		return false
+	if runtimeReceiver != nil && ast.IsInJSFile(runtimeReceiver) && ast.IsCallExpression(runtimeReceiver) {
+		argument, isPassThrough := staticObjectPassThroughArgument(runtimeReceiver)
+		if !isPassThrough || !isSafeStaticPassThroughValue(ctx, argument, map[*ast.Symbol]bool{}) {
+			return false
+		}
+		isArray, known := staticPassThroughEvaluator(ctx).EvalArrayValue(runtimeReceiver)
+		return known && !isArray
 	}
 	return unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, receiver)
 }
 
-func isPotentialStaticObjectPassThroughCall(node *ast.Node) bool {
+func staticObjectPassThroughArgument(node *ast.Node) (*ast.Node, bool) {
 	oneArgument := 1
 	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 		ArgumentsLength:     &oneArgument,
 		RejectSpreadElement: true,
 	})
 	if !ok {
-		return false
+		return nil, false
 	}
 	object := utils.ESTreeRuntimeExpression(call.Object)
 	if object == nil || !ast.IsIdentifier(object) || object.AsIdentifier().Text != "Object" {
-		return false
+		return nil, false
 	}
 	switch call.Property.AsIdentifier().Text {
 	case "freeze", "preventExtensions", "seal":
-		return true
+		return call.Call.Arguments()[0], true
 	default:
+		return nil, false
+	}
+}
+
+func isSafeStaticPassThroughValue(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	visiting map[*ast.Symbol]bool,
+) bool {
+	node = utils.ESTreeRuntimeExpression(node)
+	if node == nil {
 		return false
 	}
+	if argument, ok := staticObjectPassThroughArgument(node); ok {
+		return isSafeStaticPassThroughValue(ctx, argument, visiting)
+	}
+	if ast.IsCallExpression(node) || ast.IsNewExpression(node) ||
+		node.Kind == ast.KindAwaitExpression || node.Kind == ast.KindYieldExpression ||
+		node.Kind == ast.KindDeleteExpression {
+		return false
+	}
+	if ast.IsBinaryExpression(node) && ast.IsAssignmentOperator(node.AsBinaryExpression().OperatorToken.Kind) {
+		return false
+	}
+	if ast.IsIdentifier(node) && !utils.IsNonReferenceIdentifier(node) && ctx.Refs != nil {
+		symbol := ctx.Refs.Resolve(node)
+		if utils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile) {
+			if visiting[symbol] {
+				return false
+			}
+			initializer := utils.GetConstVariableInitializer(node, ctx.TypeChecker)
+			if initializer == nil {
+				return false
+			}
+			visiting[symbol] = true
+			safe := isSafeStaticPassThroughValue(ctx, initializer, visiting)
+			delete(visiting, symbol)
+			return safe
+		}
+	}
+
+	safe := true
+	node.ForEachChild(func(child *ast.Node) bool {
+		if !isSafeStaticPassThroughValue(ctx, child, visiting) {
+			safe = false
+			return true
+		}
+		return false
+	})
+	return safe
 }
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v74.0.0/docs/rules/no-unnecessary-array-flat-depth.md

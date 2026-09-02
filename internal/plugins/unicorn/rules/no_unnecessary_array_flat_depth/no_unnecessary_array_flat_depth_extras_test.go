@@ -69,6 +69,22 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 			{Code: `Object.seal({}).flat(1)`, FileName: "file.js"},
 			{Code: `Object.preventExtensions({}).flat(1)`, FileName: "file.js"},
 			{Code: `Object.freeze("x").flat(1)`, FileName: "file.js"},
+			{Code: `const obj = {}; Object.freeze(obj).flat(1)`, FileName: "file.js"},
+			{Code: `const obj = {}; Object.seal(obj).flat(1)`, FileName: "file.js"},
+			{Code: `const obj = {}; Object.preventExtensions(obj).flat(1)`, FileName: "file.js"},
+			{
+				Code:     `const first = {}; const second = first; Object.freeze(second).flat(1)`,
+				FileName: "file.js",
+			},
+			{
+				Code:     `const value = {}; const obj = {value}; Object.freeze(obj).flat(1)`,
+				FileName: "file.js",
+			},
+			{Code: `const obj = 1 + 2; Object.freeze(obj).flat(1)`, FileName: "file.js"},
+			{
+				Code:     `const obj = Object.freeze({}); Object.seal(obj).flat(1)`,
+				FileName: "file.js",
+			},
 
 			// ---- Dimension 4: private identifier properties do not match the
 			// identifier-named `.flat` method required by the rule. ----
@@ -147,6 +163,56 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 				`1`,
 				`Object["freeze"]({}).flat()`,
 				"file.js",
+			),
+			depthInvalid(
+				`const array = []; Object.freeze(array).flat(1)`,
+				`1`,
+				`const array = []; Object.freeze(array).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`let obj = {}; Object.freeze(obj).flat(1)`,
+				`1`,
+				`let obj = {}; Object.freeze(obj).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const obj = getValue(); Object.freeze(obj).flat(1)`,
+				`1`,
+				`const obj = getValue(); Object.freeze(obj).flat()`,
+				"file.js",
+			),
+			depthInvalidAt(
+				`const obj = Number(1); Object.freeze(obj).flat(1)`,
+				`1`,
+				`const obj = Number(1); Object.freeze(obj).flat()`,
+				"file.js",
+				1,
+			),
+			depthInvalid(
+				`let value = {}; const obj = {value}; Object.freeze(obj).flat(1)`,
+				`1`,
+				`let value = {}; const obj = {value}; Object.freeze(obj).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const obj = () => {}; Object.freeze(obj).flat(1)`,
+				`1`,
+				`const obj = () => {}; Object.freeze(obj).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const {obj} = {obj: {}}; Object.freeze(obj).flat(1)`,
+				`1`,
+				`const {obj} = {obj: {}}; Object.freeze(obj).flat()`,
+				"file.js",
+			),
+			depthInvalidAt(
+				`const obj = {}; obj.value = 1; Object.freeze(obj).flat(1)`,
+				`1`,
+				`const obj = {}; obj.value = 1; Object.freeze(obj).flat()`,
+				"file.js",
+				1,
 			),
 
 			// ---- Dimension 4: single- and multi-level receiver parentheses are
