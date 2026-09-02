@@ -150,7 +150,7 @@ func isCreateElementCall(callee *ast.Node) bool {
 }
 
 func reportShortcutPairs(ctx rule.RuleContext, node *ast.Node, value string) {
-	for start := 0; start < len(value); start++ {
+	for start := range len(value) {
 		if !isASCIIWord(value[start]) || (start > 0 && isASCIIWord(value[start-1])) {
 			continue
 		}

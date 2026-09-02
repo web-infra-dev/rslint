@@ -1,3 +1,5 @@
+// cspell:ignore pener
+
 package ecmascript
 
 import "testing"

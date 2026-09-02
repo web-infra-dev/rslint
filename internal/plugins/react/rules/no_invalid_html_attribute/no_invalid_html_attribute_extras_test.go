@@ -1,3 +1,5 @@
+// cspell:ignore pener
+
 // TestNoInvalidHtmlAttributeRuleExtras locks in branches and edge shapes the
 // upstream suite does not exercise. Every case identifies its Dimension 4,
 // real-user, or upstream-branch purpose; migrated cases live in
