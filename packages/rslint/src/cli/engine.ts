@@ -76,6 +76,16 @@ function isActivateConfigsRequest(
   );
 }
 
+function isOutputRequest(
+  value: unknown,
+): value is { stream: 'stdout'; text: string } {
+  return (
+    isRecord(value) &&
+    value.stream === 'stdout' &&
+    typeof value.text === 'string'
+  );
+}
+
 function asError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value));
 }
@@ -139,6 +149,12 @@ class StdoutWriteBarrier {
     }
   }
 
+  /** Write one chunk and acknowledge it only after the destination callback. */
+  async writeAndFlush(text: string): Promise<void> {
+    this.write(text);
+    await this.waitForPendingWrites();
+  }
+
   async sealAndFlush(): Promise<void> {
     this.accepting = false;
 
@@ -147,16 +163,7 @@ class StdoutWriteBarrier {
     // shutdown in that same chunk is observed before shutdown is acknowledged.
     await Promise.resolve();
 
-    while (!this.failure && this.pendingWrites > 0) {
-      await new Promise<void>((resolve) => {
-        this.waiters.add(resolve);
-      });
-    }
-    if (this.failure) {
-      throw new Error(
-        `engine: stdout forwarding failed: ${this.failure.message}`,
-      );
-    }
+    await this.waitForPendingWrites();
   }
 
   dispose(): void {
@@ -193,6 +200,19 @@ class StdoutWriteBarrier {
   private wakeWaiters(): void {
     for (const resolve of this.waiters) resolve();
     this.waiters.clear();
+  }
+
+  private async waitForPendingWrites(): Promise<void> {
+    while (!this.failure && this.pendingWrites > 0) {
+      await new Promise<void>((resolve) => {
+        this.waiters.add(resolve);
+      });
+    }
+    if (this.failure) {
+      throw new Error(
+        `engine: stdout forwarding failed: ${this.failure.message}`,
+      );
+    }
   }
 }
 
@@ -447,6 +467,13 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             await shutdownPluginHost(stagedPluginHost).catch(() => undefined);
             throw error;
           }
+        }
+        case 'output': {
+          if (!isOutputRequest(msg.data)) {
+            throw new Error('engine: invalid acknowledged output request');
+          }
+          await forwardedStdout.writeAndFlush(msg.data.text);
+          return { ok: true };
         }
         case 'shutdown': {
           // Go sends shutdown only after its last output notification. Seal

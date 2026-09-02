@@ -214,7 +214,9 @@ func ClassEnd(pattern string, start int, flags RegexFlags) (int, bool) {
 
 // SkipPatternEscape returns how many bytes a `\`-prefixed escape consumes at
 // pattern[i] (including the leading `\`) for the purposes of class-boundary
-// scanning. Returns ok=false at EOF on `\`.
+// scanning. A step of 1 means the backslash isn't opening an escape at all and
+// stands on its own as a literal. Returns ok=false at EOF on `\`, and where an
+// escape is well-formed only outside u/v mode.
 func SkipPatternEscape(pattern string, i int, flags RegexFlags) (int, bool) {
 	if i+1 >= len(pattern) {
 		return 0, false
@@ -242,10 +244,20 @@ func SkipPatternEscape(pattern string, i int, flags RegexFlags) (int, bool) {
 		}
 		return 2, true
 	case 'c':
+		// `\cX` is a control escape only for a ControlLetter, which Annex B
+		// widens to ClassControlLetter [0-9_] inside a class body. With none of
+		// those following, u/v rejects the pattern and Annex B leaves the
+		// backslash standing alone as a literal `\`.
 		if i+2 < len(pattern) {
-			return 3, true
+			if next := pattern[i+2]; isASCIILetter(next) ||
+				!flags.UV() && (isRegexDigit(next) || next == '_') {
+				return 3, true
+			}
 		}
-		return 2, true
+		if flags.UV() {
+			return 0, false
+		}
+		return 1, true
 	case 'p', 'P':
 		if flags.UV() && i+2 < len(pattern) && pattern[i+2] == '{' {
 			closeRel := strings.IndexByte(pattern[i+3:], '}')

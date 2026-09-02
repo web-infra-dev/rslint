@@ -1,9 +1,33 @@
-import { RuleTester } from '../rule-tester';
+import {
+  RuleTester,
+  type InvalidTestCase,
+  type ValidTestCase,
+} from '../rule-tester';
 
 const ruleTester = new RuleTester();
 
+function withScriptDefaults(cases: InvalidTestCase[]): InvalidTestCase[];
+function withScriptDefaults(cases: ValidTestCase[]): ValidTestCase[];
+function withScriptDefaults(
+  cases: (ValidTestCase | InvalidTestCase)[],
+): (ValidTestCase | InvalidTestCase)[] {
+  return cases.map((testCase) => {
+    if (typeof testCase === 'string') {
+      return { code: testCase, languageOptions: { sourceType: 'script' } };
+    }
+
+    return {
+      ...testCase,
+      languageOptions: {
+        sourceType: 'script',
+        ...testCase.languageOptions,
+      },
+    };
+  });
+}
+
 ruleTester.run('no-eval', {
-  valid: [
+  valid: withScriptDefaults([
     // ================================================================
     // Basic: not eval
     // ================================================================
@@ -35,21 +59,45 @@ ruleTester.run('no-eval', {
     'type T = { eval: string }',
     'enum E { eval }',
     'eval: while(true) { break eval; }',
-    "import { eval as foo } from 'mod'; foo()",
-    'var foo = 1; export { foo as eval }',
+    {
+      code: "import { eval as foo } from 'mod'; foo()",
+      languageOptions: { sourceType: 'module' },
+    },
+    {
+      code: 'var foo = 1; export { foo as eval }',
+      languageOptions: { sourceType: 'module' },
+    },
     // Re-export: eval is source module name, not local ref
-    "export { eval } from 'mod'",
-    "export { eval as foo } from 'mod'",
-    "export { foo as eval } from 'mod'",
+    {
+      code: "export { eval } from 'mod'",
+      languageOptions: { sourceType: 'module' },
+    },
+    {
+      code: "export { eval as foo } from 'mod'",
+      languageOptions: { sourceType: 'module' },
+    },
+    {
+      code: "export { foo as eval } from 'mod'",
+      languageOptions: { sourceType: 'module' },
+    },
 
     // ================================================================
     // this.eval — safe contexts (this is NOT global)
     // ================================================================
     "function foo() { 'use strict'; this.eval('foo'); }",
     "'use strict'; function foo() { this.eval('foo'); }",
-    "import x from 'y'; this.eval('foo');",
-    "import x from 'y'; function foo() { this.eval('foo'); }",
-    "export {}; () => { this.eval('foo') }",
+    {
+      code: "import x from 'y'; this.eval('foo');",
+      languageOptions: { sourceType: 'module' },
+    },
+    {
+      code: "import x from 'y'; function foo() { this.eval('foo'); }",
+      languageOptions: { sourceType: 'module' },
+    },
+    {
+      code: "export {}; () => { this.eval('foo') }",
+      languageOptions: { sourceType: 'module' },
+    },
     "var obj = {foo: function() { this.eval('foo'); }}",
     "var obj = {}; obj.foo = function() { this.eval('foo'); }",
     'var obj = { get foo() { return this.eval(); } }',
@@ -77,7 +125,10 @@ ruleTester.run('no-eval', {
     'try {} catch(eval) { var x = eval }',
     'function eval() {} var x = eval',
     'var { a: eval } = obj; var x = eval',
-    "import { eval } from 'mod'; var x = eval",
+    {
+      code: "import { eval } from 'mod'; var x = eval",
+      languageOptions: { sourceType: 'module' },
+    },
 
     // ================================================================
     // Uppercase constructor convention
@@ -193,8 +244,8 @@ ruleTester.run('no-eval', {
       code: "(window?.eval)('foo')",
       options: [{ allowIndirect: true }] as any,
     },
-  ],
-  invalid: [
+  ]),
+  invalid: withScriptDefaults([
     // ================================================================
     // Direct eval calls
     // ================================================================
@@ -324,9 +375,21 @@ ruleTester.run('no-eval', {
     { code: 'typeof eval', errors: [{ messageId: 'unexpected' }] },
     { code: 'eval = function() {}', errors: [{ messageId: 'unexpected' }] },
     { code: 'for (eval in obj) {}', errors: [{ messageId: 'unexpected' }] },
-    { code: 'export { eval }', errors: [{ messageId: 'unexpected' }] },
-    { code: 'export { eval as foo }', errors: [{ messageId: 'unexpected' }] },
-    { code: 'export default eval', errors: [{ messageId: 'unexpected' }] },
+    {
+      code: 'export { eval }',
+      languageOptions: { sourceType: 'module' },
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'export { eval as foo }',
+      languageOptions: { sourceType: 'module' },
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'export default eval',
+      languageOptions: { sourceType: 'module' },
+      errors: [{ messageId: 'unexpected' }],
+    },
     { code: "eval['foo']", errors: [{ messageId: 'unexpected' }] },
     { code: 'eval.foo', errors: [{ messageId: 'unexpected' }] },
     { code: 'var obj = { key: eval }', errors: [{ messageId: 'unexpected' }] },
@@ -492,5 +555,5 @@ ruleTester.run('no-eval', {
         { messageId: 'unexpected' },
       ],
     },
-  ],
+  ]),
 });

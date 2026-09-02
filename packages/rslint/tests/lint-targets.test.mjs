@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@rstest/core';
+import { describe, expect, test } from 'rstack/test';
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';

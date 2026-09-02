@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import {
   runRslint,
   createFixTestDir,
@@ -73,7 +73,7 @@ describe('CLI --fix edge cases', () => {
       const result = await runRslint(['--fix', 'index.ts'], tempDir);
       expect(result.exitCode).toBe(0);
       // 2 fixes: two type assertions (no-inferrable-types not in config)
-      expect(result.stdout).toContain('fixed 2 issues');
+      expect(result.stdout).toContain('after applying 2 fixes');
     } finally {
       await cleanupTempDir(tempDir);
     }

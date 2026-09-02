@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { runRslint, createFixTestDir, cleanupTempDir } from './helpers';
 
 describe('CLI --fix output', () => {
@@ -16,8 +16,8 @@ describe('CLI --fix output', () => {
       // Fixed diagnostic should NOT appear in output
       expect(result.stdout).not.toContain('no-unnecessary-type-assertion');
       // Summary should show fix count
-      expect(result.stdout).toContain('fixed 1 issue');
-      expect(result.stdout).toContain('Found 0 errors');
+      expect(result.stdout).toContain('after applying 1 fix');
+      expect(result.stdout).toContain('success Lint passed');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -41,7 +41,7 @@ describe('CLI --fix output', () => {
       expect(result.stdout).not.toContain('no-unnecessary-type-assertion');
       // Unfixed rule SHOULD appear
       expect(result.stdout).toContain('no-unsafe-member-access');
-      expect(result.stdout).toContain('fixed 1 issue');
+      expect(result.stdout).toContain('after applying 1 fix');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -121,8 +121,8 @@ describe('CLI --fix output', () => {
       // Both rules' diagnostics should NOT appear (all fixed via cascade)
       expect(result.stdout).not.toContain('no-wrapper-object-types');
       expect(result.stdout).not.toContain('no-inferrable-types');
-      expect(result.stdout).toContain('Found 0 errors');
-      expect(result.stdout).toContain('fixed 4 issues');
+      expect(result.stdout).toContain('success Lint passed');
+      expect(result.stdout).toContain('after applying 4 fixes');
     } finally {
       await cleanupTempDir(tempDir);
     }

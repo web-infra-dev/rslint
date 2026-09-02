@@ -58,6 +58,23 @@ func TestDecodeParamsAcceptsRawJSONValue(t *testing.T) {
 	}
 }
 
+func TestSetTraceNotificationIsAccepted(t *testing.T) {
+	s := &Server{}
+	for _, payload := range []string{
+		`{"jsonrpc":"2.0","method":"$/setTrace","params":{"value":"off"}}`,
+		`{"jsonrpc":"2.0","method":"$/setTrace","params":{"value":"messages"}}`,
+		`{"jsonrpc":"2.0","method":"$/setTrace","params":{"value":"verbose"}}`,
+	} {
+		var msg lsproto.Message
+		if err := json.Unmarshal([]byte(payload), &msg); err != nil {
+			t.Fatalf("unmarshal $/setTrace notification: %v", err)
+		}
+		if err := s.handleRequestOrNotification(context.Background(), msg.AsRequest()); err != nil {
+			t.Fatalf("handle $/setTrace payload %s: %v", payload, err)
+		}
+	}
+}
+
 func stringRequestID(value string) (*jsonrpc.ID, lsproto.IntegerOrString) {
 	return jsonrpc.NewIDString(value), lsproto.IntegerOrString{String: &value}
 }

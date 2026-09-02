@@ -290,6 +290,27 @@ func TestBuildCollectsReferencesOnlyWhenAsked(t *testing.T) {
 	}
 }
 
+func TestBuildFiltersCollectedReferencesWithoutChangingResolution(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, `const kept = 1, skipped = 2; kept; skipped; missing;`, core.ScriptKindTS)
+	m := Build(sourceFile, Options{
+		CollectReferences: true,
+		ReferenceNames:    map[string]struct{}{"kept": {}, "missing": {}},
+	})
+	got := referencedNames(m)
+	want := []string{"kept->declared", "missing->?"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
+
 func TestBuildReferenceIdentifierPositions(t *testing.T) {
 	// Declaration names are not references; eslint-scope models them as
 	// `init: true` references that every consumer filters out.
@@ -315,6 +336,61 @@ func TestBuildReferenceIdentifierPositions(t *testing.T) {
 	assertReferences(t, `<div />;`)
 	assertReferences(t, `<App />;`, "App->?")
 	assertReferences(t, `<ns.Widget />;`, "ns->?")
+	assertReferences(t, `<App></App>;`, "App->?", "App->?")
+	assertReferences(t, `<ns.Widget></ns.Widget>;`, "ns->?", "ns->?")
+	// TSESTree visits both pieces of a namespaced TSX tag, but never the
+	// pieces of a namespaced attribute.
+	assertReferences(t, `<foo:bar />;`, "foo->?", "bar->?")
+	assertReferences(t, `const foo = 1, bar = 2; <foo:bar />;`, "foo->declared", "bar->declared")
+	assertReferences(t, `<Component foo:bar="value" />;`, "Component->?")
+	assertReferences(t, `<foo:bar></foo:bar>;`, "foo->?", "bar->?", "foo->?", "bar->?")
+}
+
+func TestBuildJsxReferencesExcludeEspreeClosingTags(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.jsx",
+		Path:     "/test.jsx",
+	}, `<App></App>; <ns.Widget></ns.Widget>; <foo:bar></foo:bar>;`, core.ScriptKindJSX)
+	m := Build(sourceFile, Options{CollectReferences: true})
+	got := referencedNames(m)
+	want := []string{"App->?", "ns->?"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
+
+func TestIsJsxComponentNameMatchesJavaScriptCodeUnitCasing(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{name: "snake_case", want: false},
+		{name: "snake_case-tag", want: false},
+		{name: "Snake_case-tag", want: true},
+		{name: "é_snake", want: false},
+		{name: "ß_snake", want: false},
+		{name: "ﬁ_snake", want: false},
+		{name: "ı_snake", want: false},
+		{name: "ǅ_snake", want: false},
+		{name: "É_snake", want: true},
+		{name: "中_snake", want: true},
+		// JavaScript indexes the first high surrogate, whose uppercase mapping
+		// is unchanged, rather than the astral letter as a whole.
+		{name: "𐐨_snake", want: true},
+		{name: "this", want: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsJsxComponentName(test.name); got != test.want {
+				t.Errorf("IsJsxComponentName(%q) = %v, want %v", test.name, got, test.want)
+			}
+		})
+	}
 }
 
 func TestBuildResolvesReferencesThroughTheScopeChain(t *testing.T) {

@@ -62,7 +62,7 @@ var NoInnerDeclarationsRule = rule.Rule{
 				if node.Body() == nil {
 					return
 				}
-				if allowBlockScopedFunctions && utils.IsInStrictMode(node, ctx.SourceFile) {
+				if allowBlockScopedFunctions && utils.IsInStrictModeWithSourceType(node, ctx.SourceFile, ctx.LanguageOptions.EffectiveSourceType()) {
 					return
 				}
 				check(node, functionDeclaration, &ctx)

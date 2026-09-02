@@ -160,7 +160,7 @@ func (state *noEvalState) checkMemberAccess(object *ast.Node, reportNode *ast.No
 		return
 	}
 	if object.Kind == ast.KindThisKeyword {
-		if isThisReferringToGlobal(object, state.ctx.SourceFile) {
+		if isThisReferringToGlobal(object, state.ctx.SourceFile, state.ctx.LanguageOptions.EffectiveSourceType()) {
 			state.ctx.ReportNode(reportNode, noEvalMessage)
 		}
 		return
@@ -364,7 +364,7 @@ func sourceHasValueBinding(sourceFile *ast.SourceFile, name string) bool {
 // isThisReferringToGlobal checks if 'this' at the given position refers to the global object.
 // It uses ast.GetThisContainer to find the enclosing "this scope" (skipping arrow functions
 // and class computed property names) and then determines whether 'this' is the global object.
-func isThisReferringToGlobal(thisNode *ast.Node, sourceFile *ast.SourceFile) bool {
+func isThisReferringToGlobal(thisNode *ast.Node, sourceFile *ast.SourceFile, sourceType string) bool {
 	// GetThisContainer with includeArrowFunctions=false skips arrow functions.
 	// With includeClassComputedPropertyName=false, computed property names in
 	// classes are transparent — the walker jumps past them to the outer scope.
@@ -372,13 +372,14 @@ func isThisReferringToGlobal(thisNode *ast.Node, sourceFile *ast.SourceFile) boo
 
 	switch container.Kind {
 	case ast.KindSourceFile:
-		// Top level of script — 'this' is always global (even in strict mode).
-		// In modules, 'this' is undefined.
-		return !ast.IsExternalModule(sourceFile)
+		// ESLint's no-eval rule treats every non-module Program scope as the
+		// top level of a script. That includes CommonJS even though its runtime
+		// `this` value is module.exports rather than the global object.
+		return sourceType != "module"
 
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
 		// In strict mode, 'this' is undefined — not global.
-		if utils.IsInStrictMode(thisNode, sourceFile) {
+		if utils.IsInStrictModeWithSourceType(thisNode, sourceFile, sourceType) {
 			return false
 		}
 		// Check how the function is used to determine if 'this' defaults to global.

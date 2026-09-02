@@ -2,7 +2,6 @@ package prefer_array_flat_map
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -52,15 +51,10 @@ func isIgnoredMapObject(node *ast.Node) bool {
 
 func buildFixes(sf *ast.SourceFile, flatCall dotMethodCall, mapCall dotMethodCall) []rule.RuleFix {
 	mapPropertyRange := utils.TrimNodeTextRange(sf, mapCall.Property)
-	// Remove the .flat member and the following call separately, preserving any
-	// parentheses around the callee: (foo.map(cb).flat)() -> (foo.flatMap(cb)).
-	removeFlatPropertyRange := core.NewTextRange(flatCall.Object.End(), flatCall.Callee.End())
-	removeFlatArgumentsRange := core.NewTextRange(flatCall.RawCallee.End(), flatCall.Call.End())
-	return []rule.RuleFix{
+	fixes := []rule.RuleFix{
 		rule.RuleFixReplaceRange(mapPropertyRange, "flatMap"),
-		rule.RuleFixRemoveRange(removeFlatPropertyRange),
-		rule.RuleFixRemoveRange(removeFlatArgumentsRange),
 	}
+	return append(fixes, unicornutil.RemoveMethodCallFixes(flatCall)...)
 }
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-array-flat-map.md

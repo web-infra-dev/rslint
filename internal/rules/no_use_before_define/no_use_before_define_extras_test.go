@@ -168,10 +168,14 @@ export class MyControl {}
 			// later is a separate execution context, which `variables: false`
 			// keys off ----
 			{Code: `const List = () => items.map(() => Row()); const Row = () => null; const items = [];`, Tsx: true, Options: map[string]any{"variables": false}},
-			// ---- Real-user: JSX intrinsic elements are strings, not bindings,
-			// so a later binding with the same name is irrelevant ----
+			// ---- Real-user: bare intrinsic elements are strings, not bindings.
+			// Espree also leaves namespaced JSX tag pieces unreferenced. ----
 			{Code: `<div />; let div;`, Tsx: true},
-			{Code: `<a:b />; let a;`, Tsx: true},
+			{
+				Code:     `<a:b />; let a;`,
+				FileName: "namespaced-tag.jsx",
+				TSConfig: "tsconfig.allowJs.json",
+			},
 
 			// ---- Type space and value space are resolved separately: a name
 			// only answers a reference that reads the space it declares ----
@@ -428,6 +432,13 @@ function f() {
 				Code:   `<ns.Widget />; let ns;`,
 				Tsx:    true,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 2, EndLine: 1, EndColumn: 4}},
+			},
+			// typescript-eslint visits both pieces of a namespaced TSX tag, unlike
+			// Espree's JSX visitor above.
+			{
+				Code:   `<a:b />; let a;`,
+				Tsx:    true,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedBeforeDefined", Line: 1, Column: 2, EndLine: 1, EndColumn: 3}},
 			},
 			// ---- Real-user: a component referenced from a JSX attribute value ----
 			{

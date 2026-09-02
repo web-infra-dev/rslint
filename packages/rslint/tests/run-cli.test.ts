@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@rstest/core';
+import { describe, expect, test } from 'rstack/test';
 import { runCLI } from '../src/index.js';
 
 describe('runCLI', () => {

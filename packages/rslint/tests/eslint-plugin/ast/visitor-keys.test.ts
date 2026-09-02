@@ -25,7 +25,7 @@
  * `child.type` check skips them and JS traversal order is unchanged — which
  * is exactly what the `eslint-visitor-keys` projection test below proves.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { visitorKeys as tsVisitorKeys } from '@typescript-eslint/visitor-keys';
 import { KEYS as eslintCoreKeys } from 'eslint-visitor-keys';
 

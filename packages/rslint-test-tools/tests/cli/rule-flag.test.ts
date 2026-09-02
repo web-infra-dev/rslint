@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import {
   runRslint,
   createTempDir,
@@ -139,7 +139,7 @@ describe('CLI --rule flag', () => {
       );
       expect(result.exitCode).toBe(0);
       expect(result.stdout).not.toContain('no-debugger');
-      expect(result.stdout).toContain('0 error');
+      expect(result.stdout).toContain('success Lint passed');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -189,7 +189,7 @@ describe('CLI --rule flag', () => {
       );
       expect(result.stdout).toContain('no-debugger');
       // Both files should be linted
-      expect(result.stdout).toContain('linted 2 file');
+      expect(result.stdout).toContain('(2 files,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -318,7 +318,7 @@ describe('CLI --rule flag', () => {
       expect(result.stdout).toContain('no-debugger');
       expect(result.stdout).toContain('no-var');
       expect(result.stdout).toContain('2 error');
-      expect(result.stdout).toContain('linted 2 file');
+      expect(result.stdout).toContain('(2 files,');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -539,8 +539,9 @@ describe('CLI --rule flag', () => {
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-debugger');
       expect(result.stdout).toContain('no-var');
-      expect(result.stdout).toContain('0 error');
-      expect(result.stdout).toContain('2 warning');
+      expect(result.stdout).toContain(
+        '2 warnings exceeded the configured limit of 1',
+      );
     } finally {
       await cleanupTempDir(tempDir);
     }

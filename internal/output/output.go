@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 const outputBufferSize = 4096 * 100
@@ -25,6 +24,9 @@ type formatter interface {
 }
 
 func Render(dst io.Writer, report Report, options Options) error {
+	if options.Format == FormatDefault && !report.hasSummary {
+		return errors.New("default output requires a report summary")
+	}
 	selected, err := newFormatter(options)
 	if err != nil {
 		return err
@@ -38,7 +40,11 @@ func Render(dst io.Writer, report Report, options Options) error {
 		if !isVisible(diagnostic, options.Quiet) {
 			continue
 		}
-		view, err := newDiagnosticView(diagnostic, options.ComparePaths)
+		view, err := newDiagnosticView(
+			diagnostic,
+			options.ComparePaths,
+			options.Format == FormatDefault,
+		)
 		if err != nil {
 			return err
 		}
@@ -67,8 +73,8 @@ func Render(dst io.Writer, report Report, options Options) error {
 	return w.Flush()
 }
 
-func isVisible(diagnostic rule.RuleDiagnostic, quiet bool) bool {
-	return !quiet || diagnostic.Severity == rule.SeverityError
+func isVisible(diagnostic Diagnostic, quiet bool) bool {
+	return !quiet || diagnostic.Severity == SeverityError
 }
 
 func newFormatter(options Options) (formatter, error) {

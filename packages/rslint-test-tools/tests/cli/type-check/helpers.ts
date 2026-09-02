@@ -48,7 +48,7 @@ export async function addUntypedPackage(
 /**
  * Normalize CLI output for snapshot stability:
  * - Replace temp dir paths with <TEMPDIR>
- * - Replace timing/thread info in summary line
+ * - Replace timing/thread info in the completed status line
  */
 export function normalizeOutput(output: string, tempDir: string): string {
   // Diagnostic output always uses forward slashes, even on Windows where
@@ -82,9 +82,10 @@ export function normalizeOutput(output: string, tempDir: string): string {
     '<TEMPDIR>',
   );
   result = result.replace(
-    /in (?:\d+h)?(?:\d+m)?[\d.]+(?:ms|s) using \d+ threads?/g,
-    'in <TIME> using <N> thread(s)',
+    /in (?:<1ms|(?:\d+h)?(?:\d+m)?[\d.]+(?:ms|s))/g,
+    'in <TIME>',
   );
+  result = result.replace(/\d+ threads?\)/g, '<N> thread(s))');
   return result;
 }
 

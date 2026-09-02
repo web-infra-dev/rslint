@@ -76,7 +76,8 @@ const Playground: React.FC = () => {
       const service = await ensureWasmService(version);
       if (!isCurrentLintRun(runId, version)) return;
       const code = editorRef.current?.getValue() ?? '';
-      const rslintConfig = editorRef.current?.getRslintConfig();
+      const rslintConfig = await editorRef.current?.getRslintConfig(version);
+      if (!isCurrentLintRun(runId, version)) return;
       const tsConfig = editorRef.current?.getTsConfig();
 
       // Build fileContents with code and config files
@@ -97,9 +98,7 @@ const Playground: React.FC = () => {
       const result = await service.lint({
         includeEncodedSourceFiles: true,
         fileContents,
-        config: Array.isArray(rslintConfig)
-          ? (rslintConfig as Record<string, unknown>[])
-          : undefined,
+        config: rslintConfig,
         configDirectory: '/',
       });
       if (!isCurrentLintRun(runId, version)) return;

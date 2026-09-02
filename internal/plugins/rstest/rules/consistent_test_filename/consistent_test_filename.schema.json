@@ -1,0 +1,21 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "format": "regex"
+        },
+        "allTestPattern": {
+          "type": "string",
+          "format": "regex"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

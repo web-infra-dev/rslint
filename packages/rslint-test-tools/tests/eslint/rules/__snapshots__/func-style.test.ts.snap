@@ -1,0 +1,209 @@
+// Rstest Snapshot v1
+
+exports[`func-style > invalid 1`] = `
+{
+  "code": "var foo = function(){};",
+  "diagnostics": [
+    {
+      "message": "Expected a function declaration.",
+      "messageId": "declaration",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-style > invalid 2`] = `
+{
+  "code": "var foo = () => {};",
+  "diagnostics": [
+    {
+      "message": "Expected a function declaration.",
+      "messageId": "declaration",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-style > invalid 3`] = `
+{
+  "code": "function foo(){}",
+  "diagnostics": [
+    {
+      "message": "Expected a function expression.",
+      "messageId": "expression",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-style > invalid 4`] = `
+{
+  "code": "export function foo(){}",
+  "diagnostics": [
+    {
+      "message": "Expected a function expression.",
+      "messageId": "expression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-style > invalid 5`] = `
+{
+  "code": "export var foo = function(){};",
+  "diagnostics": [
+    {
+      "message": "Expected a function declaration.",
+      "messageId": "declaration",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-style > invalid 6`] = `
+{
+  "code": "const foo = function() {};",
+  "diagnostics": [
+    {
+      "message": "Expected a function declaration.",
+      "messageId": "declaration",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-style > invalid 7`] = `
+{
+  "code": "$1: function $2() { }",
+  "diagnostics": [
+    {
+      "message": "Expected a function expression.",
+      "messageId": "expression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`func-style > invalid 8`] = `
+{
+  "code": "if (foo) function bar() {}",
+  "diagnostics": [
+    {
+      "message": "Expected a function expression.",
+      "messageId": "expression",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "func-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

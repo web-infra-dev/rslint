@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { runRslint, createTempDir, cleanupTempDir, TS_CONFIG } from './helpers';
 
 // End-to-end coverage for the `--type-check-only` mode (PR #905) and the
@@ -108,7 +108,7 @@ describe('--type-check-only basic', () => {
     }
   });
 
-  test('summary reports "type-checked N files" instead of "linted N files"', async () => {
+  test('status reports type-check-only files without rule stats', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.mjs': makeConfigPlain(),
@@ -119,15 +119,10 @@ describe('--type-check-only basic', () => {
         ['--type-check-only', '--singleThreaded'],
         tempDir,
       );
-      expect(r.stdout).toContain('type-checked');
-      expect(r.stdout).toContain('type error');
       expect(r.stdout).toMatch(
-        /Found 0 type errors \(type-checked 1 file in .+ using 1 thread\)\n/,
+        /success Type check passed in .+ \(1 file, 1 thread\)\n/,
       );
-      expect(r.stdout).not.toContain('using 1 threads');
-      // The summary line owns "linted N files"; --type-check-only uses a
-      // different summary so this phrasing should NOT appear.
-      expect(r.stdout).not.toContain('linted');
+      expect(r.stdout).not.toContain('rules');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -317,9 +312,8 @@ describe('--type-check (non-only) does not short-circuit on Phase 2 diagnostics'
         tempDir,
       );
       expect(summary.stdout).toMatch(
-        /Found 0 lint errors, 1 type error and 0 warnings \(linted 0 files with 0 rules, type-checked 1 file in .+ using 1 thread\)\n/,
+        /error   Lint and type check failed with 1 TypeScript error in .+ \(1 file, 0 rules, 1 thread\)\n/,
       );
-      expect(summary.stdout).not.toContain('using 1 threads');
     } finally {
       await cleanupTempDir(tempDir);
     }

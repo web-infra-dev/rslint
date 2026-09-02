@@ -6,8 +6,9 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
-// These live-filesystem helpers are used only while reconciling CLI TypeScript
-// diagnostics. Frozen target/config paths use config.ExactPathID directly.
+// These live-filesystem helpers reconcile compiler-owned paths from TypeScript
+// diagnostics. Frozen target/config paths use config.ExactPathID directly;
+// Program-root projection belongs to the loader.
 func authoritativeFilesystemPath(filePath string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {

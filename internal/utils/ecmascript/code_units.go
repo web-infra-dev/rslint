@@ -25,6 +25,13 @@ func StringCodeUnits(s string) []uint16 {
 	return units
 }
 
+// DecodeStringRune reads the first code point from a JavaScript string value.
+// It differs from utf8.DecodeRuneInString only for the WTF-8 spelling the
+// compiler uses to preserve an unpaired UTF-16 surrogate.
+func DecodeStringRune(s string) (rune, int) {
+	return decodeStringRune(s)
+}
+
 // StringFromCodeUnits writes the UTF-16 code units JavaScript stores as a
 // string. Adjacent surrogate pairs use their ordinary UTF-8 spelling; an
 // unpaired surrogate uses the WTF-8 spelling the compiler uses to preserve it.

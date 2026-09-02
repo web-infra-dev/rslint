@@ -27,7 +27,7 @@
  * input (the APIs are unchanged through v10.4.0, the review's oracle).
  */
 
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 

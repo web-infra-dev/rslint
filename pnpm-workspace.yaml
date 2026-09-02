@@ -16,7 +16,6 @@ allowBuilds:
 catalog:
   '@microsoft/api-extractor': ^7.58.12
   '@napi-rs/cli': ^3.8.2
-  '@rslib/core': 1.0.0-beta.3
   '@types/picomatch': ^4.0.3
   esbuild: ^0.28.1
   fast-glob: ^3.3.3
@@ -47,12 +46,9 @@ catalog:
   # Public API data shipped by @rslint/core; review the catalog diff before updating.
   globals: 17.11.0
   '@codspeed/tinybench-plugin': ^5.7.1
-  '@rstest/core': ^0.11.3
   tinybench: ^6.1.1
   ajv: ^6.15.0
-  husky: ^9.1.7
-  lint-staged: ^16.4.0
-  prettier: ^3.9.6
+  rstack: ^0.6.5
   zx: ^8.8.5
   '@types/mocha': ^10.0.10
   '@types/node': ^26.2.0

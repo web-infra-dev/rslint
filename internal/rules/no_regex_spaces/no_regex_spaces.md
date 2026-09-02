@@ -34,6 +34,14 @@ contains escape sequences that differ from the raw source (e.g.
 `new RegExp('\\d  ')`), the rule reports but does not autofix — the index into
 the parsed pattern would not map cleanly back to source positions.
 
+## Differences from ESLint
+
+- Constructor patterns using capture names or Unicode properties newer than
+  the bundled TypeScript parser's Unicode data can be skipped.
+- For a constructor pattern with a negated `v` class where a range is followed
+  by a string-valued operand, rslint skips a report that ESLint may emit because
+  JavaScript rejects the pattern.
+
 ## Original Documentation
 
 - [ESLint: no-regex-spaces](https://eslint.org/docs/latest/rules/no-regex-spaces)

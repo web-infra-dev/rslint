@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import {
   runRslint,
   createFixTestDir,
@@ -31,7 +31,7 @@ describe('CLI --fix multi-pass cascade', () => {
       expect(content).not.toContain(': string');
       expect(content).not.toContain(': Number');
       expect(content).not.toContain(': number');
-      expect(result.stdout).toContain('fixed 4 issues');
+      expect(result.stdout).toContain('after applying 4 fixes');
     } finally {
       await cleanupTempDir(tempDir);
     }
