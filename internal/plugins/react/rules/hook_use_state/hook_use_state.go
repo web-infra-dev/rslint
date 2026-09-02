@@ -84,7 +84,7 @@ func reactImportInfo(node *ast.Node) importInfo {
 	clause := decl.ImportClause.AsImportClause()
 	if clause.Name() != nil && clause.Name().Kind == ast.KindIdentifier {
 		info.defaultName = clause.Name().AsIdentifier().Text
-		info.defaultSpecifier = decl.ImportClause
+		info.defaultSpecifier = clause.Name()
 	}
 	if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
 		return info
@@ -146,30 +146,49 @@ func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports
 			return false
 		}
 	}
-	return imports.namedHookNames[name] == "useState" || name == "useState"
+	return imports.namedHookNames[name] == "useState"
 }
 
-func resolvesToDefaultReactImport(ctx rule.RuleContext, defaultSpecifier, ident *ast.Node) bool {
-	if ctx.Refs == nil || defaultSpecifier == nil || ident == nil || ident.Kind != ast.KindIdentifier ||
-		defaultSpecifier.Pos() >= ident.Pos() {
-		return false
+func firstReference(referenceScopes map[*ast.Node]*scope.Scope, ident *ast.Node, name string) *scope.Reference {
+	if ident == nil || ident.Kind != ast.KindIdentifier {
+		return nil
 	}
-	symbol := ctx.Refs.Resolve(ident)
-	if symbol == nil {
-		return false
+	from := referenceScopes[ident]
+	if from == nil {
+		return nil
 	}
-	for _, decl := range symbol.Declarations {
-		if decl == defaultSpecifier {
-			return true
+	for _, reference := range from.References {
+		if reference.Identifier != nil && reference.Identifier.Text() == name {
+			return reference
 		}
 	}
-	return false
+	return nil
+}
+
+func resolvesToDefaultReactImport(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, ident *ast.Node) bool {
+	if imports.defaultName == "" || imports.defaultSpecifier == nil {
+		return false
+	}
+	reference := firstReference(referenceScopes, ident, imports.defaultName)
+	if reference == nil {
+		return false
+	}
+	matchedImport := false
+	for _, declaration := range reference.Declarations {
+		if declaration == nil || declaration.Kind != scope.DefImport {
+			return false
+		}
+		if declaration.ID == imports.defaultSpecifier {
+			matchedImport = true
+		}
+	}
+	return matchedImport
 }
 
 // isReactUseStateCall ports Components#isReactHookCall(node, ["useState"]).
 // Parentheses are transparent because ESTree drops them; TS assertion wrappers
 // deliberately are not, matching the upstream parser's explicit TS nodes.
-func isReactUseStateCall(ctx rule.RuleContext, referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, node *ast.Node) bool {
+func isReactUseStateCall(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -195,7 +214,7 @@ func isReactUseStateCall(ctx rule.RuleContext, referenceScopes map[*ast.Node]*sc
 	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "useState" {
 		return false
 	}
-	return resolvesToDefaultReactImport(ctx, imports.defaultSpecifier, ast.SkipParentheses(access.Expression))
+	return resolvesToDefaultReactImport(referenceScopes, imports, ast.SkipParentheses(access.Expression))
 }
 
 func isDestructuringBinding(node *ast.Node) bool {
@@ -223,6 +242,13 @@ func identifierBindingName(node *ast.Node) string {
 		return ""
 	}
 	return name.AsIdentifier().Text
+}
+
+func isPresentBinding(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBindingElement {
+		return false
+	}
+	return node.AsBindingElement().Name() != nil
 }
 
 func expectedSetterNames(value string) []string {
@@ -266,6 +292,9 @@ var HookUseStateRule = rule.Rule{
 		if ctx.SourceFile != nil && ctx.SourceFile.Statements != nil {
 			for _, statement := range ctx.SourceFile.Statements.Nodes {
 				info := reactImportInfo(statement)
+				if info.defaultName != "" {
+					namedHookNames[info.defaultName] = struct{}{}
+				}
 				for local := range info.namedHookNames {
 					namedHookNames[local] = struct{}{}
 				}
@@ -298,7 +327,7 @@ var HookUseStateRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if !isReactUseStateCall(ctx, referenceScopes, imports, node) {
+				if !isReactUseStateCall(referenceScopes, imports, node) {
 					return
 				}
 				// ESTree wraps an optional call in ChainExpression, so it is not
@@ -350,8 +379,15 @@ var HookUseStateRule = rule.Rule{
 
 				ctx.ReportNodeWithDeferredSuggestions(pattern, useStateErrorMessage(), func() []rule.RuleSuggestion {
 					suggestions := make([]rule.RuleSuggestion, 0, 2)
-					if value != nil && len(elements) == 1 && node.AsCallExpression().Arguments != nil && len(node.AsCallExpression().Arguments.Nodes) == 1 {
+					if isPresentBinding(value) && len(elements) == 1 && node.AsCallExpression().Arguments != nil && len(node.AsCallExpression().Arguments.Nodes) == 1 {
 						argument := node.AsCallExpression().Arguments.Nodes[0]
+						memoValueName := valueName
+						if memoValueName == "" {
+							// AssignmentPattern and RestElement have an undefined
+							// ESTree `name`, which becomes the string "undefined"
+							// when the upstream fixer interpolates it.
+							memoValueName = "undefined"
+						}
 						memoName := imports.useMemoName
 						var importFix *rule.RuleFix
 						if memoName == "" {
@@ -370,7 +406,7 @@ var HookUseStateRule = rule.Rule{
 							fixes = append(fixes, *importFix)
 						}
 						fixes = append(fixes,
-							rule.RuleFixReplace(ctx.SourceFile, pattern, valueName),
+							rule.RuleFixReplace(ctx.SourceFile, pattern, memoValueName),
 							rule.RuleFixReplace(ctx.SourceFile, node, memoName+"(() => "+utils.TrimmedNodeText(ctx.SourceFile, ast.SkipParentheses(argument))+
 								", [])"),
 						)

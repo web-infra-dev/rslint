@@ -32,6 +32,9 @@ func TestHookUseStateExtras(t *testing.T) {
 		{Code: `import { useState as useStore } from 'react'; const [data, setData] = useStore({})`, Tsx: true},
 		// Components#isReactHookCall does not recognize renamed named imports.
 		{Code: `import { useState as state } from 'react'; const [color] = state(value)`, Tsx: true},
+		// The imported hook name controls matching even when its local alias is
+		// named useState.
+		{Code: `import { useFoo as useState } from 'react'; const result = useState()`, Tsx: true},
 		// Components sees only the first default React import.
 		{Code: `import A from 'react'; import B from 'react'; const result = B.useState()`, Tsx: true},
 		// Components has not seen an import declared after the call yet.
@@ -145,6 +148,20 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 		// even when the current callee is shadowed by a later local declaration.
 		hookUseStateError(`import { useFoo, useState } from 'react';
 	function f() { useFoo(); function useState() {} const result = useState() }`, useStateErrorText, 2, 65),
+		// Components uses the first default React reference in the function
+		// scope, even when a later body declaration shadows the same spelling.
+		{
+			Code:   `import React from 'react'; function f(x = React) { const React = {}; const result = React.useState(); }`,
+			Tsx:    true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText}},
+		},
+		// An omitted first binding is falsy in the upstream truthiness check and
+		// must not receive the single-getter memo suggestion.
+		{
+			Code:   `import { useState } from 'react'; const [,] = useState(initial)`,
+			Tsx:    true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText}},
+		},
 		// A single non-identifier binding still receives the upstream memo suggestion.
 		{
 			Code: `import { useState } from 'react'; const [value = fallback] = useState(initial)`,
@@ -153,7 +170,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 				MessageId: "useStateErrorMessage", Message: useStateErrorText,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 					MessageId: "suggestMemo",
-					Output:    `import { useState, useMemo } from 'react'; const  = useMemo(() => initial, [])`,
+					Output:    `import { useState, useMemo } from 'react'; const undefined = useMemo(() => initial, [])`,
 				}},
 			}},
 		},
@@ -164,7 +181,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 				MessageId: "useStateErrorMessage", Message: useStateErrorText,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 					MessageId: "suggestMemo",
-					Output:    `import { useState, useMemo } from 'react'; const  = useMemo(() => initial, [])`,
+					Output:    `import { useState, useMemo } from 'react'; const undefined = useMemo(() => initial, [])`,
 				}},
 			}},
 		},
