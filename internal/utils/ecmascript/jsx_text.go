@@ -3,6 +3,7 @@ package ecmascript
 import (
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 )
@@ -11,29 +12,56 @@ import (
 // as decoded text in direct attribute values. Invalid or unterminated
 // references remain in the result, matching the JSX token reader.
 func DecodeJSXEntities(raw string) string {
-	var decoded strings.Builder
+	units := make([]jsxDecodedUnit, 0, len(raw))
 	for pos := 0; pos < len(raw); {
 		if raw[pos] == '&' {
 			first, second, count, next, ok := decodeJSXTextEntity(raw, pos)
 			if ok {
+				units = append(units, jsxDecodedUnit{value: first})
 				if count == 2 {
-					decoded.WriteRune(utf16.DecodeRune(rune(first), rune(second)))
-				} else {
-					decoded.WriteRune(rune(first))
+					units = append(units, jsxDecodedUnit{value: second})
 				}
 				pos = next
 				continue
 			}
-			decoded.WriteByte('&')
+			units = append(units, jsxDecodedUnit{value: '&'})
 			pos++
 			continue
 		}
 
-		_, size := decodeStringRune(raw[pos:])
-		decoded.WriteString(raw[pos : pos+size])
+		r, size := decodeStringRune(raw[pos:])
+		if r > 0xFFFF {
+			high, low := utf16.EncodeRune(r)
+			units = append(units,
+				jsxDecodedUnit{value: uint16(high)},
+				jsxDecodedUnit{value: uint16(low)},
+			)
+		} else {
+			units = append(units, jsxDecodedUnit{value: uint16(r)})
+		}
 		pos += size
 	}
+
+	var decoded strings.Builder
+	for pos := 0; pos < len(units); {
+		unit := units[pos]
+		r := rune(unit.value)
+		if pos+1 < len(units) && r >= 0xD800 && r <= 0xDBFF &&
+			units[pos+1].value >= 0xDC00 && units[pos+1].value <= 0xDFFF {
+			r = utf16.DecodeRune(r, rune(units[pos+1].value))
+			pos++
+		}
+		if r >= 0xD800 && r <= 0xDFFF {
+			r = utf8.RuneError
+		}
+		decoded.WriteRune(r)
+		pos++
+	}
 	return decoded.String()
+}
+
+type jsxDecodedUnit struct {
+	value uint16
 }
 
 // JSXTextTokenValuesEqual reports whether two raw JSX text spans produce the

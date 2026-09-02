@@ -42,6 +42,9 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		{Code: `var x = <link rel="mask-icon" href="/pinned.svg"/>`, Tsx: true},
 		// JSX attribute string values are entity-decoded by ESTree.
 		{Code: `var x = <a rel="no&#x6f;pener"/>`, Tsx: true},
+		// The raw entity expands the source range, so a trailing decoded space is
+		// not an upstream boundary whitespace report.
+		{Code: `var x = <a rel="noopener&#x20;"/>`, Tsx: true},
 		// Computed string member names are not accepted by the upstream callee
 		// predicate, even though computed identifier names are.
 		{Code: `React["createElement"]("a", {rel: "invalid"})`, Tsx: true},
@@ -52,6 +55,7 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		{Code: `React.createElement("a", {rel: ["invalid", "canonical"]})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", {rel: ["", "canonical"]})`}}}, {MessageId: "notValidFor"}}},
 		{Code: `React.createElement(1, {rel: "alternate"})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor"}}},
 		{Code: `var x = <a rel={undefined}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Description: `"remove rel"`, Data: map[string]string{"attributeName": "rel"}, Output: `var x = <a />`}}}}},
+		{Code: `var x = <a rel={true}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Data: map[string]string{"attributeName": "rel", "reportingValue": "true"}, Line: 1, Column: 17, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Data: map[string]string{"attributeName": "rel", "reportingValue": "true"}, Output: `var x = <a />`}}}}},
 		// Locks in upstream checkCreateProps() arm: method takes precedence over values.
 		{Code: `React.createElement("a", {rel() {}})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMethod"}}},
 		{Code: `React.createElement("html", {rel})`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor"}}},
@@ -66,6 +70,8 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		{Code: `React.createElement("a", {rel: "canonical"})`, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h"}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notValidFor", Message: `“"canonical"” is not a valid “rel” attribute value for <a>.`}}},
 		{Code: `var x = <a rel={/invalid/}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `var x = <a />`}}}}},
 		{Code: `var x = <a rel={1n}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `var x = <a />`}}}}},
+		{Code: `var x = <a rel={5}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Data: map[string]string{"attributeName": "rel"}, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Data: map[string]string{"attributeName": "rel"}, Output: `var x = <a />`}}}}},
+		{Code: `var x = <a rel={null}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Data: map[string]string{"attributeName": "rel"}, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Data: map[string]string{"attributeName": "rel"}, Output: `var x = <a />`}}}}},
 		{Code: `var x = <a rel={("invalid")}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <a rel={("")}/>`}}}}},
 		{Code: `var x = <a rel={"invalid"}/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Line: 1, Column: 17, EndLine: 1, EndColumn: 26, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <a rel={""}/>`}}}}},
 		{Code: `var x = <a rel={""} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noEmpty", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveEmpty", Description: `"remove empty attribute rel"`, Data: map[string]string{"attributeName": "rel", "reportingValue": ""}, Output: `var x = <a rel= />`}}}}},
@@ -79,6 +85,7 @@ func TestNoInvalidHtmlAttributeRuleExtras(t *testing.T) {
 		// ---- Real-user: eslint-plugin-react#3172 ----
 		{Code: `var x = <a rel="shortcut"/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notValidFor", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <a rel=""/>`}}}, {MessageId: "notAlone"}}},
 		{Code: `var x = <link rel=".shortcut"/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <link rel=""/>`}}}, {MessageId: "notAlone"}}},
+		{Code: `var x = <a rel="&copy; noopener"/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Data: map[string]string{"attributeName": "rel", "reportingValue": "©"}, Line: 1, Column: 16, EndLine: 1, EndColumn: 33, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Data: map[string]string{"attributeName": "rel", "reportingValue": "©"}, Output: `var x = <a rel="copy; noopener"/>`}}}}},
 		{Code: `var x = <link rel="-shortcut foo"/>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <link rel=" foo"/>`}}}, {MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `var x = <link rel="-shortcut "/>`}}}, {MessageId: "notPaired"}}},
 	})
 }

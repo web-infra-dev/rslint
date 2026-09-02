@@ -56,6 +56,8 @@ func TestDecodeJSXEntities(t *testing.T) {
 		{name: "named entity", raw: "no&amp;pener", want: "no&pener"},
 		{name: "hex entity", raw: "no&#x6f;pener", want: "noopener"},
 		{name: "invalid entity", raw: "no&#xZZ;pener", want: "no&#xZZ;pener"},
+		{name: "adjacent surrogate entities", raw: "&#xD83D;&#xDE00;", want: "😀"},
+		{name: "lone surrogate entity uses replacement rune", raw: "&#xD83D;", want: "�"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -61,10 +61,16 @@ func suggestion(id, description string, data map[string]string, fix rule.RuleFix
 	return []rule.RuleSuggestion{{Message: message(id, description, data), FixesArr: []rule.RuleFix{fix}}}
 }
 
-// stringParts is the JS /\\S+/g equivalent with byte offsets. JavaScript's
-// whitespace set is deliberately used instead of Go's Unicode definition.
-func stringParts(value string) [][2]int {
-	var out [][2]int
+// stringParts is the JS /\\S+/g equivalent. It records UTF-8 byte spans for
+// slicing the decoded Go string and UTF-16 spans for ESLint-style ranges.
+type valuePart struct {
+	bytes [2]int
+	units [2]int
+}
+
+func stringParts(value string) []valuePart {
+	var out []valuePart
+	units := 0
 	for start := 0; start < len(value); {
 		for start < len(value) {
 			r, n := utf8.DecodeRuneInString(value[start:])
@@ -72,43 +78,58 @@ func stringParts(value string) [][2]int {
 				break
 			}
 			start += n
+			units += utf16Width(r)
 		}
 		end := start
+		startUnits := units
 		for end < len(value) {
 			r, n := utf8.DecodeRuneInString(value[end:])
 			if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 				break
 			}
 			end += n
+			units += utf16Width(r)
 		}
 		if start < end {
-			out = append(out, [2]int{start, end})
+			out = append(out, valuePart{bytes: [2]int{start, end}, units: [2]int{startUnits, units}})
 		}
 		start = end
 	}
 	return out
 }
 
-func whitespaceParts(value string) [][2]int {
-	var out [][2]int
+func whitespaceParts(value string) []valuePart {
+	var out []valuePart
+	units := 0
 	for start := 0; start < len(value); {
 		r, n := utf8.DecodeRuneInString(value[start:])
 		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 			start += n
+			units += utf16Width(r)
 			continue
 		}
+		startUnits := units
 		end := start + n
+		units += utf16Width(r)
 		for end < len(value) {
 			r, n = utf8.DecodeRuneInString(value[end:])
 			if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
 				break
 			}
 			end += n
+			units += utf16Width(r)
 		}
-		out = append(out, [2]int{start, end})
+		out = append(out, valuePart{bytes: [2]int{start, end}, units: [2]int{startUnits, units}})
 		start = end
 	}
 	return out
+}
+
+func utf16Width(r rune) int {
+	if r > 0xFFFF {
+		return 2
+	}
+	return 1
 }
 
 func literalString(node *ast.Node) (string, bool) {
@@ -241,7 +262,31 @@ func removeStaticValue(ctx rule.RuleContext, node *ast.Node, value string) rule.
 
 func literalRange(ctx rule.RuleContext, node *ast.Node, offset [2]int) core.TextRange {
 	r := utils.TrimNodeTextRange(ctx.SourceFile, node)
-	return core.NewTextRange(r.Pos()+1+offset[0], r.Pos()+1+offset[1])
+	raw := ctx.SourceFile.Text()[r.Pos():r.End()]
+	if len(raw) >= 2 {
+		inner := raw[1 : len(raw)-1]
+		return core.NewTextRange(
+			r.Pos()+1+rawByteOffsetForUTF16(inner, offset[0]),
+			r.Pos()+1+rawByteOffsetForUTF16(inner, offset[1]),
+		)
+	}
+	return core.NewTextRange(r.Pos()+offset[0], r.Pos()+offset[1])
+}
+
+func rawByteOffsetForUTF16(value string, target int) int {
+	if target <= 0 {
+		return 0
+	}
+	units := 0
+	for pos := 0; pos < len(value); {
+		r, size := utf8.DecodeRuneInString(value[pos:])
+		if units >= target {
+			return pos
+		}
+		units += utf16Width(r)
+		pos += size
+	}
+	return len(value)
 }
 
 // https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-invalid-html-attribute.js
@@ -258,6 +303,12 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 			}
 			if !isString {
 				data := map[string]string{"attributeName": "rel"}
+				// The upstream fixture exposes the boolean literal's value here,
+				// while its numeric and null cases intentionally carry only the
+				// attribute name.
+				if valueNode.Kind == ast.KindTrueKeyword {
+					data["reportingValue"] = "true"
+				}
 				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("onlyStrings", "“rel” attribute only supports strings.", data), func() []rule.RuleSuggestion {
 					return suggestion("suggestRemoveNonString", "remove non-string value in “rel”", data, rule.RuleFixRemove(ctx.SourceFile, nonStringRemoveNode))
 				})
@@ -271,7 +322,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				return
 			}
 			for _, part := range stringParts(value) {
-				word := value[part[0]:part[1]]
+				word := value[part.bytes[0]:part.bytes[1]]
 				tags, exists := relValues[word]
 				data := map[string]string{"attributeName": "rel", "reportingValue": word}
 				id, desc := "", ""
@@ -282,7 +333,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					data["elementName"] = element
 				}
 				if id != "" {
-					partRange := literalRange(ctx, valueNode, part)
+					partRange := literalRange(ctx, valueNode, part.units)
 					ctx.ReportNodeWithDeferredSuggestions(valueNode, message(id, desc, data), func() []rule.RuleSuggestion {
 						return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+word+"”", data, rule.RuleFixRemoveRange(partRange))
 					})
@@ -290,11 +341,12 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 			}
 			reportShortcutPairs(ctx, valueNode, value)
 			for _, part := range whitespaceParts(value) {
-				r := literalRange(ctx, valueNode, part)
-				whitespace := value[part[0]:part[1]]
-				if part[0] == 0 || part[1] == len(value) || whitespace != " " {
+				r := literalRange(ctx, valueNode, part.units)
+				whitespace := value[part.bytes[0]:part.bytes[1]]
+				nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, valueNode)
+				if r.Pos() == nodeRange.Pos()+1 || r.End() == nodeRange.End()-1 || whitespace != " " {
 					replacement := " "
-					if part[0] == 0 || part[1] == len(value) {
+					if part.units[0] == 0 || part.units[1] == int(core.UTF16Len(value)) {
 						replacement = ""
 					}
 					data := map[string]string{"attributeName": "rel"}

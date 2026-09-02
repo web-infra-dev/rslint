@@ -43,7 +43,8 @@ type ValidTestCase struct {
 }
 
 type InvalidTestCaseError struct {
-	MessageId string `json:"messageId"`
+	MessageId string            `json:"messageId"`
+	Data      map[string]string `json:"data,omitempty"`
 	// Message, if non-empty, must match the diagnostic's formatted message
 	// exactly. Leave empty to skip the text assertion.
 	Message     string                      `json:"message,omitempty"`
@@ -114,6 +115,7 @@ type ESLintInvalidTestCase struct {
 type ESLintError struct {
 	Message     string             `json:"message,omitempty"`
 	MessageId   string             `json:"messageId,omitempty"`
+	Data        map[string]string  `json:"data,omitempty"`
 	Type        string             `json:"type,omitempty"`
 	Line        int                `json:"line,omitempty"`
 	Column      int                `json:"column,omitempty"`
@@ -124,9 +126,10 @@ type ESLintError struct {
 
 // ESLintSuggestion represents a suggestion in ESLint format
 type ESLintSuggestion struct {
-	MessageId string `json:"messageId,omitempty"`
-	Desc      string `json:"desc,omitempty"`
-	Output    string `json:"output,omitempty"`
+	MessageId string            `json:"messageId,omitempty"`
+	Desc      string            `json:"desc,omitempty"`
+	Data      map[string]string `json:"data,omitempty"`
+	Output    string            `json:"output,omitempty"`
 }
 
 // ESLintTestSuite represents a complete ESLint test suite
@@ -344,6 +347,9 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				if expected.Message != "" && expected.Message != diagnostic.Message.Description {
 					t.Errorf("Invalid message text %q. Expected %q", diagnostic.Message.Description, expected.Message)
 				}
+				if expected.Data != nil && !reflect.DeepEqual(expected.Data, diagnostic.Message.Data) {
+					t.Errorf("Invalid diagnostic data %#v. Expected %#v", diagnostic.Message.Data, expected.Data)
+				}
 
 				lineIndex, columnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
 				line, column := lineIndex+1, int(columnIndex)+1
@@ -481,12 +487,14 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 		for j, sug := range err.Suggestions {
 			suggestions[j] = InvalidTestCaseSuggestion{
 				MessageId: sug.MessageId,
+				Data:      sug.Data,
 				Output:    sug.Output,
 			}
 		}
 
 		errors[i] = InvalidTestCaseError{
 			MessageId:   err.MessageId,
+			Data:        err.Data,
 			Line:        err.Line,
 			Column:      err.Column,
 			EndLine:     err.EndLine,
