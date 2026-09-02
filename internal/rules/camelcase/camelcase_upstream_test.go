@@ -1,7 +1,7 @@
 // TestCamelcaseUpstream migrates the full valid/invalid suite from upstream
 // eslint/tests/lib/rules/camelcase.js 1:1. Position assertions cover
 // line/column for every invalid case. rslint-specific lock-in cases live in
-// the camelcase_extras_test.go file.
+// camelcase_extras_test.go and the camelcase_extras_*_test.go area files.
 package camelcase
 
 import (
