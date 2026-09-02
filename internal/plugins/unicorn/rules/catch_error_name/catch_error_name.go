@@ -7,7 +7,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -62,35 +61,6 @@ func parseOptions(raw []any) options {
 		}
 	}
 	return result
-}
-
-func jsxNamespaceReferences(identifier *ast.Node, body *ast.Node, name string) []*ast.Node {
-	var references []*ast.Node
-	declaration := bindingDeclaration(identifier)
-	var boundary *ast.Node
-	if declaration != nil {
-		boundary = declaration.Parent
-	}
-	var walk func(*ast.Node)
-	walk = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-		if node.Kind == ast.KindJsxNamespacedName {
-			namespacedName := node.AsJsxNamespacedName()
-			if namespacedName != nil && namespacedName.Namespace != nil && ast.IsJsxTagName(node) &&
-				namespacedName.Namespace.Text() == name &&
-				!utils.IsNameShadowedBetween(namespacedName.Namespace, boundary, name) {
-				references = append(references, namespacedName.Namespace)
-			}
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			walk(child)
-			return false
-		})
-	}
-	walk(body)
-	return references
 }
 
 func upperFirst(value string) string {
@@ -378,27 +348,6 @@ func availableName(ctx rule.RuleContext, identifier *ast.Node, references []*ast
 	}
 }
 
-func mergeReferences(left, right []*ast.Node) []*ast.Node {
-	if len(left) == 0 {
-		return right
-	}
-	if len(right) == 0 {
-		return left
-	}
-	merged := make([]*ast.Node, 0, len(left)+len(right))
-	for len(left) > 0 && len(right) > 0 {
-		if left[0].Pos() < right[0].Pos() {
-			merged = append(merged, left[0])
-			left = left[1:]
-		} else {
-			merged = append(merged, right[0])
-			right = right[1:]
-		}
-	}
-	merged = append(merged, left...)
-	return append(merged, right...)
-}
-
 func renameFixes(ctx rule.RuleContext, identifier *ast.Node, references []*ast.Node, name string) []rule.RuleFix {
 	fixes := make([]rule.RuleFix, 0, len(references)+1)
 	fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, identifier, name))
@@ -432,9 +381,6 @@ var CatchErrorNameRule = rule.Rule{
 					return
 				}
 				references := ctx.Refs.References(declaration.Symbol())
-				if ctx.SourceFile.LanguageVariant == core.LanguageVariantJSX {
-					references = mergeReferences(references, jsxNamespaceReferences(identifier, handlerScope(identifier), originalName))
-				}
 				if originalName == "_" && len(references) == 0 {
 					return
 				}

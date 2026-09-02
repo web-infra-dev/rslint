@@ -9,7 +9,7 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build": "rslib build",
+    "build": "rs lib",
     "compile": "tsgo -p tsconfig.build.json"
   },
   "keywords": [],
@@ -17,7 +17,6 @@
   "license": "MIT",
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
-    "@rslib/core": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:"
   },

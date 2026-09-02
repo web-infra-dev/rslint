@@ -26,7 +26,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/consistent-class-member-order': 'error', // not implemented
     // 'unicorn/consistent-compound-words': 'error', // not implemented
     // 'unicorn/consistent-conditional-object-spread': 'error', // not implemented
-    // 'unicorn/consistent-date-clone': 'error', // not implemented
+    'unicorn/consistent-date-clone': 'error',
     // 'unicorn/consistent-destructuring': 'off', // not implemented
     // 'unicorn/consistent-empty-array-spread': 'error', // not implemented
     // 'unicorn/consistent-existence-index-check': 'error', // not implemented
@@ -36,7 +36,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/consistent-json-file-read': 'error', // not implemented
     // 'unicorn/consistent-optional-chaining': 'error', // not implemented
     // 'unicorn/consistent-template-literal-escape': 'error', // not implemented
-    // 'unicorn/consistent-tuple-labels': 'error', // not implemented
+    'unicorn/consistent-tuple-labels': 'error',
     // 'unicorn/custom-error-definition': 'off', // not implemented
     // 'unicorn/default-export-style': 'error', // not implemented
     // 'unicorn/dom-node-dataset': 'error', // not implemented
@@ -132,7 +132,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-non-function-verb-prefix': 'error', // not implemented
     // 'unicorn/no-nonstandard-builtin-properties': 'error', // not implemented
     // 'unicorn/no-null': 'error', // not implemented
-    // 'unicorn/no-object-as-default-parameter': 'error', // not implemented
+    'unicorn/no-object-as-default-parameter': 'error',
     // 'unicorn/no-object-methods-with-collections': 'error', // not implemented
     // 'unicorn/no-optional-chaining-on-undeclared-variable': 'error', // not implemented
     // 'unicorn/no-process-exit': 'error', // not implemented
@@ -206,7 +206,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-abort-signal-any': 'error', // not implemented
     // 'unicorn/prefer-abort-signal-timeout': 'error', // not implemented
     // 'unicorn/prefer-add-event-listener': 'error', // not implemented
-    // 'unicorn/prefer-add-event-listener-options': 'error', // not implemented
+    'unicorn/prefer-add-event-listener-options': 'error',
     // 'unicorn/prefer-aggregate-error': 'error', // not implemented
     // 'unicorn/prefer-array-find': 'error', // not implemented
     'unicorn/prefer-array-flat': 'error',
@@ -222,7 +222,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-at': 'error', // not implemented
     // 'unicorn/prefer-await': 'error', // not implemented
     // 'unicorn/prefer-bigint-literals': 'error', // not implemented
-    // 'unicorn/prefer-blob-reading-methods': 'error', // not implemented
+    'unicorn/prefer-blob-reading-methods': 'error',
     // 'unicorn/prefer-block-statement-over-iife': 'error', // not implemented
     // 'unicorn/prefer-boolean-return': 'error', // not implemented
     // 'unicorn/prefer-class-fields': 'error', // not implemented

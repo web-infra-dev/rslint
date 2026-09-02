@@ -39,7 +39,6 @@
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@rstest/core": "catalog:",
     "@types/react": "catalog:",
     "ajv": "catalog:",
     "rstack": "catalog:",

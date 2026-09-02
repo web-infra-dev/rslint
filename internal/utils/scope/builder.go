@@ -11,6 +11,7 @@ import (
 type builder struct {
 	manager           *Manager
 	collectReferences bool
+	referenceNames    map[string]struct{}
 }
 
 func (b *builder) push(kind Kind, block *ast.Node, parent *Scope) *Scope {
@@ -28,6 +29,11 @@ func (b *builder) push(kind Kind, block *ast.Node, parent *Scope) *Scope {
 func (b *builder) reference(id *ast.Node, s *Scope) {
 	if !b.collectReferences || id == nil || s == nil {
 		return
+	}
+	if b.referenceNames != nil {
+		if _, relevant := b.referenceNames[id.Text()]; !relevant {
+			return
+		}
 	}
 	if !IsReferenceIdentifier(id) {
 		return

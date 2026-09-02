@@ -18,6 +18,12 @@ func invalidTSX(code, output, original, fixed string) rule_tester.InvalidTestCas
 	return result
 }
 
+func invalidJSX(code, output, original, fixed string) rule_tester.InvalidTestCase {
+	result := invalid(code, output, original, fixed)
+	result.FileName = "catch-error-name.jsx"
+	return result
+}
+
 func TestCatchErrorNameExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -117,6 +123,9 @@ func TestCatchErrorNameExtras(t *testing.T) {
 			invalidTSX("try {} catch (bad) { use(bad); const x = <error /> }", "try {} catch (error) { use(error); const x = <error /> }", "bad", "error"),
 			invalidTSX("try {} catch (_) { const x = <_:foo /> }", "try {} catch (error) { const x = <error:foo /> }", "_", "error"),
 			invalidTSX("try {} catch (bad) { use(bad); const x = <bad:foo /> }", "try {} catch (error) { use(error); const x = <error:foo /> }", "bad", "error"),
+			// Espree does not create references for namespaced JSX tag pieces, so
+			// the fixer must leave the tag unchanged.
+			invalidJSX("try {} catch (bad) { use(bad); const x = <bad:foo /> }", "try {} catch (error) { use(error); const x = <bad:foo /> }", "bad", "error"),
 			// Namespaced JSX attributes are syntax, and shadowed tag namespaces do not refer to the handler parameter.
 			invalidTSX("try {} catch (bad) { use(bad); const x = <div bad:attr=\"1\" /> }", "try {} catch (error) { use(error); const x = <div bad:attr=\"1\" /> }", "bad", "error"),
 			invalidTSX("try {} catch (bad) { use(bad); const x = <div error:attr=\"1\" /> }", "try {} catch (error) { use(error); const x = <div error:attr=\"1\" /> }", "bad", "error"),

@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/block_scoped_var"
+	"github.com/web-infra-dev/rslint/internal/rules/camelcase"
 	"github.com/web-infra-dev/rslint/internal/rules/capitalized_comments"
 	"github.com/web-infra-dev/rslint/internal/rules/class_methods_use_this"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
@@ -32,6 +33,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/func_name_matching"
 	"github.com/web-infra-dev/rslint/internal/rules/func_names"
+	"github.com/web-infra-dev/rslint/internal/rules/func_style"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/grouped_accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
@@ -91,6 +93,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implicit_coercion"
+	"github.com/web-infra-dev/rslint/internal/rules/no_implicit_globals"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inline_comments"
@@ -186,6 +189,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_destructuring"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_exponentiation_operator"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_named_capture_group"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_numeric_literals"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_has_own"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_object_spread"
@@ -243,6 +247,7 @@ func coreRules() []rule.Rule {
 		array_callback_return.ArrayCallbackReturnRule,
 		arrow_body_style.ArrowBodyStyleRule,
 		block_scoped_var.BlockScopedVarRule,
+		camelcase.CamelcaseRule,
 		capitalized_comments.CapitalizedCommentsRule,
 		class_methods_use_this.ClassMethodsUseThisRule,
 		complexity.ComplexityRule,
@@ -257,6 +262,7 @@ func coreRules() []rule.Rule {
 		for_direction.ForDirectionRule,
 		func_name_matching.FuncNameMatchingRule,
 		func_names.FuncNamesRule,
+		func_style.FuncStyleRule,
 		getter_return.GetterReturnRule,
 		grouped_accessor_pairs.GroupedAccessorPairsRule,
 		guard_for_in.GuardForInRule,
@@ -314,6 +320,7 @@ func coreRules() []rule.Rule {
 		no_func_assign.NoFuncAssignRule,
 		no_global_assign.NoGlobalAssignRule,
 		no_implicit_coercion.NoImplicitCoercionRule,
+		no_implicit_globals.NoImplicitGlobalsRule,
 		no_implied_eval.NoImpliedEvalRule,
 		no_import_assign.NoImportAssignRule,
 		no_inline_comments.NoInlineCommentsRule,
@@ -372,6 +379,7 @@ func coreRules() []rule.Rule {
 		prefer_const.PreferConstRule,
 		prefer_destructuring.PreferDestructuringRule,
 		prefer_exponentiation_operator.PreferExponentiationOperatorRule,
+		prefer_named_capture_group.PreferNamedCaptureGroupRule,
 		prefer_numeric_literals.PreferNumericLiteralsRule,
 		prefer_object_has_own.PreferObjectHasOwnRule,
 		prefer_object_spread.PreferObjectSpreadRule,

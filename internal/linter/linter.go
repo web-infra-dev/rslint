@@ -156,9 +156,10 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// Directive parsing is itself lazy and only runs when a rule reports.
 		disableManager := rule.NewDisableManager(file, comments)
 
-		// A cheap source-text check inside ParseInlineGlobals avoids asking
-		// the store for all comments unless an inline directive is possible.
+		// A cheap source-text check inside each parser avoids asking the store
+		// for all comments unless that inline directive is possible.
 		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
+		inlineExported, inlineExportedDeclarations := rule.ParseInlineExported(file, comments)
 		var environment rule.RuleEnvironment
 		if filePlan.environment != nil {
 			environment = *filePlan.environment
@@ -188,6 +189,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			Settings:        environment.Settings,
 			LanguageOptions: languageOptions,
 			Globals:         rule.NewGlobals(languageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
+			Exported:        rule.NewExported(inlineExported, inlineExportedDeclarations),
 			Comments:        comments,
 			Refs:            refs,
 			BOM:             sourceBOM,

@@ -19,7 +19,7 @@
  *     `null` (rslint) vs `undefined` (typescript-eslint), tripping unicorn
  *     `no-static-only-class`.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import {
   compareCases,
   ALIASES,

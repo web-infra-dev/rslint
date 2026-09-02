@@ -1,0 +1,27 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "callbacksLast": { "type": "boolean" },
+        "shorthandFirst": { "type": "boolean" },
+        "shorthandLast": { "type": "boolean" },
+        "multiline": {
+          "enum": ["ignore", "first", "last"],
+          "default": "ignore"
+        },
+        "ignoreCase": { "type": "boolean" },
+        "noSortAlphabetically": { "type": "boolean" },
+        "reservedFirst": {
+          "type": ["array", "boolean"],
+          "items": { "type": "string" }
+        },
+        "locale": { "type": "string", "default": "auto" }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -51,6 +51,34 @@ func canonicalPathID(filePath string, fsys vfs.FS) string {
 	return exactPathID(authoritativePath(filePath, fsys))
 }
 
+// seedCanonicalTargetIdentityHints records source-path hints and the set of
+// physical identities already frozen by target planning. Canonical
+// self-identities are seeded first so a lexical alias cannot overwrite a path
+// that is itself another target's identity.
+func seedCanonicalTargetIdentityHints(
+	targets []target.File,
+	canonicalBySourcePath map[string]string,
+	targetCanonicalIDs map[string]struct{},
+) {
+	for _, target := range targets {
+		if target.CanonicalPath == "" {
+			continue
+		}
+		canonicalID := exactPathID(target.CanonicalPath)
+		targetCanonicalIDs[canonicalID] = struct{}{}
+		canonicalBySourcePath[canonicalID] = canonicalID
+	}
+	for _, target := range targets {
+		if target.Path == "" || target.CanonicalPath == "" {
+			continue
+		}
+		sourcePathID := exactPathID(target.Path)
+		if _, isCanonicalTarget := targetCanonicalIDs[sourcePathID]; !isCanonicalTarget {
+			canonicalBySourcePath[sourcePathID] = exactPathID(target.CanonicalPath)
+		}
+	}
+}
+
 func storeSourceTargetMapping(
 	mapping map[string]target.File,
 	sourcePath string,
@@ -121,25 +149,11 @@ func (index *programFileIndex) initialize() {
 	index.sourcesByProgram = make([]map[string]*ast.SourceFile, len(index.programs))
 	index.targetCanonicalIDs = make(map[string]struct{}, len(index.targets))
 	index.canonicalBySourcePath = make(map[string]string, len(index.targets)*2)
-	// Seed physical identities first so a lexical hint cannot overwrite a path
-	// that is itself the canonical identity of another target.
-	for _, target := range index.targets {
-		if target.CanonicalPath == "" {
-			continue
-		}
-		canonicalID := exactPathID(target.CanonicalPath)
-		index.targetCanonicalIDs[canonicalID] = struct{}{}
-		index.canonicalBySourcePath[canonicalID] = canonicalID
-	}
-	for _, target := range index.targets {
-		if target.Path == "" || target.CanonicalPath == "" {
-			continue
-		}
-		sourcePathID := exactPathID(target.Path)
-		if _, isCanonicalTarget := index.targetCanonicalIDs[sourcePathID]; !isCanonicalTarget {
-			index.canonicalBySourcePath[sourcePathID] = exactPathID(target.CanonicalPath)
-		}
-	}
+	seedCanonicalTargetIdentityHints(
+		index.targets,
+		index.canonicalBySourcePath,
+		index.targetCanonicalIDs,
+	)
 	index.targets = nil
 }
 

@@ -3,7 +3,7 @@
 // rslib plugin: splices typed rule options into `dist/index.d.ts` once the
 // whole (multi-`lib`-entry) build finishes — `onAfterBuild` fires once for
 // the entire rslib build, so by the time it runs the library surface's
-// `dist/index.d.ts` already exists (see rslib.config.ts).
+// `dist/index.d.ts` already exists (see rstack.config.ts).
 //
 // Reads every Go rule's options JSON Schema from `rule-schemas.json` — a
 // `{name, schema}[]` dump produced by `tools/dump_rule_schemas` from the shared
@@ -13,7 +13,7 @@
 // schema yet (internal/rule.Rule.Schema == nil) are omitted by the Go side
 // and keep falling back to `RulesRecord`'s untyped index signature (see
 // packages/rslint/src/config/define-config.ts).
-import type { RsbuildPlugin } from '@rslib/core';
+import type { RsbuildPlugin } from 'rstack/lib';
 import { compile } from 'json-schema-to-typescript';
 import fs from 'node:fs/promises';
 import path from 'node:path';
