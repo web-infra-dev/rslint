@@ -33,6 +33,7 @@ func TestPreferReadOnlyPropsExtras(t *testing.T) {
 		{Code: `type Props = {}; const Hello = ({}: Props) => <div/>;`, Tsx: true},
 		{Code: `class Hello extends React.Component {} const value = (props: { name: string }) => null;`, Tsx: true},
 		{Code: `declare function Hello(props: { name: string }): JSX.Element;`, Tsx: true},
+		{Code: `type Props = { name: string }; const Hello = React.forwardRef<HTMLDivElement, Props>(((props, ref) => <div ref={ref} />)!);`, Tsx: true},
 
 		// ---- Branch lock-ins: component classification and type selection ----
 		// Locks in upstream isSuperTypeParameterPropsDeclaration()'s no-type-args arm.

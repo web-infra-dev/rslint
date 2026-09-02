@@ -178,7 +178,10 @@ func checkFunction(node *ast.Node, pragma string, genericImports map[string]stri
 }
 
 func parentCall(node *ast.Node) *ast.CallExpression {
-	parent := reactutil.SkipExpressionWrappersUp(node)
+	parent := node.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
 	if parent != nil && parent.Kind == ast.KindCallExpression {
 		return parent.AsCallExpression()
 	}
