@@ -1326,6 +1326,25 @@ foo;`,
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
 			},
 			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`ClassBody[parent.type='ClassDeclaration']`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedSyntax",
+					Line:      1,
+					Column:    9,
+					EndLine:   1,
+					EndColumn: 19,
+				}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`:is(ClassDeclaration, ClassBody)`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
+					{MessageId: "restrictedSyntax"},
+				},
+			},
+			{
 				Code:    `const x = <Foo.Bar baz={value}>{/* hi */}{children}</Foo.Bar>;`,
 				Options: []interface{}{`JSXMemberExpression`},
 				Tsx:     true,
@@ -1361,6 +1380,21 @@ foo;`,
 				Options: []interface{}{`JSXExpressionContainer > JSXEmptyExpression`},
 				Tsx:     true,
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `const x = <div>{/* hi */}</div>;`,
+				Options: []interface{}{`JSXEmptyExpression[parent.type='JSXExpressionContainer']`},
+				Tsx:     true,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `const x = <div>{/* hi */}</div>;`,
+				Options: []interface{}{`:is(JSXExpressionContainer, JSXEmptyExpression)`},
+				Tsx:     true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
+					{MessageId: "restrictedSyntax"},
+				},
 			},
 		},
 	)

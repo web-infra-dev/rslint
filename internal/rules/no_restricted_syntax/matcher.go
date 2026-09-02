@@ -117,43 +117,60 @@ func matches(sel selector, node *ast.Node, mc *matchContext) bool {
 }
 
 func matchesInScope(sel selector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
+	return matchesInScopeTarget(sel, node, mc, scopeRoot, "")
+}
+
+// matchesInScopeTarget evaluates the selector against either the physical
+// tsgo node (target == "physical") or one of the ESTree wrapper nodes that
+// tsgo folds into that node. An empty target retains the historical behavior
+// used when walking ancestors and children.
+func matchesInScopeTarget(sel selector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node, target string) bool {
 	switch v := sel.(type) {
 	case subjectSelector:
-		return matchesInScope(v.Inner, node, mc, scopeRoot)
+		return matchesInScopeTarget(v.Inner, node, mc, scopeRoot, target)
 	case identifierSelector:
+		if target == "physical" {
+			if v.Name == "ClassBody" || v.Name == "JSXEmptyExpression" {
+				return false
+			}
+			return matchesIdentifier(v, node)
+		}
+		if target != "" {
+			return v.Name == "*" || v.Name == target
+		}
 		return matchesIdentifier(v, node)
 	case classSelector:
-		if !matchesInScope(v.Inner, node, mc, scopeRoot) {
+		if !matchesInScopeTarget(v.Inner, node, mc, scopeRoot, target) {
 			return false
 		}
 		return matchesClass(node, v.Path, scopeRoot)
 	case attrSelector:
-		if !matchesInScope(v.Inner, node, mc, scopeRoot) {
+		if !matchesInScopeTarget(v.Inner, node, mc, scopeRoot, target) {
 			return false
 		}
-		if selectorTargetsClassBody(v.Inner) && len(v.Path) == 1 && v.Path[0] == "type" {
-			return compareAttr("ClassBody", v.Op, v.Value)
+		if target != "" && target != "physical" {
+			return matchesVirtualAttr(node, target, v.Path, v.Op, v.Value, mc)
 		}
 		return matchesAttr(node, v.Path, v.Op, v.Value, mc)
 	case combinatorSelector:
-		if !matchesInScope(v.Right, node, mc, scopeRoot) {
+		if !matchesInScopeTarget(v.Right, node, mc, scopeRoot, target) {
 			return false
 		}
-		return matchesCombinator(v, node, mc, scopeRoot)
+		return matchesCombinatorTarget(v, node, mc, scopeRoot, target)
 	case relativeSelector:
 		// Relative selectors are meaningful only as arguments to :has(),
 		// where the node on the left is the :has() subject.
 		return false
 	case pseudoSelector:
-		return matchesPseudo(v, node, mc, scopeRoot)
+		return matchesPseudoTarget(v, node, mc, scopeRoot, target)
 	case combinedPseudo:
-		if !matchesInScope(v.Inner, node, mc, scopeRoot) {
+		if !matchesInScopeTarget(v.Inner, node, mc, scopeRoot, target) {
 			return false
 		}
-		return matchesPseudo(v.Pseudo, node, mc, scopeRoot)
+		return matchesPseudoTarget(v.Pseudo, node, mc, scopeRoot, target)
 	case unionSelector:
 		for _, a := range v.Selectors {
-			if matchesInScope(a, node, mc, scopeRoot) {
+			if matchesInScopeTarget(a, node, mc, scopeRoot, target) {
 				return true
 			}
 		}
@@ -445,6 +462,32 @@ func matchesAttr(node *ast.Node, path []string, op attrOp, value attrValue, mc *
 	return compareAttr(val, op, value)
 }
 
+func matchesVirtualAttr(node *ast.Node, target string, path []string, op attrOp, value attrValue, mc *matchContext) bool {
+	val, ok := lookupVirtualAttrPath(node, target, path, mc)
+	if op == attrPresent {
+		return ok && attrIsPresent(val)
+	}
+	if !ok {
+		val = undefinedAttr{}
+	}
+	return compareAttr(val, op, value)
+}
+
+func lookupVirtualAttrPath(node *ast.Node, target string, path []string, mc *matchContext) (interface{}, bool) {
+	if node == nil || len(path) == 0 {
+		return nil, false
+	}
+	var current interface{} = virtualNodeFacade{node: node, typeName: target}
+	for _, segment := range path {
+		next, ok := stepAttrPath(current, segment, mc)
+		if !ok {
+			return nil, false
+		}
+		current = next
+	}
+	return current, true
+}
+
 func attrIsPresent(value interface{}) bool {
 	if value == nil {
 		return false
@@ -516,9 +559,15 @@ func lookupStringAttrPath(node *ast.Node, path []string, mc *matchContext) (text
 // matchesCombinator handles `>` (parent), descendant, `+` (prev sibling),
 // `~` (any prior sibling). The right-hand side has already been verified
 // against the current node before this function is called.
-func matchesCombinator(c combinatorSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
+func matchesCombinatorTarget(c combinatorSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node, target string) bool {
 	switch c.Kind {
 	case combChild:
+		if target == "ClassBody" && isClassLikeNode(node) && selectorTargetsClassBody(c.Right) {
+			return matchesInScope(c.Left, node, mc, scopeRoot)
+		}
+		if target == "JSXEmptyExpression" && isEmptyJSXExpression(node) && selectorTargetsJSXEmptyExpression(c.Right) {
+			return matchesInScope(c.Left, node, mc, scopeRoot)
+		}
 		if selectorTargetsClassBody(c.Right) && isClassLikeNode(node) && matchesInScope(c.Right, node, mc, scopeRoot) {
 			return matchesInScope(c.Left, node, mc, scopeRoot)
 		}
@@ -650,6 +699,14 @@ func selectorTargetsEstreeType(sel selector, nodeType string) bool {
 		return selectorTargetsEstreeType(value.Inner, nodeType)
 	case combinedPseudo:
 		return selectorTargetsEstreeType(value.Inner, nodeType)
+	case pseudoSelector:
+		if value.Name == "is" || value.Name == "matches" {
+			for _, child := range value.Args {
+				if selectorTargetsEstreeType(child, nodeType) {
+					return true
+				}
+			}
+		}
 	case combinatorSelector:
 		return selectorTargetsEstreeType(value.Right, nodeType)
 	case unionSelector:
@@ -666,18 +723,18 @@ func isEmptyJSXExpression(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindJsxExpression && node.AsJsxExpression().DotDotDotToken == nil && node.AsJsxExpression().Expression == nil
 }
 
-func matchesPseudo(p pseudoSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
+func matchesPseudoTarget(p pseudoSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node, target string) bool {
 	switch p.Name {
 	case "is", "matches":
 		for _, a := range p.Args {
-			if matchesInScope(a, node, mc, scopeRoot) {
+			if matchesInScopeTarget(a, node, mc, scopeRoot, target) {
 				return true
 			}
 		}
 		return false
 	case "not":
 		for _, a := range p.Args {
-			if matchesInScope(a, node, mc, scopeRoot) {
+			if matchesInScopeTarget(a, node, mc, scopeRoot, target) {
 				return false
 			}
 		}
@@ -840,6 +897,26 @@ func stepAttrPath(current interface{}, segment string, mc *matchContext) (interf
 			return "Identifier", true
 		}
 		return nil, false
+	}
+	if vn, ok := current.(virtualNodeFacade); ok {
+		switch segment {
+		case "type":
+			return vn.typeName, true
+		case "parent":
+			switch vn.typeName {
+			case "ClassBody":
+				return vn.node, true
+			case "JSXEmptyExpression":
+				return virtualNodeFacade{node: vn.node, typeName: "JSXExpressionContainer"}, true
+			default:
+				return estreeParent(vn.node), true
+			}
+		case "expression":
+			if vn.typeName == "JSXExpressionContainer" {
+				return unwrapExpression(vn.node.AsJsxExpression().Expression), true
+			}
+		}
+		return readNodeAttr(vn.node, segment, mc)
 	}
 	if fv, ok := current.(functionValueFacade); ok {
 		switch segment {
@@ -2428,6 +2505,14 @@ func readExpressionAttr(node *ast.Node) (interface{}, bool) {
 		return unwrapExpression(node.AsJsxExpression().Expression), true
 	}
 	return nil, false
+}
+
+// virtualNodeFacade models an ESTree wrapper that tsgo folds into node. The
+// underlying node remains available for fields shared with the physical AST,
+// while type and parent preserve the wrapper's identity.
+type virtualNodeFacade struct {
+	node     *ast.Node
+	typeName string
 }
 
 // functionValueFacade models the synthetic FunctionExpression stored at

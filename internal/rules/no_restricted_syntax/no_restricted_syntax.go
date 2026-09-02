@@ -26,8 +26,8 @@ var schemaJSON []byte
 //
 // https://eslint.org/docs/latest/rules/no-restricted-syntax
 var NoRestrictedSyntaxRule = rule.Rule{
-	Name:            "no-restricted-syntax",
-	Schema:          rule.NewSchema(schemaJSON),
+	Name:   "no-restricted-syntax",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		plan := cachedRulePlan(options)
 		if len(plan.buckets) == 0 {
@@ -294,7 +294,7 @@ func supportsSingleDispatch(path []string) bool {
 }
 
 func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
-	if selectorTargetsClassBody(sel) {
+	if selectorTargetsClassBody(sel) || selectorTargetsJSXEmptyExpression(sel) {
 		return attrs
 	}
 	switch value := sel.(type) {
@@ -396,23 +396,27 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
 		compiled = bucket.dispatch.matched[index]
 	}
-	if !matches(compiled, node, mc) {
-		return
-	}
 	message := rule.RuleMessage{
 		Id:          "restrictedSyntax",
 		Description: entry.formatMessage(),
 	}
-	if selectorTargetsClassBody(entry.compiled) && isClassLikeNode(node) {
+
+	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
+	classBodyMatch := isClassLikeNode(node) && selectorTargetsClassBody(compiled) &&
+		matchesInScopeTarget(compiled, node, mc, nil, "ClassBody")
+	jsxEmptyMatch := isEmptyJSXExpression(node) && selectorTargetsJSXEmptyExpression(compiled) &&
+		matchesInScopeTarget(compiled, node, mc, nil, "JSXEmptyExpression")
+
+	if classBodyMatch {
 		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
-		return
 	}
-	if selectorTargetsJSXEmptyExpression(entry.compiled) && isEmptyJSXExpression(node) {
+	if jsxEmptyMatch {
 		nodeRange := utils.TrimNodeTextRange(mc.sf, node)
 		ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
-		return
 	}
-	ctx.ReportNode(node, message)
+	if physicalMatch {
+		ctx.ReportNode(node, message)
+	}
 }
 
 func (e ruleEntry) formatMessage() string {
