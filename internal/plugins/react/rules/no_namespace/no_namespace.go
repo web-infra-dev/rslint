@@ -14,7 +14,7 @@ var NoNamespaceRule = rule.Rule{
 	Name:   "react/no-namespace",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		pragma := reactutil.GetReactPragma(ctx.Settings)
+		pragma := reactutil.GetReactPragmaFromContext(ctx)
 
 		reportIfNamespaced := func(node *ast.Node, name string) {
 			if name == "" || strings.IndexByte(name, ':') == -1 {

@@ -13,6 +13,13 @@ import (
 
 func TestNoNamespaceExtras(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
+		// The file pragma takes precedence over settings for createElement calls.
+		{
+			Code:     `/* @jsx h */ React.createElement("ns:Panel");`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "Preact"}},
+		},
+
 		// ---- Dimension 4: paired JSX opening element ----
 		{Code: `const x = <Outer><Child /></Outer>;`, Tsx: true},
 		// ---- Dimension 4: nested namespace and member-expression siblings ----
@@ -61,6 +68,18 @@ func TestNoNamespaceExtras(t *testing.T) {
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
+		// The file pragma selects the createElement factory used by the rule.
+		{
+			Code:     `/* @jsx h */ h.createElement("ns:Panel");`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "Preact"}},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "noNamespace",
+				Message:   "React component ns:Panel must not be in a namespace, as React does not support them",
+				Line:      1, Column: 14, EndLine: 1, EndColumn: 41,
+			}},
+		},
+
 		// Locks in JSXOpeningElement's namespaced-name arm for a paired element.
 		{
 			Code: `const x = <ns:Panel></ns:Panel>`,
