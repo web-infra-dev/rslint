@@ -26,13 +26,35 @@ func removeDepthArgumentFix(sourceFile *ast.SourceFile, argument *ast.Node) []ru
 
 func shouldSkipFlatReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
 	// For source-only JavaScript, Unicorn leaves CallExpression receivers unknown.
-	// The shared classifier can fold built-in calls such as Number(1), so keep
-	// JavaScript call receivers reportable for this rule.
+	// The exception does not cover safe Object pass-through calls, whose static
+	// result Unicorn still classifies.
 	runtimeReceiver := utils.ESTreeRuntimeExpression(receiver)
-	if runtimeReceiver != nil && ast.IsInJSFile(runtimeReceiver) && ast.IsCallExpression(runtimeReceiver) {
+	if runtimeReceiver != nil && ast.IsInJSFile(runtimeReceiver) && ast.IsCallExpression(runtimeReceiver) &&
+		!isPotentialStaticObjectPassThroughCall(runtimeReceiver) {
 		return false
 	}
 	return unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, receiver)
+}
+
+func isPotentialStaticObjectPassThroughCall(node *ast.Node) bool {
+	oneArgument := 1
+	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
+		ArgumentsLength:     &oneArgument,
+		RejectSpreadElement: true,
+	})
+	if !ok {
+		return false
+	}
+	object := utils.ESTreeRuntimeExpression(call.Object)
+	if object == nil || !ast.IsIdentifier(object) || object.AsIdentifier().Text != "Object" {
+		return false
+	}
+	switch call.Property.AsIdentifier().Text {
+	case "freeze", "preventExtensions", "seal":
+		return true
+	default:
+		return false
+	}
 }
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v74.0.0/docs/rules/no-unnecessary-array-flat-depth.md

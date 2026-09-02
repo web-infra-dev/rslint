@@ -63,6 +63,13 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 			{Code: `(() => {}).flat(1)`, FileName: "file.js"},
 			{Code: `(class {}).flat(1)`, FileName: "file.js"},
 
+			// ---- Regression: safe source-only Object pass-through calls retain
+			// their statically known non-array result and remain skipped. ----
+			{Code: `Object.freeze({}).flat(1)`, FileName: "file.js"},
+			{Code: `Object.seal({}).flat(1)`, FileName: "file.js"},
+			{Code: `Object.preventExtensions({}).flat(1)`, FileName: "file.js"},
+			{Code: `Object.freeze("x").flat(1)`, FileName: "file.js"},
+
 			// ---- Dimension 4: private identifier properties do not match the
 			// identifier-named `.flat` method required by the rule. ----
 			{
@@ -118,6 +125,29 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 			),
 			depthInvalidAt(`Math.abs(-1).flat(1)`, `1`, `Math.abs(-1).flat()`, "file.js", 1),
 			depthInvalid(`Object().flat(1)`, `1`, `Object().flat()`, "file.js"),
+
+			// A pass-through-shaped call only keeps the shared classification when
+			// it matches upstream's exact safe-call contract.
+			depthInvalid(`Object.freeze([]).flat(1)`, `1`, `Object.freeze([]).flat()`, "file.js"),
+			depthInvalidAt(
+				`Object.freeze({}, 1).flat(1)`,
+				`1`,
+				`Object.freeze({}, 1).flat()`,
+				"file.js",
+				1,
+			),
+			depthInvalid(
+				`const Object = {freeze: value => value}; Object.freeze({}).flat(1)`,
+				`1`,
+				`const Object = {freeze: value => value}; Object.freeze({}).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`Object["freeze"]({}).flat(1)`,
+				`1`,
+				`Object["freeze"]({}).flat()`,
+				"file.js",
+			),
 
 			// ---- Dimension 4: single- and multi-level receiver parentheses are
 			// transparent for detection and remain intact after the fix. ----
