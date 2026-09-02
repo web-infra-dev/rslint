@@ -204,6 +204,8 @@ func TestIsValidRegexPatternECMAVersion(t *testing.T) {
 	}{
 		{name: "named capture before introduction", pattern: `(?<a>x)`, ecmaVersion: 2017},
 		{name: "named capture after introduction", pattern: `(?<a>x)`, ecmaVersion: 2018, want: true},
+		{name: "lookbehind before introduction", pattern: `(?<=a)b`, ecmaVersion: 2017},
+		{name: "lookbehind after introduction", pattern: `(?<=a)b`, ecmaVersion: 2018, want: true},
 		{name: "duplicate alternatives before relaxation", pattern: `(?<a>x)|(?<a>y)`, ecmaVersion: 2024},
 		{name: "duplicate alternatives after relaxation", pattern: `(?<a>x)|(?<a>y)`, ecmaVersion: 2025, want: true},
 		{name: "escaped duplicate alternatives before relaxation", pattern: `(?<\u0061>x)|(?<a>y)`, ecmaVersion: 2024},

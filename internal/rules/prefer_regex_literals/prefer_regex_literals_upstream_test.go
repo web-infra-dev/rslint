@@ -269,6 +269,9 @@ func TestPreferRegexLiteralsUpstream(t *testing.T) {
 			{Code: "new RegExp(/[[A--B]]/v, 'u')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags"}}},
 			{Code: "new RegExp('(?i:foo)bar')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/(?i:foo)bar/"}}}}},
 			{Code: "new RegExp('(?i:foo)bar')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('(?<=a)b')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('\\\\p{ASCII}', 'u')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('(?<a>x)|(?<a>y)')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "var regex = new RegExp('foo', 'u');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "var regex = /foo/u;"}}}}},
 		},
 	)
