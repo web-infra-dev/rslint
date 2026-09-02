@@ -37,7 +37,7 @@ var NoNamespaceRule = rule.Rule{
 			ast.KindJsxSelfClosingElement: checkJSX,
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCallWithChecker(call.Expression, pragma, ctx.TypeChecker) {
+				if !reactutil.IsCreateElementCallWithRefs(call.Expression, pragma, ctx.TypeChecker, ctx.Refs) {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {

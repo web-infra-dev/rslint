@@ -44,8 +44,21 @@ func IsCreateElementCallWithChecker(callee *ast.Node, pragma string, tc *checker
 	return isCreateElementCallCore(callee, pragma, tc)
 }
 
+// IsCreateElementCallWithRefs is the source-only-aware variant. The resolver
+// is used only when TypeChecker is nil, so existing TypeChecker behavior stays
+// unchanged while bare imported createElement calls no longer ignore lexical
+// shadowing in source-only runs.
+func IsCreateElementCallWithRefs(
+	callee *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	refs ReferenceResolver,
+) bool {
+	return isPragmaFactoryCallCore(callee, pragma, tc, refs, createElementOnly)
+}
+
 func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isPragmaFactoryCallCore(callee, pragma, tc, createElementOnly)
+	return isPragmaFactoryCallCore(callee, pragma, tc, nil, createElementOnly)
 }
 
 // IsCreateOrCloneElementCall reports whether the callee resolves to
@@ -64,7 +77,7 @@ func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 // skipped — that would over-match relative to ESLint's JS-only AST and
 // is a divergence we deliberately avoid.
 func IsCreateOrCloneElementCall(callee *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isPragmaFactoryCallCore(callee, pragma, tc, createOrCloneElement)
+	return isPragmaFactoryCallCore(callee, pragma, tc, nil, createOrCloneElement)
 }
 
 type pragmaFactoryNames int
@@ -84,7 +97,13 @@ func (k pragmaFactoryNames) matches(name string) bool {
 	return false
 }
 
-func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checker, names pragmaFactoryNames) bool {
+func isPragmaFactoryCallCore(
+	callee *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	refs ReferenceResolver,
+	names pragmaFactoryNames,
+) bool {
 	if callee == nil {
 		return false
 	}
@@ -126,7 +145,7 @@ func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 		if !names.matches(callee.AsIdentifier().Text) {
 			return false
 		}
-		return IsDestructuredFromPragmaImport(callee, pragma, tc)
+		return IsDestructuredFromPragmaImportWithRefs(callee, pragma, tc, refs)
 	}
 
 	// Member-access callee: `<pragma>.<name>(arg)`. Optional-chain access

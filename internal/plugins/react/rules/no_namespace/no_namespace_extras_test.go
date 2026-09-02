@@ -7,9 +7,73 @@ package no_namespace
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/binder"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestNoNamespaceSourceOnlyRespectsShadowing(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		code string
+		want int
+	}{
+		{
+			name: "local createElement shadows imported binding",
+			code: `import { createElement } from "react";
+function f() {
+  const createElement = () => null;
+  createElement("ns:Panel");
+}`,
+			want: 0,
+		},
+		{
+			name: "imported createElement is recognized",
+			code: `import { createElement } from "react";
+createElement("ns:Panel");`,
+			want: 1,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/react.tsx",
+				Path:     tspath.Path("/react.tsx"),
+			}, testCase.code, core.ScriptKindTSX)
+			binder.BindSourceFile(sourceFile)
+			refs := rule.NewRefStore(sourceFile, &core.CompilerOptions{}, nil, rule.RefStoreInit{})
+			comments := rule.NewCommentStore(sourceFile)
+			var diagnostics []rule.RuleDiagnostic
+			ctx := (rule.RuleContext{
+				SourceFile:     sourceFile,
+				Comments:       comments,
+				Refs:           refs,
+				DisableManager: rule.NewDisableManager(sourceFile, comments),
+			}).WithReporter(NoNamespaceRule.Name, rule.SeverityError, func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			})
+
+			listeners := NoNamespaceRule.Run(ctx, nil)
+			var visit func(node *ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if listener := listeners[node.Kind]; listener != nil {
+					listener(node)
+				}
+				node.ForEachChild(visit)
+				return false
+			}
+			sourceFile.Node.ForEachChild(visit)
+
+			if len(diagnostics) != testCase.want {
+				t.Fatalf("got %d diagnostics, want %d: %#v", len(diagnostics), testCase.want, diagnostics)
+			}
+		})
+	}
+}
 
 func TestNoNamespaceExtras(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{

@@ -6,6 +6,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
+// ReferenceResolver is the file-local portion of rule.RefStore needed by
+// import-aware helpers. Keeping this small interface here avoids coupling the
+// React utility package to the rule package while allowing source-only callers
+// to retain lexical-scope resolution without a TypeChecker.
+type ReferenceResolver interface {
+	ResolveInFile(node *ast.Node) *ast.Symbol
+}
+
 // IsDestructuredFromPragmaImport mirrors upstream eslint-plugin-react's
 // `lib/util/isDestructuredFromPragmaImport.js`: reports whether the
 // Identifier `ident` (a bare callee like `memo`) was bound from the
@@ -32,6 +40,20 @@ import (
 // observable wrapper-recognition behavior aligned with upstream in
 // no-tsconfig modes.
 func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.Checker) bool {
+	return IsDestructuredFromPragmaImportWithRefs(ident, pragma, tc, nil)
+}
+
+// IsDestructuredFromPragmaImportWithRefs is the RefStore-aware variant. When
+// no TypeChecker is available, refs resolves bindings through the file's
+// lexical scopes before the legacy source-file scan is considered. This keeps
+// source-only linting from treating a shadowed local binding as an imported
+// React helper.
+func IsDestructuredFromPragmaImportWithRefs(
+	ident *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	refs ReferenceResolver,
+) bool {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -39,6 +61,10 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 		pragma = DefaultReactPragma
 	}
 	pragmaLower := ecmascript.StringToLowerCase(pragma)
+
+	if tc == nil && refs != nil {
+		return isDestructuredFromPragmaSymbol(refs.ResolveInFile(ident), pragma, pragmaLower)
+	}
 
 	if tc == nil {
 		// Syntax-only fallback: walk up to the SourceFile and scan it
@@ -51,6 +77,14 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 	}
 
 	symbol := tc.GetSymbolAtLocation(ident)
+	if symbol == nil {
+		return false
+	}
+
+	return isDestructuredFromPragmaSymbol(symbol, pragma, pragmaLower)
+}
+
+func isDestructuredFromPragmaSymbol(symbol *ast.Symbol, pragma, pragmaLower string) bool {
 	if symbol == nil {
 		return false
 	}
