@@ -52,7 +52,8 @@ type RuleContext struct {
 	// Exported owns the file's `/* exported */` view: the names an inline
 	// directive marks as intentionally global for other files to consume. Rules
 	// should ask it instead of scanning comments themselves, through
-	// IsExportedGlobalBinding where they hold the declaration — see Exported.
+	// IsExportedGlobalBinding where they hold the raw binder symbol — see
+	// Exported.
 	Exported Exported
 	// Comments lazily provides every comment in SourceFile, in source order.
 	// Rules should call Comments.All instead of walking the token tree with

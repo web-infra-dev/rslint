@@ -466,6 +466,8 @@ for (var i in arr2) {
     },
     {
       code: 'var a = 10;',
+      // The adapted ESLint fixture predates flat config and ran as a script.
+      languageOptions: { sourceType: 'script' },
       options: [{ vars: 'local' }],
     },
     {
