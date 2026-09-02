@@ -38,6 +38,12 @@ func TestJsxOneExpressionPerLineExtras(t *testing.T) {
 		// Locks in upstream handleJSX() arm 2: non-jsx returns when no direct JSX child exists.
 		{Code: `<App>text {value}</App>`, Tsx: true, Options: map[string]any{"allow": "non-jsx"}},
 	}, []rule_tester.InvalidTestCase{
+		{Code: `<App><Foo.Bar /></App>`, Tsx: true, Output: []string{"<App>\n<Foo.Bar />\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine", Message: "`Foo.Bar` must be placed on a new line"},
+		}},
+		{Code: `<App><svg:path /></App>`, Tsx: true, Output: []string{"<App>\n<svg:path />\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine", Message: "`svg:path` must be placed on a new line"},
+		}},
 		// Locks in upstream handleJSX() arm 1: empty children return without a report.
 		{Code: `<App><Foo />text</App>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "moveToNewLine", Message: "`Foo` must be placed on a new line", Line: 1, Column: 6, EndLine: 1, EndColumn: 13},

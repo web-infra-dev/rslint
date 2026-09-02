@@ -108,29 +108,6 @@ func reverseRunes(source string) []rune {
 	return runes
 }
 
-func tagDescriptor(tagName *ast.Node) string {
-	if tagName == nil {
-		return ""
-	}
-	switch tagName.Kind {
-	case ast.KindIdentifier:
-		return tagName.AsIdentifier().Text
-	case ast.KindThisKeyword:
-		return "this"
-	case ast.KindPropertyAccessExpression:
-		name := tagName.AsPropertyAccessExpression().Name()
-		if name != nil && name.Kind == ast.KindIdentifier {
-			return name.AsIdentifier().Text
-		}
-	case ast.KindJsxNamespacedName:
-		name := tagName.AsJsxNamespacedName().Name()
-		if name != nil && name.Kind == ast.KindIdentifier {
-			return name.AsIdentifier().Text
-		}
-	}
-	return ""
-}
-
 func childDescriptor(source string, child *ast.Node) string {
 	if child == nil {
 		return ""
@@ -145,7 +122,7 @@ func childDescriptor(source string, child *ast.Node) string {
 	case ast.KindJsxSelfClosingElement:
 		tagName = child.AsJsxSelfClosingElement().TagName
 	}
-	if descriptor := tagDescriptor(tagName); descriptor != "" {
+	if descriptor := reactutil.GetJsxElementTypeString(tagName); descriptor != "" {
 		return descriptor
 	}
 	return strings.ReplaceAll(nodeSource(source, child), "\n", "")
