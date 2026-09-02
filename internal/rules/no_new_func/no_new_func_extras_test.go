@@ -4,67 +4,61 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoNewFuncRule(t *testing.T) {
+func TestNoNewFuncRuleExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
 		t,
 		&NoNewFuncRule,
-		// Valid cases
 		[]rule_tester.ValidTestCase{
-			// --- Not the global Function ---
-			{Code: `var a = new _function("b", "c", "return b+c");`},
-			{Code: `var a = _function("b", "c", "return b+c");`},
-
-			// --- Function as a value reference, not invoked ---
-			{Code: `call(Function)`},
-			{Code: `new Class(Function)`},
+			// Value references and non-matching member shapes are not calls to the constructor.
 			{Code: `var x = [Function]`},
 			{Code: `var x = Function`},
 			{Code: `typeof Function`},
-
-			// --- Non-matching method calls ---
-			{Code: `Function.toString()`},
 			{Code: `Function.hasOwnProperty("call")`},
 			{Code: `Function.prototype`},
-
-			// --- Dynamic/computed property: not statically "call"/"apply"/"bind" ---
-			{Code: `foo[Function]()`},
-			{Code: `Function[call]()`},
-
-			// --- Accessing but not calling .bind/.call/.apply ---
-			{Code: `foo(Function.bind)`},
 			{Code: `var x = Function.call`},
 			{Code: `var x = Function.apply`},
+			{Code: "Function`code`"},
+			{Code: `Reflect.construct(Function, ["code"])`},
+			{Code: `globalThis.Function("code")`},
+			{Code: `new Function.call(null, "code")`},
+			{Code: `Function.call.call(null, null, "code")`},
+			{Code: `Function["ca" + "ll"](null, "code")`},
 
-			// --- Shadowing: class declaration ---
-			{Code: `class Function {}; new Function()`},
-			{Code: `const fn = () => { class Function {}; new Function() }`},
+			// ESTree preserves TypeScript assertions as distinct expressions.
+			{Code: `(Function as any)("code")`},
+			{Code: `(<any>Function)("code")`},
+			{Code: `Function!("code")`},
+			{Code: `(Function satisfies any)("code")`},
+			{Code: `new (Function as any)("code")`},
+			{Code: `(Function as any).call(null, "code")`},
+			{Code: `Function!.call(null, "code")`},
+			{Code: `(Function.call as any)(null, "code")`},
+			{Code: `Function.call!(null, "code")`},
+			{Code: `(Function.call satisfies any)(null, "code")`},
+			{Code: `Function["call" as const](null, "code")`},
+			{Code: `Function[("call" as const)](null, "code")`},
 
-			// --- Shadowing: function declaration ---
-			{Code: `function Function() {}; Function()`},
-			{Code: `var fn = function () { function Function() {}; Function() }`},
+			// Type-only imports do define a scope-manager variable; value namespaces also shadow.
+			{Code: "import type { Function } from \"source\";\nFunction(\"code\")"},
+			{Code: "namespace Function {}\nFunction(\"code\")"},
+			{Code: "declare namespace Function {}\nFunction(\"code\")"},
+			{Code: "enum Function {}\nFunction(\"code\")"},
 
-			// --- Shadowing: function expression name ---
-			{Code: `var x = function Function() { Function(); }`},
-
-			// --- Shadowing: var (hoisted across blocks) ---
-			{Code: `function test() { var Function = function(){}; return new Function(); }`},
+			// Local value bindings shadow the global through every relevant scope.
 			{Code: `function test() { var x = new Function("code"); var Function = function() {}; }`},
 			{Code: `function test() { if (true) { var Function = 42; } new Function(); }`},
 			{Code: `function test() { for (var Function = 0; Function < 1; Function++) {} new Function(); }`},
 			{Code: `function test() { for (var Function in {}) {} new Function(); }`},
 			{Code: `function test() { for (var Function of []) {} new Function(); }`},
 			{Code: `function test() { switch (0) { case 0: var Function = 1; } new Function(); }`},
-
-			// --- Shadowing: let/const ---
 			{Code: `function test() { let Function = class {}; return new Function(); }`},
 			{Code: `function test() { const Function = class {}; return Function(); }`},
-
-			// --- Shadowing: parameter ---
 			{Code: `function test(Function) { return new Function(); }`},
 			{Code: `function test({ Function }) { return new Function(); }`},
 			{Code: `function test([Function]) { return new Function(); }`},
@@ -73,53 +67,54 @@ func TestNoNewFuncRule(t *testing.T) {
 			{Code: `var fn = (Function) => Function();`},
 			{Code: `function* gen(Function) { yield new Function(); }`},
 			{Code: `async function af(Function) { return new Function(); }`},
-
-			// --- Shadowing: catch clause ---
 			{Code: `try {} catch (Function) { new Function(); }`},
-
-			// --- Shadowing: nested scopes ---
 			{Code: `function test() { var Function = class {}; function inner() { return new Function(); } }`},
 			{Code: `function test() { var Function = class {}; var fn = () => new Function(); }`},
-
-			// --- Shadowing: method/constructor parameters ---
 			{Code: `var obj = { m(Function) { return new Function(); } };`},
 			{Code: `class C { m(Function) { return new Function(); } }`},
 			{Code: `class C { constructor(Function) { this.x = new Function(); } }`},
-
-			// --- Shadowing: for-let/of (inside loop body) ---
 			{Code: `function test() { for (let Function in {}) { new Function(); } }`},
 			{Code: `function test() { for (let Function of []) { new Function(); } }`},
-
-			// --- Shadowing applies to .call/.apply/.bind too ---
 			{Code: `function test(Function) { return Function.call(null, "code"); }`},
 			{Code: `function test() { var Function = class {}; Function.apply(null, ["code"]); }`},
+			{Code: `function test(Function = Function("code")) {}`},
 
-			// --- Tagged template (not a call) ---
-			{Code: "Function`code`"},
+			// A class declaration is bound in its outer scope; member decorators see the class scope.
+			{Code: `@dec(Function("code")) class Function {}`},
+			{Code: `class Function { @dec(Function("code")) method() {} }`},
+			{Code: `class Function { method(@dec(Function("code")) value: any) {} }`},
 
-			// --- Config `/* global Function: off */` un-declares the builtin ---
+			// A top-level definition changes the global variable's defs in non-module source goals.
+			{Code: "interface Function {}\nnew Function(\"code\")", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: "type Function = {}\nFunction(\"code\")", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: "interface Function {}\nfunction nested() { Function(\"code\") }", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: "interface Function {}\nnew Function(\"code\")", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}},
+
+			// Removing Function from the effective globals removes the rule's target variable.
 			{Code: `new Function("code");`, Globals: map[string]any{"Function": "off"}},
 		},
-		// Invalid cases
 		[]rule_tester.InvalidTestCase{
-			// === Direct: new Function(...) ===
 			{
-				Code:   `var a = new Function("b", "c", "return b+c");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
+				Code: `new Function()`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noFunctionConstructor",
+					Message:   "The Function constructor is eval.",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 15,
+				}},
 			},
-			// No arguments
 			{
-				Code:   `new Function()`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
+				Code: "Function(\r\n  \"😀\"\r\n)",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noFunctionConstructor",
+					Line:      1,
+					Column:    1,
+					EndLine:   3,
+					EndColumn: 2,
+				}},
 			},
-
-			// === Direct: Function(...) ===
-			{
-				Code:   `var a = Function("b", "c", "return b+c");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
-			},
-
-			// === Parenthesized callee ===
 			{
 				Code:   `(Function)("code")`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
@@ -132,36 +127,13 @@ func TestNoNewFuncRule(t *testing.T) {
 				Code:   `new (Function)("code")`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
-
-			// === Optional call ===
 			{
 				Code:   `Function?.("code")`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
-
-			// === Method: .call / .apply / .bind (dot notation) ===
 			{
-				Code:   `var a = Function.call(null, "b", "c", "return b+c");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
-			},
-			{
-				Code:   `var a = Function.apply(null, ["b", "c", "return b+c"]);`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
-			},
-			{
-				Code:   `var a = Function.bind(null, "b", "c", "return b+c");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
-			},
-			// .bind(...)() — only the inner Function.bind(...) call is reported
-			{
-				Code:   `var a = Function.bind(null, "b", "c", "return b+c")();`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
-			},
-
-			// === Method: bracket notation ===
-			{
-				Code:   `var a = Function["call"](null, "b", "c", "return b+c");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
+				Code:   `Function<string>("code")`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
 			{
 				Code:   `var a = Function["apply"](null, ["b", "c", "return b+c"]);`,
@@ -171,16 +143,9 @@ func TestNoNewFuncRule(t *testing.T) {
 				Code:   `var a = Function["bind"](null, "b", "c", "return b+c");`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
 			},
-			// Template literal bracket notation
 			{
 				Code:   "var a = Function[`call`](null, \"code\")",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 9}},
-			},
-
-			// === Optional chaining on method ===
-			{
-				Code:   `(Function?.call)(null, "b", "c", "return b+c");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
 			{
 				Code:   `Function?.call(null, "code")`,
@@ -194,8 +159,22 @@ func TestNoNewFuncRule(t *testing.T) {
 				Code:   `Function?.bind(null, "code")`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
-
-			// === Parenthesized object in method call ===
+			{
+				Code:   `Function.call?.(null, "code")`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `Function?.["call"](null, "code")`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `Function["call"]?.(null, "code")`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `Function[("call")](null, "code")`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
+			},
 			{
 				Code:   `(Function).call(null, "code")`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
@@ -204,67 +183,10 @@ func TestNoNewFuncRule(t *testing.T) {
 				Code:   `(Function).apply(null, ["code"])`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
-
-			// === TypeScript assertions on callee ===
-			{
-				Code:   `(Function as any)("code")`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
-			},
-			{
-				Code:   `(<any>Function)("code")`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
-			},
-			{
-				Code:   `Function!("code")`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
-			},
-			{
-				Code:   `(Function satisfies any)("code")`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
-			},
-			{
-				Code:   `new (Function as any)("code")`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
-			},
-			// TypeScript assertion on object of method call
-			{
-				Code:   `(Function as any).call(null, "code")`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
-			},
-
-			// === Nested new wrapping a Function call ===
 			{
 				Code:   `new (Function("code"))`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 6}},
 			},
-
-			// === Nesting: inside various constructs ===
-			{
-				Code:   `function f() { return new Function("code"); }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 23}},
-			},
-			{
-				Code:   `var f = () => new Function("code");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 15}},
-			},
-			{
-				Code:   `if (true) { var x = new Function("code"); }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 21}},
-			},
-			{
-				Code:   `class C { m() { return new Function("code"); } }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 24}},
-			},
-			{
-				Code:   `class C { constructor() { this.x = new Function("code"); } }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 36}},
-			},
-			{
-				Code:   `function outer() { function inner() { return new Function("code"); } }`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 46}},
-			},
-
-			// === Multiple errors in one statement ===
 			{
 				Code: `var a = new Function("a"); var b = Function("b");`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -272,8 +194,6 @@ func TestNoNewFuncRule(t *testing.T) {
 					{MessageId: "noFunctionConstructor", Line: 1, Column: 36},
 				},
 			},
-
-			// === Expressions: ternary, logical, comma ===
 			{
 				Code: `var x = true ? new Function("a") : Function("b");`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -282,50 +202,25 @@ func TestNoNewFuncRule(t *testing.T) {
 				},
 			},
 			{
-				Code:   `var x = foo || new Function("code");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 16}},
-			},
-			{
-				Code:   `var x = foo ?? new Function("code");`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 16}},
-			},
-
-			// === Scoping: inner shadow does NOT reach outer ===
-			{
-				Code:   `const fn = () => { class Function {} }; new Function('', '')`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 41}},
-			},
-			{
-				Code:   `var fn = function () { function Function() {} }; Function('', '')`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 50}},
-			},
-			// let in sibling block does not shadow
-			{
 				Code:   `function f() { { let Function = class {}; } var x = new Function("code"); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 53}},
 			},
-			// var in inner function does NOT hoist to outer
 			{
 				Code:   `function f() { var x = new Function("code"); (function() { var Function = 1; })(); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 24}},
 			},
-			// arrow param does not shadow outer scope
 			{
 				Code:   `function f() { var fn = (Function) => Function; var x = new Function("code"); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 57}},
 			},
-			// catch variable does not shadow outside catch block
 			{
 				Code:   `function f() { try {} catch (Function) {} var x = new Function("code"); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 51}},
 			},
-			// for-let does not shadow outside the loop
 			{
 				Code:   `function f() { for (let Function of []) {} var x = new Function("code"); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 52}},
 			},
-
-			// Config declares Function as a writable global — still the builtin.
 			{
 				Code:    `new Function("code");`,
 				Globals: map[string]any{"Function": "readonly"},
@@ -337,7 +232,51 @@ func TestNoNewFuncRule(t *testing.T) {
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 1}},
 			},
 
-			// === Ambient augmentations extend the global, they do not shadow it ===
+			// Type-only declarations in module scope do not define the global variable.
+			{
+				Code:            "interface Function {}\nnew Function(\"code\")",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 2, Column: 1}},
+			},
+			{
+				Code:            "type Function = {}\nFunction(\"code\")",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 2, Column: 1}},
+			},
+
+			// Class names and parameters are not visible while their decorators evaluate.
+			{
+				Code:   `const C = @dec(Function("code")) class Function {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 16}},
+			},
+			{
+				Code:   `class C { m(@dec(Function("code")) Function: any) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 1, Column: 18}},
+			},
+			{
+				Code:   `class C { m(Function: any, @dec(Function("code")) value: any) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor"}},
+			},
+			{
+				Code:   `class C { m<Function>(@dec(Function("code")) value: any) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor"}},
+			},
+			{
+				Code:   `function test(value = Function("code")) { var Function = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor"}},
+			},
+			{
+				Code:            "function test() { interface Function {}\nFunction(\"code\") }",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 2, Column: 1}},
+			},
+			{
+				Code:            "if (true) { interface Function {} }\nFunction(\"code\")",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 2, Column: 1}},
+			},
+
+			// Ambient global augmentations extend, rather than shadow, the builtin.
 			{
 				Code:   "export {};\ndeclare global {\n\tnamespace Function {}\n}\nnew Function(\"code\");",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noFunctionConstructor", Line: 5, Column: 1}},

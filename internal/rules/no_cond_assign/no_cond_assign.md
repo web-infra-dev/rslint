@@ -38,4 +38,4 @@ var branchResult = x ? (y = 1) : z; // assignment is in a branch, not the test
 ## Original Documentation
 
 - [ESLint: no-cond-assign](https://eslint.org/docs/latest/rules/no-cond-assign)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-cond-assign.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-cond-assign.js)

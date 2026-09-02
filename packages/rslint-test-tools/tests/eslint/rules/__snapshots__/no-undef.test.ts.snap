@@ -2176,3 +2176,29 @@ exports[`no-undef > invalid 82`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-undef languageOptions merge > invalid 1`] = `
+{
+  "code": "defaultGlobal; caseGlobal; Promise;",
+  "diagnostics": [
+    {
+      "message": "'Promise' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

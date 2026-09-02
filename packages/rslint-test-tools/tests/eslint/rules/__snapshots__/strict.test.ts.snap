@@ -147,7 +147,7 @@ exports[`strict > invalid 5`] = `
 
 exports[`strict > invalid 6`] = `
 {
-  "code": ""use strict"; foo(); export {};",
+  "code": ""use strict"; foo();",
   "diagnostics": [
     {
       "message": "'use strict' is unnecessary inside of modules.",
@@ -374,7 +374,7 @@ exports[`strict > invalid 12`] = `
 
 exports[`strict > invalid 13`] = `
 {
-  "code": "'use strict'; foo(); export {};",
+  "code": "'use strict'; foo();",
   "diagnostics": [
     {
       "message": "'use strict' is unnecessary inside of modules.",
@@ -1281,6 +1281,111 @@ exports[`strict > invalid 45`] = `
         },
         "start": {
           "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 46`] = `
+{
+  "code": "var foo = function() {  'use strict'; return; }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of modules.",
+      "messageId": "module",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 47`] = `
+{
+  "code": "class C { static { function foo() {
+'use strict'; } } }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of modules.",
+      "messageId": "module",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 48`] = `
+{
+  "code": "module.exports = function identity (value) { return value; }",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 49`] = `
+{
+  "code": "module.exports = function identity (value) { return value; }",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
           "line": 1,
         },
       },

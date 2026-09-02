@@ -4,19 +4,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 // https://eslint.org/docs/latest/rules/no-new-func
-
-// skipTransparent skips parentheses and TS type assertions (as, angle-bracket,
-// non-null !, satisfies) so that e.g. (Function as any)("code") is still caught.
-const skipTransparent = ast.OEKParentheses | ast.OEKAssertions
-
-var callMethods = map[string]bool{
-	"call":  true,
-	"apply": true,
-	"bind":  true,
-}
 
 var msg = rule.RuleMessage{
 	Id:          "noFunctionConstructor",
@@ -27,19 +18,13 @@ var NoNewFuncRule = rule.Rule{
 	Name:   "no-new-func",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// isGlobalFunction checks whether an identifier resolves to the
-		// built-in Function (from lib.d.ts), not a user-declared one.
-		//
-		// Strategy: TypeChecker accurately resolves symbols inside function
-		// scopes, but at the top level TypeScript's declaration merging can
-		// cause GetSymbolAtLocation to return the global symbol even when a
-		// local class/function with the same name exists. So we use both:
-		//   1. TypeChecker (when available) — authoritative for non-top-level
-		//   2. IsShadowed — catches top-level shadowing that TypeChecker misses
+		analysisReady := false
+		globalFunctionHasDefinitions := false
+		var localFunctionReferences map[*ast.Node]struct{}
+
+		// isGlobalFunction checks whether an identifier resolves to ESLint's
+		// declaration-less global Function variable rather than a file binding.
 		isGlobalFunction := func(id *ast.Node) bool {
-			if utils.IsShadowed(id, "Function") {
-				return false
-			}
 			// A config `/* global Function: off */` / `languageOptions.globals`
 			// entry un-declares the builtin, so `Function` no longer resolves
 			// to a known global — ESLint's `globalScope.set.get("Function")`
@@ -47,16 +32,29 @@ var NoNewFuncRule = rule.Rule{
 			if !ctx.Globals.Access("Function").IsDeclared() {
 				return false
 			}
-			if ctx.TypeChecker != nil {
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(id)
-				if symbol == nil {
-					// The effective ESLint globals remain authoritative when the
-					// TypeScript program omits its default libraries (`noLib`).
-					return true
+			if !analysisReady {
+				analysisReady = true
+				manager := scope.Build(ctx.SourceFile, scope.Options{
+					CollectReferences: true,
+					ReferenceNames:    map[string]struct{}{"Function": {}},
+				})
+				globalFunctionHasDefinitions = len(manager.Global.Declarations("Function")) != 0
+				for _, reference := range manager.References {
+					if reference.Resolved() != nil {
+						if localFunctionReferences == nil {
+							localFunctionReferences = make(map[*ast.Node]struct{})
+						}
+						localFunctionReferences[reference.Identifier] = struct{}{}
+					}
 				}
-				return !utils.IsSymbolDeclaredInFile(symbol, ctx.SourceFile)
 			}
-			return true
+			// In a module, authored declarations live in the module scope and do
+			// not add definitions to ESLint's outer global Function variable.
+			if ctx.LanguageOptions.EffectiveSourceType() != "module" && globalFunctionHasDefinitions {
+				return false
+			}
+			_, local := localFunctionReferences[id]
+			return !local
 		}
 
 		check := func(node *ast.Node) {
@@ -71,9 +69,9 @@ var NoNewFuncRule = rule.Rule{
 				return
 			}
 
-			// Unwrap parentheses and TS assertions so that patterns like
-			// (Function)(...), (Function as any)(...), Function!(...) are all caught.
-			unwrapped := ast.SkipOuterExpressions(callee, skipTransparent)
+			// ESTree discards parentheses, but keeps TypeScript assertions as
+			// separate expressions. Only the former are transparent here.
+			unwrapped := ast.SkipParentheses(callee)
 
 			// Case 1: new Function(...), Function(...), (Function)(...)
 			if unwrapped.Kind == ast.KindIdentifier && unwrapped.AsIdentifier().Text == "Function" {
@@ -89,13 +87,17 @@ var NoNewFuncRule = rule.Rule{
 			if node.Kind != ast.KindCallExpression {
 				return
 			}
-
-			propName, ok := utils.AccessExpressionStaticName(unwrapped)
-			if !ok || !callMethods[propName] {
+			if !ast.IsAccessExpression(unwrapped) {
 				return
 			}
 
-			obj := ast.SkipOuterExpressions(utils.AccessExpressionObject(unwrapped), skipTransparent)
+			if !utils.IsSpecificMemberAccess(unwrapped, "Function", "apply") &&
+				!utils.IsSpecificMemberAccess(unwrapped, "Function", "bind") &&
+				!utils.IsSpecificMemberAccess(unwrapped, "Function", "call") {
+				return
+			}
+
+			obj := ast.SkipParentheses(utils.AccessExpressionObject(unwrapped))
 			if obj == nil || obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != "Function" {
 				return
 			}
