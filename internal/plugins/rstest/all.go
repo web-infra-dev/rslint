@@ -19,6 +19,7 @@ import (
 	no_import_node "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_import_node_test"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_rstest_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_exactly_once_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_once"
@@ -62,6 +63,7 @@ func GetAllRules() []rule.Rule {
 		no_import_node.NoImportNodeTestRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
 		no_mocks_import.NoMocksImportRule,
+		no_restricted_rstest_methods.NoRestrictedRstestMethodsRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		prefer_called_exactly_once_with.PreferCalledExactlyOnceWithRule,
 		prefer_called_once.PreferCalledOnceRule,

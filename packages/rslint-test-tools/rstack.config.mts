@@ -626,6 +626,7 @@ define.test({
     './tests/rstest/rules/no-import-node-test.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
+    './tests/rstest/rules/no-restricted-rstest-methods.test.ts',
     './tests/rstest/rules/no-standalone-expect.test.ts',
     './tests/rstest/rules/prefer-called-exactly-once-with.test.ts',
     './tests/rstest/rules/prefer-called-once.test.ts',
