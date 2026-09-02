@@ -169,6 +169,8 @@ import.meta.rstest!.expect(1).toBe(1);
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 			program, sourceFile, err := helper.CreateTestProgram(test.code, test.name+"-edit-demand.ts", "tsconfig.json")
 			if err != nil {
