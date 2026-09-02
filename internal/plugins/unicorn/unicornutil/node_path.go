@@ -5,19 +5,23 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // NodeMatchesPath mirrors unicorn's isNodeMatchesNameOrPath helper. It accepts
 // dotted, non-computed, non-optional paths rooted at an identifier, this,
-// super, or a meta property. ast.IsDottedName is intentionally not used
-// because it also accepts property accesses containing optional-chain links.
+// super, or a meta property. Parentheses and JavaScript JSDoc casts are
+// transparent at every segment; authored TypeScript assertions remain
+// visible. ast.IsDottedName is intentionally not used because it also accepts
+// property accesses containing optional-chain links.
 func NodeMatchesPath(node *ast.Node, path string) bool {
 	parts := strings.Split(ecmascript.StringTrim(path), ".")
-	return nodeMatchesPathParts(ast.SkipParentheses(node), parts)
+	return nodeMatchesPathParts(utils.ESTreeRuntimeExpression(node), parts)
 }
 
 func nodeMatchesPathParts(node *ast.Node, parts []string) bool {
+	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil || len(parts) == 0 {
 		return false
 	}
@@ -57,8 +61,5 @@ func nodeMatchesPathParts(node *ast.Node, parts []string) bool {
 		return false
 	}
 
-	return nodeMatchesPathParts(
-		ast.SkipParentheses(propertyAccess.Expression),
-		parts[:len(parts)-1],
-	)
+	return nodeMatchesPathParts(propertyAccess.Expression, parts[:len(parts)-1])
 }

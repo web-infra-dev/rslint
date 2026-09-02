@@ -14,6 +14,11 @@ import (
 // ReadonlyArray. Typed arrays and keyed collections are non-arrays. Unknown
 // receivers return false so syntactic array rules can still report them.
 func IsKnownNonArray(ctx rule.RuleContext, node *ast.Node) bool {
+	if isSourceOnlyFile(ctx) {
+		return classifySourceOnlyArrayReceiver(
+			ctx, node, arrayTargets, knownNonArrayNames,
+		) == arrayClassNonTarget
+	}
 	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassNonTarget
 }
 

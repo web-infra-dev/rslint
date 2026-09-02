@@ -128,7 +128,11 @@ func findConditionalAncestor(node *ast.Node) *ast.Node {
 		if test, _ := conditionalTest(parent); test == current {
 			return parent
 		}
-		if ast.IsFunctionLikeDeclaration(parent) {
+		// ts-go combines ESTree's MethodDefinition and FunctionExpression into
+		// one node. Its computed name and member decorators remain outside the
+		// function boundary; parameters, types, and the body remain inside it.
+		if ast.IsFunctionLikeDeclaration(parent) &&
+			current != parent.Name() && current.Kind != ast.KindDecorator {
 			return nil
 		}
 		current = parent

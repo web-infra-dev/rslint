@@ -323,6 +323,12 @@ func (s *preferConstState) shouldReport(candidate *candidateInfo) bool {
 	if candidate.symbol == nil {
 		return false
 	}
+	// A global listed by `/* exported */` is shared with separately loaded
+	// files, any of which may reassign it, so upstream declines to judge
+	// whether it could be `const`.
+	if s.ctx.IsExportedGlobalBinding(candidate.symbol, candidate.nameNode.Text()) {
+		return false
+	}
 	info := s.symbols[candidate.symbol]
 	if candidate.hasInitializer {
 		return info.writeCount == 0

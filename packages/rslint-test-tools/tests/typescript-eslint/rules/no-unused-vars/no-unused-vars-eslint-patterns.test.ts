@@ -577,6 +577,8 @@ function foo() {
 }
 foo();
       `,
+      // The adapted ESLint fixture predates flat config and ran as a script.
+      languageOptions: { sourceType: 'script' },
       options: [{ vars: 'local', varsIgnorePattern: '^_' }],
     },
     {

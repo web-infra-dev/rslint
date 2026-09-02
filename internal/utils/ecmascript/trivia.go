@@ -99,6 +99,35 @@ func ContainsLineTerminator(text string, low, high int) bool {
 	return false
 }
 
+// LineTerminatorSequenceAt returns the exact ECMAScript LineTerminatorSequence
+// beginning at byte position pos. CRLF is returned as one sequence; the other
+// possibilities are LF, CR, LS (U+2028), and PS (U+2029). An empty result means
+// pos does not begin a line terminator.
+func LineTerminatorSequenceAt(text string, pos int) string {
+	if pos < 0 || pos >= len(text) {
+		return ""
+	}
+	switch text[pos] {
+	case '\n':
+		return "\n"
+	case '\r':
+		if pos+1 < len(text) && text[pos+1] == '\n' {
+			return "\r\n"
+		}
+		return "\r"
+	case 0xE2:
+		if pos+2 < len(text) && text[pos+1] == 0x80 {
+			switch text[pos+2] {
+			case 0xA8:
+				return "\u2028"
+			case 0xA9:
+				return "\u2029"
+			}
+		}
+	}
+	return ""
+}
+
 // SkipLeadingWhitespace walks forward from `low` through ECMAScript trivia
 // whitespace and line terminators (the union of §12.2 WhiteSpace and §12.3
 // LineTerminator), returning the position of the first non-whitespace byte

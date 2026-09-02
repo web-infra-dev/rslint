@@ -22,62 +22,13 @@ func TestPreferArrayFlatUpstreamConcat(t *testing.T) {
 		`[].concat(array, EXTRA_ARGUMENT)`,
 		`[]?.concat(array)`,
 		`[].concat?.(array)`,
+		`[].concat(maybeArray)`,
+		`[].concat( ((0, maybeArray)) )`,
+		`[].concat( ((maybeArray)) )`,
+		`[].concat( [foo] )`,
+		`[].concat( [[foo]] )`,
+		`function foo(){return[].concat(maybeArray)}`,
 	)
-	for _, testCase := range []struct {
-		code        string
-		target      string
-		replacement string
-		output      string
-	}{
-		{
-			code:        `[].concat(maybeArray)`,
-			target:      `[].concat(maybeArray)`,
-			replacement: `[maybeArray].flat()`,
-		},
-		{
-			code:        `[].concat( ((0, maybeArray)) )`,
-			target:      `[].concat( ((0, maybeArray)) )`,
-			replacement: `[((0, maybeArray))].flat()`,
-		},
-		{
-			code:        `[].concat( ((maybeArray)) )`,
-			target:      `[].concat( ((maybeArray)) )`,
-			replacement: `[((maybeArray))].flat()`,
-		},
-		{
-			code:        `[].concat( [foo] )`,
-			target:      `[].concat( [foo] )`,
-			replacement: `[[foo]].flat()`,
-		},
-		{
-			code:        `[].concat( [[foo]] )`,
-			target:      `[].concat( [[foo]] )`,
-			replacement: `[[[foo]]].flat()`,
-		},
-		{
-			code:        `function foo(){return[].concat(maybeArray)}`,
-			target:      `[].concat(maybeArray)`,
-			replacement: `[maybeArray].flat()`,
-			output:      `function foo(){return [maybeArray].flat()}`,
-		},
-	} {
-		if testCase.output == "" {
-			suite.addFixed(
-				testCase.code,
-				testCase.target,
-				testCase.replacement,
-				`[].concat()`,
-				nil,
-			)
-			continue
-		}
-		suite.addFixedOutput(
-			testCase.code,
-			testCase.output,
-			nil,
-			expectedDiagnostic{target: testCase.target, description: `[].concat()`},
-		)
-	}
 
 	// ---- `[].concat(...array)` ----
 	suite.addValid(nil,
@@ -171,6 +122,11 @@ func TestPreferArrayFlatUpstreamConcat(t *testing.T) {
 		`[].concat.apply?.([], array)`,
 		`[].concat?.apply([], array)`,
 		`[]?.concat.apply([], array)`,
+		`[].concat.call([], maybeArray)`,
+		`[].concat.call([], ((0, maybeArray)))`,
+		`[].concat.call([], ((maybeArray)))`,
+		`[].concat.call([], [foo])`,
+		`[].concat.call([], [[foo]])`,
 	)
 	for _, testCase := range []struct {
 		code        string
@@ -181,11 +137,6 @@ func TestPreferArrayFlatUpstreamConcat(t *testing.T) {
 		{`[].concat.apply([], ((array)))`, `((array)).flat()`},
 		{`[].concat.apply([], [foo])`, `[foo].flat()`},
 		{`[].concat.apply([], [[foo]])`, `[[foo]].flat()`},
-		{`[].concat.call([], maybeArray)`, `[maybeArray].flat()`},
-		{`[].concat.call([], ((0, maybeArray)))`, `[((0, maybeArray))].flat()`},
-		{`[].concat.call([], ((maybeArray)))`, `[((maybeArray))].flat()`},
-		{`[].concat.call([], [foo])`, `[[foo]].flat()`},
-		{`[].concat.call([], [[foo]])`, `[[[foo]]].flat()`},
 		{`[].concat.call([], ...array)`, `array.flat()`},
 		{`[].concat.call([], ...((0, array)))`, `((0, array)).flat()`},
 		{`[].concat.call([], ...((array)))`, `((array)).flat()`},
@@ -231,6 +182,11 @@ func TestPreferArrayFlatUpstreamConcat(t *testing.T) {
 		`Array.prototype?.concat.apply([], array)`,
 		`Array?.prototype.concat.apply([], array)`,
 		`object.Array.prototype.concat.apply([], array)`,
+		`Array.prototype.concat.call([], maybeArray)`,
+		`Array.prototype.concat.call([], ((0, maybeArray)))`,
+		`Array.prototype.concat.call([], ((maybeArray)))`,
+		`Array.prototype.concat.call([], [foo])`,
+		`Array.prototype.concat.call([], [[foo]])`,
 	)
 	for _, testCase := range []struct {
 		code        string
@@ -241,11 +197,6 @@ func TestPreferArrayFlatUpstreamConcat(t *testing.T) {
 		{`Array.prototype.concat.apply([], ((array)))`, `((array)).flat()`},
 		{`Array.prototype.concat.apply([], [foo])`, `[foo].flat()`},
 		{`Array.prototype.concat.apply([], [[foo]])`, `[[foo]].flat()`},
-		{`Array.prototype.concat.call([], maybeArray)`, `[maybeArray].flat()`},
-		{`Array.prototype.concat.call([], ((0, maybeArray)))`, `[((0, maybeArray))].flat()`},
-		{`Array.prototype.concat.call([], ((maybeArray)))`, `[((maybeArray))].flat()`},
-		{`Array.prototype.concat.call([], [foo])`, `[[foo]].flat()`},
-		{`Array.prototype.concat.call([], [[foo]])`, `[[[foo]]].flat()`},
 		{`Array.prototype.concat.call([], ...array)`, `array.flat()`},
 		{`Array.prototype.concat.call([], ...((0, array)))`, `((0, array)).flat()`},
 		{`Array.prototype.concat.call([], ...((array)))`, `((array)).flat()`},
