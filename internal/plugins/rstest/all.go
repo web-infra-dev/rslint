@@ -1,7 +1,9 @@
 package rstest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/consistent_each_for"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/consistent_rstest_namespace"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/consistent_test_filename"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/hoisted_apis_on_top"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/max_expects"
@@ -25,6 +27,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_falsy"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_truthy"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_awaited_expect_poll"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
@@ -39,7 +44,9 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		consistent_each_for.ConsistentEachForRule,
 		consistent_rstest_namespace.ConsistentRstestNamespaceRule,
+		consistent_test_filename.ConsistentTestFilenameRule,
 		expect_expect.ExpectExpectRule,
 		hoisted_apis_on_top.HoistedApisOnTopRule,
 		max_expects.MaxExpectsRule,
@@ -63,6 +70,9 @@ func GetAllRules() []rule.Rule {
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_import_in_mock.PreferImportInMockRule,
+		prefer_strict_boolean_matchers.PreferStrictBooleanMatchersRule,
+		prefer_to_be_falsy.PreferToBeFalsyRule,
+		prefer_to_be_truthy.PreferToBeTruthyRule,
 		prefer_todo.PreferTodoRule,
 		require_awaited_expect_poll.RequireAwaitedExpectPollRule,
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,

@@ -20,8 +20,6 @@ func TestCamelcaseExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// ---- Review regression: import-type qualifiers are not lexical references ----
 			{Code: `type X = typeof import("pkg").value_name;`},
-			// ---- Review regression: JSX namespaced attributes are names, not references ----
-			{Code: `const element = <div attr_name:value_name="x" />`, Tsx: true},
 			// ---- Regression: upstream's MemberExpression target helper excludes updates and loop headers ----
 			{Code: `obj.snake_case++; ++obj.other_case; for (obj.third_case in source); for (obj.fourth_case of source);`},
 			// ---- WRAP-03/WRAP-05: TypeScript wrappers stop member assignment-target classification ----
@@ -137,6 +135,7 @@ func TestCamelcaseExtras(t *testing.T) {
 					{MessageId: "notCamelCase", Line: 1, Column: 33, EndLine: 1, EndColumn: 43},
 				},
 			},
+			// ---- Review regression: var/function merges keep the first declaration anchor ----
 			{
 				Code: `var snake_case; function snake_case() {} snake_case;`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -144,6 +143,7 @@ func TestCamelcaseExtras(t *testing.T) {
 					{MessageId: "notCamelCase", Line: 1, Column: 42, EndLine: 1, EndColumn: 52},
 				},
 			},
+			// ---- Review regression: duplicate parameters report the first binding and its read ----
 			{
 				Code: `function f(snake_case, snake_case) { snake_case; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -291,11 +291,12 @@ func TestCamelcaseExtras(t *testing.T) {
 				Options: map[string]any{"ignoreGlobals": true},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "notCamelCase", Line: 1, Column: 1, EndLine: 1, EndColumn: 17}},
 			},
-			// ---- Locks in property listener default and explicit-empty option equivalence ----
+			// ---- Locks in property listener behavior with default options ----
 			{
 				Code:   `const value = { property_name: 1 }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notCamelCase", Line: 1, Column: 17, EndLine: 1, EndColumn: 30}},
 			},
+			// ---- Locks in property listener equivalence with explicit empty options ----
 			{
 				Code:    `const value = { property_name: 1 }`,
 				Options: map[string]any{},

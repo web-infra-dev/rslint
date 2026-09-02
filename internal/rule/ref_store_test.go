@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -313,28 +314,108 @@ func TestRefStoreResolveExcludedPositions(t *testing.T) {
 	}
 }
 
-func TestRefStoreJsxNamespacedNameExcluded(t *testing.T) {
-	// `bar` in the namespaced JSX tag name `<bar:qux />` is syntactic, not a
-	// reference to a same-named variable.
-	sourceFile, refs := newBoundRefStore(t, "/jsx-namespaced.tsx", core.ScriptKindTSX,
-		"export {}; function f() { var bar = 1; const el = <bar:qux />; return bar; }")
+func TestRefStoreJsxNamespacedTagReferencesFollowTheParser(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileName   string
+		scriptKind core.ScriptKind
+		wantTag    bool
+	}{
+		{name: "TSESTree", fileName: "/jsx-namespaced.tsx", scriptKind: core.ScriptKindTSX, wantTag: true},
+		{name: "Espree", fileName: "/jsx-namespaced.jsx", scriptKind: core.ScriptKindJSX, wantTag: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, test.fileName, test.scriptKind,
+				"export {}; function f() { var bar = 1; const el = <bar:qux />; return bar; }")
 
-	occurrences := identifiers(sourceFile.AsNode(), "bar")
-	if len(occurrences) != 3 {
-		t.Fatalf("expected 3 occurrences of bar, got %d", len(occurrences))
-	}
-	declIdent, tagIdent, useIdent := occurrences[0], occurrences[1], occurrences[2]
-	if tagIdent.Parent == nil || tagIdent.Parent.Kind != ast.KindJsxNamespacedName {
-		t.Fatalf("expected the second `bar` to be the JsxNamespacedName's namespace, got parent kind %v", tagIdent.Parent.Kind)
-	}
-	sym := declIdent.Parent.Symbol()
-	if sym == nil {
-		t.Fatal("declaration identifier has no bound symbol")
-	}
+			occurrences := identifiers(sourceFile.AsNode(), "bar")
+			if len(occurrences) != 3 {
+				t.Fatalf("expected 3 occurrences of bar, got %d", len(occurrences))
+			}
+			declaration, tag, use := occurrences[0], occurrences[1], occurrences[2]
+			if tag.Parent == nil || tag.Parent.Kind != ast.KindJsxNamespacedName {
+				t.Fatalf("expected the second `bar` to be the JsxNamespacedName's namespace, got parent kind %v", tag.Parent.Kind)
+			}
+			symbol := declaration.Parent.Symbol()
+			if symbol == nil {
+				t.Fatal("declaration identifier has no bound symbol")
+			}
 
-	got := refs.References(sym)
-	if len(got) != 1 || got[0] != useIdent {
-		t.Fatalf("References = %v, want [%v] (the namespaced JSX tag's `bar` must be excluded)", got, useIdent)
+			got := refs.References(symbol)
+			want := []*ast.Node{use}
+			if test.wantTag {
+				want = []*ast.Node{tag, use}
+			}
+			if !slices.Equal(got, want) {
+				t.Fatalf("References = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestRefStoreJsxClosingTagReferencesFollowTheParser(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileName   string
+		scriptKind core.ScriptKind
+		wantClose  bool
+	}{
+		{name: "TSESTree", fileName: "/jsx-closing.tsx", scriptKind: core.ScriptKindTSX, wantClose: true},
+		{name: "Espree", fileName: "/jsx-closing.jsx", scriptKind: core.ScriptKindJSX, wantClose: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, test.fileName, test.scriptKind,
+				"export {}; function f() { var Component = 1, ns = 2; const a = <Component></Component>; const b = <ns.Part></ns.Part>; return Component + ns; }")
+
+			for _, name := range []string{"Component", "ns"} {
+				occurrences := identifiers(sourceFile.AsNode(), name)
+				if len(occurrences) != 4 {
+					t.Fatalf("expected 4 occurrences of %s, got %d", name, len(occurrences))
+				}
+				declaration, opening, closing, use := occurrences[0], occurrences[1], occurrences[2], occurrences[3]
+				symbol := declaration.Parent.Symbol()
+				if symbol == nil {
+					t.Fatalf("declaration identifier %s has no bound symbol", name)
+				}
+				want := []*ast.Node{opening, use}
+				if test.wantClose {
+					want = []*ast.Node{opening, closing, use}
+				}
+				if got := refs.References(symbol); !slices.Equal(got, want) {
+					t.Fatalf("References(%s) = %v, want %v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestRefStoreJsxNamespacedAttributeNamesRemainExcluded(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		fileName   string
+		scriptKind core.ScriptKind
+	}{
+		{name: "TSESTree", fileName: "/jsx-attribute.tsx", scriptKind: core.ScriptKindTSX},
+		{name: "Espree", fileName: "/jsx-attribute.jsx", scriptKind: core.ScriptKindJSX},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, refs := newBoundRefStore(t, test.fileName, test.scriptKind,
+				`export {}; function f() { var attr = 1; const el = <Component attr:name="v" />; return attr; }`)
+			occurrences := identifiers(sourceFile.AsNode(), "attr")
+			if len(occurrences) != 3 {
+				t.Fatalf("expected 3 occurrences of attr, got %d", len(occurrences))
+			}
+			declaration, attribute, use := occurrences[0], occurrences[1], occurrences[2]
+			if attribute.Parent == nil || attribute.Parent.Kind != ast.KindJsxNamespacedName {
+				t.Fatalf("expected the second `attr` to be a namespaced attribute, got parent kind %v", attribute.Parent.Kind)
+			}
+			symbol := declaration.Parent.Symbol()
+			if got := refs.References(symbol); len(got) != 1 || got[0] != use {
+				t.Fatalf("References = %v, want [%v]", got, use)
+			}
+		})
 	}
 }
 
