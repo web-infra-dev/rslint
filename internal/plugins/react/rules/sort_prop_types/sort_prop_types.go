@@ -354,11 +354,11 @@ func isBigIntPropNameBefore(current, previous propName) bool {
 		return current.bigInt.Cmp(previous.bigInt) < 0
 	}
 	if current.kind == propNameBigInt && previous.kind == propNameString {
-		value, ok := new(big.Int).SetString(strings.TrimSpace(previous.text), 0)
+		value, ok := new(big.Int).SetString(ecmascript.StringTrim(previous.text), 0)
 		return ok && current.bigInt.Cmp(value) < 0
 	}
 	if previous.kind == propNameBigInt && current.kind == propNameString {
-		value, ok := new(big.Int).SetString(strings.TrimSpace(current.text), 0)
+		value, ok := new(big.Int).SetString(ecmascript.StringTrim(current.text), 0)
 		return ok && value.Cmp(previous.bigInt) < 0
 	}
 	currentNumber, currentOK := propNameNumberValue(current)
