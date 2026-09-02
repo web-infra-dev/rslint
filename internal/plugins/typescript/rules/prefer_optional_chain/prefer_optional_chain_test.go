@@ -667,6 +667,15 @@ func TestPreferOptionalChainRule(t *testing.T) {
 				{MessageId: "preferOptionalChain", Column: 1},
 			},
 		},
+		// Preserve the remainder outside a partially folded parenthesized chain,
+		// including when the logical expression does not begin at source offset 0.
+		{
+			Code:   "declare const a: any, other: any;\na && (a.b && other);",
+			Output: []string{"declare const a: any, other: any;\na?.b && other;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferOptionalChain", Column: 1},
+			},
+		},
 		{
 			Code:   "(a && a.b) && a.b.c",
 			Output: []string{"a?.b?.c"},
@@ -860,6 +869,23 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		{
 			Code:   "foo && foo[`some long string`] && foo[`some long string`].baz;",
 			Output: []string{"foo?.[`some long string`]?.baz;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferOptionalChain"},
+			},
+		},
+		// Different template substitutions can resolve to different keys. Fold
+		// only the prefix whose property expression is actually equal.
+		{
+			Code:   "foo && foo[`key ${left}`] && foo[`key ${right}`].baz;",
+			Output: []string{"foo?.[`key ${left}`] && foo[`key ${right}`].baz;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferOptionalChain"},
+			},
+		},
+		// Numerically equivalent literal spellings address the same property.
+		{
+			Code:   "foo && foo[1] && foo[1.0].baz;",
+			Output: []string{"foo?.[1]?.baz;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "preferOptionalChain"},
 			},
@@ -1423,6 +1449,19 @@ func TestPreferOptionalChainRule(t *testing.T) {
 			Output: []string{"foo?.[bar as string]?.baz;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
+		// Equivalent string literal spellings address the same property and should
+		// not split an otherwise valid chain.
+		{
+			Code:   `foo && foo['bar'] && foo["bar"].baz;`,
+			Output: []string{`foo?.['bar']?.baz;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+		},
+		// Keep the source spelling of a property introduced by an earlier operand.
+		{
+			Code:   `foo && foo.\u0062ar && foo.bar.baz;`,
+			Output: []string{`foo?.\u0062ar?.baz;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+		},
 		// Mismatched arguments break chain
 		{
 			Code:   "foo && foo.bar(a) && foo.bar(a, b).baz;",
@@ -1433,6 +1472,13 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		{
 			Code:   "foo && foo.bar(/* comment */a,\n  // comment2\n  b);",
 			Output: []string{"foo?.bar(/* comment */a,\n  // comment2\n  b);"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+		},
+		// Comments and formatting come from the first operand that introduces a
+		// call, even when a later operand repeats the call without that trivia.
+		{
+			Code:   "foo && foo.bar && foo.bar(\n  /* keep ?. ... */ a,\n) && foo.bar(a).baz;",
+			Output: []string{"foo?.bar?.(\n  /* keep ?. ... */ a,\n)?.baz;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
 		// foo && foo.bar != null && baz (trailing unrelated)
@@ -1453,6 +1499,13 @@ func TestPreferOptionalChainRule(t *testing.T) {
 			Output: []string{"!foo!.bar?.baz;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
+		// Making an earlier link optional does not make a called value non-null, so
+		// preserve the assertion that keeps the call type-correct.
+		{
+			Code:   "foo && foo.bar!() && foo.bar!().baz;",
+			Output: []string{"foo?.bar!()?.baz;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+		},
 		// Type parameters: matching
 		{
 			Code:   "foo && foo<string>() && foo<string>().bar;",
@@ -1469,6 +1522,12 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		{
 			Code:   "foo && foo<T>() && foo<T>().bar;",
 			Output: []string{"foo?.<T>()?.bar;"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+		},
+		// Preserve the complete spelling of the first matching type argument list.
+		{
+			Code:   "foo && foo< /* keep */ T >() && foo<T>().bar;",
+			Output: []string{"foo?.< /* keep */ T >()?.bar;"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
 		},
 
