@@ -24,6 +24,17 @@ func removeDepthArgumentFix(sourceFile *ast.SourceFile, argument *ast.Node) []ru
 	return []rule.RuleFix{rule.RuleFixRemoveRange(removalRange)}
 }
 
+func shouldSkipFlatReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
+	// For source-only JavaScript, Unicorn leaves CallExpression receivers unknown.
+	// The shared classifier can fold built-in calls such as Number(1), so keep
+	// JavaScript call receivers reportable for this rule.
+	runtimeReceiver := utils.ESTreeRuntimeExpression(receiver)
+	if runtimeReceiver != nil && ast.IsInJSFile(runtimeReceiver) && ast.IsCallExpression(runtimeReceiver) {
+		return false
+	}
+	return unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, receiver)
+}
+
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v74.0.0/docs/rules/no-unnecessary-array-flat-depth.md
 var NoUnnecessaryArrayFlatDepthRule = rule.Rule{
 	Name:   "unicorn/no-unnecessary-array-flat-depth",
@@ -44,13 +55,13 @@ var NoUnnecessaryArrayFlatDepthRule = rule.Rule{
 				}
 
 				rawArgument := call.Call.Arguments()[0]
-				depth := ast.SkipParentheses(rawArgument)
+				depth := utils.ESTreeRuntimeExpression(rawArgument)
 				if depth == nil || depth.Kind != ast.KindNumericLiteral ||
 					utils.NormalizeNumericLiteral(depth.AsNumericLiteral().Text) != "1" {
 					return
 				}
 
-				if unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, call.Object) {
+				if shouldSkipFlatReceiver(ctx, call.Object) {
 					return
 				}
 

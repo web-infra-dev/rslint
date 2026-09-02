@@ -54,6 +54,12 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 				Code:     `class Collection { flat(depth: number) {} } function f(value: Collection) { value.flat(1) }`,
 				FileName: "file.ts",
 			},
+			{
+				// The source-only call exception does not apply to a TypeScript receiver
+				// whose return type is a keyed collection.
+				Code:     `function getCollection(): Map<string, string> { return new Map() } getCollection().flat(1)`,
+				FileName: "file.ts",
+			},
 			{Code: `(() => {}).flat(1)`, FileName: "file.js"},
 			{Code: `(class {}).flat(1)`, FileName: "file.js"},
 
@@ -83,6 +89,36 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 			// and option combinations do not apply. ----
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Regression: JavaScript JSDoc casts are wrappers in
+			// tsgo but invisible to ESTree, so the inner literal still reports. ----
+			depthInvalid(
+				`array.flat(/** @type {number} */ (1))`,
+				`1`,
+				`array.flat(/** @type {number} */ )`,
+				"file.js",
+			),
+			depthInvalid(
+				`array.flat(/** @satisfies {number} */ (1))`,
+				`1`,
+				`array.flat(/** @satisfies {number} */ )`,
+				"file.js",
+			),
+
+			// ---- Regression: source-only CallExpression receivers
+			// remain unknown upstream even when rslint can fold their values. ----
+			depthInvalidAt(`Number(1).flat(1)`, `1`, `Number(1).flat()`, "file.js", 1),
+			depthInvalid(`String("x").flat(1)`, `1`, `String("x").flat()`, "file.js"),
+			depthInvalid(`Boolean(0).flat(1)`, `1`, `Boolean(0).flat()`, "file.js"),
+			depthInvalidAt(
+				`parseInt("1", 10).flat(1)`,
+				`1`,
+				`parseInt("1", 10).flat()`,
+				"file.js",
+				2,
+			),
+			depthInvalidAt(`Math.abs(-1).flat(1)`, `1`, `Math.abs(-1).flat()`, "file.js", 1),
+			depthInvalid(`Object().flat(1)`, `1`, `Object().flat()`, "file.js"),
+
 			// ---- Dimension 4: single- and multi-level receiver parentheses are
 			// transparent for detection and remain intact after the fix. ----
 			depthInvalid(`(array).flat(1)`, `1`, `(array).flat()`, "file.js"),

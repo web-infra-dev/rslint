@@ -48,11 +48,15 @@ func expectedDepthError(code, target string, occurrence int) rule_tester.Invalid
 }
 
 func depthInvalid(code, target, output, fileName string) rule_tester.InvalidTestCase {
+	return depthInvalidAt(code, target, output, fileName, 0)
+}
+
+func depthInvalidAt(code, target, output, fileName string, occurrence int) rule_tester.InvalidTestCase {
 	return rule_tester.InvalidTestCase{
 		Code:     code,
 		FileName: fileName,
 		Output:   []string{output},
-		Errors:   []rule_tester.InvalidTestCaseError{expectedDepthError(code, target, 0)},
+		Errors:   []rule_tester.InvalidTestCaseError{expectedDepthError(code, target, occurrence)},
 	}
 }
 
