@@ -50,6 +50,12 @@ interface ResultPanelProps {
     kind?: number,
     fileName?: string,
   ) => Promise<GetAstInfoResponse | null>;
+  /**
+   * Write any pending URL update before the current one is read, so that the
+   * copied link carries the editors' current contents rather than whatever the
+   * debounce last wrote.
+   */
+  onBeforeShare?: () => void;
   /** Highlight a range in the editor (on hover) */
   onHighlightRange?: (pos: number, end: number) => void;
   /** Clear the highlight decoration */
@@ -87,6 +93,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
     onFetchAstInfoForLazy,
     onHighlightRange,
     onClearHighlight,
+    onBeforeShare,
   } = props;
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window === 'undefined') return 'lint';
@@ -395,6 +402,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
   const [shareCopied, setShareCopied] = useState(false);
   async function copyShareUrl() {
     try {
+      onBeforeShare?.();
       const url = window.location.href;
       await copyToClipboard(url);
       setShareCopied(true);

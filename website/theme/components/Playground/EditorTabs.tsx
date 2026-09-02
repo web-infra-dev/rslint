@@ -59,6 +59,11 @@ export interface EditorTabsRef {
   highlightRange: (start: number, end: number) => void;
   /** Clear the temporary highlight decoration */
   clearHighlight: () => void;
+  /**
+   * Write the pending URL update now instead of when its debounce expires, so
+   * that a reader who edits and immediately shares copies what is on screen.
+   */
+  flushShareUrl: () => void;
 }
 
 interface EditorTabsProps {
@@ -132,22 +137,27 @@ export const EditorTabs = ({
     onConfigChangeRef.current = onConfigChange;
   }, [onChange, onSelectionChange, onConfigChange]);
 
-  function scheduleSerializeToUrl() {
-    if (typeof window === 'undefined') return;
+  function serializeToUrl() {
+    writeShareState({
+      code: codeEditorRef.current?.getValue() ?? initialState.code,
+      rslintConfig:
+        rslintEditorRef.current?.getValue() ?? initialState.rslintConfig,
+      tsconfig: tsconfigEditorRef.current?.getValue() ?? initialState.tsconfig,
+      wasmVersion: wasmVersionRef.current,
+    });
+  }
+
+  function cancelPendingSerialize() {
     if (urlUpdateTimer.current) {
       window.clearTimeout(urlUpdateTimer.current);
       urlUpdateTimer.current = null;
     }
-    urlUpdateTimer.current = window.setTimeout(() => {
-      writeShareState({
-        code: codeEditorRef.current?.getValue() ?? initialState.code,
-        rslintConfig:
-          rslintEditorRef.current?.getValue() ?? initialState.rslintConfig,
-        tsconfig:
-          tsconfigEditorRef.current?.getValue() ?? initialState.tsconfig,
-        wasmVersion: wasmVersionRef.current,
-      });
-    }, 300);
+  }
+
+  function scheduleSerializeToUrl() {
+    if (typeof window === 'undefined') return;
+    cancelPendingSerialize();
+    urlUpdateTimer.current = window.setTimeout(serializeToUrl, 300);
   }
 
   useEffect(() => {
@@ -161,6 +171,11 @@ export const EditorTabs = ({
   }, []);
 
   useImperativeHandle(ref, () => ({
+    flushShareUrl: () => {
+      if (typeof window === 'undefined') return;
+      cancelPendingSerialize();
+      serializeToUrl();
+    },
     getValue: () => codeEditorRef.current?.getValue(),
     getCodeValue: () => codeEditorRef.current?.getValue(),
     getRslintConfig: async (wasmVersion) => {

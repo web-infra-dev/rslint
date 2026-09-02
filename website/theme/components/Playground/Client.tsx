@@ -404,6 +404,7 @@ const Playground: React.FC = () => {
         }
         right={
           <ResultPanel
+            onBeforeShare={() => editorRef.current?.flushShareUrl()}
             initialized={initialized}
             diagnostics={diagnostics}
             ast={ast}
