@@ -228,6 +228,7 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			Options: objNever,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unexpectedObjectTypeAssertion",
+				Message:   "Use a type annotation or the `satisfies` operator instead of a type assertion for object literals.",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "replaceObjectTypeAssertionWithAnnotation", Output: `const x: Foo = {};`},
 					{MessageId: "replaceObjectTypeAssertionWithSatisfies", Output: `const x = {} satisfies Foo;`},
@@ -336,8 +337,22 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			Options: objNever,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unexpectedObjectTypeAssertion",
+				Message:   "Use the `satisfies` operator instead of a type assertion for object literals.",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "replaceObjectTypeAssertionWithSatisfies", Output: `const f = (): Foo => ({ bar: 5 }) satisfies Foo;`},
+				},
+			}},
+		},
+		// An existing annotation prevents an annotation suggestion, even though
+		// the assertion is directly inside a variable declaration.
+		{
+			Code:    `const x: Foo = {} as Foo;`,
+			Options: objNever,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unexpectedObjectTypeAssertion",
+				Message:   "Use the `satisfies` operator instead of a type assertion for object literals.",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "replaceObjectTypeAssertionWithSatisfies", Output: `const x: Foo = {} satisfies Foo;`},
 				},
 			}},
 		},
@@ -393,6 +408,7 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			Options: arrNever,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unexpectedArrayTypeAssertion",
+				Message:   "Use a type annotation or the `satisfies` operator instead of a type assertion for array literals.",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "replaceArrayTypeAssertionWithAnnotation", Output: `const x: Foo = [];`},
 					{MessageId: "replaceArrayTypeAssertionWithSatisfies", Output: `const x = [] satisfies Foo;`},
@@ -420,6 +436,17 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "replaceArrayTypeAssertionWithAnnotation", Output: `const x: any | string[] = [5];`},
 					{MessageId: "replaceArrayTypeAssertionWithSatisfies", Output: `const x = [5] satisfies any | string[];`},
+				},
+			}},
+		},
+		{
+			Code:    `const f = (): Foo => [] as Foo;`,
+			Options: arrNever,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unexpectedArrayTypeAssertion",
+				Message:   "Use the `satisfies` operator instead of a type assertion for array literals.",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "replaceArrayTypeAssertionWithSatisfies", Output: `const f = (): Foo => [] satisfies Foo;`},
 				},
 			}},
 		},
