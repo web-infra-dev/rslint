@@ -2,6 +2,8 @@ package sort_prop_types
 
 import (
 	_ "embed"
+	"math"
+	"math/big"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -25,10 +27,20 @@ type options struct {
 }
 
 type propName struct {
-	text     string
-	number   float64
-	isNumber bool
+	text   string
+	number float64
+	bigInt *big.Int
+	kind   propNameKind
 }
+
+type propNameKind uint8
+
+const (
+	propNameString propNameKind = iota
+	propNameNumber
+	propNameBigInt
+	propNameBoolean
+)
 
 func parseOptions(input []any) options {
 	if len(input) == 0 {
@@ -123,14 +135,11 @@ var SortPropTypesRule = rule.Rule{
 						continue
 					}
 				}
-				left, right := previousName.text, name.text
+				outOfOrder := isPropNameBefore(name, previousName)
 				if opts.ignoreCase {
-					left = ecmascript.StringToLowerCase(left)
-					right = ecmascript.StringToLowerCase(right)
-				}
-				outOfOrder := ecmascript.CompareStrings(right, left) < 0
-				if !opts.ignoreCase {
-					outOfOrder = isPropNameBefore(name, previousName)
+					left := ecmascript.StringToLowerCase(propNameToString(previousName))
+					right := ecmascript.StringToLowerCase(propNameToString(name))
+					outOfOrder = ecmascript.CompareStrings(right, left) < 0
 				}
 				if !opts.noSortAlphabetically && outOfOrder {
 					if !propsNotSortedSeen[current] {
@@ -159,7 +168,7 @@ var SortPropTypesRule = rule.Rule{
 			case ast.KindIdentifier:
 				// The upstream rule resolves an identifier initialized with an
 				// object. The binder lookup avoids a whole-file text scan here.
-				if decl := declarationObject(ctx.Refs.Resolve(value)); decl != nil {
+				if decl := declarationObject(ctx.SourceFile, ctx.Refs.Resolve(value)); decl != nil {
 					checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes)
 				}
 			case ast.KindCallExpression:
@@ -192,6 +201,9 @@ var SortPropTypesRule = rule.Rule{
 			},
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				property := node.AsPropertyDeclaration()
+				if hasModifier(property.Modifiers(), ast.KindAccessorKeyword) {
+					return
+				}
 				if property.Type != nil && isAuthoredPropertyName(property.Name(), "props") {
 					checkValue(property.Initializer)
 					return
@@ -202,6 +214,9 @@ var SortPropTypesRule = rule.Rule{
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
+				if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+					return
+				}
 				// ESTree omits parentheses but keeps TypeScript expression
 				// wrappers around the member, so only skip parentheses here.
 				left := ast.SkipParentheses(binary.Left)
@@ -211,8 +226,7 @@ var SortPropTypesRule = rule.Rule{
 				isPropTypes := false
 				switch left.Kind {
 				case ast.KindPropertyAccessExpression:
-					name := left.AsPropertyAccessExpression().Name()
-					isPropTypes = name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "propTypes"
+					isPropTypes = isPropertyAccessNamed(left, "propTypes")
 				case ast.KindElementAccessExpression:
 					argument := ast.SkipParentheses(left.AsElementAccessExpression().ArgumentExpression)
 					isPropTypes = argument != nil && argument.Kind == ast.KindIdentifier && argument.AsIdentifier().Text == "propTypes"
@@ -234,7 +248,7 @@ var SortPropTypesRule = rule.Rule{
 				case ast.KindObjectLiteralExpression:
 					checkSorted(firstArg.AsObjectLiteralExpression().Properties.Nodes)
 				case ast.KindIdentifier:
-					if decl := declarationObject(ctx.Refs.Resolve(firstArg)); decl != nil {
+					if decl := declarationObject(ctx.SourceFile, ctx.Refs.Resolve(firstArg)); decl != nil {
 						checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes)
 					}
 				}
@@ -263,55 +277,126 @@ var SortPropTypesRule = rule.Rule{
 }
 
 func declarationName(sourceFile *ast.SourceFile, node *ast.Node) (propName, bool) {
-	if node == nil {
+	if node == nil || node.Name() == nil {
 		return propName{}, false
 	}
-	name := node.Name()
-	if name == nil {
-		return propName{}, false
-	}
-	if numeric := numericPropertyName(name); numeric != nil {
-		text := utils.TrimmedNodeText(sourceFile, numeric)
-		if value, ok := ecmascript.StringToNumber(utils.NormalizeNumericLiteral(numeric.AsNumericLiteral().Text)); ok && value != 0 {
-			return propName{text: utils.NormalizeNumericLiteral(numeric.AsNumericLiteral().Text), number: value, isNumber: true}, true
-		}
-		return propName{text: text}, true
-	}
-	if value, ok := utils.GetStaticPropertyName(name); ok {
-		return propName{text: value}, true
-	}
-	if name.Kind == ast.KindComputedPropertyName {
-		return propName{text: utils.TrimmedNodeText(sourceFile, name.AsComputedPropertyName().Expression)}, true
-	}
-	return propName{text: utils.TrimmedNodeText(sourceFile, name)}, true
+	return propNameFromNode(sourceFile, node.Name()), true
 }
 
-func numericPropertyName(name *ast.Node) *ast.Node {
-	if name.Kind == ast.KindNumericLiteral {
-		return name
+func propNameFromNode(sourceFile *ast.SourceFile, node *ast.Node) propName {
+	if node == nil {
+		return propName{}
 	}
-	if name.Kind == ast.KindComputedPropertyName {
-		expression := ast.SkipParentheses(name.AsComputedPropertyName().Expression)
-		if expression != nil && expression.Kind == ast.KindNumericLiteral {
-			return expression
+	if node.Kind == ast.KindComputedPropertyName {
+		return propNameFromNode(sourceFile, ast.SkipParentheses(node.AsComputedPropertyName().Expression))
+	}
+	sourceText := utils.TrimmedNodeText(sourceFile, node)
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindPrivateIdentifier:
+		return propName{text: sourceText, kind: propNameString}
+	case ast.KindStringLiteral:
+		value := node.AsStringLiteral().Text
+		if value != "" {
+			return propName{text: value, kind: propNameString}
 		}
+		return propName{text: sourceText, kind: propNameString}
+	case ast.KindNumericLiteral:
+		valueText, ok := utils.GetStaticPropertyName(node)
+		if ok {
+			if value, valueOK := ecmascript.StringToNumber(valueText); valueOK && value != 0 {
+				return propName{number: value, kind: propNameNumber}
+			}
+		}
+		return propName{text: sourceText, kind: propNameString}
+	case ast.KindBigIntLiteral:
+		value := new(big.Int)
+		if normalized := utils.NormalizeBigIntLiteral(node.AsBigIntLiteral().Text); normalized != "" {
+			if _, ok := value.SetString(normalized, 10); ok && value.Sign() != 0 {
+				return propName{bigInt: value, kind: propNameBigInt}
+			}
+		}
+		return propName{text: sourceText, kind: propNameString}
+	case ast.KindTrueKeyword:
+		return propName{number: 1, kind: propNameBoolean}
+	default:
+		return propName{text: sourceText, kind: propNameString}
 	}
-	return nil
+}
+
+func propNameToString(name propName) string {
+	switch name.kind {
+	case propNameNumber:
+		return ecmascript.NumberToString(name.number)
+	case propNameBigInt:
+		if name.bigInt != nil {
+			return name.bigInt.String()
+		}
+	case propNameBoolean:
+		return "true"
+	}
+	return name.text
 }
 
 func isPropNameBefore(current, previous propName) bool {
-	if current.isNumber && previous.isNumber {
-		return current.number < previous.number
+	if current.kind == propNameBigInt || previous.kind == propNameBigInt {
+		return isBigIntPropNameBefore(current, previous)
 	}
-	if current.isNumber {
-		previousNumber, ok := ecmascript.StringToNumber(previous.text)
-		return ok && current.number < previousNumber
+	if current.kind == propNameString && previous.kind == propNameString {
+		return ecmascript.CompareStrings(current.text, previous.text) < 0
 	}
-	if previous.isNumber {
-		currentNumber, ok := ecmascript.StringToNumber(current.text)
-		return ok && currentNumber < previous.number
+	currentNumber, currentOK := propNameNumberValue(current)
+	previousNumber, previousOK := propNameNumberValue(previous)
+	return currentOK && previousOK && currentNumber < previousNumber
+}
+
+func isBigIntPropNameBefore(current, previous propName) bool {
+	if current.kind == propNameBigInt && previous.kind == propNameBigInt {
+		return current.bigInt.Cmp(previous.bigInt) < 0
 	}
-	return ecmascript.CompareStrings(current.text, previous.text) < 0
+	if current.kind == propNameBigInt && previous.kind == propNameString {
+		value, ok := new(big.Int).SetString(strings.TrimSpace(previous.text), 0)
+		return ok && current.bigInt.Cmp(value) < 0
+	}
+	if previous.kind == propNameBigInt && current.kind == propNameString {
+		value, ok := new(big.Int).SetString(strings.TrimSpace(current.text), 0)
+		return ok && value.Cmp(previous.bigInt) < 0
+	}
+	currentNumber, currentOK := propNameNumberValue(current)
+	previousNumber, previousOK := propNameNumberValue(previous)
+	if current.kind == propNameBigInt && previousOK {
+		return compareBigIntAndNumber(current.bigInt, previousNumber) < 0
+	}
+	if previous.kind == propNameBigInt && currentOK {
+		return compareBigIntAndNumber(previous.bigInt, currentNumber) > 0
+	}
+	return false
+}
+
+func propNameNumberValue(name propName) (float64, bool) {
+	switch name.kind {
+	case propNameNumber, propNameBoolean:
+		return name.number, true
+	case propNameString:
+		return ecmascript.StringToNumber(name.text)
+	default:
+		return 0, false
+	}
+}
+
+func compareBigIntAndNumber(value *big.Int, number float64) int {
+	if value == nil {
+		return 0
+	}
+	if number != number {
+		return 0
+	}
+	if math.IsInf(number, 1) {
+		return -1
+	}
+	if math.IsInf(number, -1) {
+		return 1
+	}
+	return new(big.Rat).SetInt(value).Cmp(new(big.Rat).SetFloat64(number))
 }
 
 // firstParamType mirrors upstream's direct ESTree `param.typeAnnotation`
@@ -334,10 +419,18 @@ func isRequired(node *ast.Node) bool {
 		return false
 	}
 	value := ast.SkipParentheses(node.AsPropertyAssignment().Initializer)
-	return value != nil && value.Kind == ast.KindPropertyAccessExpression &&
-		value.AsPropertyAccessExpression().Name() != nil &&
-		value.AsPropertyAccessExpression().Name().Kind == ast.KindIdentifier &&
-		value.AsPropertyAccessExpression().Name().AsIdentifier().Text == "isRequired"
+	if value == nil || ast.IsOptionalChain(value) {
+		return false
+	}
+	switch value.Kind {
+	case ast.KindPropertyAccessExpression:
+		return identifierOrPrivateName(value.AsPropertyAccessExpression().Name()) == "isRequired"
+	case ast.KindElementAccessExpression:
+		argument := ast.SkipParentheses(value.AsElementAccessExpression().ArgumentExpression)
+		return argument != nil && argument.Kind == ast.KindIdentifier && argument.AsIdentifier().Text == "isRequired"
+	default:
+		return false
+	}
 }
 
 func isCallback(name string) bool {
@@ -345,36 +438,63 @@ func isCallback(name string) bool {
 }
 
 func isShapeCall(callee *ast.Node) bool {
-	if callee == nil {
+	if callee == nil || ast.IsOptionalChain(callee) {
 		return false
 	}
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	switch callee.Kind {
+	case ast.KindPropertyAccessExpression:
+		return identifierOrPrivateName(callee.AsPropertyAccessExpression().Name()) == "shape"
+	case ast.KindElementAccessExpression:
+		argument := ast.SkipParentheses(callee.AsElementAccessExpression().ArgumentExpression)
+		return argument != nil && argument.Kind == ast.KindIdentifier && argument.AsIdentifier().Text == "shape"
+	default:
 		return false
 	}
-	name := callee.AsPropertyAccessExpression().Name()
-	return name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "shape"
 }
 
 func isAuthoredPropertyName(name *ast.Node, expected string) bool {
 	if name == nil {
 		return false
 	}
-	if name.Kind == ast.KindIdentifier {
-		return name.AsIdentifier().Text == expected
+	if identifierOrPrivateName(name) == expected {
+		return true
 	}
 	if name.Kind == ast.KindComputedPropertyName {
 		expression := ast.SkipParentheses(name.AsComputedPropertyName().Expression)
-		return expression != nil && expression.Kind == ast.KindIdentifier && expression.AsIdentifier().Text == expected
+		return identifierOrPrivateName(expression) == expected
+	}
+	return false
+}
+
+func identifierOrPrivateName(node *ast.Node) string {
+	return reactutil.IdentifierOrPrivateName(node)
+}
+
+func isPropertyAccessNamed(node *ast.Node, expected string) bool {
+	if node == nil || node.Kind != ast.KindPropertyAccessExpression || ast.IsOptionalChain(node) {
+		return false
+	}
+	return identifierOrPrivateName(node.AsPropertyAccessExpression().Name()) == expected
+}
+
+func hasModifier(modifiers *ast.ModifierList, kind ast.Kind) bool {
+	if modifiers == nil {
+		return false
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier != nil && modifier.Kind == kind {
+			return true
+		}
 	}
 	return false
 }
 
 func isPropWrapperCallByCalleeName(call *ast.Node, wrappers []reactutil.PropWrapperEntry) bool {
-	if call == nil || call.Kind != ast.KindCallExpression {
+	if call == nil || call.Kind != ast.KindCallExpression || ast.IsOptionalChain(call) {
 		return false
 	}
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
-	if callee == nil || callee.Kind != ast.KindIdentifier {
+	if callee == nil || callee.Kind != ast.KindIdentifier || ast.IsOptionalChain(callee) {
 		return false
 	}
 	name := callee.AsIdentifier().Text
@@ -390,6 +510,9 @@ func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func(
 	if typeNode == nil {
 		return
 	}
+	for typeNode.Kind == ast.KindParenthesizedType {
+		typeNode = typeNode.AsParenthesizedTypeNode().Type
+	}
 	switch typeNode.Kind {
 	case ast.KindTypeLiteral:
 		check(typeNode.AsTypeLiteralNode().Members.Nodes)
@@ -403,12 +526,15 @@ func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func(
 	}
 }
 
-func declarationObject(symbol *ast.Symbol) *ast.Node {
-	if symbol == nil || symbol.ValueDeclaration == nil {
+func declarationObject(sourceFile *ast.SourceFile, symbol *ast.Symbol) *ast.Node {
+	if sourceFile == nil || symbol == nil || symbol.ValueDeclaration == nil {
 		return nil
 	}
 	decl := symbol.ValueDeclaration
-	if decl.Kind != ast.KindVariableDeclaration {
+	for decl != nil && decl.Kind != ast.KindVariableDeclaration {
+		decl = decl.Parent
+	}
+	if decl == nil || ast.GetSourceFileOfNode(decl) != sourceFile {
 		return nil
 	}
 	value := ast.SkipParentheses(decl.AsVariableDeclaration().Initializer)

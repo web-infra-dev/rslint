@@ -4,10 +4,20 @@
 package sort_prop_types
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestSortPropTypesExtras(t *testing.T) {
@@ -49,6 +59,16 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `PropTypes.shape(forbidExtraProps({ z: PropTypes.string, a: PropTypes.string }));`, Options: map[string]any{"sortShapeProp": true}, Settings: map[string]interface{}{"propWrapperFunctions": []any{"forbidExtraProps"}}, Tsx: true},
 		// JavaScript relational string ordering compares UTF-16 code units.
 		{Code: `Component.propTypes = { "\u{10000}": PropTypes.string, "\uE000": PropTypes.string };`, Tsx: true},
+		// Optional wrapper calls remain opaque to the upstream direct-callee lookup.
+		{Code: `Component.propTypes = wrap?.({ z: PropTypes.string, a: PropTypes.string });`, Settings: map[string]interface{}{"propWrapperFunctions": []any{"wrap"}}, Tsx: true},
+		// Auto-accessor fields are not included in the upstream class-property listener.
+		{Code: `class C { static accessor propTypes = { z: PropTypes.string, a: PropTypes.string }; }`, Tsx: true},
+		// A comma expression is not an assignment target in the upstream listener.
+		{Code: `Component.propTypes, ({ z: PropTypes.string, a: PropTypes.string });`, Tsx: true},
+		// An empty string key falls back to its authored source text upstream.
+		{Code: `C.propTypes = { 1: PropTypes.string, "": PropTypes.string };`, Tsx: true},
+		// Optional required access is opaque, while the computed identifier is visible.
+		{Code: `Component.propTypes = { a: PropTypes.string, b: PropTypes?.isRequired };`, Options: map[string]any{"requiredFirst": true}, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// Locks in upstream callbackPropsLastSeen: report a misplaced callback only once.
 		{Code: `Component.propTypes = { onChange: PropTypes.func, a: PropTypes.string, b: PropTypes.string };`, Options: map[string]any{"callbacksLast": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "callbackPropsLast", Line: 1, Column: 25}}},
@@ -84,5 +104,59 @@ func TestSortPropTypesExtras(t *testing.T) {
 		// Assignment detection does not cross TypeScript expression wrappers on the member.
 		{Code: `(Component.propTypes as any) = { z: PropTypes.string, a: PropTypes.string };`, Tsx: true},
 		{Code: `(Component.propTypes!) = { z: PropTypes.string, a: PropTypes.string };`, Tsx: true},
+		// Private names are exposed by ESTree without the leading '#'.
+		{Code: `class C { static #propTypes = { z: PropTypes.string, a: PropTypes.string }; method() { this.#propTypes = { z: PropTypes.string, a: PropTypes.string }; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}, {MessageId: "propsNotSorted"}}},
+		// Computed shape names use the ESTree member's identifier name.
+		{Code: `Component.propTypes = { x: PropTypes[shape]({ z: PropTypes.string, a: PropTypes.string }) };`, Options: map[string]any{"sortShapeProp": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// JavaScript relational comparison preserves non-string key values.
+		{Code: `C.propTypes = { 2: PropTypes.string, [true]: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		{Code: "C.propTypes = { 10n: PropTypes.string, 2n: PropTypes.string };", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		{Code: "C.propTypes = { a: PropTypes.string, [`z`]: PropTypes.string };", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Computed required access is visible to the upstream property-name lookup.
+		{Code: `Component.propTypes = { a: PropTypes.string, b: PropTypes[isRequired] };`, Options: map[string]any{"requiredFirst": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requiredPropsFirst"}}},
+		// Parenthesized type annotations are transparent in typescript-eslint.
+		{Code: `function Component(props: ({ z: string; a: string })) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Destructured bindings resolve through their containing variable declaration.
+		{Code: `const { props } = { z: PropTypes.string, a: PropTypes.string }; Component.propTypes = props;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
 	})
+}
+
+func TestSortPropTypesDoesNotResolveObjectsAcrossFiles(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	declarationFile := tspath.NormalizePath(filepath.Join(dir, "global.ts"))
+	usageFile := tspath.NormalizePath(filepath.Join(dir, "cross-file.ts"))
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{
+		declarationFile: `const sharedProps = { z: PropTypes.string, a: PropTypes.string };`,
+		usageFile:       `C.propTypes = sharedProps;`,
+	})
+	host := utils.CreateCompilerHost(dir, fs)
+	program, err := utils.CreateProgramFromOptions(true, &core.CompilerOptions{
+		Target: core.ScriptTargetESNext,
+	}, []string{declarationFile, usageFile}, host)
+	if err != nil {
+		t.Fatalf("create typed program: %v", err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program:     lintprogram.NewFromCompiler(program),
+		File:        usageFile,
+		HasTypeInfo: true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     SortPropTypesRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return SortPropTypesRule.Run(ctx, nil)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		}},
+	})
+
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
+	}
 }
