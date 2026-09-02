@@ -42,8 +42,8 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 	}
 
 	// ---- `options.functions` ----
-	options := map[string]interface{}{
-		"functions": []interface{}{
+	options := map[string]any{
+		"functions": []any{
 			"flat",
 			"utils.flat",
 			"globalThis.lodash.flatten",
@@ -143,8 +143,8 @@ func TestPreferArrayFlatUpstreamFunctions(t *testing.T) {
 	)
 
 	// ---- Whitespace in `options.functions` ----
-	spacesInFunctions := []interface{}{map[string]interface{}{
-		"functions": []interface{}{
+	spacesInFunctions := []any{map[string]any{
+		"functions": []any{
 			"",
 			" ",
 			" flat1 ",

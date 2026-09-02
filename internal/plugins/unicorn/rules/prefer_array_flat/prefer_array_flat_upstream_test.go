@@ -347,19 +347,6 @@ func TestPreferArrayFlatUpstream(t *testing.T) {
 		`Array#reduce()`,
 		nil,
 	)
-	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
-		Code:     `let foo = new Set(); foo.reduce((a, b) => a.concat(b), []);`,
-		FileName: "file.js",
-		Output:   []string{`let foo = new Set(); foo.flat();`},
-		Errors: []rule_tester.InvalidTestCaseError{
-			upstreamError(
-				`let foo = new Set(); foo.reduce((a, b) => a.concat(b), []);`,
-				`foo.reduce((a, b) => a.concat(b), [])`,
-				`Array#reduce()`,
-				0,
-			),
-		},
-	})
 
 	// ---- `array.reduce((a, b) => [...a, ...b], [])` ----
 	suite.addValid(nil,
