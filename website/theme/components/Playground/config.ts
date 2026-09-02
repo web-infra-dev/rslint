@@ -38,11 +38,13 @@ const SANDBOX_POLICY = [
 ].join('; ');
 
 /**
- * Long enough for a cold `esm.sh` fetch of the core package, short enough that
- * a config which never finishes stops mattering. A spinning frame cannot block
- * this document, so the deadline is about reporting rather than rescue.
+ * Generous, because the first evaluation of a session waits on `esm.sh` to
+ * serve the core package — measured at 2.4s on a fast connection, and a reader
+ * on a slow one should not be told their config failed. Nothing is lost by
+ * waiting: a spinning frame cannot block this document, and a config that never
+ * finishes never finishes at five seconds either.
  */
-const EVALUATION_TIMEOUT_MS = 5000;
+const EVALUATION_TIMEOUT_MS = 20000;
 
 /**
  * Receives the config source, imports it as a module and hands back the default
