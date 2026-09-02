@@ -211,9 +211,7 @@ func TestPropTypesRuleUpstream(t *testing.T) {
 			{Code: "\n        import React, { memo, forwardRef } from 'react';\n        const Label = memo(forwardRef(({ text }, ref) => {\n          return <div ref={ref}>{text}</div>;\n        }));\n        Label.propTypes = {\n          text: PropTypes.string\n        };\n      ", Tsx: true},
 			{Code: "\n        import Foo, { memo, forwardRef } from 'foo';\n        const Label = memo(forwardRef(({ text }, ref) => {\n          return <div ref={ref}>{text}</div>;\n        }));\n        Label.propTypes = {\n          text: PropTypes.string\n        };\n      ", Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "Foo"}}, Tsx: true},
 			{Code: "\n        const Foo = ({ length, ordering }) => (\n          length > 0 && (\n            <Paginator items={ordering} pageSize={10} />\n          )\n        );\n        Foo.propTypes = {\n          length: PropTypes.number,\n          ordering: PropTypes.array\n        };\n      ", Tsx: true},
-			{Code: `function noAComponent(props) {
-      return <div>{props.text}</div>;
-    }`, Tsx: true},
+			{Code: "\n        function noAComponent(props) {\n          return <div>{props.text}</div>;\n        }\n      ", Tsx: true},
 			{Code: "\n      export default function() {}\n      ", Tsx: true},
 			{Code: "\n        function Component(props) {\n          return 0,\n          <div>\n            Hello, { props.name }!\n          </div>\n        }\n\n        Component.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", Tsx: true},
 			{Code: "\n      const SideMenu = styled(\n        ({ componentId }) => (\n          <S.Container>\n            <S.Head />\n            <UserInfo />\n            <Separator />\n            <MenuList componentId={componentId} />\n          </S.Container>\n        ),\n      );\n      SideMenu.propTypes = {\n        componentId: PropTypes.string.isRequired\n      }\n      ", Settings: map[string]interface{}{"componentWrapperFunctions": []interface{}{map[string]interface{}{"property": "styled"}}}, Tsx: true},
