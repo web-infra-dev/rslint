@@ -54,6 +54,9 @@ const EVALUATION_TIMEOUT_MS = 20000;
  * The result is serialized here because that is what the lint service does with
  * it anyway: anything that cannot survive JSON would not have reached the
  * linter under the old in-page evaluation either.
+ *
+ * The closing tag is written as `\u002F` so that the literal characters never
+ * appear in a bundle that something might one day inline into a page.
  */
 const SANDBOX_MARKUP = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${SANDBOX_POLICY}"><script type="module">
 const post = (message) => parent.postMessage(message, '*');
@@ -71,7 +74,7 @@ addEventListener('message', async (event) => {
   }
 });
 post({ ready: true });
-<\/script>`;
+<\u002Fscript>`;
 
 interface SandboxMessage {
   ready?: boolean;
@@ -107,9 +110,8 @@ function runInSandbox(source: string): Promise<string> {
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.display = 'none';
 
-    let timer: number | undefined;
     function settle(action: () => void) {
-      if (timer !== undefined) window.clearTimeout(timer);
+      window.clearTimeout(timer);
       window.removeEventListener('message', onMessage);
       iframe.remove();
       action();
@@ -136,7 +138,9 @@ function runInSandbox(source: string): Promise<string> {
     }
 
     window.addEventListener('message', onMessage);
-    timer = window.setTimeout(() => {
+    // Assigned before the frame is attached, so nothing can settle before it
+    // exists even though `settle` closes over it.
+    const timer = window.setTimeout(() => {
       settle(() =>
         reject(
           new Error(
