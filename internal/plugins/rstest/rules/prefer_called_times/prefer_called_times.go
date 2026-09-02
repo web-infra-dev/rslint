@@ -5,7 +5,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -49,10 +48,14 @@ var PreferCalledTimesRule = rule.Rule{
 						return nil
 					}
 
-					argumentStart, ok := argumentListStart(ctx.SourceFile, matcherCall)
+					argumentsRange, ok := rstestUtils.MatcherArgumentListRange(ctx.SourceFile, matcherCall)
 					if !ok {
 						return nil
 					}
+					// The count is inserted at the start of the argument list
+					// rather than written over it, so a comment the author put
+					// between the parentheses stays where it is.
+					argumentStart := argumentsRange.Pos()
 
 					return []rule.RuleFix{
 						rule.RuleFixReplaceRange(nameRange, nameText),
@@ -89,7 +92,7 @@ func calledOnceMatcherEntry(
 		return rstestUtils.ParsedRstestFnMemberEntry{}, nil, false
 	}
 
-	call := matcherCall(parsed.MatcherEntry)
+	call := rstestUtils.MatcherCall(parsed.MatcherEntry)
 	if call == nil {
 		return rstestUtils.ParsedRstestFnMemberEntry{}, nil, false
 	}
@@ -101,70 +104,4 @@ func calledOnceMatcherEntry(
 	}
 
 	return *parsed.MatcherEntry, call, true
-}
-
-// matcherCall returns the call expression that directly invokes entry's
-// accessor.
-//
-// MemberEntry.Call cannot be used for this. GetMemberEntries marks the last
-// entry of a callee chain as invoked, so each enclosing call overwrites the
-// field: for `expect(fn).toHaveBeenCalledOnce()()` the matcher entry ends up
-// carrying the outer call, whose parentheses hold no matcher argument list at
-// all. Inserting the count there produces
-// `expect(fn).toHaveBeenCalledTimes()(1)`, which asserts something else
-// entirely. Walking up from the accessor instead always lands on the call the
-// matcher name is the callee of, and stops at it. Parentheses around the
-// callee are transparent, matching how the chain was parsed in the first
-// place.
-func matcherCall(entry *rstestUtils.ParsedRstestFnMemberEntry) *ast.Node {
-	_, accessor := testFramework.AccessorReceiverAndParent(entry)
-	if accessor == nil {
-		return nil
-	}
-
-	child := accessor
-	parent := accessor.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		child = parent
-		parent = parent.Parent
-	}
-	if parent == nil ||
-		parent.Kind != ast.KindCallExpression ||
-		parent.AsCallExpression().Expression != child {
-		return nil
-	}
-	return parent
-}
-
-// argumentListStart returns the offset just after the matcher call's opening
-// parenthesis, which is where the `1` argument is inserted.
-//
-// Upstream computes this as `matcher.range[1] + 1`, which assumes the `(`
-// immediately follows the matcher name. That holds for `x.toBeCalledOnce()`
-// only: `x['toBeCalledOnce']()`, `x.toBeCalledOnce /* c */ ()` and a call split
-// across lines all put other characters in between. The parenthesis is scanned
-// for instead, starting after the callee so that the parentheses of the
-// receiver — `expect(fn)` — are never mistaken for the matcher's own.
-func argumentListStart(sourceFile *ast.SourceFile, call *ast.Node) (int, bool) {
-	callee := call.AsCallExpression().Expression
-	if callee == nil {
-		return 0, false
-	}
-
-	start := callee.End()
-	// A type argument list may hold parentheses of its own, as in
-	// `toHaveBeenCalledOnce<(a: string) => void>()`.
-	if typeArguments := call.AsCallExpression().TypeArguments; typeArguments != nil {
-		start = max(start, typeArguments.End())
-	}
-
-	for _, token := range utils.TokensOfNode(sourceFile, call) {
-		if token.Start < start {
-			continue
-		}
-		if token.Kind == ast.KindOpenParenToken {
-			return token.End, true
-		}
-	}
-	return 0, false
 }
