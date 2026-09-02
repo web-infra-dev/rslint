@@ -10,6 +10,8 @@ export interface ValidTestCase {
   name?: string;
   code: string;
   options?: any;
+  features?: string[];
+  parserOptions?: Record<string, any>;
   filename?: string | undefined;
   only?: boolean;
   settings?: Record<string, any> | undefined;

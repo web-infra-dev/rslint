@@ -212,6 +212,7 @@ define.test({
     './tests/eslint-plugin-react/rules/jsx-no-target-blank.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-undef.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-useless-fragment.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-one-expression-per-line.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
