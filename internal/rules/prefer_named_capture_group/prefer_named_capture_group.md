@@ -9,8 +9,9 @@ retrieve (`match.groups.name` instead of a numbered index that shifts if the
 pattern changes).
 
 This rule checks regex literals as well as string patterns passed to the
-`RegExp` constructor (including through `globalThis`/`window`/`self`/`global`)
-when the pattern is statically determinable.
+`RegExp` constructor, including stable local aliases initialized from
+`RegExp` or `globalThis`/`window`/`self`/`global`, when the pattern is
+statically determinable.
 
 Examples of **incorrect** code for this rule:
 
@@ -39,9 +40,18 @@ This rule has no configurable options.
 
 ## Differences from ESLint
 
-- rslint doesn't follow a local alias assigned from the global `RegExp`
-  constructor — `const R = RegExp; new R("(a)")` is not reported, while
-  ESLint reports it.
+- ESLint reports some indirect constructor calls that rslint currently skips.
+  This includes aliases created by destructuring, a parameter default, or a
+  separate assignment, as well as an alias assigned again anywhere in the
+  file.
+- If a single call can resolve to the global `RegExp` through more than 128
+  logical or conditional branches, rslint reports at most 128 warnings for
+  each unnamed capture group.
+- A pattern that uses a Unicode property added after rslint's bundled Unicode
+  version may be accepted by the target runtime but not reported by this rule.
+- Suggested edits can differ from ESLint: rslint omits an edit that would make
+  the pattern invalid and may choose a different temporary group name to avoid
+  reusing one already present in the pattern.
 
 ## When Not To Use It
 
