@@ -218,6 +218,11 @@ type Options struct {
 	// Rules that only inspect declarations leave it off so the extra
 	// identifier walk and resolution pass are skipped.
 	CollectReferences bool
+	// ReferenceNames limits collected references to these exact binding names.
+	// A nil map collects every name. Scope construction and declaration
+	// collection remain complete, so filtering cannot change how retained
+	// references resolve.
+	ReferenceNames map[string]struct{}
 }
 
 // Manager owns a built scope tree.
@@ -237,7 +242,11 @@ type Manager struct {
 // Build analyzes `sf` and returns its scope tree.
 func Build(sf *ast.SourceFile, opts Options) *Manager {
 	m := &Manager{SourceFile: sf}
-	b := &builder{manager: m, collectReferences: opts.CollectReferences}
+	b := &builder{
+		manager:           m,
+		collectReferences: opts.CollectReferences,
+		referenceNames:    opts.ReferenceNames,
+	}
 	m.Global = b.buildProgram(sf)
 	if opts.CollectReferences {
 		m.resolveReferences()

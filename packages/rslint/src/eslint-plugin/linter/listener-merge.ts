@@ -73,6 +73,114 @@ export interface TaggedListenerMap {
 }
 
 /**
+ * Esquery selector AST node — the minimal shape used by the cached analyses.
+ * The canonical matcher receives the complete object returned by
+ * `esquery.parse`; this interface intentionally describes only the fields
+ * rslint itself reads.
+ */
+interface EsqSelector {
+  type: string;
+  value?: string;
+  name?: string;
+  selectors?: EsqSelector[];
+  left?: EsqSelector;
+  right?: EsqSelector;
+}
+
+/** File-independent result of compiling one non-bare raw selector string. */
+interface CompiledSelectorMetadata {
+  readonly kind: 'compiled';
+  /** Canonical `esquery.parse` result, deeply frozen before publication. */
+  readonly selector: EsqSelector;
+  readonly attributeCount: number;
+  readonly identifierCount: number;
+  /** Conservative node-type anchors; `null` means the wildcard bucket. */
+  readonly anchorTypes: readonly string[] | null;
+}
+
+/** A parse failure caches only its stable message; attribution stays per merge. */
+interface InvalidSelectorMetadata {
+  readonly kind: 'invalid';
+  readonly message: string;
+}
+
+type SelectorCompilation = CompiledSelectorMetadata | InvalidSelectorMetadata;
+
+// This module is evaluated independently inside every worker_threads isolate,
+// so module ownership gives the cache exactly the worker lifetime: worker
+// replacement or plugin-host reload drops the whole map naturally. Map
+// insertion order implements bounded FIFO; cache hits deliberately do not
+// promote entries.
+const SELECTOR_COMPILATION_CACHE_MAX = 2048;
+const selectorCompilationCache = new Map<string, SelectorCompilation>();
+
+/**
+ * Lookup/compile one non-bare selector. The key is the exact raw selector text
+ * after the listener-direction suffix has been removed; no normalization makes
+ * semantically similar spellings share metadata accidentally.
+ */
+function getSelectorCompilation(raw: string): SelectorCompilation {
+  const cached = selectorCompilationCache.get(raw);
+  if (cached !== undefined) return cached;
+
+  const compilation = compileSelector(raw);
+  if (selectorCompilationCache.size >= SELECTOR_COMPILATION_CACHE_MAX) {
+    const oldest = selectorCompilationCache.keys().next();
+    if (!oldest.done) selectorCompilationCache.delete(oldest.value);
+  }
+  selectorCompilationCache.set(raw, compilation);
+  return compilation;
+}
+
+/** Pure, file/rule/context-independent selector compilation. */
+function compileSelector(raw: string): SelectorCompilation {
+  let selector: EsqSelector;
+  try {
+    selector = esquery().parse(raw) as EsqSelector;
+  } catch (err) {
+    // Keep only the stable text. The current file/rule attribution is attached
+    // below every time this cached failure participates in a listener merge.
+    return Object.freeze({
+      kind: 'invalid',
+      message: (err as Error).message,
+    });
+  }
+
+  // Keep analysis outside the parse catch: only canonical esquery parse
+  // failures are invalid selectors. An internal analysis bug must retain the
+  // existing behavior of propagating rather than being mislabeled as plugin
+  // input.
+  const { attributeCount, identifierCount } = analyzeSpecificity(selector);
+  const anchors = extractAnchorTypes(selector);
+  const anchorTypes = anchors == null ? null : Object.freeze([...anchors]);
+
+  // Parsed selector trees can contain arrays and RegExp instances. Freeze the
+  // complete tree before sharing it across files so the cache cannot acquire
+  // matcher or caller state (notably RegExp.lastIndex).
+  deepFreezeSelectorValue(selector);
+  return Object.freeze({
+    kind: 'compiled',
+    selector,
+    attributeCount,
+    identifierCount,
+    anchorTypes,
+  });
+}
+
+function deepFreezeSelectorValue(value: unknown): void {
+  if (value == null || typeof value !== 'object' || Object.isFrozen(value)) {
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  // Freeze first so this remains safe if a future parser result contains a
+  // cycle. The current esquery AST is acyclic.
+  Object.freeze(value);
+  for (const child of Object.values(record)) {
+    deepFreezeSelectorValue(child);
+  }
+}
+
+/**
  * A compiled esquery-style entry, keyed by listeners + raw text. Pre-
  * computed specificity lets the bucketed dispatch table sort once at
  * merge time instead of per visit — same fields ESLint v10's
@@ -94,6 +202,8 @@ interface EsqEntry {
   attributeCount: number;
   /** Number of `identifier` selectors (a literal node-type name) in the parsed AST. */
   identifierCount: number;
+  /** Cached conservative anchors for non-bare selectors. */
+  anchorTypes: readonly string[] | null;
   /** True for bare-type selectors — skip `esquery.matches` and fire directly. */
   isSimple: boolean;
 }
@@ -220,14 +330,13 @@ export function mergeListeners(
           raw: cleanSelector,
           attributeCount: 0,
           identifierCount: 1,
+          anchorTypes: null,
           listeners: [...tagged],
           isSimple: true,
         };
       } else {
-        let compiled: EsqSelector;
-        try {
-          compiled = esquery().parse(cleanSelector) as EsqSelector;
-        } catch (err) {
+        const compilation = getSelectorCompilation(cleanSelector);
+        if (compilation.kind === 'invalid') {
           // #3: a buggy plugin rule's invalid esquery selector must not
           // throw out of `mergeListeners` → `lintFile` (whose contract is
           // to never throw; per-rule failures surface via `ruleErrors`).
@@ -238,18 +347,17 @@ export function mergeListeners(
             merged.selectorErrors.push({
               ruleName: tl.ruleName,
               selector: cleanSelector,
-              message: (err as Error).message,
+              message: compilation.message,
             });
           }
           continue;
         }
-        const { attributeCount, identifierCount } =
-          analyzeSpecificity(compiled);
         entry = {
-          selector: compiled,
+          selector: compilation.selector,
           raw: cleanSelector,
-          attributeCount,
-          identifierCount,
+          attributeCount: compilation.attributeCount,
+          identifierCount: compilation.identifierCount,
+          anchorTypes: compilation.anchorTypes,
           listeners: [...tagged],
           isSimple: false,
         };
@@ -284,22 +392,6 @@ function isSimpleSelector(s: string): boolean {
   // Reject empty, non-letter starting char, or anything containing
   // characters esquery would interpret (e.g. spaces, brackets, > +).
   return /^[A-Z][a-zA-Z]*$/.test(s);
-}
-
-/**
- * Esquery selector AST node — minimal shape we need for type analysis.
- * Mirrors what `esquery.parse` returns. `value` is the identifier name
- * for `type: 'identifier'`; `selectors` is the child set for `not` /
- * `matches` / `compound`; `left` / `right` are the operands for binary
- * combinators (`child` / `descendant` / `sibling` / `adjacent`).
- */
-interface EsqSelector {
-  type: string;
-  value?: string;
-  name?: string;
-  selectors?: EsqSelector[];
-  left?: EsqSelector;
-  right?: EsqSelector;
 }
 
 /**
@@ -418,9 +510,7 @@ function bucketByAnchor(entries: EsqEntry[]): {
   for (const entry of entries) {
     // Bare-type entry: anchor is the raw type name directly. Bypass
     // `extractAnchorTypes` since selector is null.
-    const anchors = entry.isSimple
-      ? [entry.raw]
-      : extractAnchorTypes(entry.selector as EsqSelector);
+    const anchors = entry.isSimple ? [entry.raw] : entry.anchorTypes;
     if (anchors == null) {
       wildcard.push(entry);
       continue;

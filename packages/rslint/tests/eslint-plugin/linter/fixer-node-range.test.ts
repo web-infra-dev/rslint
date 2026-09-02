@@ -18,7 +18,7 @@
  * normally — for the runtime path it still ends in the rule-error
  * channel, but the message is now actionable.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { makeFixer } from '../../../src/eslint-plugin/linter/fixer.js';
 

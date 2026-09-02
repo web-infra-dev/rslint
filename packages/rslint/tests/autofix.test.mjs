@@ -1,5 +1,5 @@
 import { Rslint } from '@rslint/core';
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';

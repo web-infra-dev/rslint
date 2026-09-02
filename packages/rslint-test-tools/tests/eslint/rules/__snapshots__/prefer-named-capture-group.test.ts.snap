@@ -1,0 +1,806 @@
+// Rstest Snapshot v1
+
+exports[`prefer-named-capture-group > invalid 1`] = `
+{
+  "code": "/([0-9]{4})/",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 2`] = `
+{
+  "code": "new RegExp('([0-9]{4})')",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 3`] = `
+{
+  "code": "RegExp('([0-9]{4})')",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 4`] = `
+{
+  "code": "new RegExp(\`a(bc)d\`)",
+  "diagnostics": [
+    {
+      "message": "Capture group '(bc)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 5`] = `
+{
+  "code": "new RegExp('ሴ噸(?:a)(b)');",
+  "diagnostics": [
+    {
+      "message": "Capture group '(b)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 6`] = `
+{
+  "code": "new RegExp('\\\\u1234\\\\u5678(?:a)(b)');",
+  "diagnostics": [
+    {
+      "message": "Capture group '(b)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 7`] = `
+{
+  "code": "/([0-9]{4})-(\\w{5})/",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+    {
+      "message": "Capture group '(\\w{5})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 8`] = `
+{
+  "code": "/([0-9]{4})-(5)/",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+    {
+      "message": "Capture group '(5)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 9`] = `
+{
+  "code": "/(?<temp2>(a))/",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 10`] = `
+{
+  "code": "/(?<temp2>(a)(?<temp5>b))/",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 11`] = `
+{
+  "code": "/(?<temp1>[0-9]{4})-(\\w{5})/",
+  "diagnostics": [
+    {
+      "message": "Capture group '(\\w{5})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 12`] = `
+{
+  "code": "/(?<temp1>[0-9]{4})-(5)/",
+  "diagnostics": [
+    {
+      "message": "Capture group '(5)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 13`] = `
+{
+  "code": "/(?<temp1>a)(?<temp2>a)(a)(?<temp3>a)/",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 14`] = `
+{
+  "code": "new RegExp('(' + 'a)')",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 15`] = `
+{
+  "code": "new RegExp('a(bc)d' + 'e')",
+  "diagnostics": [
+    {
+      "message": "Capture group '(bc)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 16`] = `
+{
+  "code": "new RegExp("foo" + "(a)" + "(b)");",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+    {
+      "message": "Capture group '(b)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 17`] = `
+{
+  "code": "new RegExp("foo" + "(?:a)" + "(b)");",
+  "diagnostics": [
+    {
+      "message": "Capture group '(b)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 18`] = `
+{
+  "code": "RegExp('(a)'+'')",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 19`] = `
+{
+  "code": "RegExp( '' + '(ab)')",
+  "diagnostics": [
+    {
+      "message": "Capture group '(ab)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 20`] = `
+{
+  "code": "new RegExp(\`(ab)\${''}\`)",
+  "diagnostics": [
+    {
+      "message": "Capture group '(ab)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 21`] = `
+{
+  "code": "new RegExp(\`(a)
+\`)",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 22`] = `
+{
+  "code": "RegExp(\`a(b
+c)d\`)",
+  "diagnostics": [
+    {
+      "message": "Capture group '(b
+c)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 23`] = `
+{
+  "code": "new RegExp('a(b)\\'')",
+  "diagnostics": [
+    {
+      "message": "Capture group '(b)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 24`] = `
+{
+  "code": "RegExp('(a)\\\\d')",
+  "diagnostics": [
+    {
+      "message": "Capture group '(a)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 25`] = `
+{
+  "code": "RegExp(\`\\\\a(b)\`)",
+  "diagnostics": [
+    {
+      "message": "Capture group '(b)' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 26`] = `
+{
+  "code": "new globalThis.RegExp('([0-9]{4})')",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 27`] = `
+{
+  "code": "globalThis.RegExp('([0-9]{4})')",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 28`] = `
+{
+  "code": "
+                function foo() { var globalThis = bar; }
+                new globalThis.RegExp('([0-9]{4})');
+            ",
+  "diagnostics": [
+    {
+      "message": "Capture group '([0-9]{4})' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-named-capture-group > invalid 29`] = `
+{
+  "code": "new RegExp('([[A--B]])', 'v')",
+  "diagnostics": [
+    {
+      "message": "Capture group '([[A--B]])' should be converted to a named or non-capturing group.",
+      "messageId": "required",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-named-capture-group",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

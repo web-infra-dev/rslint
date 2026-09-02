@@ -34,6 +34,15 @@ for (const x of [1, 2, 3]) {
 }
 ```
 
+A global named by an `/* exported name */` block comment is shared with the
+other scripts loaded alongside this one, any of which may reassign it, so the
+rule leaves such a declaration alone:
+
+```javascript
+/* exported sharedValue */
+let sharedValue = 1;
+```
+
 ## Original Documentation
 
 - [ESLint: prefer-const](https://eslint.org/docs/latest/rules/prefer-const)

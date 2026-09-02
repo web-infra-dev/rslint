@@ -71,9 +71,15 @@ func TestNoEvalRule(t *testing.T) {
 			// Strict mode: source file directive
 			{Code: `'use strict'; function foo() { this.eval('foo'); }`},
 			// Module: always strict
-			{Code: `import x from 'y'; this.eval('foo');`},
-			{Code: `import x from 'y'; function foo() { this.eval('foo'); }`},
-			{Code: `export {}; () => { this.eval('foo') }`},
+			{Code: `import x from 'y'; this.eval('foo');`, LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			{Code: `import x from 'y'; function foo() { this.eval('foo'); }`, LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			{Code: `export {}; () => { this.eval('foo') }`, LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			{
+				Code:            `function foo() { this.eval('foo'); }`,
+				FileName:        "explicit-module.cjs",
+				TSConfig:        "tsconfig.allow-js.json",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			},
 			// Object method: this is the object
 			{Code: `var obj = {foo: function() { this.eval('foo'); }}`},
 			{Code: `var obj = {}; obj.foo = function() { this.eval('foo'); }`},
@@ -199,6 +205,11 @@ func TestNoEvalRule(t *testing.T) {
 			{Code: `(window?.eval)('foo')`, Options: []any{map[string]any{"allowIndirect": true}}},
 		}),
 		withNoEvalWindowGlobalInvalid([]rule_tester.InvalidTestCase{
+			{
+				Code:            `export {}; function foo() { this.eval('foo'); }`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
+			},
 			// ================================================================
 			// Direct eval calls — always flagged regardless of scope
 			// ================================================================
@@ -961,6 +972,9 @@ func noEvalWindowGlobal(overrides map[string]any) map[string]any {
 func withNoEvalWindowGlobalValid(testCases []rule_tester.ValidTestCase) []rule_tester.ValidTestCase {
 	for index := range testCases {
 		testCases[index].Globals = noEvalWindowGlobal(testCases[index].Globals)
+		if testCases[index].LanguageOptions.SourceType == "" {
+			testCases[index].LanguageOptions.SourceType = "script"
+		}
 	}
 	return testCases
 }
@@ -968,6 +982,9 @@ func withNoEvalWindowGlobalValid(testCases []rule_tester.ValidTestCase) []rule_t
 func withNoEvalWindowGlobalInvalid(testCases []rule_tester.InvalidTestCase) []rule_tester.InvalidTestCase {
 	for index := range testCases {
 		testCases[index].Globals = noEvalWindowGlobal(testCases[index].Globals)
+		if testCases[index].LanguageOptions.SourceType == "" {
+			testCases[index].LanguageOptions.SourceType = "script"
+		}
 	}
 	return testCases
 }

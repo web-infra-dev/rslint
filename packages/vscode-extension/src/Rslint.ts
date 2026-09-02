@@ -20,7 +20,6 @@ import {
   type Middleware,
   ServerOptions,
   State,
-  Trace,
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
 import path from 'node:path';
@@ -98,6 +97,7 @@ export function shouldResetDocumentSessionOnServerState(
 export function createLanguageClientOptions(
   workspaceFolder: WorkspaceFolder,
   outputChannel: OutputChannel | undefined,
+  traceOutputChannel: OutputChannel,
   middleware?: Middleware,
 ): LanguageClientOptions {
   const documentSelector = createWorkspaceDocumentSelector(workspaceFolder);
@@ -111,6 +111,10 @@ export function createLanguageClientOptions(
       // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       documentSelector as unknown as LanguageClientOptions['documentSelector'],
     outputChannel,
+    // vscode-languageclient reads rslint.trace.server and owns its initial and
+    // live $/setTrace updates. Supplying this unconditionally ensures enabling
+    // tracing after startup never falls back to the ordinary server log.
+    traceOutputChannel,
     middleware,
   };
 }
@@ -323,7 +327,7 @@ export interface RslintOptions {
   readonly workspaceFolder: WorkspaceFolder;
   readonly installation: CoreInstallation;
   readonly outputChannel: OutputChannel;
-  readonly lspOutputChannel: OutputChannel;
+  readonly traceOutputChannel: OutputChannel;
   readonly router: WorkspaceDocumentRouter;
 }
 
@@ -334,7 +338,8 @@ export class Rslint implements Disposable {
   public readonly workspaceFolder: WorkspaceFolder;
   private readonly installation: CoreInstallation;
   private readonly router: WorkspaceDocumentRouter;
-  private readonly lspOutputChannel: OutputChannel | undefined;
+  /** Borrowed from Extension; runtimes must not dispose the shared channel. */
+  private readonly traceOutputChannel: OutputChannel;
   private readonly outputChannel: OutputChannel | undefined;
   private configWatcher: FileSystemWatcher | undefined;
   private configReloadTimer: ReturnType<typeof setTimeout> | undefined;
@@ -369,7 +374,7 @@ export class Rslint implements Disposable {
       `Rslint ${options.installation.version} (${options.workspaceFolder.name})`,
     ).useDefaultLogLevel();
     this.logger = logger;
-    this.lspOutputChannel = options.lspOutputChannel;
+    this.traceOutputChannel = options.traceOutputChannel;
     this.outputChannel = options.outputChannel;
     try {
       this.pluginLintPool = new PluginLintPool(
@@ -421,15 +426,10 @@ export class Rslint implements Disposable {
       return process;
     };
 
-    // Check if LSP tracing is enabled
-    const traceServer = workspace
-      .getConfiguration('rslint', this.workspaceFolder.uri)
-      .get<string>('trace.server', 'off');
-    const traceEnabled = traceServer !== 'off';
-
     const clientOptions = createLanguageClientOptions(
       this.workspaceFolder,
       this.outputChannel,
+      this.traceOutputChannel,
       this.router.createMiddleware(this),
     );
     const errorHandlerHolder: { current?: ErrorHandler } = {};
@@ -454,15 +454,6 @@ export class Rslint implements Disposable {
         return result;
       },
     };
-
-    if (traceEnabled) {
-      clientOptions.traceOutputChannel = this.lspOutputChannel;
-      this.logger.info(
-        'LSP tracing enabled, output will be logged to "Rslint LSP trace" channel',
-      );
-    } else {
-      this.logger.debug('LSP tracing disabled by configuration');
-    }
 
     const client = new ManagedLanguageClient(
       'rslint',
@@ -577,14 +568,6 @@ export class Rslint implements Disposable {
           },
         );
       });
-
-      if (traceEnabled) {
-        const traceLevel =
-          traceServer === 'verbose' ? Trace.Verbose : Trace.Messages;
-        await client.setTrace(traceLevel);
-        this.assertStartCurrent(epoch, signal, client);
-        this.logger.info(`LSP trace level set to: ${traceServer}`);
-      }
 
       this.installConfigRefreshWatcher();
       // The watcher is live before initial discovery, so a mutation during a

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -512,6 +513,50 @@ export interface Constructable {
 }
 `,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 8}},
+		},
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
+}
+
+// TestNoUnusedVarsExportedDirective covers the `/* exported */` comment, which
+// marks a global-scope binding used for a separately loaded file's sake. The
+// TypeScript scope manager puts type-only declarations in the same global scope
+// as value ones, so the directive reaches every declaration form a script-mode
+// file can bind at its top level.
+func TestNoUnusedVarsExportedDirective(t *testing.T) {
+	validTestCases := []rule_tester.ValidTestCase{
+		{Code: `/* exported publicValue */ var publicValue = 1;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported publicFn */ function publicFn() {}`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicClass */ class PublicClass {}`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicInterface */ interface PublicInterface { a: string }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicType */ type PublicType = string;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicEnum */ enum PublicEnum { A }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported PublicNS */ namespace PublicNS { export const a = 1; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported ambient */ declare var ambient: number;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		{Code: `/* exported external */ import external = require("external");`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		// A `var` reaches the global scope from inside a block.
+		{Code: `/* exported hoisted */ { var hoisted = 1; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+	}
+
+	invalidTestCases := []rule_tester.InvalidTestCase{
+		// A parameter, a block binding, and anything at all in a module are out
+		// of the global scope the directive resolves against.
+		{
+			Code: `/* exported param */ function outer(param: number) {}
+outer(1);`,
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 37}},
+		},
+		{
+			Code:            `/* exported blockScoped */ { let blockScoped = 1; }`,
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 34}},
+		},
+		{
+			Code: `/* exported moduleValue */ var moduleValue = 1;
+export {};`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 32}},
 		},
 	}
 

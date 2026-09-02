@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -24,22 +25,6 @@ var hoistedAPIs = map[string]string{
 	"unmock":        "doUnmock",
 	"unmockRequire": "doUnmockRequire",
 	"hoisted":       "",
-}
-
-// namespaceNames are the two spellings of the utilities object the rewrite
-// recognizes.
-//
-// NOTE: no import or scope analysis backs this set, and that is deliberate
-// rather than an omission. The rewrite matches the receiver by the name written
-// at the call site: `rs.mock('./m')` is lifted in a file whose only `rs` is a
-// local `const rs = {...}`, and in a file that imports `rs` from another
-// package, while the same call written through a renamed binding
-// (`import { rs as r }`, then `r.mock('./m')`) is not rewritten at all and
-// throws when it runs. Resolving the receiver would therefore report calls the
-// build leaves alone and stay silent on calls it lifts.
-var namespaceNames = map[string]bool{
-	"rs":     true,
-	"rstest": true,
 }
 
 var hoistedApisOnTopMessage = rule.RuleMessage{
@@ -132,47 +117,15 @@ func useNonHoistedAPIMessage(namespace, api, replacement string) rule.RuleMessag
 // hoistedAPICall reports whether node names a module-mock API the Rstest build
 // lifts, and returns the API's name node, the receiver's name, and the API's
 // name.
-//
-// Parentheses and TypeScript wrappers are transparent on both sides of the
-// callee, because TypeScript erases them before the module-mock rewrite runs:
-// `(rs).mock()`, `rs!.mock()`, `(rs as any).mock()`, `(rs.mock)()` and
-// `(rs.mock as any)()` are all rewritten. The API itself must be written as a
-// plain dotted member off a plain identifier: `rs['mock']()` and a call reached
-// through `import.meta.rstest` are left as ordinary runtime calls that throw,
-// and so is anything on an optional chain.
 func hoistedAPICall(node *ast.Node) (*ast.Node, string, string, bool) {
-	call := node.AsCallExpression()
-	if call == nil || ast.IsOptionalChain(node) {
+	utility := rstestUtils.ParseRstestUtilityCall(node)
+	if utility == nil {
 		return nil, "", "", false
 	}
-
-	callee := utils.SkipAssertionsAndParens(call.Expression)
-	if callee == nil ||
-		callee.Kind != ast.KindPropertyAccessExpression ||
-		ast.IsOptionalChain(callee) {
+	if _, lifted := hoistedAPIs[utility.Member]; !lifted {
 		return nil, "", "", false
 	}
-
-	access := callee.AsPropertyAccessExpression()
-	accessor := access.Name()
-	if accessor == nil || accessor.Kind != ast.KindIdentifier {
-		return nil, "", "", false
-	}
-	api := accessor.AsIdentifier().Text
-	if _, lifted := hoistedAPIs[api]; !lifted {
-		return nil, "", "", false
-	}
-
-	receiver := utils.SkipAssertionsAndParens(access.Expression)
-	if receiver == nil || receiver.Kind != ast.KindIdentifier {
-		return nil, "", "", false
-	}
-	namespace := receiver.AsIdentifier().Text
-	if !namespaceNames[namespace] {
-		return nil, "", "", false
-	}
-
-	return accessor, namespace, api, true
+	return utility.MemberNode, utility.Namespace, utility.Member, true
 }
 
 // liftedPosition is where a lifted call is written, as the rewrite sees it:

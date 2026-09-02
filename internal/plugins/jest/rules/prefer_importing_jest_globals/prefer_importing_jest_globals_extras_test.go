@@ -1,3 +1,4 @@
+// cspell:ignore descr lobals
 package prefer_importing_jest_globals_test
 
 import (
@@ -216,6 +217,173 @@ func TestPreferImportingJestGlobalsExtras(t *testing.T) {
             test("foo");
           });
         })
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- AST parity: computed string require key preserves its local alias ----
+			{
+				Code: `
+        const { ["describe"]: context } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- AST parity: computed template require key preserves its local alias ----
+			{
+				Code:            "\n        const { [`describe`]: context } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      ",
+				Output:          []string{"\n        const { describe, describe: context, test } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- AST parity: parentheses around require arguments are transparent ----
+			{
+				Code: `
+        const { ["describe"]: context } = require(('@jest/globals'));
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- ESTree parity: parentheses around the require callee are transparent ----
+			{
+				Code: `
+        const { ["describe"]: context } = ((require))('@jest/globals');
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: require matching only inspects the first argument ----
+			{
+				Code: `
+        const { ["describe"]: context } = require('@jest/globals', extra);
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, describe: context, test } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: optional require calls are not merge targets ----
+			{
+				Code: `
+        const { ["describe"]: context } = require?.('@jest/globals');
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, test } = require('@jest/globals');
+        const { ["describe"]: context } = require?.('@jest/globals');
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// Keep parenthesized arguments from bypassing the optional-call guard.
+			{
+				Code: `
+        const { ["describe"]: context } = require?.(('@jest/globals'));
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, test } = require('@jest/globals');
+        const { ["describe"]: context } = require?.(('@jest/globals'));
+        describe("suite", () => test("foo"));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// Upstream compares a template module specifier's raw text, not its cooked value.
+			{
+				Code:            "\n        const { [\"describe\"]: context } = require(`@jest/\\u0067lobals`);\n        describe(\"suite\", () => test(\"foo\"));\n      ",
+				Output:          []string{"\n        const { describe, test } = require('@jest/globals');\n        const { [\"describe\"]: context } = require(`@jest/\\u0067lobals`);\n        describe(\"suite\", () => test(\"foo\"));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// String literals use their cooked value, unlike template module specifiers.
+			{
+				Code:            "\n        const { [\"describe\"]: context } = require('@jest/\\u0067lobals');\n        describe(\"suite\", () => test(\"foo\"));\n      ",
+				Output:          []string{"\n        const { describe, describe: context, test } = require('@jest/globals');\n        describe(\"suite\", () => test(\"foo\"));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: computed numeric require keys are unsupported ----
+			{
+				Code: `
+        const { [1]: context, [0x2]: another } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `,
+				Output: []string{`
+        const { describe, test } = require('@jest/globals');
+        describe("suite", () => context("inner", () => test("foo")));
+      `},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: defaulted aliases are unsupported accessor values ----
+			{
+				Code:            "\n        const { [\"describe\"]: context = fallback, [`test`]: spec = fallback } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      ",
+				Output:          []string{"\n        const { describe, test } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- Upstream parity: template require keys preserve their raw value ----
+			{
+				Code:            "\n        const { [`descr\\u0069be`]: context } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      ",
+				Output:          []string{"\n        const { descr\\u0069be: context, describe, test } = require('@jest/globals');\n        describe(\"suite\", () => context(\"inner\", () => test(\"foo\")));\n      "},
+				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: `preferImportingJestGlobal`, Line: 3, Column: 9, EndColumn: 17},
+				},
+			},
+			// ---- JavaScript parity: generated names sort by UTF-16 code units ----
+			{
+				Code: `
+        const { ["𐐀"]: astral, ["Ａ"]: fullwidth } = require('@jest/globals');
+        describe("suite", () => test("foo"));
+      `,
+				Output: []string{`
+        const { describe, test, 𐐀: astral, Ａ: fullwidth } = require('@jest/globals');
+        describe("suite", () => test("foo"));
       `},
 				LanguageOptions: rule.LanguageOptions{SourceType: `commonjs`},
 				Errors: []rule_tester.InvalidTestCaseError{

@@ -1,6 +1,9 @@
 package unicornutil
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import (
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
 
 func isIdentifierNamed(node *ast.Node, name string) bool {
 	return node != nil && ast.IsIdentifier(node) && node.AsIdentifier().Text == name
@@ -8,8 +11,10 @@ func isIdentifierNamed(node *ast.Node, name string) bool {
 
 // IsArrayPrototypeProperty mirrors unicorn's isArrayPrototypeProperty helper.
 // It intentionally accepts only dotted, non-optional member access.
+// Parentheses and JavaScript JSDoc casts are transparent at every segment;
+// authored TypeScript assertions remain visible.
 func IsArrayPrototypeProperty(node *ast.Node, property string) bool {
-	node = ast.SkipParentheses(node)
+	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil || !ast.IsPropertyAccessExpression(node) {
 		return false
 	}
@@ -20,7 +25,7 @@ func IsArrayPrototypeProperty(node *ast.Node, property string) bool {
 		return false
 	}
 
-	object := ast.SkipParentheses(propertyAccess.Expression)
+	object := utils.ESTreeRuntimeExpression(propertyAccess.Expression)
 	if object == nil {
 		return false
 	}
@@ -37,5 +42,5 @@ func IsArrayPrototypeProperty(node *ast.Node, property string) bool {
 		return false
 	}
 
-	return isIdentifierNamed(ast.SkipParentheses(prototypeAccess.Expression), "Array")
+	return isIdentifierNamed(utils.ESTreeRuntimeExpression(prototypeAccess.Expression), "Array")
 }

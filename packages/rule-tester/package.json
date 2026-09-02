@@ -1,6 +1,6 @@
 {
   "name": "@typescript-eslint/rule-tester",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,8 +16,8 @@
   "scripts": {
     "build": "tsgo -b tsconfig.build.json --force",
     "dev": "tsgo -b tsconfig.build.json --force --watch",
-    "test": "rstest run --testTimeout=0 --passWithNoTests",
-    "test:update": "rstest run -u --testTimeout=0 --passWithNoTests"
+    "test": "rs test --testTimeout=0 --passWithNoTests",
+    "test:update": "rs test -u --testTimeout=0 --passWithNoTests"
   },
   "files": [
     "dist"

@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';

@@ -23,7 +23,7 @@
  * result) would be caught by one of the two.
  */
 
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import { createRequire } from 'node:module';
 
 import {
@@ -130,6 +130,41 @@ function anchorsOf(selector: string): readonly string[] | null {
  */
 function mergeAndGetBuckets(listeners: Record<string, () => void>) {
   return mergeListeners([{ ruleName: 'test', listeners }]).esqueryByType;
+}
+
+function compiledSelectorFor(raw: string): object {
+  const merged = mergeListeners([
+    { ruleName: 'cache-probe', listeners: { [raw]: () => {} } },
+  ]);
+  const entry = merged.esqueryByType.enter
+    .get('Identifier')
+    ?.find((candidate) => candidate.raw === raw);
+  if (entry?.selector == null) {
+    throw new Error(`expected a compiled Identifier selector for ${raw}`);
+  }
+  return entry.selector;
+}
+
+function cacheProbeProgram(): ESTreeNode {
+  return {
+    type: 'Program',
+    sourceType: 'module',
+    body: [
+      {
+        type: 'ExpressionStatement',
+        expression: { type: 'Identifier', name: 'first' },
+      },
+      {
+        type: 'ExpressionStatement',
+        expression: {
+          type: 'CallExpression',
+          callee: { type: 'Identifier', name: 'target' },
+          arguments: [],
+          optional: false,
+        },
+      },
+    ],
+  } as unknown as ESTreeNode;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -362,6 +397,170 @@ describe('mergeListeners — esqueryByType bucket assembly', () => {
     expect(buckets.enter.get('FunctionExpression')?.length).toBe(1);
     expect(buckets.enter.get('ArrowFunctionExpression')?.length).toBe(1);
     expect(buckets.enterWildcard).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// worker-local selector compilation cache
+// ─────────────────────────────────────────────────────────────────────
+
+describe('mergeListeners — selector compilation cache', () => {
+  test('reuses only immutable metadata; listeners and regexp state remain per merge', () => {
+    const raw = 'Identifier[name=/^target$/i]';
+    let firstHits = 0;
+    const first = mergeListeners([
+      {
+        ruleName: 'first-rule',
+        listeners: { [raw]: () => firstHits++ },
+      },
+    ]);
+    const firstEntry = first.esqueryByType.enter.get('Identifier')?.[0];
+    expect(firstEntry).toBeDefined();
+
+    visit(cacheProbeProgram(), first);
+    expect(firstHits).toBe(1);
+
+    let secondHits = 0;
+    const second = mergeListeners([
+      {
+        ruleName: 'second-rule',
+        listeners: { [raw]: () => secondHits++ },
+      },
+    ]);
+    const secondEntry = second.esqueryByType.enter.get('Identifier')?.[0];
+    expect(secondEntry).toBeDefined();
+
+    // The cache publishes only compilation metadata. Each merge still owns a
+    // fresh entry/listener array with the current rule attribution.
+    expect(secondEntry).not.toBe(firstEntry);
+    expect(secondEntry?.listeners).not.toBe(firstEntry?.listeners);
+    expect(secondEntry?.listeners.map((listener) => listener.ruleName)).toEqual(
+      ['second-rule'],
+    );
+    expect(secondEntry?.selector).toBe(firstEntry?.selector);
+    expect(secondEntry?.anchorTypes).toBe(firstEntry?.anchorTypes);
+    expect(Object.isFrozen(secondEntry?.selector)).toBe(true);
+    expect(Object.isFrozen(secondEntry?.anchorTypes)).toBe(true);
+
+    const parsed = secondEntry?.selector as {
+      selectors: Array<{
+        value?: { value?: RegExp };
+      }>;
+    };
+    const regexp = parsed.selectors[1]?.value?.value;
+    expect(regexp).toBeInstanceOf(RegExp);
+    expect(Object.isFrozen(regexp)).toBe(true);
+    expect(regexp?.lastIndex).toBe(0);
+
+    // Reusing the cached RegExp-bearing parse tree on later files neither
+    // calls the first file's closure nor carries matcher state forward.
+    visit(cacheProbeProgram(), second);
+    visit(cacheProbeProgram(), second);
+    expect(firstHits).toBe(1);
+    expect(secondHits).toBe(2);
+    expect(regexp?.lastIndex).toBe(0);
+  });
+
+  test('keys by exact raw selector spelling', () => {
+    const doubleQuoted = 'Identifier[name="target"]';
+    const singleQuoted = "Identifier[name='target']";
+    const first = compiledSelectorFor(doubleQuoted);
+    expect(compiledSelectorFor(doubleQuoted)).toBe(first);
+    expect(compiledSelectorFor(singleQuoted)).not.toBe(first);
+  });
+
+  test('cached invalid message is attributed to the current rule on every merge', () => {
+    const raw = 'Foo > ';
+    const first = mergeListeners([
+      { ruleName: 'first-bad-rule', listeners: { [raw]: () => {} } },
+    ]);
+    const second = mergeListeners([
+      { ruleName: 'second-bad-rule', listeners: { [raw]: () => {} } },
+      { ruleName: 'third-bad-rule', listeners: { [raw]: () => {} } },
+    ]);
+
+    expect(first.selectorErrors).toHaveLength(1);
+    expect(second.selectorErrors).toHaveLength(2);
+    expect(first.selectorErrors[0].ruleName).toBe('first-bad-rule');
+    expect(second.selectorErrors.map((error) => error.ruleName)).toEqual([
+      'second-bad-rule',
+      'third-bad-rule',
+    ]);
+    expect(second.selectorErrors[0].message).toBe(
+      first.selectorErrors[0].message,
+    );
+  });
+
+  test('preserves canonical esquery behavior after metadata reuse', () => {
+    const expected: Record<string, number> = {
+      Identifier: 2,
+      'Identifier:exit': 2,
+      'Program > ExpressionStatement': 2,
+      'Program Identifier': 2,
+      'ExpressionStatement + ExpressionStatement': 1,
+      'ExpressionStatement ~ ExpressionStatement': 1,
+      'Identifier[name="target"]': 1,
+      'CallExpression > Identifier.callee': 1,
+      ':statement': 2,
+      'Identifier:not([name="first"])': 1,
+      ':matches(Identifier, CallExpression)': 3,
+      'CallExpression:has(Identifier[name="target"])': 1,
+      'Program > :nth-child(2)': 1,
+      '*[name="target"]': 1,
+    };
+
+    const run = (): Record<string, number> => {
+      const counts: Record<string, number> = {};
+      const listeners: Record<string, () => void> = {};
+      for (const raw of Object.keys(expected)) {
+        listeners[raw] = () => {
+          counts[raw] = (counts[raw] ?? 0) + 1;
+        };
+      }
+      visit(
+        cacheProbeProgram(),
+        mergeListeners([{ ruleName: 'grammar-probe', listeners }]),
+      );
+      return counts;
+    };
+
+    expect(run()).toEqual(expected);
+    // A second merge exercises the cached parse/specificity/anchor metadata
+    // with a fresh listener set and a fresh file AST.
+    expect(run()).toEqual(expected);
+  });
+
+  test('is bounded to 2048 FIFO entries and bare selectors never enter it', () => {
+    const raw = (index: number) =>
+      `Identifier[name="__rslint_selector_cache_${index}"]`;
+    let first!: object;
+    let third!: object;
+
+    // Whatever earlier tests left in this worker is displaced before this
+    // loop finishes. The resulting cache contains exactly these 2048 new raw
+    // selectors in insertion order.
+    for (let index = 0; index < 2048; index++) {
+      const selector = compiledSelectorFor(raw(index));
+      if (index === 0) first = selector;
+      if (index === 2) third = selector;
+    }
+
+    // Capacity is at least 2048, and a hit does not promote the oldest entry.
+    expect(compiledSelectorFor(raw(0))).toBe(first);
+    compiledSelectorFor(raw(2048));
+    // The 2049th insertion evicted raw(0), proving the exact bound and FIFO
+    // rather than LRU behavior.
+    expect(compiledSelectorFor(raw(0))).not.toBe(first);
+
+    // After reinserting raw(0), raw(2) is oldest. If either bare enter/exit
+    // selector touched the compilation cache it would evict raw(2).
+    mergeListeners([
+      {
+        ruleName: 'bare-probe',
+        listeners: { CacheProbe: () => {}, 'CacheProbe:exit': () => {} },
+      },
+    ]);
+    expect(compiledSelectorFor(raw(2))).toBe(third);
   });
 });
 

@@ -274,23 +274,19 @@
     },
     {
       "code": "/*exported toaster*/ var toaster = 'great'",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support /* exported */ comments"
+      "languageOptions": { "sourceType": "script" }
     },
     {
       "code": "/*exported toaster, poster*/ var toaster = 1; poster = 0;",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support /* exported */ comments"
+      "languageOptions": { "sourceType": "script" }
     },
     {
       "code": "/*exported x*/ var { x } = y",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support /* exported */ comments"
+      "languageOptions": { "sourceType": "script" }
     },
     {
       "code": "/*exported x, y*/  var { x, y } = z",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support /* exported */ comments"
+      "languageOptions": { "sourceType": "script" }
     },
     {
       "code": "/*eslint custom/use-every-a:1*/ var a;",
@@ -1526,8 +1522,7 @@
     },
     {
       "code": "/*exported max*/ var max = 1, min = {min: 1}",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support /* exported */ comments",
+      "languageOptions": { "sourceType": "script" },
       "errors": [
         {
           "messageId": "unusedVar",
@@ -1547,8 +1542,7 @@
     },
     {
       "code": "/*exported x*/ var { x, y } = z",
-      "skip": true,
-      "skipReason": "SKIP: rslint does not support /* exported */ comments",
+      "languageOptions": { "sourceType": "script" },
       "errors": [
         {
           "messageId": "unusedVar",

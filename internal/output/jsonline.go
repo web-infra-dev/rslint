@@ -28,7 +28,7 @@ func (jsonLineFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error 
 
 	diagnostic := jsonDiagnostic{
 		RuleName: view.raw.RuleName,
-		Message:  view.raw.Message.Description,
+		Message:  view.raw.Message,
 		FilePath: view.relativePath,
 		Range: jsonRange{
 			Start: jsonLocation{Line: view.start.line + 1, Column: view.start.column + 1},

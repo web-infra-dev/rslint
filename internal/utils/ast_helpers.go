@@ -37,6 +37,60 @@ func OutermostParenthesizedExpression(node *ast.Node) *ast.Node {
 	return current
 }
 
+// IsPlainClassMember reports whether a tsgo class member maps to ESTree's
+// MethodDefinition or PropertyDefinition. Abstract members and auto-accessors
+// use TypeScript-specific ESTree node kinds instead.
+func IsPlainClassMember(member *ast.Node) bool {
+	return member != nil &&
+		!ast.HasSyntacticModifier(member, ast.ModifierFlagsAbstract|ast.ModifierFlagsAccessor)
+}
+
+// IsImportAttributeKey reports whether node is an import attribute key in a
+// static import/re-export or in a dynamic import options object. These keys
+// are fixed by the import-attributes protocol rather than freely chosen
+// identifier or property names.
+func IsImportAttributeKey(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	parent := node.Parent
+
+	// import data from "./data.json" with { type: "json" }
+	if parent.Kind == ast.KindImportAttribute && parent.AsImportAttribute().Name() == node {
+		return true
+	}
+
+	// import("./data.json", { with: { type: "json" } })
+	switch parent.Kind {
+	case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
+		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+	default:
+		return false
+	}
+	if parent.Name() != node {
+		return false
+	}
+	objectExpression := parent.Parent
+	if objectExpression == nil || objectExpression.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+	outer := OutermostParenthesizedExpression(objectExpression)
+	container := outer.Parent
+	if container == nil {
+		return false
+	}
+	if container.Kind == ast.KindCallExpression {
+		call := container.AsCallExpression()
+		return call.Expression != nil && call.Expression.Kind == ast.KindImportKeyword &&
+			call.Arguments != nil && len(call.Arguments.Nodes) > 1 && call.Arguments.Nodes[1] == outer
+	}
+	if container.Kind == ast.KindPropertyAssignment && container.AsPropertyAssignment().Initializer == outer &&
+		!ast.IsComputedPropertyName(container.Name()) {
+		return IsImportAttributeKey(container.Name())
+	}
+	return false
+}
+
 // IsCommaOperator reports whether node is a BinaryExpression whose operator is
 // the comma token — tsgo's collapsed form of ESLint's SequenceExpression.
 func IsCommaOperator(node *ast.Node) bool {
@@ -132,6 +186,70 @@ func IsGlobalParseIntCallee(callee *ast.Node, override func(string) GlobalAccess
 		return false
 	}
 	return override == nil || override("Number") != GlobalAccessOff
+}
+
+// globalObjectAliasNames are the well-known references to the global object
+// through which a built-in constructor can also be reached (`globalThis.Foo`,
+// `window.Foo`, …).
+var globalObjectAliasNames = [...]string{"globalThis", "window", "self", "global"}
+
+// IsBuiltinGlobalCallee reports whether callee references the built-in global
+// named name — either directly (an unshadowed identifier) or through one of
+// the well-known global-object aliases (`globalThis.RegExp`, `window.RegExp`,
+// `self.RegExp`, `global.RegExp`). Outer parentheses and TS assertion
+// wrappers are transparent on both the callee and the alias receiver.
+//
+// isDeclaredGlobal reports whether a name resolves to a known global (i.e.
+// hasn't been turned `off` by a `/* global name: off */` comment or
+// languageOptions.globals entry); pass ctx.Globals.Access(name).IsDeclared.
+func IsBuiltinGlobalCallee(callee *ast.Node, name string, isDeclaredGlobal func(string) bool) bool {
+	callee = SkipAssertionsAndParens(callee)
+	if callee == nil {
+		return false
+	}
+
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		if callee.AsIdentifier().Text != name || IsShadowed(callee, name) {
+			return false
+		}
+		return isDeclaredGlobal(name)
+	case ast.KindPropertyAccessExpression:
+		access := callee.AsPropertyAccessExpression()
+		if access == nil || access.Name() == nil || access.Name().Kind != ast.KindIdentifier {
+			return false
+		}
+		if access.Name().AsIdentifier().Text != name {
+			return false
+		}
+		return isGlobalObjectAlias(access.Expression, isDeclaredGlobal)
+	case ast.KindElementAccessExpression:
+		access := callee.AsElementAccessExpression()
+		if access == nil || access.ArgumentExpression == nil {
+			return false
+		}
+		value, ok := GetStaticExpressionValue(SkipAssertionsAndParens(access.ArgumentExpression))
+		if !ok || value != name {
+			return false
+		}
+		return isGlobalObjectAlias(access.Expression, isDeclaredGlobal)
+	}
+
+	return false
+}
+
+func isGlobalObjectAlias(node *ast.Node, isDeclaredGlobal func(string) bool) bool {
+	node = SkipAssertionsAndParens(node)
+	if node == nil || node.Kind != ast.KindIdentifier {
+		return false
+	}
+	name := node.AsIdentifier().Text
+	for _, alias := range globalObjectAliasNames {
+		if name == alias {
+			return !IsShadowed(node, name) && isDeclaredGlobal(name)
+		}
+	}
+	return false
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference

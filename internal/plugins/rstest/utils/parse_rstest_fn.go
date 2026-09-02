@@ -236,6 +236,11 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 		}
 		parts[len(parts)-1].invocation = rstestTagInvoked
 		return root, parts, rootInvoked, true
+	case ast.KindBinaryExpression:
+		if !internalUtils.IsCommaOperator(node) {
+			return nil, nil, false, false
+		}
+		return parseRstestChain(node.AsBinaryExpression().Right)
 	default:
 		return nil, nil, false, false
 	}
@@ -305,9 +310,41 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 		}
 		parts[len(parts)-1].invocation = rstestTagInvoked
 		return root, parts, rootInvoked, true
+	case ast.KindBinaryExpression:
+		if !internalUtils.IsCommaOperator(node) {
+			return nil, nil, false, false
+		}
+		return parseImportMetaRstestChain(node.AsBinaryExpression().Right)
 	default:
 		return nil, nil, false, false
 	}
+}
+
+// resolveRstestRootSymbol returns the binding a registration chain's root
+// identifier refers to.
+//
+// Every discrimination this parser promises — an import from `@rstest/core`
+// against a same-named import from Vitest or Jest, a global against a local
+// declaration that shadows it, an alias against an unrelated variable — is
+// decided from this symbol's declarations. Without one,
+// [testFramework.ResolveFunctionIdentifierReferenceFromSymbol] can only fall
+// back to the identifier's spelling, which is wrong in both directions: a
+// `test` imported from Vitest is taken for an Rstest global, while a renamed
+// or namespace import from `@rstest/core` stops resolving at all.
+//
+// The TypeChecker is therefore not the only source consulted. A source-only
+// Program — the generation rslint builds for files no tsconfig project owns —
+// carries no checker, so the file's reference store answers instead. Its
+// binder scope walk resolves imports and declarations authored in this file,
+// which is everything the discriminations above need; only bindings declared
+// outside the file are beyond it, and those were never Rstest registrations.
+func resolveRstestRootSymbol(ctx rule.RuleContext, root *ast.Node) *ast.Symbol {
+	if ctx.TypeChecker != nil {
+		if symbol := ctx.TypeChecker.GetSymbolAtLocation(root); symbol != nil {
+			return symbol
+		}
+	}
+	return ctx.Refs.ResolveInFile(root)
 }
 
 func resolveRstestRoot(
@@ -322,10 +359,7 @@ func resolveRstestRoot(
 	}
 
 	localName := root.AsIdentifier().Text
-	var symbol *ast.Symbol
-	if ctx.TypeChecker != nil {
-		symbol = ctx.TypeChecker.GetSymbolAtLocation(root)
-	}
+	symbol := resolveRstestRootSymbol(ctx, root)
 	for _, profile := range rstestAllProfiles {
 		module := profileImportModule(profile)
 		name, originalNode, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(

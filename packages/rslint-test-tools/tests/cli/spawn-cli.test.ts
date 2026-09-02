@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@rstest/core';
+import { describe, expect, test } from 'rstack/test';
 
 import { validateConformanceStderrContract } from './js-config/eslint-plugin-conformance/stderr-contract.js';
 import { validateCliClose } from './spawn-cli.js';

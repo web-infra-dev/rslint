@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type gitlabFormatter struct {
@@ -52,18 +50,18 @@ func (f *gitlabFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error
 
 	severity := "info"
 	switch view.raw.Severity {
-	case rule.SeverityError:
+	case SeverityError:
 		severity = "major"
-	case rule.SeverityWarning:
+	case SeverityWarning:
 		severity = "minor"
 	}
 
 	beginLine, beginColumn := view.start.line+1, view.start.column+1
 	endLine, endColumn := view.end.line+1, view.end.column+1
 	issue := gitlabIssue{
-		Description: view.raw.Message.Description,
+		Description: view.raw.Message,
 		CheckName:   view.raw.RuleName,
-		Fingerprint: f.fingerprints.fingerprint(view.relativePath, view.raw.RuleName, view.raw.Message.Description, beginLine, beginColumn, endLine, endColumn),
+		Fingerprint: f.fingerprints.fingerprint(view.relativePath, view.raw.RuleName, view.raw.Message, beginLine, beginColumn, endLine, endColumn),
 		Severity:    severity,
 		Location: gitlabLocation{
 			Path:  view.relativePath,

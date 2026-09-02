@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -26,36 +26,25 @@
     "sync:rule-releases": "node scripts/sync-rule-releases.js",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "rs fmt",
+    "format:check": "rs fmt --check",
     "test": "pnpm -r --filter=@rslint/test-tools... --filter=rslint... test",
     "test:go": "go test ./cmd/... ./internal/...",
     "typecheck": "pnpm tsgo -b tsconfig.json --noEmit",
     "lint": "rslint --config rslint.config.ts",
     "lint:go": "golangci-lint run ./cmd/... ./internal/...",
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
-    "prepare": "husky",
+    "prepare": "rs hooks",
     "migrate:tests": "sg scan -r ast-grep-rule.yml ./packages/rslint-test-tools/tests/typescript-eslint/rules/**/*.test.ts --update-all"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@rstest/core": "catalog:",
     "@types/react": "catalog:",
     "ajv": "catalog:",
-    "husky": "catalog:",
-    "lint-staged": "catalog:",
-    "prettier": "catalog:",
+    "rstack": "catalog:",
     "typescript": "catalog:",
     "@typescript/native-preview": "catalog:",
     "zx": "catalog:"
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "prettier --write"
-    ],
-    "*.{json,css,scss,md,yaml,yml}": [
-      "prettier --write"
-    ]
   },
   "packageManager": "pnpm@10.34.4",
   "engines": {
