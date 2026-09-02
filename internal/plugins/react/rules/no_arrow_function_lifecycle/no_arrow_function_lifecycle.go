@@ -68,6 +68,34 @@ func componentProperties(component *ast.Node) []*ast.Node {
 	return nil
 }
 
+// isCreateReactClassObjectComponent mirrors eslint-plugin-react's
+// isES5Component check. The upstream check only inspects the object's direct
+// call parent and callee; it does not require the object to be the first
+// argument. The shared reactutil helper is intentionally stricter because
+// other rules use the first argument as their component-shape boundary.
+func isCreateReactClassObjectComponent(obj *ast.Node, pragma, createClass string) bool {
+	if obj == nil || obj.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+	arg := obj
+	for arg.Parent != nil && arg.Parent.Kind == ast.KindParenthesizedExpression {
+		arg = arg.Parent
+	}
+	if arg.Parent == nil || arg.Parent.Kind != ast.KindCallExpression {
+		return false
+	}
+	call := arg.Parent.AsCallExpression()
+	if !reactutil.IsCreateClassCall(call, pragma, createClass) || call.Arguments == nil {
+		return false
+	}
+	for _, candidate := range call.Arguments.Nodes {
+		if candidate == arg {
+			return true
+		}
+	}
+	return false
+}
+
 func isLifecycleMethod(member *ast.Node, name string) bool {
 	methods := instanceLifecycleMethods
 	if utils.IncludesModifier(member, ast.KindStaticKeyword) {
@@ -76,18 +104,14 @@ func isLifecycleMethod(member *ast.Node, name string) bool {
 	return methods[name]
 }
 
-func parameterNames(fn *ast.Node) string {
+func parameterText(sf *ast.SourceFile, fn *ast.Node) string {
 	params := reactutil.FunctionParameters(fn)
-	names := make([]string, len(params))
-	for i, param := range params {
-		if param != nil {
-			name := param.AsParameterDeclaration().Name()
-			if name != nil && name.Kind == ast.KindIdentifier {
-				names[i] = name.AsIdentifier().Text
-			}
-		}
+	if len(params) == 0 {
+		return ""
 	}
-	return strings.Join(names, ", ")
+	first := utils.TrimNodeTextRange(sf, params[0])
+	last := utils.TrimNodeTextRange(sf, params[len(params)-1])
+	return sourceSlice(sf, first.Pos(), last.End())
 }
 
 func sourceSlice(sf *ast.SourceFile, start, end int) string {
@@ -150,7 +174,7 @@ func buildFixes(ctx rule.RuleContext, member, fn, rawValue *ast.Node) []rule.Rul
 		}
 	}
 
-	params := parameterNames(fn)
+	params := parameterText(ctx.SourceFile, fn)
 	methodText := "(" + params + ") "
 	if member.Kind == ast.KindPropertyAssignment {
 		methodText = ": function(" + params + ") "
@@ -217,7 +241,7 @@ var NoArrowFunctionLifecycleRule = rule.Rule{
 					reportComponent(ctx, node)
 				}
 			case ast.KindObjectLiteralExpression:
-				if reactutil.IsCreateReactClassObjectArg(node, pragma, createClass) {
+				if isCreateReactClassObjectComponent(node, pragma, createClass) {
 					reportComponent(ctx, node)
 				}
 			}

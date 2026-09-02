@@ -39,8 +39,6 @@ func TestNoArrowFunctionLifecycleRuleExtras(t *testing.T) {
 		{Code: "abstract class Hello extends React.Component { abstract render(): unknown; }", Tsx: true},
 		// ---- Branch lock-in: a non-createReactClass object is not a component ----
 		{Code: "const options = { render: () => null };", Tsx: true},
-		// ---- Branch lock-in: createReactClass only recognizes its first object argument ----
-		{Code: "createReactClass(factory(), { render: () => null });", Tsx: true},
 		// ---- Branch lock-in: object method values are not arrow functions ----
 		{Code: "var Hello = createReactClass({ render() { return null; } });", Tsx: true},
 		// ---- Regression: TypeScript field without an initializer ----
@@ -75,6 +73,24 @@ func TestNoArrowFunctionLifecycleRuleExtras(t *testing.T) {
 			Tsx:    true,
 			Output: []string{"class Hello extends React.Component { static getDerivedStateFromProps() { return null; } }"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "getDerivedStateFromProps" + upstreamLifecycleMessage, Line: 1, Column: 39, EndLine: 1, EndColumn: 84}},
+		},
+		{
+			Code:   "createReactClass(factory(), { render: () => null });",
+			Tsx:    true,
+			Output: []string{"createReactClass(factory(), { render: function() { return null; } });"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "class Hello extends React.Component { render = (value = 1, ...rest) => value; }",
+			Tsx:    true,
+			Output: []string{"class Hello extends React.Component { render(value = 1, ...rest) { return value; } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "var Hello = createReactClass({ render: ({ value }, [item]) => value });",
+			Tsx:    true,
+			Output: []string{"var Hello = createReactClass({ render: function({ value }, [item]) { return value; } });"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
 		},
 	}
 
