@@ -405,8 +405,9 @@ func isRstestNamespaceImportSymbol(symbol *ast.Symbol) bool {
 		if importDeclaration == nil || importDeclaration.ModuleSpecifier == nil {
 			continue
 		}
-		switch importDeclaration.ModuleSpecifier.Text() {
-		case rstestUtils.RstestImportModule, rstestUtils.RstestPlaywrightImportModule:
+		specifier := importDeclaration.ModuleSpecifier.Text()
+		if rstestUtils.IsRstestCoreImportModule(specifier) ||
+			specifier == rstestUtils.RstestPlaywrightImportModule {
 			return true
 		}
 	}
@@ -467,12 +468,12 @@ func isSafeBareIdentifierReference(
 		return false
 	}
 
-	name, _, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
+	name, _, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
 		identifier.AsIdentifier().Text,
 		identifier,
 		symbol,
 		ctx.SourceFile,
-		rstestUtils.RstestImportModule,
+		rstestUtils.RstestCoreImportModules,
 	)
 	if mode == rstestUtils.RSTEST_IMPORT_MODE && (name == "test" || name == "it") {
 		return true

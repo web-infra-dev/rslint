@@ -14,7 +14,10 @@ func TestIsValidRegexLiteral(t *testing.T) {
 		want    bool
 	}{
 		{name: "basic", literal: `/abc/g`, want: true},
+		{name: "slash equals token", literal: `/=/`, want: true},
 		{name: "unicode sets", literal: `/[[A--B]]/v`, want: true},
+		{name: "single v ampersand", literal: `/[&]/v`, want: true},
+		{name: "escaped and single v ampersands", literal: `/[\&&]/v`, want: true},
 		{name: "inline modifier", literal: `/(?i:foo)bar/`, want: true},
 		{name: "annex b decimal escape", literal: `/\78\126\5934/`, want: true},
 		{name: "invalid unicode property", literal: `/\p{NotAProperty}/u`, want: false},
@@ -42,12 +45,78 @@ func TestIsValidRegexLiteral(t *testing.T) {
 		// A backreference that does resolve stays valid under every flag.
 		{name: "resolved backreference", literal: `/(a)\1/`, want: true},
 		{name: "resolved backreference under u", literal: `/(a)\1/u`, want: true},
+		{name: "missing named backreference under u", literal: `/\k<missing>/u`, want: false},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if got := IsValidRegexLiteral(test.literal); got != test.want {
 				t.Errorf("IsValidRegexLiteral(%q) = %v, want %v", test.literal, got, test.want)
+			}
+		})
+	}
+}
+
+func TestIsValidRegexLiteralForVersion(t *testing.T) {
+	tests := []struct {
+		literal string
+		version int
+		want    bool
+	}{
+		{literal: `/abc/u`, version: 3, want: false},
+		{literal: `/abc/u`, version: 2015, want: true},
+		{literal: `/a/d`, version: 2021, want: false},
+		{literal: `/a/d`, version: 2022, want: true},
+		{literal: `/[[A--B]]/v`, version: 2023, want: false},
+		{literal: `/[[A--B]]/v`, version: 2024, want: true},
+		{literal: `/(?i:foo)bar/`, version: 2024, want: false},
+		{literal: `/(?i:foo)bar/`, version: 2025, want: true},
+		{literal: `/[(?i:)]/`, version: 2024, want: true},
+		{literal: `/\(\?i:/`, version: 2024, want: true},
+		{literal: ``, version: 2024, want: false},
+	}
+
+	for _, test := range tests {
+		if got := IsValidRegexLiteralForVersion(test.literal, test.version); got != test.want {
+			t.Errorf("IsValidRegexLiteralForVersion(%q, %d) = %v, want %v", test.literal, test.version, got, test.want)
+		}
+	}
+}
+
+func TestRegexLiteralCharacterEventCutoff(t *testing.T) {
+	tests := []struct {
+		literal      string
+		position     int
+		unterminated bool
+		hasError     bool
+	}{
+		{literal: `/\x1f/`},
+		{literal: `/=/`},
+		{literal: `/[.&\x1f]/v`},
+		{literal: `/\u{NOT_HEX}\x1f/`},
+		{literal: `/\u{NOT_HEX}\x1f/u`, position: 4, hasError: true},
+		{literal: `/\x1f\u{NOT_HEX}/u`, position: 8, hasError: true},
+		{literal: `/\x1f[/`, position: 0, unterminated: true, hasError: true},
+		{literal: `/\x1f/uv`, position: 7, hasError: true},
+		// regexpp resolves named backreferences after character callbacks, so
+		// this semantic error must not truncate a rule's collected events.
+		{literal: `/\k<missing>\x1f/u`},
+		{literal: `/(?<a>a)\k<missing>\x1f/u`},
+	}
+	for _, test := range tests {
+		t.Run(test.literal, func(t *testing.T) {
+			position, unterminated, hasError := RegexLiteralCharacterEventCutoff(test.literal)
+			if position != test.position || unterminated != test.unterminated || hasError != test.hasError {
+				t.Fatalf(
+					"RegexLiteralCharacterEventCutoff(%q) = (%d, %v, %v), want (%d, %v, %v)",
+					test.literal,
+					position,
+					unterminated,
+					hasError,
+					test.position,
+					test.unterminated,
+					test.hasError,
+				)
 			}
 		})
 	}

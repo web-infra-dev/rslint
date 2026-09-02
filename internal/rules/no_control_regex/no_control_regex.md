@@ -38,15 +38,7 @@ var pattern7 = new RegExp('\\t');
 var pattern8 = new RegExp('\\n');
 ```
 
-## Differences from ESLint
-
-ESLint's implementation delegates pattern validation to `@eslint-community/regexpp` and wraps it in `try/catch`. On a regex-syntax error, regexpp aborts parsing, so any control characters appearing after the error point are never reported.
-
-This implementation is a linear scanner without a full ES regex parser. On a **syntactically-invalid pattern** it keeps scanning past the error, which may surface control characters ESLint would have suppressed. For valid regex patterns the two implementations produce identical output.
-
-Syntactically-invalid patterns are independently flagged by the [`no-invalid-regexp`](https://eslint.org/docs/latest/rules/no-invalid-regexp) rule, so running both rules together surfaces every relevant issue; only the rule attribution differs on malformed input.
-
 ## Original Documentation
 
 - [ESLint: no-control-regex](https://eslint.org/docs/latest/rules/no-control-regex)
-- [Source code](https://github.com/eslint/eslint/blob/v10.2.1/lib/rules/no-control-regex.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-control-regex.js)

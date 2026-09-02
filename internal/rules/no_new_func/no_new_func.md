@@ -26,4 +26,4 @@ var x = function (a, b) {
 ## Original Documentation
 
 - [ESLint: no-new-func](https://eslint.org/docs/latest/rules/no-new-func)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-new-func.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-new-func.js)

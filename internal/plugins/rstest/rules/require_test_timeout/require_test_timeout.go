@@ -514,12 +514,12 @@ func isRuntimeObject(ctx rule.RuleContext, receiver *ast.Node) bool {
 		// `rs` and `rstest` are the same object under two names
 		// (packages/core/src/runtime/api/public.ts:63-64), and either may be
 		// imported under a further name of its own.
-		name, _, _ := testFramework.ResolveFunctionIdentifierReference(
+		name, _, _ := testFramework.ResolveFunctionIdentifierReferenceModules(
 			receiver.AsIdentifier().Text,
 			receiver,
 			ctx.TypeChecker,
 			ctx.SourceFile,
-			rstestUtils.RstestImportModule,
+			rstestUtils.RstestCoreImportModules,
 		)
 		return name == "rs" || name == "rstest"
 	}
@@ -535,7 +535,7 @@ func isRuntimeObject(ctx rule.RuleContext, receiver *ast.Node) bool {
 		return false
 	}
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(namespace)
-	return testFramework.IsModuleNamespaceSymbol(symbol, rstestUtils.RstestImportModule)
+	return testFramework.IsModuleNamespaceSymbolModules(symbol, rstestUtils.RstestCoreImportModules)
 }
 
 // isImportMetaRstest reports whether node is `import.meta.rstest`, the third

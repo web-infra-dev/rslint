@@ -201,23 +201,43 @@ func HasCommentInsideNode(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	return hasComment
 }
 
-// HasCommentInSpan reports whether any comment in sourceComments overlaps the
+// CommentsInSpan returns a read-only view of the comments that overlap the
 // half-open source span [start, end). sourceComments must be sorted by
-// position — pass ctx.Comments.All(), which the linter builds lazily
-// once per file. Runs in O(log k) via binary search over the (typically
-// small) comment list, the same technique ESLint's TokenStore uses for
-// commentsExistBetween, instead of re-walking the whole file's token tree on
-// every call.
+// position — pass ctx.Comments.All(), which the linter builds lazily once per
+// file. The result aliases sourceComments and runs in O(log k + m), where m is
+// the number of returned comments.
+func CommentsInSpan(sourceComments []*ast.CommentRange, start int, end int) []*ast.CommentRange {
+	if start >= end {
+		return nil
+	}
+
+	first := firstCommentOverlappingSpan(sourceComments, start)
+	if first == len(sourceComments) || sourceComments[first].Pos() >= end {
+		return nil
+	}
+	last := first + sort.Search(len(sourceComments)-first, func(i int) bool {
+		return sourceComments[first+i].Pos() >= end
+	})
+	return sourceComments[first:last]
+}
+
+// HasCommentInSpan reports whether any comment in sourceComments overlaps the
+// half-open source span [start, end). It has the same input contract as
+// CommentsInSpan and runs in O(log k).
 func HasCommentInSpan(sourceComments []*ast.CommentRange, start int, end int) bool {
 	if start >= end {
 		return false
 	}
+	first := firstCommentOverlappingSpan(sourceComments, start)
+	return first < len(sourceComments) && sourceComments[first].Pos() < end
+}
 
-	idx := sort.Search(len(sourceComments), func(i int) bool { return sourceComments[i].Pos() >= start })
-	if idx > 0 && sourceComments[idx-1].End() > start {
-		return true
+func firstCommentOverlappingSpan(sourceComments []*ast.CommentRange, start int) int {
+	first := sort.Search(len(sourceComments), func(i int) bool { return sourceComments[i].Pos() >= start })
+	if first > 0 && sourceComments[first-1].End() > start {
+		return first - 1
 	}
-	return idx < len(sourceComments) && sourceComments[idx].Pos() < end
+	return first
 }
 
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
