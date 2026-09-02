@@ -253,6 +253,13 @@ func TestPreferArrayFlatUpstream(t *testing.T) {
 		nil,
 	)
 	suite.addFixed(
+		`let effects = new Set(); effects.flatMap(x => x);`,
+		`effects.flatMap(x => x)`,
+		`effects.flat()`,
+		`Array#flatMap()`,
+		nil,
+	)
+	suite.addFixed(
 		`const Items = []; Items.flatMap(x => x);`,
 		`Items.flatMap(x => x)`,
 		`Items.flat()`,
@@ -288,6 +295,25 @@ func TestPreferArrayFlatUpstream(t *testing.T) {
 		`array.reduce((a, b) => b.concat(a), [])`,
 		`array.reduce((a, b) => a.notConcat(b), [])`,
 		`array.reduce((a, b) => a.concat, [])`,
+		`array.reduce((a, b) => Iterator.concat(a, b), [])`,
+	)
+	suite.valid = append(suite.valid,
+		rule_tester.ValidTestCase{
+			Code:     `function f(foo: Set<number[]>) { foo.reduce((a, b) => a.concat(b), []); }`,
+			FileName: "file.ts",
+		},
+		rule_tester.ValidTestCase{
+			Code:     `function f(foo: Uint8Array) { foo.reduce((a, b) => a.concat(b), []); }`,
+			FileName: "file.ts",
+		},
+		rule_tester.ValidTestCase{
+			Code:     `const foo = new Uint8Array(); foo.reduce((a, b) => a.concat(b), []);`,
+			FileName: "file.js",
+		},
+		rule_tester.ValidTestCase{
+			Code:     `function f(foo: string) { foo.reduce((a, b) => a.concat(b), []); }`,
+			FileName: "file.ts",
+		},
 	)
 	for _, code := range []string{
 		`array.reduce((a, b) => a.concat(b), [])`,
@@ -314,6 +340,13 @@ func TestPreferArrayFlatUpstream(t *testing.T) {
 			expectedDiagnostic{target: target, description: `Array#reduce()`},
 		)
 	}
+	suite.addFixed(
+		`function f(foo: number[][]) { foo.reduce((a, b) => a.concat(b), []); }`,
+		`foo.reduce((a, b) => a.concat(b), [])`,
+		`foo.flat()`,
+		`Array#reduce()`,
+		nil,
+	)
 
 	// ---- `array.reduce((a, b) => [...a, ...b], [])` ----
 	suite.addValid(nil,
@@ -340,6 +373,16 @@ func TestPreferArrayFlatUpstream(t *testing.T) {
 		`array.reduce((a, b) => [, ], [])`,
 		`array.reduce((a, b) => [, ,], [])`,
 	)
+	suite.valid = append(suite.valid,
+		rule_tester.ValidTestCase{
+			Code:     `function f(foo: Set<number[]>) { foo.reduce((a, b) => [...a, ...b], []); }`,
+			FileName: "file.ts",
+		},
+		rule_tester.ValidTestCase{
+			Code:     `function f(foo: Uint8Array) { foo.reduce((a, b) => [...a, ...b], []); }`,
+			FileName: "file.ts",
+		},
+	)
 	suite.addFixed(
 		`array.reduce((a, b) => [...a, ...b], [])`,
 		`array.reduce((a, b) => [...a, ...b], [])`,
@@ -362,6 +405,13 @@ func TestPreferArrayFlatUpstream(t *testing.T) {
 			target:      `[].reduce((a, b) => [...a, ...b,], [])`,
 			description: `Array#reduce()`,
 		},
+	)
+	suite.addFixed(
+		`function f(foo: number[][]) { foo.reduce((a, b) => [...a, ...b], []); }`,
+		`foo.reduce((a, b) => [...a, ...b], [])`,
+		`foo.flat()`,
+		`Array#reduce()`,
+		nil,
 	)
 
 	suite.run(t)

@@ -3,6 +3,7 @@ package prefer_array_flat
 import (
 	_ "embed"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -19,18 +20,22 @@ var (
 	//go:embed prefer_array_flat.schema.json
 	schemaJSON []byte
 
-	lodashFlattenFunctions = []string{
-		"_.flatten",
-		"lodash.flatten",
-		"underscore.flatten",
+	lodashFlattenFunctions = []flattenFunction{
+		{name: "_.flatten", leaf: "flatten"},
+		{name: "lodash.flatten", leaf: "flatten"},
+		{name: "underscore.flatten", leaf: "flatten"},
 	}
 )
 
 type flattenMatch struct {
-	array         *ast.Node
-	description   string
-	switchToArray bool
-	optional      bool
+	array       *ast.Node
+	description string
+	optional    bool
+}
+
+type flattenFunction struct {
+	name string
+	leaf string
 }
 
 func message(description string) rule.RuleMessage {
@@ -56,7 +61,7 @@ func matchArrayFlatMap(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool
 	if len(arguments) != 1 || ast.IsSpreadElement(arguments[0]) {
 		return flattenMatch{}, false
 	}
-	callback := ast.SkipParentheses(arguments[0])
+	callback := utils.ESTreeRuntimeExpression(arguments[0])
 	if callback == nil || !ast.IsArrowFunction(callback) || ast.IsAsyncFunction(callback) {
 		return flattenMatch{}, false
 	}
@@ -67,8 +72,9 @@ func matchArrayFlatMap(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool
 		return flattenMatch{}, false
 	}
 	parameter := unicornutil.PlainParameterIdentifier(arrow.Parameters.Nodes[0])
-	if parameter == nil || !unicornutil.IsSameIdentifier(parameter, arrow.Body) ||
-		isObviouslyNonArrayFlatMapReceiver(call.Object, ctx) {
+	if parameter == nil ||
+		!unicornutil.IsSameIdentifier(parameter, utils.ESTreeRuntimeExpression(arrow.Body)) ||
+		isObviouslyNonArrayFlatMapReceiver(utils.ESTreeRuntimeExpression(call.Object), ctx) {
 		return flattenMatch{}, false
 	}
 
@@ -79,7 +85,7 @@ func matchArrayFlatMap(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool
 	}, true
 }
 
-func matchArrayReduce(node *ast.Node) (flattenMatch, bool) {
+func matchArrayReduce(node *ast.Node, ctx rule.RuleContext) (flattenMatch, bool) {
 	twoArguments := 2
 	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 		Method:              "reduce",
@@ -93,11 +99,11 @@ func matchArrayReduce(node *ast.Node) (flattenMatch, bool) {
 	arguments := node.Arguments()
 	if len(arguments) != 2 || ast.IsSpreadElement(arguments[0]) ||
 		ast.IsSpreadElement(arguments[1]) ||
-		!ast.IsEmptyArrayLiteral(ast.SkipParentheses(arguments[1])) {
+		!ast.IsEmptyArrayLiteral(utils.ESTreeRuntimeExpression(arguments[1])) {
 		return flattenMatch{}, false
 	}
 
-	callback := ast.SkipParentheses(arguments[0])
+	callback := utils.ESTreeRuntimeExpression(arguments[0])
 	if callback == nil || !ast.IsArrowFunction(callback) || ast.IsAsyncFunction(callback) {
 		return flattenMatch{}, false
 	}
@@ -113,9 +119,12 @@ func matchArrayReduce(node *ast.Node) (flattenMatch, bool) {
 		return flattenMatch{}, false
 	}
 
-	body := ast.SkipParentheses(arrow.Body)
+	body := utils.ESTreeRuntimeExpression(arrow.Body)
 	if !matchesConcatReducer(body, firstParameter, secondParameter) &&
 		!matchesSpreadReducer(body, firstParameter, secondParameter) {
+		return flattenMatch{}, false
+	}
+	if unicornutil.IsKnownNonArray(ctx, utils.ESTreeRuntimeExpression(call.Object)) {
 		return flattenMatch{}, false
 	}
 
@@ -138,8 +147,14 @@ func matchesConcatReducer(body *ast.Node, firstParameter *ast.Node, secondParame
 	arguments := body.Arguments()
 	return len(arguments) == 1 &&
 		!ast.IsSpreadElement(arguments[0]) &&
-		unicornutil.IsSameIdentifier(firstParameter, call.Object) &&
-		unicornutil.IsSameIdentifier(secondParameter, arguments[0])
+		unicornutil.IsSameIdentifier(
+			firstParameter,
+			utils.ESTreeRuntimeExpression(call.Object),
+		) &&
+		unicornutil.IsSameIdentifier(
+			secondParameter,
+			utils.ESTreeRuntimeExpression(arguments[0]),
+		)
 }
 
 func matchesSpreadReducer(body *ast.Node, firstParameter *ast.Node, secondParameter *ast.Node) bool {
@@ -156,7 +171,10 @@ func matchesSpreadReducer(body *ast.Node, firstParameter *ast.Node, secondParame
 		if element == nil || element.Kind != ast.KindSpreadElement {
 			return false
 		}
-		if !unicornutil.IsSameIdentifier(parameters[index], element.AsSpreadElement().Expression) {
+		if !unicornutil.IsSameIdentifier(
+			parameters[index],
+			utils.ESTreeRuntimeExpression(element.AsSpreadElement().Expression),
+		) {
 			return false
 		}
 	}
@@ -173,52 +191,43 @@ func matchEmptyArrayConcat(node *ast.Node) (flattenMatch, bool) {
 		return flattenMatch{}, false
 	}
 
-	object := ast.SkipParentheses(call.Object)
+	object := utils.ESTreeRuntimeExpression(call.Object)
 	if !ast.IsEmptyArrayLiteral(object) {
 		return flattenMatch{}, false
 	}
 
 	argument := node.Arguments()[0]
-	if ast.IsSpreadElement(argument) {
-		return flattenMatch{
-			array:       argument.AsSpreadElement().Expression,
-			description: "[].concat()",
-		}, true
+	if !ast.IsSpreadElement(argument) {
+		return flattenMatch{}, false
 	}
 	return flattenMatch{
-		array:         argument,
-		description:   "[].concat()",
-		switchToArray: true,
+		array:       argument.AsSpreadElement().Expression,
+		description: "[].concat()",
 	}, true
 }
 
 func matchArrayPrototypeConcat(node *ast.Node) (flattenMatch, bool) {
 	twoArguments := 2
 	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
-		Method:          "apply",
+		Methods:         []string{"apply", "call"},
 		ArgumentsLength: &twoArguments,
 	})
-	method := "apply"
-	if !ok {
-		call, ok = unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
-			Method:          "call",
-			ArgumentsLength: &twoArguments,
-		})
-		method = "call"
-	}
 	if !ok || !unicornutil.IsArrayPrototypeProperty(call.Object, "concat") {
 		return flattenMatch{}, false
 	}
 
 	arguments := node.Arguments()
 	if len(arguments) != 2 || ast.IsSpreadElement(arguments[0]) ||
-		!ast.IsEmptyArrayLiteral(ast.SkipParentheses(arguments[0])) {
+		!ast.IsEmptyArrayLiteral(utils.ESTreeRuntimeExpression(arguments[0])) {
 		return flattenMatch{}, false
 	}
 
+	method := call.Property.AsIdentifier().Text
 	secondArgument := arguments[1]
 	isSpread := ast.IsSpreadElement(secondArgument)
-	if method == "apply" && isSpread {
+	matchesApply := method == "apply" && !isSpread
+	matchesCall := method == "call" && isSpread
+	if !matchesApply && !matchesCall {
 		return flattenMatch{}, false
 	}
 	if isSpread {
@@ -226,13 +235,12 @@ func matchArrayPrototypeConcat(node *ast.Node) (flattenMatch, bool) {
 	}
 
 	return flattenMatch{
-		array:         secondArgument,
-		description:   "Array.prototype.concat()",
-		switchToArray: method == "call" && !isSpread,
+		array:       secondArgument,
+		description: "Array.prototype.concat()",
 	}, true
 }
 
-func matchFlattenFunction(node *ast.Node, functions []string) (flattenMatch, bool) {
+func matchFlattenFunction(node *ast.Node, functions []flattenFunction) (flattenMatch, bool) {
 	if node == nil || !ast.IsCallExpression(node) {
 		return flattenMatch{}, false
 	}
@@ -243,22 +251,56 @@ func matchFlattenFunction(node *ast.Node, functions []string) (flattenMatch, boo
 		return flattenMatch{}, false
 	}
 
-	callee := ast.SkipParentheses(call.Expression)
+	callee := utils.ESTreeRuntimeExpression(call.Expression)
+	leaf := nodePathLeaf(callee)
+	if leaf == "" {
+		return flattenMatch{}, false
+	}
 	for _, function := range functions {
-		if unicornutil.NodeMatchesPath(callee, function) {
+		if leaf == function.leaf && unicornutil.NodeMatchesPath(callee, function.name) {
 			return flattenMatch{
 				array:       arguments[0],
-				description: ecmascript.StringTrim(function) + "()",
+				description: function.name + "()",
 			}, true
 		}
 	}
 	return flattenMatch{}, false
 }
 
+func nodePathLeaf(node *ast.Node) string {
+	node = utils.ESTreeRuntimeExpression(node)
+	if node == nil {
+		return ""
+	}
+	if ast.IsIdentifier(node) {
+		return node.AsIdentifier().Text
+	}
+	switch node.Kind {
+	case ast.KindThisKeyword:
+		return "this"
+	case ast.KindSuperKeyword:
+		return "super"
+	}
+	if ast.IsPropertyAccessExpression(node) {
+		name := node.AsPropertyAccessExpression().Name()
+		if name != nil && ast.IsIdentifier(name) {
+			return name.AsIdentifier().Text
+		}
+		return ""
+	}
+	if node.Kind == ast.KindMetaProperty {
+		name := node.AsMetaProperty().Name()
+		if name != nil {
+			return name.Text()
+		}
+	}
+	return ""
+}
+
 // Upstream checks only whether the first Unicode rune is an uppercase letter;
 // this is not intended to validate the rest of a PascalCase name.
 func isPascalCaseIdentifier(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
+	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil || !ast.IsIdentifier(node) {
 		return false
 	}
@@ -267,7 +309,7 @@ func isPascalCaseIdentifier(node *ast.Node) bool {
 }
 
 func isDefinitelyArrayExpression(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
+	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil {
 		return false
 	}
@@ -277,12 +319,12 @@ func isDefinitelyArrayExpression(node *ast.Node) bool {
 	if !ast.IsNewExpression(node) {
 		return false
 	}
-	callee := ast.SkipParentheses(node.AsNewExpression().Expression)
+	callee := utils.ESTreeRuntimeExpression(node.AsNewExpression().Expression)
 	return callee != nil && ast.IsIdentifier(callee) && callee.AsIdentifier().Text == "Array"
 }
 
 func isDefinitelyNonArrayExpression(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
+	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil {
 		return false
 	}
@@ -303,7 +345,7 @@ func isDefinitelyNonArrayExpression(node *ast.Node) bool {
 		ast.KindClassExpression:
 		return true
 	case ast.KindNewExpression:
-		callee := ast.SkipParentheses(node.AsNewExpression().Expression)
+		callee := utils.ESTreeRuntimeExpression(node.AsNewExpression().Expression)
 		return callee != nil && ast.IsIdentifier(callee) &&
 			callee.AsIdentifier().Text != "Array"
 	default:
@@ -323,7 +365,7 @@ func isObviouslyNonArrayFlatMapReceiver(node *ast.Node, ctx rule.RuleContext) bo
 
 func canFix(node *ast.Node, array *ast.Node, ctx rule.RuleContext) bool {
 	nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-	arrayRange := utils.TrimNodeTextRange(ctx.SourceFile, ast.SkipParentheses(array))
+	arrayRange := utils.TrimNodeTextRange(ctx.SourceFile, utils.ESTreeRuntimeExpression(array))
 	comments := ctx.Comments.All()
 	// Upstream fixes only when every comment in the matched call belongs to the
 	// selected array expression. Since array is nested in node, check the two
@@ -335,9 +377,7 @@ func canFix(node *ast.Node, array *ast.Node, ctx rule.RuleContext) bool {
 func replacementText(sourceFile *ast.SourceFile, match flattenMatch) string {
 	arrayText := utils.TrimmedNodeText(sourceFile, match.array)
 	fixed := arrayText
-	if match.switchToArray {
-		fixed = "[" + fixed + "]"
-	} else if match.array.Kind != ast.KindParenthesizedExpression &&
+	if match.array.Kind != ast.KindParenthesizedExpression &&
 		unicornutil.ShouldAddParenthesesToMemberExpressionObject(sourceFile, match.array) {
 		fixed = "(" + fixed + ")"
 	}
@@ -359,16 +399,29 @@ func buildFixes(node *ast.Node, match flattenMatch, ctx rule.RuleContext) []rule
 	return append(fixes, unicornutil.SpaceAroundKeywordFixes(ctx.SourceFile, node)...)
 }
 
-func parseFunctions(options []any) []string {
-	functions := make([]string, 0, len(lodashFlattenFunctions))
+func parseFunctions(options []any) []flattenFunction {
+	var configured []string
 	if len(options) > 0 {
 		optionsMap, _ := options[0].(map[string]any)
-		functions = append(functions, utils.ToStringSlice(optionsMap["functions"])...)
+		configured = utils.ToStringSlice(optionsMap["functions"])
+	}
+	if len(configured) == 0 {
+		return lodashFlattenFunctions
+	}
+
+	functions := make([]flattenFunction, 0, len(configured)+len(lodashFlattenFunctions))
+	for _, function := range configured {
+		name := ecmascript.StringTrim(function)
+		leafStart := strings.LastIndexByte(name, '.') + 1
+		functions = append(functions, flattenFunction{
+			name: name,
+			leaf: name[leafStart:],
+		})
 	}
 	return append(functions, lodashFlattenFunctions...)
 }
 
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-array-flat.md
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v74.0.0/docs/rules/prefer-array-flat.md
 var PreferArrayFlatRule = rule.Rule{
 	Name:   "unicorn/prefer-array-flat",
 	Schema: rule.NewSchema(schemaJSON),
@@ -376,33 +429,32 @@ var PreferArrayFlatRule = rule.Rule{
 		functions := parseFunctions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				var matches []flattenMatch
 				if match, ok := matchArrayFlatMap(node, ctx); ok {
-					matches = append(matches, match)
+					reportMatch(node, match, ctx)
 				}
-				if match, ok := matchArrayReduce(node); ok {
-					matches = append(matches, match)
+				if match, ok := matchArrayReduce(node, ctx); ok {
+					reportMatch(node, match, ctx)
 				}
 				if match, ok := matchEmptyArrayConcat(node); ok {
-					matches = append(matches, match)
+					reportMatch(node, match, ctx)
 				}
 				if match, ok := matchArrayPrototypeConcat(node); ok {
-					matches = append(matches, match)
+					reportMatch(node, match, ctx)
 				}
 				if match, ok := matchFlattenFunction(node, functions); ok {
-					matches = append(matches, match)
-				}
-
-				for _, match := range matches {
-					ruleMessage := message(match.description)
-					ctx.ReportNodeWithDeferredFixes(node, ruleMessage, func() []rule.RuleFix {
-						if !canFix(node, match.array, ctx) {
-							return nil
-						}
-						return buildFixes(node, match, ctx)
-					})
+					reportMatch(node, match, ctx)
 				}
 			},
 		}
 	},
+}
+
+func reportMatch(node *ast.Node, match flattenMatch, ctx rule.RuleContext) {
+	ruleMessage := message(match.description)
+	ctx.ReportNodeWithDeferredFixes(node, ruleMessage, func() []rule.RuleFix {
+		if !canFix(node, match.array, ctx) {
+			return nil
+		}
+		return buildFixes(node, match, ctx)
+	})
 }

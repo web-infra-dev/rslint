@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -301,6 +302,17 @@ func TestPreferConstRule(t *testing.T) {
 			{
 				Code:    `function f() { let a: any; var b: any; ({a, b} = ({} as any)); b = 1; }`,
 				Options: map[string]interface{}{"destructuring": "all"},
+			},
+
+			// A global listed by `/* exported */` may be reassigned from another
+			// file, so it is never a const candidate — which also holds a
+			// destructuring group back under destructuring: "all".
+			{Code: `/* exported exportedLet */ let exportedLet = 1;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `/* exported exportedLet */ let exportedLet; exportedLet = 1;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{
+				Code:            `/* exported a */ let { a, b } = source;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Options:         map[string]interface{}{"destructuring": "all"},
 			},
 		},
 		// Invalid cases
@@ -1207,6 +1219,40 @@ func TestPreferConstRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 5},
 					{MessageId: "useConst", Line: 1, Column: 32},
+				},
+			},
+
+			// `/* exported */` resolves against the global scope only: a block or
+			// function binding of the same name, and any binding at all in a
+			// module, stay ordinary const candidates.
+			{
+				Code:   `/* exported blockScoped */ { let blockScoped = 1; }`,
+				Output: []string{`/* exported blockScoped */ { const blockScoped = 1; }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 34, EndLine: 1, EndColumn: 45},
+				},
+			},
+			{
+				Code:   `/* exported inner */ function f() { let inner = 1; return inner; }`,
+				Output: []string{`/* exported inner */ function f() { const inner = 1; return inner; }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 41, EndLine: 1, EndColumn: 46},
+				},
+			},
+			{
+				Code:   `/* exported x */ let x = 1; export {};`,
+				Output: []string{`/* exported x */ const x = 1; export {};`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 22, EndLine: 1, EndColumn: 23},
+				},
+			},
+			// Only the listed name is spared; the rest of the declaration is
+			// still judged, and the partial group blocks the fix.
+			{
+				Code:            `/* exported a */ let { a, b } = source;`,
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 27, EndLine: 1, EndColumn: 28},
 				},
 			},
 		},

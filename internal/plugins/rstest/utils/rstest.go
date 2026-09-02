@@ -10,6 +10,35 @@ import (
 const RstestImportModule = "@rstest/core"
 const RstestPlaywrightImportModule = "@rstest/playwright"
 
+// RstackTestImportModule is the Rstack CLI's re-export of the Rstest core API.
+// `rstack/test` is a fixed subpath export whose module body is
+// `export * from '@rstest/core'`, so a binding imported from it is the same API
+// under a second specifier, not a separate framework.
+const RstackTestImportModule = "rstack/test"
+
+// The module lists below are package-level so that resolving a call site does
+// not allocate a slice per lookup.
+var (
+	// RstestCoreImportModules holds every specifier that reaches the Rstest
+	// core API surface.
+	RstestCoreImportModules = []string{RstestImportModule, RstackTestImportModule}
+	// RstestPlaywrightImportModules holds every specifier that reaches the
+	// Rstest Playwright API surface.
+	RstestPlaywrightImportModules = []string{RstestPlaywrightImportModule}
+	// RstestAllImportModules holds every specifier of either surface.
+	RstestAllImportModules = []string{
+		RstestImportModule,
+		RstackTestImportModule,
+		RstestPlaywrightImportModule,
+	}
+)
+
+// IsRstestCoreImportModule reports whether specifier reaches the Rstest core
+// API surface.
+func IsRstestCoreImportModule(specifier string) bool {
+	return specifier == RstestImportModule || specifier == RstackTestImportModule
+}
+
 type RstestFnType = testFramework.FnKind
 
 type RstestImportMode = testFramework.ReferenceMode
@@ -106,20 +135,20 @@ func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	return testFramework.ResolveFirstIdentifier(node)
 }
 
-func ResolveFunctionReferenceForModule(
+func ResolveFunctionReferenceForModules(
 	node *ast.Node,
 	localName string,
 	localNode *ast.Node,
 	ctx rule.RuleContext,
-	importModule string,
+	importModules []string,
 ) (string, *ast.Node, RstestImportMode) {
-	return testFramework.ResolveFunctionReferenceForModule(
+	return testFramework.ResolveFunctionReferenceForModules(
 		node,
 		localName,
 		localNode,
 		ctx.TypeChecker,
 		ctx.SourceFile,
-		importModule,
+		importModules,
 	)
 }
 
@@ -129,5 +158,5 @@ func ResolveRstestFunctionReference(
 	localNode *ast.Node,
 	ctx rule.RuleContext,
 ) (string, *ast.Node, RstestImportMode) {
-	return ResolveFunctionReferenceForModule(node, localName, localNode, ctx, RstestImportModule)
+	return ResolveFunctionReferenceForModules(node, localName, localNode, ctx, RstestCoreImportModules)
 }

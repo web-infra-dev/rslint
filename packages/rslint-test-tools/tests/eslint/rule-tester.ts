@@ -97,6 +97,10 @@ function filterSnapshot(diags: LintResponse & { code?: string }): LintResponse {
 }
 
 export class RuleTester {
+  public constructor(
+    private readonly defaultLanguageOptions?: TestLanguageOptions,
+  ) {}
+
   public run(
     ruleName: string,
     cases: {
@@ -123,7 +127,7 @@ export class RuleTester {
             typeof validCase === 'string' ? validCase : validCase.code;
           const options =
             typeof validCase === 'object' ? validCase.options : undefined;
-          const languageOptions =
+          const caseLanguageOptions =
             typeof validCase === 'object'
               ? validCase.languageOptions
               : undefined;
@@ -143,8 +147,13 @@ export class RuleTester {
           const diags = await lint({
             config: [
               ...resolvedConfig,
+              ...(this.defaultLanguageOptions
+                ? [{ languageOptions: this.defaultLanguageOptions }]
+                : []),
+              ...(caseLanguageOptions
+                ? [{ languageOptions: caseLanguageOptions }]
+                : []),
               {
-                ...(languageOptions ? { languageOptions } : {}),
                 rules: {
                   [ruleName]:
                     ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',
@@ -168,7 +177,13 @@ export class RuleTester {
           if (item.skip) continue;
           if (hasOnly && !item.only) continue;
 
-          const { code, errors, options, languageOptions, filename } = item;
+          const {
+            code,
+            errors,
+            options,
+            languageOptions: caseLanguageOptions,
+            filename,
+          } = item;
           const virtual_entry = path.resolve(cwd, filename ?? 'src/virtual.ts');
 
           const { config: resolvedConfig, configDirectory } =
@@ -181,8 +196,13 @@ export class RuleTester {
           const diags = await lint({
             config: [
               ...resolvedConfig,
+              ...(this.defaultLanguageOptions
+                ? [{ languageOptions: this.defaultLanguageOptions }]
+                : []),
+              ...(caseLanguageOptions
+                ? [{ languageOptions: caseLanguageOptions }]
+                : []),
               {
-                ...(languageOptions ? { languageOptions } : {}),
                 rules: {
                   [ruleName]:
                     ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',

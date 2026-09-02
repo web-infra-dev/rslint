@@ -20,6 +20,14 @@ ruleTester.run('no-control-regex', {
     String.raw`new RegExp("\\u{1F}", flags)`,
     String.raw`new RegExp("[\\q{\\u{20}}]", "v")`,
     String.raw`/[\u{20}--B]/v`,
+    // Only the global RegExp constructor is checked (ESLint v10.9.1).
+    String.raw`function foo(RegExp) { RegExp("\x1f"); }`,
+    String.raw`function foo(RegExp) { new RegExp("\x1f"); }`,
+    String.raw`let RegExp; RegExp("\x1f");`,
+    {
+      code: String.raw`RegExp("\x1f")`,
+      languageOptions: { globals: { RegExp: 'off' } },
+    },
     // Symbolic escapes — allowed
     String.raw`/\t/`,
     String.raw`/\n/`,

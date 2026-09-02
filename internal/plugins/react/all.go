@@ -32,6 +32,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_pascal_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_multi_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spread_multi"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spreading"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_sort_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
@@ -62,6 +64,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
@@ -112,7 +115,9 @@ func GetAllRules() []rule.Rule {
 		jsx_no_undef.JsxNoUndefRule,
 		jsx_pascal_case.JsxPascalCaseRule,
 		jsx_props_no_multi_spaces.JsxPropsNoMultiSpacesRule,
+		jsx_props_no_spreading.JsxPropsNoSpreadingRule,
 		jsx_props_no_spread_multi.JsxPropsNoSpreadMultiRule,
+		jsx_sort_props.JsxSortPropsRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
@@ -143,6 +148,7 @@ func GetAllRules() []rule.Rule {
 		no_will_update_set_state.NoWillUpdateSetStateRule,
 		prefer_es6_class.PreferEs6ClassRule,
 		prefer_stateless_function.PreferStatelessFunctionRule,
+		prop_types.PropTypesRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		require_optimization.RequireOptimizationRule,
 		require_render_return.RequireRenderReturnRule,

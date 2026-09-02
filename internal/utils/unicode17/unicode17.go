@@ -153,6 +153,26 @@ func IsLower(r rune) bool {
 	return unicode.IsLower(r) || unicode.Is(lowerAdded, r)
 }
 
+// IsUppercase reports the Unicode Uppercase derived property as Unicode 17
+// defines it. It includes uppercase letters and Other_Uppercase characters
+// such as Roman numerals.
+func IsUppercase(r rune) bool {
+	return IsUpper(r) || unicode.Is(unicode.Other_Uppercase, r)
+}
+
+// IsLowercase reports the Unicode Lowercase derived property as Unicode 17
+// defines it. It includes lowercase letters and Other_Lowercase characters.
+func IsLowercase(r rune) bool {
+	return IsLower(r) || unicode.Is(unicode.Other_Lowercase, r)
+}
+
+// IsTitle reports whether r is a title-case letter (general category Lt).
+// Unicode 16 and 17 added no characters to this category, so the toolchain's
+// table already carries the complete answer.
+func IsTitle(r rune) bool {
+	return unicode.Is(unicode.Lt, r)
+}
+
 // IsLetter says for the category L what [IsUpper] says for Lu. Most of what it
 // adds is the scripts the two editions brought in whole.
 func IsLetter(r rune) bool {

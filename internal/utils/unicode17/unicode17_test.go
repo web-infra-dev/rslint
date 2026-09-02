@@ -169,6 +169,34 @@ func TestCasedLettersAreLetters(t *testing.T) {
 	}
 }
 
+func TestCaseClassification(t *testing.T) {
+	tests := []struct {
+		name                        string
+		r                           rune
+		uppercase, lowercase, title bool
+	}{
+		{name: "uppercase letter", r: 'A', uppercase: true},
+		{name: "lowercase letter", r: 'a', lowercase: true},
+		{name: "other uppercase", r: '\u2160', uppercase: true},
+		{name: "other lowercase", r: '\u2170', lowercase: true},
+		{name: "title-case letter", r: '\u01C5', title: true},
+		{name: "uncased letter", r: '\u4E2D'},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsUppercase(test.r); got != test.uppercase {
+				t.Errorf("IsUppercase(%U) = %v, want %v", test.r, got, test.uppercase)
+			}
+			if got := IsLowercase(test.r); got != test.lowercase {
+				t.Errorf("IsLowercase(%U) = %v, want %v", test.r, got, test.lowercase)
+			}
+			if got := IsTitle(test.r); got != test.title {
+				t.Errorf("IsTitle(%U) = %v, want %v", test.r, got, test.title)
+			}
+		})
+	}
+}
+
 // runesOf walks out every character a table names.
 func runesOf(table *unicode.RangeTable) []rune {
 	var runes []rune
