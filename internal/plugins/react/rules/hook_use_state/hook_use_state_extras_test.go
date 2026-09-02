@@ -141,6 +141,33 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 				},
 			}},
 		},
+		// Components selects the first hook-shaped reference in the current scope,
+		// even when the current callee is shadowed by a later local declaration.
+		hookUseStateError(`import { useFoo, useState } from 'react';
+	function f() { useFoo(); function useState() {} const result = useState() }`, useStateErrorText, 2, 65),
+		// A single non-identifier binding still receives the upstream memo suggestion.
+		{
+			Code: `import { useState } from 'react'; const [value = fallback] = useState(initial)`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "suggestMemo",
+					Output:    `import { useState, useMemo } from 'react'; const  = useMemo(() => initial, [])`,
+				}},
+			}},
+		},
+		{
+			Code: `import { useState } from 'react'; const [...value] = useState(initial)`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "suggestMemo",
+					Output:    `import { useState, useMemo } from 'react'; const  = useMemo(() => initial, [])`,
+				}},
+			}},
+		},
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed hook_use_state.schema.json
@@ -41,6 +42,7 @@ type importInfo struct {
 	useStateSpecifier *ast.Node
 	useMemoSpecifier  *ast.Node
 	useMemoName       string
+	namedHookNames    map[string]string
 }
 
 func importedName(spec *ast.Node) string {
@@ -87,8 +89,14 @@ func reactImportInfo(node *ast.Node) importInfo {
 	if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
 		return info
 	}
+	info.namedHookNames = make(map[string]string)
 	for _, spec := range clause.NamedBindings.AsNamedImports().Elements.Nodes {
-		switch importedName(spec) {
+		imported := importedName(spec)
+		local := localName(spec)
+		if len(imported) >= 4 && imported[:3] == "use" && imported[3] >= 'A' && imported[3] <= 'Z' && local != "" {
+			info.namedHookNames[local] = imported
+		}
+		switch imported {
 		case "useState":
 			if info.useStateSpecifier == nil {
 				info.useStateSpecifier = spec
@@ -103,23 +111,24 @@ func reactImportInfo(node *ast.Node) importInfo {
 	return info
 }
 
-func isReactImportDeclaration(node *ast.Node) bool {
-	if node == nil {
-		return false
+func firstReactHookReference(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, ident *ast.Node) *scope.Reference {
+	if ident == nil || imports.namedHookNames == nil {
+		return nil
 	}
-	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		if parent.Kind != ast.KindImportDeclaration {
-			continue
+	from := referenceScopes[ident]
+	if from == nil {
+		return nil
+	}
+	for _, reference := range from.References {
+		if _, ok := imports.namedHookNames[reference.Identifier.Text()]; ok {
+			return reference
 		}
-		decl := parent.AsImportDeclaration()
-		return decl.ModuleSpecifier != nil && decl.ModuleSpecifier.Kind == ast.KindStringLiteral &&
-			decl.ModuleSpecifier.AsStringLiteral().Text == "react"
 	}
-	return false
+	return nil
 }
 
-func resolvesToNamedUseState(ctx rule.RuleContext, ident *ast.Node) bool {
-	if ctx.Refs == nil || ident == nil || ident.Kind != ast.KindIdentifier {
+func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, ident *ast.Node) bool {
+	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
 	// Components#isReactHookCall requires the local hook spelling to match
@@ -128,17 +137,16 @@ func resolvesToNamedUseState(ctx rule.RuleContext, ident *ast.Node) bool {
 	if len(name) < 4 || name[:3] != "use" || name[3] < 'A' || name[3] > 'Z' {
 		return false
 	}
-	symbol := ctx.Refs.Resolve(ident)
-	if symbol == nil {
+	reference := firstReactHookReference(referenceScopes, imports, ident)
+	if reference == nil {
 		return false
 	}
-	for _, decl := range symbol.Declarations {
-		if decl != nil && decl.Kind == ast.KindImportSpecifier && decl.Pos() < ident.Pos() &&
-			importedName(decl) == "useState" && isReactImportDeclaration(decl) {
-			return true
+	for _, declaration := range reference.Declarations {
+		if declaration != nil && declaration.Name == name && declaration.Kind != scope.DefImport {
+			return false
 		}
 	}
-	return false
+	return imports.namedHookNames[name] == "useState" || name == "useState"
 }
 
 func resolvesToDefaultReactImport(ctx rule.RuleContext, defaultSpecifier, ident *ast.Node) bool {
@@ -161,7 +169,7 @@ func resolvesToDefaultReactImport(ctx rule.RuleContext, defaultSpecifier, ident 
 // isReactUseStateCall ports Components#isReactHookCall(node, ["useState"]).
 // Parentheses are transparent because ESTree drops them; TS assertion wrappers
 // deliberately are not, matching the upstream parser's explicit TS nodes.
-func isReactUseStateCall(ctx rule.RuleContext, imports importInfo, node *ast.Node) bool {
+func isReactUseStateCall(ctx rule.RuleContext, referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -177,7 +185,7 @@ func isReactUseStateCall(ctx rule.RuleContext, imports importInfo, node *ast.Nod
 		return false
 	}
 	if callee.Kind == ast.KindIdentifier {
-		return resolvesToNamedUseState(ctx, callee)
+		return resolvesToNamedUseState(referenceScopes, imports, callee)
 	}
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return false
@@ -254,9 +262,29 @@ var HookUseStateRule = rule.Rule{
 		}
 
 		imports := importInfo{}
+		namedHookNames := make(map[string]struct{})
+		if ctx.SourceFile != nil && ctx.SourceFile.Statements != nil {
+			for _, statement := range ctx.SourceFile.Statements.Nodes {
+				info := reactImportInfo(statement)
+				for local := range info.namedHookNames {
+					namedHookNames[local] = struct{}{}
+				}
+			}
+		}
+		manager := scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true, ReferenceNames: namedHookNames})
+		referenceScopes := make(map[*ast.Node]*scope.Scope, len(manager.References))
+		for _, reference := range manager.References {
+			referenceScopes[reference.Identifier] = reference.From
+		}
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				info := reactImportInfo(node)
+				if imports.namedHookNames == nil {
+					imports.namedHookNames = make(map[string]string)
+				}
+				for local, imported := range info.namedHookNames {
+					imports.namedHookNames[local] = imported
+				}
 				if imports.defaultName == "" && info.defaultName != "" {
 					imports.defaultName = info.defaultName
 					imports.defaultSpecifier = info.defaultSpecifier
@@ -270,7 +298,7 @@ var HookUseStateRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if !isReactUseStateCall(ctx, imports, node) {
+				if !isReactUseStateCall(ctx, referenceScopes, imports, node) {
 					return
 				}
 				// ESTree wraps an optional call in ChainExpression, so it is not
@@ -322,7 +350,7 @@ var HookUseStateRule = rule.Rule{
 
 				ctx.ReportNodeWithDeferredSuggestions(pattern, useStateErrorMessage(), func() []rule.RuleSuggestion {
 					suggestions := make([]rule.RuleSuggestion, 0, 2)
-					if value != nil && len(elements) == 1 && valueName != "" && node.AsCallExpression().Arguments != nil && len(node.AsCallExpression().Arguments.Nodes) == 1 {
+					if value != nil && len(elements) == 1 && node.AsCallExpression().Arguments != nil && len(node.AsCallExpression().Arguments.Nodes) == 1 {
 						argument := node.AsCallExpression().Arguments.Nodes[0]
 						memoName := imports.useMemoName
 						var importFix *rule.RuleFix
