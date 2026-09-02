@@ -103,12 +103,20 @@ comment itself as a use:
 var publicValue = 1;
 ```
 
-The comment resolves each name against the global scope, so it applies to a
-file whose top level is that scope — a `.ts` script, or any file with no
-`import`/`export` of its own. A module's top-level binding, a block binding, and
-a function's locals live in their own scopes and are still reported.
+The comment resolves each name only against the outer global scope. Whether a
+file has that scope is determined by its effective
+`languageOptions.sourceType`, not by the presence of `import` or `export`
+syntax. With flat config, omitting `sourceType` makes `.js` and `.ts` files
+modules even when they contain no module syntax, so the comment has no effect.
+Set `sourceType: "script"` for a shared script.
+
+Module bindings, bindings in a JavaScript CommonJS wrapper, block bindings, and
+function locals are still reported. An exact, case-sensitive `.cjs` extension
+defaults to the CommonJS wrapper. TypeScript-flavoured files configured as
+`commonjs` retain a global program scope, so their top-level bindings can be
+marked by the comment.
 
 ## Original Documentation
 
 - [ESLint: no-unused-vars](https://eslint.org/docs/latest/rules/no-unused-vars)
-- [Source code](https://github.com/eslint/eslint/blob/v9.32.0/lib/rules/no-unused-vars.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-unused-vars.js)

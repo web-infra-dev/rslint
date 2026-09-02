@@ -285,7 +285,7 @@ func isTrackable(
 	}
 	if ctx.Exported.Has(sym.Name) {
 		for _, decl := range sym.Declarations {
-			if ctx.IsExportedGlobalBinding(decl, sym.Name) {
+			if ctx.IsExportedGlobalBinding(decl.Symbol(), sym.Name) {
 				return false
 			}
 		}
