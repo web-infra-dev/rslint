@@ -1813,7 +1813,7 @@ func readValueAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 		}
 		return text, true
 	case ast.KindBigIntLiteral:
-		return node.AsBigIntLiteral().Text, true
+		return utils.NormalizeBigIntLiteral(node.AsBigIntLiteral().Text), true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindTrueKeyword:
