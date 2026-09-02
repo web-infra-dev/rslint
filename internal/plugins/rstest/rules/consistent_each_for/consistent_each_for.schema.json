@@ -1,0 +1,25 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "describe": {
+          "type": "string",
+          "enum": ["each", "for"]
+        },
+        "it": {
+          "type": "string",
+          "enum": ["each", "for"]
+        },
+        "test": {
+          "type": "string",
+          "enum": ["each", "for"]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

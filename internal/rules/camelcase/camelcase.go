@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -26,10 +25,9 @@ var CamelcaseRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		state := camelcaseState{
-			ctx:              ctx,
-			opts:             opts,
-			reported:         make(map[int]struct{}),
-			reportedBindings: make(map[bindingReportKey]struct{}),
+			ctx:      ctx,
+			opts:     opts,
+			reported: make(map[int]struct{}),
 		}
 
 		return rule.RuleListeners{
@@ -122,44 +120,86 @@ type camelcaseState struct {
 	identifiers        []*ast.Node
 	privateIdentifiers []*ast.Node
 	reported           map[int]struct{}
-	reportedBindings   map[bindingReportKey]struct{}
 }
 
-type bindingReportKey struct {
-	scope *ast.Node
+type bindingCandidate struct {
+	identifier *ast.Node
+	kind       bindingKind
+}
+
+type bindingGroupKey struct {
+	scope *scope.Scope
 	name  string
 }
 
+type bindingGroup struct {
+	key          bindingGroupKey
+	declarations []*scope.Variable
+	hasLocal     bool
+	hasImport    bool
+}
+
 func (s *camelcaseState) checkFile() {
-	badReferences := make(map[*ast.Node]struct{})
+	badIdentifiers := make([]*ast.Node, 0)
+	candidates := make([]bindingCandidate, 0)
+	needsScopeAnalysis := false
 	for _, identifier := range s.identifiers {
-		kind := runtimeBindingKind(identifier)
-		if kind == bindingNone || s.opts.isGoodName(identifier.AsIdentifier().Text) {
+		if s.opts.isGoodName(identifier.AsIdentifier().Text) {
 			continue
 		}
-		if sym := bindingReferenceSymbol(identifier); sym != nil && s.ctx.Refs != nil {
-			for _, reference := range s.ctx.Refs.References(sym) {
-				badReferences[reference] = struct{}{}
-			}
+		badIdentifiers = append(badIdentifiers, identifier)
+		kind := runtimeBindingKind(identifier)
+		if kind != bindingNone {
+			needsScopeAnalysis = true
+			candidates = append(candidates, bindingCandidate{identifier: identifier, kind: kind})
+		} else if s.needsScopeAnalysis(identifier) {
+			needsScopeAnalysis = true
 		}
 	}
 
-	for _, identifier := range s.identifiers {
+	badReferences := make(map[*ast.Node]struct{})
+	bindingReports := make(map[*ast.Node]string)
+	initializationReports := make(map[*ast.Node]string)
+	var resolvedReferences map[*ast.Node]*scope.Reference
+	var manager *scope.Manager
+	if needsScopeAnalysis {
+		// TypeScript's binder and typescript-eslint's scope manager deliberately
+		// disagree for some reference spaces and invalid declaration merges. Use
+		// the shared ESLint-shaped graph as the authority for both local binding
+		// references and Program's local-vs-global decision.
+		analysisOptions := scope.Options{CollectReferences: true}
+		// Filtering pays for sparse violations. On dense files, collecting every
+		// reference avoids building an equally large name set and its map lookups.
+		if len(badIdentifiers)*2 < len(s.identifiers) {
+			referenceNames := make(map[string]struct{}, len(badIdentifiers))
+			for _, identifier := range badIdentifiers {
+				referenceNames[identifier.AsIdentifier().Text] = struct{}{}
+			}
+			analysisOptions.ReferenceNames = referenceNames
+		}
+		manager = scope.Build(s.ctx.SourceFile, analysisOptions)
+		resolvedReferences = make(map[*ast.Node]*scope.Reference, len(manager.References))
+		for _, reference := range manager.References {
+			resolvedReferences[reference.Identifier] = reference
+		}
+	}
+	if len(candidates) != 0 {
+		s.checkBindings(manager, candidates, badReferences, bindingReports, initializationReports)
+	}
+
+	for _, identifier := range badIdentifiers {
 		name := identifier.AsIdentifier().Text
-		if s.opts.isGoodName(name) || utils.IsImportAttributeKey(identifier) {
+		if utils.IsImportAttributeKey(identifier) {
 			continue
 		}
+		if reportName, ok := bindingReports[identifier]; ok {
+			s.reportBinding(identifier, reportName)
+		}
+		if reportName, ok := initializationReports[identifier]; ok {
+			s.reportInitializationReference(identifier, reportName)
+		}
 
-		switch runtimeBindingKind(identifier) {
-		case bindingLocal:
-			if !s.opts.ignoreDestructuring || !equalsOriginalName(identifier) {
-				s.reportBinding(identifier, name)
-			}
-			continue
-		case bindingImport:
-			if !s.opts.ignoreImports || !equalsImportedName(identifier) {
-				s.reportBinding(identifier, name)
-			}
+		if runtimeBindingKind(identifier) != bindingNone {
 			continue
 		}
 
@@ -193,12 +233,29 @@ func (s *camelcaseState) checkFile() {
 		if !isRuntimeReference(identifier) {
 			continue
 		}
-		if s.ctx.Refs != nil && s.ctx.Refs.IsDefinedInFile(identifier) {
-			// The identifier resolves to a local declaration kind that ESLint's
-			// camelcase visitors do not inspect (for example, a TS-only binding).
+		globalDeclared := s.ctx.Globals.Access(name).IsDeclared()
+		if reference := resolvedReferences[identifier]; reference != nil && reference.Resolved() != nil {
+			// Program only receives unresolved references. This scope-manager
+			// lookup also covers declaration merges which TypeScript rejects but
+			// ESTree still models as one local variable.
 			continue
 		}
-		if s.opts.ignoreGlobals && s.ctx.Globals.Access(name).IsDeclared() {
+		if s.ctx.Refs != nil {
+			referenceSpace := scope.ESLintReferenceSpace(identifier)
+			meaning := referenceSpace.DeclarationMeaning()
+			if referenceSpace.IncludesValue() && s.ctx.Refs.HasImplicitWrapperBinding(name) {
+				// A lexical wrapper binding is local but has no authored declaration
+				// for the scope graph to record.
+				continue
+			}
+			if globalDeclared && !s.ctx.Refs.IsGlobalNameReference(identifier, name, meaning) {
+				// In a global script, scope-manager merges configured globals with
+				// same-named authored Program definitions. Any identifier on that
+				// merged variable makes Program skip all of its references.
+				continue
+			}
+		}
+		if s.opts.ignoreGlobals && globalDeclared {
 			continue
 		}
 		s.reportReference(identifier, name)
@@ -217,15 +274,166 @@ func (s *camelcaseState) checkFile() {
 	}
 }
 
-func (s *camelcaseState) reportBinding(node *ast.Node, name string) {
-	node = bindingReportIdentifier(node)
-	if scope := bindingScope(node, name); scope != nil {
-		key := bindingReportKey{scope: scope, name: name}
-		if _, exists := s.reportedBindings[key]; exists {
-			return
-		}
-		s.reportedBindings[key] = struct{}{}
+// needsScopeAnalysis mirrors the direct-report branches in checkFile and
+// returns true only when the identifier can reach Program's resolution logic.
+// This keeps property-only, label-only, and intrinsic-JSX files on the cheap
+// syntax path without weakening the authoritative scope result where it is
+// semantically required.
+func (s *camelcaseState) needsScopeAnalysis(identifier *ast.Node) bool {
+	if utils.IsImportAttributeKey(identifier) {
+		return false
 	}
+	if isPropertyName(identifier) {
+		return !s.opts.properties && !utils.IsNonReferenceIdentifier(identifier)
+	}
+	if isAssignedPropertyAccessName(identifier) || isExportedName(identifier) || isLabel(identifier) {
+		return false
+	}
+	return isRuntimeReference(identifier)
+}
+
+func (s *camelcaseState) checkBindings(
+	manager *scope.Manager,
+	candidates []bindingCandidate,
+	badReferences map[*ast.Node]struct{},
+	bindingReports map[*ast.Node]string,
+	initializationReports map[*ast.Node]string,
+) {
+	if manager == nil {
+		return
+	}
+	candidateKinds := make(map[*ast.Node]bindingKind, len(candidates))
+	for _, candidate := range candidates {
+		candidateKinds[candidate.identifier] = candidate.kind
+	}
+
+	groupsByKey := make(map[bindingGroupKey]*bindingGroup)
+	groups := make([]*bindingGroup, 0, len(candidates))
+	matched := make(map[*ast.Node]struct{}, len(candidates))
+
+	for _, currentScope := range manager.Scopes {
+		for _, declaration := range currentScope.Vars {
+			kind, ok := candidateKinds[declaration.ID]
+			if !ok {
+				continue
+			}
+			matched[declaration.ID] = struct{}{}
+			key := bindingGroupKey{scope: currentScope, name: declaration.Name}
+			group := groupsByKey[key]
+			if group == nil {
+				group = &bindingGroup{
+					key:          key,
+					declarations: currentScope.Declarations(declaration.Name),
+				}
+				groupsByKey[key] = group
+				groups = append(groups, group)
+			}
+			switch kind {
+			case bindingLocal:
+				group.hasLocal = true
+			case bindingImport:
+				group.hasImport = true
+			}
+		}
+	}
+
+	badGroups := make(map[bindingGroupKey]struct{}, len(groups))
+	for _, group := range groups {
+		badGroups[group.key] = struct{}{}
+		name := group.key.name
+		anchor := scopeManagerBindingIdentifier(group.key.scope, group.declarations)
+		if anchor != nil {
+			if group.hasLocal && (!s.opts.ignoreDestructuring || !equalsOriginalName(anchor)) {
+				bindingReports[anchor] = name
+			}
+			if group.hasImport && (!s.opts.ignoreImports || !equalsOriginalName(anchor)) {
+				bindingReports[anchor] = name
+			}
+		}
+		for _, declaration := range group.declarations {
+			if declaration == nil || declaration.ID == nil {
+				continue
+			}
+			if group.hasImport && declaration.Kind == scope.DefVariable &&
+				hasScopeManagerInitReference(declaration.ID) {
+				initializationReports[declaration.ID] = name
+			}
+		}
+	}
+	for _, reference := range manager.References {
+		resolved := reference.Resolved()
+		if resolved == nil {
+			continue
+		}
+		if _, bad := badGroups[bindingGroupKey{scope: resolved.Scope, name: resolved.Name}]; bad {
+			badReferences[reference.Identifier] = struct{}{}
+		}
+	}
+
+	// Every runtime binding kind above is modeled by the shared scope builder.
+	// Keep a syntax fallback so a newly parsed binding shape cannot silently
+	// disappear before the scope model gains its corresponding definition.
+	for _, candidate := range candidates {
+		if _, ok := matched[candidate.identifier]; ok {
+			continue
+		}
+		name := candidate.identifier.AsIdentifier().Text
+		if (candidate.kind == bindingLocal && (!s.opts.ignoreDestructuring || !equalsOriginalName(candidate.identifier))) ||
+			(candidate.kind == bindingImport && (!s.opts.ignoreImports || !equalsOriginalName(candidate.identifier))) {
+			bindingReports[candidate.identifier] = name
+		}
+	}
+}
+
+// scopeManagerBindingIdentifier returns Variable#identifiers[0]. The shared
+// scope builder records declarations in source order except for runtime
+// function scopes: typescript-eslint defines parameters before type parameters,
+// while tsgo exposes the type parameters first. That is the only ordering
+// exception which can affect a camelcase declaration anchor.
+func scopeManagerBindingIdentifier(currentScope *scope.Scope, declarations []*scope.Variable) *ast.Node {
+	var first *ast.Node
+	var firstParameter *ast.Node
+	for _, declaration := range declarations {
+		if declaration == nil || declaration.Anonymous || declaration.ID == nil ||
+			declaration.ID.Kind != ast.KindIdentifier {
+			continue
+		}
+		identifier := declaration.ID
+		if first == nil || identifier.Pos() < first.Pos() {
+			first = identifier
+		}
+		if currentScope.Kind == scope.KindFunction && declaration.Kind == scope.DefParameter &&
+			(firstParameter == nil || identifier.Pos() < firstParameter.Pos()) {
+			firstParameter = identifier
+		}
+	}
+	if firstParameter != nil {
+		return firstParameter
+	}
+	return first
+}
+
+func hasScopeManagerInitReference(identifier *ast.Node) bool {
+	for current := identifier.Parent; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindBindingElement:
+			if current.AsBindingElement().Initializer != nil {
+				return true
+			}
+		case ast.KindVariableDeclaration:
+			if current.AsVariableDeclaration().Initializer != nil {
+				return true
+			}
+			declarationList := current.Parent
+			return declarationList != nil && declarationList.Kind == ast.KindVariableDeclarationList &&
+				declarationList.Parent != nil &&
+				(declarationList.Parent.Kind == ast.KindForInStatement || declarationList.Parent.Kind == ast.KindForOfStatement)
+		}
+	}
+	return false
+}
+
+func (s *camelcaseState) reportBinding(node *ast.Node, name string) {
 	if _, exists := s.reported[node.Pos()]; exists {
 		return
 	}
@@ -233,92 +441,35 @@ func (s *camelcaseState) reportBinding(node *ast.Node, name string) {
 	s.ctx.ReportRange(utils.GetESTreeBindingIdentifierRange(s.ctx.SourceFile, node), camelcaseMessage(name, false))
 }
 
-// bindingReportIdentifier reproduces scope-manager's binding anchor for an
-// implemented function overload set. The implementation is the syntax node
-// that triggers upstream's FunctionDeclaration listener, but its declared
-// variable retains the first overload signature as identifiers[0]. A purely
-// ambient/body-less declaration never reaches this helper.
-func bindingReportIdentifier(node *ast.Node) *ast.Node {
-	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindFunctionDeclaration || node.Parent.Body() == nil {
-		return node
-	}
-	symbol := utils.BindingNameSymbol(node)
-	if symbol == nil {
-		return node
-	}
-	for _, declaration := range symbol.Declarations {
-		if declaration.Kind != ast.KindFunctionDeclaration {
-			continue
-		}
-		name := declaration.Name()
-		if name != nil && name.Kind == ast.KindIdentifier && name.Text() == node.Text() {
-			return name
-		}
-	}
-	return node
-}
-
-// bindingScope identifies the scope-manager variable that owns a declaration.
-// Looking up the first enclosing table by name also covers declarations that
-// TypeScript keeps as distinct error symbols, such as duplicate parameters or
-// conflicting var/function declarations.
-func bindingScope(node *ast.Node, name string) *ast.Node {
-	// ESLint gives a named function or class expression's self-binding its own
-	// scope. Keep it distinct from same-named outer, parameter, and body bindings.
-	if node != nil && node.Parent != nil &&
-		(node.Parent.Kind == ast.KindFunctionExpression || node.Parent.Kind == ast.KindClassExpression) &&
-		node.Parent.Name() == node {
-		return node
-	}
-	symbol := utils.BindingNameSymbol(node)
-	if symbol != nil {
-		for current := node.Parent; current != nil; current = current.Parent {
-			if locals := current.Locals(); locals != nil && locals[name] == symbol {
-				return current
-			}
-		}
-	}
-	for current := node.Parent; current != nil; current = current.Parent {
-		if locals := current.Locals(); locals != nil && locals[name] != nil {
-			return current
-		}
-	}
-	return nil
-}
-
-// A parameter property is entered into both the constructor's local scope and
-// the class's property table. The second bind leaves the property symbol on the
-// declaration node, while references in the constructor body resolve through
-// the constructor's local table.
-func bindingReferenceSymbol(node *ast.Node) *ast.Symbol {
-	symbol := utils.BindingNameSymbol(node)
-	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindParameter ||
-		node.Parent.Parent == nil || !ast.IsParameterPropertyDeclaration(node.Parent, node.Parent.Parent) {
-		return symbol
-	}
-	if locals := node.Parent.Parent.Locals(); locals != nil {
-		if local := locals[node.Text()]; local != nil {
-			return local
-		}
-	}
-	return symbol
-}
-
 func (s *camelcaseState) reportReference(node *ast.Node, name string) {
+	if !s.shouldReportReference(node) {
+		return
+	}
+	s.report(node, name, false)
+}
+
+func (s *camelcaseState) reportInitializationReference(node *ast.Node, name string) {
+	if !s.shouldReportReference(node) {
+		return
+	}
+	s.reportBinding(node, name)
+}
+
+func (s *camelcaseState) shouldReportReference(node *ast.Node) bool {
 	outer := utils.OutermostParenthesizedExpression(node)
 	parent := outer.Parent
 	if parent != nil {
 		if parent.Kind == ast.KindCallExpression || parent.Kind == ast.KindNewExpression {
-			return
+			return false
 		}
 		if isDefaultValue(parent, outer) {
-			return
+			return false
 		}
 	}
 	if s.opts.ignoreDestructuring && equalsOriginalName(node) {
-		return
+		return false
 	}
-	s.report(node, name, false)
+	return !utils.IsImportAttributeKey(node)
 }
 
 func (s *camelcaseState) report(node *ast.Node, name string, private bool) {
@@ -383,9 +534,9 @@ func runtimeBindingKind(node *ast.Node) bindingKind {
 	return bindingNone
 }
 
-func equalsImportedName(node *ast.Node) bool {
+func equalsOriginalName(node *ast.Node) bool {
 	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindImportSpecifier {
-		return false
+		return equalsDestructuredName(node)
 	}
 	specifier := node.Parent.AsImportSpecifier()
 	if specifier.Name() != node {
@@ -399,7 +550,7 @@ func equalsImportedName(node *ast.Node) bool {
 	return ok && name == node.AsIdentifier().Text
 }
 
-func equalsOriginalName(node *ast.Node) bool {
+func equalsDestructuredName(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
@@ -549,8 +700,10 @@ func isLabel(node *ast.Node) bool {
 }
 
 func isRuntimeReference(node *ast.Node) bool {
-	if isJsxIntrinsicTagName(node) || isJsxNamespacedAttributeName(node) {
-		return false
+	if isJsxNamePart(node) {
+		// Keep direct, member, namespaced, attribute, and parser-specific
+		// opening/closing behavior in the shared scope-manager predicate.
+		return scope.IsReferenceIdentifier(node)
 	}
 	if utils.IsImportTypeSyntax(node) {
 		return false
@@ -582,10 +735,28 @@ func isAliasedTypeExportSource(node *ast.Node) bool {
 	return ast.IsTypeOnlyImportOrExportDeclaration(node.Parent) && !utils.IsReExportSpecifier(node.Parent)
 }
 
-func isJsxNamespacedAttributeName(node *ast.Node) bool {
-	return node != nil && node.Parent != nil && node.Parent.Kind == ast.KindJsxNamespacedName &&
-		node.Parent.Parent != nil && node.Parent.Parent.Kind == ast.KindJsxAttribute &&
-		node.Parent.Parent.Name() == node.Parent
+func isJsxNamePart(node *ast.Node) bool {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindPropertyAccessExpression:
+			access := parent.AsPropertyAccessExpression()
+			if access == nil || (access.Expression != current && access.Name() != current) {
+				return false
+			}
+			current = parent
+		case ast.KindJsxNamespacedName:
+			current = parent
+		case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement, ast.KindJsxClosingElement:
+			return ast.IsJsxTagName(current)
+		case ast.KindJsxAttribute:
+			return parent.Name() == current
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // isTypeQueryValueReference recognizes the value-side root of a TypeScript
@@ -601,24 +772,4 @@ func isTypeQueryValueReference(node *ast.Node) bool {
 		current = current.Parent
 	}
 	return current != nil && current.Parent != nil && current.Parent.Kind == ast.KindTypeQuery
-}
-
-// isJsxIntrinsicTagName reports bare lowercase intrinsic tag identifiers such
-// as both `snake_case` nodes in `<snake_case></snake_case>`. JSX namespace
-// names and dotted component names are distinct upstream shapes and remain
-// eligible for ordinary reference handling.
-func isJsxIntrinsicTagName(node *ast.Node) bool {
-	if node == nil || node.Parent == nil || !scanner.IsIntrinsicJsxName(node.Text()) {
-		return false
-	}
-	var tagName *ast.Node
-	switch node.Parent.Kind {
-	case ast.KindJsxOpeningElement:
-		tagName = node.Parent.AsJsxOpeningElement().TagName
-	case ast.KindJsxSelfClosingElement:
-		tagName = node.Parent.AsJsxSelfClosingElement().TagName
-	case ast.KindJsxClosingElement:
-		tagName = node.Parent.AsJsxClosingElement().TagName
-	}
-	return tagName == node
 }
