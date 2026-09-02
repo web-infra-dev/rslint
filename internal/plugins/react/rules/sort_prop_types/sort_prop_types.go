@@ -214,7 +214,7 @@ var SortPropTypesRule = rule.Rule{
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
-				if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+				if binary.OperatorToken == nil || binary.OperatorToken.Kind == ast.KindCommaToken {
 					return
 				}
 				// ESTree omits parentheses but keeps TypeScript expression
@@ -239,6 +239,9 @@ var SortPropTypesRule = rule.Rule{
 		if opts.sortShapeProp {
 			listeners[ast.KindCallExpression] = func(node *ast.Node) {
 				call := node.AsCallExpression()
+				if call.QuestionDotToken != nil {
+					return
+				}
 				callee := ast.SkipParentheses(call.Expression)
 				if !isShapeCall(callee) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 					return
@@ -257,12 +260,16 @@ var SortPropTypesRule = rule.Rule{
 		if opts.checkTypes {
 			listeners[ast.KindTypeAliasDeclaration] = func(node *ast.Node) {
 				decl := node.AsTypeAliasDeclaration()
-				if decl.Name() == nil || decl.Name().Kind != ast.KindIdentifier || decl.Type == nil || decl.Type.Kind != ast.KindTypeLiteral {
+				if decl.Name() == nil || decl.Name().Kind != ast.KindIdentifier {
+					return
+				}
+				typeNode := unwrapParenthesizedType(decl.Type)
+				if typeNode == nil || typeNode.Kind != ast.KindTypeLiteral {
 					return
 				}
 				name := decl.Name().AsIdentifier().Text
 				if _, exists := typeAliases[name]; !exists {
-					typeAliases[name] = decl.Type
+					typeAliases[name] = typeNode
 				}
 			}
 			checkFunction := func(node *ast.Node) {
@@ -316,6 +323,8 @@ func propNameFromNode(sourceFile *ast.SourceFile, node *ast.Node) propName {
 			}
 		}
 		return propName{text: sourceText, kind: propNameString}
+	case ast.KindRegularExpressionLiteral:
+		return propName{text: utils.RegExpLiteralStringValue(node.AsRegularExpressionLiteral().Text), kind: propNameString}
 	case ast.KindTrueKeyword:
 		return propName{number: 1, kind: propNameBoolean}
 	default:
@@ -354,11 +363,11 @@ func isBigIntPropNameBefore(current, previous propName) bool {
 		return current.bigInt.Cmp(previous.bigInt) < 0
 	}
 	if current.kind == propNameBigInt && previous.kind == propNameString {
-		value, ok := new(big.Int).SetString(ecmascript.StringTrim(previous.text), 0)
+		value, ok := ecmascript.StringToBigInt(previous.text)
 		return ok && current.bigInt.Cmp(value) < 0
 	}
 	if previous.kind == propNameBigInt && current.kind == propNameString {
-		value, ok := new(big.Int).SetString(ecmascript.StringTrim(current.text), 0)
+		value, ok := ecmascript.StringToBigInt(current.text)
 		return ok && value.Cmp(previous.bigInt) < 0
 	}
 	currentNumber, currentOK := propNameNumberValue(current)
@@ -438,7 +447,7 @@ func isCallback(name string) bool {
 }
 
 func isShapeCall(callee *ast.Node) bool {
-	if callee == nil || ast.IsOptionalChain(callee) {
+	if callee == nil {
 		return false
 	}
 	switch callee.Kind {
@@ -507,11 +516,9 @@ func isPropWrapperCallByCalleeName(call *ast.Node, wrappers []reactutil.PropWrap
 }
 
 func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func([]*ast.Node)) {
+	typeNode = unwrapParenthesizedType(typeNode)
 	if typeNode == nil {
 		return
-	}
-	for typeNode.Kind == ast.KindParenthesizedType {
-		typeNode = typeNode.AsParenthesizedTypeNode().Type
 	}
 	switch typeNode.Kind {
 	case ast.KindTypeLiteral:
@@ -531,8 +538,14 @@ func declarationObject(sourceFile *ast.SourceFile, symbol *ast.Symbol) *ast.Node
 		return nil
 	}
 	decl := symbol.ValueDeclaration
-	for decl != nil && decl.Kind != ast.KindVariableDeclaration {
-		decl = decl.Parent
+	switch decl.Kind {
+	case ast.KindBindingElement:
+		for decl != nil && decl.Kind != ast.KindVariableDeclaration {
+			decl = decl.Parent
+		}
+	case ast.KindVariableDeclaration:
+	default:
+		return nil
 	}
 	if decl == nil || ast.GetSourceFileOfNode(decl) != sourceFile {
 		return nil
@@ -542,4 +555,15 @@ func declarationObject(sourceFile *ast.SourceFile, symbol *ast.Symbol) *ast.Node
 		return value
 	}
 	return nil
+}
+
+func unwrapParenthesizedType(typeNode *ast.Node) *ast.Node {
+	for typeNode != nil && typeNode.Kind == ast.KindParenthesizedType {
+		parenthesized := typeNode.AsParenthesizedTypeNode()
+		if parenthesized == nil {
+			return nil
+		}
+		typeNode = parenthesized.Type
+	}
+	return typeNode
 }

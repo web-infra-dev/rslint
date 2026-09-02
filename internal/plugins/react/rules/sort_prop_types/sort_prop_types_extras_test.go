@@ -65,6 +65,10 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `C.propTypes = { 1: PropTypes.string, "": PropTypes.string };`, Tsx: true},
 		// Optional required access is opaque, while the computed identifier is visible.
 		{Code: `Component.propTypes = { a: PropTypes.string, b: PropTypes?.isRequired };`, Options: map[string]any{"requiredFirst": true}, Tsx: true},
+		// Optional calls remain opaque, while optional receivers expose their member name.
+		{Code: `PropTypes.shape?.({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
+		// A parameter is not a variable binding whose initializer should be inspected.
+		{Code: `const holder = { z: PropTypes.string, a: PropTypes.string, method(props) { Component.propTypes = props; } };`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// Locks in upstream callbackPropsLastSeen: report a misplaced callback only once.
 		{Code: `Component.propTypes = { onChange: PropTypes.func, a: PropTypes.string, b: PropTypes.string };`, Options: map[string]any{"callbacksLast": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "callbackPropsLast", Line: 1, Column: 25}}},
@@ -114,6 +118,19 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `function Component(props: ({ z: string; a: string })) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
 		// Destructured bindings resolve through their containing variable declaration.
 		{Code: `const { props } = { z: PropTypes.string, a: PropTypes.string }; Component.propTypes = props;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Parenthesized type aliases are transparent to the upstream type-alias listener.
+		{Code: `type Props = ({ z: string; a: string }); function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Compound and ordinary binary parents are inspected, but comma expressions are not.
+		{Code: `C.propTypes += { z: PropTypes.string, a: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		{Code: `C.propTypes + ({ z: PropTypes.string, a: PropTypes.string });`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// RegExp.prototype.toString canonicalizes authored flag order before comparison.
+		{Code: `C.propTypes = { [/a/mi]: PropTypes.string, "/a/j": PropTypes.string };`, Tsx: true},
+		// StringToBigInt treats a non-prefixed leading-zero string as decimal.
+		{Code: `C.propTypes = { 10n: PropTypes.string, "010": PropTypes.string };`, Tsx: true},
+		{Code: `C.propTypes = { 10n: PropTypes.string, "08": PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Optional receivers expose shape, including computed identifiers.
+		{Code: `PropTypes?.shape({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		{Code: `PropTypes?.[shape]({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
 	})
 }
 
