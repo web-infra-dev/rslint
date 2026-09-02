@@ -3,6 +3,7 @@ package unicorn_plugin
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
@@ -42,6 +43,7 @@ func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
+		consistent_tuple_labels.ConsistentTupleLabelsRule,
 		error_message.ErrorMessageRule,
 		filename_case.FilenameCaseRule,
 		new_for_builtins.NewForBuiltinsRule,

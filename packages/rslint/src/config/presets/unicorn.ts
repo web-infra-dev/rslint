@@ -36,7 +36,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/consistent-json-file-read': 'error', // not implemented
     // 'unicorn/consistent-optional-chaining': 'error', // not implemented
     // 'unicorn/consistent-template-literal-escape': 'error', // not implemented
-    // 'unicorn/consistent-tuple-labels': 'error', // not implemented
+    'unicorn/consistent-tuple-labels': 'error',
     // 'unicorn/custom-error-definition': 'off', // not implemented
     // 'unicorn/default-export-style': 'error', // not implemented
     // 'unicorn/dom-node-dataset': 'error', // not implemented
