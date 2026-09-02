@@ -1,0 +1,14 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "ignore": { "type": "array", "items": { "type": "string" } },
+        "customValidators": { "type": "array", "items": { "type": "string" } },
+        "skipUndeclared": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

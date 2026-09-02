@@ -64,6 +64,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_read_only_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
@@ -147,6 +148,7 @@ func GetAllRules() []rule.Rule {
 		prefer_es6_class.PreferEs6ClassRule,
 		prefer_read_only_props.PreferReadOnlyPropsRule,
 		prefer_stateless_function.PreferStatelessFunctionRule,
+		prop_types.PropTypesRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		require_optimization.RequireOptimizationRule,
 		require_render_return.RequireRenderReturnRule,

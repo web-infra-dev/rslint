@@ -53,6 +53,32 @@ func TestIsValidRegexLiteral(t *testing.T) {
 	}
 }
 
+func TestIsValidRegexLiteralForVersion(t *testing.T) {
+	tests := []struct {
+		literal string
+		version int
+		want    bool
+	}{
+		{literal: `/abc/u`, version: 3, want: false},
+		{literal: `/abc/u`, version: 2015, want: true},
+		{literal: `/a/d`, version: 2021, want: false},
+		{literal: `/a/d`, version: 2022, want: true},
+		{literal: `/[[A--B]]/v`, version: 2023, want: false},
+		{literal: `/[[A--B]]/v`, version: 2024, want: true},
+		{literal: `/(?i:foo)bar/`, version: 2024, want: false},
+		{literal: `/(?i:foo)bar/`, version: 2025, want: true},
+		{literal: `/[(?i:)]/`, version: 2024, want: true},
+		{literal: `/\(\?i:/`, version: 2024, want: true},
+		{literal: ``, version: 2024, want: false},
+	}
+
+	for _, test := range tests {
+		if got := IsValidRegexLiteralForVersion(test.literal, test.version); got != test.want {
+			t.Errorf("IsValidRegexLiteralForVersion(%q, %d) = %v, want %v", test.literal, test.version, got, test.want)
+		}
+	}
+}
+
 func TestCanonicalizeRegExpLiteral(t *testing.T) {
 	for _, test := range []struct {
 		literal string

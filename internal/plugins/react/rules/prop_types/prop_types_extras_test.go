@@ -1,0 +1,114 @@
+package prop_types
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestPropTypesRuleExtras(t *testing.T) {
+	var longAlias strings.Builder
+	for i := range 65 {
+		fmt.Fprintf(&longAlias, "type A%02d = A%02d; ", i, i+1)
+	}
+	longAlias.WriteString("type A65 = { name: string }; function Hello(props: A00) { return <div>{props.name}</div>; }")
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PropTypesRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.shape({ name: PropTypes.string }) };`, Tsx: true},
+			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.shape({ name: PropTypes.string }).isRequired };`, Tsx: true},
+			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.oneOfType([PropTypes.string, PropTypes.shape({ name: PropTypes.string })]) };`, Tsx: true},
+			{Code: `function Hello({ ...rest }) { return <div>{rest.name}</div>; }`, Tsx: true},
+			{Code: `function Hello({ name }) { return <div>{name}</div>; } Hello.propTypes = { ...externalPropTypes };`, Tsx: true},
+			{Code: `function Hello({ name, children }) { return <div>{name}{children}</div>; }`, Options: map[string]interface{}{"ignore": []interface{}{"name", "children"}}, Tsx: true},
+			{Code: `function Hello({ name }) { return <div>{name}</div>; }`, Options: map[string]interface{}{"skipUndeclared": true}, Tsx: true},
+			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = externalPropTypes;`, Tsx: true},
+			{Code: `const Hello = props => <div>{props.name}</div>; Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `class Hello extends React.Component { render() { return <div>{this.props.name.firstname}</div>; } } Hello.propTypes = { name: PropTypes.object.isRequired };`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.a.b}</div>; } Hello.propTypes = {}; Hello.propTypes.a = PropTypes.shape({ b: PropTypes.string });`, Tsx: true},
+			{Code: `class Hello extends React.Component { static get propTypes() { return { name: PropTypes.string }; } render() { return <div>{this.props.name}</div>; } }`, Tsx: true},
+			{Code: `function Hello(props) { const { user: { name } } = props; return <div>{name}</div>; } Hello.propTypes = { user: PropTypes.shape({ name: PropTypes.string }) };`, Tsx: true},
+			{Code: `class Hello extends React.Component { render() { const allProps = this.props; const { name } = allProps; return <div>{name}</div>; } } Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `function Hello(props) { const user = props.user; return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.shape({ name: PropTypes.string }) };`, Tsx: true},
+			{Code: `const Hello = React.memo(props => <div>{props.name}</div>); Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `import React from 'react'; function Hello(props: React.PropsWithChildren<{ name: string }>) { return <div>{props.name}</div>; }`, Tsx: true},
+			{Code: `import R from 'react'; const Hello: R.FC<{ name: string }> = props => <div>{props.name}</div>;`, Tsx: true},
+			{Code: `const Hello = myObserver(props => <div>{props.name}</div>); Hello.propTypes = { name: PropTypes.string };`, Settings: map[string]interface{}{"componentWrapperFunctions": []interface{}{"myObserver"}}, Tsx: true},
+			{Code: `const Hello = React.memo((props => <div>{props.name}</div>) as unknown); Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `class Hello extends React.Component { render() { const { props: { name } } = this; return <div>{name}</div>; } } Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.user.name}</div>; } Hello.propTypes = { user: CustomValidator.object() };`, Options: map[string]interface{}{"customValidators": []interface{}{"CustomValidator"}}, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.user.name}</div>; } Hello.propTypes = forbidExtraProps({ user: PropTypes.shape({ name: PropTypes.string }) });`, Settings: map[string]interface{}{"propWrapperFunctions": []interface{}{"forbidExtraProps"}}, Tsx: true},
+			{Code: `function Hello(props) { props.name = "local"; return <div />; }`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.toString()}</div>; }`, Tsx: true},
+			{Code: `const Greetings = {}; Greetings.Hello = props => <div>{props.name}</div>; Greetings.Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `const Greetings = { Hello: class extends React.Component { render() { return <div>{this.props.name}</div>; } } }; Greetings.Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `function Hello(props: { user: { name: string } }) { return <div>{props.user.name}</div>; }`, Tsx: true},
+			{Code: `interface Props { user: { name: string } } function Hello(props: Props) { return <div>{props.user.name}</div>; }`, Tsx: true},
+			{Code: `type First = { first: string }; type Last = { last: string }; function Hello(props: First & Last) { return <div>{props.first}{props.last}</div>; }`, Tsx: true},
+			{Code: `class Hello extends React.Component<{ user: { name: string } }> { render() { return <div>{this.props.user.name}</div>; } }`, Tsx: true},
+			{Code: `class Hello extends React.Component { props: { name: string }; render() { return <div>{this.props.name}</div>; } }`, Tsx: true},
+			{Code: `import React from 'react'; const Hello: React.FC<{ name: string }> = props => <div>{props.name}</div>;`, Tsx: true},
+			{Code: `let Hello; Hello = props => <div>{props.name}</div>; Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `const Hello = createReactClass({ render: function() { return <div>{this.props.name}</div>; } }); Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
+			{Code: `const types = { name: PropTypes.string }; function Hello(props) { return <div>{props.name}</div>; } Hello.propTypes = types;`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.user.name}</div>; } Hello.propTypes = { user: PropTypes.instanceOf(User) };`, Tsx: true},
+			{Code: `import type { Props } from './types'; function Hello(props: Props) { return <div>{props.name}</div>; }`, Tsx: true},
+			{Code: `interface Base { inherited: string } interface Props extends Base { onClick(): void } function Hello(props: Props) { return <div>{props.inherited}{props.onClick()}</div>; }`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.first}{props.last}</div>; } Hello.propTypes = { first: PropTypes.string }; Hello.propTypes = { last: PropTypes.string };`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.user.toString()}</div>; } Hello.propTypes = { user: PropTypes.shape({}) };`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.name}</div>; } Hello.propTypes = { name() {} };`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props[1n]}</div>; }`, Tsx: true},
+			{Code: `import React from 'react'; const Hello: React.FC<{ name: string }> = props => <div>{props.name}</div>;`, Tsx: true},
+			{Code: `const Hello = React.forwardRef<HTMLDivElement, { name: string }>((props, ref) => <div ref={ref}>{props.name}</div>);`, Tsx: true},
+			{Code: longAlias.String(), Tsx: true},
+			{Code: `Hello.propTypes = { name: PropTypes.string }; function Hello(props) { return <div>{props.name}</div>; }`, Tsx: true},
+			{Code: `interface Props { outer: string } { interface Props { inner: string } function Inner(props: Props) { return <div>{props.inner}</div>; } } function Outer(props: Props) { return <div>{props.outer}</div>; }`, Tsx: true},
+			{Code: `function Hello(props) { return <div>{props.outer}</div>; } Hello.propTypes = { outer: PropTypes.string }; { function Hello(props) { return <div>{props.inner}</div>; } Hello.propTypes = { inner: PropTypes.string }; }`, Tsx: true},
+			{Code: `function Hello(input) { return <div>{input.name}</div>; }`, Tsx: true},
+			{Code: `function Hello(props) { const copy = props; return <div>{copy.name}</div>; }`, Tsx: true},
+			{Code: `import { FC as Component, forwardRef } from 'react'; type Props = { name: string }; const One: Component<Props> = props => <div>{props.name}</div>; const Two = forwardRef<HTMLDivElement, Props>((props, ref) => <div ref={ref}>{props.name}</div>);`, Tsx: true},
+			{Code: `type Props = { user: { name: string } }; function Hello(props: Props) { return <div>{props.user.missing}</div>; }`, Tsx: true},
+			{Code: `type A = { name: string }; type B = { other: string }; function Hello(props: A | B) { return <div>{props.name}</div>; }`, Tsx: true},
+			{Code: `interface Props { first: string } interface Props { last: string } function Hello(props: Props) { return <div>{props.first}{props.last}</div>; }`, Tsx: true},
+			{Code: `type A = B; type B = C; type C = D; type D = E; type E = F; type F = { name: string }; function Hello(props: A) { return <div>{props.name}</div>; }`, Tsx: true},
+		}, []rule_tester.InvalidTestCase{
+			{Code: `function Hello(props) { return <div>{props[0]}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'0' is missing in props validation`}}},
+			{Code: `function Hello({ user }) { return <div>{user.name}</div>; } Hello.propTypes = { user: PropTypes.shape({}) };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType"}}},
+			{Code: `function Hello(props) { return <div>{props.missing}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType"}}},
+			{Code: `function Hello(props) { const { name } = props; return <div>{name}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `function Hello(props) { const { user: { name } } = props; return <div>{name}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'user.name' is missing in props validation`}}},
+			{Code: `class Hello extends React.Component { get propTypes() { return { name: PropTypes.string }; } render() { return <div>{this.props.name}</div>; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `class Hello extends React.Component { render() { const { props: { name } } = this; return <div>{name}</div>; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `class Hello extends React.Component { constructor(props) { super(props); this.name = props.name; } render() { return <div />; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `class Hello extends React.Component { componentWillReceiveProps(nextProps) { this.name = nextProps.name; } render() { return <div />; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `const userType = PropTypes.shape({}); function Hello(props) { return <div>{props.user.name}</div>; } Hello.propTypes = { user: userType };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'user.name' is missing in props validation`}}},
+			{Code: `function Hello(props) { return <div>{props.user.name}</div>; } Hello.propTypes = forbidExtraProps({ user: PropTypes.shape({}) });`, Settings: map[string]interface{}{"propWrapperFunctions": []interface{}{"forbidExtraProps"}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'user.name' is missing in props validation`}}},
+			{Code: `function Hello(props) { return <div>{props.users[0].name}</div>; } Hello.propTypes = { users: PropTypes.arrayOf(PropTypes.shape({})) };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'users[].name' is missing in props validation`}}},
+			{Code: `class Hello extends React.Component { render() { this.setState((state, props) => ({ name: props.name })); return <div />; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `const types = { name: PropTypes.string }; function Hello(props) { return <div>{props.name}{props.missing}</div>; } Hello.propTypes = types;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'missing' is missing in props validation`}}},
+			{Code: `function Hello(props) { props = {}; return <div>{props.name}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `function Hello(props) { return <div>{props.user.missing}</div>; } Hello.propTypes = { user: PropTypes.shape({ ...fields, name: PropTypes.string }) };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'user.missing' is missing in props validation`}}},
+			{Code: `function Hello(props) { return <div>{props.name}{props.name}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType"}, {MessageId: "missingPropType"}}},
+			{Code: `const nodeType = PropTypes.shape({ child: nodeType }); function Tree(props) { return <div>{props.node.child}</div>; } Tree.propTypes = { node: nodeType };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'node' is missing in props validation`}, {MessageId: "missingPropType", Message: `'node.child' is missing in props validation`}}},
+			{Code: `const Hello: Wrapper<{ name: string }> = props => <div>{props.name}</div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `function Outer(props) { function Inner(innerProps) { return <span>{props.outer}</span>; } Inner.propTypes = {}; return <Inner />; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'outer' is missing in props validation`}}},
+			{Code: `var first = second; var second = first; function Hello(props) { return <div>{props.name}</div>; } Hello.propTypes = first;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `function Hello({ name }) { return <div>Hello</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `function Hello(props) { const { name } = props; return <div>Hello</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `function Hello(props) { return <div>{props.users[i].name}</div>; } Hello.propTypes = { users: PropTypes.arrayOf(PropTypes.shape({})) };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'users[].name' is missing in props validation`}}},
+			{Code: `function Hello(props) { return <div>{props.name}</div>; } Hello.propTypes = makePropTypes();`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `type Props = {}; namespace Fake { export type FC<T> = T } const Hello: Fake.FC<Props> = props => <div>{props.name}</div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `function Outer({ outer }) { function Inner() { return <span>{outer}</span>; } return <Inner />; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'outer' is missing in props validation`}}},
+			{Code: `const key = 'other'; function Hello(props) { return <div>{props.name}</div>; } Hello.propTypes = { [key]: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `interface Props { outer: string } { interface Props { inner: string } function Inner(props: Props) { return <div>{props.inner}</div>; } } function Outer(props: Props) { return <div>{props.inner}</div>; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'inner' is missing in props validation`}}},
+			{Code: `import * as R from 'not-react'; import React from 'react'; type Props = { name: string }; const Hello: R.FC<Props> = props => <div>{props.name}</div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `type Props = { name: string }; class Hello extends React.Component implements Other<Props> { render() { return <div>{this.props.name}</div>; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `type Props = { name: string }; const Hello: React.ComponentType<Props> = props => <div>{props.name}</div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `type Props = { name: string }; const Hello = Foo.forwardRef<HTMLDivElement, Props>(props => <div>{props.name}</div>);`, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "Foo"}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `type Props = { name: string }; const Hello: React.FC<Props> = props => <div>{props.name}</div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'name' is missing in props validation`}}},
+			{Code: `const A = {}; A.X = props => <div>{props.outer}</div>; A.X.propTypes = { outer: PropTypes.string }; { const A = {}; A.X = props => <div>{props.outer}</div>; A.X.propTypes = { inner: PropTypes.string }; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingPropType", Message: `'outer' is missing in props validation`}}},
+		})
+}
