@@ -222,7 +222,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-at': 'error', // not implemented
     // 'unicorn/prefer-await': 'error', // not implemented
     // 'unicorn/prefer-bigint-literals': 'error', // not implemented
-    // 'unicorn/prefer-blob-reading-methods': 'error', // not implemented
+    'unicorn/prefer-blob-reading-methods': 'error',
     // 'unicorn/prefer-block-statement-over-iife': 'error', // not implemented
     // 'unicorn/prefer-boolean-return': 'error', // not implemented
     // 'unicorn/prefer-class-fields': 'error', // not implemented

@@ -686,6 +686,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-blob-reading-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
