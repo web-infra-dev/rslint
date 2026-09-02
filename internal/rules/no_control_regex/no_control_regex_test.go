@@ -124,11 +124,25 @@ func TestCollectControlChars(t *testing.T) {
 		{"\\p{Script=Latin} under u", `\p{Script=Latin}`, `u`, nil},
 		{"\\p next to control xHH", `\p{Letter}\x1f`, `u`, []string{`\x1f`}},
 
-		// ── Documented divergence from ESLint on syntactically-invalid patterns.
-		// ESLint's collector inherits regexpp's stop-on-error behavior; this
-		// scanner intentionally does not model that (see rule doc). The cases
-		// below pin the current over-reporting behavior so changes are loud.
-		{"malformed: \\u{...} invalid content before control", `\u{NOT_HEX}\x1f`, `u`, []string{`\x1f`}},
+		// ── Syntax errors stop regexpp's character callbacks at the error.
+		{"malformed: \\u{...} invalid content before control", `\u{NOT_HEX}\x1f`, `u`, nil},
+		{"malformed: control before invalid \\u{...}", `\x1f\u{NOT_HEX}`, `u`, []string{`\x1f`}},
+		{"malformed: invalid quantifier before control", `*\x1f`, `u`, nil},
+		{"malformed: control before invalid quantifier", `\x1f**`, `u`, []string{`\x1f`}},
+		{"malformed: invalid range before control", `[z-a\x1f]`, `u`, nil},
+		{"malformed: control before invalid range", `[\x1fz-a]`, `u`, []string{`\x1f`}},
+		{"legacy malformed: unmatched close before control", `)\x1f`, ``, nil},
+		{"legacy malformed: control before unmatched close", `\x1f)`, ``, []string{`\x1f`}},
+		{"legacy malformed: range before control", `[a--b]\x1f`, ``, nil},
+		{"legacy Annex B identity before control", `\u{NOT_HEX}\x1f`, ``, []string{`\x1f`}},
+		{"missing numeric reference before control", `\1\x1f`, `u`, nil},
+		{"missing named reference is resolved after callbacks", `(?<a>a)\k<missing>\x1f`, `u`, []string{`\x1f`}},
+		{"single ampersand in v class", `[&\x1f]`, `v`, []string{`\x1f`}},
+		{"duplicate capture before control", `(?<a>a)(?<a>a)\x1f`, `u`, nil},
+		{"malformed: mutually exclusive u and v", `\u{1F}`, `uv`, nil},
+		{"malformed: duplicate u is ignored by pattern validator", `\u{1F}`, `uu`, []string{`\x1f`}},
+		{"malformed: unknown flag is ignored by pattern validator", `\x1f`, `z`, []string{`\x1f`}},
+		{"malformed: overflowing code point escape", `\u{100000001}`, `u`, nil},
 		{"malformed: unclosed [ still collects control inside", `[\x1f`, ``, []string{`\x1f`}},
 		{"malformed: unclosed ( still collects control inside", `(\x1f`, ``, []string{`\x1f`}},
 	}
@@ -199,6 +213,16 @@ func TestNoControlRegexRule(t *testing.T) {
 			{Code: `/[\u{20}--B]/v`},
 			{Code: "new RegExp('\\x20')"},
 
+			// ── Only the environment-global RegExp constructor is checked ──
+			{Code: `function foo(RegExp) { RegExp("\x1f"); }`},
+			{Code: `function foo(RegExp) { new RegExp("\x1f"); }`},
+			{Code: `let RegExp; RegExp("\x1f");`},
+			{Code: `RegExp("\x1f")`, Globals: map[string]any{"RegExp": "off"}},
+			{Code: `/* global RegExp: off */ RegExp("\x1f")`},
+			{Code: `namespace RegExp {} RegExp("\x1f")`},
+			{Code: `class RegExp {} RegExp("\x1f")`},
+			{Code: `enum RegExp {} RegExp("\x1f")`},
+
 			// ── Symbolic escapes — all allowed ──
 			{Code: `/\t/`},
 			{Code: `/\n/`},
@@ -220,8 +244,8 @@ func TestNoControlRegexRule(t *testing.T) {
 
 			// ── Non-string first argument — constructor path skipped ──
 			{Code: "RegExp(pattern)"},
-			{Code: "RegExp(/x20/)"},      // inner regex has no controls
-			{Code: "RegExp('a' + 'b')"},  // binary expression
+			{Code: "RegExp(/x20/)"},     // inner regex has no controls
+			{Code: "RegExp('a' + 'b')"}, // binary expression
 			{Code: "RegExp(cond ? 'a' : 'b')"},
 			{Code: "RegExp(123)"},
 			{Code: "RegExp(null)"},
@@ -250,6 +274,11 @@ func TestNoControlRegexRule(t *testing.T) {
 			// ── \p{...} unicode property — not a control escape ──
 			{Code: `/\p{Letter}/u`},
 			{Code: `new RegExp("\\p{Letter}", "u")`},
+
+			// ── Syntax errors suppress controls that occur after the error ──
+			{Code: `RegExp("\\u{NOT_HEX}\\x1f", "u")`},
+			{Code: `RegExp("*\\x1f", "u")`},
+			{Code: `RegExp("\\u{1F}", "uv")`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ── Regex literals: \xHH ──
@@ -397,6 +426,61 @@ func TestNoControlRegexRule(t *testing.T) {
 				Code: `new RegExp("[\\q{\\u{1F}}]", "v")`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 12},
+				},
+			},
+
+			// Parentheses are not represented in ESLint's ESTree arguments.
+			{
+				Code: `RegExp(("\\x1f"))`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code: `RegExp("\\u{1F}", ("u"))`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
+				},
+			},
+
+			// Type-only declarations do not shadow the value-space global.
+			{
+				Code: `type RegExp = string; RegExp("\x1f")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+			{
+				Code: `interface RegExp {} RegExp("\x1f")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+
+			{
+				Code: `RegExp("\t\0")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Message: `Unexpected control character(s) in regular expression: \x09, \x00.`, Line: 1, Column: 8},
+				},
+			},
+
+			// Controls collected before a syntax error remain reportable.
+			{
+				Code: `RegExp("\\x1f\\u{NOT_HEX}", "u")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `RegExp("\\u{1F}", "uu")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
+				},
+			},
+			{
+				Code: `RegExp("\\x1f", "z")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
 				},
 			},
 
