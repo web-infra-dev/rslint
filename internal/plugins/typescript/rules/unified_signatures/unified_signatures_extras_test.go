@@ -21,6 +21,8 @@ func TestUnifiedSignaturesExtras(t *testing.T) {
 		{Code: `declare class C { #f(x: string): void; f(x: number): void; }`},
 		{Code: `declare const a: unique symbol; declare const b: unique symbol; interface I { [a](x: string): void; [b](x: number): void; }`},
 		{Code: `declare class C { constructor(x: string); "constructor"(x: number); }`},
+		// A generic constructor keeps its constructor key before scanning <T>.
+		// The corresponding overloads are covered in the invalid cases below.
 		// ---- Dimension 4: declaration/container forms ----
 		{Code: `const C = class { f(x: string): void; f(x: number): void; };`},
 		{Code: `declare module "m" { export default function (x: string): void; function export_default(x: number): void; }`},
@@ -76,6 +78,9 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 		{Code: `interface I<T> { f(x: (T)): void; f(x: string): void; }`},
 		{Code: `interface I<T> { f(x: keyof T): void; f(x: string): void; }`},
 		{Code: `interface I<T> { f(x: readonly T[]): void; f(x: string): void; }`},
+		// The outer type parameter can occur in the value annotation of a mapped type.
+		{Code: `interface I<T> { f(x: { [K in keyof T]: T }): void; f(x: string): void; }`},
+		{Code: `interface I<T> { f(x: { [K in keyof T]: T[] }): void; f(x: string): void; }`},
 		// Locks in upstream type-parameter-name equality arm.
 		{Code: `function f<T>(x: T): void; function f<U>(x: U): void;`},
 		// Locks in upstream constraint-kind equality arm.
@@ -221,6 +226,14 @@ declare function f(x: boolean): void;`,
 				Message:   "These overloads can be combined into one signature taking `string | number`.",
 				Line:      3, Column: 15, EndLine: 3, EndColumn: 24,
 			}},
+		},
+		// Generic constructors must remain in the constructor overload group.
+		{
+			Code: `declare class C {
+  constructor<T>(x: string);
+  constructor<T>(x: number);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 3}},
 		},
 		// ---- Real-user: typescript-eslint#12504 duplicate union members ----
 		{

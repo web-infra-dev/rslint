@@ -170,8 +170,17 @@ func (a *overloadAnalyzer) constructorOverloadKey(node *ast.Node) (string, bool)
 	var nameKind ast.Kind
 	var nameText string
 	for a.tokens.Scan(); a.tokens.Token() != ast.KindEndOfFile && a.tokens.TokenEnd() <= openParen; a.tokens.Scan() {
-		nameKind = a.tokens.Token()
-		nameText = a.tokens.TokenText()
+		switch a.tokens.Token() {
+		case ast.KindConstructorKeyword, ast.KindIdentifier, ast.KindStringLiteral:
+			// The type-parameter list belongs to the constructor name, so stop
+			// recording tokens once the name has been found. Otherwise a generic
+			// constructor leaves nameKind as GreaterThanToken.
+			nameKind = a.tokens.Token()
+			nameText = a.tokens.TokenText()
+		}
+		if nameKind != 0 {
+			break
+		}
 	}
 
 	if nameKind == ast.KindConstructorKeyword && !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
@@ -588,6 +597,9 @@ func typeContainsTypeParameter(typeNode *ast.Node, names map[string]struct{}) bo
 		return typeContainsTypeParameter(typeNode.AsTypeOperatorNode().Type, names)
 	case ast.KindParenthesizedType:
 		return typeContainsTypeParameter(typeNode.AsParenthesizedTypeNode().Type, names)
+	case ast.KindMappedType:
+		mappedType := typeNode.AsMappedTypeNode()
+		return mappedType != nil && typeContainsTypeParameter(mappedType.Type, names)
 	}
 	return false
 }
