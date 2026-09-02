@@ -80,26 +80,16 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			if !reactutil.ExtendsReactComponent(node, pragma) {
 				return
 			}
-			if heritage := ast.GetClassExtendsHeritageElement(node); heritage != nil {
-				if extends := heritage.AsExpressionWithTypeArguments(); extends != nil &&
-					extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) > 0 {
-					if extends.TypeArguments.Nodes[0].Kind == ast.KindTypeReference {
-						validateType(node, extends.TypeArguments.Nodes[0])
-					}
-				}
+			if propsType := classPropsTypeArgument(node); propsType != nil {
+				validateType(node, propsType)
 			}
 		},
 		ast.KindClassExpression: func(node *ast.Node) {
 			if !reactutil.ExtendsReactComponent(node, pragma) {
 				return
 			}
-			if heritage := ast.GetClassExtendsHeritageElement(node); heritage != nil {
-				if extends := heritage.AsExpressionWithTypeArguments(); extends != nil &&
-					extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) > 0 {
-					if extends.TypeArguments.Nodes[0].Kind == ast.KindTypeReference {
-						validateType(node, extends.TypeArguments.Nodes[0])
-					}
-				}
+			if propsType := classPropsTypeArgument(node); propsType != nil {
+				validateType(node, propsType)
 			}
 		},
 		ast.KindPropertyDeclaration: func(node *ast.Node) {
@@ -141,6 +131,29 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	}
 }
 
+func classPropsTypeArgument(node *ast.Node) *ast.Node {
+	heritage := ast.GetClassExtendsHeritageElement(node)
+	if heritage == nil {
+		return nil
+	}
+	extends := heritage.AsExpressionWithTypeArguments()
+	if extends == nil || extends.TypeArguments == nil || len(extends.TypeArguments.Nodes) == 0 {
+		return nil
+	}
+	propsType := extends.TypeArguments.Nodes[0]
+	for propsType != nil && propsType.Kind == ast.KindParenthesizedType {
+		parenthesized := propsType.AsParenthesizedTypeNode()
+		if parenthesized == nil {
+			return nil
+		}
+		propsType = parenthesized.Type
+	}
+	if propsType == nil || propsType.Kind != ast.KindTypeReference {
+		return nil
+	}
+	return propsType
+}
+
 func checkFunction(node *ast.Node, pragma string, genericImports map[string]string, wrappers []reactutil.ComponentWrapperEntry, validateType func(*ast.Node, *ast.Node)) {
 	// The forwardRef arm is checked before component-return heuristics in the
 	// upstream collector. Its second type argument is the props type.
@@ -159,15 +172,16 @@ func checkFunction(node *ast.Node, pragma string, genericImports map[string]stri
 	if len(params) == 0 {
 		return
 	}
+	hasParameterType := false
 	if param := params[0].AsParameterDeclaration(); param != nil && param.Type != nil {
+		hasParameterType = true
 		validateType(node, param.Type)
 	}
 
-	// For `const Component: React.FC<Props> = (...) => ...`, the upstream
-	// collector uses the variable's annotation rather than the parameter's.
-	// Validate it as well; the per-node cycle guard prevents recursive aliases.
+	// For `const Component: React.FC<Props> = (...) => ...` without a parameter
+	// annotation, the upstream collector uses the variable's annotation.
 	parent := node.Parent
-	if parent != nil && parent.Kind == ast.KindVariableDeclaration {
+	if !hasParameterType && parent != nil && parent.Kind == ast.KindVariableDeclaration {
 		vd := parent.AsVariableDeclaration()
 		if vd != nil && vd.Type != nil {
 			if propsType := reactGenericPropsType(vd.Type, genericImports); propsType != nil {

@@ -221,6 +221,18 @@ function Hello(props: Props) {
 			Output: []string{`interface Props extends ReturnType<() => { readonly name: string }> {} const Hello = (props: Props) => <div/>;`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
+		{
+			Code:   `import React from "react"; type P = { a: string }; type Q = { b: string }; const Hello: React.FC<P> = (props: Q) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`import React from "react"; type P = { a: string }; type Q = { readonly b: string }; const Hello: React.FC<P> = (props: Q) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'b' should be read-only."}},
+		},
+		{
+			Code:   `type Props = { name: string }; class Hello extends React.Component<(Props)> { render() { return <div/>; } }`,
+			Tsx:    true,
+			Output: []string{`type Props = { readonly name: string }; class Hello extends React.Component<(Props)> { render() { return <div/>; } }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
 	})
 }
 
