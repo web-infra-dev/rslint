@@ -1,0 +1,677 @@
+// Rstest Snapshot v1
+
+exports[`no-cond-assign > invalid 1`] = `
+{
+  "code": "var x; if (x = 0) { var b = 1; }",
+  "diagnostics": [
+    {
+      "message": "Expected a conditional expression and instead saw an assignment.",
+      "messageId": "missing",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 2`] = `
+{
+  "code": "var x; while (x = 0) { var b = 1; }",
+  "diagnostics": [
+    {
+      "message": "Expected a conditional expression and instead saw an assignment.",
+      "messageId": "missing",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 3`] = `
+{
+  "code": "var x = 0, y; do { y = x; } while (x = x + 1);",
+  "diagnostics": [
+    {
+      "message": "Expected a conditional expression and instead saw an assignment.",
+      "messageId": "missing",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 4`] = `
+{
+  "code": "var x; for(; x+=1 ;){};",
+  "diagnostics": [
+    {
+      "message": "Expected a conditional expression and instead saw an assignment.",
+      "messageId": "missing",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 5`] = `
+{
+  "code": "var x; if ((x) = (0));",
+  "diagnostics": [
+    {
+      "message": "Expected a conditional expression and instead saw an assignment.",
+      "messageId": "missing",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 6`] = `
+{
+  "code": "if (someNode || (someNode = parentNode)) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 7`] = `
+{
+  "code": "while (someNode || (someNode = parentNode)) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'while' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 8`] = `
+{
+  "code": "do { } while (someNode || (someNode = parentNode));",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'do...while' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 9`] = `
+{
+  "code": "for (; (typeof l === 'undefined' ? (l = 0) : l); i++) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'for' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 10`] = `
+{
+  "code": "if (x = 0) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 11`] = `
+{
+  "code": "while (x = 0) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'while' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 12`] = `
+{
+  "code": "do { } while (x = x + 1);",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'do...while' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 13`] = `
+{
+  "code": "for(; x = y; ) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'for' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 14`] = `
+{
+  "code": "if ((x = 0)) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 15`] = `
+{
+  "code": "while ((x = 0)) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'while' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 16`] = `
+{
+  "code": "do { } while ((x = x + 1));",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'do...while' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 17`] = `
+{
+  "code": "for(; (x = y); ) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within a 'for' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 18`] = `
+{
+  "code": "var x; var b = (x = 0) ? 1 : 0;",
+  "diagnostics": [
+    {
+      "message": "Expected a conditional expression and instead saw an assignment.",
+      "messageId": "missing",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 19`] = `
+{
+  "code": "var x; var b = x && (y = 0) ? 1 : 0;",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within ConditionalExpression.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 20`] = `
+{
+  "code": "(((3496.29)).bkufyydt = 2e308) ? foo : bar;",
+  "diagnostics": [
+    {
+      "message": "Expected a conditional expression and instead saw an assignment.",
+      "messageId": "missing",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 21`] = `
+{
+  "code": "if (class { [value = next()]() {} }) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 22`] = `
+{
+  "code": "if ({ [value = next()]() {} }) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 23`] = `
+{
+  "code": "if (class { get [value = next()]() { return 1 } }) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 24`] = `
+{
+  "code": "if (class { set [value = next()](nextValue) {} }) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 25`] = `
+{
+  "code": "if (class { static async *[value = next()]() {} }) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-cond-assign > invalid 26`] = `
+{
+  "code": "if (class { @dec(value = next()) method() {} }) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected assignment within an 'if' statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-cond-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
