@@ -66,7 +66,7 @@ interface EditorTabsProps {
   onChange: (value: string) => void;
   onSelectionChange?: (start: number, end: number) => void;
   onConfigChange?: () => void;
-  /** Pinned `@rslint/wasm` version, or `undefined` while the latest is in use. */
+  /** The `@rslint/wasm` version to pin in the link, once one is selected. */
   wasmVersion?: string;
   toolbarEnd?: ReactNode;
 }

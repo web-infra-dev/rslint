@@ -370,11 +370,7 @@ const Playground: React.FC = () => {
                 })
               }
               onConfigChange={() => scheduleRunLint()}
-              wasmVersion={
-                selectedVersion === wasmVersions[0]
-                  ? undefined
-                  : selectedVersion
-              }
+              wasmVersion={selectedVersion}
               toolbarEnd={
                 <div className="flex items-center">
                   <Select

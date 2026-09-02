@@ -33,7 +33,12 @@ export interface ShareState {
   code: string;
   rslintConfig: string;
   tsconfig: string;
-  /** A pinned `@rslint/wasm` version; `undefined` means "whatever is latest". */
+  /**
+   * The `@rslint/wasm` version the link runs against. Always written once the
+   * version list has loaded, so a shared link reproduces what its author saw
+   * even after a newer version ships; `undefined` only on a link that predates
+   * version pinning, or before the list arrives.
+   */
   wasmVersion?: string;
 }
 
@@ -176,7 +181,8 @@ function decodeFrame(frame: Uint8Array): ShareState | null {
 
 /**
  * Returns the fragment for a link to `state`, or `null` when nothing has been
- * touched and the link needs no fragment at all.
+ * touched and no version is known yet, in which case the link needs no
+ * fragment at all.
  */
 export function encodeShareState(state: ShareState): string | null {
   let flags = 0;
