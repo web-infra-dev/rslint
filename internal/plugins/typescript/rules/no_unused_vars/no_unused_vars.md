@@ -83,12 +83,20 @@ var PublicValue = 1;
 type PublicType = string;
 ```
 
-The comment resolves each name against the global scope, so it applies to a
-file whose top level is that scope — one with no `import`/`export` of its own.
-A module's top-level binding, a block binding, and a function's parameters live
-in their own scopes and are still reported.
+The comment resolves each name only against the outer global scope. Whether a
+file has that scope is determined by its effective
+`languageOptions.sourceType`, not by the presence of `import` or `export`
+syntax. With flat config, omitting `sourceType` makes `.js` and `.ts` files
+modules even when they contain no module syntax, so the comment has no effect.
+Set `sourceType: "script"` for a shared script.
+
+Module bindings, bindings in a JavaScript CommonJS wrapper, block bindings,
+function parameters, and nested type bindings are still reported. An exact,
+case-sensitive `.cjs` extension defaults to the CommonJS wrapper.
+TypeScript-flavoured files configured as `commonjs` retain a global program
+scope, so their top-level bindings can be marked by the comment.
 
 ## Original Documentation
 
 - [typescript-eslint: no-unused-vars](https://typescript-eslint.io/rules/no-unused-vars)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-unused-vars.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/src/rules/no-unused-vars.ts)

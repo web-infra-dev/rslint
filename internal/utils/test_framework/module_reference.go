@@ -6,6 +6,18 @@ import (
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
+// matchesModule reports whether specifier is one of importModules. The lists
+// carry at most a handful of entries, so a linear scan beats a map lookup and
+// keeps the callers' package-level lists allocation free.
+func matchesModule(specifier string, importModules []string) bool {
+	for _, module := range importModules {
+		if specifier == module {
+			return true
+		}
+	}
+	return false
+}
+
 // ResolveFunctionReferenceForModule resolves an imported/required test API
 // back to its exported name. Local declarations shadow framework globals.
 func ResolveFunctionReferenceForModule(
@@ -15,6 +27,26 @@ func ResolveFunctionReferenceForModule(
 	typeChecker *checker.Checker,
 	sourceFile *ast.SourceFile,
 	importModule string,
+) (string, *ast.Node, ReferenceMode) {
+	return ResolveFunctionReferenceForModules(
+		node,
+		localName,
+		localNode,
+		typeChecker,
+		sourceFile,
+		[]string{importModule},
+	)
+}
+
+// ResolveFunctionReferenceForModules is ResolveFunctionReferenceForModule for a
+// framework whose API surface is reachable through more than one specifier.
+func ResolveFunctionReferenceForModules(
+	node *ast.Node,
+	localName string,
+	localNode *ast.Node,
+	typeChecker *checker.Checker,
+	sourceFile *ast.SourceFile,
+	importModules []string,
 ) (string, *ast.Node, ReferenceMode) {
 	if typeChecker == nil {
 		return localName, localNode, ReferenceModeGlobal
@@ -30,12 +62,12 @@ func ResolveFunctionReferenceForModule(
 		return localName, localNode, ReferenceModeGlobal
 	}
 
-	return ResolveFunctionIdentifierReference(
+	return ResolveFunctionIdentifierReferenceModules(
 		localName,
 		identifier,
 		typeChecker,
 		sourceFile,
-		importModule,
+		importModules,
 	)
 }
 
@@ -48,17 +80,35 @@ func ResolveFunctionIdentifierReference(
 	sourceFile *ast.SourceFile,
 	importModule string,
 ) (string, *ast.Node, ReferenceMode) {
+	return ResolveFunctionIdentifierReferenceModules(
+		localName,
+		identifier,
+		typeChecker,
+		sourceFile,
+		[]string{importModule},
+	)
+}
+
+// ResolveFunctionIdentifierReferenceModules is
+// ResolveFunctionIdentifierReference across several equivalent specifiers.
+func ResolveFunctionIdentifierReferenceModules(
+	localName string,
+	identifier *ast.Node,
+	typeChecker *checker.Checker,
+	sourceFile *ast.SourceFile,
+	importModules []string,
+) (string, *ast.Node, ReferenceMode) {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier || typeChecker == nil {
 		return localName, identifier, ReferenceModeGlobal
 	}
 
 	symbol := typeChecker.GetSymbolAtLocation(identifier)
-	return ResolveFunctionIdentifierReferenceFromSymbol(
+	return ResolveFunctionIdentifierReferenceFromSymbolModules(
 		localName,
 		identifier,
 		symbol,
 		sourceFile,
-		importModule,
+		importModules,
 	)
 }
 
@@ -71,6 +121,31 @@ func ResolveFunctionIdentifierReferenceFromSymbol(
 	symbol *ast.Symbol,
 	sourceFile *ast.SourceFile,
 	importModule string,
+) (string, *ast.Node, ReferenceMode) {
+	return ResolveFunctionIdentifierReferenceFromSymbolModules(
+		localName,
+		identifier,
+		symbol,
+		sourceFile,
+		[]string{importModule},
+	)
+}
+
+// ResolveFunctionIdentifierReferenceFromSymbolModules resolves an identifier
+// against every specifier that reaches the same API surface.
+//
+// Every specifier is tried against each declaration in one pass, rather than
+// re-running the whole resolution per specifier. A declaration that belongs to
+// a non-matching module still lives in the linted file, so a per-specifier loop
+// would reach the shadowing fallback below on its first miss and report the
+// binding as a local declaration before the specifier that actually matches was
+// ever tried.
+func ResolveFunctionIdentifierReferenceFromSymbolModules(
+	localName string,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+	sourceFile *ast.SourceFile,
+	importModules []string,
 ) (string, *ast.Node, ReferenceMode) {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier {
 		return localName, identifier, ReferenceModeGlobal
@@ -85,10 +160,10 @@ func ResolveFunctionIdentifierReferenceFromSymbol(
 			continue
 		}
 
-		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModule); ok {
+		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules); ok {
 			return name, originalNode, ReferenceModeImport
 		}
-		if name, originalNode, ok := resolveModuleRequireBinding(declaration, importModule); ok {
+		if name, originalNode, ok := resolveModuleRequireBinding(declaration, importModules); ok {
 			return name, originalNode, ReferenceModeImport
 		}
 		if sourceFile != nil && ast.GetSourceFileOfNode(declaration) == sourceFile {
@@ -116,6 +191,12 @@ func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 // IsModuleNamespaceSymbol reports whether symbol is a namespace import or a
 // whole-module require for importModule.
 func IsModuleNamespaceSymbol(symbol *ast.Symbol, importModule string) bool {
+	return IsModuleNamespaceSymbolModules(symbol, []string{importModule})
+}
+
+// IsModuleNamespaceSymbolModules is IsModuleNamespaceSymbol across several
+// equivalent specifiers.
+func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) bool {
 	if symbol == nil {
 		return false
 	}
@@ -129,14 +210,14 @@ func IsModuleNamespaceSymbol(symbol *ast.Symbol, importModule string) bool {
 			importDeclaration := FindImportDeclaration(declaration)
 			if importDeclaration != nil &&
 				importDeclaration.ModuleSpecifier != nil &&
-				importDeclaration.ModuleSpecifier.Text() == importModule {
+				matchesModule(importDeclaration.ModuleSpecifier.Text(), importModules) {
 				return true
 			}
 		}
 
 		if declaration.Kind == ast.KindVariableDeclaration {
 			variable := declaration.AsVariableDeclaration()
-			if variable != nil && IsModuleRequireCall(variable.Initializer, importModule) {
+			if variable != nil && IsModuleRequireCallModules(variable.Initializer, importModules) {
 				return true
 			}
 		}
@@ -145,7 +226,7 @@ func IsModuleNamespaceSymbol(symbol *ast.Symbol, importModule string) bool {
 	return false
 }
 
-func resolveModuleImportSpecifier(declaration *ast.Node, importModule string) (string, *ast.Node, bool) {
+func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string) (string, *ast.Node, bool) {
 	if declaration == nil || declaration.Kind != ast.KindImportSpecifier {
 		return "", nil, false
 	}
@@ -153,7 +234,7 @@ func resolveModuleImportSpecifier(declaration *ast.Node, importModule string) (s
 	importDeclaration := FindImportDeclaration(declaration)
 	if importDeclaration == nil ||
 		importDeclaration.ModuleSpecifier == nil ||
-		importDeclaration.ModuleSpecifier.Text() != importModule {
+		!matchesModule(importDeclaration.ModuleSpecifier.Text(), importModules) {
 		return "", nil, false
 	}
 
@@ -171,14 +252,14 @@ func resolveModuleImportSpecifier(declaration *ast.Node, importModule string) (s
 	return name.Text(), name, true
 }
 
-func resolveModuleRequireBinding(declaration *ast.Node, importModule string) (string, *ast.Node, bool) {
+func resolveModuleRequireBinding(declaration *ast.Node, importModules []string) (string, *ast.Node, bool) {
 	if declaration == nil || declaration.Kind != ast.KindBindingElement {
 		return "", nil, false
 	}
 
 	varDeclaration := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
 	if varDeclaration == nil ||
-		!IsModuleRequireCall(varDeclaration.AsVariableDeclaration().Initializer, importModule) {
+		!IsModuleRequireCallModules(varDeclaration.AsVariableDeclaration().Initializer, importModules) {
 		return "", nil, false
 	}
 
@@ -200,6 +281,12 @@ func resolveModuleRequireBinding(declaration *ast.Node, importModule string) (st
 
 // IsModuleRequireCall reports whether node is require(importModule).
 func IsModuleRequireCall(node *ast.Node, importModule string) bool {
+	return IsModuleRequireCallModules(node, []string{importModule})
+}
+
+// IsModuleRequireCallModules reports whether node is a require call for any of
+// importModules.
+func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 	if node == nil {
 		return false
 	}
@@ -220,9 +307,9 @@ func IsModuleRequireCall(node *ast.Node, importModule string) bool {
 
 	switch specifier.Kind {
 	case ast.KindStringLiteral:
-		return specifier.AsStringLiteral().Text == importModule
+		return matchesModule(specifier.AsStringLiteral().Text, importModules)
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return specifier.AsNoSubstitutionTemplateLiteral().Text == importModule
+		return matchesModule(specifier.AsNoSubstitutionTemplateLiteral().Text, importModules)
 	default:
 		return false
 	}

@@ -2,6 +2,13 @@ import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
 
+const languageOptionsRuleTester = new RuleTester({
+  ecmaVersion: 5,
+  sourceType: 'script',
+  globals: { defaultGlobal: 'readonly' },
+  parserOptions: { ecmaFeatures: { globalReturn: true } } as any,
+});
+
 ruleTester.run('no-undef', {
   valid: [
     // === Variable / function / class declarations ===
@@ -725,3 +732,29 @@ ruleTester.run('no-undef', {
     },
   ],
 });
+
+languageOptionsRuleTester.run(
+  'no-undef',
+  {
+    valid: [
+      {
+        code: 'return defaultGlobal; caseGlobal;',
+        languageOptions: {
+          globals: { caseGlobal: 'readonly' },
+          parserOptions: { ecmaFeatures: { jsx: true } } as any,
+        },
+      },
+    ],
+    invalid: [
+      {
+        code: 'defaultGlobal; caseGlobal; Promise;',
+        languageOptions: {
+          globals: { caseGlobal: 'readonly' },
+          parserOptions: { ecmaFeatures: { jsx: true } } as any,
+        },
+        errors: [{ messageId: 'undef' }],
+      },
+    ],
+  },
+  'no-undef languageOptions merge',
+);

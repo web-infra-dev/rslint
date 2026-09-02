@@ -379,7 +379,7 @@ func TestNoUnusedVarsTypeParameters(t *testing.T) {
 		{Code: `export type Greeting<T extends string> = ` + "`Hello ${T}`" + `;`},
 		// --- Type parameter USED in mapped type ---
 		{Code: `export type MyRecord<K extends string> = { [P in K]: number };`},
-		// --- infer type is not a declaration — P in mapped type not reported ---
+		// --- used infer type and mapped-type bindings are not reported ---
 		{Code: `export type ElementOf<T> = T extends (infer U)[] ? U : never;`},
 		// --- arrow function type parameter ---
 		{Code: `export const fn = <T,>(x: T): T => x;`},

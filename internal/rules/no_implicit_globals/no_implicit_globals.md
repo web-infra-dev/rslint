@@ -130,13 +130,15 @@ Examples of **correct** code for this rule with `{ "lexicalBindings": true }`:
 
 ## Differences from ESLint
 
-- ESLint's `parserOptions.ecmaFeatures.globalReturn` is not configurable, so rslint cannot place a script's top-level declarations inside the synthetic function scope that option creates.
-- ESLint's `env` config (which supplies environment globals such as `browser`'s `window`) is not supported. Declare the same names through `languageOptions.globals` or a `/*global */` comment instead.
-- TypeScript declaration forms that bind no runtime variable of their own are not reported: ambient declarations (`declare var foo: number;`, `declare function foo(): void;`, `declare class Foo {}`) and overload signatures. ESLint reports the ambient forms, and counts one declaration per overload signature, so it reports an overload pair twice where this rule reports only the implementation.
-- `/* exported __proto__ */` treats `__proto__` like any other exported name. ESLint 10.8.1 accidentally loses that entry because its directive parser stores names in an ordinary JavaScript object, where assigning `__proto__` invokes the inherited prototype setter instead of creating an own property.
-- Rslint does not reproduce `@typescript-eslint/parser`'s recovered `PatternVisitor` diagnostics for assignment targets that remain invalid after TypeScript syntax is erased, such as `[foo + bar] = value`. This rule limits assignment-target parity to code whose generated JavaScript is executable.
+- For a script parsed by ESLint with `languageOptions.parserOptions.ecmaFeatures.globalReturn: true`, ESLint treats the top level as a function scope and does not report its `var` or function declarations. Rslint treats the same source as a global script and reports those declarations.
+- In TypeScript scripts, ESLint reports ambient `var` and function declarations and, with `lexicalBindings: true`, ambient `let`, `const`, and class declarations. Rslint does not report these declarations.
+- For an overloaded global function in a TypeScript script, ESLint reports every overload signature and the implementation. Rslint reports only the implementation.
+- In TypeScript assignment targets, rslint reports only runtime value targets. For `[foo as (x: T) => U] = value`, rslint reports `foo`; ESLint also reports the function-type parameter name `x`.
+- Rslint recognizes value writes through nested erased assertions. For `(foo satisfies T) = value`, rslint reports `foo`, while ESLint does not.
+- With `/* exported __proto__ */`, rslint suppresses the global-declaration diagnostic just as it does for other exported names. ESLint 10.9.1 still reports `__proto__` because of an upstream directive-parser bug.
+- On invalid TypeScript accepted through parser recovery, such as `[foo<T>] = value` or `[foo + bar] = value`, ESLint may emit assignment diagnostics that rslint does not.
 
 ## Original Documentation
 
 - [ESLint: no-implicit-globals](https://eslint.org/docs/latest/rules/no-implicit-globals)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-implicit-globals.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-implicit-globals.js)

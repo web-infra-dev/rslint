@@ -130,8 +130,7 @@ func TestPreferRegexLiteralsUpstream(t *testing.T) {
 			{Code: "new RegExp('a');", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Line: 1, Column: 1, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/a/;"}}}}},
 			{Code: "new RegExp(/a/, String.raw`u`);", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Line: 1, Column: 1, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteralAndFlags", Output: "/a/u;"}}}}},
 			{Code: "new RegExp(/a/ /* comment */);", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExp", Line: 1, Column: 1}}},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific d flag validation.
-			{Code: "new RegExp(/a/, 'd');", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Skip: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Line: 1, Column: 1}}},
+			{Code: "new RegExp(/a/, 'd');", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2021}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Line: 1, Column: 1}}},
 			{Code: "(a)\nnew RegExp(/b/);", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExp", Line: 2, Column: 1}}},
 			{Code: "(a)\nnew RegExp(/b/, 'g');", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Line: 2, Column: 1}}},
 			{Code: "a/RegExp(/foo/);", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExp", Line: 1, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "a/ /foo/;"}}}}},
@@ -145,10 +144,8 @@ func TestPreferRegexLiteralsUpstream(t *testing.T) {
 			{Code: "new RegExp('*', 'g');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "RegExp('+', 'g');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "RegExp('*', 'g');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific regex literal validation.
-			{Code: "RegExp('abc', 'u');", Skip: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific d flag validation.
-			{Code: "new RegExp('abc', 'd');", Skip: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "RegExp('abc', 'u');", LanguageOptions: rule.LanguageOptions{ECMAVersion: 3, SourceType: "script"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('abc', 'd');", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2021}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "RegExp('abc', 'd');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/abc/d;"}}}}},
 			{Code: "RegExp('\\\\\\\\', '');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/\\\\/;"}}}}},
 			{Code: "RegExp('\\n', '');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/\\n/;"}}}}},
@@ -260,21 +257,21 @@ func TestPreferRegexLiteralsUpstream(t *testing.T) {
 			{Code: "new RegExp(\"\\u000A\\u000A\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/\\n\\n/;"}}}}},
 			{Code: "new RegExp('mysafereg' /* comment explaining its safety */)", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "new RegExp('[[A--B]]', 'v')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/[[A--B]]/v"}}}}},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific v flag validation.
-			{Code: "new RegExp('[[A--B]]', 'v')", Skip: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('[[A--B]]', 'v')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2023}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "new RegExp('[[A&&&]]', 'v')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "new RegExp('a', 'uv')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "new RegExp(/a/, 'v')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteralAndFlags", Output: "/a/v"}}}}},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific v flag validation.
-			{Code: "new RegExp(/a/, 'v')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Skip: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags"}}},
+			{Code: "new RegExp(/a/, 'v')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2023}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags"}}},
 			{Code: "new RegExp(/a/g, 'v')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteralAndFlags", Output: "/a/v"}, {MessageId: "replaceWithIntendedLiteralAndFlags", Output: "/a/gv"}}}}},
 			{Code: "new RegExp(/[[A--B]]/v, 'g')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithIntendedLiteralAndFlags", Output: "/[[A--B]]/vg"}}}}},
 			{Code: "new RegExp(/a/u, 'v')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteralAndFlags", Output: "/a/v"}}}}},
 			{Code: "new RegExp(/a/v, 'u')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteralAndFlags", Output: "/a/u"}}}}},
 			{Code: "new RegExp(/[[A--B]]/v, 'u')", Options: []interface{}{map[string]interface{}{"disallowRedundantWrapping": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRedundantRegExpWithFlags"}}},
 			{Code: "new RegExp('(?i:foo)bar')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "/(?i:foo)bar/"}}}}},
-			// SKIP: rslint does not emulate ESLint ecmaVersion-specific inline modifier validation.
-			{Code: "new RegExp('(?i:foo)bar')", Skip: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('(?i:foo)bar')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('(?<=a)b')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('\\\\p{ASCII}', 'u')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
+			{Code: "new RegExp('(?<a>x)|(?<a>y)')", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2024}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp"}}},
 			{Code: "var regex = new RegExp('foo', 'u');", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpectedRegExp", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceWithLiteral", Output: "var regex = /foo/u;"}}}}},
 		},
 	)

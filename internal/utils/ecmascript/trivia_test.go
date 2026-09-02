@@ -96,6 +96,32 @@ func TestContainsLineTerminator_RangeClamping(t *testing.T) {
 	}
 }
 
+func TestLineTerminatorSequenceAt(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		pos  int
+		want string
+	}{
+		{name: "LF", text: "a\nb", pos: 1, want: "\n"},
+		{name: "CRLF", text: "a\r\nb", pos: 1, want: "\r\n"},
+		{name: "CR", text: "a\rb", pos: 1, want: "\r"},
+		{name: "LS", text: "a\u2028b", pos: 1, want: "\u2028"},
+		{name: "PS", text: "a\u2029b", pos: 1, want: "\u2029"},
+		{name: "middle of CRLF", text: "a\r\nb", pos: 2, want: "\n"},
+		{name: "ordinary byte", text: "abc", pos: 1},
+		{name: "out of bounds low", text: "abc", pos: -1},
+		{name: "out of bounds high", text: "abc", pos: 3},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := LineTerminatorSequenceAt(test.text, test.pos); got != test.want {
+				t.Fatalf("LineTerminatorSequenceAt(%q, %d) = %q, want %q", test.text, test.pos, got, test.want)
+			}
+		})
+	}
+}
+
 func TestSkipTrailingWhitespace(t *testing.T) {
 	cases := []struct {
 		name string

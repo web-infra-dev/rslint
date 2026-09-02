@@ -6,20 +6,16 @@ Require or disallow strict mode directives (`"use strict"`).
 
 The rule supports four options:
 
-- `"safe"` (default) — equivalent to `"function"` for script files; module files always use `"module"` semantics.
+- `"safe"` (default) — uses `"function"` semantics for scripts and `"global"` semantics for CommonJS files; module files always use `"module"` semantics.
 - `"never"` — disallows all strict mode directives.
 - `"global"` — requires exactly one strict directive in global scope and disallows all other directives.
 - `"function"` — requires one strict directive in each top-level function and disallows directives in the global scope or in nested functions / class bodies.
 
-When the file is an ES module (detected via top-level `import` / `export`), the rule always uses module semantics: every `"use strict"` directive is reported as unnecessary and removed by autofix.
+When `languageOptions.sourceType` is `"module"`, the rule always uses module semantics: every `"use strict"` directive is reported as unnecessary and removed by autofix.
 
 ## Differences from ESLint
 
-This rule determines module status from top-level `import` / `export` syntax,
-independently of `languageOptions.sourceType`. In particular, configuring
-`sourceType: 'module'` on a file without module syntax or `sourceType:
-'commonjs'` does not change this rule's behavior. The
-`parserOptions.ecmaFeatures.impliedStrict` and `globalReturn` options are also
+The `parserOptions.ecmaFeatures.impliedStrict` and `globalReturn` options are
 not supported.
 
 ## Examples
@@ -125,4 +121,4 @@ const foo2 = (function() {
 ## Original Documentation
 
 - [ESLint: strict](https://eslint.org/docs/latest/rules/strict)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/strict.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/strict.js)
