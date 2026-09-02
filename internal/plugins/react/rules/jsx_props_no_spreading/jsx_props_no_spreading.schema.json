@@ -1,0 +1,34 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "html": { "enum": ["enforce", "ignore"] },
+            "custom": { "enum": ["enforce", "ignore"] },
+            "explicitSpread": { "enum": ["enforce", "ignore"] },
+            "exceptions": {
+              "type": "array",
+              "items": { "type": "string", "uniqueItems": true }
+            }
+          }
+        },
+        {
+          "not": {
+            "type": "object",
+            "required": ["html", "custom"],
+            "properties": {
+              "html": { "enum": ["ignore"] },
+              "custom": { "enum": ["ignore"] },
+              "exceptions": { "type": "array", "minItems": 0, "maxItems": 0 }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
