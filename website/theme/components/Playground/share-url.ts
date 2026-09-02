@@ -33,6 +33,8 @@ export interface ShareState {
   code: string;
   rslintConfig: string;
   tsconfig: string;
+  /** A pinned `@rslint/wasm` version; `undefined` means "whatever is latest". */
+  wasmVersion?: string;
 }
 
 /**
@@ -42,14 +44,20 @@ export interface ShareState {
  */
 const SHARE_VERSION = '1';
 
-/** Holds the whole state; `code` alone still lives in `?code=` on old links. */
-const SHARE_PARAM = 's';
-/** Plain-text parameter used before share links were compressed. */
+/**
+ * The payload owns the whole fragment rather than sitting in a `name=` pair:
+ * the playground has no anchors to share it with, and two characters of URL are
+ * two characters. A fragment that does not start with the version digit is an
+ * old plain-text link instead.
+ */
 const LEGACY_CODE_PARAM = 'code';
 
 const FLAG_CODE = 1;
 const FLAG_RSLINT_CONFIG = 2;
 const FLAG_TSCONFIG = 4;
+const FLAG_WASM_VERSION = 8;
+const ALL_FLAGS =
+  FLAG_CODE | FLAG_RSLINT_CONFIG | FLAG_TSCONFIG | FLAG_WASM_VERSION;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -77,65 +85,98 @@ function fromBase64Url(value: string): Uint8Array {
 }
 
 /**
- * The frame is a flags byte naming the sections that differ from their default,
- * followed by those sections in flag order. Every section but the last is
- * prefixed with its LEB128 byte length; the last one runs to the end.
+ * The frame is a flags byte naming the parts that differ from their default,
+ * followed by the pinned wasm version as three LEB128 numbers when it is
+ * present, then the text sections in flag order. Every text section but the
+ * last is prefixed with its LEB128 byte length; the last one runs to the end.
  */
-function encodeFrame(sections: Uint8Array[], flags: number): Uint8Array {
+function pushVarint(bytes: number[], value: number) {
+  let rest = value;
+  do {
+    const byte = rest & 0x7f;
+    rest >>>= 7;
+    bytes.push(rest > 0 ? byte | 0x80 : byte);
+  } while (rest > 0);
+}
+
+function readVarint(frame: Uint8Array, cursor: { offset: number }): number {
+  let value = 0;
+  let shift = 0;
+  let byte: number;
+  do {
+    if (cursor.offset >= frame.length || shift > 28) throw new RangeError();
+    byte = frame[cursor.offset++];
+    value |= (byte & 0x7f) << shift;
+    shift += 7;
+  } while (byte & 0x80);
+  return value;
+}
+
+function parseVersion(version: string): number[] | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  return match === null ? null : [+match[1], +match[2], +match[3]];
+}
+
+function encodeFrame(
+  flags: number,
+  version: number[] | null,
+  sections: Uint8Array[],
+): Uint8Array {
   const bytes: number[] = [flags];
+  if (version !== null) for (const part of version) pushVarint(bytes, part);
   sections.forEach((section, index) => {
-    if (index < sections.length - 1) {
-      let length = section.length;
-      do {
-        const byte = length & 0x7f;
-        length >>>= 7;
-        bytes.push(length > 0 ? byte | 0x80 : byte);
-      } while (length > 0);
-    }
+    if (index < sections.length - 1) pushVarint(bytes, section.length);
     for (const byte of section) bytes.push(byte);
   });
   return new Uint8Array(bytes);
 }
 
-function decodeFrame(
-  frame: Uint8Array,
-): { flags: number; sections: string[] } | null {
+function decodeFrame(frame: Uint8Array): ShareState | null {
   if (frame.length === 0) return null;
   const flags = frame[0];
-  const count =
-    (flags & FLAG_CODE ? 1 : 0) +
-    (flags & FLAG_RSLINT_CONFIG ? 1 : 0) +
-    (flags & FLAG_TSCONFIG ? 1 : 0);
-  if (count === 0 || flags > (FLAG_CODE | FLAG_RSLINT_CONFIG | FLAG_TSCONFIG)) {
-    return null;
+  if (flags === 0 || flags > ALL_FLAGS) return null;
+  const cursor = { offset: 1 };
+
+  const state: ShareState = {
+    code: DEFAULT_CODE,
+    rslintConfig: DEFAULT_RSLINT_CONFIG,
+    tsconfig: DEFAULT_TSCONFIG,
+  };
+  if (flags & FLAG_WASM_VERSION) {
+    const parts = [
+      readVarint(frame, cursor),
+      readVarint(frame, cursor),
+      readVarint(frame, cursor),
+    ];
+    state.wasmVersion = parts.join('.');
   }
 
-  const sections: string[] = [];
-  let offset = 1;
-  for (let index = 0; index < count; index++) {
-    if (index === count - 1) {
-      sections.push(decoder.decode(frame.subarray(offset)));
-      return { flags, sections };
+  const keys = (
+    [
+      [FLAG_CODE, 'code'],
+      [FLAG_RSLINT_CONFIG, 'rslintConfig'],
+      [FLAG_TSCONFIG, 'tsconfig'],
+    ] as const
+  ).filter(([flag]) => flags & flag);
+  keys.forEach(([, key], index) => {
+    if (index === keys.length - 1) {
+      state[key] = decoder.decode(frame.subarray(cursor.offset));
+      cursor.offset = frame.length;
+      return;
     }
-    let length = 0;
-    let shift = 0;
-    let byte: number;
-    do {
-      if (offset >= frame.length || shift > 28) return null;
-      byte = frame[offset++];
-      length |= (byte & 0x7f) << shift;
-      shift += 7;
-    } while (byte & 0x80);
-    if (offset + length > frame.length) return null;
-    sections.push(decoder.decode(frame.subarray(offset, offset + length)));
-    offset += length;
-  }
-  return { flags, sections };
+    const length = readVarint(frame, cursor);
+    if (cursor.offset + length > frame.length) throw new RangeError();
+    state[key] = decoder.decode(
+      frame.subarray(cursor.offset, cursor.offset + length),
+    );
+    cursor.offset += length;
+  });
+  return state;
 }
 
 /**
- * Returns the payload for the share parameter, or `null` when every editor
- * holds its default and the link needs no parameter at all.
+ * Returns the fragment for a link to `state`, or `null` when nothing has been
+ * touched and the link needs no fragment at all.
  */
 export function encodeShareState(state: ShareState): string | null {
   let flags = 0;
@@ -152,9 +193,12 @@ export function encodeShareState(state: ShareState): string | null {
     flags |= FLAG_TSCONFIG;
     sections.push(encoder.encode(state.tsconfig));
   }
+  const version =
+    state.wasmVersion === undefined ? null : parseVersion(state.wasmVersion);
+  if (version !== null) flags |= FLAG_WASM_VERSION;
   if (flags === 0) return null;
 
-  const compressed = deflateSync(encodeFrame(sections, flags), {
+  const compressed = deflateSync(encodeFrame(flags, version, sections), {
     level: 9,
     mem: 12,
     dictionary: getDictionary(),
@@ -163,40 +207,20 @@ export function encodeShareState(state: ShareState): string | null {
 }
 
 /**
- * Decodes a share payload. A truncated, corrupt or future-version link decodes
+ * Decodes a share fragment. A truncated, corrupt or future-version link decodes
  * to `null` so the caller can fall back to the defaults instead of failing.
  */
 export function decodeShareState(payload: string): ShareState | null {
   if (payload[0] !== SHARE_VERSION) return null;
-  let decoded: { flags: number; sections: string[] } | null;
   try {
-    const frame = inflateSync(fromBase64Url(payload.slice(1)), {
-      dictionary: getDictionary(),
-    });
-    decoded = decodeFrame(frame);
+    return decodeFrame(
+      inflateSync(fromBase64Url(payload.slice(1)), {
+        dictionary: getDictionary(),
+      }),
+    );
   } catch {
     return null;
   }
-  if (decoded === null) return null;
-
-  const { flags, sections } = decoded;
-  let index = 0;
-  return {
-    code: flags & FLAG_CODE ? sections[index++] : DEFAULT_CODE,
-    rslintConfig:
-      flags & FLAG_RSLINT_CONFIG ? sections[index++] : DEFAULT_RSLINT_CONFIG,
-    tsconfig: flags & FLAG_TSCONFIG ? sections[index++] : DEFAULT_TSCONFIG,
-  };
-}
-
-function readParam(name: string): string | null {
-  const { search, hash } = window.location;
-  const fromSearch = new URLSearchParams(search).get(name);
-  if (fromSearch !== null) return fromSearch;
-  if (hash.startsWith('#')) {
-    return new URLSearchParams(hash.slice(1)).get(name);
-  }
-  return null;
 }
 
 /**
@@ -211,28 +235,31 @@ export function readShareState(): ShareState {
   };
   if (typeof window === 'undefined') return defaults;
 
-  const payload = readParam(SHARE_PARAM);
-  if (payload !== null) return decodeShareState(payload) ?? defaults;
+  const { search, hash } = window.location;
+  const fragment = hash.startsWith('#') ? hash.slice(1) : '';
+  if (fragment.startsWith(SHARE_VERSION)) {
+    return decodeShareState(fragment) ?? defaults;
+  }
 
-  const legacyCode = readParam(LEGACY_CODE_PARAM);
+  const legacyCode =
+    new URLSearchParams(search).get(LEGACY_CODE_PARAM) ??
+    new URLSearchParams(fragment).get(LEGACY_CODE_PARAM);
   if (legacyCode !== null) return { ...defaults, code: legacyCode };
 
   return defaults;
 }
 
 /**
- * Rewrites the current URL to carry `state`. Nothing but the share parameter is
- * left behind: an unmodified playground gets a bare URL, and a link opened in
- * the legacy plain-text form is upgraded in place on the first edit.
+ * Rewrites the current URL to carry `state`. Nothing but the fragment is left
+ * behind: an unmodified playground gets a bare URL, and a link opened in the
+ * legacy plain-text form is upgraded in place on the first edit.
  */
 export function writeShareState(state: ShareState) {
   if (typeof window === 'undefined') return;
   try {
     const url = new URL(window.location.href);
-    url.searchParams.delete(SHARE_PARAM);
     url.searchParams.delete(LEGACY_CODE_PARAM);
-    const payload = encodeShareState(state);
-    url.hash = payload === null ? '' : `${SHARE_PARAM}=${payload}`;
+    url.hash = encodeShareState(state) ?? '';
     window.history.replaceState(null, '', url.toString());
   } catch {
     // A URL we cannot rewrite is not worth failing an edit over.

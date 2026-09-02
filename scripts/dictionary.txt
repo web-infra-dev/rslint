@@ -686,6 +686,7 @@ valuemin
 valuenow
 valuetext
 variabledeclaration
+varint
 vfsmatch
 visitchildren
 vitest

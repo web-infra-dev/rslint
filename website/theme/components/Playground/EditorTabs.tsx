@@ -66,6 +66,8 @@ interface EditorTabsProps {
   onChange: (value: string) => void;
   onSelectionChange?: (start: number, end: number) => void;
   onConfigChange?: () => void;
+  /** Pinned `@rslint/wasm` version, or `undefined` while the latest is in use. */
+  wasmVersion?: string;
   toolbarEnd?: ReactNode;
 }
 
@@ -88,6 +90,7 @@ export const EditorTabs = ({
   onChange,
   onSelectionChange,
   onConfigChange,
+  wasmVersion,
   toolbarEnd,
 }: EditorTabsProps) => {
   const [activeTab, setActiveTab] = useState<EditorTabType>('code');
@@ -117,6 +120,7 @@ export const EditorTabs = ({
   const onChangeRef = useRef(onChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onConfigChangeRef = useRef(onConfigChange);
+  const wasmVersionRef = useRef(wasmVersion);
 
   const lastValidTsConfig = useRef<any>(null);
 
@@ -141,9 +145,15 @@ export const EditorTabs = ({
           rslintEditorRef.current?.getValue() ?? initialState.rslintConfig,
         tsconfig:
           tsconfigEditorRef.current?.getValue() ?? initialState.tsconfig,
+        wasmVersion: wasmVersionRef.current,
       });
     }, 300);
   }
+
+  useEffect(() => {
+    wasmVersionRef.current = wasmVersion;
+    scheduleSerializeToUrl();
+  }, [wasmVersion]);
 
   // Initialize the last valid tsconfig.
   useEffect(() => {
