@@ -32,4 +32,4 @@ const x = 3 as const; // const assertions are allowed
 ## Original Documentation
 
 - [typescript-eslint: no-unnecessary-type-assertion](https://typescript-eslint.io/rules/no-unnecessary-type-assertion)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/src/rules/no-unnecessary-type-assertion.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.68.0/packages/eslint-plugin/src/rules/no-unnecessary-type-assertion.ts)

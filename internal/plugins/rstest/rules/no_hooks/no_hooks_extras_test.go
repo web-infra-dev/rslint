@@ -59,7 +59,6 @@ func TestNoHooksExtras(t *testing.T) {
 			// ---- Locks in parser contract: non-plain-call positions ----
 			{Code: `new beforeEach()`},
 			{Code: "beforeEach`x`"},
-			{Code: `(0, beforeEach)(() => {})`},
 			{Code: `globalThis.beforeEach(() => {})`},
 			// ---- Locks in upstream create() branch: non-hook CallExpression is ignored ----
 			{Code: `notAHook(() => {})`},
@@ -98,6 +97,18 @@ func TestNoHooksExtras(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Dimension 4: a comma-wrapped hook remains the called hook ----
+			{
+				Code: `(0, beforeEach)(() => {})`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unexpectedHook",
+					Message:   "Unexpected 'beforeEach' hook",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 26,
+				}},
+			},
 			// ---- Locks in parser branch: core globals and timeout overload ----
 			{
 				Code: `beforeAll(() => {}, 1000);`,

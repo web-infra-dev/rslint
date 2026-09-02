@@ -13,7 +13,7 @@
  * `applyJsxValueDecoding`) otherwise lost its coverage. espree is the
  * oracle — every case runs through the native parser AND espree.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import * as espree from 'espree';
 import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 

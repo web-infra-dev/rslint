@@ -314,7 +314,7 @@ cd packages/rslint && pnpm run build:bin
 go test -count=1 ./internal/rules/<rule_name>
 
 # Run JS tests (first run: append -u to generate snapshots)
-cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
+cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name>
 
 # Pre-commit gate (BLOCKING — all must pass before commit)
 pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check

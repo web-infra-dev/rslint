@@ -10,14 +10,10 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type defaultFormatter struct {
-	colors  colorScheme
-	outcome Outcome
+	colors colorScheme
 }
 
 const statusLabelWidth = 7
@@ -63,32 +59,32 @@ func (f *defaultFormatter) finish(w *bufio.Writer, report Report) error {
 		return err
 	}
 	elapsed := time.Duration(0)
-	if !report.metadata.StartedAt.IsZero() {
-		elapsed = time.Since(report.metadata.StartedAt)
+	if !report.summary.StartedAt.IsZero() {
+		elapsed = time.Since(report.summary.StartedAt)
 	}
-	renderSummary(w, report, f.outcome, elapsed, f.colors)
+	renderSummary(w, report, elapsed, f.colors)
 	return nil
 }
 
-func renderSummary(w *bufio.Writer, report Report, outcome Outcome, elapsed time.Duration, colors colorScheme) {
-	if outcome.Kind == OutcomePassed && report.metadata.Files == 0 && report.counts.Errors == 0 && report.counts.Warnings == 0 {
-		message := fmt.Sprintf("%s in %s", emptyMessage(report.metadata.Mode), formatElapsed(elapsed))
+func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors colorScheme) {
+	if report.outcome.Kind == OutcomePassed && report.summary.Files == 0 && report.counts.Errors == 0 && report.counts.Warnings == 0 {
+		message := fmt.Sprintf("%s in %s", emptyMessage(report.mode), formatElapsed(elapsed))
 		_ = renderStatusLine(w, "success", colors.SuccessText, message, "")
 		return
 	}
 
-	subject := completedSubject(report.metadata.Mode)
+	subject := completedSubject(report.mode)
 	fixes := ""
-	if report.metadata.FixedIssues > 0 {
+	if report.summary.FixedIssues > 0 {
 		fixes = fmt.Sprintf(" after applying %d %s",
-			report.metadata.FixedIssues,
-			pluralize(report.metadata.FixedIssues, "fix", "fixes"),
+			report.summary.FixedIssues,
+			pluralize(report.summary.FixedIssues, "fix", "fixes"),
 		)
 	}
 
 	var label, message string
 	var labelColor func(string, ...interface{}) string
-	switch outcome.Kind {
+	switch report.outcome.Kind {
 	case OutcomeDiagnosticsFailed:
 		label = "error"
 		labelColor = colors.ErrorText
@@ -107,7 +103,7 @@ func renderSummary(w *bufio.Writer, report Report, outcome Outcome, elapsed time
 			formatElapsed(elapsed),
 			colors.WarnText("%d", report.counts.Warnings),
 			pluralize(report.counts.Warnings, "warning", "warnings"),
-			outcome.WarningLimit,
+			report.outcome.WarningLimit,
 		)
 	default:
 		label = "success"
@@ -206,7 +202,7 @@ func findingSummary(report Report, colors colorScheme) string {
 		}
 	}
 
-	switch report.metadata.Mode {
+	switch report.mode {
 	case ModeLintAndTypeCheck:
 		appendFinding(report.counts.LintErrors, "lint error", "lint errors", colors.ErrorText)
 		appendFinding(report.counts.TypeErrors, "TypeScript error", "TypeScript errors", colors.ErrorText)
@@ -231,15 +227,15 @@ func findingSummary(report Report, colors colorScheme) string {
 
 func summaryDetails(report Report) string {
 	details := []string{
-		fmt.Sprintf("%d %s", report.metadata.Files, pluralize(report.metadata.Files, "file", "files")),
+		fmt.Sprintf("%d %s", report.summary.Files, pluralize(report.summary.Files, "file", "files")),
 	}
-	if report.metadata.Mode != ModeTypeCheckOnly {
+	if report.mode != ModeTypeCheckOnly {
 		details = append(details,
-			fmt.Sprintf("%d %s", report.metadata.Rules, pluralize(report.metadata.Rules, "rule", "rules")),
+			fmt.Sprintf("%d %s", report.summary.Rules, pluralize(report.summary.Rules, "rule", "rules")),
 		)
 	}
 	details = append(details,
-		fmt.Sprintf("%d %s", report.metadata.Threads, pluralize(report.metadata.Threads, "thread", "threads")),
+		fmt.Sprintf("%d %s", report.summary.Threads, pluralize(report.summary.Threads, "thread", "threads")),
 	)
 	return "(" + strings.Join(details, ", ") + ")"
 }
@@ -260,24 +256,21 @@ func pluralize(count int, singular, plural string) string {
 
 func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorScheme) {
 	diagnostic := view.raw
-	diagnosticStart := diagnostic.Range.Pos()
-	diagnosticEnd := diagnostic.Range.End()
+	diagnosticStart := diagnostic.Range.Start
+	diagnosticEnd := diagnostic.Range.End
 	diagnosticStartLine := view.start.line
 	diagnosticStartColumn := view.start.column
 	diagnosticEndLine := view.end.line
 
-	lineMap := scanner.GetECMALineStarts(diagnostic.SourceFile)
-	text := diagnostic.SourceFile.Text()
+	lineMap := diagnostic.Source.lineStarts
+	text := diagnostic.Source.text
 
 	codeboxStartLine := max(diagnosticStartLine-1, 0)
 	codeboxEndLine := min(diagnosticEndLine+1, len(lineMap)-1)
-
-	codeboxStart := int(lineMap[codeboxStartLine])
-	var codeboxEnd int
-	if codeboxEndLine == len(lineMap)-1 {
-		codeboxEnd = len(text)
-	} else {
-		codeboxEnd = int(lineMap[codeboxEndLine+1]) - 1
+	codeboxStart := lineMap[codeboxStartLine]
+	codeboxEnd := len(text)
+	if codeboxEndLine != len(lineMap)-1 {
+		codeboxEnd = lineMap[codeboxEndLine+1] - 1
 	}
 
 	w.WriteByte(' ')
@@ -285,15 +278,15 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 	w.WriteString(" — ")
 
 	severityColor := colors.WarnText
-	if diagnostic.Severity == rule.SeverityError {
+	if diagnostic.Severity == SeverityError {
 		severityColor = colors.ErrorText
 	}
 	w.WriteString(severityColor("[%s] ", diagnostic.Severity.String()))
 
 	messageLineStart := 0
-	for i, char := range diagnostic.Message.Description {
+	for i, char := range diagnostic.Message {
 		if char == '\n' {
-			w.WriteString(diagnostic.Message.Description[messageLineStart : i+1])
+			w.WriteString(diagnostic.Message[messageLineStart : i+1])
 			messageLineStart = i + 1
 			if diagnostic.PreFormatted {
 				w.WriteString("  ")
@@ -304,8 +297,8 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 			}
 		}
 	}
-	if messageLineStart <= len(diagnostic.Message.Description) {
-		w.WriteString(diagnostic.Message.Description[messageLineStart:])
+	if messageLineStart <= len(diagnostic.Message) {
+		w.WriteString(diagnostic.Message[messageLineStart:])
 	}
 
 	w.WriteString("\n  ")
@@ -326,17 +319,20 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 	lineStarts := make([]int, numLines)
 	lineEnds := make([]int, numLines)
 
+	// Preserve the established code-frame rendering contract: source locations
+	// follow the producer's ECMAScript line map, while displayed content advances
+	// only at LF. This intentionally retains legacy CR/U+2028/U+2029 behavior.
 	codeboxText := text[codeboxStart:codeboxEnd]
-	for i := 0; i < len(codeboxText); {
-		char, size := utf8.DecodeRuneInString(codeboxText[i:])
-		current := codeboxStart + i
+	for offset := 0; offset < len(codeboxText); {
+		char, size := utf8.DecodeRuneInString(codeboxText[offset:])
+		current := codeboxStart + offset
 		next := current + size
-		i += size
+		offset += size
 
 		if char == '\n' {
 			if line != codeboxEndLine {
 				lineIndentCalculated = false
-				lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
+				lineEnds[line-codeboxStartLine] = max(lastNonSpaceByteIndex-lineMap[line], 0)
 				lastNonSpaceByteIndex = -1
 				line++
 			}
@@ -345,16 +341,15 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 
 		if !lineIndentCalculated && !unicode.IsSpace(char) {
 			lineIndentCalculated = true
-			lineStarts[line-codeboxStartLine] = current - int(lineMap[line])
+			lineStarts[line-codeboxStartLine] = max(current-lineMap[line], 0)
 			indentSize = min(indentSize, lineStarts[line-codeboxStartLine])
 		}
-
 		if lineIndentCalculated && !unicode.IsSpace(char) {
 			lastNonSpaceByteIndex = next
 		}
 	}
 	if line == codeboxEndLine {
-		lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
+		lineEnds[line-codeboxStartLine] = max(lastNonSpaceByteIndex-lineMap[line], 0)
 	}
 	if indentSize == math.MaxInt {
 		indentSize = 0
@@ -374,7 +369,7 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 			w.WriteByte('\n')
 
 			line = codeboxEndLine - 1
-			diagnosticHighlightActive = diagnosticStart < int(lineMap[line]) && diagnosticEnd >= int(lineMap[line])
+			diagnosticHighlightActive = diagnosticStart < lineMap[line] && diagnosticEnd >= lineMap[line]
 		}
 
 		w.WriteString("  ")
@@ -391,19 +386,19 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 		w.WriteString(colors.BorderText(" │"))
 		w.WriteString("  ")
 
-		lineTextStart := int(lineMap[line]) + indentSize
-		underlineStart := max(lineTextStart, int(lineMap[line])+lineStarts[line-codeboxStartLine])
+		lineTextStart := lineMap[line] + indentSize
+		underlineStart := max(lineTextStart, lineMap[line]+lineStarts[line-codeboxStartLine])
 		underlineEnd := underlineStart
-		lineTextEnd := max(int(lineMap[line])+lineEnds[line-codeboxStartLine], lineTextStart)
+		lineTextEnd := max(lineMap[line]+lineEnds[line-codeboxStartLine], lineTextStart)
 
 		if diagnosticHighlightActive {
 			underlineEnd = lineTextEnd
-		} else if int(lineMap[line]) <= diagnosticStart && (line == len(lineMap)-1 || diagnosticStart < int(lineMap[line+1])) {
+		} else if lineMap[line] <= diagnosticStart && (line == len(lineMap)-1 || diagnosticStart < lineMap[line+1]) {
 			underlineStart = min(max(lineTextStart, diagnosticStart), lineTextEnd)
 			underlineEnd = lineTextEnd
 			diagnosticHighlightActive = true
 		}
-		if int(lineMap[line]) <= diagnosticEnd && (line == len(lineMap)-1 || diagnosticEnd < int(lineMap[line+1])) {
+		if lineMap[line] <= diagnosticEnd && (line == len(lineMap)-1 || diagnosticEnd < lineMap[line+1]) {
 			underlineEnd = min(max(underlineStart, diagnosticEnd), lineTextEnd)
 			diagnosticHighlightActive = false
 		}

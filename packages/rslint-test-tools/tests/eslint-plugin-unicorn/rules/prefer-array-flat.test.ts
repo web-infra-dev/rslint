@@ -64,6 +64,11 @@ const validCases = [
   'array.reduce((a, b) => b.concat(a), [])',
   'array.reduce((a, b) => a.notConcat(b), [])',
   'array.reduce((a, b) => a.concat, [])',
+  'array.reduce((a, b) => Iterator.concat(a, b), [])',
+  'function f(foo: Set<number[]>) { foo.reduce((a, b) => a.concat(b), []); }',
+  'function f(foo: Uint8Array) { foo.reduce((a, b) => a.concat(b), []); }',
+  'const foo = new Uint8Array(); foo.reduce((a, b) => a.concat(b), []);',
+  'function f(foo: string) { foo.reduce((a, b) => a.concat(b), []); }',
 
   // `array.reduce((a, b) => [...a, ...b], [])`
   'new array.reduce((a, b) => [...a, ...b], [])',
@@ -88,6 +93,8 @@ const validCases = [
   'array.reduce((a, b) => [,...a, ...b], [])',
   'array.reduce((a, b) => [, ], [])',
   'array.reduce((a, b) => [, ,], [])',
+  'function f(foo: Set<number[]>) { foo.reduce((a, b) => [...a, ...b], []); }',
+  'function f(foo: Uint8Array) { foo.reduce((a, b) => [...a, ...b], []); }',
 
   // `[].concat(array)`
   '[].concat',
@@ -100,6 +107,12 @@ const validCases = [
   '[].concat(array, EXTRA_ARGUMENT)',
   '[]?.concat(array)',
   '[].concat?.(array)',
+  '[].concat(maybeArray)',
+  '[].concat( ((0, maybeArray)) )',
+  '[].concat( ((maybeArray)) )',
+  '[].concat( [foo] )',
+  '[].concat( [[foo]] )',
+  'function foo(){return[].concat(maybeArray)}',
 
   // `[].concat(...array)`
   'new [].concat(...array)',
@@ -128,6 +141,11 @@ const validCases = [
   '[].concat.apply?.([], array)',
   '[].concat?.apply([], array)',
   '[]?.concat.apply([], array)',
+  '[].concat.call([], maybeArray)',
+  '[].concat.call([], ((0, maybeArray)))',
+  '[].concat.call([], ((maybeArray)))',
+  '[].concat.call([], [foo])',
+  '[].concat.call([], [[foo]])',
 
   // `Array.prototype.concat.{apply,call}`
   'new Array.prototype.concat.apply([], array)',
@@ -149,6 +167,11 @@ const validCases = [
   'Array.prototype?.concat.apply([], array)',
   'Array?.prototype.concat.apply([], array)',
   'object.Array.prototype.concat.apply([], array)',
+  'Array.prototype.concat.call([], maybeArray)',
+  'Array.prototype.concat.call([], ((0, maybeArray)))',
+  'Array.prototype.concat.call([], ((maybeArray)))',
+  'Array.prototype.concat.call([], [foo])',
+  'Array.prototype.concat.call([], [[foo]])',
 
   // `_.flatten(array)`
   'new _.flatten(array)',
@@ -164,6 +187,21 @@ const validCases = [
 
   'array.flat()',
   'array.flat(1)',
+  `before()
+  Array.prototype.concat.call([], +1)`,
+  'Array.prototype.concat.call([], (0, array))',
+  'async function a() { return [].concat(await getArray()); }',
+  `before()
+  Array.prototype.concat.call([], 1)`,
+  `before()
+  Array.prototype.concat.call([], 1.)`,
+  `before()
+  Array.prototype.concat.call([], .1)`,
+  `before()
+  Array.prototype.concat.call([], 1.0)`,
+  '[].concat(some./**/array)',
+  '[/**/].concat(some./**/array)',
+  '[/**/].concat(some.array)',
 ].map((code) => valid(code));
 
 const invalidCases = [
@@ -176,6 +214,7 @@ const invalidCases = [
   'Foo.bar.flatMap(x => x)',
   'const values = getValues(); values.flatMap(x => x);',
   'const values = []; values.flatMap(x => x);',
+  'let effects = new Set(); effects.flatMap(x => x);',
   'const Items = []; Items.flatMap(x => x);',
   `for (const value of values) {
     value.flatMap(x => x);
@@ -186,19 +225,13 @@ const invalidCases = [
   'array?.reduce((a, b) => a.concat(b), [])',
   'function foo(){return[].reduce((a, b) => a.concat(b), [])}',
   'function foo(){return[]?.reduce((a, b) => a.concat(b), [])}',
+  'function f(foo: number[][]) { foo.reduce((a, b) => a.concat(b), []); }',
 
   // `array.reduce((a, b) => [...a, ...b], [])`
   'array.reduce((a, b) => [...a, ...b], [])',
   'array.reduce((a, b) => [...a, ...b,], [])',
   'function foo(){return[].reduce((a, b) => [...a, ...b,], [])}',
-
-  // `[].concat(array)`
-  '[].concat(maybeArray)',
-  '[].concat( ((0, maybeArray)) )',
-  '[].concat( ((maybeArray)) )',
-  '[].concat( [foo] )',
-  '[].concat( [[foo]] )',
-  'function foo(){return[].concat(maybeArray)}',
+  'function f(foo: number[][]) { foo.reduce((a, b) => [...a, ...b], []); }',
 
   // `[].concat(...array)`
   '[].concat(...array)',
@@ -215,11 +248,6 @@ const invalidCases = [
   '[].concat.apply([], ((array)))',
   '[].concat.apply([], [foo])',
   '[].concat.apply([], [[foo]])',
-  '[].concat.call([], maybeArray)',
-  '[].concat.call([], ((0, maybeArray)))',
-  '[].concat.call([], ((maybeArray)))',
-  '[].concat.call([], [foo])',
-  '[].concat.call([], [[foo]])',
   '[].concat.call([], ...array)',
   '[].concat.call([], ...((0, array)))',
   '[].concat.call([], ...((array)))',
@@ -233,11 +261,6 @@ const invalidCases = [
   'Array.prototype.concat.apply([], ((array)))',
   'Array.prototype.concat.apply([], [foo])',
   'Array.prototype.concat.apply([], [[foo]])',
-  'Array.prototype.concat.call([], maybeArray)',
-  'Array.prototype.concat.call([], ((0, maybeArray)))',
-  'Array.prototype.concat.call([], ((maybeArray)))',
-  'Array.prototype.concat.call([], [foo])',
-  'Array.prototype.concat.call([], [[foo]])',
   'Array.prototype.concat.call([], ...array)',
   'Array.prototype.concat.call([], ...((0, array)))',
   'Array.prototype.concat.call([], ...((array)))',
@@ -258,33 +281,18 @@ const invalidCases = [
   Array.prototype.concat.apply([], [array].concat(array))`,
   `before()
   Array.prototype.concat.apply([], +1)`,
-  `before()
-  Array.prototype.concat.call([], +1)`,
   'Array.prototype.concat.apply([], (0, array))',
-  'Array.prototype.concat.call([], (0, array))',
-  'async function a() { return [].concat(await getArray()); }',
   '_.flatten((0, array))',
   'async function a() { return _.flatten(await getArray()); }',
   'async function a() { return _.flatten((await getArray())); }',
   `before()
   Array.prototype.concat.apply([], 1)`,
   `before()
-  Array.prototype.concat.call([], 1)`,
-  `before()
   Array.prototype.concat.apply([], 1.)`,
-  `before()
-  Array.prototype.concat.call([], 1.)`,
   `before()
   Array.prototype.concat.apply([], .1)`,
   `before()
-  Array.prototype.concat.call([], .1)`,
-  `before()
   Array.prototype.concat.apply([], 1.0)`,
-  `before()
-  Array.prototype.concat.call([], 1.0)`,
-  '[].concat(some./**/array)',
-  '[/**/].concat(some./**/array)',
-  '[/**/].concat(some.array)',
 ].map((code) => invalid(code));
 
 const options = [

@@ -1,4 +1,4 @@
-import { describe, expect, test } from '@rstest/core';
+import { describe, expect, test } from 'rstack/test';
 import path from 'node:path';
 
 import {

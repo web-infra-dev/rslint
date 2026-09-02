@@ -6,7 +6,7 @@ function valid(code: string, options?: unknown[], ecmaVersion = 5) {
   return {
     code,
     ...(options ? { options: options as any } : {}),
-    languageOptions: { ecmaVersion } as any,
+    languageOptions: { ecmaVersion, sourceType: 'script' } as any,
   };
 }
 
@@ -28,7 +28,7 @@ function invalid(
   return {
     code,
     ...(options ? { options: options as any } : {}),
-    languageOptions: { ecmaVersion } as any,
+    languageOptions: { ecmaVersion, sourceType: 'script' } as any,
     errors,
   };
 }

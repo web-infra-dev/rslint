@@ -24,7 +24,7 @@
  *      audit trail.)
  */
 
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 
 import { createSourceCode } from '../../../src/eslint-plugin/source-code/source-code.js';
 import { createRuleContext } from '../../../src/eslint-plugin/linter/context.js';

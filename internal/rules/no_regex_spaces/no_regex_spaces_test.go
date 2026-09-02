@@ -71,6 +71,12 @@ func TestNoRegexSpacesRule(t *testing.T) {
 			{Code: `var foo = new RegExp('[  ');`},
 			{Code: `var foo = new RegExp('{  ', 'u');`},
 			{Code: `var foo = new RegExp('{  ', 'v');`},
+			{Code: `RegExp("(?=(?<a>x))(?<a>y)  ", "u")`},
+			{Code: `RegExp("[^a\\q{bc}]  ", "v")`},
+			{Code: `RegExp("[^a-z\\q{bc}]  ", "v")`},
+			// The bundled TypeScript scanner does not yet recognize this newer
+			// Unicode script value, so shared pattern validation fails closed.
+			{Code: `RegExp("[^a\\p{Script=Gara}]  ", "v")`},
 
 			// ---- Flags cannot be determined ----
 			{Code: `new RegExp('  ', flags)`},
@@ -78,6 +84,23 @@ func TestNoRegexSpacesRule(t *testing.T) {
 			{Code: `new RegExp('[[abc]\q{  }]', flags + 'v')`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Shared ECMAScript pattern validation ----
+			{
+				Code:   `var foo = /(?<a>x)|(?<a>y)  /u;`,
+				Output: []string{`var foo = /(?<a>x)|(?<a>y) {2}/u;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "multipleSpaces"}},
+			},
+			{
+				Code:   `var foo = /[^a\q{b|c}]  /v;`,
+				Output: []string{`var foo = /[^a\q{b|c}] {2}/v;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "multipleSpaces"}},
+			},
+			{
+				Code:   `var foo = /[^a\p{Letter}]  /v;`,
+				Output: []string{`var foo = /[^a\p{Letter}] {2}/v;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "multipleSpaces"}},
+			},
+
 			// ---- Regex literals ----
 			{
 				Code:   `var foo = /bar  baz/;`,

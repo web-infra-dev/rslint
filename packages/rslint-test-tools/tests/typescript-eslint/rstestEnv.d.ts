@@ -1,1 +1,1 @@
-/// <reference types="@rstest/core/globals" />
+/// <reference types="rstack/test/globals" />

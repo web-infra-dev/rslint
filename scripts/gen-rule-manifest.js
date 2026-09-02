@@ -10,7 +10,7 @@ const PLUGINS_DIR = path.join(__dirname, '../internal/plugins');
 const CORE_RULES_DIR = path.join(__dirname, '../internal/rules');
 const TEST_CONFIG_PATH = path.join(
   __dirname,
-  '../packages/rslint-test-tools/rstest.config.mts',
+  '../packages/rslint-test-tools/rstack.config.mts',
 );
 const TESTS_BASE_DIR = path.join(
   __dirname,
@@ -87,7 +87,7 @@ function ruleKey(group, rule) {
 }
 
 function getIncludedRuleTests(groups) {
-  // Parse rstest.config.mts include list and associate each rule with its
+  // Parse the Rstack test config's include list and associate each rule with its
   // enabled test files, including tests nested under a rule directory.
   const config = fs.readFileSync(TEST_CONFIG_PATH, 'utf-8');
   // Translate the on-disk test directory back to its manifest group once here,

@@ -38,7 +38,7 @@
  * These tests pin the post-fix behaviour: every accepted shape must
  * surface its rules into the dispatch map with the proper prefix.
  */
-import { describe, test, expect } from '@rstest/core';
+import { describe, test, expect } from 'rstack/test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
