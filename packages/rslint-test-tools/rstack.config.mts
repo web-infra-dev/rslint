@@ -623,6 +623,7 @@ define.test({
     './tests/rstest/rules/no-hooks.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
     './tests/rstest/rules/no-import-node-test.test.ts',
+    './tests/rstest/rules/no-importing-rstest-globals.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
     './tests/rstest/rules/no-standalone-expect.test.ts',

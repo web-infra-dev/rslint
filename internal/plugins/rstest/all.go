@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
 	no_import_node "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_import_node_test"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
@@ -60,6 +61,7 @@ func GetAllRules() []rule.Rule {
 		no_hooks.NoHooksRule,
 		no_identical_title.NoIdenticalTitleRule,
 		no_import_node.NoImportNodeTestRule,
+		no_importing_rstest_globals.NoImportingRstestGlobalsRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
 		no_mocks_import.NoMocksImportRule,
 		no_standalone_expect.NoStandaloneExpectRule,
