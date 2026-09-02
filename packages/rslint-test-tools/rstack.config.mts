@@ -82,6 +82,7 @@ define.test({
     './tests/eslint/rules/func-style.test.ts',
     './tests/eslint/rules/grouped-accessor-pairs.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
+    './tests/eslint/rules/no-cond-assign.test.ts',
     './tests/eslint/rules/no-console.test.ts',
     './tests/eslint/rules/no-continue.test.ts',
     './tests/eslint/rules/no-div-regex.test.ts',
