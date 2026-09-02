@@ -12,6 +12,32 @@ const CORE_IMPORT = /from ['"]@rslint\/core['"]/g;
 const SANDBOX_ATTRIBUTE = 'allow-scripts';
 
 /**
+ * The opaque origin keeps a config away from this page's data; this keeps it
+ * from phoning home. Without it a config could still reach an attacker's server
+ * — `fetch`, an image beacon, `sendBeacon`, a dynamic import — and a link that
+ * looks like it points at the docs would quietly hand over the reader's address
+ * the moment they opened it.
+ *
+ * Package CDNs stay reachable because a config is meant to import from one, and
+ * allowing them costs nothing here: an attacker cannot read jsDelivr's logs, so
+ * a request smuggled into a CDN URL tells them nothing about who made it.
+ *
+ * `'unsafe-inline'` is not a concession. Every script in this frame is the
+ * config the reader is asking to run; the policy exists to bound where that
+ * script can reach, not to keep it out.
+ */
+const MODULE_HOSTS = [
+  'https://esm.sh',
+  'https://cdn.jsdelivr.net',
+  'https://unpkg.com',
+].join(' ');
+const SANDBOX_POLICY = [
+  "default-src 'none'",
+  `script-src 'unsafe-inline' blob: ${MODULE_HOSTS}`,
+  `connect-src ${MODULE_HOSTS}`,
+].join('; ');
+
+/**
  * Long enough for a cold `esm.sh` fetch of the core package, short enough that
  * a config which never finishes stops mattering. A spinning frame cannot block
  * this document, so the deadline is about reporting rather than rescue.
@@ -27,7 +53,7 @@ const EVALUATION_TIMEOUT_MS = 5000;
  * it anyway: anything that cannot survive JSON would not have reached the
  * linter under the old in-page evaluation either.
  */
-const SANDBOX_MARKUP = `<!doctype html><meta charset="utf-8"><script type="module">
+const SANDBOX_MARKUP = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${SANDBOX_POLICY}"><script type="module">
 const post = (message) => parent.postMessage(message, '*');
 addEventListener('error', (event) => post({ error: String(event.message) }));
 addEventListener('unhandledrejection', (event) => post({ error: String(event.reason) }));
