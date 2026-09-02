@@ -2177,6 +2177,267 @@ exports[`no-undef > invalid 82`] = `
 }
 `;
 
+exports[`no-undef > invalid 83`] = `
+{
+  "code": "const el = <Missing></Missing>;",
+  "diagnostics": [
+    {
+      "message": "'Missing' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 84`] = `
+{
+  "code": "const el = <Éclair />;",
+  "diagnostics": [
+    {
+      "message": "'Éclair' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 85`] = `
+{
+  "code": "const el = <foo:bar></foo:bar>;",
+  "diagnostics": [
+    {
+      "message": "'foo' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'bar' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'foo' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'bar' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 86`] = `
+{
+  "code": "const el = <this></this>;",
+  "diagnostics": [
+    {
+      "message": "'this' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'this' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 87`] = `
+{
+  "code": "const el = <this:Foo></this:Foo>;",
+  "diagnostics": [
+    {
+      "message": "'this' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'Foo' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'this' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'Foo' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 88`] = `
+{
+  "code": "export as namespace Missing;",
+  "diagnostics": [
+    {
+      "message": "'Missing' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
 exports[`no-undef languageOptions merge > invalid 1`] = `
 {
   "code": "defaultGlobal; caseGlobal; Promise;",
