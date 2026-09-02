@@ -112,6 +112,10 @@ func jsxTagName(element *ast.Node) (string, bool) {
 	switch tagName.Kind {
 	case ast.KindIdentifier:
 		return tagName.AsIdentifier().Text, true
+	case ast.KindThisKeyword:
+		// ts-go parses a bare JSX `this` tag as ThisKeyword, while ESTree
+		// exposes it as a JSXIdentifier named "this".
+		return "this", true
 	case ast.KindPropertyAccessExpression:
 		propertyAccess := tagName.AsPropertyAccessExpression()
 		property := propertyAccess.Name()

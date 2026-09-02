@@ -51,6 +51,10 @@ func TestJsxPropsNoSpreadingExtras(t *testing.T) {
 		{Code: `<App {...props} />`, Tsx: true, Options: map[string]any{"custom": "ignore"}},
 		// Locks in upstream custom enforce branch with an exception.
 		{Code: `<App {...props} />`, Tsx: true, Options: map[string]any{"custom": "enforce", "exceptions": []any{"App"}}},
+		// ts-go represents a bare JSX `this` tag as ThisKeyword, while upstream
+		// exposes it as JSXIdentifier("this").
+		{Code: `<this {...props} />`, Tsx: true, Options: map[string]any{"html": "ignore"}},
+		{Code: `<this {...props} />`, Tsx: true, Options: map[string]any{"exceptions": []any{"this"}}},
 		// ESLint classifies an astral name by its first UTF-16 code unit, whose
 		// surrogate has no case mapping, so this is a custom tag.
 		{Code: `<𐐨 {...props} />`, Tsx: true, Options: map[string]any{"custom": "ignore"}},
