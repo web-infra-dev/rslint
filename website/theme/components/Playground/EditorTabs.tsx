@@ -19,6 +19,11 @@ import { type Diagnostic } from '@rslint/core/service';
 import { useDark } from '@rspress/core/runtime';
 import { Button } from '@components/ui/button';
 import { evaluateConfig, type PlaygroundConfig } from './config';
+import {
+  DEFAULT_RSLINT_CONFIG,
+  readShareState,
+  writeShareState,
+} from './share-url';
 import { installRslintCoreTypes } from './config-types';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
@@ -64,88 +69,6 @@ interface EditorTabsProps {
   toolbarEnd?: ReactNode;
 }
 
-const DEFAULT_RSLINT_CONFIG = `import { defineConfig, js, ts } from '@rslint/core';
-
-export default defineConfig([
-  js.configs.recommended,
-  ts.configs.recommendedTypeChecked,
-  {
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.json'],
-      },
-    },
-    rules: {
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-    },
-  },
-]);`;
-
-const DEFAULT_TSCONFIG = `{
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "strict": true,
-    "strictNullChecks": true
-  }
-}`;
-
-const DEFAULT_CODE = ['let a: any;', 'a.b = 10;'].join('\n');
-
-/**
- * The config editors only take a URL param once their content differs from the
- * default, so links that predate them (and links to unmodified configs) stay
- * valid: a missing param means "the default".
- */
-const CODE_PARAM = 'code';
-const RSLINT_CONFIG_PARAM = 'config';
-const TSCONFIG_PARAM = 'tsconfig';
-const HASH_PARAM_PATTERN = new RegExp(
-  `(?:^|&)(?:${CODE_PARAM}|${RSLINT_CONFIG_PARAM}|${TSCONFIG_PARAM})=`,
-);
-
-function readUrlParam(name: string): string | null {
-  if (typeof window === 'undefined') return null;
-  const { search, hash } = window.location;
-  const fromSearch = new URLSearchParams(search).get(name);
-  if (fromSearch != null) return fromSearch;
-  if (hash && hash.startsWith('#')) {
-    const fromHash = new URLSearchParams(hash.slice(1)).get(name);
-    if (fromHash != null) return fromHash;
-  }
-  return null;
-}
-
-function getInitialCode(): string {
-  return readUrlParam(CODE_PARAM) ?? DEFAULT_CODE;
-}
-
-function getInitialRslintConfig(): string {
-  return readUrlParam(RSLINT_CONFIG_PARAM) ?? DEFAULT_RSLINT_CONFIG;
-}
-
-function getInitialTsConfig(): string {
-  return readUrlParam(TSCONFIG_PARAM) ?? DEFAULT_TSCONFIG;
-}
-
-/**
- * An editor that has not been created yet leaves its param untouched; an editor
- * holding the default content drops its param entirely.
- */
-function serializeParam(
-  url: URL,
-  name: string,
-  value: string | undefined,
-  defaultValue: string,
-) {
-  if (value === undefined) return;
-  if (value === defaultValue) {
-    url.searchParams.delete(name);
-  } else {
-    url.searchParams.set(name, value);
-  }
-}
-
 function parseJsonc(content: string): any | null {
   try {
     // Remove single-line comments
@@ -168,6 +91,7 @@ export const EditorTabs = ({
   toolbarEnd,
 }: EditorTabsProps) => {
   const [activeTab, setActiveTab] = useState<EditorTabType>('code');
+  const [initialState] = useState(readShareState);
   const isDark = useDark();
   const editorTheme = isDark ? 'vs-dark' : 'vs';
 
@@ -211,37 +135,19 @@ export const EditorTabs = ({
       urlUpdateTimer.current = null;
     }
     urlUpdateTimer.current = window.setTimeout(() => {
-      try {
-        const url = new URL(window.location.href);
-        const code = codeEditorRef.current?.getValue();
-        if (code !== undefined) {
-          url.searchParams.set(CODE_PARAM, code);
-        }
-        serializeParam(
-          url,
-          RSLINT_CONFIG_PARAM,
-          rslintEditorRef.current?.getValue(),
-          DEFAULT_RSLINT_CONFIG,
-        );
-        serializeParam(
-          url,
-          TSCONFIG_PARAM,
-          tsconfigEditorRef.current?.getValue(),
-          DEFAULT_TSCONFIG,
-        );
-        if (url.hash && HASH_PARAM_PATTERN.test(url.hash.slice(1))) {
-          url.hash = '';
-        }
-        window.history.replaceState(null, '', url.toString());
-      } catch {
-        // ignore URL update errors
-      }
+      writeShareState({
+        code: codeEditorRef.current?.getValue() ?? initialState.code,
+        rslintConfig:
+          rslintEditorRef.current?.getValue() ?? initialState.rslintConfig,
+        tsconfig:
+          tsconfigEditorRef.current?.getValue() ?? initialState.tsconfig,
+      });
     }, 300);
   }
 
   // Initialize the last valid tsconfig.
   useEffect(() => {
-    lastValidTsConfig.current = parseJsonc(getInitialTsConfig());
+    lastValidTsConfig.current = parseJsonc(initialState.tsconfig);
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -380,7 +286,7 @@ export const EditorTabs = ({
     if (!codeContainerRef.current) return;
 
     const editor = monaco.editor.create(codeContainerRef.current, {
-      value: getInitialCode(),
+      value: initialState.code,
       language: 'typescript',
       theme: editorTheme,
       automaticLayout: true,
@@ -476,7 +382,7 @@ export const EditorTabs = ({
       noSyntaxValidation: false,
     });
     const model = monaco.editor.createModel(
-      getInitialRslintConfig(),
+      initialState.rslintConfig,
       'javascript',
       monaco.Uri.parse('file:///rslint.config.js'),
     );
@@ -505,7 +411,7 @@ export const EditorTabs = ({
     if (!tsconfigContainerRef.current) return;
 
     const editor = monaco.editor.create(tsconfigContainerRef.current, {
-      value: getInitialTsConfig(),
+      value: initialState.tsconfig,
       language: 'json',
       theme: editorTheme,
       automaticLayout: true,
