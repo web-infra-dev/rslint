@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -188,8 +189,57 @@ class C { handler(@Body(pipe) _b: unknown) {} }`},
 			// with no throwable node, so nothing reaches the `catch` clause and
 			// the code after it is never analysed ----
 			{Code: `function f() { try { for (var i = 0;;) { break; } return 1; } catch (e) {} let x = 1; x = 2; return x; }`},
+
+			// ---- A global listed by `/* exported */` leaves the file the same
+			// way an ES export does, so its last assignment can still be read ----
+			{Code: `/* exported v */
+let v = 1;
+console.log(v);
+v = 2;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// An uninitialized declaration can reach this rule through a
+			// checker-resolved symbol. Its declaration must still recover the raw
+			// global binder symbol used by the directive's scope lookup.
+			{Code: `/* exported v */
+let v;
+v = 1;
+console.log(v);
+v = 2;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `/* exported v */
+let { v } = source;
+console.log(v);
+v = 2;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `/* exported v */
+{ var v = 1; console.log(v); v = 2; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- `/* exported */` names the global scope, so a block or
+			// function binding of the same name stays trackable, and a module's
+			// top-level binding is out of the directive's reach entirely ----
+			{
+				Code: `/* exported v */
+function f() { let v = 1; console.log(v); v = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 2, Column: 43, EndLine: 2, EndColumn: 44},
+				},
+			},
+			{
+				Code: `/* exported v */
+{ let v = 1; console.log(v); v = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 2, Column: 30, EndLine: 2, EndColumn: 31},
+				},
+			},
+			{
+				Code: `/* exported v */
+let v = 1;
+console.log(v);
+v = 2;
+export {};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssignment", Line: 4, Column: 1, EndLine: 4, EndColumn: 2},
+				},
+			},
+
 			// ---- Dimension 4: parenthesized assignment target ----
 			{
 				Code: `function f() { let v = 1; g(v); (v) = 2; }`,

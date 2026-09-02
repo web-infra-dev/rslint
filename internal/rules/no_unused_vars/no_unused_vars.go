@@ -2002,28 +2002,6 @@ func coreTypeDeclarationSelfReferenceCounts(definition *ast.Node) bool {
 		(definition.Kind == ast.KindInterfaceDeclaration || definition.Kind == ast.KindTypeAliasDeclaration)
 }
 
-// isScriptGlobalDefinition models ESLint's global scope for vars:"local".
-// RefStore carries sourceType overrides; parser module syntax is only a
-// fallback for callers that do not provide one.
-// `var` uses its enclosing variable scope even when nested in a block or loop;
-// lexical declarations use tsgo's block-scope container.
-func isScriptGlobalDefinition(sourceFile *ast.SourceFile, refs *rule.RefStore, definition *ast.Node) bool {
-	if sourceFile == nil || definition == nil ||
-		(refs != nil && refs.HasNonGlobalProgramScope()) ||
-		(refs == nil && ast.IsExternalModule(sourceFile)) {
-		return false
-	}
-	root := ast.GetRootDeclaration(definition)
-	if root == nil {
-		return false
-	}
-	if root.Kind == ast.KindVariableDeclaration && root.Parent != nil &&
-		root.Parent.Kind == ast.KindVariableDeclarationList && utils.IsVarKeyword(root.Parent) {
-		return utils.FindEnclosingScope(root) == sourceFile.AsNode()
-	}
-	return ast.GetEnclosingBlockScopeContainer(root) == sourceFile.AsNode()
-}
-
 // processVariable determines whether a single declared variable/parameter/import
 // is unused and, if so, reports it. The decision pipeline:
 //  1. Resolve the symbol and look up usages (original sym → SkipAlias → shared reference index)
@@ -2128,6 +2106,13 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
 	}
+	// An `/* exported */` global is consumed by a separately loaded file, so
+	// upstream counts the directive itself as a use. reportUsedIgnorePattern
+	// still sees it as used, which is what turns a directive on an ignored name
+	// into a usedIgnoredVar report.
+	if !varInfo.Used && ctx.IsExportedGlobalBinding(sym, name) {
+		varInfo.Used = true
+	}
 	// A used binding cannot produce a diagnostic unless the caller asks to
 	// report names that match an ignore pattern. Avoid category, export, and
 	// assignment analysis on the common path.
@@ -2135,7 +2120,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		return
 	}
 
-	scriptGlobal := isScriptGlobalDefinition(ctx.SourceFile, ctx.Refs, definition)
+	scriptGlobal := ctx.IsGlobalScopeBinding(sym, name)
 	// vars: "local" skips only the script global scope. ES module top-level
 	// bindings live in a module scope and must still be checked.
 	if opts.Vars == "local" && scriptGlobal {

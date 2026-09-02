@@ -4,15 +4,14 @@ package prefer_array_flat_test
 import (
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
 // TestPreferArrayFlatExtrasRegressions locks in expressions, token boundaries,
 // nested calls, and scope behavior found by comparing the Go implementation
-// with unicorn v64. The complete upstream suite lives in the
-// prefer_array_flat_upstream_*_test.go files; the general Dimension 4,
-// real-user, branch, and fix-boundary cases live in the sibling extras file.
+// with unicorn v74. The complete upstream suite lives in the
+// prefer_array_flat_upstream_*_test.go files; other rslint-specific coverage
+// lives in the sibling prefer_array_flat_extras_*_test.go files.
 func TestPreferArrayFlatExtrasRegressions(t *testing.T) {
 	var suite upstreamSuite
 
@@ -30,12 +29,12 @@ func TestPreferArrayFlatExtrasRegressions(t *testing.T) {
 	// ---- Differential: a standalone scanner must recover the parser's regex token ----
 	suite.addFixedOutput(
 		`/before/giu
-Array.prototype.concat.call([], value)`,
+Array.prototype.concat.call([], ...value)`,
 		`/before/giu
-;[value].flat()`,
+value.flat()`,
 		nil,
 		expectedDiagnostic{
-			target:      `Array.prototype.concat.call([], value)`,
+			target:      `Array.prototype.concat.call([], ...value)`,
 			description: `Array.prototype.concat()`,
 		},
 	)
@@ -208,44 +207,44 @@ Array.prototype.concat.call([], value)`,
 		output string
 	}{
 		{
-			code:   `function flatten() { throw[].concat(value); }`,
-			target: `[].concat(value)`,
-			output: `function flatten() { throw [value].flat(); }`,
+			code:   `function flatten() { throw[].concat(...value); }`,
+			target: `[].concat(...value)`,
+			output: `function flatten() { throw value.flat(); }`,
 		},
 		{
-			code:   `const result = typeof[].concat(value);`,
-			target: `[].concat(value)`,
-			output: `const result = typeof [value].flat();`,
+			code:   `const result = typeof[].concat(...value);`,
+			target: `[].concat(...value)`,
+			output: `const result = typeof value.flat();`,
 		},
 		{
-			code:   `const result = void[].concat(value);`,
-			target: `[].concat(value)`,
-			output: `const result = void [value].flat();`,
+			code:   `const result = void[].concat(...value);`,
+			target: `[].concat(...value)`,
+			output: `const result = void value.flat();`,
 		},
 		{
-			code:   `const result = delete[].concat(value);`,
-			target: `[].concat(value)`,
-			output: `const result = delete [value].flat();`,
+			code:   `const result = delete[].concat(...value);`,
+			target: `[].concat(...value)`,
+			output: `const result = delete value.flat();`,
 		},
 		{
-			code:   `const result = [].concat(value)in object;`,
-			target: `[].concat(value)`,
-			output: `const result = [value].flat() in object;`,
+			code:   `const result = [].concat(...value)in object;`,
+			target: `[].concat(...value)`,
+			output: `const result = value.flat() in object;`,
 		},
 		{
-			code:   `for (const item of[].concat(value)) {}`,
-			target: `[].concat(value)`,
-			output: `for (const item of [value].flat()) {}`,
+			code:   `for (const item of[].concat(...value)) {}`,
+			target: `[].concat(...value)`,
+			output: `for (const item of value.flat()) {}`,
 		},
 		{
-			code:   `async function flatten() { await[].concat(value); }`,
-			target: `[].concat(value)`,
-			output: `async function flatten() { await [value].flat(); }`,
+			code:   `async function flatten() { await[].concat(...value); }`,
+			target: `[].concat(...value)`,
+			output: `async function flatten() { await value.flat(); }`,
 		},
 		{
-			code:   `function* flatten() { yield[].concat(value); }`,
-			target: `[].concat(value)`,
-			output: `function* flatten() { yield [value].flat(); }`,
+			code:   `function* flatten() { yield[].concat(...value); }`,
+			target: `[].concat(...value)`,
+			output: `function* flatten() { yield value.flat(); }`,
 		},
 	} {
 		suite.addFixedOutput(
@@ -307,6 +306,24 @@ Array.prototype.concat.call([], value)`,
 		`Array#flatMap()`,
 		nil,
 	)
+
+	// Locks in upstream isKnownNonArrayNode()'s source-only boundary: a let
+	// binding is not resolved in JavaScript, so its Set initializer does not
+	// suppress the reduce diagnostic.
+	const unknownSetReduce = `let foo = new Set(); foo.reduce((a, b) => a.concat(b), []);`
+	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
+		Code:     unknownSetReduce,
+		FileName: "file.js",
+		Output:   []string{`let foo = new Set(); foo.flat();`},
+		Errors: []rule_tester.InvalidTestCaseError{
+			upstreamError(
+				unknownSetReduce,
+				`foo.reduce((a, b) => a.concat(b), [])`,
+				`Array#reduce()`,
+				0,
+			),
+		},
+	})
 	// U+2160 is uppercase-like but belongs to Unicode category Nl, not Lu.
 	// Upstream's /^\p{Lu}/u therefore does not suppress this receiver.
 	suite.addFixed(
@@ -359,8 +376,8 @@ Items.flat();`,
 		nil,
 	)
 
-	pathOptions := map[string]interface{}{
-		"functions": []interface{}{"utils.deep.flat", "utils.flat", "flat"},
+	pathOptions := map[string]any{
+		"functions": []any{"utils.deep.flat", "utils.flat", "flat"},
 	}
 	suite.addFixed(
 		`(utils.deep).flat(array)`,
@@ -396,7 +413,7 @@ Items.flat();`,
 	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
 		Code:    overlapCode,
 		Output:  []string{`array.flat()`},
-		Options: map[string]interface{}{"functions": []interface{}{"array.flatMap"}},
+		Options: map[string]any{"functions": []any{"array.flatMap"}},
 		Errors: []rule_tester.InvalidTestCaseError{
 			upstreamError(overlapCode, overlapCode, `Array#flatMap()`, 0),
 			upstreamError(overlapCode, overlapCode, `array.flatMap()`, 0),
@@ -421,8 +438,8 @@ Items.flat();`,
 		},
 	})
 
-	// Nested member receivers, switch-to-array fixes, and direct member-object
-	// fixes all settle one non-overlapping replacement per pass, in the same
+	// Nested member receivers and direct member-object fixes settle one
+	// non-overlapping replacement per pass, in the same
 	// range order as ESLint's SourceCodeFixer.
 	nestedMemberCode := `array.flatMap(value => value).flatMap(value => value)`
 	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
@@ -442,12 +459,12 @@ Items.flat();`,
 		},
 	})
 
-	nestedSwitchCode := `[].concat(_.flatten(value))`
+	nestedSwitchCode := `[].concat(..._.flatten(value))`
 	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
 		Code: nestedSwitchCode,
 		Output: []string{
-			`[_.flatten(value)].flat()`,
-			`[value.flat()].flat()`,
+			`_.flatten(value).flat()`,
+			`value.flat().flat()`,
 		},
 		Errors: []rule_tester.InvalidTestCaseError{
 			upstreamError(nestedSwitchCode, nestedSwitchCode, `[].concat()`, 0),
@@ -455,156 +472,18 @@ Items.flat();`,
 		},
 	})
 
-	nestedDirectCode := `_.flatten([].concat(value))`
+	nestedDirectCode := `_.flatten([].concat(...value))`
 	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
 		Code: nestedDirectCode,
 		Output: []string{
-			`[].concat(value).flat()`,
-			`[value].flat().flat()`,
+			`[].concat(...value).flat()`,
+			`value.flat().flat()`,
 		},
 		Errors: []rule_tester.InvalidTestCaseError{
 			upstreamError(nestedDirectCode, nestedDirectCode, `_.flatten()`, 0),
-			upstreamError(nestedDirectCode, `[].concat(value)`, `[].concat()`, 0),
+			upstreamError(nestedDirectCode, `[].concat(...value)`, `[].concat()`, 0),
 		},
 	})
 
 	suite.run(t)
-}
-
-// TestPreferArrayFlatJSDocCalleeRegression verifies that JavaScript JSDoc
-// wrappers stay transparent like they are in ESTree without making authored
-// TypeScript wrappers or optional/computed calls transparent.
-func TestPreferArrayFlatJSDocCalleeRegression(t *testing.T) {
-	var suite upstreamSuite
-
-	for _, testCase := range []struct {
-		fileName string
-		code     string
-		target   string
-		output   string
-	}{
-		{
-			fileName: "file.js",
-			code:     `/** @type {any} */ ([].concat)(...array)`,
-			target:   `([].concat)(...array)`,
-			output:   `/** @type {any} */ array.flat()`,
-		},
-		{
-			fileName: "file.js",
-			code:     `/** @satisfies {any} */ ([].concat)(array)`,
-			target:   `([].concat)(array)`,
-			output:   `/** @satisfies {any} */ [array].flat()`,
-		},
-		{
-			fileName: "file.jsx",
-			code:     `const view = <div>{/** @type {any} */ ([].concat)(...array)}</div>;`,
-			target:   `([].concat)(...array)`,
-			output:   `const view = <div>{/** @type {any} */ array.flat()}</div>;`,
-		},
-	} {
-		suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
-			Code:     testCase.code,
-			FileName: testCase.fileName,
-			Output:   []string{testCase.output},
-			Errors: []rule_tester.InvalidTestCaseError{
-				upstreamError(testCase.code, testCase.target, `[].concat()`, 0),
-			},
-		})
-	}
-
-	const internalJSDoc = `((/** @type {any} */ ([].concat)))(...array)`
-	suite.invalid = append(suite.invalid, rule_tester.InvalidTestCase{
-		Code:     internalJSDoc,
-		FileName: "file.js",
-		Errors: []rule_tester.InvalidTestCaseError{
-			upstreamError(internalJSDoc, internalJSDoc, `[].concat()`, 0),
-		},
-	})
-
-	for _, code := range []string{
-		`/** @type {any} */ (value.concat)(...array)`,
-		`/** @type {any} */ ([]?.concat)(...array)`,
-		`/** @type {any} */ ([].concat)?.(...array)`,
-		`/** @type {any} */ ([]["concat"])(...array)`,
-	} {
-		suite.valid = append(suite.valid, rule_tester.ValidTestCase{
-			Code:     code,
-			FileName: "file.js",
-		})
-	}
-
-	for _, code := range []string{
-		`([].concat as any)(...array)`,
-		`([].concat satisfies any)(...array)`,
-		`([].concat!)(...array)`,
-	} {
-		suite.valid = append(suite.valid, rule_tester.ValidTestCase{
-			Code:     code,
-			FileName: "file.ts",
-		})
-	}
-
-	suite.run(t)
-}
-
-// TestPreferArrayFlatSchemaParity locks the public option schema to unicorn
-// v64. In particular, upstream leaves array item types unconstrained while
-// still enforcing tuple length, uniqueness, and additionalProperties.
-func TestPreferArrayFlatSchemaParity(t *testing.T) {
-	tests := []struct {
-		name    string
-		options []any
-		wantErr bool
-	}{
-		{name: "no options"},
-		{name: "empty object", options: []any{map[string]any{}}},
-		{
-			name: "string functions",
-			options: []any{map[string]any{
-				"functions": []any{"flat", "utils.flat"},
-			}},
-		},
-		{
-			name: "unconstrained item types",
-			options: []any{map[string]any{
-				"functions": []any{1.0, nil, true, map[string]any{}},
-			}},
-		},
-		{
-			name: "duplicate functions",
-			options: []any{map[string]any{
-				"functions": []any{"flat", "flat"},
-			}},
-			wantErr: true,
-		},
-		{
-			name: "functions must be array",
-			options: []any{map[string]any{
-				"functions": "flat",
-			}},
-			wantErr: true,
-		},
-		{
-			name: "unknown property",
-			options: []any{map[string]any{
-				"unknown": true,
-			}},
-			wantErr: true,
-		},
-		{
-			name:    "only one option object",
-			options: []any{map[string]any{}, map[string]any{}},
-			wantErr: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := prefer_array_flat.PreferArrayFlatRule.Schema.Validate(test.options)
-			if (err != nil) != test.wantErr {
-				t.Fatalf("Schema.Validate(%#v) error = %v, wantErr %v",
-					test.options, err, test.wantErr)
-			}
-		})
-	}
 }

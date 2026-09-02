@@ -384,7 +384,12 @@ func canFixTo(ctx rule.RuleContext, node *ast.Node, literal string) bool {
 			return false
 		}
 	}
-	return ecmascript.IsValidRegexLiteral(literal)
+	ecmaVersion := ctx.LanguageOptions.EffectiveECMAVersion()
+	if !ecmascript.IsValidRegexLiteralForVersion(literal, ecmaVersion) {
+		return false
+	}
+	pattern, flags := utils.ExtractRegexPatternAndFlags(literal)
+	return utils.IsValidRegexPatternForECMAVersion(pattern, utils.ParseRegexFlags(flags), ecmaVersion)
 }
 
 func areFlagsEqual(flagsA string, flagsB string) bool {

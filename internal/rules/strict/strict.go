@@ -15,13 +15,8 @@ var schemaJSON []byte
 
 // https://eslint.org/docs/latest/rules/strict
 //
-// NOTE: Unlike ESLint, this rule determines module state from
-// ast.IsExternalModule (the presence of import/export syntax), independently
-// of languageOptions.sourceType. rslint also does not expose parserOptions
-// ecmaFeatures.impliedStrict / ecmaFeatures.globalReturn. Consequences:
-//   - "safe" resolves to "function" on script files and "module" on ES modules
-//     (ESLint's commonjs-aware "global" fallback has no rslint analogue).
-//   - "implied" and "globalReturn" code paths are unreachable.
+// NOTE: rslint does not expose parserOptions ecmaFeatures.impliedStrict /
+// ecmaFeatures.globalReturn, so those ESLint code paths are unreachable.
 // See strict.md "Differences from ESLint" for the user-visible contract.
 
 type strictMode int
@@ -350,10 +345,10 @@ func buildFunctionModeListeners(ctx rule.RuleContext) rule.RuleListeners {
 	}
 }
 
-// parseOptions maps the configured mode name onto a strictMode. rslint cannot
-// detect commonjs / globalReturn, so "safe" — the default — maps to "function",
-// matching ESLint's non-commonjs, non-globalReturn behavior.
-func parseOptions(options []any) strictMode {
+// parseOptions maps the configured mode name onto a strictMode. ESLint's
+// "safe" mode selects the global form for CommonJS and the function form for
+// scripts; module mode is applied afterwards for every configured option.
+func parseOptions(options []any, sourceType string) strictMode {
 	mode := "safe"
 	if len(options) > 0 {
 		if s, ok := options[0].(string); ok {
@@ -366,7 +361,12 @@ func parseOptions(options []any) strictMode {
 		return modeNever
 	case "global":
 		return modeGlobal
+	case "function":
+		return modeFunction
 	default:
+		if sourceType == "commonjs" {
+			return modeGlobal
+		}
 		return modeFunction
 	}
 }
@@ -375,9 +375,10 @@ var StrictRule = rule.Rule{
 	Name:   "strict",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		m := parseOptions(options)
+		sourceType := ctx.LanguageOptions.EffectiveSourceType()
+		m := parseOptions(options, sourceType)
 
-		if ast.IsExternalModule(ctx.SourceFile) {
+		if sourceType == "module" {
 			m = modeModule
 		}
 

@@ -14,9 +14,9 @@
 // or, where the language spells out no name at all, the question being asked
 // ([IsBlank]).
 //
-// Everything here is a pure function of its arguments. Only
-// [IsValidRegexLiteral] reaches past the standard library, for the scanner that
-// reads a regexp literal, and a rule carries that dependency already.
+// Most helpers here are pure functions of their arguments. [LocaleComparer]
+// is the exception: it owns mutable collation scratch state so one rule run can
+// reuse the expensive tables without sharing them concurrently.
 //
 // The one larger piece of the language a rule has to reproduce lives in
 // [ecmascript/regexp], which compiles a JavaScript RegExp and closes the gaps
