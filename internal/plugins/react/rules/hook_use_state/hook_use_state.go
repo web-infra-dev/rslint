@@ -146,7 +146,9 @@ func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports
 			return false
 		}
 	}
-	return imports.namedHookNames[name] == "useState"
+	// Components#isReactHookCall falls back to the local spelling when the
+	// first hook-shaped reference is not mapped to a different imported name.
+	return imports.namedHookNames[name] == "" || imports.namedHookNames[name] == "useState"
 }
 
 func firstReference(referenceScopes map[*ast.Node]*scope.Scope, ident *ast.Node, name string) *scope.Reference {
@@ -214,7 +216,11 @@ func isReactUseStateCall(referenceScopes map[*ast.Node]*scope.Scope, imports imp
 	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "useState" {
 		return false
 	}
-	return resolvesToDefaultReactImport(referenceScopes, imports, ast.SkipParentheses(access.Expression))
+	receiver := ast.SkipParentheses(access.Expression)
+	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.AsIdentifier().Text != imports.defaultName {
+		return false
+	}
+	return resolvesToDefaultReactImport(referenceScopes, imports, receiver)
 }
 
 func isDestructuringBinding(node *ast.Node) bool {
@@ -300,6 +306,11 @@ var HookUseStateRule = rule.Rule{
 				}
 			}
 		}
+		// The upstream hook matcher can fall back to a bare `useState` spelling
+		// after finding another hook-shaped React reference in the scope. Keep
+		// that otherwise-unimported reference available to the first-reference
+		// lookup without collecting every identifier in the file.
+		namedHookNames["useState"] = struct{}{}
 		manager := scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true, ReferenceNames: namedHookNames})
 		referenceScopes := make(map[*ast.Node]*scope.Scope, len(manager.References))
 		for _, reference := range manager.References {

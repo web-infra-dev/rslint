@@ -148,6 +148,11 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 		// even when the current callee is shadowed by a later local declaration.
 		hookUseStateError(`import { useFoo, useState } from 'react';
 	function f() { useFoo(); function useState() {} const result = useState() }`, useStateErrorText, 2, 65),
+		// Components falls back to the bare callee spelling after selecting an
+		// earlier hook-shaped reference in the scope.
+		hookUseStateError(`import { useEffect } from 'react';
+	useEffect();
+	const result = useState()`, useStateErrorText, 3, 17),
 		// Components uses the first default React reference in the function
 		// scope, even when a later body declaration shadows the same spelling.
 		{
