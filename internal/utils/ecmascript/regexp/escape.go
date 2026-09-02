@@ -306,3 +306,101 @@ func countGroups(source string) (int, bool) {
 	}
 	return count, named
 }
+
+// CapturingGroupCount returns the lexical number of capturing groups and
+// whether at least one is named. RegExp parsers perform this pass before
+// interpreting numeric and named backreferences, including on patterns that
+// later fail another grammar check.
+func CapturingGroupCount(source string) (int, bool) {
+	return countGroups(source)
+}
+
+type legacyEscapeReplacement struct {
+	start int
+	end   int
+	text  string
+}
+
+// NormalizeAnnexBEscapesForParser rewrites the few Annex B escapes that the
+// TypeScript RegExp scanner diagnoses using its JavaScript-string rules. Each
+// replacement is one parser-equivalent atom, so surrounding groups,
+// quantifiers, and ranges retain their original grammar. When rewriting is
+// needed, offsets maps every output byte back to its source byte position and
+// includes one terminal entry for len(source).
+func NormalizeAnnexBEscapesForParser(source string) (normalized string, offsets []int) {
+	groupCount, named := countGroups(source)
+	var replacements []legacyEscapeReplacement
+	inClass := false
+
+	for i := 0; i < len(source); {
+		if source[i] != '\\' {
+			switch source[i] {
+			case '[':
+				inClass = true
+			case ']':
+				inClass = false
+			}
+			_, width := utf8.DecodeRuneInString(source[i:])
+			if width == 0 {
+				width = 1
+			}
+			i += width
+			continue
+		}
+		if i+1 >= len(source) {
+			break
+		}
+		if _, width, ok := namedBackreference(source[i:]); ok {
+			i += width
+			continue
+		}
+
+		escape, err := decodeEscape(source, i+1, escapeContext{
+			inClass: inClass,
+			groups:  groupCount,
+			named:   named,
+		})
+		if err != nil {
+			i++
+			continue
+		}
+		consumed := 1 + escape.width
+		if escape.width == 0 {
+			consumed = 1
+		}
+		if escape.kind == escapeRune {
+			replacements = append(replacements, legacyEscapeReplacement{
+				start: i,
+				end:   i + consumed,
+				text:  literalRune(escape.r),
+			})
+		}
+		i += consumed
+	}
+
+	if len(replacements) == 0 {
+		return source, nil
+	}
+	var result strings.Builder
+	result.Grow(len(source))
+	offsets = make([]int, 0, len(source)+1)
+	write := func(text string, offset int) {
+		result.WriteString(text)
+		for range len(text) {
+			offsets = append(offsets, offset)
+		}
+	}
+	last := 0
+	for _, replacement := range replacements {
+		for i := last; i < replacement.start; i++ {
+			write(source[i:i+1], i)
+		}
+		write(replacement.text, replacement.start)
+		last = replacement.end
+	}
+	for i := last; i < len(source); i++ {
+		write(source[i:i+1], i)
+	}
+	offsets = append(offsets, len(source))
+	return result.String(), offsets
+}

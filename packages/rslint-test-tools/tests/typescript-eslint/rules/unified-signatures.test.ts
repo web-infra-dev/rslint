@@ -1,7 +1,5 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 
-
-
 //------------------------------------------------------------------------------
 // Tests
 //------------------------------------------------------------------------------
@@ -412,6 +410,79 @@ function f(this: void | {}, a: boolean): void {}
   invalid: [
     {
       code: `
+declare function f(a: number): void;
+declare function f(a: number): void;
+      `,
+      errors: [
+        {
+          column: 1,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+          },
+          line: 3,
+          messageId: 'allParametersAreSame',
+        },
+      ],
+    },
+    {
+      code: `
+declare function f(a: number): void;
+declare function f(a: number): void;
+declare function f(a: string): string;
+      `,
+      errors: [
+        {
+          column: 1,
+          data: {
+            failureStringStart:
+              'This overload and the one on line 2 can be combined into one signature',
+          },
+          line: 3,
+          messageId: 'allParametersAreSame',
+        },
+      ],
+    },
+    {
+      code: `
+function f(a: number): void;
+function f(a: number): void;
+function f(a: number): void {}
+      `,
+      errors: [
+        {
+          column: 1,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+          },
+          line: 3,
+          messageId: 'allParametersAreSame',
+        },
+      ],
+    },
+    {
+      code: `
+class A {
+  f(a: number): void;
+  f(a: number): void;
+  f(a: number): void {}
+}
+      `,
+      errors: [
+        {
+          column: 4,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+          },
+          line: 4,
+          messageId: 'allParametersAreSame',
+        },
+      ],
+    },
+    {
+      code: `
 function f(a: number): void;
 function f(b: string): void;
 function f(a: number | string): void {}
@@ -422,8 +493,7 @@ function f(a: number | string): void {}
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string',
+            types: 'number | string',
           },
           line: 3,
           messageId: 'singleParameterDifference',
@@ -444,8 +514,7 @@ function f(x: any): any {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string',
+            types: 'number | string',
           },
           line: 3,
           messageId: 'singleParameterDifference',
@@ -466,8 +535,7 @@ function f(x: any): any {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string',
+            types: 'number | string',
           },
           line: 3,
           messageId: 'singleParameterDifference',
@@ -630,8 +698,7 @@ interface I {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string',
+            types: 'number | string',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -652,8 +719,7 @@ interface I {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string',
+            types: 'number | string',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -733,8 +799,7 @@ interface I {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string | boolean',
+            types: 'number | string | boolean',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -755,8 +820,7 @@ interface I {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: '[string, boolean]',
+            types: 'number | [string, boolean]',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -776,8 +840,7 @@ interface Generic<T> {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'T[]',
-            type2: 'T',
+            types: 'T[] | T',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -796,8 +859,7 @@ function f<T>(x: T): void;
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'T[]',
-            type2: 'T',
+            types: 'T[] | T',
           },
           line: 3,
           messageId: 'singleParameterDifference',
@@ -816,8 +878,7 @@ function f<T extends number>(x: T): void;
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'T[]',
-            type2: 'T',
+            types: 'T[] | T',
           },
           line: 3,
           messageId: 'singleParameterDifference',
@@ -838,8 +899,7 @@ abstract class Foo {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string',
+            types: 'number | string',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -862,8 +922,7 @@ abstract class C {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'string',
-            type2: 'number',
+            types: 'string | number',
           },
           line: 7,
           messageId: 'singleParameterDifference',
@@ -884,8 +943,7 @@ interface Foo {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'string',
-            type2: 'number',
+            types: 'string | number',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -906,8 +964,7 @@ interface Foo {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'string',
-            type2: 'number',
+            types: 'string | number',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -932,8 +989,7 @@ interface IFoo {
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'string',
-            type2: 'number',
+            types: 'string | number',
           },
           line: 8,
           messageId: 'singleParameterDifference',
@@ -1017,8 +1073,7 @@ declare function f(x: boolean): void;
           data: {
             failureStringStart:
               'This overload and the one on line 6 can be combined into one signature',
-            type1: 'number',
-            type2: 'boolean',
+            types: 'number | boolean',
           },
           line: 7,
           messageId: 'singleParameterDifference',
@@ -1044,8 +1099,7 @@ declare function f(x: boolean): void;
           data: {
             failureStringStart:
               'This overload and the one on line 5 can be combined into one signature',
-            type1: 'string',
-            type2: 'number',
+            types: 'string | number',
           },
           line: 9,
           messageId: 'singleParameterDifference',
@@ -1071,8 +1125,7 @@ declare function f(x: boolean): void;
           data: {
             failureStringStart:
               'This overload and the one on line 6 can be combined into one signature',
-            type1: 'number',
-            type2: 'boolean',
+            types: 'number | boolean',
           },
           line: 10,
           messageId: 'singleParameterDifference',
@@ -1098,8 +1151,7 @@ export function f(x: boolean): void;
           data: {
             failureStringStart:
               'This overload and the one on line 6 can be combined into one signature',
-            type1: 'number',
-            type2: 'boolean',
+            types: 'number | boolean',
           },
           line: 10,
           messageId: 'singleParameterDifference',
@@ -1129,8 +1181,7 @@ function f(x: string): void;
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'string',
+            types: 'number | string',
           },
           line: 14,
           messageId: 'singleParameterDifference',
@@ -1158,8 +1209,7 @@ interface I {
           data: {
             failureStringStart:
               'This overload and the one on line 7 can be combined into one signature',
-            type1: 'number',
-            type2: 'boolean',
+            types: 'number | boolean',
           },
           line: 11,
           messageId: 'singleParameterDifference',
@@ -1179,8 +1229,7 @@ declare function f(x: boolean): unknown;
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'number',
-            type2: 'boolean',
+            types: 'number | boolean',
           },
           line: 4,
           messageId: 'singleParameterDifference',
@@ -1228,8 +1277,7 @@ function f(this: string | number): void {}
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'string',
-            type2: 'number',
+            types: 'string | number',
           },
           line: 3,
           messageId: 'singleParameterDifference',
@@ -1248,10 +1296,344 @@ function f(this: string | number, a: boolean): void {}
           data: {
             failureStringStart:
               'These overloads can be combined into one signature',
-            type1: 'string',
-            type2: 'number',
+            types: 'string | number',
           },
           line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(x: string | number): void;
+function f(x: number | boolean): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'string | number | boolean',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(value): void;
+function f(value: string): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'string',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(value: string): void;
+function f(value): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'string',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+type Alias = string;
+function f(x: Alias): void;
+function f(x: Alias | number): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'Alias | number',
+          },
+          line: 4,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+type Name = string;
+function f(x: Name): void;
+function f(x: string | Name): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'Name | string',
+          },
+          line: 4,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f<T>(x: T): void;
+function f<T>(x: T | string): void;
+      `,
+      errors: [
+        {
+          column: 15,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'T | string',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(x: 'a|b'): void;
+function f(x: 'a|b' | string): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: "'a|b' | string",
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(x: string /* first */ | number): void;
+function f(x: number | /* second */ string): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'string | number',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+declare function fn(a: number): void;
+declare function fn(a: (/* before */ string /* after */)): void;
+      `,
+      errors: [
+        {
+          column: 21,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'number | string',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      // To avoid complex type comparisons when resolving #12504, allow duplicate union members when their source text differs.
+      code: `
+function f(x: string & { brand: true }): void;
+function f(x: number | string & /* brand */ { brand: true }): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types:
+              'string & { brand: true } | number | string & /* brand */ { brand: true }',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(x: string & { brand: true }): void;
+function f(x: number | string & { brand: true }): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'string & { brand: true } | number',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f<T, U>(x: () => void): void;
+function f<T, U>(x: T extends U ? string : number): void;
+      `,
+      errors: [
+        {
+          column: 18,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: '(() => void) | (T extends U ? string : number)',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+interface Value {}
+function f(x: new () => Value): void;
+function f(x: string): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: '(new () => Value) | string',
+          },
+          line: 4,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+interface I {
+  f(x: string | number): void;
+  f(x: number | boolean): void;
+  f(x: symbol): string;
+}
+      `,
+      errors: [
+        {
+          column: 5,
+          data: {
+            failureStringStart:
+              'This overload and the one on line 3 can be combined into one signature',
+            types: 'string | number | boolean',
+          },
+          line: 4,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(x: 'a' | 'b'): void;
+function f(x: 'b' | 'c'): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: "'a' | 'b' | 'c'",
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(x: Array<string> | boolean): void;
+function f(x: Array<number> | boolean): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'Array<string> | boolean | Array<number>',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+function f(x: Promise | boolean): void;
+function f(x: Promise<string> | boolean): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'Promise | boolean | Promise<string>',
+          },
+          line: 3,
+          messageId: 'singleParameterDifference',
+        },
+      ],
+    },
+    {
+      code: `
+namespace Namespace {
+  export type Value = string;
+}
+function f(x: Namespace.Value): void;
+function f(x: Namespace.Value | string): void;
+      `,
+      errors: [
+        {
+          column: 12,
+          data: {
+            failureStringStart:
+              'These overloads can be combined into one signature',
+            types: 'Namespace.Value | string',
+          },
+          line: 6,
           messageId: 'singleParameterDifference',
         },
       ],

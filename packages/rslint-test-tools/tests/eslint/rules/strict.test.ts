@@ -1,6 +1,6 @@
 import { RuleTester } from '../rule-tester';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({ sourceType: 'script' });
 
 ruleTester.run('strict', {
   valid: [
@@ -26,10 +26,20 @@ ruleTester.run('strict', {
     },
     { code: 'var fn = x => 1;', options: ['never'] as any },
     { code: 'var fn = x => { return; };', options: ['never'] as any },
+    {
+      code: 'foo();',
+      options: ['never'] as any,
+      languageOptions: { sourceType: 'module' },
+    },
 
     // "global" mode
     { code: '// Intentionally empty', options: ['global'] as any },
     { code: "'use strict'; foo();", options: ['global'] as any },
+    {
+      code: 'foo();',
+      options: ['global'] as any,
+      languageOptions: { sourceType: 'module' },
+    },
     {
       code: "'use strict'; function foo() { return; }",
       options: ['global'] as any,
@@ -57,6 +67,16 @@ ruleTester.run('strict', {
       options: ['function'] as any,
     },
     {
+      code: 'function foo() { return; }',
+      options: ['function'] as any,
+      languageOptions: { sourceType: 'module' },
+    },
+    {
+      code: 'var foo = function() { return; }',
+      options: ['function'] as any,
+      languageOptions: { sourceType: 'module' },
+    },
+    {
       code: "var foo = function() { 'use strict'; return; }",
       options: ['function'] as any,
     },
@@ -71,6 +91,11 @@ ruleTester.run('strict', {
     {
       code: "var foo = () => { 'use strict'; var bar = () => 1; bar(); };",
       options: ['function'] as any,
+    },
+    {
+      code: 'var foo = () => { var bar = () => 1; bar(); };',
+      options: ['function'] as any,
+      languageOptions: { sourceType: 'module' },
     },
     { code: 'class A { constructor() { } }', options: ['function'] as any },
     { code: 'class A { foo() { } }', options: ['function'] as any },
@@ -88,7 +113,16 @@ ruleTester.run('strict', {
       code: "function foo() { 'use strict'; return; }",
       options: ['safe'] as any,
     },
+    {
+      code: 'function foo() { return; }',
+      options: ['safe'] as any,
+      languageOptions: { sourceType: 'module' },
+    },
     "function foo() { 'use strict'; return; }",
+    {
+      code: 'function foo() { return; }',
+      languageOptions: { sourceType: 'module' },
+    },
 
     // class static blocks have no directive prologue
     {
@@ -120,6 +154,22 @@ ruleTester.run('strict', {
     {
       code: "class C { static { 'use strict'; 'use strict'; } }",
       options: ['never'] as any,
+    },
+    {
+      code: "class C { static { 'use strict'; } }",
+      options: ['safe'] as any,
+      languageOptions: { sourceType: 'module' },
+    },
+
+    // CommonJS uses global mode for "safe" and the default option.
+    {
+      code: "'use strict'; module.exports = function identity (value) { return value; }",
+      languageOptions: { sourceType: 'commonjs' },
+    },
+    {
+      code: "'use strict'; module.exports = function identity (value) { return value; }",
+      options: ['safe'] as any,
+      languageOptions: { sourceType: 'commonjs' },
     },
 
     // class heritage: function inside `extends` is NOT in the class body
@@ -168,8 +218,9 @@ ruleTester.run('strict', {
       errors: [{ messageId: 'never' }, { messageId: 'never' }],
     },
     {
-      code: '"use strict"; foo(); export {};',
+      code: '"use strict"; foo();',
       options: ['never'] as any,
+      languageOptions: { sourceType: 'module' },
       errors: [{ messageId: 'module' }],
     },
 
@@ -205,8 +256,9 @@ ruleTester.run('strict', {
       errors: [{ messageId: 'multiple' }],
     },
     {
-      code: "'use strict'; foo(); export {};",
+      code: "'use strict'; foo();",
       options: ['global'] as any,
+      languageOptions: { sourceType: 'module' },
       errors: [{ messageId: 'module' }],
     },
 
@@ -383,6 +435,33 @@ ruleTester.run('strict', {
       code: 'class Foo extends (function() { return class {}; }()) {}',
       options: ['function'] as any,
       errors: [{ messageId: 'function' }],
+    },
+
+    // Remaining module-mode cases from upstream.
+    {
+      code: "var foo = function() {  'use strict'; return; }",
+      options: ['function'] as any,
+      languageOptions: { sourceType: 'module' },
+      errors: [{ messageId: 'module' }],
+    },
+    {
+      code: "class C { static { function foo() {\n'use strict'; } } }",
+      options: ['safe'] as any,
+      languageOptions: { sourceType: 'module' },
+      errors: [{ messageId: 'module' }],
+    },
+
+    // CommonJS "safe" mode requires a global directive.
+    {
+      code: 'module.exports = function identity (value) { return value; }',
+      options: ['safe'] as any,
+      languageOptions: { sourceType: 'commonjs' },
+      errors: [{ messageId: 'global' }],
+    },
+    {
+      code: 'module.exports = function identity (value) { return value; }',
+      languageOptions: { sourceType: 'commonjs' },
+      errors: [{ messageId: 'global' }],
     },
   ],
 });

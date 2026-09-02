@@ -196,6 +196,18 @@ class C { handler(@Body(pipe) _b: unknown) {} }`},
 let v = 1;
 console.log(v);
 v = 2;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// An uninitialized declaration can reach this rule through a
+			// checker-resolved symbol. Its declaration must still recover the raw
+			// global binder symbol used by the directive's scope lookup.
+			{Code: `/* exported v */
+let v;
+v = 1;
+console.log(v);
+v = 2;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			{Code: `/* exported v */
+let { v } = source;
+console.log(v);
+v = 2;`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 			{Code: `/* exported v */
 { var v = 1; console.log(v); v = 2; }`, LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
 		},

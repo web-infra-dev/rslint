@@ -352,6 +352,44 @@ func TestNoCondAssignAlwaysMessageData(t *testing.T) {
 	assert.Equal(t, diagnostics[0].Message.Data["type"], "an 'if' statement")
 }
 
+func TestNoCondAssignAlwaysFunctionBoundaries(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want int
+	}{
+		// ESTree represents each method as a MethodDefinition whose computed
+		// name and decorators sit outside the nested FunctionExpression.
+		{name: "class computed method", code: `if (class { [value = next()]() {} }) {}`, want: 1},
+		{name: "object computed method", code: `if ({ [value = next()]() {} }) {}`, want: 1},
+		{name: "computed getter", code: `if (class { get [value = next()]() { return 1 } }) {}`, want: 1},
+		{name: "computed setter", code: `if (class { set [value = next()](nextValue) {} }) {}`, want: 1},
+		{name: "static async generator name", code: `if (class { static async *[value = next()]() {} }) {}`, want: 1},
+		{name: "method decorator", code: `if (class { @dec(value = next()) method() {} }) {}`, want: 1},
+		{name: "field initializer", code: `if (class { field = (value = next()) }) {}`, want: 1},
+		{name: "static block", code: `if (class { static { value = next() } }) {}`, want: 1},
+
+		// These positions belong to the method's FunctionExpression and must
+		// continue to shield their assignments from an outer condition.
+		{name: "method body", code: `if (class { method() { value = next() } }) {}`},
+		{name: "method parameter", code: `if (class { method(parameter = value = next()) {} }) {}`},
+		{name: "parameter decorator", code: `if (class { method(@dec(value = next()) parameter: unknown) {} }) {}`},
+		{name: "function in computed name", code: `if (class { [() => value = next()]() {} }) {}`},
+		{name: "function in method decorator", code: `if (class { @dec(() => value = next()) method() {} }) {}`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			diagnostics := runNoCondAssign(t, test.code, []any{"always"}, rule.EditDemandNone)
+			assert.Equal(t, len(diagnostics), test.want)
+			for _, diagnostic := range diagnostics {
+				assert.Equal(t, diagnostic.Message.Id, "unexpected")
+				assert.Equal(t, diagnostic.Message.Data["type"], "an 'if' statement")
+			}
+		})
+	}
+}
+
 func runNoCondAssign(t *testing.T, code string, options []any, demand rule.EditDemand) []rule.RuleDiagnostic {
 	t.Helper()
 

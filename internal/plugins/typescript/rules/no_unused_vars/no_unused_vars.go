@@ -2151,23 +2151,14 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// upstream counts the directive itself as a use. reportUsedIgnorePattern
 	// still sees it as used, which is what turns a directive on an ignored name
 	// into a usedIgnoredVar report.
-	if !varInfo.Used && ctx.IsExportedGlobalBinding(definition, name) {
+	if !varInfo.Used && ctx.IsExportedGlobalBinding(rawSym, name) {
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
 	}
 
 	// vars: "local" — skip top-level (global scope) variable declarations.
-	if opts.Vars == "local" && !isParameterNode(definition) && !isCaughtErrorNode(definition) {
-		if definition != nil && definition.Parent != nil {
-			parent := definition.Parent
-			// VariableDeclaration → VariableDeclarationList → VariableStatement → SourceFile
-			for parent != nil && (parent.Kind == ast.KindVariableDeclarationList || parent.Kind == ast.KindVariableStatement) {
-				parent = parent.Parent
-			}
-			if parent != nil && parent.Kind == ast.KindSourceFile {
-				return
-			}
-		}
+	if opts.Vars == "local" && ctx.IsGlobalScopeBinding(rawSym, name) {
+		return
 	}
 
 	// For type-level declarations and imports, being used in a type context
@@ -2629,12 +2620,14 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 
 			ast.KindTypeParameter: func(node *ast.Node) {
 				// Generic type parameter declarations: `<T>`, `<T = unknown>`, `<T extends U>`.
-				// Skip nodes that syntactically share KindTypeParameter in tsgo but aren't
-				// parameter declarations: `infer T`, mapped-type `[P in K]`, JSDoc @template.
+				// Skip nodes that syntactically share KindTypeParameter in tsgo but the
+				// TypeScript rule intentionally treats as used: mapped-type `[P in K]`
+				// bindings and JSDoc @template metadata. `infer T` remains an ordinary
+				// scope variable and is checked.
 				parent := node.Parent
 				if parent != nil {
 					switch parent.Kind {
-					case ast.KindInferType, ast.KindMappedType, ast.KindJSDocTemplateTag:
+					case ast.KindMappedType, ast.KindJSDocTemplateTag:
 						return
 					}
 				}

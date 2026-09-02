@@ -2,10 +2,57 @@ package regexp
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestNormalizeAnnexBEscapesForParser(t *testing.T) {
+	tests := []struct {
+		source  string
+		want    string
+		offsets []int
+	}{
+		{source: "abc", want: "abc"},
+		{source: `\k<a>`, want: `\k<a>`},
+		{
+			source:  `\u{41}*\x00`,
+			want:    `u{41}*\u0000`,
+			offsets: []int{0, 2, 3, 4, 5, 6, 7, 7, 7, 7, 7, 7, 11},
+		},
+		{
+			source:  `\01a`,
+			want:    `\u0001a`,
+			offsets: []int{0, 0, 0, 0, 0, 0, 3, 4},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.source, func(t *testing.T) {
+			got, offsets := NormalizeAnnexBEscapesForParser(test.source)
+			if got != test.want || !slices.Equal(offsets, test.offsets) {
+				t.Fatalf("NormalizeAnnexBEscapesForParser(%q) = (%q, %v), want (%q, %v)", test.source, got, offsets, test.want, test.offsets)
+			}
+		})
+	}
+}
+
+func TestCapturingGroupCount(t *testing.T) {
+	for _, test := range []struct {
+		source string
+		count  int
+		named  bool
+	}{
+		{source: `(?:a)(b)[(](?<name>c)`, count: 2, named: true},
+		{source: `\((a)(?=b)`, count: 1},
+	} {
+		count, named := CapturingGroupCount(test.source)
+		if count != test.count || named != test.named {
+			t.Errorf("CapturingGroupCount(%q) = (%d, %v), want (%d, %v)", test.source, count, named, test.count, test.named)
+		}
+	}
+}
 
 // Every expectation below is what `new RegExp(source, flags).test(subject)`
 // answers in JavaScript.
