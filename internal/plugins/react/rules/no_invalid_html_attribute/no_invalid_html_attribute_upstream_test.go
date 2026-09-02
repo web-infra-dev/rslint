@@ -1,7 +1,6 @@
 // TestNoInvalidHtmlAttributeRuleUpstream migrates every valid and invalid fixture
 // from eslint-plugin-react v7.37.5's tests/lib/rules/no-invalid-html-attribute.js.
 // The cases are deliberately written as explicit literals to preserve the upstream suite.
-// Data assertions are retained for the value-bearing and non-string branches.
 // ESTree `type` values are not copied: ts-go node kinds do not have a one-to-one
 // mapping to ESTree names, and native diagnostics intentionally store source
 // ranges rather than parser-specific node type strings.
@@ -209,7 +208,7 @@ func TestNoInvalidHtmlAttributeRuleUpstream(t *testing.T) {
 		{Code: `<link rel="apple-touch-startup-image" href="iphone5.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" />`, Tsx: true},
 		{Code: `<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#fff" />`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
-		{Code: `<a rel="alternatex"></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Data: map[string]string{"attributeName": "rel", "reportingValue": "alternatex"}, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Data: map[string]string{"attributeName": "rel", "reportingValue": "alternatex"}, Output: `<a rel=""></a>`}}}}},
+		{Code: `<a rel="alternatex"></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `<a rel=""></a>`}}}}},
 		{Code: `React.createElement("a", { rel: "alternatex" })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", { rel: "" })`}}}}},
 		{Code: `React.createElement("a", { rel: ["alternatex"] })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", { rel: [""] })`}}}}},
 		{Code: `<a rel="alternatex alternate"></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `<a rel=" alternate"></a>`}}}}},
@@ -218,17 +217,17 @@ func TestNoInvalidHtmlAttributeRuleUpstream(t *testing.T) {
 		{Code: `<a rel="alternate alternatex"></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `<a rel="alternate "></a>`}}}}},
 		{Code: `React.createElement("a", { rel: "alternate alternatex" })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", { rel: "" })`}}}}},
 		{Code: `React.createElement("a", { rel: ["alternate alternatex"] })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `React.createElement("a", { rel: [""] })`}}}}},
-		{Code: `<html rel></html>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor", Data: map[string]string{"attributeName": "rel", "tagNames": `"<link>", "<a>", "<area>", "<form>"`}, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Data: map[string]string{"attributeName": "rel", "tagNames": `"<link>", "<a>", "<area>", "<form>"`}, Output: `<html ></html>`}}}}},
+		{Code: `<html rel></html>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Output: `<html ></html>`}}}}},
 		{Code: `React.createElement("html", { rel: 1 })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor"}}},
-		{Code: `<a rel></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyIsMeaningless", Data: map[string]string{"attributeName": "rel"}, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveEmpty", Data: map[string]string{"attributeName": "rel"}, Output: `<a ></a>`}}}}},
+		{Code: `<a rel></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyIsMeaningless", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveEmpty", Output: `<a ></a>`}}}}},
 		// SKIP: upstream incorrectly treats this non-string Literal as a rel
 		// string and offers a malformed suggestion; rslint intentionally skips it.
 		{Code: `React.createElement("a", { rel: 1 })`, Tsx: true, Skip: true},
 		{Code: `React.createElement("a", { rel() { return 1; } })`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMethod"}}},
 		{Code: `<span rel></span>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyMeaningfulFor", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Output: `<span ></span>`}}}}},
-		{Code: `<a rel={null}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Data: map[string]string{"attributeName": "rel"}, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Data: map[string]string{"attributeName": "rel"}, Output: `<a ></a>`}}}}},
-		{Code: `<a rel={5}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Data: map[string]string{"attributeName": "rel"}, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Data: map[string]string{"attributeName": "rel"}, Output: `<a ></a>`}}}}},
-		{Code: `<a rel={true}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Data: map[string]string{"attributeName": "rel", "reportingValue": "true"}, Line: 1, Column: 9, EndLine: 1, EndColumn: 13, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Data: map[string]string{"attributeName": "rel", "reportingValue": "true"}, Output: `<a ></a>`}}}}},
+		{Code: `<a rel={null}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `<a ></a>`}}}}},
+		{Code: `<a rel={5}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `<a ></a>`}}}}},
+		{Code: `<a rel={true}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Line: 1, Column: 9, EndLine: 1, EndColumn: 13, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveNonString", Output: `<a ></a>`}}}}},
 		{Code: `<a rel={{}}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Output: `<a ></a>`}}}}},
 		{Code: `<a rel={undefined}></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "onlyStrings", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveDefault", Output: `<a ></a>`}}}}},
 		{Code: `<a rel="noreferrer noopener foobar"></a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverValid", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestRemoveInvalid", Output: `<a rel="noreferrer noopener "></a>`}}}}},

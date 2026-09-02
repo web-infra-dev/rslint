@@ -53,12 +53,12 @@ func configured(options []any) bool {
 	return false
 }
 
-func message(id, description string, data map[string]string) rule.RuleMessage {
-	return rule.RuleMessage{Id: id, Description: description, Data: data}
+func message(id, description string) rule.RuleMessage {
+	return rule.RuleMessage{Id: id, Description: description}
 }
 
-func suggestion(id, description string, data map[string]string, fix rule.RuleFix) []rule.RuleSuggestion {
-	return []rule.RuleSuggestion{{Message: message(id, description, data), FixesArr: []rule.RuleFix{fix}}}
+func suggestion(id, description string, fix rule.RuleFix) []rule.RuleSuggestion {
+	return []rule.RuleSuggestion{{Message: message(id, description), FixesArr: []rule.RuleFix{fix}}}
 }
 
 // stringParts is the JS /\\S+/g equivalent. It records UTF-8 byte spans for
@@ -220,7 +220,7 @@ func reportShortcutPairs(ctx rule.RuleContext, node *ast.Node, value string) {
 		if second != "" {
 			id, desc = "notPaired", "“shortcut” can not be directly followed by “"+second+"” without “icon”."
 		}
-		ctx.ReportNode(node, message(id, desc, map[string]string{"reportingValue": "shortcut", "secondValue": second, "missingValue": "icon"}))
+		ctx.ReportNode(node, message(id, desc))
 	}
 }
 
@@ -302,40 +302,30 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				value, isString = jsxLiteralString(ctx, valueNode)
 			}
 			if !isString {
-				data := map[string]string{"attributeName": "rel"}
-				// The upstream fixture exposes the boolean literal's value here,
-				// while its numeric and null cases intentionally carry only the
-				// attribute name.
-				if valueNode.Kind == ast.KindTrueKeyword {
-					data["reportingValue"] = "true"
-				}
-				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("onlyStrings", "“rel” attribute only supports strings.", data), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveNonString", "remove non-string value in “rel”", data, rule.RuleFixRemove(ctx.SourceFile, nonStringRemoveNode))
+				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("onlyStrings", "“rel” attribute only supports strings."), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveNonString", "remove non-string value in “rel”", rule.RuleFixRemove(ctx.SourceFile, nonStringRemoveNode))
 				})
 				return
 			}
 			if ecmascript.IsBlank(value) {
-				data := map[string]string{"attributeName": "rel", "reportingValue": value}
-				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("noEmpty", "An empty “rel” attribute is meaningless.", data), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveEmpty", "\"remove empty attribute rel\"", data, rule.RuleFixRemove(ctx.SourceFile, emptyRemoveNode))
+				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("noEmpty", "An empty “rel” attribute is meaningless."), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveEmpty", "\"remove empty attribute rel\"", rule.RuleFixRemove(ctx.SourceFile, emptyRemoveNode))
 				})
 				return
 			}
 			for _, part := range stringParts(value) {
 				word := value[part.bytes[0]:part.bytes[1]]
 				tags, exists := relValues[word]
-				data := map[string]string{"attributeName": "rel", "reportingValue": word}
 				id, desc := "", ""
 				if !exists {
 					id, desc = "neverValid", "“"+word+"” is never a valid “rel” attribute value."
 				} else if _, allowed := tags[element]; !allowed {
 					id, desc = "notValidFor", "“"+word+"” is not a valid “rel” attribute value for <"+element+">."
-					data["elementName"] = element
 				}
 				if id != "" {
 					partRange := literalRange(ctx, valueNode, part.units)
-					ctx.ReportNodeWithDeferredSuggestions(valueNode, message(id, desc, data), func() []rule.RuleSuggestion {
-						return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+word+"”", data, rule.RuleFixRemoveRange(partRange))
+					ctx.ReportNodeWithDeferredSuggestions(valueNode, message(id, desc), func() []rule.RuleSuggestion {
+						return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+word+"”", rule.RuleFixRemoveRange(partRange))
 					})
 				}
 			}
@@ -349,9 +339,8 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					if part.units[0] == 0 || part.units[1] == int(core.UTF16Len(value)) {
 						replacement = ""
 					}
-					data := map[string]string{"attributeName": "rel"}
-					ctx.ReportNodeWithDeferredSuggestions(valueNode, message("spaceDelimited", "”rel“ attribute values should be space delimited.", data), func() []rule.RuleSuggestion {
-						return suggestion("suggestRemoveWhitespaces", "remove whitespaces in “rel”", data, rule.RuleFixReplaceRange(r, replacement))
+					ctx.ReportNodeWithDeferredSuggestions(valueNode, message("spaceDelimited", "”rel“ attribute values should be space delimited."), func() []rule.RuleSuggestion {
+						return suggestion("suggestRemoveWhitespaces", "remove whitespaces in “rel”", rule.RuleFixReplaceRange(r, replacement))
 					})
 				}
 			}
@@ -372,17 +361,15 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				return
 			}
 			if _, ok := relElements[element]; !ok {
-				data := map[string]string{"attributeName": "rel", "tagNames": "\"<link>\", \"<a>\", \"<area>\", \"<form>\""}
-				ctx.ReportNodeWithDeferredSuggestions(name, message("onlyMeaningfulFor", "The ”rel“ attribute only has meaning on the tags: \"<link>\", \"<a>\", \"<area>\", \"<form>\"", data), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveDefault", "\"remove rel\"", data, rule.RuleFixRemove(ctx.SourceFile, node))
+				ctx.ReportNodeWithDeferredSuggestions(name, message("onlyMeaningfulFor", "The ”rel“ attribute only has meaning on the tags: \"<link>\", \"<a>\", \"<area>\", \"<form>\""), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveDefault", "\"remove rel\"", rule.RuleFixRemove(ctx.SourceFile, node))
 				})
 				return
 			}
 			init := attr.Initializer
 			if init == nil {
-				data := map[string]string{"attributeName": "rel"}
-				ctx.ReportNodeWithDeferredSuggestions(name, message("emptyIsMeaningless", "An empty “rel” attribute is meaningless.", data), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveEmpty", "\"remove empty attribute rel\"", data, rule.RuleFixRemove(ctx.SourceFile, node))
+				ctx.ReportNodeWithDeferredSuggestions(name, message("emptyIsMeaningless", "An empty “rel” attribute is meaningless."), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveEmpty", "\"remove empty attribute rel\"", rule.RuleFixRemove(ctx.SourceFile, node))
 				})
 				return
 			}
@@ -402,9 +389,8 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				return
 			}
 			if expr.Kind == ast.KindObjectLiteralExpression || (expr.Kind == ast.KindIdentifier && expr.AsIdentifier().Text == "undefined") {
-				data := map[string]string{"attributeName": "rel"}
-				ctx.ReportNodeWithDeferredSuggestions(init, message("onlyStrings", "“rel” attribute only supports strings.", data), func() []rule.RuleSuggestion {
-					return suggestion("suggestRemoveDefault", "\"remove rel\"", data, rule.RuleFixRemove(ctx.SourceFile, node))
+				ctx.ReportNodeWithDeferredSuggestions(init, message("onlyStrings", "“rel” attribute only supports strings."), func() []rule.RuleSuggestion {
+					return suggestion("suggestRemoveDefault", "\"remove rel\"", rule.RuleFixRemove(ctx.SourceFile, node))
 				})
 			}
 		}
@@ -460,11 +446,11 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					continue
 				}
 				if !isString || (element != "link" && element != "a" && element != "area" && element != "form") {
-					ctx.ReportNode(key, message("onlyMeaningfulFor", "The ”rel“ attribute only has meaning on the tags: \"<link>\", \"<a>\", \"<area>\", \"<form>\"", map[string]string{"attributeName": "rel", "tagNames": "\"<link>\", \"<a>\", \"<area>\", \"<form>\""}))
+					ctx.ReportNode(key, message("onlyMeaningfulFor", "The ”rel“ attribute only has meaning on the tags: \"<link>\", \"<a>\", \"<area>\", \"<form>\""))
 					continue
 				}
 				if method {
-					ctx.ReportNode(property, message("noMethod", "The ”rel“ attribute cannot be a method.", map[string]string{"attributeName": "rel"}))
+					ctx.ReportNode(property, message("noMethod", "The ”rel“ attribute cannot be a method."))
 					continue
 				}
 				if shorthand || computed || accessor {
@@ -503,14 +489,13 @@ func reportCreateElementValue(ctx rule.RuleContext, value *ast.Node, element str
 	}
 	tags, exists := relValues[text]
 	if !exists {
-		data := map[string]string{"attributeName": "rel", "reportingValue": text}
-		ctx.ReportNodeWithDeferredSuggestions(value, message("neverValid", "“"+text+"” is never a valid “rel” attribute value.", data), func() []rule.RuleSuggestion {
-			return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+text+"”", data, removeStaticValue(ctx, value, text))
+		ctx.ReportNodeWithDeferredSuggestions(value, message("neverValid", "“"+text+"” is never a valid “rel” attribute value."), func() []rule.RuleSuggestion {
+			return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+text+"”", removeStaticValue(ctx, value, text))
 		})
 		return
 	}
 	if _, allowed := tags[element]; !allowed {
 		raw := sourceText(ctx, value)
-		ctx.ReportNode(value, message("notValidFor", "“"+raw+"” is not a valid “rel” attribute value for <"+element+">.", map[string]string{"attributeName": "rel", "reportingValue": raw, "elementName": element}))
+		ctx.ReportNode(value, message("notValidFor", "“"+raw+"” is not a valid “rel” attribute value for <"+element+">."))
 	}
 }

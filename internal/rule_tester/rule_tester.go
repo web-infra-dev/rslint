@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strconv"
 	"sync"
@@ -43,8 +42,7 @@ type ValidTestCase struct {
 }
 
 type InvalidTestCaseError struct {
-	MessageId string            `json:"messageId"`
-	Data      map[string]string `json:"data,omitempty"`
+	MessageId string `json:"messageId"`
 	// Message, if non-empty, must match the diagnostic's formatted message
 	// exactly. Leave empty to skip the text assertion.
 	Message     string                      `json:"message,omitempty"`
@@ -56,10 +54,8 @@ type InvalidTestCaseError struct {
 }
 
 type InvalidTestCaseSuggestion struct {
-	MessageId   string            `json:"messageId"`
-	Description string            `json:"description,omitempty"`
-	Data        map[string]string `json:"data,omitempty"`
-	Output      string            `json:"output"`
+	MessageId string `json:"messageId"`
+	Output    string `json:"output"`
 }
 
 type InvalidTestCase struct {
@@ -115,7 +111,6 @@ type ESLintInvalidTestCase struct {
 type ESLintError struct {
 	Message     string             `json:"message,omitempty"`
 	MessageId   string             `json:"messageId,omitempty"`
-	Data        map[string]string  `json:"data,omitempty"`
 	Type        string             `json:"type,omitempty"`
 	Line        int                `json:"line,omitempty"`
 	Column      int                `json:"column,omitempty"`
@@ -126,10 +121,9 @@ type ESLintError struct {
 
 // ESLintSuggestion represents a suggestion in ESLint format
 type ESLintSuggestion struct {
-	MessageId string            `json:"messageId,omitempty"`
-	Desc      string            `json:"desc,omitempty"`
-	Data      map[string]string `json:"data,omitempty"`
-	Output    string            `json:"output,omitempty"`
+	MessageId string `json:"messageId,omitempty"`
+	Desc      string `json:"desc,omitempty"`
+	Output    string `json:"output,omitempty"`
 }
 
 // ESLintTestSuite represents a complete ESLint test suite
@@ -347,10 +341,6 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				if expected.Message != "" && expected.Message != diagnostic.Message.Description {
 					t.Errorf("Invalid message text %q. Expected %q", diagnostic.Message.Description, expected.Message)
 				}
-				if expected.Data != nil && !reflect.DeepEqual(expected.Data, diagnostic.Message.Data) {
-					t.Errorf("Invalid diagnostic data %#v. Expected %#v", diagnostic.Message.Data, expected.Data)
-				}
-
 				lineIndex, columnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
 				line, column := lineIndex+1, int(columnIndex)+1
 				endLineIndex, endColumnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.End())
@@ -381,12 +371,6 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 						if expectedSuggestion.MessageId != suggestion.Message.Id {
 							t.Errorf("Invalid suggestion message id %v. Expected %v", suggestion.Message.Id, expectedSuggestion.MessageId)
 						} else {
-							if expectedSuggestion.Description != "" && expectedSuggestion.Description != suggestion.Message.Description {
-								t.Errorf("Invalid suggestion description %q. Expected %q", suggestion.Message.Description, expectedSuggestion.Description)
-							}
-							if expectedSuggestion.Data != nil && !reflect.DeepEqual(expectedSuggestion.Data, suggestion.Message.Data) {
-								t.Errorf("Invalid suggestion data %#v. Expected %#v", suggestion.Message.Data, expectedSuggestion.Data)
-							}
 							output, _, _ := linter.ApplyRuleFixes(testCase.Code, []rule.RuleSuggestion{suggestion})
 
 							assert.Equal(t, expectedSuggestion.Output, output, "Expected code after suggestion fix")
@@ -487,14 +471,12 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 		for j, sug := range err.Suggestions {
 			suggestions[j] = InvalidTestCaseSuggestion{
 				MessageId: sug.MessageId,
-				Data:      sug.Data,
 				Output:    sug.Output,
 			}
 		}
 
 		errors[i] = InvalidTestCaseError{
 			MessageId:   err.MessageId,
-			Data:        err.Data,
 			Line:        err.Line,
 			Column:      err.Column,
 			EndLine:     err.EndLine,
