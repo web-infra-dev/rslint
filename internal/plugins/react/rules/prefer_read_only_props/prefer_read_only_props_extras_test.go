@@ -4,6 +4,7 @@
 package prefer_read_only_props
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
@@ -19,9 +20,6 @@ func TestPreferReadOnlyPropsExtras(t *testing.T) {
 		// ---- Dimension 4: property key equivalence classes ----
 		{Code: `class Hello extends React.Component<{ readonly "name": string; readonly 0: string; readonly [key: string]: string }> { render() { return <div/>; } }`, Tsx: true},
 		{Code: `class Hello extends React.Component<{ [name: string]: string; method(): void; readonly name?: string }> { render() { return <div/>; } }`, Tsx: true},
-		// Computed keys and private names are not TSPropertySignature names that
-		// eslint-plugin-react can turn into a declared prop key.
-		{Code: `type Props = { ["name"]: string }; const Hello = (props: Props) => <div/>;`, Tsx: true},
 
 		// ---- Dimension 4: declaration/container forms ----
 		{Code: `const Hello = class extends React.Component<{ readonly name: string }> { render() { return <div/>; } };`, Tsx: true},
@@ -55,6 +53,7 @@ func TestPreferReadOnlyPropsExtras(t *testing.T) {
 		// v7.37.5 searches only top-level declarations, so a namespace member is
 		// not resolved and remains silent, matching the released implementation.
 		{Code: `namespace ItemsListElementSkeleton { export interface Props { name?: string } } function ItemsListElementSkeleton({name}: ItemsListElementSkeleton.Props) { return <div>{name}</div>; }`, Tsx: true},
+		{Code: `namespace ItemsListElementSkeleton { export interface Props { name?: string } } type Props = { top: string }; function ItemsListElementSkeleton({name}: ItemsListElementSkeleton.Props) { return <div>{name}</div>; }`, Tsx: true},
 		// ---- Real-user: #3650 implicit React reference ----
 		{Code: `interface ChipProps { chipColor: string; label: string } const Chip: React.FC<ChipProps> = ({chipColor, label}) => <div>{chipColor}{label}</div>;`, Tsx: true},
 
@@ -113,5 +112,86 @@ function Hello(props: Props) {
 			Output: []string{`import React from "react"; type Props = { readonly name: string }; const Hello = React.forwardRef<HTMLDivElement, Props>((props, ref) => <div ref={ref}>{props.name}</div>);`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
+		{
+			Code: `type Props = { ['name']: string; [name]: number; [1]: boolean; [+1]: unknown }; function Hello(props: Props) { return <div/>; }`,
+			Tsx:  true,
+			Output: []string{
+				`type Props = { ['name']: string; readonly [name]: number; readonly [1]: boolean; readonly [+1]: unknown }; function Hello(props: Props) { return <div/>; }`,
+				`type Props = { readonly ['name']: string; readonly [name]: number; readonly [1]: boolean; readonly [+1]: unknown }; function Hello(props: Props) { return <div/>; }`,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."},
+				{MessageId: "readOnlyProp", Message: "Prop '1' should be read-only."},
+				{MessageId: "readOnlyProp", Message: "Prop 'undefined' should be read-only."},
+			},
+		},
+		{
+			Code:   `type Props = { name: string }; const obj = { Hello(props: Props) { return <div/>; } };`,
+			Tsx:    true,
+			Output: []string{`type Props = { readonly name: string }; const obj = { Hello(props: Props) { return <div/>; } };`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `import { ForwardRefRenderFunction } from "react"; type Props = { name: string }; const Hello: ForwardRefRenderFunction<HTMLDivElement, Props> = (props, ref) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`import { ForwardRefRenderFunction } from "react"; type Props = { readonly name: string }; const Hello: ForwardRefRenderFunction<HTMLDivElement, Props> = (props, ref) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `import { forwardRef } from "react"; type Props = { name: string }; const Hello: forwardRef<HTMLDivElement, Props> = (props, ref) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`import { forwardRef } from "react"; type Props = { readonly name: string }; const Hello: forwardRef<HTMLDivElement, Props> = (props, ref) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `type Props = { name: string }; class Hello extends React.Component<Props> { props: Props; render() { return <div/>; } }`,
+			Tsx:    true,
+			Output: []string{`type Props = { readonly name: string }; class Hello extends React.Component<Props> { props: Props; render() { return <div/>; } }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `import React from "react"; type Props = { name: string }; const Hello: React.FC<Props> = (props: Props) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`import React from "react"; type Props = { readonly name: string }; const Hello: React.FC<Props> = (props: Props) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code: `type Props = { name: string } & { name: number }; function Hello(props: Props) { return <div/>; }`,
+			Tsx:  true,
+			Output: []string{
+				`type Props = { name: string } & { readonly name: number }; function Hello(props: Props) { return <div/>; }`,
+				`type Props = { readonly name: string } & { readonly name: number }; function Hello(props: Props) { return <div/>; }`,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
 	})
+}
+
+func TestPreferReadOnlyPropsLongAliasChain(t *testing.T) {
+	var source strings.Builder
+	for i := 0; i < 34; i++ {
+		name := string(rune('A' + i))
+		next := string(rune('A' + i + 1))
+		if i == 25 {
+			name = "Z"
+			next = "AA"
+		}
+		if i > 25 {
+			name = "A" + string(rune('A'+i-26))
+			next = "A" + string(rune('A'+i-25))
+		}
+		source.WriteString("type " + name + " = " + next + "; ")
+	}
+	source.WriteString("type AI = { name: string }; function Hello(props: A) { return <div/>; }")
+	code := source.String()
+	output := strings.Replace(code, "type AI = { name: string }", "type AI = { readonly name: string }", 1)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferReadOnlyPropsRule, nil, []rule_tester.InvalidTestCase{{
+		Code:   code,
+		Tsx:    true,
+		Output: []string{output},
+		Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "readOnlyProp",
+			Message:   "Prop 'name' should be read-only.",
+		}},
+	}})
 }

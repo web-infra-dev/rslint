@@ -22,22 +22,47 @@ var PreferReadOnlyPropsRule = rule.Rule{
 func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	pragma := reactutil.GetReactPragma(ctx.Settings)
 	typeAliases, genericImports := collectTopLevelTypes(ctx.SourceFile)
+	type reportKey struct {
+		owner *ast.Node
+		name  string
+	}
+	type pendingReport struct {
+		node *ast.Node
+		name string
+	}
+	pending := make(map[reportKey]int)
+	reports := make([]pendingReport, 0)
 
-	report := func(node *ast.Node, name string) {
-		if node == nil {
+	report := func(owner, node *ast.Node, name string) {
+		if owner == nil || node == nil {
 			return
 		}
-		ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{
-			Id:          "readOnlyProp",
-			Description: fmt.Sprintf(readOnlyPropMessage, name),
-			Data:        map[string]string{"name": name},
-		}, func() []rule.RuleFix {
-			return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, node, "readonly ")}
-		})
+		key := reportKey{owner: owner, name: name}
+		if index, ok := pending[key]; ok {
+			reports[index] = pendingReport{node: node, name: name}
+			return
+		}
+		pending[key] = len(reports)
+		reports = append(reports, pendingReport{node: node, name: name})
 	}
 
-	validateType := func(node *ast.Node) {
-		validateTypeNode(node, typeAliases, report, 32, map[*ast.Node]bool{})
+	flushReports := func() {
+		for _, item := range reports {
+			node, name := item.node, item.name
+			ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{
+				Id:          "readOnlyProp",
+				Description: fmt.Sprintf(readOnlyPropMessage, name),
+				Data:        map[string]string{"name": name},
+			}, func() []rule.RuleFix {
+				return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, node, "readonly ")}
+			})
+		}
+	}
+
+	validateType := func(owner, node *ast.Node) {
+		validateTypeNode(node, typeAliases, func(node *ast.Node, name string) {
+			report(owner, node, name)
+		}, map[*ast.Node]bool{})
 	}
 
 	return rule.RuleListeners{
@@ -48,7 +73,7 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			if heritage := ast.GetClassExtendsHeritageElement(node); heritage != nil {
 				if extends := heritage.AsExpressionWithTypeArguments(); extends != nil &&
 					extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) > 0 {
-					validateType(extends.TypeArguments.Nodes[0])
+					validateType(node, extends.TypeArguments.Nodes[0])
 				}
 			}
 		},
@@ -59,7 +84,7 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			if heritage := ast.GetClassExtendsHeritageElement(node); heritage != nil {
 				if extends := heritage.AsExpressionWithTypeArguments(); extends != nil &&
 					extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) > 0 {
-					validateType(extends.TypeArguments.Nodes[0])
+					validateType(node, extends.TypeArguments.Nodes[0])
 				}
 			}
 		},
@@ -76,7 +101,7 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "props" {
 				return
 			}
-			validateType(pd.Type)
+			validateType(classNode, pd.Type)
 		},
 		ast.KindFunctionDeclaration: func(node *ast.Node) {
 			checkFunction(node, pragma, genericImports, validateType)
@@ -87,14 +112,26 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		ast.KindArrowFunction: func(node *ast.Node) {
 			checkFunction(node, pragma, genericImports, validateType)
 		},
+		ast.KindMethodDeclaration: func(node *ast.Node) {
+			checkFunction(node, pragma, genericImports, validateType)
+		},
+		ast.KindGetAccessor: func(node *ast.Node) {
+			checkFunction(node, pragma, genericImports, validateType)
+		},
+		ast.KindSetAccessor: func(node *ast.Node) {
+			checkFunction(node, pragma, genericImports, validateType)
+		},
+		ast.KindEndOfFile: func(_ *ast.Node) {
+			flushReports()
+		},
 	}
 }
 
-func checkFunction(node *ast.Node, pragma string, genericImports map[string]string, validateType func(*ast.Node)) {
+func checkFunction(node *ast.Node, pragma string, genericImports map[string]string, validateType func(*ast.Node, *ast.Node)) {
 	// The forwardRef arm is checked before component-return heuristics in the
 	// upstream collector. Its second type argument is the props type.
 	if call := parentCall(node); call != nil && call.TypeArguments != nil && len(call.TypeArguments.Nodes) >= 2 && isForwardRefCall(call) {
-		validateType(call.TypeArguments.Nodes[1])
+		validateType(node, call.TypeArguments.Nodes[1])
 		return
 	}
 
@@ -106,7 +143,7 @@ func checkFunction(node *ast.Node, pragma string, genericImports map[string]stri
 		return
 	}
 	if param := params[0].AsParameterDeclaration(); param != nil && param.Type != nil {
-		validateType(param.Type)
+		validateType(node, param.Type)
 	}
 
 	// For `const Component: React.FC<Props> = (...) => ...`, the upstream
@@ -117,7 +154,7 @@ func checkFunction(node *ast.Node, pragma string, genericImports map[string]stri
 		vd := parent.AsVariableDeclaration()
 		if vd != nil && vd.Type != nil {
 			if propsType := reactGenericPropsType(vd.Type, genericImports); propsType != nil {
-				validateType(propsType)
+				validateType(node, propsType)
 			}
 		}
 	}
@@ -227,31 +264,43 @@ func reactGenericPropsType(node *ast.Node, imports map[string]string) *ast.Node 
 	if ref == nil || ref.TypeArguments == nil || len(ref.TypeArguments.Nodes) == 0 || !isReactGenericType(ref.TypeName, imports) {
 		return nil
 	}
-	return ref.TypeArguments.Nodes[0]
+	index := 0
+	if genericName, _ := reactGenericTypeName(ref.TypeName, imports); genericName == "forwardRef" || genericName == "ForwardRefRenderFunction" {
+		index = 1
+	}
+	if len(ref.TypeArguments.Nodes) <= index {
+		return nil
+	}
+	return ref.TypeArguments.Nodes[index]
 }
 
 func isReactGenericType(name *ast.Node, imports map[string]string) bool {
+	_, ok := reactGenericTypeName(name, imports)
+	return ok
+}
+
+func reactGenericTypeName(name *ast.Node, imports map[string]string) (string, bool) {
 	if name == nil {
-		return false
+		return "", false
 	}
 	if name.Kind == ast.KindIdentifier {
 		imported, ok := imports[name.AsIdentifier().Text]
-		return ok && imported != "" && imported != "*" && isGenericTypeName(imported)
+		return imported, ok && imported != "" && imported != "*" && isGenericTypeName(imported)
 	}
 	if name.Kind != ast.KindQualifiedName {
-		return false
+		return "", false
 	}
 	qualified := name.AsQualifiedName()
 	if qualified == nil || qualified.Left == nil || qualified.Right == nil {
-		return false
+		return "", false
 	}
 	left := reactutil.EntityNameRightmost(qualified.Left)
 	right := reactutil.EntityNameRightmost(qualified.Right)
 	if left == nil || right == nil || !isGenericTypeName(right.AsIdentifier().Text) {
-		return false
+		return "", false
 	}
 	_, ok := imports[left.AsIdentifier().Text]
-	return ok
+	return right.AsIdentifier().Text, ok
 }
 
 func isGenericTypeName(name string) bool {
@@ -263,8 +312,8 @@ func isGenericTypeName(name string) bool {
 	}
 }
 
-func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report func(*ast.Node, string), depth int, seen map[*ast.Node]bool) {
-	if node == nil || depth == 0 || seen[node] {
+func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report func(*ast.Node, string), seen map[*ast.Node]bool) {
+	if node == nil || seen[node] {
 		return
 	}
 	seen[node] = true
@@ -297,12 +346,11 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report fun
 					if extends == nil {
 						continue
 					}
-					name := reactutil.EntityNameRightmost(extends.Expression)
-					if name == nil {
+					if extends.Expression == nil || extends.Expression.Kind != ast.KindIdentifier {
 						continue
 					}
-					for _, target := range aliases[name.AsIdentifier().Text] {
-						validateTypeNode(target, aliases, report, depth-1, seen)
+					for _, target := range aliases[extends.Expression.AsIdentifier().Text] {
+						validateTypeNode(target, aliases, report, seen)
 					}
 				}
 			}
@@ -312,23 +360,22 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report fun
 		if ref == nil {
 			return
 		}
-		name := reactutil.EntityNameRightmost(ref.TypeName)
-		if name == nil {
+		if ref.TypeName == nil || ref.TypeName.Kind != ast.KindIdentifier {
 			return
 		}
-		for _, target := range aliases[name.AsIdentifier().Text] {
-			validateTypeNode(target, aliases, report, depth-1, seen)
+		for _, target := range aliases[ref.TypeName.AsIdentifier().Text] {
+			validateTypeNode(target, aliases, report, seen)
 		}
 	case ast.KindParenthesizedType:
 		parenthesized := node.AsParenthesizedTypeNode()
 		if parenthesized != nil {
-			validateTypeNode(parenthesized.Type, aliases, report, depth-1, seen)
+			validateTypeNode(parenthesized.Type, aliases, report, seen)
 		}
 	case ast.KindIntersectionType:
 		intersection := node.AsIntersectionTypeNode()
 		if intersection != nil && intersection.Types != nil {
 			for _, item := range intersection.Types.Nodes {
-				validateTypeNode(item, aliases, report, depth-1, seen)
+				validateTypeNode(item, aliases, report, seen)
 			}
 		}
 	}
@@ -343,6 +390,30 @@ func checkPropertySignature(node *ast.Node, report func(*ast.Node, string)) {
 		return
 	}
 	nameNode := property.Name()
+	name, ok := propertyName(nameNode)
+	if !ok {
+		return
+	}
+	report(node, name)
+}
+
+func propertyName(nameNode *ast.Node) (string, bool) {
+	if nameNode == nil {
+		return "", false
+	}
+	if nameNode.Kind == ast.KindComputedPropertyName {
+		expr := ast.SkipParentheses(nameNode.AsComputedPropertyName().Expression)
+		if expr == nil {
+			return "undefined", true
+		}
+		if expr.Kind == ast.KindIdentifier {
+			return expr.AsIdentifier().Text, true
+		}
+		if name, ok := utils.GetStaticPropertyName(expr); ok && expr.Kind != ast.KindNoSubstitutionTemplateLiteral {
+			return name, true
+		}
+		return "undefined", true
+	}
 	var name string
 	switch nameNode.Kind {
 	case ast.KindIdentifier:
@@ -352,7 +423,7 @@ func checkPropertySignature(node *ast.Node, report func(*ast.Node, string)) {
 	case ast.KindNumericLiteral:
 		name, _ = utils.GetStaticPropertyName(nameNode)
 	default:
-		return
+		return "", false
 	}
-	report(node, name)
+	return name, true
 }
