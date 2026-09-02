@@ -67,12 +67,30 @@ func TestNoArrowFunctionLifecycleRuleExtras(t *testing.T) {
 			Output: []string{"class Hello extends React.Component { #render() { return null; } }"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
 		},
+		{
+			Code:   "class Hello extends React.Component { [render] = () => null; }",
+			Tsx:    true,
+			Output: []string{"class Hello extends React.Component { [render]() { return null; } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "createReactClass({ [render]: () => null });",
+			Tsx:    true,
+			Output: []string{"createReactClass({ [render]: function() { return null; } });"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
 		// ---- Branch lock-in: static members use the separate static lifecycle list ----
 		{
 			Code:   "class Hello extends React.Component { static getDerivedStateFromProps = () => null; }",
 			Tsx:    true,
 			Output: []string{"class Hello extends React.Component { static getDerivedStateFromProps() { return null; } }"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "getDerivedStateFromProps" + upstreamLifecycleMessage, Line: 1, Column: 39, EndLine: 1, EndColumn: 84}},
+		},
+		{
+			Code:   "class Hello extends React.Component { static [getDerivedStateFromProps] = () => null; }",
+			Tsx:    true,
+			Output: []string{"class Hello extends React.Component { static [getDerivedStateFromProps]() { return null; } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "getDerivedStateFromProps" + upstreamLifecycleMessage}},
 		},
 		{
 			Code:   "createReactClass(factory(), { render: () => null });",

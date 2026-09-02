@@ -39,7 +39,14 @@ func memberName(member *ast.Node) string {
 	if member == nil {
 		return ""
 	}
-	return reactutil.IdentifierOrPrivateName(member.Name())
+	name := member.Name()
+	if name != nil && name.Kind == ast.KindComputedPropertyName {
+		// ESTree keeps an Identifier key for `[render]`, so upstream's
+		// `getPropertyName` still returns "render". String and non-identifier
+		// computed keys remain unnamed.
+		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
+	}
+	return reactutil.IdentifierOrPrivateName(name)
 }
 
 func memberValue(member *ast.Node) *ast.Node {
