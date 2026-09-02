@@ -159,6 +159,34 @@ import { test } from 'node:test';`,
 import { test } from 'rstack/test';`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
 			},
+			// A require inside a function body, and one whose result is
+			// immediately accessed, name the specifier just as a top-level
+			// require does.
+			{
+				Code: `function setup() { require('rstack/test'); }
+import { test } from 'node:test';`,
+				Output: []string{`function setup() { require('rstack/test'); }
+import { test } from 'rstack/test';`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			{
+				Code: `const expect = require('rstack/test').expect;
+import { test } from 'node:test';`,
+				Output: []string{`const expect = require('rstack/test').expect;
+import { test } from 'rstack/test';`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
+			// A nested `@rstest/core` require wins over an Rstack import the
+			// same way a top-level one does.
+			{
+				Code: `import { describe } from 'rstack/test';
+function setup() { require('@rstest/core'); }
+import { test } from 'node:test';`,
+				Output: []string{`import { describe } from 'rstack/test';
+function setup() { require('@rstest/core'); }
+import { test } from '@rstest/core';`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportNodeTest"}},
+			},
 			// A globals type reference names it without any import.
 			{
 				Code: `/// <reference types="rstack/test/globals" />

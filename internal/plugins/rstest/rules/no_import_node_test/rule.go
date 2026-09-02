@@ -52,37 +52,44 @@ func replacementModuleForFile(sourceFile *ast.SourceFile) string {
 		}
 	}
 
-	for _, statement := range sourceFile.Statements.Nodes {
-		specifier, ok := importedModuleSpecifier(statement)
-		if !ok {
-			continue
+	// A `require()` can sit anywhere — inside a function body, as the object of
+	// a property access — so the whole file is walked rather than only its
+	// top-level statements.
+	sawRstest := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node == nil {
+			return false
 		}
-		if specifier == rstestUtils.RstestImportModule {
-			return rstestUtils.RstestImportModule
+		if specifier, ok := referencedModuleSpecifier(node); ok {
+			switch specifier {
+			case rstestUtils.RstestImportModule:
+				sawRstest = true
+				return true
+			case rstestUtils.RstackTestImportModule:
+				sawRstack = true
+			}
 		}
-		if specifier == rstestUtils.RstackTestImportModule {
-			sawRstack = true
-		}
+		return node.ForEachChild(visit)
 	}
+	sourceFile.AsNode().ForEachChild(visit)
 
+	if sawRstest {
+		return rstestUtils.RstestImportModule
+	}
 	if sawRstack {
 		return rstestUtils.RstackTestImportModule
 	}
 	return rstestUtils.RstestImportModule
 }
 
-// importedModuleSpecifier returns the module a top-level statement imports, in
-// any of the three static forms a test file writes: `import ... from 'm'`,
-// `import x = require('m')`, and a variable statement whose initializer is
-// `require('m')`.
-func importedModuleSpecifier(statement *ast.Node) (string, bool) {
-	if statement == nil {
-		return "", false
-	}
-
-	switch statement.Kind {
+// referencedModuleSpecifier returns the module a node names, in any of the
+// three static forms a test file writes: `import ... from 'm'`,
+// `import x = require('m')`, and a `require('m')` call.
+func referencedModuleSpecifier(node *ast.Node) (string, bool) {
+	switch node.Kind {
 	case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-		declaration := statement.AsImportDeclaration()
+		declaration := node.AsImportDeclaration()
 		if declaration == nil || declaration.ModuleSpecifier == nil ||
 			!isStringNode(declaration.ModuleSpecifier) {
 			return "", false
@@ -90,7 +97,7 @@ func importedModuleSpecifier(statement *ast.Node) (string, bool) {
 		return declaration.ModuleSpecifier.Text(), true
 
 	case ast.KindImportEqualsDeclaration:
-		declaration := statement.AsImportEqualsDeclaration()
+		declaration := node.AsImportEqualsDeclaration()
 		if declaration == nil || declaration.ModuleReference == nil ||
 			declaration.ModuleReference.Kind != ast.KindExternalModuleReference {
 			return "", false
@@ -105,25 +112,8 @@ func importedModuleSpecifier(statement *ast.Node) (string, bool) {
 		}
 		return specifier.Text(), true
 
-	case ast.KindVariableStatement:
-		variableStatement := statement.AsVariableStatement()
-		if variableStatement == nil || variableStatement.DeclarationList == nil {
-			return "", false
-		}
-		list := variableStatement.DeclarationList.AsVariableDeclarationList()
-		if list == nil || list.Declarations == nil {
-			return "", false
-		}
-		for _, declaration := range list.Declarations.Nodes {
-			variable := declaration.AsVariableDeclaration()
-			if variable == nil {
-				continue
-			}
-			if specifier, ok := requiredModuleSpecifier(variable.Initializer); ok {
-				return specifier, true
-			}
-		}
-		return "", false
+	case ast.KindCallExpression:
+		return requiredModuleSpecifier(node)
 
 	default:
 		return "", false
