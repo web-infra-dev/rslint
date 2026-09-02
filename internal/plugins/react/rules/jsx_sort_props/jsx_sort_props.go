@@ -14,8 +14,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
-	"golang.org/x/text/collate"
-	"golang.org/x/text/language"
 )
 
 //go:embed jsx_sort_props.schema.json
@@ -29,6 +27,7 @@ var JsxSortPropsRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		nameComparer := propNameComparer{options: opts}
 		reported := map[*ast.Node]map[string]bool{}
 
 		check := func(element *ast.Node) {
@@ -95,9 +94,11 @@ var JsxSortPropsRule = rule.Rule{
 				currentValue := current.AsJsxAttribute().Initializer != nil
 				previousCallback := isCallback(previousName)
 				currentCallback := isCallback(currentName)
+				previousOrderingName := previousName
+				currentOrderingName := currentName
 				if opts.ignoreCase {
-					previousName = ecmascript.StringToLowerCase(previousName)
-					currentName = ecmascript.StringToLowerCase(currentName)
+					previousOrderingName = ecmascript.StringToLowerCase(previousOrderingName)
+					currentOrderingName = ecmascript.StringToLowerCase(currentOrderingName)
 				}
 
 				if opts.reservedFirst {
@@ -105,8 +106,8 @@ var JsxSortPropsRule = rule.Rule{
 						reportAttr(current, opts.reservedError, opts.reservedDescription, opts.reservedData, true)
 						continue
 					}
-					previousReserved := contains(reserved, previousName)
-					currentReserved := contains(reserved, currentName)
+					previousReserved := contains(reserved, previousOrderingName)
+					currentReserved := contains(reserved, currentOrderingName)
 					if previousReserved && !currentReserved {
 						memo = current
 						continue
@@ -167,7 +168,7 @@ var JsxSortPropsRule = rule.Rule{
 						continue
 					}
 				}
-				if !opts.noSortAlphabetically && compareNames(previousName, currentName, opts) > 0 {
+				if !opts.noSortAlphabetically && nameComparer.Compare(previousName, currentName) > 0 {
 					reportAttr(current, "sortPropsByAlpha", "Props should be sorted alphabetically", nil, false)
 					continue
 				}
@@ -178,6 +179,15 @@ var JsxSortPropsRule = rule.Rule{
 				right := utils.TrimNodeTextRange(ctx.SourceFile, pending[j].attr)
 				return left.Pos() < right.Pos()
 			})
+			var fixes []rule.RuleFix
+			fixesBuilt := false
+			getFixes := func() []rule.RuleFix {
+				if !fixesBuilt {
+					fixes = buildFixes(ctx, element, &nameComparer, reserved)
+					fixesBuilt = true
+				}
+				return fixes
+			}
 			for _, report := range pending {
 				reportNode := report.attr.AsJsxAttribute().Name()
 				if report.wholeAttribute {
@@ -189,7 +199,7 @@ var JsxSortPropsRule = rule.Rule{
 					continue
 				}
 				ctx.ReportNodeWithDeferredFixes(reportNode, message, func() []rule.RuleFix {
-					return buildFixes(ctx, element, opts, reserved)
+					return slices.Clone(getFixes())
 				})
 			}
 		}
@@ -267,44 +277,74 @@ func isMultiline(ctx rule.RuleContext, node *ast.Node) bool {
 	return scanner.ComputeLineOfPosition(lines, r.Pos()) != scanner.ComputeLineOfPosition(lines, r.End())
 }
 
-func compareNames(left, right string, opts options) int {
-	if opts.ignoreCase || opts.locale != "auto" {
-		locale := language.Make(opts.locale)
-		base, _ := locale.Base()
-		if base.String() == "da" && ecmascript.StringToLowerCase(left) == ecmascript.StringToLowerCase(right) {
-			return ecmascript.CompareStrings(left, right)
-		}
-		return collate.New(locale).CompareString(left, right)
+type propNameComparer struct {
+	options        options
+	localeComparer *ecmascript.LocaleComparer
+}
+
+func (c *propNameComparer) Compare(left, right string) int {
+	if c.options.ignoreCase {
+		left = ecmascript.StringToLowerCase(left)
+		right = ecmascript.StringToLowerCase(right)
 	}
-	return ecmascript.CompareStrings(left, right)
+	if !c.options.ignoreCase && c.options.locale == "auto" {
+		return ecmascript.CompareStrings(left, right)
+	}
+	if c.localeComparer == nil {
+		c.localeComparer = ecmascript.NewLocaleComparer(c.options.locale)
+	}
+	return c.localeComparer.Compare(left, right)
 }
 
 type sortableAttribute struct {
-	node       *ast.Node
-	start, end int
-	pinned     bool
+	node                   *ast.Node
+	members                []*ast.Node
+	start, end             int
+	pinned                 bool
+	trailingLineComment    bool
+	trailingLineTerminator string
 }
 
-func buildFixes(ctx rule.RuleContext, element *ast.Node, opts options, reserved []string) []rule.RuleFix {
+func buildFixes(ctx rule.RuleContext, element *ast.Node, nameComparer *propNameComparer, reserved []string) []rule.RuleFix {
 	attrs := reactutil.GetJsxElementAttributes(element)
 	groups := sortableGroups(ctx, element, attrs)
 	text := ctx.SourceFile.Text()
+	elementEnd := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
 	var fixes []rule.RuleFix
 	for _, group := range groups {
 		sorted := slices.Clone(group)
-		sort.SliceStable(sorted, func(i, j int) bool { return compareAttributes(ctx, sorted[i], sorted[j], opts, reserved) < 0 })
+		sort.SliceStable(sorted, func(i, j int) bool {
+			return compareAttributes(ctx, sorted[i], sorted[j], nameComparer, reserved) < 0
+		})
+		if !preservesDuplicateOrder(attrs, group, sorted) {
+			continue
+		}
+		groupFixes := make([]rule.RuleFix, 0, len(group))
+		fixable := true
 		for index, target := range group {
 			source := sorted[index]
 			if target.start == source.start && target.end == source.end {
 				continue
 			}
-			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(target.start, target.end), text[source.start:source.end]))
+			replacement := text[source.start:source.end]
+			if source.trailingLineComment && !destinationHasLineTerminator(text, target.end, elementEnd) {
+				if source.trailingLineTerminator == "" {
+					fixable = false
+					break
+				}
+				replacement += source.trailingLineTerminator
+			}
+			groupFixes = append(groupFixes, rule.RuleFixReplaceRange(core.NewTextRange(target.start, target.end), replacement))
+		}
+		if fixable {
+			fixes = append(fixes, groupFixes...)
 		}
 	}
 	return fixes
 }
 
-func compareAttributes(ctx rule.RuleContext, left, right sortableAttribute, opts options, reserved []string) int {
+func compareAttributes(ctx rule.RuleContext, left, right sortableAttribute, nameComparer *propNameComparer, reserved []string) int {
+	opts := nameComparer.options
 	if left.pinned != right.pinned {
 		if left.pinned {
 			return 1
@@ -362,10 +402,7 @@ func compareAttributes(ctx rule.RuleContext, left, right sortableAttribute, opts
 	if opts.noSortAlphabetically {
 		return 0
 	}
-	if opts.ignoreCase {
-		leftName, rightName = ecmascript.StringToLowerCase(leftName), ecmascript.StringToLowerCase(rightName)
-	}
-	return compareNames(leftName, rightName, opts)
+	return nameComparer.Compare(leftName, rightName)
 }
 
 func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) [][]sortableAttribute {
@@ -378,6 +415,8 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 		}
 	}
 	comments := ctx.Comments.All()
+	text := ctx.SourceFile.Text()
+	elementEnd := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
 	for index := 0; index < len(attrs); index++ {
 		attr := attrs[index]
 		if attr.Kind == ast.KindJsxSpreadAttribute {
@@ -388,32 +427,53 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 			continue
 		}
 		r := utils.TrimNodeTextRange(ctx.SourceFile, attr)
-		item := sortableAttribute{node: attr, start: r.Pos(), end: r.End()}
+		item := sortableAttribute{node: attr, members: []*ast.Node{attr}, start: r.Pos(), end: r.End()}
+		var terminalLineComment *ast.CommentRange
 		var next *ast.Node
 		if index+1 < len(attrs) {
 			next = attrs[index+1]
 		}
 		nextIsAttribute := next != nil && next.Kind == ast.KindJsxAttribute
-		limit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
+		limit := elementEnd
 		if next != nil {
 			limit = utils.TrimNodeTextRange(ctx.SourceFile, next).Pos()
 		}
-		between := commentsInSpan(comments, r.End(), limit)
+		between := utils.CommentsInSpan(comments, r.End(), limit)
 		line := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), r.Pos())
+		absorbNext := func() {
+			nextRange := utils.TrimNodeTextRange(ctx.SourceFile, next)
+			item.end = nextRange.End()
+			item.members = append(item.members, next)
+			terminalLineComment = nil
+			afterNextLimit := elementEnd
+			if index+2 < len(attrs) {
+				afterNextLimit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+2]).Pos()
+			}
+			nextComments := utils.CommentsInSpan(comments, item.end, afterNextLimit)
+			if len(nextComments) == 1 && scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextRange.Pos()) == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextComments[0].Pos()) {
+				item.end = nextComments[0].End()
+				if nextComments[0].Kind == ast.KindSingleLineCommentTrivia {
+					terminalLineComment = nextComments[0]
+				}
+			}
+		}
 		if len(between) == 1 {
 			commentLine := scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[0].Pos())
 			if nextIsAttribute && line+1 == commentLine {
-				item.end = utils.TrimNodeTextRange(ctx.SourceFile, next).End()
+				absorbNext()
 				item.pinned = true
 				index++
 			} else if line == commentLine {
 				if between[0].Kind == ast.KindMultiLineCommentTrivia && nextIsAttribute {
-					item.end = utils.TrimNodeTextRange(ctx.SourceFile, next).End()
+					absorbNext()
 					item.pinned = true
 					index++
 				} else {
 					item.end = between[0].End()
 					item.pinned = between[0].Kind == ast.KindMultiLineCommentTrivia
+					if between[0].Kind == ast.KindSingleLineCommentTrivia {
+						terminalLineComment = between[0]
+					}
 				}
 			} else {
 				continue
@@ -422,18 +482,13 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 			if !nextIsAttribute || line+1 != scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), between[1].Pos()) {
 				continue
 			}
-			nextRange := utils.TrimNodeTextRange(ctx.SourceFile, next)
-			item.end = nextRange.End()
-			afterNextLimit := utils.TrimNodeTextRange(ctx.SourceFile, element).End()
-			if index+2 < len(attrs) {
-				afterNextLimit = utils.TrimNodeTextRange(ctx.SourceFile, attrs[index+2]).Pos()
-			}
-			nextComments := commentsInSpan(comments, item.end, afterNextLimit)
-			if len(nextComments) == 1 && scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextRange.Pos()) == scanner.ComputeLineOfPosition(ctx.SourceFile.ECMALineMap(), nextComments[0].Pos()) {
-				item.end = nextComments[0].End()
-			}
+			absorbNext()
 			item.pinned = true
 			index++
+		}
+		if terminalLineComment != nil {
+			item.trailingLineComment = true
+			item.trailingLineTerminator = ecmascript.LineTerminatorSequenceAt(text, terminalLineComment.End())
 		}
 		group = append(group, item)
 	}
@@ -441,11 +496,54 @@ func sortableGroups(ctx rule.RuleContext, element *ast.Node, attrs []*ast.Node) 
 	return groups
 }
 
-func commentsInSpan(comments []*ast.CommentRange, start, end int) []*ast.CommentRange {
-	index := sort.Search(len(comments), func(i int) bool { return comments[i].Pos() >= start })
-	var result []*ast.CommentRange
-	for ; index < len(comments) && comments[index].Pos() < end; index++ {
-		result = append(result, comments[index])
+func destinationHasLineTerminator(text string, start, end int) bool {
+	whitespaceEnd := ecmascript.SkipLeadingWhitespace(text, start, end)
+	return ecmascript.ContainsLineTerminator(text, start, whitespaceEnd)
+}
+
+func preservesDuplicateOrder(attrs []*ast.Node, original, sorted []sortableAttribute) bool {
+	originalIndex := make(map[*ast.Node]int, len(attrs))
+	for index, attr := range attrs {
+		if attr.Kind == ast.KindJsxAttribute {
+			originalIndex[attr] = index
+		}
 	}
-	return result
+
+	replacementByTarget := make(map[*ast.Node]sortableAttribute, len(original))
+	absorbedTargets := make(map[*ast.Node]bool)
+	for index, target := range original {
+		replacementByTarget[target.node] = sorted[index]
+		for _, member := range target.members[1:] {
+			absorbedTargets[member] = true
+		}
+	}
+
+	lastIndexByName := make(map[string]int)
+	seen := make(map[string]bool)
+	visit := func(member *ast.Node) bool {
+		if member.Kind == ast.KindJsxAttribute {
+			name := reactutil.GetJsxPropName(member)
+			memberIndex := originalIndex[member]
+			if seen[name] && memberIndex < lastIndexByName[name] {
+				return false
+			}
+			seen[name] = true
+			lastIndexByName[name] = memberIndex
+		}
+		return true
+	}
+	for _, attr := range attrs {
+		if replacement, ok := replacementByTarget[attr]; ok {
+			for _, member := range replacement.members {
+				if !visit(member) {
+					return false
+				}
+			}
+			continue
+		}
+		if !absorbedTargets[attr] && !visit(attr) {
+			return false
+		}
+	}
+	return true
 }
