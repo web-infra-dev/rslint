@@ -91,8 +91,9 @@ non-object expression is still reported.
 ### `exceptions`
 
 `exceptions` is an array of tag names whose HTML or custom-component setting is
-inverted. Exceptions use the complete JSX tag name, including member
-components such as `components.Group`.
+inverted. Exceptions use the JSX tag name, including two-part member components
+such as `components.Group`. This follows the upstream rule's member-expression
+handling; deeper member chains are not matched by their full authored name.
 
 ```json
 { "react/jsx-props-no-spreading": ["error", { "exceptions": ["Image", "img"] }] }

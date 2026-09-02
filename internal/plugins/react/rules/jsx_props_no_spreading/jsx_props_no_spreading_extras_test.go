@@ -34,7 +34,8 @@ func TestJsxPropsNoSpreadingExtras(t *testing.T) {
 
 		// Locks in upstream JSXMemberExpression handling for nested components.
 		{Code: `<components.Group.Inner {...props} />`, Tsx: true, Options: map[string]any{"custom": "ignore"}},
-		{Code: `<components.Group.Inner {...props} />`, Tsx: true, Options: map[string]any{"exceptions": []any{"components.Group.Inner"}}},
+		// Upstream's JSXMemberExpression helper does not preserve the full
+		// name for member chains deeper than one property.
 
 		// ---- Real-user: explicit inline object props ----
 		{Code: `<Foo {...{ prop1, prop2, prop3 }} />`, Tsx: true, Options: map[string]any{"explicitSpread": "ignore"}},
@@ -76,6 +77,7 @@ func TestJsxPropsNoSpreadingExtras(t *testing.T) {
 		{Code: `<svg:path {...props} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{noSpreadingError(1, 11, 21)}},
 		// ---- Real-user: unlisted sub-component remains enforced ----
 		{Code: `<components.DropdownIndicator {...props} />`, Tsx: true, Options: map[string]any{"exceptions": []any{"components.Group"}}, Errors: []rule_tester.InvalidTestCaseError{noSpreadingError(1, 31, 41)}},
+		{Code: `<components.Group.Inner {...props} />`, Tsx: true, Options: map[string]any{"exceptions": []any{"components.Group.Inner"}}, Errors: []rule_tester.InvalidTestCaseError{noSpreadingError(1, 25, 35)}},
 		// Locks in defaults: an explicitly empty option object is equivalent to
 		// omitting options entirely.
 		{Code: `<App {...props} />`, Tsx: true, Options: map[string]any{}, Errors: []rule_tester.InvalidTestCaseError{noSpreadingError(1, 6, 16)}},

@@ -109,7 +109,25 @@ func jsxTagName(element *ast.Node) (string, bool) {
 	case ast.KindIdentifier:
 		return tagName.AsIdentifier().Text, true
 	case ast.KindPropertyAccessExpression:
-		return reactutil.GetJsxElementTypeString(tagName), true
+		propertyAccess := tagName.AsPropertyAccessExpression()
+		property := propertyAccess.Name()
+		if property == nil || property.Kind != ast.KindIdentifier {
+			return "", false
+		}
+
+		// eslint-plugin-react v7.37.5 reads only the immediate object's
+		// `name` when handling JSXMemberExpression. This preserves that
+		// behavior for nested member tags, whose object has no `name`.
+		objectName := "undefined"
+		if object := propertyAccess.Expression; object != nil {
+			switch object.Kind {
+			case ast.KindIdentifier:
+				objectName = object.AsIdentifier().Text
+			case ast.KindThisKeyword:
+				objectName = "this"
+			}
+		}
+		return objectName + "." + property.AsIdentifier().Text, true
 	default:
 		// JSXNamespacedName and other tag forms are not JSXIdentifier or
 		// JSXMemberExpression in ESTree, so upstream leaves tagName undefined.
