@@ -2,7 +2,6 @@ package jsx_props_no_spreading
 
 import (
 	_ "embed"
-	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
@@ -39,18 +38,23 @@ var JsxPropsNoSpreadingRule = rule.Rule{
 				tagName, hasTagName := jsxTagName(parent)
 
 				if hasTagName {
-					first, _ := utf8.DecodeRuneInString(tagName)
-					firstString := string(first)
-					startsWithUpper := firstString == ecmascript.StringToUpperCase(firstString)
-					isHTMLTag := !startsWithUpper
-					isCustomTag := startsWithUpper || containsDot(tagName)
-					isException := contains(opts.exceptions, tagName)
+					codeUnits := ecmascript.StringCodeUnits(tagName)
+					if len(codeUnits) > 0 {
+						// ESLint indexes the first UTF-16 code unit, rather than the
+						// first Unicode code point. This matters for astral JSX names,
+						// whose high surrogate has no case mapping.
+						firstString := ecmascript.StringFromCodeUnits(codeUnits[:1])
+						startsWithUpper := firstString == ecmascript.StringToUpperCase(firstString)
+						isHTMLTag := !startsWithUpper
+						isCustomTag := startsWithUpper || containsDot(tagName)
+						isException := contains(opts.exceptions, tagName)
 
-					if isHTMLTag && ((opts.html == "ignore" && !isException) || (opts.html != "ignore" && isException)) {
-						return
-					}
-					if isCustomTag && ((opts.custom == "ignore" && !isException) || (opts.custom != "ignore" && isException)) {
-						return
+						if isHTMLTag && ((opts.html == "ignore" && !isException) || (opts.html != "ignore" && isException)) {
+							return
+						}
+						if isCustomTag && ((opts.custom == "ignore" && !isException) || (opts.custom != "ignore" && isException)) {
+							return
+						}
 					}
 				}
 
