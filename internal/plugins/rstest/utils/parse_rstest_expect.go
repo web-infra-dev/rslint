@@ -762,20 +762,18 @@ func classifyRstestExpectRoot(
 		return rstestExpectRoot{Kind: rstestExpectRootReceiver}
 	}
 
-	for _, module := range []string{RstestImportModule, RstestPlaywrightImportModule} {
-		name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
-			localName,
-			root,
-			symbol,
-			ctx.SourceFile,
-			module,
-		)
-		if name == "expect" {
-			return rstestExpectRoot{Kind: rstestExpectRootDirect}
-		}
-		if testFramework.IsModuleNamespaceSymbol(symbol, module) {
-			return rstestExpectRoot{Kind: rstestExpectRootReceiver}
-		}
+	name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
+		localName,
+		root,
+		symbol,
+		ctx.SourceFile,
+		RstestAllImportModules,
+	)
+	if name == "expect" {
+		return rstestExpectRoot{Kind: rstestExpectRootDirect}
+	}
+	if testFramework.IsModuleNamespaceSymbolModules(symbol, RstestAllImportModules) {
+		return rstestExpectRoot{Kind: rstestExpectRootReceiver}
 	}
 	return rstestExpectRoot{Kind: rstestExpectRootNone}
 }

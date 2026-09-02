@@ -24,4 +24,6 @@ test('creates a user', () => {});
 
 ## Autofix
 
-Changes an exact named import from `node:test` to `@rstest/core` when it imports only `test`, `it`, or `describe`.
+Changes an exact named import from `node:test` to an Rstest module when it imports only `test`, `it`, or `describe`.
+
+The test API is reachable as both `@rstest/core` and `rstack/test`, and the fix writes whichever of the two the file already uses — in another import, a `require`, or a `/// <reference types="..." />` directive — so that the rewritten import resolves in the project it was written for. A file that names both, or names neither, gets `@rstest/core`.
