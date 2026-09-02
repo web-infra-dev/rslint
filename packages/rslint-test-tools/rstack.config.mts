@@ -634,6 +634,7 @@ define.test({
     './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-import-in-mock.test.ts',
+    './tests/rstest/rules/prefer-importing-rstest-globals.test.ts',
     './tests/rstest/rules/prefer-strict-boolean-matchers.test.ts',
     './tests/rstest/rules/prefer-to-be-falsy.test.ts',
     './tests/rstest/rules/prefer-to-be-truthy.test.ts',
