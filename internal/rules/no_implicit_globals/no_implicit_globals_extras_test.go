@@ -25,32 +25,102 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 		withScriptDefaults([]rule_tester.ValidTestCase{
 			// ---- Dimension 4: receiver wrappers, opaque TS wrappers ----
 
-			// The single unwrap an AssignmentExpression's Left gets sheds an
-			// `as`/`<T>`/`!` wrapper but never a `satisfies`, so a directly
-			// wrapped target is no pattern at all (see findPureAssignmentRoot
-			// doc comment). Inside a real pattern the same wrapper is
-			// transparent — see the invalid cases.
-			{Code: `(foo satisfies any) = 1;`},
-			{Code: `(Array satisfies any) = 1;`},
-			{Code: `(foo satisfies any as any) = 1;`},
-			{Code: `((foo as any) satisfies any) = 1;`},
-
-			// An AssignmentExpression's Left is unwrapped exactly once, so a
-			// second wrapper leaves something that is no longer a pattern.
-			{Code: `(foo as any)! = 1;`},
-			{Code: `foo!! = 1;`},
-			{Code: `((foo as any) as any) = 1;`},
-			{Code: `(Array as any)! = 1;`},
-			// A wrapper around the destructuring target fails the same test:
-			// `[foo]` is no longer a destructuring pattern once an assertion
-			// wraps it.
+			// Instantiation expressions and assertions around an entire pattern
+			// are not valid TypeScript assignment targets.
+			{Code: `foo<T> = 1;`},
+			{Code: `Array<T> = 1;`},
+			{Code: `[foo<T>] = arr;`},
+			{Code: `for ((foo<T>) of arr) {}`},
 			{Code: `([foo] as any) = arr;`},
+			{Code: `([foo]!) = arr;`},
+			{Code: `({x: foo}!) = obj;`},
+			{Code: `([obj[bar = value]]!) = rhs;`},
+			{Code: `([obj[bar = value]]) = rhs;`},
+			{Code: `(({[bar = value]: foo})) = rhs;`},
+			{Code: `({[bar = value]: foo} as T) = rhs;`},
+			{Code: `([foo = (bar = value)] as T) = rhs;`},
+			{Code: `([obj[bar = value]])<T> = rhs;`},
+			{Code: `({[bar = value]: foo})<T> = rhs;`},
+			{Code: `([foo = (bar = value)])<T> = rhs;`},
+			{Code: `for (([obj[bar = value]]!) in rhs) {}`},
+			{Code: `for (({[bar = value]: foo} as T) of rhs) {}`},
 			// Parentheses around the destructuring container survive as a
 			// recovery-only invalid target; unlike parentheses around a bare
 			// identifier, they must not make the inner names writable.
 			{Code: `([foo]) = arr;`},
 			{Code: `(({foo})) = obj;`},
 			{Code: `(([foo, bar])) = arr;`},
+
+			// Only the value expression of an erased assertion can be written.
+			// Names occurring solely in its type remain type-only.
+			{Code: `[foo as T] = arr;`, Globals: map[string]any{"foo": "writable", "T": "readonly"}},
+			{Code: `[foo satisfies T] = arr;`, Globals: map[string]any{"foo": "writable", "T": "readonly"}},
+			{
+				Code:    `[foo as (x: T) => U] = arr;`,
+				Globals: map[string]any{"foo": "writable", "x": "readonly", "T": "readonly", "U": "readonly"},
+			},
+			{
+				Code:    `for ((foo as T) in obj) {}`,
+				Globals: map[string]any{"foo": "writable", "T": "readonly"},
+			},
+			{Code: `type X = { [bar = value]: T };`, Globals: map[string]any{"bar": "readonly"}},
+			{Code: `interface I { [bar = value]: T }`, Globals: map[string]any{"bar": "readonly"}},
+			{Code: `declare class C { [bar = value]: T }`, Globals: map[string]any{"bar": "readonly"}},
+			{
+				Code:    `declare function f(x = (bar = value)): void;`,
+				Globals: map[string]any{"bar": "readonly"},
+			},
+			{
+				Code:    `function f(x = (bar = value)): void; function f(): void {}`,
+				Globals: map[string]any{"f": "writable", "bar": "readonly"},
+			},
+			{
+				Code:    `abstract class C { abstract [bar = value]: T }`,
+				Globals: map[string]any{"bar": "readonly"},
+			},
+			{
+				Code:    `class C { declare [bar = value]: T }`,
+				Globals: map[string]any{"bar": "readonly"},
+			},
+			{
+				Code:    `declare class C { @dec(foo = 1) p: any }`,
+				Globals: map[string]any{"foo": "readonly"},
+			},
+			{
+				Code:    `@dec(foo = 1) declare class C {}`,
+				Globals: map[string]any{"foo": "readonly"},
+			},
+			{
+				Code:    `class C { @dec(foo = 1) m(x: string): void; m(x: any) {} }`,
+				Globals: map[string]any{"foo": "readonly"},
+			},
+			{
+				Code:    `abstract class C { @dec(foo = 1) abstract m(): void }`,
+				Globals: map[string]any{"foo": "readonly"},
+			},
+			{
+				Code:    `class C { m(@dec(foo = 1) x: string): void; m(x: any) {} }`,
+				Globals: map[string]any{"foo": "readonly"},
+			},
+			{
+				Code:    `abstract class C { @dec abstract [bar = value](): void }`,
+				Globals: map[string]any{"bar": "readonly"},
+			},
+			{
+				Code:    `abstract class C { abstract [bar = value](): void }`,
+				Globals: map[string]any{"bar": "readonly"},
+			},
+
+			// A nested assignment does not become executable merely because the
+			// parser recovered it inside an invalid pattern element.
+			{Code: `[foo += (bar = value)] = arr;`},
+			{Code: `[foo + (bar = value)] = arr;`},
+			{Code: `[call(bar = value)] = arr;`},
+			{Code: `[...(bar = value)] = rhs;`},
+			{Code: `({... (bar = value)} = rhs);`},
+			{Code: `for ([...(bar = value)] of rhs) {}`},
+			{Code: `[...foo = value] = rhs;`},
+			{Code: `target[([foo + (bar = 1)] = value)] = next;`},
 
 			// ---- Dimension 4: declaration vs expression forms ----
 
@@ -205,8 +275,16 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Code:   `((foo)) = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
-			// Non-null and type assertions are transparent too (unlike
-			// `satisfies`).
+			{
+				Code:   `[([foo]), bar] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([foo]) = (bar = 1);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			// Erased TypeScript assertions are transparent around a value target,
+			// including when they are nested.
 			{
 				Code:   `foo! = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
@@ -225,6 +303,26 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			},
 			{
 				Code:   `(Array as any) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:   `(foo satisfies any) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `(Array as any)! = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:   `((foo as any) satisfies any) = 1;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `class C extends (Array = Base) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:   `declare function fn<T>(): void; /*global foo:readonly*/ (foo = fn)<string>;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
 			},
 			// Inside a pattern, and in a for-in/for-of head, the target is
@@ -247,6 +345,14 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			},
 			{
 				Code:   `for (foo! in obj) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `for ([foo] in obj) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `for ({x: foo} in obj) {}`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 
@@ -474,20 +580,95 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 
-			// ---- Dimension 4: `satisfies` inside a real pattern ----
-			//
-			// A pattern element is visited directly, so the wrapper the
-			// AssignmentExpression unwrap would have rejected is transparent
-			// here.
+			// ---- Dimension 4: erased assertions inside a real pattern ----
+			// Assignments in a computed key or a default right-hand side are
+			// runtime expressions, not recovered target syntax.
+			{
+				Code:    `({[bar = value]: foo} = obj);`,
+				Globals: map[string]any{"foo": "writable"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:    `[foo = (bar = value)] = arr;`,
+				Globals: map[string]any{"foo": "writable"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `({x: obj[foo = 1]} = value);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([obj[bar = 1]] = value);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `({x: (baz = obj).p} = value);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([obj[foo + (bar = 1)]] = value);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([obj[key && (bar = value)]] = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([(bar = value, obj).p] = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([([bar = value]).p] = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([obj[[bar = value]]] = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `({x: ({a: bar = value}).p} = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([obj[{a: bar = value}]] = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([...obj[bar = value]] = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `([...(bar = value).p] = rhs);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `const x = [...(foo = iterable)];`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `const x = { ...(foo = value) };`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `fn(...(foo = iterable));`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `[([...(foo = iterable)]).p] = rhs;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `[({ ...(foo = value) }).p] = rhs;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `[obj[fn(...(foo = iterable))]] = rhs;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+
 			{
 				Code:   `[foo satisfies any] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak", Line: 1, Column: 1, EndLine: 1, EndColumn: 26}},
-			},
-			// An instantiation expression erases to its runtime expression, so
-			// its expression child remains a real assignment-pattern target.
-			{
-				Code:   `[foo<string>] = arr;`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 			{
 				Code:   `[[foo satisfies any]] = arr;`,
@@ -510,22 +691,21 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
 			},
 
-			// PatternVisitor traverses identifiers in TypeScript type positions
-			// when a runnable assignment target uses an assertion wrapper.
 			{
-				Code:    `[foo as T] = arr;`,
-				Globals: map[string]any{"foo": "writable", "T": "readonly"},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+				Code:   `[foo as T] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 			{
-				Code:    `[foo<T>] = arr;`,
-				Globals: map[string]any{"foo": "writable", "T": "readonly"},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+				Code:   `[foo satisfies T] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 			{
-				Code:    `[foo satisfies T] = arr;`,
-				Globals: map[string]any{"foo": "writable", "T": "readonly"},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+				Code:   `[foo as (x: T) => U] = arr;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:   `for ((foo as T) in obj) {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
 			},
 			// ---- Only a global script's own top level defines the
 			// global-scope variable ----
@@ -554,6 +734,31 @@ func TestNoImplicitGlobalsExtras(t *testing.T) {
 			{
 				Code:   `const C = @dec(foo = 1) class {};`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "globalVariableLeak"}},
+			},
+			{
+				Code:    `class C { @dec(foo = 1) declare p: any }`,
+				Globals: map[string]any{"foo": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:    `class C { @dec<T>(foo = 1) declare p: any }`,
+				Globals: map[string]any{"foo": "readonly", "T": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:    `abstract class C { @dec(foo = 1) abstract p: any }`,
+				Globals: map[string]any{"foo": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:    `abstract class C { @dec abstract [bar = value]: any }`,
+				Globals: map[string]any{"bar": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
+			},
+			{
+				Code:    `class C { @dec declare [bar = value]: any }`,
+				Globals: map[string]any{"bar": "readonly"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "assignmentToReadonlyGlobal"}},
 			},
 
 			// The outer declaration remains global at ES5; the nested declaration

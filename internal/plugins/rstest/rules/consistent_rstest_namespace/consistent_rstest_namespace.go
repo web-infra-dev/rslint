@@ -92,7 +92,7 @@ var ConsistentRstestNamespaceRule = rule.Rule{
 				declaration := node.AsImportDeclaration()
 				if declaration == nil ||
 					declaration.ModuleSpecifier == nil ||
-					declaration.ModuleSpecifier.Text() != rstestUtils.RstestImportModule {
+					!rstestUtils.IsRstestCoreImportModule(declaration.ModuleSpecifier.Text()) {
 					return
 				}
 				elements := namedImportElements(declaration)
@@ -262,12 +262,12 @@ type fileNamespaces struct {
 }
 
 func (file *fileNamespaces) resolveNamespace(identifier *ast.Node) (rstestUtils.RstestImportMode, bool) {
-	original, _, mode := testFramework.ResolveFunctionIdentifierReference(
+	original, _, mode := testFramework.ResolveFunctionIdentifierReferenceModules(
 		file.disallowed,
 		identifier,
 		file.ctx.TypeChecker,
 		file.ctx.SourceFile,
-		rstestUtils.RstestImportModule,
+		rstestUtils.RstestCoreImportModules,
 	)
 	return mode, original == file.disallowed
 }
@@ -333,7 +333,7 @@ func (file *fileNamespaces) scan() {
 		declaration := statement.AsImportDeclaration()
 		if declaration == nil ||
 			declaration.ModuleSpecifier == nil ||
-			declaration.ModuleSpecifier.Text() != rstestUtils.RstestImportModule {
+			!rstestUtils.IsRstestCoreImportModule(declaration.ModuleSpecifier.Text()) {
 			continue
 		}
 		for _, element := range namedImportElements(declaration) {
@@ -378,7 +378,7 @@ func (file *fileNamespaces) scan() {
 }
 
 // declaresPreferredName reports whether node declares the preferred spelling as
-// something the fix would collide with. An `@rstest/core` import of either
+// something the fix would collide with. An Rstest core import of either
 // spelling is excluded: it binds the very namespace the fix rewrites to, so a
 // call rewritten to reach it reaches the right object.
 func (file *fileNamespaces) declaresPreferredName(node *ast.Node) bool {
@@ -417,7 +417,7 @@ func declaresBinding(declaration *ast.Node) bool {
 }
 
 // isRstestNamespaceSpecifier reports whether an import specifier brings in one
-// of the two spellings of the Rstest namespace from `@rstest/core`.
+// of the two spellings of the Rstest namespace from an Rstest core module.
 func isRstestNamespaceSpecifier(element *ast.Node) bool {
 	specifier := element.AsImportSpecifier()
 	if specifier == nil || specifier.IsTypeOnly {
@@ -426,7 +426,7 @@ func isRstestNamespaceSpecifier(element *ast.Node) bool {
 	declaration := testFramework.FindImportDeclaration(element)
 	if declaration == nil ||
 		declaration.ModuleSpecifier == nil ||
-		declaration.ModuleSpecifier.Text() != rstestUtils.RstestImportModule {
+		!rstestUtils.IsRstestCoreImportModule(declaration.ModuleSpecifier.Text()) {
 		return false
 	}
 	imported := specifier.Name()

@@ -217,6 +217,7 @@ define.test({
     './tests/eslint-plugin-react/rules/jsx-no-useless-fragment.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-props-no-spreading.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
     './tests/eslint-plugin-react/rules/jsx-sort-props.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-bracket-location.test.ts',

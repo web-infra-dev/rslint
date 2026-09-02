@@ -83,9 +83,13 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
 		{Code: `interface I<T> { f(x: { [K in keyof T]: T[] }): void; f(x: string): void; }`},
 		// Locks in upstream type-parameter-name equality arm.
 		{Code: `function f<T>(x: T): void; function f<U>(x: U): void;`},
-		// Locks in upstream constraint-kind equality arm.
+		// Locks in upstream constraint-text equality arm.
 		{Code: `function f<T extends number>(x: T): void; function f<T extends string>(x: T): void;`},
-		// ESTree exposes a null constraint as TSNullKeyword rather than TSLiteralType.
+		// A missing constraint is distinct from a present constraint.
+		{Code: `function f<T>(x: T, y: string): void; function f<T extends number>(x: T): void;`},
+		// Constraint equality is textual after transparent outer parentheses.
+		{Code: `function f<T extends 1 | 2>(x: T, y: string): void; function f<T extends 1|2>(x: T): void;`},
+		// Distinct literal constraint texts remain separate.
 		{Code: `function f<T extends null>(x: string): void; function f<T extends 'x'>(x: number): void;`},
 		// Method-signature diagnostics are disabled on the method-key line, not its parameter line.
 		{Code: `interface I {
@@ -103,9 +107,43 @@ function p(key: string, defaultValue?: string): Promise<string | undefined> { th
   f<T>
   (x: string): void;
 }`},
+		// Generic constructors use the same function-value range as class methods.
+		{Code: `declare class C {
+  constructor<T>
+  (x: string);
+  // eslint-disable-next-line test
+  constructor<T>
+  (x: string);
+}`},
+		{Code: `declare class C {
+  constructor<T>
+  (x: string);
+  constructor<T> // eslint-disable-line test
+  (x: string);
+}`},
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
+		// JSDoc @overload signatures reach the same type-text comparison through
+		// tsgo's reparsed declarations and retain its JSDoc trivia semantics.
+		{
+			Code: `/**
+ * @overload
+ * @param {string} value
+ * @returns {void}
+ *
+ * @overload
+ * @param {number} value
+ * @returns {void}
+ */
+function f(value) {}`,
+			FileName: "file.mjs",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "singleParameterDifference",
+				Message:   "These overloads can be combined into one signature taking `string | number`.",
+			}},
+		},
 		// Upstream's anonymous default-export fallback is the raw ESTree node type,
 		// so a declaration with that exact name belongs to the same overload group.
 		{
@@ -234,6 +272,114 @@ declare function f(x: boolean): void;`,
   constructor<T>(x: number);
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "singleParameterDifference", Line: 3}},
+		},
+		// A generic constructor's function-value range starts at <T>, even when
+		// the parameter list begins on the next line.
+		{
+			Code: `declare class C {
+  constructor<T>
+  (x: string);
+  constructor<T>
+  (x: string);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      4, Column: 14, EndLine: 5, EndColumn: 15,
+			}},
+		},
+		// A quoted generic constructor-shaped member is a MethodDeclaration in
+		// tsgo and retains the upstream function-value range.
+		{
+			Code: `declare class C {
+  "constructor"<T>
+  (x: string): void;
+  "constructor"<T>
+  (x: string): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      4, Column: 16, EndLine: 5, EndColumn: 21,
+			}},
+		},
+		// Without type parameters, the quoted form is a Constructor and falls
+		// back to the parameter list's opening token.
+		{
+			Code: `declare class C {
+  "constructor"(x: string): void;
+  "constructor"(x: string): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      3, Column: 16, EndLine: 3, EndColumn: 34,
+			}},
+		},
+		// The static generic form is a Constructor in tsgo.
+		{
+			Code: `declare class C {
+  static constructor<T>
+  (x: string): void;
+  static constructor<T>
+  (x: string): void;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      4, Column: 21, EndLine: 5, EndColumn: 21,
+			}},
+		},
+		// Type-parameter trivia does not move the opening-delimiter range.
+		{
+			Code: `declare class C {
+  private constructor /* gap */ < /* inner */ T >
+  (x: string);
+  private constructor /* gap */ < /* inner */ T >
+  (x: string);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      4, Column: 33, EndLine: 5, EndColumn: 15,
+			}},
+		},
+		// Non-generic constructors continue to start at the opening parenthesis.
+		{
+			Code: `declare class C {
+  constructor
+  (x: string);
+  constructor
+  (x: string);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "allParametersAreSame",
+				Line:      5, Column: 3, EndLine: 5, EndColumn: 15,
+			}},
+		},
+		// Larger overload groups cite the line where each function value starts.
+		{
+			Code: `declare class C {
+  constructor
+  <T>
+  (x: string);
+  constructor
+  <T>
+  (x: string);
+  constructor
+  <T>
+  (x: string);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "allParametersAreSame", Message: "This overload and the one on line 3 can be combined into one signature with identical parameters.", Line: 6, Column: 3, EndLine: 7, EndColumn: 15},
+				{MessageId: "allParametersAreSame", Message: "This overload and the one on line 3 can be combined into one signature with identical parameters.", Line: 9, Column: 3, EndLine: 10, EndColumn: 15},
+				{MessageId: "allParametersAreSame", Message: "This overload and the one on line 6 can be combined into one signature with identical parameters.", Line: 9, Column: 3, EndLine: 10, EndColumn: 15},
+			},
+		},
+		// Parenthesized constraints are transparent in typescript-estree and
+		// therefore still compare equal.
+		{
+			Code: `function f<T extends (number)>(x: T, y: string): void;
+function f<T extends number>(x: T): void;`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "omittingSingleParameter",
+				Line:      1, Column: 38, EndLine: 1, EndColumn: 47,
+			}},
 		},
 		// ---- Real-user: typescript-eslint#12504 duplicate union members ----
 		{
