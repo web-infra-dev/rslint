@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -73,7 +74,9 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			if heritage := ast.GetClassExtendsHeritageElement(node); heritage != nil {
 				if extends := heritage.AsExpressionWithTypeArguments(); extends != nil &&
 					extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) > 0 {
-					validateType(node, extends.TypeArguments.Nodes[0])
+					if extends.TypeArguments.Nodes[0].Kind == ast.KindTypeReference {
+						validateType(node, extends.TypeArguments.Nodes[0])
+					}
 				}
 			}
 		},
@@ -84,7 +87,9 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			if heritage := ast.GetClassExtendsHeritageElement(node); heritage != nil {
 				if extends := heritage.AsExpressionWithTypeArguments(); extends != nil &&
 					extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) > 0 {
-					validateType(node, extends.TypeArguments.Nodes[0])
+					if extends.TypeArguments.Nodes[0].Kind == ast.KindTypeReference {
+						validateType(node, extends.TypeArguments.Nodes[0])
+					}
 				}
 			}
 		},
@@ -131,6 +136,9 @@ func checkFunction(node *ast.Node, pragma string, genericImports map[string]stri
 	// The forwardRef arm is checked before component-return heuristics in the
 	// upstream collector. Its second type argument is the props type.
 	if call := parentCall(node); call != nil && call.TypeArguments != nil && len(call.TypeArguments.Nodes) >= 2 && isForwardRefCall(call) {
+		if !isImportedForwardRef(call, genericImports) {
+			return
+		}
 		validateType(node, call.TypeArguments.Nodes[1])
 		return
 	}
@@ -187,6 +195,27 @@ func isForwardRefCall(call *ast.CallExpression) bool {
 	name := pa.Name()
 	return obj != nil && obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "React" &&
 		name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "forwardRef"
+}
+
+func isImportedForwardRef(call *ast.CallExpression, genericImports map[string]string) bool {
+	if call == nil {
+		return false
+	}
+	callee := reactutil.SkipExpressionWrappers(call.Expression)
+	if callee == nil {
+		return false
+	}
+	if callee.Kind == ast.KindPropertyAccessExpression {
+		pa := callee.AsPropertyAccessExpression()
+		obj := reactutil.SkipExpressionWrappers(pa.Expression)
+		name := pa.Name()
+		return obj != nil && obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "React" &&
+			name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "forwardRef"
+	}
+	if callee.Kind == ast.KindIdentifier {
+		return genericImports[callee.AsIdentifier().Text] == "forwardRef"
+	}
+	return false
 }
 
 func collectTopLevelTypes(source *ast.SourceFile) (map[string][]*ast.Node, map[string]string) {
@@ -330,11 +359,6 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report fun
 		if decl == nil {
 			return
 		}
-		if decl.Members != nil {
-			for _, member := range decl.Members.Nodes {
-				checkPropertySignature(member, report)
-			}
-		}
 		if decl.HeritageClauses != nil {
 			for _, clause := range decl.HeritageClauses.Nodes {
 				heritage := clause.AsHeritageClause()
@@ -353,6 +377,11 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report fun
 						validateTypeNode(target, aliases, report, seen)
 					}
 				}
+			}
+		}
+		if decl.Members != nil {
+			for _, member := range decl.Members.Nodes {
+				checkPropertySignature(member, report)
 			}
 		}
 	case ast.KindTypeReference:
@@ -409,8 +438,13 @@ func propertyName(nameNode *ast.Node) (string, bool) {
 		if expr.Kind == ast.KindIdentifier {
 			return expr.AsIdentifier().Text, true
 		}
-		if name, ok := utils.GetStaticPropertyName(expr); ok && expr.Kind != ast.KindNoSubstitutionTemplateLiteral {
-			return name, true
+		if expr.Kind == ast.KindNumericLiteral {
+			return authoredNumericLiteralText(expr), true
+		}
+		if expr.Kind != ast.KindNoSubstitutionTemplateLiteral {
+			if name, ok := utils.GetStaticPropertyName(nameNode); ok {
+				return name, true
+			}
 		}
 		return "undefined", true
 	}
@@ -421,9 +455,21 @@ func propertyName(nameNode *ast.Node) (string, bool) {
 	case ast.KindStringLiteral:
 		name = nameNode.AsStringLiteral().Text
 	case ast.KindNumericLiteral:
-		name, _ = utils.GetStaticPropertyName(nameNode)
+		return authoredNumericLiteralText(nameNode), true
 	default:
+		if name, ok := utils.GetStaticPropertyName(nameNode); ok {
+			return name, true
+		}
 		return "", false
 	}
 	return name, true
+}
+
+func authoredNumericLiteralText(node *ast.Node) string {
+	if sourceFile := ast.GetSourceFileOfNode(node); sourceFile != nil {
+		if text := scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false); text != "" {
+			return text
+		}
+	}
+	return node.AsNumericLiteral().Text
 }
