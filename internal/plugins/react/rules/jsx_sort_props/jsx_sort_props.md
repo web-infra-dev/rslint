@@ -143,10 +143,10 @@ You can instead provide a non-empty subset of the reserved prop list.
 `"auto"` (the default) uses rslint's default collation for locale-aware
 comparisons when `ignoreCase` is enabled. Provide a locale name to use
 locale-aware ordering even without `ignoreCase`. Unicode collation extensions
-used by `Intl.Collator` (`co`, `kf`, and `kn`) are recognized where the bundled
-collation data supports them. Nordic default collation for ASCII prop names
-follows the Node 24 / ICU 78 ordering used as the compatibility oracle,
-including the `aa` contraction and locale-specific case order.
+used by `Intl.Collator` (`co`, `kf`, and `kn`) are accepted; unsupported
+collations use the locale's default ordering. Nordic locales order ASCII prop
+names like Node 24, including the `aa` contraction and locale-specific case
+order.
 
 ```json
 { "react/jsx-sort-props": ["error", { "locale": "de" }] }
@@ -161,17 +161,12 @@ including the `aa` contraction and locale-specific case order.
 - With `locale: "auto"`, rslint uses a deterministic default collation instead
   of the host environment's locale. Set an explicit locale such as `"de"` when
   locale-specific ordering is required.
-- Explicit locales also use deterministic bundled collation data. ECMA-402
-  permits locale data to vary by implementation, so locales outside the
-  compatibility cases above can differ from an ESLint runtime that bundles a
-  different ICU/CLDR version.
-- Locale strings are expected to be well-formed BCP 47 tags. Invalid tags can
-  fall back deterministically instead of throwing the `RangeError` produced by
-  an ESLint JavaScript runtime.
-- Autofixes preserve the source order of duplicate props. If moving a
-  comment-bearing attribute block would reverse duplicate props and change
-  JSX's last-value-wins result, rslint reports the ordering error without
-  offering that unsafe fix.
+- With an explicit `locale`, rslint can order some Unicode or mixed-case prop
+  names differently from ESLint.
+- With a malformed `locale`, rslint continues linting with its default order;
+  ESLint stops with a `RangeError`.
+- If sorting a comment-attached block would reverse duplicate props, rslint
+  reports the order without a fix; ESLint can change which prop value wins.
 - rslint accepts only strings in a `reservedFirst` array. ESLint accepts other
   values and reports them as invalid rule options during linting; rslint rejects
   those configurations during schema validation.
