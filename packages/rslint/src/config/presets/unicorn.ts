@@ -152,7 +152,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-typeof-undefined': 'error', // not implemented
     // 'unicorn/no-uncalled-method': 'error', // not implemented
     // 'unicorn/no-undeclared-class-members': 'error', // not implemented
-    // 'unicorn/no-unnecessary-array-flat-depth': 'error', // not implemented
+    'unicorn/no-unnecessary-array-flat-depth': 'error',
     // 'unicorn/no-unnecessary-array-flat-map': 'error', // not implemented
     // 'unicorn/no-unnecessary-array-splice-count': 'error', // not implemented
     // 'unicorn/no-unnecessary-await': 'error', // not implemented
