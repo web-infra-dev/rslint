@@ -188,6 +188,7 @@ define.test({
     './tests/eslint-plugin-react/rules/forbid-elements.test.ts',
     './tests/eslint-plugin-react/rules/forbid-foreign-prop-types.test.ts',
     './tests/eslint-plugin-react/rules/forbid-prop-types.test.ts',
+    './tests/eslint-plugin-react/rules/prop-types.test.ts',
     './tests/eslint-plugin-react/rules/forward-ref-uses-ref.test.ts',
     './tests/eslint-plugin-react/rules/jsx-child-element-spacing.test.ts',
     './tests/eslint-plugin-react/rules/self-closing-comp.test.ts',
