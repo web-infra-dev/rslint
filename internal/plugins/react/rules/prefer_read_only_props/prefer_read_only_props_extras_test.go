@@ -136,12 +136,9 @@ function Hello(props: Props) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
 		{
-			Code: `type Props = { ['name']: string; [name]: number; [1]: boolean; [+1]: unknown }; function Hello(props: Props) { return <div/>; }`,
-			Tsx:  true,
-			Output: []string{
-				`type Props = { ['name']: string; readonly [name]: number; readonly [1]: boolean; readonly [+1]: unknown }; function Hello(props: Props) { return <div/>; }`,
-				`type Props = { readonly ['name']: string; readonly [name]: number; readonly [1]: boolean; readonly [+1]: unknown }; function Hello(props: Props) { return <div/>; }`,
-			},
+			Code:   `type Props = { ['name']: string; [name]: number; [1]: boolean; [+1]: unknown }; function Hello(props: Props) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`type Props = { ['name']: string; readonly [name]: number; readonly [1]: boolean; readonly [+1]: unknown }; function Hello(props: Props) { return <div/>; }`},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."},
 				{MessageId: "readOnlyProp", Message: "Prop '1' should be read-only."},
@@ -206,12 +203,9 @@ function Hello(props: Props) {
 			},
 		},
 		{
-			Code: `type Props = { name: string } & { name: number }; function Hello(props: Props) { return <div/>; }`,
-			Tsx:  true,
-			Output: []string{
-				`type Props = { name: string } & { readonly name: number }; function Hello(props: Props) { return <div/>; }`,
-				`type Props = { readonly name: string } & { readonly name: number }; function Hello(props: Props) { return <div/>; }`,
-			},
+			Code:   `type Props = { name: string } & { name: number }; function Hello(props: Props) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`type Props = { name: string } & { readonly name: number }; function Hello(props: Props) { return <div/>; }`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
 	})

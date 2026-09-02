@@ -2,6 +2,7 @@ package prefer_read_only_props
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -29,27 +30,34 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		name  string
 	}
 	type pendingReport struct {
-		node *ast.Node
-		name string
+		node     *ast.Node
+		name     string
+		readonly bool
 	}
 	pending := make(map[reportKey]int)
 	reports := make([]pendingReport, 0)
 
-	report := func(owner, node *ast.Node, name string) {
+	report := func(owner, node *ast.Node, name string, readonly bool) {
 		if owner == nil || node == nil {
 			return
 		}
 		key := reportKey{owner: owner, name: name}
 		if index, ok := pending[key]; ok {
-			reports[index] = pendingReport{node: node, name: name}
+			reports[index] = pendingReport{node: node, name: name, readonly: readonly}
 			return
 		}
 		pending[key] = len(reports)
-		reports = append(reports, pendingReport{node: node, name: name})
+		reports = append(reports, pendingReport{node: node, name: name, readonly: readonly})
 	}
 
 	flushReports := func() {
+		sort.SliceStable(reports, func(i, j int) bool {
+			return reports[i].node.Pos() < reports[j].node.Pos()
+		})
 		for _, item := range reports {
+			if item.readonly {
+				continue
+			}
 			node, name := item.node, item.name
 			ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{
 				Id:          "readOnlyProp",
@@ -62,8 +70,8 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	}
 
 	validateType := func(owner, node *ast.Node) {
-		validateTypeNode(node, typeAliases, genericImports, func(node *ast.Node, name string) {
-			report(owner, node, name)
+		validateTypeNode(node, typeAliases, genericImports, func(node *ast.Node, name string, readonly bool) {
+			report(owner, node, name, readonly)
 		}, map[*ast.Node]bool{})
 	}
 
@@ -342,7 +350,7 @@ func isGenericTypeName(name string) bool {
 	}
 }
 
-func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImports map[string]string, report func(*ast.Node, string), seen map[*ast.Node]bool) {
+func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImports map[string]string, report func(*ast.Node, string, bool), seen map[*ast.Node]bool) {
 	if node == nil || seen[node] {
 		return
 	}
@@ -415,8 +423,8 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImp
 	}
 }
 
-func checkPropertySignature(node *ast.Node, report func(*ast.Node, string)) {
-	if node == nil || node.Kind != ast.KindPropertySignature || ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly) {
+func checkPropertySignature(node *ast.Node, report func(*ast.Node, string, bool)) {
+	if node == nil || node.Kind != ast.KindPropertySignature {
 		return
 	}
 	property := node.AsPropertySignatureDeclaration()
@@ -428,7 +436,7 @@ func checkPropertySignature(node *ast.Node, report func(*ast.Node, string)) {
 	if !ok {
 		return
 	}
-	report(node, name)
+	report(node, name, ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly))
 }
 
 func propertyName(nameNode *ast.Node) (string, bool) {
