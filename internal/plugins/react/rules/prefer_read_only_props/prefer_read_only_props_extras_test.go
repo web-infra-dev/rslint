@@ -58,6 +58,9 @@ func TestPreferReadOnlyPropsExtras(t *testing.T) {
 		{Code: `namespace ItemsListElementSkeleton { export interface Props { name?: string } } type Props = { top: string }; function ItemsListElementSkeleton({name}: ItemsListElementSkeleton.Props) { return <div>{name}</div>; }`, Tsx: true},
 		// ---- Real-user: #3650 implicit React reference ----
 		{Code: `interface ChipProps { chipColor: string; label: string } const Chip: React.FC<ChipProps> = ({chipColor, label}) => <div>{chipColor}{label}</div>;`, Tsx: true},
+		// Bare wrapper names are not React components unless imported from React.
+		{Code: `type Props = { name: string }; const Hello = memo((props: Props) => <div/>);`, Tsx: true},
+		{Code: `type Props = { name: string }; const Hello = forwardRef((props: Props) => <div/>);`, Tsx: true},
 
 		// N/A: receiver/member access and element access — the rule inspects type
 		// declarations, not JavaScript expressions.
@@ -92,6 +95,31 @@ function Hello(props: Props) {
 			Tsx:    true,
 			Output: []string{`import { FC } from "react"; type Props = { readonly name: string }; const Hello: FC<Props> = (props) => <div/>;`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `import { FC } from "react"; function Hello(props: FC<{ name: string }>) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`import { FC } from "react"; function Hello(props: FC<{ readonly name: string }>) { return <div/>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `import { PropsWithChildren } from "react"; function Hello(props: PropsWithChildren<{ name: string }>) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`import { PropsWithChildren } from "react"; function Hello(props: PropsWithChildren<{ readonly name: string }>) { return <div/>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `import { ComponentPropsWithRef } from "react"; class Hello extends React.Component<ComponentPropsWithRef<{ name: string }>> { render() { return <div/>; } }`,
+			Tsx:    true,
+			Output: []string{`import { ComponentPropsWithRef } from "react"; class Hello extends React.Component<ComponentPropsWithRef<{ readonly name: string }>> { render() { return <div/>; } }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:     `type Props = { name: string }; const Hello = customMemo((props: Props) => <div/>);`,
+			Settings: map[string]interface{}{"componentWrapperFunctions": []interface{}{"customMemo"}},
+			Tsx:      true,
+			Output:   []string{`type Props = { readonly name: string }; const Hello = customMemo((props: Props) => <div/>);`},
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
 		// ---- Real-user: #3653 async server component ----
 		{

@@ -23,6 +23,7 @@ var PreferReadOnlyPropsRule = rule.Rule{
 func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	pragma := reactutil.GetReactPragma(ctx.Settings)
 	typeAliases, genericImports := collectTopLevelTypes(ctx.SourceFile)
+	wrapperFunctions := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
 	type reportKey struct {
 		owner *ast.Node
 		name  string
@@ -61,7 +62,7 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	}
 
 	validateType := func(owner, node *ast.Node) {
-		validateTypeNode(node, typeAliases, func(node *ast.Node, name string) {
+		validateTypeNode(node, typeAliases, genericImports, func(node *ast.Node, name string) {
 			report(owner, node, name)
 		}, map[*ast.Node]bool{})
 	}
@@ -109,22 +110,22 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			validateType(classNode, pd.Type)
 		},
 		ast.KindFunctionDeclaration: func(node *ast.Node) {
-			checkFunction(node, pragma, genericImports, validateType)
+			checkFunction(node, pragma, genericImports, wrapperFunctions, validateType)
 		},
 		ast.KindFunctionExpression: func(node *ast.Node) {
-			checkFunction(node, pragma, genericImports, validateType)
+			checkFunction(node, pragma, genericImports, wrapperFunctions, validateType)
 		},
 		ast.KindArrowFunction: func(node *ast.Node) {
-			checkFunction(node, pragma, genericImports, validateType)
+			checkFunction(node, pragma, genericImports, wrapperFunctions, validateType)
 		},
 		ast.KindMethodDeclaration: func(node *ast.Node) {
-			checkFunction(node, pragma, genericImports, validateType)
+			checkFunction(node, pragma, genericImports, wrapperFunctions, validateType)
 		},
 		ast.KindGetAccessor: func(node *ast.Node) {
-			checkFunction(node, pragma, genericImports, validateType)
+			checkFunction(node, pragma, genericImports, wrapperFunctions, validateType)
 		},
 		ast.KindSetAccessor: func(node *ast.Node) {
-			checkFunction(node, pragma, genericImports, validateType)
+			checkFunction(node, pragma, genericImports, wrapperFunctions, validateType)
 		},
 		ast.KindEndOfFile: func(_ *ast.Node) {
 			flushReports()
@@ -132,7 +133,7 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	}
 }
 
-func checkFunction(node *ast.Node, pragma string, genericImports map[string]string, validateType func(*ast.Node, *ast.Node)) {
+func checkFunction(node *ast.Node, pragma string, genericImports map[string]string, wrappers []reactutil.ComponentWrapperEntry, validateType func(*ast.Node, *ast.Node)) {
 	// The forwardRef arm is checked before component-return heuristics in the
 	// upstream collector. Its second type argument is the props type.
 	if call := parentCall(node); call != nil && call.TypeArguments != nil && len(call.TypeArguments.Nodes) >= 2 && isForwardRefCall(call) {
@@ -143,7 +144,7 @@ func checkFunction(node *ast.Node, pragma string, genericImports map[string]stri
 		return
 	}
 
-	if !reactutil.IsStatelessReactComponent(node, pragma) {
+	if !reactutil.IsStatelessReactComponentWithWrappers(node, pragma, nil, wrappers) {
 		return
 	}
 	params := reactutil.FunctionParameters(node)
@@ -341,7 +342,7 @@ func isGenericTypeName(name string) bool {
 	}
 }
 
-func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report func(*ast.Node, string), seen map[*ast.Node]bool) {
+func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImports map[string]string, report func(*ast.Node, string), seen map[*ast.Node]bool) {
 	if node == nil || seen[node] {
 		return
 	}
@@ -374,7 +375,7 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report fun
 						continue
 					}
 					for _, target := range aliases[extends.Expression.AsIdentifier().Text] {
-						validateTypeNode(target, aliases, report, seen)
+						validateTypeNode(target, aliases, genericImports, report, seen)
 					}
 				}
 			}
@@ -389,22 +390,26 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, report fun
 		if ref == nil {
 			return
 		}
+		if propsType := reactGenericPropsType(node, genericImports); propsType != nil {
+			validateTypeNode(propsType, aliases, genericImports, report, seen)
+			return
+		}
 		if ref.TypeName == nil || ref.TypeName.Kind != ast.KindIdentifier {
 			return
 		}
 		for _, target := range aliases[ref.TypeName.AsIdentifier().Text] {
-			validateTypeNode(target, aliases, report, seen)
+			validateTypeNode(target, aliases, genericImports, report, seen)
 		}
 	case ast.KindParenthesizedType:
 		parenthesized := node.AsParenthesizedTypeNode()
 		if parenthesized != nil {
-			validateTypeNode(parenthesized.Type, aliases, report, seen)
+			validateTypeNode(parenthesized.Type, aliases, genericImports, report, seen)
 		}
 	case ast.KindIntersectionType:
 		intersection := node.AsIntersectionTypeNode()
 		if intersection != nil && intersection.Types != nil {
 			for _, item := range intersection.Types.Nodes {
-				validateTypeNode(item, aliases, report, seen)
+				validateTypeNode(item, aliases, genericImports, report, seen)
 			}
 		}
 	}
