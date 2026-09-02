@@ -75,7 +75,7 @@ var SortPropTypesRule = rule.Rule{
 			ctx.ReportNode(node, rule.RuleMessage{Id: id, Description: description})
 		}
 
-		checkSorted := func(declarations []*ast.Node) {
+		checkSorted := func(declarations []*ast.Node, typeMembers bool) {
 			callbackPropsLastSeen := map[*ast.Node]bool{}
 			requiredPropsFirstSeen := map[*ast.Node]bool{}
 			propsNotSortedSeen := map[*ast.Node]bool{}
@@ -89,7 +89,7 @@ var SortPropTypesRule = rule.Rule{
 					previous = nil
 					continue
 				}
-				name, ok := declarationName(ctx.SourceFile, current)
+				name, ok := declarationName(ctx.SourceFile, current, typeMembers)
 				if !ok {
 					// An unnamed declaration breaks the comparison chain. Keep it
 					// as the previous node so the next keyed declaration is not
@@ -101,7 +101,7 @@ var SortPropTypesRule = rule.Rule{
 					previous = current
 					continue
 				}
-				previousName, previousOK := declarationName(ctx.SourceFile, previous)
+				previousName, previousOK := declarationName(ctx.SourceFile, previous, typeMembers)
 				if !previousOK {
 					previous = current
 					continue
@@ -164,12 +164,12 @@ var SortPropTypesRule = rule.Rule{
 			}
 			switch value.Kind {
 			case ast.KindObjectLiteralExpression:
-				checkSorted(value.AsObjectLiteralExpression().Properties.Nodes)
+				checkSorted(value.AsObjectLiteralExpression().Properties.Nodes, false)
 			case ast.KindIdentifier:
 				// The upstream rule resolves an identifier initialized with an
 				// object. The binder lookup avoids a whole-file text scan here.
 				if decl := declarationObject(ctx.SourceFile, ctx.Refs.Resolve(value)); decl != nil {
-					checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes)
+					checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes, false)
 				}
 			case ast.KindCallExpression:
 				if !isPropWrapperCallByCalleeName(value, wrappers) {
@@ -194,7 +194,7 @@ var SortPropTypesRule = rule.Rule{
 						// resolution belongs to assignment and class-property declarations.
 						value := ast.SkipParentheses(assignment.Initializer)
 						if value != nil && value.Kind == ast.KindObjectLiteralExpression {
-							checkSorted(value.AsObjectLiteralExpression().Properties.Nodes)
+							checkSorted(value.AsObjectLiteralExpression().Properties.Nodes, false)
 						}
 					}
 				}
@@ -249,10 +249,10 @@ var SortPropTypesRule = rule.Rule{
 				firstArg := ast.SkipParentheses(call.Arguments.Nodes[0])
 				switch firstArg.Kind {
 				case ast.KindObjectLiteralExpression:
-					checkSorted(firstArg.AsObjectLiteralExpression().Properties.Nodes)
+					checkSorted(firstArg.AsObjectLiteralExpression().Properties.Nodes, false)
 				case ast.KindIdentifier:
 					if decl := declarationObject(ctx.SourceFile, ctx.Refs.Resolve(firstArg)); decl != nil {
-						checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes)
+						checkSorted(decl.AsObjectLiteralExpression().Properties.Nodes, false)
 					}
 				}
 			}
@@ -283,8 +283,15 @@ var SortPropTypesRule = rule.Rule{
 	},
 }
 
-func declarationName(sourceFile *ast.SourceFile, node *ast.Node) (propName, bool) {
+func declarationName(sourceFile *ast.SourceFile, node *ast.Node, typeMembers bool) (propName, bool) {
 	if node == nil || node.Name() == nil {
+		if typeMembers && sourceFile != nil {
+			// typescript-eslint's getKey() falls back to getText(undefined) for
+			// nameless type members, which is the complete source text. Keep that
+			// observable value so call/index/construct signatures remain part of
+			// the same reducer chain.
+			return propName{text: sourceFile.Text(), kind: propNameString}, true
+		}
 		return propName{}, false
 	}
 	return propNameFromNode(sourceFile, node.Name()), true
@@ -515,19 +522,19 @@ func isPropWrapperCallByCalleeName(call *ast.Node, wrappers []reactutil.PropWrap
 	return false
 }
 
-func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func([]*ast.Node)) {
+func checkTypeNode(typeNode *ast.Node, aliases map[string]*ast.Node, check func([]*ast.Node, bool)) {
 	typeNode = unwrapParenthesizedType(typeNode)
 	if typeNode == nil {
 		return
 	}
 	switch typeNode.Kind {
 	case ast.KindTypeLiteral:
-		check(typeNode.AsTypeLiteralNode().Members.Nodes)
+		check(typeNode.AsTypeLiteralNode().Members.Nodes, true)
 	case ast.KindTypeReference:
 		name := typeNode.AsTypeReferenceNode().TypeName
 		if name != nil && name.Kind == ast.KindIdentifier {
 			if alias := aliases[name.AsIdentifier().Text]; alias != nil && alias.Kind == ast.KindTypeLiteral {
-				check(alias.AsTypeLiteralNode().Members.Nodes)
+				check(alias.AsTypeLiteralNode().Members.Nodes, true)
 			}
 		}
 	}

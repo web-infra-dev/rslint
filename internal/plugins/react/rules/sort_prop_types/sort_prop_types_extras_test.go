@@ -39,8 +39,6 @@ func TestSortPropTypesExtras(t *testing.T) {
 		// ---- Dimension 4: TS expression wrappers on the propTypes object ----
 		{Code: `Component.propTypes = ({ a: PropTypes.string, z: PropTypes.string } as any);`, Tsx: true},
 		// N/A: private keys and element access do not participate in upstream's static key sort.
-		// An unnamed TypeScript member breaks the comparison chain.
-		{Code: `type Props = { z: string; (): void; a: string }; function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true},
 		// A wrapper configured as Object.assign matches the bare callee name,
 		// but not the member expression itself, as in the upstream rule.
 		{Code: `Component.propTypes = Object.assign({ z: PropTypes.string, a: PropTypes.string });`, Settings: map[string]interface{}{"propWrapperFunctions": []any{map[string]interface{}{"object": "Object", "property": "assign"}}}, Tsx: true},
@@ -131,6 +129,11 @@ func TestSortPropTypesExtras(t *testing.T) {
 		// Optional receivers expose shape, including computed identifiers.
 		{Code: `PropTypes?.shape({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
 		{Code: `PropTypes?.[shape]({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}}},
+		// Nameless TypeScript signatures use the upstream source-text key fallback.
+		{Code: `type Props = { z: string; (): void; a: string }; function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}, {MessageId: "propsNotSorted"}}},
+		{Code: `type Props = { z: string; [key: string]: string; a: string }; function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}, {MessageId: "propsNotSorted"}}},
+		{Code: `type Props = { z: string; new (): object; a: string }; function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "propsNotSorted"}, {MessageId: "propsNotSorted"}}},
+		{Code: `type Props = { onChange: () => void; (): void; name: string }; function Component(props: Props) {}`, Options: map[string]any{"checkTypes": true, "callbacksLast": true}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "callbackPropsLast"}}},
 	})
 }
 
