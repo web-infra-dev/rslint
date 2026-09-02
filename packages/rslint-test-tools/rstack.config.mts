@@ -215,6 +215,7 @@ define.test({
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-sort-props.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-bracket-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-curly-brace-presence.test.ts',
@@ -605,7 +606,9 @@ define.test({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // rstest
+    './tests/rstest/rules/consistent-each-for.test.ts',
     './tests/rstest/rules/consistent-rstest-namespace.test.ts',
+    './tests/rstest/rules/consistent-test-filename.test.ts',
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
@@ -629,6 +632,9 @@ define.test({
     './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-import-in-mock.test.ts',
+    './tests/rstest/rules/prefer-strict-boolean-matchers.test.ts',
+    './tests/rstest/rules/prefer-to-be-falsy.test.ts',
+    './tests/rstest/rules/prefer-to-be-truthy.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
     './tests/rstest/rules/require-awaited-expect-poll.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
@@ -658,6 +664,7 @@ define.test({
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
+    './tests/eslint-plugin-unicorn/rules/consistent-tuple-labels.test.ts',
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
@@ -681,6 +688,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-blob-reading-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
