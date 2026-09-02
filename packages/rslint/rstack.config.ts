@@ -1,5 +1,10 @@
 import { define } from 'rstack';
 import type { Rspack } from 'rstack/lib';
+import {
+  bundleGlobalsTypesPlugin,
+  emitGlobalsAssetsPlugin,
+} from './plugins/globals.ts';
+import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-types.ts';
 
 /**
  * Single rslib build for all of `@rslint/core`'s JS: the public library surface
@@ -37,12 +42,7 @@ import type { Rspack } from 'rstack/lib';
  *    `@rslint/native-<tuple>` package at runtime via `createRequire`, which
  *    rspack can't statically follow (so the binary is never inlined — intended).
  */
-define.lib(async () => {
-  const { bundleGlobalsTypesPlugin, emitGlobalsAssetsPlugin } =
-    await import('./plugins/globals.ts');
-  const { generateRuleOptionTypesPlugin } =
-    await import('./plugins/generate-rule-option-types.ts');
-
+define.lib(() => {
   const librarySurface = {
     format: 'esm' as const,
     bundle: true,
