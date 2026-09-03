@@ -1,0 +1,47 @@
+// TestSortCompExtras covers tsgo edge shapes, real-user examples, and
+// branch lock-ins that are not part of the upstream migration sibling.
+package sort_comp
+
+import (
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestSortCompExtras(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &SortCompRule, []rule_tester.ValidTestCase{
+		// ---- Dimension 4: non-Identifier keys do not match named groups. ----
+		{Code: `class Foo extends React.Component { "render"() {} ["displayName"] = 1; }`, Tsx: true},
+		{Code: "class Foo extends React.Component { [`render`]() {} render() {} }", Tsx: true},
+		// ---- Dimension 4: nested non-React classes are independent. ----
+		{Code: `class Outer extends React.Component { onClick() {} render() { class Helper { render() {} foo() {} } return null; } }`, Tsx: true},
+		// ---- Dimension 4: empty containers and spread members are safe. ----
+		{Code: `class Foo extends React.Component {}`, Tsx: true},
+		{Code: `var Foo = createReactClass({ ...defaults, render() {} });`, Tsx: true},
+		// ---- Dimension 4: wrappers around the createReactClass object. ----
+		{Code: `var Foo = createReactClass(({ onClick() {}, render() {} }));`, Tsx: true},
+		{Code: `class Foo extends React.Component { static #private = 1; render() {} }`, Tsx: true},
+		// ---- Real-user: issue #2000 has an async arrow field referring to a prior field. ----
+		{Code: `class Test extends React.PureComponent { fetch = async () => {}; lazyFetch = _.debounce(this.fetch, 1000); }`, Tsx: true},
+		// ---- Branch lock-in: a named method can also match a custom regex group. ----
+		{Code: `class Foo extends React.Component { render() {} onClick() {} }`, Tsx: true, Options: sortCompOrder("/on.*/", "render", "/.*Click/")},
+		// ---- Branch lock-in: an unknown group without everything-else is Infinity. ----
+		{Code: `class Foo extends React.Component { render() {} other() {} }`, Tsx: true, Options: sortCompOrder("render")},
+	}, []rule_tester.InvalidTestCase{
+		// ---- Dimension 1/4: optional / computed names remain unmatched. ----
+		{Code: `class Foo extends React.Component { render() {} displayName() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "displayName")}},
+		// ---- Dimension 4: class expression is checked independently. ----
+		{Code: `const Foo = class extends React.Component { render() {} componentDidMount() {} };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		// ---- Branch lock-in: custom group can be overridden while lifecycle remains. ----
+		{Code: `class Foo extends React.Component { render() {} componentDidMount() {} }`, Tsx: true, Options: map[string]any{"order": []any{"lifecycle", "custom", "render"}, "groups": map[string]any{"custom": []any{"componentDidMount"}}}, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		// ---- Real-user: fields with an explicit custom order are still classified. ----
+		{Code: `class App extends React.Component { render() {} handler = () => {}; }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "handler")}},
+		// ---- Real-user: issue #1814 demonstrates the interaction between
+		// lifecycle fields and ordinary fields under the default order. ----
+		{Code: `class App extends React.PureComponent { something = { whatever: true }; state = { count: 0 }; constructor() { super(); } componentDidMount() {} render() {} onWsMessage() {} onWsError() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
+			sortCompError("something", "after", "componentDidMount"),
+			sortCompError("state", "after", "constructor"),
+		}},
+	})
+}
