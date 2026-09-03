@@ -346,6 +346,14 @@ func assignmentMember(node *ast.Node) (*ast.Node, *ast.Node, bool) {
 	if name == "" {
 		return nil, nil, false
 	}
+	// eslint-plugin-react's getRelatedComponent builds the component path from
+	// the complete MemberExpression. A computed string property is omitted
+	// from that path, so a nested form such as `Box.C["displayName"]` does not
+	// resolve as a related component there. Keep the direct `C["displayName"]`
+	// form below, which upstream does recognize.
+	if node.Kind == ast.KindElementAccessExpression && isNestedComputedDisplayName(nameNode, receiver) {
+		return nil, nil, false
+	}
 	current := node
 	parent := current.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
@@ -359,6 +367,14 @@ func assignmentMember(node *ast.Node) (*ast.Node, *ast.Node, bool) {
 		return nil, nil, false
 	}
 	return node, receiver, true
+}
+
+func isNestedComputedDisplayName(nameNode, receiver *ast.Node) bool {
+	nameNode = ast.SkipParentheses(nameNode)
+	receiver = ast.SkipParentheses(receiver)
+	return nameNode != nil && nameNode.Kind == ast.KindStringLiteral &&
+		nameNode.AsStringLiteral().Text == "displayName" &&
+		receiver != nil && receiver.Kind == ast.KindPropertyAccessExpression
 }
 
 var StaticPropertyPlacementRule = rule.Rule{
