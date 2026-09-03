@@ -54,11 +54,6 @@ The rule is automatically fixable by the `--fix` CLI option.
 If you do not want to enforce prototype placement for React lifecycle methods,
 you can disable this rule.
 
-## Original Documentation
-
-- [eslint-plugin-react: no-arrow-function-lifecycle](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-arrow-function-lifecycle.md)
-- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-arrow-function-lifecycle.js)
-
 ## Differences from ESLint
 
 The autofix preserves valid syntax in two cases where
@@ -68,3 +63,8 @@ eslint-plugin-react v7.37.5 produces malformed text:
   parameter syntax in the fix, while ESLint emits empty entries such as `render(, )`.
 - For computed keys such as `[render]`, rslint preserves the brackets in the
   fix, while ESLint removes them and emits malformed code such as `[render() ...`.
+
+## Original Documentation
+
+- [eslint-plugin-react: no-arrow-function-lifecycle](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-arrow-function-lifecycle.md)
+- [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-arrow-function-lifecycle.js)
