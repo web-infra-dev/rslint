@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -68,6 +69,7 @@ func stringSlice(values []any) []string {
 type memberInfo struct {
 	node             *ast.Node
 	name             string
+	displayName      string
 	getter           bool
 	setter           bool
 	staticVariable   bool
@@ -105,7 +107,7 @@ func getMembers(node *ast.Node) []*ast.Node {
 	}
 	switch node.Kind {
 	case ast.KindClassDeclaration, ast.KindClassExpression:
-		return node.Members()
+		return utils.ESTreeMembers(node.Members())
 	case ast.KindObjectLiteralExpression:
 		object := node.AsObjectLiteralExpression()
 		if object == nil || object.Properties == nil {
@@ -117,15 +119,41 @@ func getMembers(node *ast.Node) []*ast.Node {
 	}
 }
 
+func getMemberNames(member *ast.Node) (string, string) {
+	if member == nil {
+		return "", ""
+	}
+	if member.Kind == ast.KindConstructor {
+		return "constructor", "constructor"
+	}
+	name := member.Name()
+	if name == nil {
+		return "", ""
+	}
+	if name.Kind == ast.KindComputedPropertyName {
+		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
+	}
+	if name == nil {
+		return "", "undefined"
+	}
+	switch name.Kind {
+	case ast.KindIdentifier, ast.KindPrivateIdentifier:
+		value := reactutil.IdentifierOrPrivateName(name)
+		return value, value
+	default:
+		// ESTree's property-name lookup has no name for literal and
+		// computed expression keys; JavaScript interpolation renders it
+		// as "undefined".
+		return "", "undefined"
+	}
+}
+
 func getMemberInfo(member *ast.Node) memberInfo {
 	info := memberInfo{node: member}
 	if member == nil {
 		return info
 	}
-	info.name = reactutil.IdentifierOrPrivateName(member.Name())
-	if member.Kind == ast.KindConstructor {
-		info.name = "constructor"
-	}
+	info.name, info.displayName = getMemberNames(member)
 	info.getter = member.Kind == ast.KindGetAccessor
 	info.setter = member.Kind == ast.KindSetAccessor
 	value := memberValue(member)
@@ -184,11 +212,11 @@ func parsePattern(text string) pattern {
 		return pattern{text: text}
 	}
 	flags := text[last+1:]
-	for _, flag := range flags {
-		if !strings.ContainsRune("gimsuy", flag) {
-			return pattern{text: text}
-		}
+	flagEnd := 0
+	for flagEnd < len(flags) && strings.ContainsRune("gimsuy", rune(flags[flagEnd])) {
+		flagEnd++
 	}
+	flags = flags[:flagEnd]
 	re, err := esregexp.Compile(text[first+1:last], flags)
 	if err != nil {
 		return pattern{text: text}
@@ -300,7 +328,7 @@ func propertyName(info memberInfo) string {
 	if info.setter {
 		return "setter functions"
 	}
-	return info.name
+	return info.displayName
 }
 
 func isES5ComponentObject(node *ast.Node, pragma, createClass string) bool {

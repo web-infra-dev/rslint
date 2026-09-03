@@ -43,5 +43,13 @@ func TestSortCompExtras(t *testing.T) {
 			sortCompError("something", "after", "componentDidMount"),
 			sortCompError("state", "after", "constructor"),
 		}},
+		// ---- Compatibility: computed identifiers are named keys in ESTree. ----
+		{Code: `class Foo extends React.Component { render() {} [displayName]() {} }`, Tsx: true, Options: sortCompOrder("displayName", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "displayName")}},
+		// ---- Compatibility: ESTree omits empty class elements. ----
+		{Code: `class Foo extends React.Component { render() {} ; componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		// ---- Compatibility: literal keys preserve JavaScript's undefined text. ----
+		{Code: `class Foo extends React.Component { render() {} "displayName"() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "undefined")}},
+		// ---- Compatibility: upstream accepts a regex prefix before trailing text. ----
+		{Code: `class Foo extends React.Component { render() {} onClick() {} }`, Tsx: true, Options: sortCompOrder("/on.*/,", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "onClick")}},
 	})
 }
