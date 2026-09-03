@@ -181,8 +181,12 @@ func getMemberInfo(member *ast.Node) memberInfo {
 	}
 	info.name, info.displayName = getMemberNames(member)
 	plainClassMember := utils.IsPlainClassMember(member)
-	info.getter = plainClassMember && member.Kind == ast.KindGetAccessor
-	info.setter = plainClassMember && member.Kind == ast.KindSetAccessor
+	// Upstream exposes abstract accessors as TSAbstractMethodDefinition nodes,
+	// but they still retain the getter/setter kind. Keep these categories
+	// independent from the plain-member check below, which only controls the
+	// static/instance variable and method groups.
+	info.getter = member.Kind == ast.KindGetAccessor
+	info.setter = member.Kind == ast.KindSetAccessor
 	value := memberValue(member)
 	propertyDeclaration := member.Kind == ast.KindPropertyDeclaration
 	// tsgo represents abstract properties and auto-accessors as

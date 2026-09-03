@@ -27,8 +27,6 @@ func TestSortCompExtras(t *testing.T) {
 		// ---- Compatibility: non-plain class members are not variable/method groups. ----
 		{Code: `abstract class Foo extends React.Component { render() {} abstract props: string; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
 		{Code: `abstract class Foo extends React.Component { render() {} static abstract method(): void; }`, Tsx: true, Options: sortCompOrder("static-methods", "render")},
-		{Code: `abstract class Foo extends React.Component { render() {} abstract static get value(): string; }`, Tsx: true, Options: sortCompOrder("getters", "render")},
-		{Code: `abstract class Foo extends React.Component { render() {} abstract static set value(next: string); }`, Tsx: true, Options: sortCompOrder("setters", "render")},
 		{Code: `class Foo extends React.Component { render() {} accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
 		{Code: `class Foo extends React.Component { render() {} accessor foo = () => {}; }`, Tsx: true, Options: sortCompOrder("instance-methods", "render")},
 		{Code: `class Foo extends React.Component { render() {} static accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("static-variables", "render")},
@@ -69,6 +67,9 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `class Foo extends React.Component { render() {} onClick() {} }`, Tsx: true, Options: sortCompOrder("/on.*/,", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "onClick")}},
 		{Code: `class Foo extends React.Component { get foo() {} render() {} }`, Tsx: true, Options: sortCompOrder("foo", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("getter functions", "after", "render")}},
 		{Code: `class Foo extends React.Component { set foo(value) {} render() {} }`, Tsx: true, Options: sortCompOrder("foo", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("setter functions", "after", "render")}},
+		// ---- Compatibility: abstract accessors retain getter/setter groups. ----
+		{Code: `abstract class Foo extends React.Component { render() {} abstract static get value(): string; }`, Tsx: true, Options: sortCompOrder("getters", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "getter functions")}},
+		{Code: `abstract class Foo extends React.Component { render() {} abstract static set value(next: string); }`, Tsx: true, Options: sortCompOrder("setters", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "setter functions")}},
 		{Code: `class Foo extends React.Component { render() {} foo = (function() {}) }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "foo")}},
 		{Code: `class Foo extends React.Component { render() {} foo = (() => {}) }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "foo")}},
 		{Code: `class Foo extends React.Component { render() {} static foo(): void; static foo() {} }`, Tsx: true, Options: sortCompOrder("static-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("foo", "before", "render")}},
