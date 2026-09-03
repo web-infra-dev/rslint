@@ -1,0 +1,19 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "requiredFirst": { "type": "boolean" },
+        "callbacksLast": { "type": "boolean" },
+        "ignoreCase": { "type": "boolean" },
+        "noSortAlphabetically": { "type": "boolean" },
+        "sortShapeProp": { "type": "boolean" },
+        "checkTypes": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
