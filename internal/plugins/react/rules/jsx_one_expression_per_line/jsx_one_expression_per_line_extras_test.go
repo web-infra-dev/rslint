@@ -50,9 +50,16 @@ func TestJsxOneExpressionPerLineExtras(t *testing.T) {
 			{MessageId: "moveToNewLine", Message: "`text` must be placed on a new line", Line: 1, Column: 13, EndLine: 1, EndColumn: 17},
 		}, Output: []string{"<App>\n<Foo />\ntext\n</App>"}},
 		// Locks in upstream handleJSX() arm 3: a direct JSX child keeps the rule active in non-jsx mode.
-		{Code: `<App>text <Foo /></App>`, Tsx: true, Options: map[string]any{"allow": "non-jsx"}, Output: []string{"<App>\ntext\n{' '}\n<Foo />\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: `<App>text <Foo /></App>`, Tsx: true, Options: map[string]any{"allow": "non-jsx"}, Output: []string{"<App>\ntext\n<Foo />\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "moveToNewLine", Message: "`text ` must be placed on a new line", Line: 1, Column: 6, EndLine: 1, EndColumn: 11},
 			{MessageId: "moveToNewLine", Message: "`Foo` must be placed on a new line", Line: 1, Column: 11, EndLine: 1, EndColumn: 18},
+		}},
+		{Code: `<App>foo {value}</App>`, Tsx: true, Output: []string{"<App>\nfoo\n{value}\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine", Message: "`foo ` must be placed on a new line"},
+			{MessageId: "moveToNewLine", Message: "`{value}` must be placed on a new line"},
+		}},
+		{Code: "<App>foo \r\n</App>\r\n", Tsx: true, Output: []string{"<App>\nfoo \r\n</App>\r\n"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
 		}},
 		// Locks in upstream single-child allow arms: literal allows text, not an expression container.
 		{Code: `<App>{value}</App>`, Tsx: true, Options: map[string]any{"allow": "literal"}, Output: []string{"<App>\n{value}\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{

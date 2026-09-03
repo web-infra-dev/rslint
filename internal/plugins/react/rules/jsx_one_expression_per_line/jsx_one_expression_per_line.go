@@ -53,10 +53,16 @@ func nodeSource(source string, node *ast.Node) string {
 
 func fixSource(source string) string {
 	source = strings.TrimLeft(source, " ")
-	if strings.HasSuffix(source, "\r\n") {
-		return strings.TrimRight(source[:len(source)-2], " ") + "\r\n"
+	if strings.HasSuffix(source, "\n") {
+		// The upstream regular expression trims spaces before LF, but not
+		// before CRLF because the carriage return sits between the spaces and
+		// the line feed.
+		if len(source) >= 2 && source[len(source)-2] == '\r' {
+			return source
+		}
+		return strings.TrimRight(source[:len(source)-1], " ") + source[len(source)-1:]
 	}
-	if strings.HasSuffix(source, "\n") || strings.HasSuffix(source, "\r") {
+	if strings.HasSuffix(source, "\r") {
 		return strings.TrimRight(source[:len(source)-1], " ") + source[len(source)-1:]
 	}
 	return strings.TrimRight(source, " ")
@@ -180,12 +186,22 @@ func isSpaceBetween(previous, current *ast.Node) bool {
 }
 
 type fixDetails struct {
-	child           *ast.Node
-	descriptor      string
-	leadingSpace    bool
-	leadingNewline  bool
-	trailingSpace   bool
-	trailingNewline bool
+	child            *ast.Node
+	descriptor       string
+	leadingSpace     bool
+	leadingSpaceFrom []*ast.Node
+	leadingNewline   bool
+	trailingSpace    bool
+	trailingNewline  bool
+}
+
+func shouldKeepLeadingSpace(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
+	for _, previous := range details.leadingSpaceFrom {
+		if !isJSXText(previous) || detailsByChild[previous] == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
@@ -282,10 +298,12 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 			if previous != nil {
 				previousRaw := nodeSource(source, previous)
 				childRaw := nodeSource(source, child)
-				details.leadingSpace = details.leadingSpace ||
-					(isJSXText(previous) && strings.HasSuffix(previousRaw, " ")) ||
+				if (isJSXText(previous) && strings.HasSuffix(previousRaw, " ")) ||
 					(isJSXText(child) && strings.HasPrefix(childRaw, " ")) ||
-					isSpaceBetween(previous, child)
+					isSpaceBetween(previous, child) {
+					details.leadingSpace = true
+					details.leadingSpaceFrom = append(details.leadingSpaceFrom, previous)
+				}
 				details.leadingNewline = true
 			}
 			if next != nil {
@@ -321,7 +339,7 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 		ctx.ReportRangeWithDeferredFixes(core.NewTextRange(child.Pos(), child.End()), message, func() []rule.RuleFix {
 			fixedSource := fixSource(nodeSource(source, child))
 			leadingSpace := ""
-			if currentDetails.leadingSpace {
+			if currentDetails.leadingSpace && shouldKeepLeadingSpace(&currentDetails, detailsByChild) {
 				leadingSpace = "\n{' '}"
 			}
 			trailingSpace := ""
