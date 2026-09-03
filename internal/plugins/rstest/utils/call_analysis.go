@@ -443,12 +443,11 @@ func (analysis *RstestCallAnalysis) recordFunction(node *ast.Node) {
 }
 
 func isRstestRequireCall(node *ast.Node) bool {
-	return testFramework.IsModuleRequireCall(node, RstestImportModule) ||
-		testFramework.IsModuleRequireCall(node, RstestPlaywrightImportModule)
+	return testFramework.IsModuleRequireCallModules(node, RstestAllImportModules)
 }
 
 func isRstestImportModule(name string) bool {
-	return name == RstestImportModule || name == RstestPlaywrightImportModule
+	return IsRstestCoreImportModule(name) || name == RstestPlaywrightImportModule
 }
 
 func isRstestRegistrationName(name string) bool {

@@ -450,3 +450,51 @@ describe("s", () => { it("b", () => {}) });`,
 		}
 	}
 }
+
+// `rstack/test` re-exports the Rstest core API, so registrations arrive through
+// it and so does the `rs.setConfig` exemption that reads a project-wide
+// timeout.
+func TestRequireTestTimeoutRstackTestModule(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&require_test_timeout.RequireTestTimeoutRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { test } from 'rstack/test'; test("a", () => {}, 500)`},
+			{Code: `import { it as check } from 'rstack/test'; check("a", () => {}, 500)`},
+			{Code: `import * as core from 'rstack/test'; core.test("a", () => {}, 500)`},
+			{Code: `const { test } = require('rstack/test'); test("a", () => {}, 500)`},
+			// The runtime config object sets the timeout for the whole file.
+			{Code: `import { rs } from 'rstack/test'; rs.setConfig({ testTimeout: 5000 }); test("a", () => {})`},
+			{Code: `import { rs as runtime } from 'rstack/test'; runtime.setConfig({ testTimeout: 5000 }); test("a", () => {})`},
+			{Code: `import * as core from 'rstack/test'; core.rs.setConfig({ testTimeout: 5000 }); test("a", () => {})`},
+			{Code: `const core = require('rstack/test'); core.rstest.setConfig({ testTimeout: 5000 }); test("a", () => {})`},
+			{Code: `const { rs } = require('rstack/test'); rs.setConfig({ testTimeout: 5000 }); test("a", () => {})`},
+		},
+		[]rule_tester.InvalidTestCase{
+			invalidCase(
+				`import { test } from 'rstack/test'; test("a", () => {})`,
+				`test("a", () => {})`,
+			),
+			invalidCase(
+				`import { it as check } from 'rstack/test'; check("a", () => {})`,
+				`check("a", () => {})`,
+			),
+			invalidCase(
+				`import * as core from 'rstack/test'; core.test("a", () => {})`,
+				`core.test("a", () => {})`,
+			),
+			invalidCase(
+				`const { test } = require('rstack/test'); test("a", () => {})`,
+				`test("a", () => {})`,
+			),
+			// A sibling subpath exports no runtime config object, so it cannot
+			// exempt the registration.
+			invalidCase(
+				`import { rs } from 'rstack/lib'; rs.setConfig({ testTimeout: 5000 }); test("a", () => {})`,
+				`test("a", () => {})`,
+			),
+		},
+	)
+}

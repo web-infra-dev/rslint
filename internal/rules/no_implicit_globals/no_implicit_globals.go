@@ -76,9 +76,10 @@ var NoImplicitGlobalsRule = rule.Rule{
 		// code, so top-level strictness decides whether a leak is reportable.
 		// It comes from the resolved source goal rather than syntax alone:
 		// CommonJS stays sloppy even when the parser accepts import/export.
+		writeContext := writeContextCache{}
 		listeners := rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				checkImplicitGlobalWrite(ctx, node)
+				checkImplicitGlobalWrite(ctx, node, &writeContext)
 			},
 		}
 
@@ -237,38 +238,17 @@ func checkClassDeclaration(ctx rule.RuleContext, node *ast.Node, sourceFileNode 
 	reportDeclaration(ctx, node, nameNode.Text(), "class", true)
 }
 
-// checkImplicitGlobalWrite handles the two reference-driven diagnostics that
-// apply file-wide, independently of module-ness: an assignment to a read-only
-// global (assignmentToReadonlyGlobal) and an assignment to a name that is
-// neither declared anywhere in the file nor a known global at all, outside
-// strict-mode code (globalVariableLeak). Both only ever consider a pure `=`
-// assignment or bare for-in/for-of loop variable — the same shape ESLint's
-// own reference.isWrite() && !reference.isRead() filter selects, which
-// excludes compound assignments (foo += 1) and update expressions (foo++).
-//
-// The two diagnostics differ on `/* exported */`: upstream skips an exported
-// variable before reaching its reference loop, so the readonly assignment goes
-// unreported, while the leak is collected from the global scope's implicit
-// variables, which the directive never touches.
-//
-// Both stop at any name the file itself defines, which in a global script means
-// any top-level declaration whatsoever: ESLint keeps that file's declarations
-// and the configured globals in one global-scope variable, so a type-only
-// `interface foo {}` gives `foo` a definition and neither an implicit variable
-// (the leak) nor a definition-less read-only global (the assignment) remains.
-// Inner scopes hold separate variables that a value reference never resolves
-// to, so the same declaration inside a function or namespace leaves the name
-// global — the distinction IsGlobalNameReference draws.
-func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
-	root, writes := findPureAssignmentRoot(node)
+// checkImplicitGlobalWrite reports pure runtime writes to undeclared names and
+// read-only globals. TypeScript type syntax is deliberately excluded: an
+// assertion around a value can be an assignment target after erasure, but the
+// identifiers inside the assertion's type never are.
+func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node, writeContext *writeContextCache) {
+	root, writes := findPureAssignmentRoot(node, writeContext)
 	if root == nil {
 		return
 	}
 	name := node.Text()
-	// PatternVisitor records target writes in the scope containing the outer
-	// assignment, including identifiers reached through TypeScript wrappers.
-	// Resolve from that same location.
-	if ctx.Refs != nil && !ctx.Refs.IsGlobalNameReference(root, name, ast.SymbolFlagsValue|ast.SymbolFlagsAlias) {
+	if ctx.Refs != nil && !ctx.Refs.IsGlobalNameReference(node, name, ast.SymbolFlagsValue|ast.SymbolFlagsAlias) {
 		return
 	}
 	switch ctx.Globals.Access(name) {
@@ -290,157 +270,215 @@ func checkImplicitGlobalWrite(ctx rule.RuleContext, node *ast.Node) {
 	}
 }
 
-// findPureAssignmentRoot walks from a candidate write-target identifier up
-// through destructuring containers and transparent TS wrappers (parens,
-// non-null assertions, `as` and `<T>` assertions) to the enclosing pure `=`
-// assignment or for-in/for-of statement, mirroring upstream's ASSIGNMENT_NODES
-// walk of reference.identifier.parent. Alongside the root it returns how many
-// write references the scope manager records for the identifier: the assignment
-// itself, plus one for every destructuring default the identifier sits under,
-// since eslint-scope adds a write per enclosing AssignmentPattern before the
-// one for the assignment. `[[foo = 1] = []] = arr` therefore reports three
-// times over the whole assignment. It returns nil for anything that isn't a pure
-// write target: compound/logical assignment operators and update expressions
-// read as well as write, so ESLint's ordinary reference analysis does not treat
-// them as leak/readonly-assignment candidates.
-//
-// TypeScript expression wrappers are where the walk stops mirroring the AST and
-// starts mirroring the scope manager. An AssignmentExpression's Left is
-// unwrapped exactly once — a TSAsExpression, TSTypeAssertion or
-// TSNonNullExpression, never a TSSatisfiesExpression — and what remains has to
-// be a pattern, so `(foo as any) = 1` is a write while `(foo as any)! = 1`,
-// `foo!! = 1` and `(foo satisfies any) = 1` are not. A wrapper around a
-// destructuring target does not survive that test either: `[foo]` is no longer a
-// destructuring pattern once an assertion wraps it, so `([foo] as any) = arr` is
-// no write at all. Every other path — a for-in/for-of head, anything nested
-// inside a pattern — visits the pattern directly and accepts a wrapped target
-// however deeply it is nested, `satisfies` included: `[foo satisfies any] = arr`
-// is a write.
-func findPureAssignmentRoot(node *ast.Node) (*ast.Node, int) {
-	current := node
-	writes := 1
-	// wrappers counts the TS expression wrappers the walk has climbed since the
-	// last pattern node, which is what an AssignmentExpression's Left has to
-	// shed in its single unwrap; satisfies records whether any of them is the
-	// one wrapper that unwrap never sheds.
-	wrappers := 0
-	satisfies := false
-	// enterPattern moves the walk onto a pattern node. Only the wrappers
-	// between the last pattern node and the assignment have to survive that
-	// single unwrap, so reaching one clears the wrapper state.
-	enterPattern := func(pattern *ast.Node) {
-		wrappers = 0
-		satisfies = false
-		current = pattern
+// findPureAssignmentRoot delegates assignment-target discovery to tsgo. The
+// only bridge needed is for erased TypeScript assertions, which
+// GetAssignmentTarget intentionally does not cross. Default values retain the
+// existing ESLint-compatible diagnostic multiplicity.
+func findPureAssignmentRoot(node *ast.Node, writeContext *writeContextCache) (*ast.Node, int) {
+	if node == nil || node.Kind != ast.KindIdentifier {
+		return nil, 0
 	}
-	for current != nil && current.Parent != nil {
-		parent := current.Parent
-		switch parent.Kind {
-		case ast.KindBinaryExpression:
-			binary := parent.AsBinaryExpression()
-			if binary == nil || binary.OperatorToken == nil {
-				return nil, 0
-			}
-			if binary.OperatorToken.Kind != ast.KindEqualsToken {
-				return nil, 0
-			}
-			if binary.Left != current {
-				return nil, 0
-			}
-			if utils.IsInDestructuringAssignment(parent) {
-				writes++
-				enterPattern(parent)
-				continue
-			}
-			if wrappers > 1 || satisfies {
-				return nil, 0
-			}
-			return parent, writes
 
-		case ast.KindForInStatement, ast.KindForOfStatement:
-			stmt := parent.AsForInOrOfStatement()
-			if stmt == nil || stmt.Initializer != current {
-				return nil, 0
-			}
-			return parent, writes
-
-		case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
-			if !utils.IsInDestructuringAssignment(parent) {
-				return nil, 0
-			}
-			enterPattern(parent)
-
-		case ast.KindShorthandPropertyAssignment:
-			shorthand := parent.AsShorthandPropertyAssignment()
-			if shorthand == nil || shorthand.Name() != current {
-				return nil, 0
-			}
-			// `{ foo = 1 } = obj` keeps its default on the shorthand rather
-			// than in a nested assignment, but the scope manager still sees an
-			// AssignmentPattern and records its extra write.
-			if shorthand.ObjectAssignmentInitializer != nil {
-				writes++
-			}
-			enterPattern(parent)
-
-		case ast.KindPropertyAssignment:
-			propAssignment := parent.AsPropertyAssignment()
-			if propAssignment == nil || propAssignment.Initializer != current {
-				return nil, 0
-			}
-			enterPattern(parent)
-
-		case ast.KindSpreadElement, ast.KindSpreadAssignment:
-			enterPattern(parent)
-
-		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression:
-			wrappers++
-			current = parent
-
-		case ast.KindSatisfiesExpression:
-			satisfies = true
-			current = parent
-
-		case ast.KindParenthesizedExpression:
-			// ESTree erases parentheses around an identifier, but preserves
-			// parentheses around an array/object target as a recovered invalid
-			// assignment. Do not turn that recovered container into a pattern.
-			if current.Kind == ast.KindArrayLiteralExpression || current.Kind == ast.KindObjectLiteralExpression {
-				return nil, 0
-			}
-			current = parent
-
-		case ast.KindExpressionWithTypeArguments:
-			instantiation := parent.AsExpressionWithTypeArguments()
-			if instantiation != nil && instantiation.Expression == current {
-				// TypeScript erases the type arguments, leaving this runtime
-				// expression as the assignment-pattern target.
-				current = parent
-				continue
-			}
-			// Preserve PatternVisitor's existing traversal into type arguments.
-			if (!ast.IsPartOfTypeNode(current) && !ast.IsPartOfTypeNode(parent)) ||
-				!utils.IsInDestructuringAssignment(parent) {
-				return nil, 0
-			}
-			current = parent
-
-		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			// A member expression writes its property, not either identifier
-			// inside the expression. PatternVisitor records both as reads.
+	root := assignmentTargetThroughAssertions(node)
+	if root == nil || writeContext.isErasedSyntax(node, root) || writeContext.isInsideWrappedPattern(node, root) ||
+		isRestAssignmentRoot(root) {
+		return nil, 0
+	}
+	writes := 1
+	for utils.IsDefaultValueInDestructuringAssignment(root) {
+		writes++
+		root = assignmentTargetThroughAssertions(root)
+		if root == nil {
 			return nil, 0
-
-		default:
-			// TypeScript assertion and satisfies wrappers expose their type syntax
-			// to PatternVisitor. Preserve that traversal for otherwise valid
-			// assignment targets, but do not emulate recovery-only expression
-			// targets whose emitted JavaScript is not executable.
-			if (!ast.IsPartOfTypeNode(current) && !ast.IsPartOfTypeNode(parent)) ||
-				!utils.IsInDestructuringAssignment(parent) {
-				return nil, 0
-			}
-			current = parent
 		}
 	}
-	return nil, 0
+	// A standalone `=` recovered inside an invalid pattern element is not an
+	// executable assignment. Valid default initializers have already been
+	// lifted to their enclosing assignment; IsInDestructuringAssignment stops
+	// at default right-hand sides and computed property names, which remain
+	// ordinary runtime expressions.
+	if isRecoveredInvalidPatternRoot(root) {
+		return nil, 0
+	}
+	switch root.Kind {
+	case ast.KindBinaryExpression:
+		binary := root.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+			return nil, 0
+		}
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		// A non-declaration loop initializer is a pure write target.
+	default:
+		return nil, 0
+	}
+
+	for current := node.Parent; current != nil && current != root; current = current.Parent {
+		if current.Kind == ast.KindShorthandPropertyAssignment {
+			shorthand := current.AsShorthandPropertyAssignment()
+			if shorthand != nil && shorthand.ObjectAssignmentInitializer != nil {
+				writes++
+			}
+		}
+	}
+	return root, writes
+}
+
+// assignmentTargetThroughAssertions delegates the assignment-target walk to
+// tsgo and only steps across its erased assertion outer expressions. In
+// particular, it does not cross an instantiation expression: TypeScript rejects
+// one used as an assignment target.
+func assignmentTargetThroughAssertions(node *ast.Node) *ast.Node {
+	for current := node; current != nil; {
+		if target := ast.GetAssignmentTarget(current); target != nil {
+			return target
+		}
+		parent := current.Parent
+		if parent == nil || !ast.IsOuterExpression(parent, ast.OEKAssertions|ast.OEKParentheses) || parent.Expression() != current {
+			return nil
+		}
+		current = parent
+	}
+	return nil
+}
+
+// isInsideWrappedPattern rejects every write nested in an array/object pattern
+// that is itself wrapped in parentheses or a TypeScript assertion. The target
+// check keeps ordinary parenthesized array/object values inside a member
+// receiver or index expression out of this recovery-only boundary.
+func (c *writeContextCache) isInsideWrappedPattern(node *ast.Node, root *ast.Node) bool {
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current == c.wrappedKey {
+			if c.wrapped {
+				// A positive result belongs to the wrapped container, not the
+				// assignment root: a sibling pattern may remain executable.
+				return true
+			}
+			return c.rememberWrapped(root, false)
+		}
+		if !ast.IsAssignmentPattern(current) {
+			continue
+		}
+		if isWrappedPatternContainer(current) {
+			return c.rememberWrapped(current, true)
+		}
+	}
+	return c.rememberWrapped(root, false)
+}
+
+func isWrappedPatternContainer(node *ast.Node) bool {
+	current := node
+	wrapped := false
+	for current.Parent != nil {
+		parent := current.Parent
+		if !ast.IsOuterExpression(parent, ast.OEKAssertions|ast.OEKParentheses|ast.OEKExpressionsWithTypeArguments) {
+			break
+		}
+		if parent.Expression() != current {
+			break
+		}
+		wrapped = true
+		current = parent
+	}
+	return wrapped && ast.GetAssignmentTarget(current) != nil
+}
+
+// isRestAssignmentRoot rejects a recovered default/assignment used directly
+// as an array or object rest target. Assignments evaluated inside a valid
+// member target stop at that member expression and remain reportable.
+func isRestAssignmentRoot(node *ast.Node) bool {
+	current := node
+	for current.Parent != nil &&
+		ast.IsOuterExpression(current.Parent, ast.OEKAssertions|ast.OEKParentheses) &&
+		current.Parent.Expression() == current {
+		current = current.Parent
+	}
+	parent := current.Parent
+	return parent != nil && (parent.Kind == ast.KindSpreadElement || parent.Kind == ast.KindSpreadAssignment) &&
+		parent.Expression() == current && ast.GetAssignmentTarget(current) != nil
+}
+
+// isRecoveredInvalidPatternRoot distinguishes a standalone assignment buried
+// in an invalid pattern element from one evaluated while resolving a valid
+// member target. Default right-hand sides and computed property names already
+// return false from IsInDestructuringAssignment.
+func isRecoveredInvalidPatternRoot(node *ast.Node) bool {
+	if !utils.IsInDestructuringAssignment(node) {
+		return false
+	}
+	for current := node.Parent; current != nil; current = current.Parent {
+		if ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(current) {
+			// Do not let a member expression outside this pattern container make
+			// its invalid contents look executable.
+			return true
+		}
+		if ast.IsAccessExpression(current) &&
+			!ast.IsOptionalChain(current) && assignmentTargetThroughAssertions(current) != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// writeContextCache excludes identifiers in syntax that cannot contribute a
+// runtime write. NodeFlagsAmbient is propagated by the parser to descendants
+// of declaration files and `declare` declarations. Interfaces, bodyless
+// function-like declarations, and abstract properties need explicit checks
+// because recovery expressions may still appear beneath their AST nodes.
+type writeContextCache struct {
+	erasedRoot, wrappedKey *ast.Node
+	erased, wrapped        bool
+}
+
+// isErasedSyntax checks whether the path from a target identifier through its
+// assignment root is erased TypeScript syntax, then classifies the root's
+// surrounding context. Remembering only the previous root makes nested
+// assignment chains linear without allocating a per-file node map: preorder
+// traversal visits the enclosing root before the roots nested inside it.
+func (c *writeContextCache) isErasedSyntax(node *ast.Node, root *ast.Node) bool {
+	for current := node; current != nil && current != root; current = current.Parent {
+		if ast.IsPartOfTypeNode(current) {
+			return true
+		}
+	}
+
+	ambient := false
+	emittedPropertyPart := false
+	for current := root; current != nil; current = current.Parent {
+		if current == c.erasedRoot {
+			return c.rememberErased(root, c.erased)
+		}
+		ambient = ambient || utils.IsInAmbientContext(current)
+		if current.Kind == ast.KindDecorator || current.Kind == ast.KindComputedPropertyName {
+			emittedPropertyPart = true
+		}
+		if ast.IsPartOfTypeNode(current) ||
+			current.Kind == ast.KindInterfaceDeclaration ||
+			(ast.IsFunctionLike(current) && current.Body() == nil) {
+			return c.rememberErased(root, true)
+		}
+		if current.Kind != ast.KindPropertyDeclaration || (!ambient && !ast.HasAbstractModifier(current)) {
+			continue
+		}
+		owner := current.Parent
+		if emittedPropertyPart && ast.HasDecorators(current) && owner != nil && ast.IsClassLike(owner) &&
+			!utils.IsInAmbientContext(owner) {
+			// With legacy decorators enabled, TypeScript emits the decorator
+			// expression and computed name even though the property is erased.
+			return c.rememberErased(root, false)
+		}
+		return c.rememberErased(root, true)
+	}
+	return c.rememberErased(root, ambient)
+}
+
+func (c *writeContextCache) rememberErased(root *ast.Node, erased bool) bool {
+	c.erasedRoot = root
+	c.erased = erased
+	return erased
+}
+
+func (c *writeContextCache) rememberWrapped(key *ast.Node, wrapped bool) bool {
+	c.wrappedKey = key
+	c.wrapped = wrapped
+	return wrapped
 }

@@ -494,3 +494,62 @@ test("options", { timeout: 100 }, () => {});`,
 		}
 	}
 }
+
+// Registrations reach the rule through `rstack/test` as well, which re-exports
+// the Rstest core API, and the aliasing the rule follows to decide whether a
+// binding is safe to rewrite has to follow through that specifier too.
+func TestPreferTodoRstackTestModule(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&prefer_todo.PreferTodoRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { test } from "rstack/test"; test.todo("case");`},
+			// A sibling subpath exports no registration.
+			{Code: `import { test } from "rstack/lib"; test("case");`},
+			// A whole-module require object has mutable API properties, so the
+			// member may no longer be the registration by the time it is called.
+			{Code: `const core = require("rstack/test"); core.test("case");`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import { test } from "rstack/test";
+test("case");`,
+				Output: []string{`import { test } from "rstack/test";
+test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `import { test as case_ } from "rstack/test";
+case_("case");`,
+				Output: []string{`import { test as case_ } from "rstack/test";
+case_.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `const { test } = require("rstack/test");
+test("case");`,
+				Output: []string{`const { test } = require("rstack/test");
+test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `import * as rstest from "rstack/test";
+rstest.test("case");`,
+				Output: []string{`import * as rstest from "rstack/test";
+rstest.test.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unimplementedTest", Line: 2, Column: 1}},
+			},
+			{
+				Code: `import * as core from "rstack/test";
+const case_ = core.test;
+case_("case", () => {});`,
+				Output: []string{`import * as core from "rstack/test";
+const case_ = core.test;
+case_.todo("case");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "emptyTest", Line: 3, Column: 1}},
+			},
+		},
+	)
+}

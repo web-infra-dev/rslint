@@ -60,5 +60,5 @@ combined.
 ## Original documentation
 
 - [typescript-eslint: unified-signatures](https://typescript-eslint.io/rules/unified-signatures)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.68.0/packages/eslint-plugin/src/rules/unified-signatures.ts)
-- [Tests](https://github.com/typescript-eslint/typescript-eslint/blob/v8.68.0/packages/eslint-plugin/tests/rules/unified-signatures.test.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/src/rules/unified-signatures.ts)
+- [Tests](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/tests/rules/unified-signatures.test.ts)

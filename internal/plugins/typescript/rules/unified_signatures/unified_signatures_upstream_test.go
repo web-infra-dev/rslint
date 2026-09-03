@@ -1,7 +1,7 @@
 package unified_signatures
 
 // TestUnifiedSignaturesUpstream migrates every valid and invalid case from
-// typescript-eslint v8.68.0. Rslint-specific coverage lives in
+// typescript-eslint v8.69.0. Rslint-specific coverage lives in
 // unified_signatures_extras_test.go.
 
 import (
@@ -34,6 +34,9 @@ func TestUnifiedSignaturesUpstream(t *testing.T) {
 			{Code: "\ninterface Generic<T> {\n  x(): void;\n  x(x: T[]): void;\n}\n    "},
 			{Code: "\ninterface I {\n  f(x1: number): void;\n  f(x1: boolean, x2?: number): void;\n}\n    "},
 			{Code: "\nfunction f<T extends number>(x: T[]): void;\nfunction f<T extends string>(x: T): void;\n    "},
+			{Code: "\ntype A = 1 | 2;\ntype B = 3 | 4;\nfunction f<T extends A>(x: T, y: string): void;\nfunction f<T extends B>(x: T): void;\n    "},
+			{Code: "\nfunction f<T extends 1 | 2>(x: T, y: string): void;\nfunction f<T extends 3 | 4>(x: T): void;\n    "},
+			{Code: "\nfunction f<T extends number>(x: T[]): void;\nfunction f<R extends number>(x: R): void;\n    "},
 			{Code: "\ndeclare function foo(n: number): number;\n\ndeclare module 'hello' {\n  function foo(n: number, s: string): number;\n}\n    "},
 			{Code: "\n{\n  function block(): number;\n  function block(n: number): number;\n  function block(n?: number): number {\n    return 3;\n  }\n}\n    "},
 			{Code: "\nexport interface Foo {\n  bar(baz: string): number[];\n  bar(): string[];\n}\n    "},

@@ -204,6 +204,155 @@ const derived = class Derived {};
 		},
 		{
 			Code: `
+interface Base {}
+
+interface Base {
+  name: string;
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      2,
+					Column:    11,
+					EndLine:   2,
+					EndColumn: 15,
+				},
+			},
+		},
+		{
+			Code: `
+interface Base {}
+
+interface Base {}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      2,
+					Column:    11,
+					EndLine:   2,
+					EndColumn: 15,
+				},
+				{
+					MessageId: "noEmptyInterface",
+					Line:      4,
+					Column:    11,
+					EndLine:   4,
+					EndColumn: 15,
+				},
+			},
+		},
+		{
+			Code: `
+interface Base {}
+
+function foo() {
+  interface Base {
+    name: string;
+  }
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      2,
+					Column:    11,
+					EndLine:   2,
+					EndColumn: 15,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "replaceEmptyInterface",
+							Output: `
+type Base = object
+
+function foo() {
+  interface Base {
+    name: string;
+  }
+}
+`,
+						},
+						{
+							MessageId: "replaceEmptyInterface",
+							Output: `
+type Base = unknown
+
+function foo() {
+  interface Base {
+    name: string;
+  }
+}
+`,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `
+interface Base {
+  props: string;
+}
+
+interface Derived extends Base {}
+
+interface Derived {
+  name: string;
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterfaceWithSuper",
+					Line:      6,
+					Column:    11,
+					EndLine:   6,
+					EndColumn: 18,
+				},
+			},
+		},
+		{
+			Code: `export default interface Base {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      1,
+					Column:    26,
+					EndLine:   1,
+					EndColumn: 30,
+				},
+			},
+		},
+		{
+			Code: `export default interface Derived extends Base {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterfaceWithSuper",
+					Line:      1,
+					Column:    26,
+					EndLine:   1,
+					EndColumn: 33,
+				},
+			},
+		},
+		{
+			Code: `export interface Base {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 22,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyInterface", Output: `export type Base = object`},
+						{MessageId: "replaceEmptyInterface", Output: `export type Base = unknown`},
+					},
+				},
+			},
+		},
+		{
+			Code: `
 interface Base {
   name: string;
 }

@@ -241,6 +241,24 @@ ruleTester.run('no-undef', {
 
     // === Class static block with declared ===
     'var staticInit = 42; class C { static { var v = staticInit; } }',
+
+    // === Parser-specific reference shapes ===
+    {
+      code: 'const el = <éclair />; const other = <Missing:Part />;',
+      filename: 'src/virtual.jsx',
+    },
+    {
+      code: 'type T = typeof this; type U = typeof this.member;',
+      filename: 'src/virtual.ts',
+    },
+    {
+      code: 'const el = <this.Member />;',
+      filename: 'src/virtual.tsx',
+    },
+    {
+      code: 'const Missing = {}; export as namespace Missing;',
+      filename: 'src/virtual.ts',
+    },
   ],
   invalid: [
     // === Basic undeclared references ===
@@ -729,6 +747,51 @@ ruleTester.run('no-undef', {
       code: 'Temporal;',
       languageOptions: { ecmaVersion: 2025 },
       errors: [{ messageId: 'undef' }],
+    },
+
+    // === Parser-specific reference shapes ===
+    {
+      code: 'const el = <Missing></Missing>;',
+      filename: 'src/virtual.jsx',
+      errors: [{ messageId: 'undef', line: 1, column: 13 }],
+    },
+    {
+      code: 'const el = <Éclair />;',
+      filename: 'src/virtual.jsx',
+      errors: [{ messageId: 'undef', line: 1, column: 13 }],
+    },
+    {
+      code: 'const el = <foo:bar></foo:bar>;',
+      filename: 'src/virtual.tsx',
+      errors: [
+        { messageId: 'undef', line: 1, column: 13 },
+        { messageId: 'undef', line: 1, column: 17 },
+        { messageId: 'undef', line: 1, column: 23 },
+        { messageId: 'undef', line: 1, column: 27 },
+      ],
+    },
+    {
+      code: 'const el = <this></this>;',
+      filename: 'src/virtual.tsx',
+      errors: [
+        { messageId: 'undef', line: 1, column: 13 },
+        { messageId: 'undef', line: 1, column: 20 },
+      ],
+    },
+    {
+      code: 'const el = <this:Foo></this:Foo>;',
+      filename: 'src/virtual.tsx',
+      errors: [
+        { messageId: 'undef', line: 1, column: 13 },
+        { messageId: 'undef', line: 1, column: 18 },
+        { messageId: 'undef', line: 1, column: 24 },
+        { messageId: 'undef', line: 1, column: 29 },
+      ],
+    },
+    {
+      code: 'export as namespace Missing;',
+      filename: 'src/virtual.ts',
+      errors: [{ messageId: 'undef', line: 1, column: 21 }],
     },
   ],
 });
