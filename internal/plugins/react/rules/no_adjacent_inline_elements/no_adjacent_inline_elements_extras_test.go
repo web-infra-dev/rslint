@@ -24,8 +24,6 @@ func TestNoAdjacentInlineElementsExtras(t *testing.T) {
 		{Code: `<div><svg:a /><svg:b /></div>;`, Tsx: true},
 		// ---- Dimension 4: literal boundary whitespace ----
 		{Code: `React.createElement("div", null, [React.createElement("a"), "\u00a0", React.createElement("a")]);`, Tsx: true},
-		{Code: `React.createElement("div", null, [React.createElement("a"), 0, React.createElement("a")]);`, Tsx: true},
-		{Code: `React.createElement("div", null, [React.createElement("a"), true, React.createElement("a")]);`, Tsx: true},
 		// ---- Dimension 4: nested traversal boundary ----
 		{Code: `<><a /><a /></>;`, Tsx: true},
 		{Code: `<div><a />{/* comment */}<a /></div>;`, Tsx: true},
@@ -67,6 +65,13 @@ func TestNoAdjacentInlineElementsExtras(t *testing.T) {
 		{Code: `React.createElement("div", null, [React.createElement("a"), "", React.createElement("a")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 91)}},
 		{Code: `<div><span><a /><a /></span></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: inlineElementMessage, Line: 1, Column: 6, EndLine: 1, EndColumn: 29}}},
 		{Code: "<div>\n  <a />\n  <span />\n</div>;", Tsx: true},
+		// ---- Literal children in createElement arrays remain inline after
+		// JavaScript-to-TypeScript AST kind mapping ----
+		{Code: `React.createElement("div", null, [React.createElement("a"), 0, React.createElement("a")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 90)}},
+		{Code: `React.createElement("div", null, [React.createElement("a"), true, React.createElement("a")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 93)}},
+		{Code: `React.createElement("div", null, [React.createElement("a"), null, React.createElement("a")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 93)}},
+		{Code: `React.createElement("div", null, [React.createElement("a"), /x/, React.createElement("a")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 92)}},
+		{Code: `React.createElement("div", null, [React.createElement("a"), 1n, React.createElement("a")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 91)}},
 		// ---- Dimension 4: first adjacent pair is reported once ----
 		{Code: `<div><a /><span /><b /></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 30)}},
 		// Locks in upstream isInline() call-expression branch: the first string

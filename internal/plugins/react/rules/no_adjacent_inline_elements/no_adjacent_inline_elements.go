@@ -68,6 +68,16 @@ func isInline(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindStringLiteral:
 		return !hasBoundaryWhitespace(node.AsStringLiteral().Text)
+	case ast.KindNumericLiteral,
+		ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral,
+		ast.KindTrueKeyword,
+		ast.KindFalseKeyword,
+		ast.KindNullKeyword:
+		// ESTree represents all of these as Literal nodes. Upstream's
+		// whitespace check coerces their values to strings, which never
+		// produces boundary whitespace for these literal kinds.
+		return true
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
 		_, ok := inlineNames[jsxElementName(node)]
 		return ok
