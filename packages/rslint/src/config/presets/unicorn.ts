@@ -167,7 +167,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unreadable-array-destructuring': 'error', // not implemented
     // 'unicorn/no-unreadable-for-of-expression': 'error', // not implemented
     // 'unicorn/no-unreadable-iife': 'error', // not implemented
-    // 'unicorn/no-unreadable-new-expression': 'off', // not implemented
+    'unicorn/no-unreadable-new-expression': 'off',
     // 'unicorn/no-unreadable-object-destructuring': 'error', // not implemented
     // 'unicorn/no-unsafe-buffer-conversion': 'error', // not implemented
     // 'unicorn/no-unsafe-dom-html': 'off', // not implemented
