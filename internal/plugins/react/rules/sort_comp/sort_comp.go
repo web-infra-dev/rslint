@@ -80,7 +80,27 @@ type memberInfo struct {
 }
 
 func isFunctionLikeExpression(node *ast.Node) bool {
-	return node != nil && (node.Kind == ast.KindFunctionExpression || node.Kind == ast.KindArrowFunction)
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	return node.Kind == ast.KindFunctionExpression || node.Kind == ast.KindArrowFunction
+}
+
+func isConcreteMethod(member *ast.Node) bool {
+	if member == nil {
+		return false
+	}
+	switch member.Kind {
+	case ast.KindMethodDeclaration:
+		return member.AsMethodDeclaration().Body != nil
+	case ast.KindGetAccessor:
+		return member.AsGetAccessorDeclaration().Body != nil
+	case ast.KindSetAccessor:
+		return member.AsSetAccessorDeclaration().Body != nil
+	default:
+		return false
+	}
 }
 
 func memberValue(member *ast.Node) *ast.Node {
@@ -122,6 +142,12 @@ func getMembers(node *ast.Node) []*ast.Node {
 func getMemberNames(member *ast.Node) (string, string) {
 	if member == nil {
 		return "", ""
+	}
+	if member.Kind == ast.KindGetAccessor {
+		return "getter functions", "getter functions"
+	}
+	if member.Kind == ast.KindSetAccessor {
+		return "setter functions", "setter functions"
 	}
 	if member.Kind == ast.KindConstructor {
 		return "constructor", "constructor"
@@ -165,7 +191,7 @@ func getMemberInfo(member *ast.Node) memberInfo {
 	// fields participate in the static/instance variable or method groups.
 	classField := propertyDeclaration && plainClassMember
 	static := ast.IsStatic(member)
-	functionValue := isFunctionLikeExpression(value) || member.Kind == ast.KindMethodDeclaration || member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor || member.Kind == ast.KindConstructor
+	functionValue := isFunctionLikeExpression(value) || isConcreteMethod(member) || member.Kind == ast.KindConstructor
 	if propertyDeclaration && member.AsPropertyDeclaration().Type != nil && value == nil {
 		info.typeAnnotation = true
 	}
@@ -177,7 +203,7 @@ func getMemberInfo(member *ast.Node) memberInfo {
 			info.instanceVariable = value == nil || !functionValue
 			info.instanceMethod = value != nil && functionValue
 		}
-	} else if plainClassMember && static && (member.Kind == ast.KindMethodDeclaration || member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor) {
+	} else if plainClassMember && static && isConcreteMethod(member) {
 		info.staticMethod = true
 	}
 	return info

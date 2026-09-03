@@ -32,6 +32,8 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `class Foo extends React.Component { render() {} accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
 		{Code: `class Foo extends React.Component { render() {} accessor foo = () => {}; }`, Tsx: true, Options: sortCompOrder("instance-methods", "render")},
 		{Code: `class Foo extends React.Component { render() {} static accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("static-variables", "render")},
+		{Code: `class Foo extends React.Component { render() {} get foo() {} }`, Tsx: true, Options: sortCompOrder("foo", "render")},
+		{Code: `class Foo extends React.Component { render() {} set foo(value) {} }`, Tsx: true, Options: sortCompOrder("foo", "render")},
 		// ---- Real-user: issue #2000 has an async arrow field referring to a prior field. ----
 		{Code: `class Test extends React.PureComponent { fetch = async () => {}; lazyFetch = _.debounce(this.fetch, 1000); }`, Tsx: true},
 		// ---- Branch lock-in: a named method can also match a custom regex group. ----
@@ -65,5 +67,10 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `class Foo extends React.Component { render() {} "displayName"() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "undefined")}},
 		// ---- Compatibility: upstream accepts a regex prefix before trailing text. ----
 		{Code: `class Foo extends React.Component { render() {} onClick() {} }`, Tsx: true, Options: sortCompOrder("/on.*/,", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "onClick")}},
+		{Code: `class Foo extends React.Component { get foo() {} render() {} }`, Tsx: true, Options: sortCompOrder("foo", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("getter functions", "after", "render")}},
+		{Code: `class Foo extends React.Component { set foo(value) {} render() {} }`, Tsx: true, Options: sortCompOrder("foo", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("setter functions", "after", "render")}},
+		{Code: `class Foo extends React.Component { render() {} foo = (function() {}) }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "foo")}},
+		{Code: `class Foo extends React.Component { render() {} foo = (() => {}) }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "foo")}},
+		{Code: `class Foo extends React.Component { render() {} static foo(): void; static foo() {} }`, Tsx: true, Options: sortCompOrder("static-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("foo", "before", "render")}},
 	})
 }
