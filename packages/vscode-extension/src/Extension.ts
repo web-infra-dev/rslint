@@ -1,10 +1,4 @@
-import {
-  window,
-  workspace,
-  type Disposable,
-  type ExtensionContext,
-  type OutputChannel,
-} from 'vscode';
+import { window, workspace, type Disposable, type OutputChannel } from 'vscode';
 import { Logger } from './logger';
 import { Rslint } from './Rslint';
 import { setupStatusBar } from './statusBar';
@@ -27,9 +21,8 @@ export class Extension {
   private closePromise: Promise<void> | undefined;
   private activated = false;
 
-  constructor(context: ExtensionContext) {
-    Logger.setDefaultLogLevel(context);
-    this.logger = new Logger('Rslint (extension)').useDefaultLogLevel();
+  constructor(logger: Logger) {
+    this.logger = logger;
   }
 
   public activate(): void {
@@ -158,11 +151,6 @@ export class Extension {
       this.logger.error('Failed to close an extension resource', error);
     }
     this.logger.info('Rslint extension deactivated');
-    try {
-      this.logger.dispose();
-    } catch (error) {
-      errors.push(error);
-    }
     if (errors.length > 0) {
       throw new AggregateError(errors, 'failed to deactivate Rslint extension');
     }

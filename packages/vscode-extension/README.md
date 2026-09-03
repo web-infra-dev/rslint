@@ -1,5 +1,13 @@
 # Rslint VS Code Extension
 
+> [!IMPORTANT]
+>
+> **This extension is retired. Migrate to the [Rstack](https://github.com/rstackjs/rstack-editor) extension.**
+>
+> New editor features land in the unified [Rstack](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) extension (`rstack.rstack`), which covers testing, linting, and formatting in one install. It is also available on the [Open VSX Registry](https://open-vsx.org/extension/rstack/rstack) for Cursor, Trae, VSCodium, and other VS Code forks. This standalone extension stays published and keeps working while the transition is underway, but receives no new features.
+>
+> To switch: install `rstack.rstack`, disable or uninstall `rstack.rslint` so only one copy of Rslint runs, then re-enter your settings under the `rstack.rslint.*` keys. Settings are not migrated automatically. Legacy `rslint.binPath` and `rslint.customBinPath` have no equivalent; use `rstack.rslint.corePath` if you need an override. See the [migration notes](https://github.com/rstackjs/rstack-editor/blob/main/packages/vscode/README.md#coming-from-the-standalone-extensions).
+
 The official VS Code extension for [Rslint](https://github.com/web-infra-dev/rslint), a high-performance JavaScript and TypeScript linter written in Go.
 
 ## 📦 Installation
