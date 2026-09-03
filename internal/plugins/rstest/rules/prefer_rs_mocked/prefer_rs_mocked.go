@@ -119,7 +119,9 @@ func isRstestUtilitiesImportName(identifier *ast.Node) bool {
 		return false
 	}
 	specifier := identifier.Parent.AsImportSpecifier()
-	if specifier == nil || specifier.IsTypeOnly || specifier.Name() != identifier {
+	if specifier == nil ||
+		ast.IsTypeOnlyImportDeclaration(identifier.Parent) ||
+		specifier.Name() != identifier {
 		return false
 	}
 	declaration := testFramework.FindImportDeclaration(identifier.Parent)

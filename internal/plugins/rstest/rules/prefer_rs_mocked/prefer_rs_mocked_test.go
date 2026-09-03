@@ -112,6 +112,12 @@ import type { Mock } from '@rstest/core';
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
 			},
 			{
+				// `import type { rs }` binds no runtime namespace to call.
+				Code: `import type { rs, Mock } from '@rstest/core';
+(getUser as Mock).mockReturnValue(user);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 2, Column: 2}},
+			},
+			{
 				Code: `import type { Mock } from '@rstest/core';
 const rs = createUtilities();
 (getUser as Mock).mockReturnValue(user);`,

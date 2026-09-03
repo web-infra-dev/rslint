@@ -234,7 +234,7 @@ func namedImportElements(declaration *ast.ImportDeclaration) []*ast.Node {
 // two spellings this rule is about.
 func plainImportedName(element *ast.Node) string {
 	specifier := element.AsImportSpecifier()
-	if specifier == nil || specifier.IsTypeOnly || specifier.PropertyName != nil {
+	if specifier == nil || ast.IsTypeOnlyImportDeclaration(element) || specifier.PropertyName != nil {
 		return ""
 	}
 	name := specifier.Name()
@@ -420,7 +420,7 @@ func declaresBinding(declaration *ast.Node) bool {
 // of the two spellings of the Rstest namespace from an Rstest core module.
 func isRstestNamespaceSpecifier(element *ast.Node) bool {
 	specifier := element.AsImportSpecifier()
-	if specifier == nil || specifier.IsTypeOnly {
+	if specifier == nil || ast.IsTypeOnlyImportDeclaration(element) {
 		return false
 	}
 	declaration := testFramework.FindImportDeclaration(element)
