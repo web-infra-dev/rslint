@@ -71,6 +71,13 @@ func propertyName(node *ast.Node) string {
 		name = node.AsIdentifier().Text
 	case ast.KindPrivateIdentifier:
 		name = reactutil.IdentifierOrPrivateName(node)
+		// The upstream displayName predicate accepts Identifier and Literal
+		// property nodes, but not PrivateIdentifier nodes. Other properties
+		// still use the generic `.name` lookup and must retain private-name
+		// support.
+		if name == "displayName" {
+			return ""
+		}
 	case ast.KindStringLiteral:
 		// displayName is the one property whose upstream predicate accepts
 		// a Literal key. The other predicates read key.name and therefore do
