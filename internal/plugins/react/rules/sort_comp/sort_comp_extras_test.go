@@ -26,6 +26,9 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `/** @jsx Preact */ class Foo extends React.Component { render() {} componentDidMount() {} }`, Tsx: true},
 		// ---- Compatibility: non-plain class members are not variable/method groups. ----
 		{Code: `abstract class Foo extends React.Component { render() {} abstract props: string; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
+		{Code: `abstract class Foo extends React.Component { render() {} static abstract method(): void; }`, Tsx: true, Options: sortCompOrder("static-methods", "render")},
+		{Code: `abstract class Foo extends React.Component { render() {} abstract static get value(): string; }`, Tsx: true, Options: sortCompOrder("getters", "render")},
+		{Code: `abstract class Foo extends React.Component { render() {} abstract static set value(next: string); }`, Tsx: true, Options: sortCompOrder("setters", "render")},
 		{Code: `class Foo extends React.Component { render() {} accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
 		{Code: `class Foo extends React.Component { render() {} accessor foo = () => {}; }`, Tsx: true, Options: sortCompOrder("instance-methods", "render")},
 		{Code: `class Foo extends React.Component { render() {} static accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("static-variables", "render")},
@@ -54,6 +57,8 @@ func TestSortCompExtras(t *testing.T) {
 		}},
 		// ---- Compatibility: computed identifiers are named keys in ESTree. ----
 		{Code: `class Foo extends React.Component { render() {} [displayName]() {} }`, Tsx: true, Options: sortCompOrder("displayName", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "displayName")}},
+		{Code: `class Foo extends React.Component { render() {} [foo.bar]() {} }`, Tsx: true, Options: sortCompOrder("/undefined/,", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "undefined")}},
+		{Code: `var Foo = createReactClass({ render() {}, [foo.bar]() {} });`, Tsx: true, Options: sortCompOrder("/undefined/,", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "undefined")}},
 		// ---- Compatibility: ESTree omits empty class elements. ----
 		{Code: `class Foo extends React.Component { render() {} ; componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		// ---- Compatibility: literal keys preserve JavaScript's undefined text. ----

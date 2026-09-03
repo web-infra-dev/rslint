@@ -134,7 +134,7 @@ func getMemberNames(member *ast.Node) (string, string) {
 		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
 	}
 	if name == nil {
-		return "", "undefined"
+		return "undefined", "undefined"
 	}
 	switch name.Kind {
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
@@ -144,7 +144,7 @@ func getMemberNames(member *ast.Node) (string, string) {
 		// ESTree's property-name lookup has no name for literal and
 		// computed expression keys; JavaScript interpolation renders it
 		// as "undefined".
-		return "", "undefined"
+		return "undefined", "undefined"
 	}
 }
 
@@ -154,15 +154,16 @@ func getMemberInfo(member *ast.Node) memberInfo {
 		return info
 	}
 	info.name, info.displayName = getMemberNames(member)
-	info.getter = member.Kind == ast.KindGetAccessor
-	info.setter = member.Kind == ast.KindSetAccessor
+	plainClassMember := utils.IsPlainClassMember(member)
+	info.getter = plainClassMember && member.Kind == ast.KindGetAccessor
+	info.setter = plainClassMember && member.Kind == ast.KindSetAccessor
 	value := memberValue(member)
 	propertyDeclaration := member.Kind == ast.KindPropertyDeclaration
 	// tsgo represents abstract properties and auto-accessors as
 	// PropertyDeclaration, but typescript-eslint exposes them as
 	// TSAbstractPropertyDefinition / AccessorProperty. Only plain class
 	// fields participate in the static/instance variable or method groups.
-	classField := propertyDeclaration && utils.IsPlainClassMember(member)
+	classField := propertyDeclaration && plainClassMember
 	static := ast.IsStatic(member)
 	functionValue := isFunctionLikeExpression(value) || member.Kind == ast.KindMethodDeclaration || member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor || member.Kind == ast.KindConstructor
 	if propertyDeclaration && member.AsPropertyDeclaration().Type != nil && value == nil {
@@ -176,7 +177,7 @@ func getMemberInfo(member *ast.Node) memberInfo {
 			info.instanceVariable = value == nil || !functionValue
 			info.instanceMethod = value != nil && functionValue
 		}
-	} else if static && (member.Kind == ast.KindMethodDeclaration || member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor) {
+	} else if plainClassMember && static && (member.Kind == ast.KindMethodDeclaration || member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor) {
 		info.staticMethod = true
 	}
 	return info
