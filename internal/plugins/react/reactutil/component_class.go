@@ -138,7 +138,7 @@ func IsExplicitReactComponent(classNode *ast.Node) bool {
 }
 
 func containsJSDocTypeBraces(text string) bool {
-	for index := 0; index < len(text); index++ {
+	for index := range len(text) {
 		if text[index] == '{' || text[index] == '}' {
 			return true
 		}
