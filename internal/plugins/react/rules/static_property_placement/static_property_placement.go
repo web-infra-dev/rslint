@@ -65,6 +65,7 @@ func propertyName(node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
+	node = ast.SkipParentheses(node)
 	var name string
 	switch node.Kind {
 	case ast.KindIdentifier:
@@ -130,6 +131,8 @@ func classMemberName(node *ast.Node) string {
 	switch nameNode.Kind {
 	case ast.KindIdentifier:
 		name = nameNode.AsIdentifier().Text
+	case ast.KindPrivateIdentifier:
+		name = reactutil.IdentifierOrPrivateName(nameNode)
 	case ast.KindComputedPropertyName:
 		expr := ast.SkipParentheses(nameNode.AsComputedPropertyName().Expression)
 		if expr != nil && expr.Kind == ast.KindIdentifier {
@@ -267,14 +270,32 @@ func componentPath(node *ast.Node) (*ast.Node, []string, bool) {
 		return node, nil, true
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression()
-		if property.Name() == nil || property.Name().Kind != ast.KindIdentifier {
-			return nil, nil, false
-		}
 		root, path, ok := componentPath(property.Expression)
 		if !ok {
 			return nil, nil, false
 		}
-		return root, append(path, property.Name().AsIdentifier().Text), true
+		// getRelatedComponent adds only ordinary ESTree Identifier
+		// properties to its path. Private and other non-Identifier names
+		// are skipped while the object prefix remains usable.
+		if name := property.Name(); name != nil && name.Kind == ast.KindIdentifier {
+			return root, append(path, name.AsIdentifier().Text), true
+		}
+		return root, path, true
+	case ast.KindElementAccessExpression:
+		property := node.AsElementAccessExpression()
+		root, path, ok := componentPath(property.Expression)
+		if !ok {
+			return nil, nil, false
+		}
+		// getRelatedComponent includes an ESTree computed identifier in the
+		// component path, but omits literal and other computed keys. Keep the
+		// resolved prefix for the latter so `Box.C["helper"].propTypes`
+		// still resolves through `Box.C` like upstream.
+		argument := ast.SkipParentheses(property.ArgumentExpression)
+		if argument != nil && argument.Kind == ast.KindIdentifier {
+			path = append(path, argument.AsIdentifier().Text)
+		}
+		return root, path, true
 	default:
 		return nil, nil, false
 	}
@@ -420,6 +441,12 @@ var StaticPropertyPlacementRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
+				// TypeScript represents auto-accessors as PropertyDeclaration,
+				// while typescript-eslint exposes AccessorProperty, which is not
+				// included in the upstream rule's listener selector.
+				if hasModifier(node, ast.KindAccessorKeyword) {
+					return
+				}
 				checkClassMember(node, node.Modifiers() != nil && node.Modifiers().Nodes != nil && hasStaticModifier(node))
 			},
 			ast.KindGetAccessor: func(node *ast.Node) {
@@ -446,11 +473,15 @@ var StaticPropertyPlacementRule = rule.Rule{
 }
 
 func hasStaticModifier(node *ast.Node) bool {
+	return hasModifier(node, ast.KindStaticKeyword)
+}
+
+func hasModifier(node *ast.Node, kind ast.Kind) bool {
 	if node == nil || node.Modifiers() == nil {
 		return false
 	}
 	for _, modifier := range node.Modifiers().Nodes {
-		if modifier.Kind == ast.KindStaticKeyword {
+		if modifier.Kind == kind {
 			return true
 		}
 	}

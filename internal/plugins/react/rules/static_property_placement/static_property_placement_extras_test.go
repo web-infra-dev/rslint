@@ -31,6 +31,8 @@ func TestStaticPropertyPlacementExtras(t *testing.T) {
 			{Code: `class MyComponent extends React.Component { static ['other'] = {}; }`, Tsx: true},
 			{Code: `class MyComponent extends React.Component { static #propTypes = {}; }`, Tsx: true},
 			{Code: `class MyComponent extends React.Component { static [dynamic] = {}; }`, Tsx: true},
+			{Code: `class MyComponent extends React.Component { static accessor propTypes = {}; }`, Options: []interface{}{staticGetter}, Tsx: true},
+			{Code: `class MyComponent extends React.Component { accessor displayName = {}; }`, Options: []interface{}{propertyAssignment}, Tsx: true},
 			// ---- Dimension 4: declaration/container forms ----
 			// A class expression is detected as a component, so assignment mode
 			// correctly rejects its static field (the invalid counterpart below
