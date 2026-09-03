@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "rspress build",
-    "dev": "rspress dev",
-    "preview": "rspress preview"
+    "build": "rs doc build",
+    "dev": "rs doc",
+    "preview": "rs doc preview"
   },
   "dependencies": {
     "@radix-ui/react-label": "catalog:",

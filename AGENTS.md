@@ -51,7 +51,8 @@ This document summarizes how to work on rslint effectively and consistently.
 - Use `.txtar` only for portable regular text files. Construct symlinks, permissions, concurrency, and other OS behavior directly in Go tests.
 - Fixture helpers must reject missing or empty selections instead of allowing a test to pass without exercising a case.
 - Keep tests minimal and behavior-focused; avoid unrelated scenarios.
-- Run `pnpm run test:go` (Go) and `pnpm run test` (JS) before submitting.
+- By default, run tests for the packages containing changed code. If a change affects shared behavior or an exported API, also run tests for its direct consumer packages.
+- Run the full `pnpm run test:go` (Go) and `pnpm run test` (JS) suites only for broad or cross-cutting changes, changes to shared test or build infrastructure, changes whose impact cannot be scoped reliably, or when explicitly requested by CI or a reviewer.
 
 ## Commit & Pull Request Guidelines
 
