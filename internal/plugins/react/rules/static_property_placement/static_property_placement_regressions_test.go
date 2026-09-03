@@ -10,6 +10,7 @@ import (
 func TestStaticPropertyPlacementRegressions(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StaticPropertyPlacementRule,
 		[]rule_tester.ValidTestCase{
+			{Code: `abstract class C extends React.Component { abstract propTypes: Props; abstract context: Context; }`, Tsx: true},
 			{Code: `const Box = { C: class extends React.Component {} }; Box.C["displayName"] = {};`, Options: []interface{}{staticGetter}, Tsx: true},
 			{Code: `const Box = { C: class extends React.Component {} }; Box.C['displayName'] = {};`, Tsx: true},
 			{Code: `class C extends React.Component { static ["propTypes"] = {}; }`, Options: []interface{}{staticGetter}, Tsx: true},

@@ -424,6 +424,13 @@ var StaticPropertyPlacementRule = rule.Rule{
 		o := parseOptions(rawOptions)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		checkClassMember := func(node *ast.Node, isStatic bool) {
+			// @typescript-eslint/parser represents abstract fields as
+			// TSAbstractPropertyDefinition, which is not matched by the upstream
+			// rule's ClassProperty/PropertyDefinition selector. tsgo exposes the
+			// same field as PropertyDeclaration, so filter abstract members here.
+			if hasModifier(node, ast.KindAbstractKeyword) {
+				return
+			}
 			if reactutil.GetParentReactComponentScopeBased(node, pragma, reactutil.GetReactCreateClass(ctx.Settings)) == nil {
 				return
 			}
