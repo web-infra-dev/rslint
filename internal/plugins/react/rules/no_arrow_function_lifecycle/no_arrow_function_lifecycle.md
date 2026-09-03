@@ -59,14 +59,12 @@ you can disable this rule.
 - [eslint-plugin-react: no-arrow-function-lifecycle](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-arrow-function-lifecycle.md)
 - [Source code](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-arrow-function-lifecycle.js)
 
-## Intentional autofix divergences
+## Differences from ESLint
 
-The rslint autofix intentionally preserves valid syntax where
+The autofix preserves valid syntax in two cases where
 eslint-plugin-react v7.37.5 produces malformed text:
 
-- The upstream rule derives parameters from ESTree `p.name`, so default,
-  rest, and destructured parameters become empty entries such as `render(, )`.
-  rslint preserves the complete parameter syntax.
-- The upstream rule starts a computed-key replacement at the inner key's end,
-  so `[render]` becomes `[render() ...` or `[render: function() ...`.
-  rslint replaces after the complete computed key and preserves valid syntax.
+- For default, rest, or destructured parameters, rslint preserves the
+  parameter syntax in the fix, while ESLint emits empty entries such as `render(, )`.
+- For computed keys such as `[render]`, rslint preserves the brackets in the
+  fix, while ESLint removes them and emits malformed code such as `[render() ...`.

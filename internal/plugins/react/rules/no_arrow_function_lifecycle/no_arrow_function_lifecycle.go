@@ -155,6 +155,9 @@ func isExplicitReactComponentType(node *ast.Node) bool {
 }
 
 func parameterText(sf *ast.SourceFile, fn *ast.Node) string {
+	// NOTE: Unlike ESLint v7.37.5, preserve the complete parameter source.
+	// The upstream fixer emits empty names for default, rest, and destructured
+	// parameters, which produces invalid JavaScript.
 	params := reactutil.FunctionParameters(fn)
 	if len(params) == 0 {
 		return ""
@@ -229,6 +232,9 @@ func buildFixes(ctx rule.RuleContext, member, fn, rawValue *ast.Node) []rule.Rul
 	if member.Kind == ast.KindPropertyAssignment {
 		methodText = ": function(" + params + ") "
 	}
+	// NOTE: Unlike ESLint v7.37.5, replace after the complete computed key.
+	// The upstream range can remove the closing bracket and produce invalid
+	// JavaScript for keys such as `[render]`.
 	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(name.End(), headEnd), methodText)}
 	if body.Kind == ast.KindBlock {
 		return fixes
