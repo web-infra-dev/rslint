@@ -147,14 +147,7 @@ func (file *fileNamespaces) collectImportSpecifier(element *ast.Node) {
 	if local == nil || local.Kind != ast.KindIdentifier {
 		return
 	}
-	imported := specifier.PropertyName
-	if imported == nil {
-		imported = local
-	}
-	if imported.Kind != ast.KindIdentifier {
-		return
-	}
-	switch imported.AsIdentifier().Text {
+	switch importedName(specifier) {
 	case namespaceRs:
 		file.rs.imported = true
 		file.rs.localName = local.AsIdentifier().Text
@@ -196,15 +189,26 @@ func isRstestUtilitiesImportName(identifier *ast.Node) bool {
 		!rstestUtils.IsRstestCoreImportModule(declaration.ModuleSpecifier.Text()) {
 		return false
 	}
-	imported := specifier.PropertyName
-	if imported == nil {
-		imported = specifier.Name()
-	}
-	if imported == nil || imported.Kind != ast.KindIdentifier {
-		return false
-	}
-	name := imported.AsIdentifier().Text
+	name := importedName(specifier)
 	return name == namespaceRs || name == namespaceRstest
+}
+
+// importedName is the name the specifier reaches for in the module it imports
+// from. It is spelled by `PropertyName` when the import is aliased, and an
+// alias may name the export with a string literal, so the text is read off the
+// node rather than the node being required to be an identifier.
+func importedName(specifier *ast.ImportSpecifier) string {
+	if specifier == nil {
+		return ""
+	}
+	if specifier.PropertyName != nil {
+		return specifier.PropertyName.Text()
+	}
+	name := specifier.Name()
+	if name == nil {
+		return ""
+	}
+	return name.Text()
 }
 
 func declaresBinding(declaration *ast.Node) bool {

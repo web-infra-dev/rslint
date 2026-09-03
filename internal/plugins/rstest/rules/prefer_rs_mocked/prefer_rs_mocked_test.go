@@ -120,6 +120,22 @@ import type { Mock } from '@rstest/core';
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 2, Column: 2}},
 			},
 			{
+				// An export named with a string literal binds the same
+				// namespace as the identifier spelling.
+				Code: `import { "rs" as r, type Mock } from '@rstest/core';
+(getUser as Mock).mockReturnValue(user);`,
+				Output: []string{`import { "rs" as r, type Mock } from '@rstest/core';
+(r.mocked(getUser)).mockReturnValue(user);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 2, Column: 2}},
+			},
+			{
+				Code: `import { "rstest" as rstest, type Mock } from '@rstest/core';
+(getUser as Mock).mockReturnValue(user);`,
+				Output: []string{`import { "rstest" as rstest, type Mock } from '@rstest/core';
+(rstest.mocked(getUser)).mockReturnValue(user);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 2, Column: 2}},
+			},
+			{
 				Code: `import { rstest as helper, type Mocked } from '@rstest/core';
 (mod as Mocked<typeof mod>).init();`,
 				Output: []string{`import { rstest as helper, type Mocked } from '@rstest/core';
