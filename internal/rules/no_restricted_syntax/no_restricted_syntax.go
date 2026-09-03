@@ -304,7 +304,8 @@ func supportsSingleDispatch(path []string) bool {
 
 func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
 	if selectorTargetsClassBody(sel) || selectorTargetsJSXEmptyExpression(sel) ||
-		selectorTargetsEstreeType(sel, "TSEnumBody") || selectorTargetsEstreeType(sel, "FunctionExpression") {
+		selectorTargetsEstreeType(sel, "TSEnumBody") || selectorTargetsEstreeType(sel, "FunctionExpression") ||
+		selectorTargetsEstreeType(sel, "JSXElement") || selectorTargetsEstreeType(sel, "JSXOpeningElement") {
 		return attrs
 	}
 	switch value := sel.(type) {
@@ -413,7 +414,13 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
 
 	for _, target := range virtualTargets(node) {
-		if !matchesInScopeTarget(compiled, node, mc, nil, target) {
+		if !selectorTargetsEstreeType(entry.compiled, target) {
+			continue
+		}
+		// Dispatch predicates are stripped only for the physical path.
+		// Virtual ESTree identities must be checked against the original
+		// selector, otherwise the stripped wildcard reports them again.
+		if !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
 			continue
 		}
 		switch target {
@@ -424,6 +431,8 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 		case "JSXEmptyExpression":
 			nodeRange := utils.TrimNodeTextRange(mc.sf, node)
 			ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
+		case "FunctionExpression":
+			ctx.ReportRange(functionValueTextRange(mc.sf, node), message)
 		default:
 			ctx.ReportNode(node, message)
 		}
@@ -435,6 +444,46 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 
 func (e ruleEntry) formatMessage() string {
 	return e.message
+}
+
+func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	if sf == nil || node == nil || node.Body() == nil {
+		if node == nil {
+			return core.TextRange{}
+		}
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	tokens := utils.TokensOfNode(sf, node)
+	bodyStart := node.Body().Pos()
+	openIndex := -1
+	for index, token := range tokens {
+		if token.Start >= bodyStart {
+			break
+		}
+		if token.Kind == ast.KindOpenParenToken {
+			openIndex = index
+		}
+	}
+	if openIndex < 0 {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	start := tokens[openIndex].Start
+	if openIndex > 0 && tokens[openIndex-1].Kind == ast.KindGreaterThanToken {
+		depth := 1
+		for index := openIndex - 1; index >= 0; index-- {
+			switch tokens[index].Kind {
+			case ast.KindGreaterThanToken:
+				depth++
+			case ast.KindLessThanToken:
+				depth--
+				if depth == 0 {
+					start = tokens[index].Start
+					index = -1
+				}
+			}
+		}
+	}
+	return core.NewTextRange(start, node.Body().End())
 }
 
 func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
