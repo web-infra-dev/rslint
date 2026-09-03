@@ -155,6 +155,9 @@ func TestNoChildrenPropRule(t *testing.T) {
 		// Parenthesized createElement callee is still recognized — so a
 		// valid call with no `children` prop must still pass cleanly.
 		{Code: `(React.createElement)("div", {});`, Tsx: true},
+		// Authored TypeScript assertions remain visible to ESTree and keep the
+		// receiver from matching the configured pragma.
+		{Code: `(React as any).createElement("div", {children: "x"});`, Tsx: true},
 		// Parenthesized props object — still recognized; no children here.
 		{Code: `React.createElement("div", ({className: "x"}));`, Tsx: true},
 		// Generic createElement: `React.createElement<Props>(...)` — type args
@@ -391,6 +394,28 @@ func TestNoChildrenPropRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "passChildrenAsArgs", Line: 1, Column: 1},
 			},
+		},
+		// JavaScript JSDoc casts are not exposed by ESTree, so the pragma
+		// receiver is still React.
+		{
+			Code:     `/** @type {any} */ (React).createElement("div", {children: "x"});`,
+			FileName: "jsdoc-create-element.js",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "passChildrenAsArgs", Line: 1, Column: 20},
+			},
+		},
+		{
+			Code:     `/** @type {any} */ (React)?.createElement("div", {children: "x"});`,
+			FileName: "jsdoc-optional-create-element.js",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "passChildrenAsArgs"}},
+		},
+		{
+			Code:     `/** @type {any} */ (React.createElement)("div", {children: "x"});`,
+			FileName: "jsdoc-create-element-callee.js",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "passChildrenAsArgs"}},
 		},
 		// Custom pragma: `h.createElement(...)` is picked up when settings
 		// declares it.
