@@ -118,6 +118,19 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			{Code: `const rs = { importActual: async (p) => ({}) }; rs['importActual']('./example.js');`, Options: checkImports},
 			// An optional chain on the receiver is left as the runtime stub.
 			{Code: `rs?.importActual('./example.js')`, Options: checkImports},
+			// A template literal names no member for any of them, even with no
+			// substitution: measured on @rstest/core 0.11.11, only a plain
+			// quoted string reaches the *Actual rewrite.
+			{Code: "rs[`importActual`]('./example.js')", Options: checkImports},
+			{Code: "rs[`requireActual`]('./example.js')", Options: checkImports},
+			// The wider surface belongs to the two *Actual members alone. The
+			// other two loaders are matched on the name as written, so these
+			// shapes stay the throwing stub and a type parameter would not
+			// make them run.
+			{Code: `rs['importMock']('./example.js')`, Options: checkImports},
+			{Code: `rs['requireMock']('./example.js')`, Options: checkImports},
+			{Code: `rs['importMock']?.('./example.js')`, Options: checkImports},
+			{Code: `rs.requireMock?.('./example.js')`, Options: checkImports},
 
 			// The build resolves the path, so anything it cannot read at build
 			// time is either a build failure or the runtime stub.
@@ -162,17 +175,19 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			{Code: `rs.importActual(('./example.js'))`, Options: checkImports, Errors: missing("importActual", 1, 4, 16)},
 			{Code: `rs.importActual('./example.js' as string)`, Options: checkImports, Errors: missing("importActual", 1, 4, 16)},
 
-			// ---- Dimension 4: the loader rewrite's wider call surface ----
-			// A computed string key and an optional call are both rewritten,
-			// measured on rstest 0.11.8, so both leave an untyped module.
+			// ---- Dimension 4: the two *Actual loaders' wider call surface ----
+			// A bracketed string key and an optional call are rewritten for
+			// these two and for no other member, measured on @rstest/core
+			// 0.11.11, so both leave an untyped module.
 			{Code: `rs['importActual']('./example.js')`, Options: checkImports, Errors: missing("importActual", 1, 4, 18)},
-			{Code: "rs[`requireActual`]('./example.js')", Options: checkImports, Errors: missing("requireActual", 1, 4, 19)},
 			{Code: `rs.importActual?.('./example.js')`, Options: checkImports, Errors: missing("importActual", 1, 4, 16)},
-			{Code: `rs['importMock']?.('./example.js')`, Options: checkImports, Errors: missing("importMock", 1, 4, 16)},
+			{Code: `rs['requireActual']('./example.js')`, Options: checkImports, Errors: missing("requireActual", 1, 4, 19)},
 			{Code: `(rs as any)['importActual']('./example.js')`, Options: checkImports, Errors: missing("importActual", 1, 13, 27)},
-			// The shadowing rule is the same whichever way the member is
-			// written, and so is the argument shape.
-			{Code: `rs['requireMock']('./example.js')`, Options: checkImports, Errors: missing("requireMock", 1, 4, 17)},
+			// `importMock` and `requireMock` are matched on the name as
+			// written, so a local declaration of the receiver does not take
+			// the call away from the rewrite the way it does for the two
+			// *Actual members.
+			{Code: `const rs = { importMock: async (p) => ({}) }; rs.importMock('./example.js');`, Options: checkImports, Errors: missing("importMock", 1, 50, 60)},
 
 			// ---- The two module loaders Rstest adds ----
 			{
@@ -254,6 +269,51 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 const load = rs.fn<() => void>();
 const save = rs.fn();`,
 				Errors: missing("fn", 3, 17, 19),
+			},
+		},
+	)
+}
+
+// The `rs` / `rstest` utility object is the same object through `rstack/test`,
+// which re-exports the Rstest core API, so every receiver form resolves there
+// too.
+func TestRequireMockTypeParametersRstackTestModule(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&RequireMockTypeParametersRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { rs } from 'rstack/test'; rs.fn<() => void>();`},
+			// A sibling subpath exports no utility object.
+			{Code: `import { rs } from 'rstack/lib'; rs.fn();`},
+			// The namespace itself is not the utility object.
+			{Code: `import * as core from 'rstack/test'; core.fn();`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `import { rs } from 'rstack/test'; rs.fn();`,
+				Errors: missing("fn", 1, 38, 40),
+			},
+			{
+				Code:   `import { rs as vi } from 'rstack/test'; vi.fn();`,
+				Errors: missing("fn", 1, 44, 46),
+			},
+			{
+				Code:   `import { rstest as mocker } from 'rstack/test'; mocker.fn();`,
+				Errors: missing("fn", 1, 56, 58),
+			},
+			{
+				Code:   `const { rs } = require('rstack/test'); rs.fn();`,
+				Errors: missing("fn", 1, 43, 45),
+			},
+			{
+				Code:   `import * as core from 'rstack/test'; core.rs.fn();`,
+				Errors: missing("fn", 1, 46, 48),
+			},
+			{
+				Code:   `const core = require('rstack/test'); core.rstest.fn();`,
+				Errors: missing("fn", 1, 50, 52),
 			},
 		},
 	)

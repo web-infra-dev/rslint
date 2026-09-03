@@ -35,6 +35,7 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		// === void type ===
 		{Code: "declare function foo(): number | void;\nconst r = foo() === undefined;\n"},
 		{Code: "declare function foo(): number | void;\nconst r = foo() == null;\n"},
+		{Code: "declare function foo(): number | void;\nfoo() ?? 1;\n"},
 
 		// === Generics and type parameters ===
 		{Code: "function test<T extends string>(t: T) {\n  return t ? 'yes' : 'no';\n}\n"},
@@ -122,6 +123,9 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		// void return
 		{Code: "declare function foo(): void | { key: string };\nconst bar = foo()?.key;\n"},
 		{Code: "type fn = () => void;\ndeclare function foo(): void | fn;\nconst bar = foo()?.();\n"},
+		{Code: "declare function maybe<T>(v: T): T | void;\nconst a = maybe({ key1: { key2: maybe({ i: 1 }) } })?.key1.key2?.i;\n"},
+		{Code: "type Foo = { bar: { baz: number } | void } | null;\ndeclare const foo: Foo;\nfoo?.bar?.baz;\n"},
+		{Code: "declare function maybeFn(): { fn: (() => number) | void } | undefined;\nmaybeFn()?.fn?.();\n"},
 
 		// === Array index expressions ===
 		{Code: "declare const arr: string[];\nif (arr[0]) {}\n"},
@@ -170,7 +174,6 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		{Code: "declare function isString(x: unknown): x is string;\ndeclare const a: string;\nisString(a);\n"},
 		// Literal subtype (type is 'falafel' not string, so guard still narrows)
 		{Code: "declare function assertString(x: unknown): asserts x is string;\nassertString('falafel');\n", Options: map[string]interface{}{"checkTypePredicates": true}},
-
 
 		// === exactOptionalPropertyTypes: private optional field with ??= ===
 		{

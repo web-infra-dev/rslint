@@ -36,7 +36,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/consistent-json-file-read': 'error', // not implemented
     // 'unicorn/consistent-optional-chaining': 'error', // not implemented
     // 'unicorn/consistent-template-literal-escape': 'error', // not implemented
-    // 'unicorn/consistent-tuple-labels': 'error', // not implemented
+    'unicorn/consistent-tuple-labels': 'error',
     // 'unicorn/custom-error-definition': 'off', // not implemented
     // 'unicorn/default-export-style': 'error', // not implemented
     // 'unicorn/dom-node-dataset': 'error', // not implemented
@@ -167,7 +167,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unreadable-array-destructuring': 'error', // not implemented
     // 'unicorn/no-unreadable-for-of-expression': 'error', // not implemented
     // 'unicorn/no-unreadable-iife': 'error', // not implemented
-    // 'unicorn/no-unreadable-new-expression': 'off', // not implemented
+    'unicorn/no-unreadable-new-expression': 'off',
     // 'unicorn/no-unreadable-object-destructuring': 'error', // not implemented
     // 'unicorn/no-unsafe-buffer-conversion': 'error', // not implemented
     // 'unicorn/no-unsafe-dom-html': 'off', // not implemented
@@ -222,7 +222,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-at': 'error', // not implemented
     // 'unicorn/prefer-await': 'error', // not implemented
     // 'unicorn/prefer-bigint-literals': 'error', // not implemented
-    // 'unicorn/prefer-blob-reading-methods': 'error', // not implemented
+    'unicorn/prefer-blob-reading-methods': 'error',
     // 'unicorn/prefer-block-statement-over-iife': 'error', // not implemented
     // 'unicorn/prefer-boolean-return': 'error', // not implemented
     // 'unicorn/prefer-class-fields': 'error', // not implemented

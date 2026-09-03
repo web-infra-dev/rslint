@@ -1,36 +1,64 @@
 # unified-signatures
 
-## Rule Details
+Disallow overloads that can be combined into one signature with a union,
+optional parameter, or rest parameter.
 
-Disallow two overloads that could be unified into one with a union or optional parameter. Function overloads that only differ in one parameter's type can typically be replaced with a single signature using a union type. Similarly, overloads where one signature has an additional optional parameter can be unified into one signature with that parameter marked as optional. Reducing overloads makes the API simpler and easier to understand.
+## Rule details
+
+Multiple overloads make an API harder to read when they differ only in a
+single parameter type or in one parameter that can be omitted. This rule
+reports those signatures and recommends expressing the difference directly.
 
 Examples of **incorrect** code for this rule:
 
 ```typescript
-function foo(x: number): void;
-function foo(x: string): void;
+function parse(value: string): void;
+function parse(value: number): void;
 
-interface Bar {
-  method(x: number): void;
-  method(x: string): void;
+interface Factory {
+  create(): Result;
+  create(options?: Options): Result;
 }
 ```
 
 Examples of **correct** code for this rule:
 
 ```typescript
-function foo(x: number | string): void;
+function parse(value: string | number): void;
 
-interface Bar {
-  method(x: number | string): void;
+interface Factory {
+  create(options?: Options): Result;
 }
 
-// Different enough signatures are OK
-function baz(x: number): number;
-function baz(x: string): string;
+function convert(value: string): string;
+function convert(value: number): number;
 ```
 
-## Original Documentation
+The last pair is allowed because its return types differ.
+
+## Options
+
+The rule accepts an optional object:
+
+```json
+{
+  "ignoreDifferentlyNamedParameters": false,
+  "ignoreOverloadsWithDifferentJSDoc": false
+}
+```
+
+### `ignoreDifferentlyNamedParameters`
+
+When `true`, overloads whose corresponding parameters have different names
+are not combined.
+
+### `ignoreOverloadsWithDifferentJSDoc`
+
+When `true`, overloads with different preceding block comments are not
+combined.
+
+## Original documentation
 
 - [typescript-eslint: unified-signatures](https://typescript-eslint.io/rules/unified-signatures)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/unified-signatures.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/src/rules/unified-signatures.ts)
+- [Tests](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/tests/rules/unified-signatures.test.ts)

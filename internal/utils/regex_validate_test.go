@@ -7,6 +7,16 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
+func TestNormalizeRegexCaptureName(t *testing.T) {
+	high := ecmascript.StringFromCodeUnits([]uint16{0xD835})
+	low := ecmascript.StringFromCodeUnits([]uint16{0xDC9C})
+
+	got, ok := NormalizeRegexCaptureName(high + low)
+	if !ok || got != "𝒜" {
+		t.Fatalf("NormalizeRegexCaptureName(raw surrogate pair) = (%q, %v), want (%q, true)", got, ok, "𝒜")
+	}
+}
+
 func TestRegexPatternLiteral(t *testing.T) {
 	high := ecmascript.StringFromCodeUnits([]uint16{0xD800})
 	tests := []struct {
@@ -40,6 +50,53 @@ func TestRegexPatternLiteral(t *testing.T) {
 			got, ok := regexPatternLiteral(test.pattern, test.flags)
 			if got != test.want || ok != test.ok {
 				t.Fatalf("regexPatternLiteral(%q) = (%q, %v), want (%q, %v)", test.pattern, got, ok, test.want, test.ok)
+			}
+		})
+	}
+}
+
+func TestRegexPatternCharacterEventCutoff(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  string
+		flags    RegexFlags
+		position int
+		invalid  bool
+	}{
+		{name: "valid", pattern: `\x1f`},
+		{name: "slash equals carrier", pattern: `=\x1f`, flags: RegexFlags{Unicode: true}},
+		{name: "legacy unicode identity", pattern: `\u{NOT_HEX}\x1f`},
+		{name: "single v ampersand", pattern: `[&]\x1f`, flags: RegexFlags{UnicodeSets: true}},
+		{name: "escaped capture name", pattern: `(?<\u{1d49c}>.)\x1f`},
+		{name: "deferred named reference", pattern: `(?<a>a)\k<missing>\x1f`, flags: RegexFlags{Unicode: true}},
+		{name: "invalid escape before control", pattern: `\u{NOT_HEX}\x1f`, flags: RegexFlags{Unicode: true}, position: 3, invalid: true},
+		{name: "control before invalid escape", pattern: `\x1f\u{NOT_HEX}`, flags: RegexFlags{Unicode: true}, position: 7, invalid: true},
+		{name: "leading quantifier", pattern: `*\x1f`, position: 0, invalid: true},
+		{name: "leading unicode quantifier", pattern: `{0}\x1f\😀`, flags: RegexFlags{Unicode: true}, position: 0, invalid: true},
+		{name: "invalid unicode q escape", pattern: `\q{a}\x1f`, flags: RegexFlags{Unicode: true}, position: 0, invalid: true},
+		{name: "missing numeric reference", pattern: `\1\x1f`, flags: RegexFlags{Unicode: true}, position: 0, invalid: true},
+		{name: "invalid range before control", pattern: `[z-a\x1f]`, position: 4, invalid: true},
+		{name: "legacy invalid range before control", pattern: `[a--b]\x1f`, position: 4, invalid: true},
+		{name: "control before invalid range", pattern: `[\x1fz-a]`, position: 8, invalid: true},
+		{name: "unterminated class", pattern: `[\x1f`, position: 5, invalid: true},
+		{name: "unterminated group", pattern: `(\x1f`, position: 5, invalid: true},
+		{name: "conflicting modes", pattern: `\u{1F}`, flags: RegexFlags{Unicode: true, UnicodeSets: true}, position: 0, invalid: true},
+		{name: "duplicate capture", pattern: `(?<a>a)(?<a>a)\x1f`, flags: RegexFlags{Unicode: true}, position: 10, invalid: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			position, invalid := RegexPatternCharacterEventCutoff(test.pattern, test.flags)
+			if position != test.position || invalid != test.invalid {
+				t.Fatalf(
+					"RegexPatternCharacterEventCutoff(%q, %+v) = (%d, %v), want (%d, %v)",
+					test.pattern,
+					test.flags,
+					position,
+					invalid,
+					test.position,
+					test.invalid,
+				)
 			}
 		})
 	}
@@ -204,6 +261,8 @@ func TestIsValidRegexPatternECMAVersion(t *testing.T) {
 	}{
 		{name: "named capture before introduction", pattern: `(?<a>x)`, ecmaVersion: 2017},
 		{name: "named capture after introduction", pattern: `(?<a>x)`, ecmaVersion: 2018, want: true},
+		{name: "lookbehind before introduction", pattern: `(?<=a)b`, ecmaVersion: 2017},
+		{name: "lookbehind after introduction", pattern: `(?<=a)b`, ecmaVersion: 2018, want: true},
 		{name: "duplicate alternatives before relaxation", pattern: `(?<a>x)|(?<a>y)`, ecmaVersion: 2024},
 		{name: "duplicate alternatives after relaxation", pattern: `(?<a>x)|(?<a>y)`, ecmaVersion: 2025, want: true},
 		{name: "escaped duplicate alternatives before relaxation", pattern: `(?<\u0061>x)|(?<a>y)`, ecmaVersion: 2024},

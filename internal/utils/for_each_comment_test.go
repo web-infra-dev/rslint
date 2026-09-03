@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -154,19 +155,41 @@ func TestHasCommentInSpan(t *testing.T) {
 		comments = append(comments, comment)
 	}, sf)
 	sort.Slice(comments, func(i, j int) bool { return comments[i].Pos() < comments[j].Pos() })
+	comments = slices.CompactFunc(comments, func(left, right *ast.CommentRange) bool {
+		return left.Pos() == right.Pos() && left.End() == right.End()
+	})
 
 	commentGapStart := strings.Index(src, "1")
 	commentGapEnd := strings.Index(src, "+")
+	commentsInGap := CommentsInSpan(comments, commentGapStart, commentGapEnd)
+	if len(commentsInGap) != 1 || src[commentsInGap[0].Pos():commentsInGap[0].End()] != "/* real */" {
+		t.Fatalf("CommentsInSpan returned %#v, want the real block comment", commentsInGap)
+	}
 	if !HasCommentInSpan(comments, commentGapStart, commentGapEnd) {
 		t.Fatal("expected real block comment in numeric-expression gap")
+	}
+	if got := CommentsInSpan(comments, commentsInGap[0].Pos()+1, commentsInGap[0].End()); len(got) != 1 {
+		t.Fatalf("span beginning inside a comment returned %d comments, want 1", len(got))
+	}
+	if got := CommentsInSpan(comments, commentsInGap[0].Pos()-1, commentsInGap[0].Pos()); len(got) != 0 {
+		t.Fatalf("span ending at a comment returned %d comments, want 0", len(got))
+	}
+	if got := CommentsInSpan(comments, commentsInGap[0].End(), commentsInGap[0].End()+1); len(got) != 0 {
+		t.Fatalf("span starting after a comment returned %d comments, want 0", len(got))
 	}
 
 	stringStart := strings.Index(src, `"/*`)
 	stringEnd := strings.Index(src, `*/"`) + len(`*/"`)
+	if got := CommentsInSpan(comments, stringStart, stringEnd); len(got) != 0 {
+		t.Fatalf("string literal comment markers returned %d comments, want 0", len(got))
+	}
 	if HasCommentInSpan(comments, stringStart, stringEnd) {
 		t.Fatal("string literal comment markers must not count as comments")
 	}
 
+	if got := CommentsInSpan(comments, commentGapStart, commentGapStart); got != nil {
+		t.Fatalf("empty span returned comments: %#v", got)
+	}
 	if HasCommentInSpan(comments, commentGapStart, commentGapStart) {
 		t.Fatal("empty span must not contain comments")
 	}

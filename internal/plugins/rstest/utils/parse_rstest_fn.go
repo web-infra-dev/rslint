@@ -324,13 +324,13 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 // identifier refers to.
 //
 // Every discrimination this parser promises — an import from `@rstest/core`
-// against a same-named import from Vitest or Jest, a global against a local
-// declaration that shadows it, an alias against an unrelated variable — is
-// decided from this symbol's declarations. Without one,
-// [testFramework.ResolveFunctionIdentifierReferenceFromSymbol] can only fall
-// back to the identifier's spelling, which is wrong in both directions: a
+// or `rstack/test` against a same-named import from Vitest or Jest, a global
+// against a local declaration that shadows it, an alias against an unrelated
+// variable — is decided from this symbol's declarations. Without one,
+// [testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules] can only
+// fall back to the identifier's spelling, which is wrong in both directions: a
 // `test` imported from Vitest is taken for an Rstest global, while a renamed
-// or namespace import from `@rstest/core` stops resolving at all.
+// or namespace import from an Rstest module stops resolving at all.
 //
 // The TypeChecker is therefore not the only source consulted. A source-only
 // Program — the generation rslint builds for files no tsconfig project owns —
@@ -361,13 +361,12 @@ func resolveRstestRoot(
 	localName := root.AsIdentifier().Text
 	symbol := resolveRstestRootSymbol(ctx, root)
 	for _, profile := range rstestAllProfiles {
-		module := profileImportModule(profile)
-		name, originalNode, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
+		name, originalNode, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
 			localName,
 			root,
 			symbol,
 			ctx.SourceFile,
-			module,
+			profileImportModules(profile),
 		)
 		if state := directRstestAPIState(profile, name); state != rstestAPIInvalid {
 			return rstestResolvedAPI{
@@ -393,7 +392,7 @@ func resolveRstestRoot(
 	}
 
 	for _, profile := range rstestAllProfiles {
-		if testFramework.IsModuleNamespaceSymbol(symbol, profileImportModule(profile)) {
+		if testFramework.IsModuleNamespaceSymbolModules(symbol, profileImportModules(profile)) {
 			if len(parts) == 0 || parts[0].invocation != rstestNotInvoked {
 				return rstestResolvedAPI{}, 0, false
 			}
@@ -664,11 +663,11 @@ func applyResolvedRstestChainPart(resolved *rstestResolvedAPI, part rstestChainP
 	return true
 }
 
-func profileImportModule(profile rstestAPIProfile) string {
+func profileImportModules(profile rstestAPIProfile) []string {
 	if profile == rstestProfilePlaywright {
-		return RstestPlaywrightImportModule
+		return RstestPlaywrightImportModules
 	}
-	return RstestImportModule
+	return RstestCoreImportModules
 }
 
 var rstestAllProfiles = [...]rstestAPIProfile{rstestProfileCore, rstestProfilePlaywright}

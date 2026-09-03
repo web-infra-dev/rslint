@@ -47,7 +47,16 @@ f();
 typeof maybeUndefined === 'string';
 ```
 
+## Differences from ESLint
+
+- In TypeScript files, rslint applies `languageOptions.ecmaVersion` to runtime
+  ECMAScript globals. ESLint with `@typescript-eslint/parser` uses that parser's
+  default ESNext library instead. For example, with `ecmaVersion: 2019`, rslint
+  reports `BigInt(1)` unless `BigInt` is configured as a global, while ESLint
+  does not. With the default parser library, type-only ESNext names such as
+  `Record` remain available in both.
+
 ## Original Documentation
 
 - [ESLint: no-undef](https://eslint.org/docs/latest/rules/no-undef)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-undef.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-undef.js)

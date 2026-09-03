@@ -7,7 +7,6 @@ import (
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
-	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 //go:embed require_mock_type_parameters.schema.json
@@ -27,10 +26,12 @@ const mockFactory = "fn"
 // signatures on them.
 //
 // All four are plugin-managed, so they are matched by the syntax at the call
-// site rather than by resolving the receiver. Their rewrite reads a wider set
-// of call shapes than the hoisted module-mock APIs do, so it is read by
-// parseModuleLoaderCall rather than by the shared parser: see the comment
-// there.
+// site rather than by resolving the receiver. The four do not share one shape:
+// the shared table has `importActual` and `requireActual` reading a bracketed
+// string, an optional call and a local declaration of the receiver, while
+// `importMock` and `requireMock` are matched on the name as written like the
+// mock family. ParseRstestPluginManagedCall applies each member's own shape, so
+// this list only says which members this rule checks.
 var moduleLoaders = map[string]bool{
 	"importActual":  true,
 	"importMock":    true,
@@ -84,19 +85,20 @@ var RequireMockTypeParametersRule = rule.Rule{
 				}
 
 				if opts.CheckImportFunctions {
-					if loader := parseModuleLoaderCall(call); loader != nil &&
+					if loader := rstestUtils.ParseRstestPluginManagedCall(node); loader != nil &&
+						moduleLoaders[loader.Member] &&
 						loadsOneModule(call) &&
-						!isShadowed(ctx, loader.namespace) {
-						ctx.ReportNode(loader.memberNode, missingTypeParameterMessage(loader.member))
+						!receiverTakesTheCall(ctx, loader) {
+						ctx.ReportNode(loader.MemberNode, missingTypeParameterMessage(loader.Member))
 						return
 					}
 				}
 
-				member, receiver := calledMember(call.Expression)
+				member, receiver := rstestUtils.CalledPlainMember(call.Expression)
 				if member == nil || member.Text() != mockFactory {
 					return
 				}
-				if !isUtilitiesObject(ctx, receiver) {
+				if !rstestUtils.IsUtilitiesObject(ctx, receiver) {
 					return
 				}
 				ctx.ReportNode(member, missingTypeParameterMessage(mockFactory))
@@ -105,187 +107,17 @@ var RequireMockTypeParametersRule = rule.Rule{
 	},
 }
 
-// moduleLoaderCall is one of the four module loaders as it is written at the
-// call site: the member name, the node that names it, and the receiver.
-type moduleLoaderCall struct {
-	member     string
-	memberNode *ast.Node
-	namespace  *ast.Node
-}
-
-// parseModuleLoaderCall matches a module-loader call the way Rstest's rewrite
-// matches it, which is not the way the hoisted module-mock APIs are matched.
-// Measured on rstest 0.11.8, with `rs` imported from `@rstest/core`:
+// receiverTakesTheCall reports whether this file's own declaration of the
+// receiver name takes the call away from the rewrite, so that the loader runs
+// as an ordinary method of an ordinary object and the type parameter this rule
+// asks for would be meaningless.
 //
-//	rs.importActual('./m')      rewritten    rs.mock('./m')      rewritten
-//	rs['importActual']('./m')   rewritten    rs['mock']('./m')   throws
-//	rs[`importActual`]('./m')   rewritten
-//	rs.importActual?.('./m')    rewritten    rs.mock?.('./m')    throws
-//	rs?.importActual('./m')     throws
-//
-// So a computed key and an optional call reach the loader rewrite and are
-// matched here, while an optional receiver does not and is left alone. The
-// shared parser keeps the narrower shape the mock family needs; widening it
-// there would report calls that really do stay as the throwing stub.
-//
-// Parentheses and type-only syntax are transparent on both sides, for the same
-// reason they are in the shared parser.
-func parseModuleLoaderCall(call *ast.CallExpression) *moduleLoaderCall {
-	callee := internalUtils.SkipAssertionsAndParens(call.Expression)
-	if callee == nil {
-		return nil
-	}
-
-	var member string
-	var memberNode, namespace *ast.Node
-	switch callee.Kind {
-	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
-		if access == nil || access.QuestionDotToken != nil {
-			return nil
-		}
-		name := access.Name()
-		if name == nil || name.Kind != ast.KindIdentifier {
-			return nil
-		}
-		member, memberNode, namespace = name.AsIdentifier().Text, name, access.Expression
-	case ast.KindElementAccessExpression:
-		access := callee.AsElementAccessExpression()
-		if access == nil || access.QuestionDotToken != nil {
-			return nil
-		}
-		// A key that is not a plain string is not a name the build can read,
-		// and a substitution is only known at run time.
-		key := internalUtils.SkipAssertionsAndParens(access.ArgumentExpression)
-		if key == nil ||
-			(key.Kind != ast.KindStringLiteral && key.Kind != ast.KindNoSubstitutionTemplateLiteral) {
-			return nil
-		}
-		member, memberNode, namespace = key.Text(), key, access.Expression
-	default:
-		return nil
-	}
-
-	if !moduleLoaders[member] {
-		return nil
-	}
-
-	namespace = internalUtils.SkipAssertionsAndParens(namespace)
-	if namespace == nil || namespace.Kind != ast.KindIdentifier {
-		return nil
-	}
-	if name := namespace.AsIdentifier().Text; name != "rs" && name != "rstest" {
-		return nil
-	}
-	return &moduleLoaderCall{member: member, memberNode: memberNode, namespace: namespace}
-}
-
-// calledMember returns the property name a call reaches its callee through,
-// and the expression it is read off. Both are nil when the callee is anything
-// but a plain dotted member.
-//
-// A computed member is not matched: it is written to reach a property whose
-// name is not a fixed identifier, and reporting the string inside the brackets
-// would point at a value rather than at a member.
-func calledMember(callee *ast.Node) (*ast.Node, *ast.Node) {
-	callee = internalUtils.SkipAssertionsAndParens(callee)
-	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
-		return nil, nil
-	}
-	access := callee.AsPropertyAccessExpression()
-	if access == nil {
-		return nil, nil
-	}
-	name := access.Name()
-	if name == nil || name.Kind != ast.KindIdentifier {
-		return nil, nil
-	}
-	return name, access.Expression
-}
-
-// isUtilitiesObject reports whether receiver names Rstest's utilities object.
-//
-// `fn` is an ordinary function on an ordinary object, so it is reached through
-// ordinary bindings: a renamed import is the same function, and a local
-// declaration of `rs` really is a different object. That is the opposite of
-// how the plugin-managed members are matched, and it is why the receiver is
-// resolved here and read as written there.
-//
-// The recognizer stays with this rule rather than being shared. Modeling the
-// utilities object in general — its mock, timer and spy surface — is separate
-// work, and `require_test_timeout` keeps its own narrower recognizer for the
-// same reason.
-func isUtilitiesObject(ctx rule.RuleContext, receiver *ast.Node) bool {
-	receiver = internalUtils.SkipAssertionsAndParens(receiver)
-	if receiver == nil {
-		return false
-	}
-
-	if receiver.Kind == ast.KindIdentifier {
-		// `rs` and `rstest` name the same object
-		// (packages/core/src/runtime/api/public.ts), either may be imported
-		// under a further name, and under `globals: true` both are on
-		// `globalThis` with no import at all. A local declaration of the name
-		// shadows both, and resolution reports that by returning no name.
-		//
-		// ctx.Refs.Resolve places an import and a local declaration from the
-		// binder alone, so a file that declares the name is recognized whether
-		// or not a TypeChecker is configured.
-		name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
-			receiver.AsIdentifier().Text,
-			receiver,
-			ctx.Refs.Resolve(receiver),
-			ctx.SourceFile,
-			rstestUtils.RstestImportModule,
-		)
-		return name == "rs" || name == "rstest"
-	}
-
-	// A namespace import or a whole-module require reaches the same object
-	// through one more member: `core.rs.fn()`.
-	member, namespace := calledMember(receiver)
-	if member == nil || (member.Text() != "rs" && member.Text() != "rstest") {
-		return false
-	}
-	namespace = internalUtils.SkipAssertionsAndParens(namespace)
-	if namespace == nil || namespace.Kind != ast.KindIdentifier {
-		return false
-	}
-	return testFramework.IsModuleNamespaceSymbol(
-		ctx.Refs.Resolve(namespace),
-		rstestUtils.RstestImportModule,
-	)
-}
-
-// isShadowed reports whether the receiver name is declared in this file by
-// something other than an import.
-//
-// Unlike the hoisted module-mock APIs, which are rewritten purely on the name
-// written at the call site, the four module loaders are left as the runtime
-// stub when the receiver is a local binding: a file that declares
-// `const rs = { importActual: … }` — or takes `rs` as a parameter — runs its
-// own object, while a file that reaches `rs` through an import runs the
-// rewrite, whichever module the import came from. So an import of any kind is
-// not shadowing here, and every other declaration is.
-func isShadowed(ctx rule.RuleContext, receiver *ast.Node) bool {
-	symbol := ctx.Refs.Resolve(receiver)
-	if symbol == nil {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
-			continue
-		}
-		switch declaration.Kind {
-		case ast.KindImportSpecifier,
-			ast.KindImportClause,
-			ast.KindNamespaceImport,
-			ast.KindImportEqualsDeclaration:
-			continue
-		}
-		return true
-	}
-	return false
+// Only the members whose rewrite resolves the receiver can be taken that way.
+// The others are rewritten on the name as written, so a local `const rs = { … }`
+// is bypassed and the call is still Rstest's.
+func receiverTakesTheCall(ctx rule.RuleContext, loader *rstestUtils.RstestPluginManagedCall) bool {
+	return loader.API.ResolvesReceiver &&
+		rstestUtils.ReceiverIsLocallyDeclared(ctx, loader.NamespaceNode)
 }
 
 // loadsOneModule reports whether Rstest's build actually rewrites this call.

@@ -48,7 +48,7 @@ catalog:
   '@codspeed/tinybench-plugin': ^5.7.1
   tinybench: ^6.1.1
   ajv: ^6.15.0
-  rstack: ^0.6.5
+  rstack: ^0.7.2
   zx: ^8.8.5
   '@types/mocha': ^10.0.10
   '@types/node': ^26.2.0

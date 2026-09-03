@@ -23,9 +23,10 @@ func IsReferenceIdentifier(id *ast.Node) bool {
 		return false
 	}
 
-	// `typeof import('m').a.b` names exports of another module, not bindings
-	// in this file.
-	if isImportTypeQualifier(id) {
+	// The argument, attributes, and qualifier of `import('m').a` are module
+	// syntax rather than bindings in this file. Type arguments remain normal
+	// references.
+	if utils.IsImportTypeSyntax(id) {
 		return false
 	}
 	// eslint-scope's JSXElement visitor only visits the opening tag. The
@@ -45,7 +46,12 @@ func IsReferenceIdentifier(id *ast.Node) bool {
 	case ast.KindQualifiedName:
 		// Same shape in type position: `A.B.C` references `A`.
 		qn := parent.AsQualifiedName()
-		return qn != nil && qn.Left == id
+		if qn == nil || qn.Left != id {
+			return false
+		}
+		// TSESTree represents the root of `typeof this.member` as a
+		// TSThisType, which its type visitor deliberately does not reference.
+		return id.Text() != "this" || !ast.IsPartOfTypeQuery(id)
 
 	case ast.KindShorthandPropertyAssignment:
 		// `{ a }` and `({ a = b } = c)` — the name is the value.
@@ -98,6 +104,17 @@ func IsReferenceIdentifier(id *ast.Node) bool {
 		// the predicate. `this is T` uses a ThisType node, not an Identifier.
 		return true
 
+	case ast.KindTypeQuery:
+		// TSESTree exposes bare `typeof this` as TSThisType rather than an
+		// Identifier, so scope-manager creates no reference for it.
+		return id.Text() != "this"
+
+	case ast.KindNamespaceExportDeclaration:
+		// `export as namespace Name` references the exported value. This is
+		// distinct from `export * as Name from`, whose NamespaceExport is only
+		// an external export label.
+		return true
+
 	case ast.KindJsxAttribute:
 		return false
 
@@ -115,6 +132,16 @@ func IsReferenceIdentifier(id *ast.Node) bool {
 	}
 
 	return !ast.IsDeclarationName(id)
+}
+
+// IsTypeScriptJsxThisReference reports the one scope-manager reference that
+// tsgo cannot represent as an Identifier: bare `this` in a TSX tag name.
+// TSESTree emits a JSXIdentifier there. It deliberately excludes
+// `<this.Member>`, whose `this` object is skipped by scope-manager, and every
+// JavaScript/JSX file, where Espree does not reference `this` tag names.
+func IsTypeScriptJsxThisReference(node *ast.Node) bool {
+	return node != nil && node.Kind == ast.KindThisKeyword &&
+		!ast.IsInJSFile(node) && ast.IsJsxTagName(node)
 }
 
 // isPartOfJsxClosingTagName climbs a tag-name chain from any identifier piece
@@ -342,21 +369,6 @@ func isTypeOnlyPropertyAccessQualifier(id *ast.Node) bool {
 		entity = entity.Parent
 	}
 	return entity != id && ast.IsPartOfTypeNode(entity)
-}
-
-// isImportTypeQualifier reports whether `id` is part of the qualifier of an
-// `import(...)` type — the `a` or `b` in `typeof import('m').a.b`.
-func isImportTypeQualifier(id *ast.Node) bool {
-	current := id
-	for current.Parent != nil && current.Parent.Kind == ast.KindQualifiedName {
-		current = current.Parent
-	}
-	parent := current.Parent
-	if parent == nil || parent.Kind != ast.KindImportType {
-		return false
-	}
-	importType := parent.AsImportTypeNode()
-	return importType != nil && importType.Qualifier == current
 }
 
 // IsJsxComponentName reports whether a bare JSXIdentifier passes the shared

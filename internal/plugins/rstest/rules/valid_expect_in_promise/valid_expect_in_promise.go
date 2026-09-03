@@ -152,17 +152,17 @@ func isRstestAssertCall(node *ast.Node, ctx rule.RuleContext) bool {
 	if isImportMetaRstestAlias(symbol) {
 		return len(entries) > 1 && entries[1].Name == "assert"
 	}
-	name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
+	name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
 		localName,
 		root,
 		symbol,
 		ctx.SourceFile,
-		rstestUtils.RstestImportModule,
+		rstestUtils.RstestCoreImportModules,
 	)
 	if name == "assert" {
 		return true
 	}
-	return testFramework.IsModuleNamespaceSymbol(symbol, rstestUtils.RstestImportModule) &&
+	return testFramework.IsModuleNamespaceSymbolModules(symbol, rstestUtils.RstestCoreImportModules) &&
 		len(entries) > 1 && entries[1].Name == "assert"
 }
 

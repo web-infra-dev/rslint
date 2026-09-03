@@ -51,13 +51,14 @@ for comment := range utils.GetCommentsInRange(ctx.SourceFile, textRange) {
 // GetCommentsInRange above — safe to call per-node.
 hasComments := utils.HasCommentsInRange(ctx.SourceFile, textRange)
 
-// Check if any comment overlaps an arbitrary [start, end) span, e.g. the gap
-// between two tokens that aren't adjacent nodes. Binary-searches the file's
+// Get a read-only view of every comment overlapping an arbitrary [start, end)
+// span, or just check whether one exists. Both binary-search the file's
 // already-collected comment list — pass ctx.Comments.All(), don't rebuild it.
 // Prefer this over GetCommentsInRange/HasCommentsInRange when you're calling
 // it once per matching AST node across the whole file (e.g. once per boolean
 // cast, once per label) — see the "Token and Comment Iteration" section below
 // for why that distinction matters.
+comments := utils.CommentsInSpan(ctx.Comments.All(), start, end)
 hasComment := utils.HasCommentInSpan(ctx.Comments.All(), start, end)
 ```
 
@@ -239,10 +240,10 @@ Rules of thumb:
 
 - Need every comment in the file → iterate `ctx.Comments.All()`. Don't call
   `ForEachComment` on `ctx.SourceFile.AsNode()` yourself.
-- Need to know whether a comment exists somewhere in a bounded, non-adjacent
-  span (e.g. between two tokens that aren't parent/child) →
-  `utils.HasCommentInSpan(ctx.Comments.All(), start, end)`. It binary-searches
-  the sorted comment list (O(log k), mirrors
+- Need the comments in a bounded, non-adjacent span (e.g. between two tokens
+  that aren't parent/child) → call `utils.CommentsInSpan` with
+  `ctx.Comments.All()`, `start`, and `end`. If only existence matters, use
+  `utils.HasCommentInSpan`. Both binary-search the sorted comment list (mirrors
   ESLint's `TokenStore#commentsExistBetween`) instead of scanning again. This
   matters most when the check runs once per matching AST node (once per
   boolean cast, once per label) — a per-node full-file scan is the

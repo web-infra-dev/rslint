@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -130,6 +131,20 @@ type ESLintSuggestion struct {
 type ESLintTestSuite struct {
 	Valid   []ESLintTestCase        `json:"valid"`
 	Invalid []ESLintInvalidTestCase `json:"invalid"`
+}
+
+var defaultTestFileID atomic.Uint64
+
+func resolveTestCaseFileName(fileName string, tsx bool) string {
+	if fileName != "" {
+		return fileName
+	}
+
+	extension := ".ts"
+	if tsx {
+		extension = ".tsx"
+	}
+	return "filename-" + strconv.FormatUint(defaultTestFileID.Add(1), 10) + extension
 }
 
 // ResolveTestCaseOptions puts a test case's options through the same step a
@@ -264,13 +279,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				t.SkipNow()
 			}
 
-			fileName := "file.ts"
-			if testCase.Tsx {
-				fileName = "react.tsx"
-			}
-			if testCase.FileName != "" {
-				fileName = testCase.FileName
-			}
+			fileName := resolveTestCaseFileName(testCase.FileName, testCase.Tsx)
 
 			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.TSConfig, fileName)
 			if len(diagnostics) != 0 {
@@ -296,13 +305,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 			outputs := make([]string, 0, 1)
 			code := testCase.Code
 
-			fileName := "file.ts"
-			if testCase.Tsx {
-				fileName = "react.tsx"
-			}
-			if testCase.FileName != "" {
-				fileName = testCase.FileName
-			}
+			fileName := resolveTestCaseFileName(testCase.FileName, testCase.Tsx)
 
 			for i := range 10 {
 				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.LanguageOptions, testCase.Globals, testCase.TSConfig, fileName)
@@ -341,7 +344,6 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				if expected.Message != "" && expected.Message != diagnostic.Message.Description {
 					t.Errorf("Invalid message text %q. Expected %q", diagnostic.Message.Description, expected.Message)
 				}
-
 				lineIndex, columnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
 				line, column := lineIndex+1, int(columnIndex)+1
 				endLineIndex, endColumnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.End())
@@ -425,7 +427,7 @@ func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
 		}
 	}
 
-	fileName := "file.ts"
+	fileName := ""
 	tsx := false
 	if tc.Filename != "" {
 		fileName = tc.Filename
@@ -456,7 +458,7 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 		}
 	}
 
-	fileName := "file.ts"
+	fileName := ""
 	tsx := false
 	if tc.Filename != "" {
 		fileName = tc.Filename

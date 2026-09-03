@@ -62,7 +62,7 @@ func validateRegexPattern(pattern string, flags RegexFlags) regexPatternValidati
 	// validation just as the RegExp parser's CodePoint operation does.
 	pattern = ecmascript.CombineSurrogatePairs(pattern)
 
-	normalized, captureNames, ok := normalizeRegexCaptureNames(pattern, flags)
+	normalized, captureNames, _, ok := normalizeRegexCaptureNames(pattern, flags, false)
 	if !ok {
 		return regexPatternValidation{
 			hasDuplicateCaptureName:             captureNames.hasDuplicate,
@@ -218,6 +218,7 @@ func hasRegexNamedCapture(pattern string, flags RegexFlags) bool {
 type regexCaptureNameAnalysis struct {
 	hasDuplicate             bool
 	hasNonExclusiveDuplicate bool
+	nonExclusivePosition     int
 }
 
 type regexBranch struct {
@@ -305,7 +306,7 @@ func (t *regexBranchTracker) separatedFrom(left int, right int) bool {
 // declarations get distinct placeholders because ES2025 permits them when
 // their Alternatives are mutually exclusive; references use the first
 // declaration's placeholder.
-func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, regexCaptureNameAnalysis, bool) {
+func normalizeRegexCaptureNames(pattern string, flags RegexFlags, trackOffsets bool) (string, regexCaptureNameAnalysis, []int, bool) {
 	var replacements []regexCaptureNameReplacement
 	var placeholders map[string]string
 	var lastDeclarationBranch map[string]int
@@ -356,6 +357,7 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, regex
 				if !analysis.hasNonExclusiveDuplicate &&
 					(!trackBranches || !branches.separatedFrom(previous, branches.current)) {
 					analysis.hasNonExclusiveDuplicate = true
+					analysis.nonExclusivePosition = nameStart
 				}
 			}
 			lastDeclarationBranch[name] = branches.current
@@ -368,21 +370,28 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, regex
 		return true
 	}
 
+scanPattern:
 	for i := 0; i < len(pattern); {
 		switch pattern[i] {
 		case '[':
 			end := 0
 			if flags.UnicodeSets {
 				var ok bool
-				end, ok = analyzeRegexVClass(pattern, i)
+				end, _, ok = analyzeRegexVClass(pattern, i)
 				if !ok {
-					return "", analysis, false
+					if trackOffsets {
+						break scanPattern
+					}
+					return "", analysis, nil, false
 				}
 			} else {
 				var ok bool
 				end, ok = ClassEnd(pattern, i, flags)
 				if !ok {
-					return "", analysis, false
+					if trackOffsets {
+						break scanPattern
+					}
+					return "", analysis, nil, false
 				}
 			}
 			i = end
@@ -390,14 +399,20 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, regex
 			if strings.HasPrefix(pattern[i:], `\k<`) {
 				_, next, ok := readAngleName(pattern, i+2)
 				if !ok || !addName(i+3, next-1, false) {
-					return "", analysis, false
+					if trackOffsets {
+						break scanPattern
+					}
+					return "", analysis, nil, false
 				}
 				i = next
 				continue
 			}
 			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
-				return "", analysis, false
+				if trackOffsets {
+					break scanPattern
+				}
+				return "", analysis, nil, false
 			}
 			i += step
 		case '(':
@@ -405,7 +420,10 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, regex
 				(i+3 >= len(pattern) || pattern[i+3] != '=' && pattern[i+3] != '!') {
 				_, next, ok := readAngleName(pattern, i+2)
 				if !ok || !addName(i+3, next-1, true) {
-					return "", analysis, false
+					if trackOffsets {
+						break scanPattern
+					}
+					return "", analysis, nil, false
 				}
 				i = next
 			} else {
@@ -434,18 +452,41 @@ func normalizeRegexCaptureNames(pattern string, flags RegexFlags) (string, regex
 	}
 
 	if len(replacements) == 0 {
-		return pattern, analysis, true
+		return pattern, analysis, nil, true
 	}
 	var result strings.Builder
 	result.Grow(len(pattern))
+	var offsets []int
+	if trackOffsets {
+		offsets = make([]int, 0, len(pattern)+1)
+	}
+	writeOriginal := func(start int, end int) {
+		result.WriteString(pattern[start:end])
+		if trackOffsets {
+			for i := start; i < end; i++ {
+				offsets = append(offsets, i)
+			}
+		}
+	}
+	writeReplacement := func(replacement regexCaptureNameReplacement) {
+		result.WriteString(replacement.placeholder)
+		if trackOffsets {
+			for range len(replacement.placeholder) {
+				offsets = append(offsets, replacement.start)
+			}
+		}
+	}
 	last := 0
 	for _, replacement := range replacements {
-		result.WriteString(pattern[last:replacement.start])
-		result.WriteString(replacement.placeholder)
+		writeOriginal(last, replacement.start)
+		writeReplacement(replacement)
 		last = replacement.end
 	}
-	result.WriteString(pattern[last:])
-	return result.String(), analysis, true
+	writeOriginal(last, len(pattern))
+	if trackOffsets {
+		offsets = append(offsets, len(pattern))
+	}
+	return result.String(), analysis, offsets, true
 }
 
 type regexVClassFrame struct {
@@ -490,9 +531,9 @@ func (f *regexVClassFrame) addOperand(mayHaveStrings bool) {
 // mirrors the ClassSetExpression MayContainStrings reduction because the
 // pinned tsgo scanner does not propagate later union operands. tsgo remains
 // the grammar authority for every other production.
-func analyzeRegexVClass(pattern string, start int) (end int, ok bool) {
+func analyzeRegexVClass(pattern string, start int) (end int, errorPosition int, ok bool) {
 	if start >= len(pattern) || pattern[start] != '[' {
-		return start, false
+		return start, start, false
 	}
 
 	flags := RegexFlags{UnicodeSets: true}
@@ -508,9 +549,9 @@ func analyzeRegexVClass(pattern string, start int) (end int, ok bool) {
 		switch pattern[i] {
 		case '\\':
 			if strings.HasPrefix(pattern[i:], `\q{`) {
-				next, mayHaveStrings, qOK := scanRegexVQString(pattern, i)
+				next, mayHaveStrings, qErrorPosition, qOK := scanRegexVQString(pattern, i)
 				if !qOK {
-					return start, false
+					return start, qErrorPosition, false
 				}
 				frame.addOperand(mayHaveStrings)
 				i = next
@@ -519,7 +560,7 @@ func analyzeRegexVClass(pattern string, start int) (end int, ok bool) {
 			mayHaveStrings := regexVPropertyMayContainStrings(pattern, i)
 			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
-				return start, false
+				return start, i, false
 			}
 			frame.addOperand(mayHaveStrings)
 			i += step
@@ -533,26 +574,26 @@ func analyzeRegexVClass(pattern string, start int) (end int, ok bool) {
 			}
 		case ']':
 			if frame.trailingHyphen {
-				return start, false
+				return start, i, false
 			}
 			if frame.negated && frame.mayHaveStrings {
-				return start, false
+				return start, i, false
 			}
 			completedMayHaveStrings := !frame.negated && frame.mayHaveStrings
 			frames = frames[:len(frames)-1]
 			i++
 			if len(frames) == 0 {
-				return i, true
+				return i, 0, true
 			}
 			parent := &frames[len(frames)-1]
 			parent.addOperand(completedMayHaveStrings)
 		case '/':
 			// `/` is a ClassSetSyntaxCharacter. Escaping it only in the
 			// carrier would make an invalid constructor pattern valid.
-			return start, false
+			return start, i, false
 		case '^', '$':
 			if i+1 < len(pattern) && pattern[i+1] == pattern[i] {
-				return start, false
+				return start, i, false
 			}
 			frame.addOperand(false)
 			i++
@@ -583,10 +624,10 @@ func analyzeRegexVClass(pattern string, start int) (end int, ok bool) {
 			i += width
 		}
 	}
-	return start, false
+	return start, len(pattern), false
 }
 
-func scanRegexVQString(pattern string, start int) (next int, mayHaveStrings bool, ok bool) {
+func scanRegexVQString(pattern string, start int) (next int, mayHaveStrings bool, errorPosition int, ok bool) {
 	flags := RegexFlags{UnicodeSets: true}
 	characterCount := 0
 	for i := start + 3; i < len(pattern); {
@@ -594,7 +635,7 @@ func scanRegexVQString(pattern string, start int) (next int, mayHaveStrings bool
 		case '\\':
 			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
-				return 0, false, false
+				return 0, false, i, false
 			}
 			characterCount++
 			if high, fixed := regexFixedUnicodeEscape(pattern, i); fixed && high >= 0xD800 && high <= 0xDBFF {
@@ -608,12 +649,12 @@ func scanRegexVQString(pattern string, start int) (next int, mayHaveStrings bool
 			characterCount = 0
 			i++
 		case '}':
-			return i + 1, mayHaveStrings || characterCount != 1, true
+			return i + 1, mayHaveStrings || characterCount != 1, 0, true
 		case '/':
-			return 0, false, false
+			return 0, false, i, false
 		case '^', '$':
 			if i+1 < len(pattern) && pattern[i+1] == pattern[i] {
-				return 0, false, false
+				return 0, false, i, false
 			}
 			characterCount++
 			i++
@@ -626,7 +667,7 @@ func scanRegexVQString(pattern string, start int) (next int, mayHaveStrings bool
 			i += width
 		}
 	}
-	return 0, false, false
+	return 0, false, len(pattern), false
 }
 
 func regexFixedUnicodeEscape(pattern string, start int) (uint32, bool) {
@@ -665,71 +706,326 @@ func regexVPropertyMayContainStrings(pattern string, start int) bool {
 // delimiters, and rejects cases where encoding a line terminator or surrogate
 // would turn an invalid identity escape into valid syntax.
 func regexPatternLiteral(pattern string, flags RegexFlags) (string, bool) {
+	literal, _, _, ok := buildRegexPatternLiteral(pattern, flags, false)
+	return literal, ok
+}
+
+// RegexPatternCharacterEventCutoff returns the byte position where a syntax
+// error stops regexpp-style character events. It transports constructor text
+// through a RegExp literal while retaining an output-to-pattern position map.
+func RegexPatternCharacterEventCutoff(pattern string, flags RegexFlags) (int, bool) {
+	referencePosition, invalidReference := firstInvalidUnicodeNumericBackreference(pattern, flags)
+	vClassPosition, invalidVClass := firstRegexVClassErrorPosition(pattern, flags)
+	duplicatePosition, invalidDuplicate := firstDuplicateCaptureNamePosition(pattern, flags)
+	position, invalid := regexPatternParserErrorPosition(pattern, flags, true)
+	if invalidReference && (!invalid || referencePosition < position) {
+		position, invalid = referencePosition, true
+	}
+	if invalidVClass && (!invalid || vClassPosition < position) {
+		position, invalid = vClassPosition, true
+	}
+	if invalidDuplicate && (!invalid || duplicatePosition < position) {
+		position, invalid = duplicatePosition, true
+	}
+	return position, invalid
+}
+
+func firstDuplicateCaptureNamePosition(pattern string, flags RegexFlags) (int, bool) {
+	if strings.Count(pattern, "(?<") < 2 {
+		return 0, false
+	}
+	_, analysis, _, _ := normalizeRegexCaptureNames(pattern, flags, false)
+	return analysis.nonExclusivePosition, analysis.hasNonExclusiveDuplicate
+}
+
+func regexPatternParserErrorPosition(pattern string, flags RegexFlags, repairUnterminated bool) (int, bool) {
+	if flags.Unicode && flags.UnicodeSets {
+		// regexpp rejects conflicting modes before entering the pattern.
+		return 0, true
+	}
+	if strings.HasPrefix(pattern, "*") {
+		// Transporting this pattern as /*.../ would make the scanner read a
+		// block comment. A quantifier cannot begin an ECMAScript pattern.
+		return 0, true
+	}
+	literal, offsets, failureOffset, ok := buildRegexPatternLiteral(pattern, flags, true)
+	if !ok {
+		if repairUnterminated {
+			if repairedPosition, found := regexPatternEarlierErrorAfterRepair(pattern, flags, failureOffset); found {
+				return repairedPosition, true
+			}
+		}
+		return failureOffset, true
+	}
+	position, unterminated, hasError := ecmascript.RegexLiteralCharacterEventCutoff(literal)
+	if !hasError {
+		return 0, false
+	}
+	if unterminated && repairUnterminated {
+		if repairedPosition, found := regexPatternEarlierErrorAfterRepair(pattern, flags, len(pattern)); found {
+			return repairedPosition, true
+		}
+		return len(pattern), true
+	}
+	if unterminated || position >= len(offsets) {
+		return offsets[len(offsets)-1], true
+	}
+	return offsets[position], true
+}
+
+func regexPatternEarlierErrorAfterRepair(pattern string, flags RegexFlags, boundary int) (int, bool) {
+	repaired := pattern
+	trailingBackslashes := 0
+	for i := len(repaired) - 1; i >= 0 && repaired[i] == '\\'; i-- {
+		trailingBackslashes++
+	}
+	if trailingBackslashes%2 != 0 {
+		repaired += `\`
+	}
+	repaired += strings.Repeat("}]", len(pattern)+1)
+	position, invalid := regexPatternParserErrorPosition(repaired, flags, false)
+	return position, invalid && position < boundary
+}
+
+func firstInvalidUnicodeNumericBackreference(pattern string, flags RegexFlags) (int, bool) {
+	if !flags.UV() {
+		return 0, false
+	}
+	groupCount, _ := esregexp.CapturingGroupCount(pattern)
+	classDepth := 0
+	for i := 0; i < len(pattern); {
+		if pattern[i] == '\\' {
+			if classDepth == 0 && i+1 < len(pattern) && pattern[i+1] >= '1' && pattern[i+1] <= '9' {
+				value := 0
+				for j := i + 1; j < len(pattern) && pattern[j] >= '0' && pattern[j] <= '9'; j++ {
+					digit := int(pattern[j] - '0')
+					if value > (groupCount-digit)/10 {
+						return i, true
+					}
+					value = value*10 + digit
+				}
+				if value > groupCount {
+					return i, true
+				}
+			}
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				i++
+			} else {
+				i += step
+			}
+			continue
+		}
+		switch pattern[i] {
+		case '[':
+			if classDepth == 0 || flags.UnicodeSets {
+				classDepth++
+			}
+		case ']':
+			if classDepth > 0 {
+				classDepth--
+			}
+		}
+		_, width := utf8.DecodeRuneInString(pattern[i:])
+		if width == 0 {
+			width = 1
+		}
+		i += width
+	}
+	return 0, false
+}
+
+func firstRegexVClassErrorPosition(pattern string, flags RegexFlags) (int, bool) {
+	if !flags.UnicodeSets {
+		return 0, false
+	}
+	for i := 0; i < len(pattern); {
+		switch pattern[i] {
+		case '\\':
+			step, ok := SkipPatternEscape(pattern, i, flags)
+			if !ok {
+				return i, true
+			}
+			i += step
+		case '[':
+			end, errorPosition, ok := analyzeRegexVClass(pattern, i)
+			if !ok {
+				return errorPosition, true
+			}
+			i = end
+		default:
+			_, width := utf8.DecodeRuneInString(pattern[i:])
+			if width == 0 {
+				width = 1
+			}
+			i += width
+		}
+	}
+	return 0, false
+}
+
+func buildRegexPatternLiteral(pattern string, flags RegexFlags, trackOffsets bool) (literalText string, offsets []int, failureOffset int, ok bool) {
 	pattern = ecmascript.CombineSurrogatePairs(pattern)
+	originalLength := len(pattern)
+	var normalizedOffsets []int
+	if trackOffsets {
+		if normalized, _, nameOffsets, namesOK := normalizeRegexCaptureNames(pattern, flags, true); namesOK {
+			pattern = normalized
+			normalizedOffsets = nameOffsets
+		}
+		if !flags.UV() {
+			normalized, annexOffsets := esregexp.NormalizeAnnexBEscapesForParser(pattern)
+			pattern = normalized
+			if annexOffsets != nil {
+				if normalizedOffsets != nil {
+					for i, offset := range annexOffsets {
+						annexOffsets[i] = normalizedOffsets[offset]
+					}
+				}
+				normalizedOffsets = annexOffsets
+			}
+		}
+	}
+	patternOffset := func(offset int) int {
+		if normalizedOffsets != nil && offset >= 0 && offset < len(normalizedOffsets) {
+			return normalizedOffsets[offset]
+		}
+		return offset
+	}
 	units := ecmascript.StringCodeUnits(pattern)
 	if ecmascript.StringFromCodeUnits(units) != pattern {
-		return "", false
+		return "", nil, 0, false
 	}
 
 	var literal strings.Builder
 	literal.Grow(len(pattern) + 4)
-	literal.WriteByte('/')
+	if trackOffsets {
+		offsets = make([]int, 0, len(pattern)+5)
+	}
+	writeString := func(value string, patternOffset int) {
+		literal.WriteString(value)
+		if trackOffsets {
+			for range len(value) {
+				offsets = append(offsets, patternOffset)
+			}
+		}
+	}
+	writeRune := func(value rune, patternOffset int) {
+		before := literal.Len()
+		literal.WriteRune(value)
+		if trackOffsets {
+			for range literal.Len() - before {
+				offsets = append(offsets, patternOffset)
+			}
+		}
+	}
+	writeUnicodeEscape := func(unit uint16, patternOffset int) {
+		before := literal.Len()
+		writeRegexUnicodeEscape(&literal, unit)
+		if trackOffsets {
+			for range literal.Len() - before {
+				offsets = append(offsets, patternOffset)
+			}
+		}
+	}
+
+	writeString("/", 0)
 	if len(units) == 0 {
-		literal.WriteString("(?:)")
+		writeString("(?:)", 0)
 	}
 
 	escaped := false
-	for _, unit := range units {
-		if unit == '\\' {
-			literal.WriteByte('\\')
-			escaped = !escaped
+	escapeStart := -1
+	unitIndex := 0
+	for sourceStart := 0; sourceStart < len(pattern); {
+		r, size := ecmascript.DecodeStringRune(pattern[sourceStart:])
+		originalSourceStart := patternOffset(sourceStart)
+		if escaped && trackOffsets &&
+			(r == '\n' || r == '\r' || r == 0x2028 || r == 0x2029 || r >= 0xD800 && r <= 0xDFFF || r > 0xFFFF) {
+			// A constructor pattern may contain characters that cannot follow a
+			// backslash in a RegExp literal carrier. Keep an invalid one-atom
+			// escape in its place so tsgo can still reveal any earlier grammar
+			// error; the inserted byte maps back to the original escape.
+			writeString("q", escapeStart)
+			escaped = false
+			escapeStart = -1
+			unitIndex++
+			if r > 0xFFFF {
+				unitIndex++
+			}
+			sourceStart += size
 			continue
 		}
-
-		switch unit {
-		case '/':
-			if !escaped {
-				literal.WriteByte('\\')
-			}
-			literal.WriteByte('/')
-		case '\n':
-			if escaped {
-				return "", false
-			}
-			literal.WriteString(`\n`)
-		case '\r':
-			if escaped {
-				return "", false
-			}
-			literal.WriteString(`\r`)
-		case 0x2028, 0x2029:
-			if escaped {
-				return "", false
-			}
-			writeRegexUnicodeEscape(&literal, unit)
-		default:
-			if unit >= 0xD800 && unit <= 0xDFFF {
-				if escaped {
-					return "", false
-				}
-				writeRegexUnicodeEscape(&literal, unit)
-			} else {
-				literal.WriteRune(rune(unit))
-			}
+		unitCount := 1
+		if r > 0xFFFF {
+			unitCount = 2
 		}
-		escaped = false
+		for range unitCount {
+			unit := units[unitIndex]
+			unitIndex++
+			if unit == '\\' {
+				writeString("\\", originalSourceStart)
+				if escaped {
+					escaped = false
+					escapeStart = -1
+				} else {
+					escaped = true
+					escapeStart = originalSourceStart
+				}
+				continue
+			}
+
+			switch unit {
+			case '/':
+				if !escaped {
+					writeString("\\", originalSourceStart)
+				}
+				writeString("/", originalSourceStart)
+			case '\n':
+				if escaped {
+					return "", nil, escapeStart, false
+				}
+				writeString(`\n`, originalSourceStart)
+			case '\r':
+				if escaped {
+					return "", nil, escapeStart, false
+				}
+				writeString(`\r`, originalSourceStart)
+			case 0x2028, 0x2029:
+				if escaped {
+					return "", nil, escapeStart, false
+				}
+				writeUnicodeEscape(unit, originalSourceStart)
+			default:
+				if unit >= 0xD800 && unit <= 0xDFFF {
+					if escaped {
+						return "", nil, escapeStart, false
+					}
+					writeUnicodeEscape(unit, originalSourceStart)
+				} else {
+					writeRune(rune(unit), originalSourceStart)
+				}
+			}
+			escaped = false
+			escapeStart = -1
+		}
+		sourceStart += size
 	}
 	if escaped {
-		return "", false
+		return "", nil, escapeStart, false
 	}
 
-	literal.WriteByte('/')
+	writeString("/", originalLength)
 	if flags.UnicodeSets {
-		literal.WriteByte('v')
-	} else {
-		literal.WriteByte('u')
+		writeString("v", originalLength)
 	}
-	return literal.String(), true
+	if flags.Unicode {
+		writeString("u", originalLength)
+	}
+	if trackOffsets {
+		offsets = append(offsets, originalLength)
+	}
+	return literal.String(), offsets, 0, true
 }
 
 func writeRegexUnicodeEscape(builder *strings.Builder, unit uint16) {
@@ -793,6 +1089,13 @@ func normalizeRegexCaptureName(name string) (string, bool) {
 		result.WriteRune(value)
 	}
 	return result.String(), !first
+}
+
+// NormalizeRegexCaptureName validates and decodes a RegExpIdentifierName.
+// Callers that compare authored capture names must use the decoded value so
+// raw and Unicode-escaped spellings name the same group.
+func NormalizeRegexCaptureName(name string) (string, bool) {
+	return normalizeRegexCaptureName(ecmascript.CombineSurrogatePairs(name))
 }
 
 // decodeRegexCaptureNameEscape decodes one `\u` escape. fixed is true only
