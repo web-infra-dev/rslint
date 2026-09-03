@@ -24,6 +24,11 @@ func TestNoImportingRstestGlobalsExtras(t *testing.T) {
 			// ---- Real-user: a comma inside a comment is not the separator ----
 			{Code: `import { defineConfig, /* comma, in comment */ expect } from '@rstest/core';`, Output: []string{`import { defineConfig } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 48}}},
 			{Code: `import { expect /* comma, in comment */, defineConfig } from '@rstest/core';`, Output: []string{`import { defineConfig } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10}}},
+			// ---- Real-user: a default import survives the named binding removal ----
+			// The removal range ends at the end of the named-bindings node, which
+			// covers the closing brace, so only the default binding is left.
+			{Code: `import core, { expect } from '@rstest/core'; expect(value);`, Output: []string{`import core from '@rstest/core'; expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 16}}},
+			{Code: "import core, {\n  expect,\n} from '@rstest/core';\nexpect(value);", Output: []string{"import core from '@rstest/core';\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 2, Column: 3}}},
 			// Locks in import removal with a surviving type-only specifier.
 			{Code: `import { type Mock, test } from '@rstest/core';`, Output: []string{`import { type Mock } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 21}}},
 			// ---- Real-user: an aliased sibling keeps the declaration alive ----
