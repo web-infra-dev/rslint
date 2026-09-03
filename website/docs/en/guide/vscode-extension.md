@@ -1,37 +1,21 @@
 # VSCode Extension
 
-The [Rstack](https://github.com/rstackjs/rstack-editor) VS Code extension provides Rslint integration alongside testing and formatting in one install.
+Install the official extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rslint). It provides:
 
-## Installation
+:::tip Rstack extension
 
-Install `rstack.rstack` from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rstack):
+The unified [Rstack extension](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) (`rstack.rstack`) ships the same Rslint integration plus Rstest and formatting in one install, and is where new editor features land. We recommend it for new setups. It is also available from [Open VSX](https://open-vsx.org/extension/rstack/rstack) for Cursor, Trae, and VSCodium.
 
-- Open the _Extensions_ view (<kbd>Ctrl</kbd>/<kbd title="Cmd">⌘</kbd> + <kbd>Shift</kbd> + <kbd>X</kbd>) and search for `rstack.rstack`.
-- Open the _Quick Open_ panel (<kbd>Ctrl</kbd>/<kbd title="Cmd">⌘</kbd> + <kbd>P</kbd>), enter `ext install rstack.rstack`, and press Enter.
-- Run `code --install-extension rstack.rstack` in the terminal.
-
-For Cursor, Trae, VSCodium, and other VS Code forks, install it from the [Open VSX Registry](https://open-vsx.org/extension/rstack/rstack).
-
-:::tip Coming from the standalone Rslint extension
-
-The standalone `rstack.rslint` extension is retired and receives no new features. It stays published and keeps working while the transition is underway, but we recommend switching now:
-
-1. Install `rstack.rstack` as described above.
-2. Disable or uninstall `rstack.rslint` so only one copy of Rslint runs.
-3. Re-enter your settings under the `rstack.rslint.*` keys and re-bind any keybindings to the new `rstack.rslint.*` command ids. Settings are not migrated automatically. Legacy `rslint.binPath` and `rslint.customBinPath` have no equivalent; use `rstack.rslint.corePath` if you need an override. See the [migration notes](https://github.com/rstackjs/rstack-editor/blob/main/packages/vscode/README.md#coming-from-the-standalone-extensions) for details.
+When switching, disable or uninstall `rstack.rslint` so only one copy of Rslint runs, then re-enter settings under `rstack.rslint.*` as described in the [migration notes](https://github.com/rstackjs/rstack-editor/blob/main/packages/vscode/README.md#coming-from-the-standalone-extensions).
 
 :::
-
-## Features
-
-Rstack provides:
 
 - Real-time diagnostics as you type
 - Code actions for auto-fixable rules
 - Auto-fix on save via `source.fixAll.rslint`
 - Multi-workspace support
 
-The extension resolves `@rslint/core` from your project and automatically detects your `rslint.config.ts`.
+The extension works out of the box — it uses the built-in rslint binary and automatically picks up your `rslint.config.ts`.
 
 ## Auto-fix on Save
 
@@ -53,8 +37,9 @@ To automatically fix lint issues when you save a file, add the following to your
 
 ## Settings
 
-| Setting                      | Default | Description                                      |
-| ---------------------------- | ------- | ------------------------------------------------ |
-| `rstack.rslint.enable`       | `true`  | Enable or disable the Rslint integration         |
-| `rstack.rslint.corePath`     | —       | Path to an `@rslint/core` package directory      |
-| `rstack.rslint.trace.server` | `off`   | LSP trace level: `off`, `messages`, or `verbose` |
+| Setting                | Default    | Description                                                 |
+| ---------------------- | ---------- | ----------------------------------------------------------- |
+| `rslint.enable`        | `true`     | Enable or disable the linter                                |
+| `rslint.binPath`       | `built-in` | Binary source: `built-in`, `local` (workspace), or `custom` |
+| `rslint.customBinPath` | —          | Path to a custom rslint binary (when `binPath` is `custom`) |
+| `rslint.trace.server`  | `off`      | LSP trace level: `off`, `messages`, or `verbose`            |
