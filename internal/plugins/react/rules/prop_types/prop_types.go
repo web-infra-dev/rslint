@@ -43,6 +43,7 @@ type component struct {
 
 type componentDeclarationEvent struct {
 	source         *ast.Node
+	typeNode       *ast.Node
 	component      *component
 	declaration    propDeclaration
 	propNames      []string
@@ -700,6 +701,20 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 func propTypeFromType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node, seen map[*ast.Node]bool) propType {
 	// Upstream validates TypeScript props at the declared property boundary only.
 	return propType{open: true}
+}
+
+func collectComponentTypeDeclaration(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol map[*ast.Symbol]*ast.Node) {
+	name := n.Name()
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return
+	}
+	aliases[name.AsIdentifier().Text] = append(aliases[name.AsIdentifier().Text], n)
+	if symbol := name.Symbol(); symbol != nil {
+		aliasesBySymbol[symbol] = n
+	}
+	if symbol := n.Symbol(); symbol != nil {
+		aliasesBySymbol[symbol] = n
+	}
 }
 
 func classPropsType(class *ast.Node) *ast.Node {
@@ -1697,37 +1712,6 @@ var PropTypesRule = rule.Rule{
 		}
 		typeAliases := map[string][]*ast.Node{}
 		typeAliasesBySymbol := map[*ast.Symbol]*ast.Node{}
-		var collectTypeAliases ast.Visitor
-		collectTypeAliases = func(n *ast.Node) bool {
-			if n == nil {
-				return false
-			}
-			switch n.Kind {
-			case ast.KindTypeAliasDeclaration:
-				if name := n.AsTypeAliasDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
-					typeAliases[name.AsIdentifier().Text] = append(typeAliases[name.AsIdentifier().Text], n)
-					if symbol := name.Symbol(); symbol != nil {
-						typeAliasesBySymbol[symbol] = n
-					}
-					if symbol := n.Symbol(); symbol != nil {
-						typeAliasesBySymbol[symbol] = n
-					}
-				}
-			case ast.KindInterfaceDeclaration:
-				if name := n.AsInterfaceDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
-					typeAliases[name.AsIdentifier().Text] = append(typeAliases[name.AsIdentifier().Text], n)
-					if symbol := name.Symbol(); symbol != nil {
-						typeAliasesBySymbol[symbol] = n
-					}
-					if symbol := n.Symbol(); symbol != nil {
-						typeAliasesBySymbol[symbol] = n
-					}
-				}
-			}
-			n.ForEachChild(collectTypeAliases)
-			return false
-		}
-		ctx.SourceFile.Node.ForEachChild(collectTypeAliases)
 		var comps []*component
 		byNode := map[*ast.Node]*component{}
 		byComponentKey := map[componentKey]*component{}
@@ -1827,12 +1811,17 @@ var PropTypesRule = rule.Rule{
 				return false
 			}
 			switch n.Kind {
+			case ast.KindTypeAliasDeclaration, ast.KindInterfaceDeclaration:
+				collectComponentTypeDeclaration(n, typeAliases, typeAliasesBySymbol)
 			case ast.KindClassDeclaration, ast.KindClassExpression:
 				if reactutil.ExtendsReactComponent(n, pragma) || extendsComponent(n) {
 					c := newComponent(n)
 					propsType := classPropsType(n)
-					if declaration, ok := declaredType(propsType, typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}, resolveInitializer); ok {
-						queueDeclaration(propsType, c, declaration, true, n.Kind == ast.KindClassExpression)
+					if propsType != nil {
+						declarationEvents = append(declarationEvents, componentDeclarationEvent{
+							source: propsType, typeNode: propsType, component: c,
+							final: n.Kind == ast.KindClassExpression,
+						})
 					}
 				}
 			case ast.KindObjectLiteralExpression:
@@ -1852,26 +1841,25 @@ var PropTypesRule = rule.Rule{
 						}
 						propsType, isForwardRef, typedForwardRef := forwardRefPropsType(n)
 						if typedForwardRef {
-							declaration := concreteDeclaration(map[string]propType{})
-							if propsType != nil {
-								if resolved, ok := declaredType(propsType, typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}, resolveInitializer); ok {
-									declaration = resolved
-								} else {
-									declaration = opaqueDeclaration()
-								}
+							if propsType == nil {
+								queueDeclaration(n, c, concreteDeclaration(map[string]propType{}), true, false)
+							} else {
+								declarationEvents = append(declarationEvents, componentDeclarationEvent{
+									source: n, typeNode: propsType, component: c,
+									declaration: propDeclaration{opaque: true},
+								})
 							}
-							queueDeclaration(n, c, declaration, true, false)
 						} else if parameter.Type != nil {
 							propsType := parameter.Type.AsNode()
-							if declaration, ok := declaredType(propsType, typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}, resolveInitializer); ok {
-								queueDeclaration(propsType, c, declaration, true, false)
-							}
+							declarationEvents = append(declarationEvents, componentDeclarationEvent{
+								source: propsType, typeNode: propsType, component: c,
+							})
 						} else if !isForwardRef {
 							variableType := componentVariableType(n)
 							if reactComponentTypeArgument(variableType) != nil {
-								if declaration, ok := declaredType(variableType, typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}, resolveInitializer); ok {
-									queueDeclaration(variableType, c, declaration, true, false)
-								}
+								declarationEvents = append(declarationEvents, componentDeclarationEvent{
+									source: variableType, typeNode: variableType, component: c,
+								})
 							}
 						}
 					}
@@ -1913,9 +1901,9 @@ var PropTypesRule = rule.Rule{
 				if keyName(pd.Name()) == "props" && !ast.HasSyntacticModifier(n, ast.ModifierFlagsStatic) {
 					if c := componentFor(n.Parent, byNode); c != nil && pd.Type != nil {
 						propsType := pd.Type.AsNode()
-						if declaration, ok := declaredType(propsType, typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}, resolveInitializer); ok {
-							queueDeclaration(propsType, c, declaration, true, false)
-						}
+						declarationEvents = append(declarationEvents, componentDeclarationEvent{
+							source: propsType, typeNode: propsType, component: c,
+						})
 					}
 				}
 				if keyName(pd.Name()) == "propTypes" {
@@ -1991,6 +1979,26 @@ var PropTypesRule = rule.Rule{
 			return false
 		}
 		ctx.SourceFile.Node.ForEachChild(walk)
+		// Resolve component types only after the existing walk has collected all
+		// declarations. This preserves support for declarations after components
+		// without a second full-file traversal.
+		resolvedEvents := declarationEvents[:0]
+		for _, event := range declarationEvents {
+			if event.typeNode != nil {
+				declaration, ok := declaredType(event.typeNode, typeAliases, typeAliasesBySymbol, map[*ast.Node]bool{}, resolveInitializer)
+				if !ok {
+					if !event.declaration.opaque {
+						continue
+					}
+					declaration = opaqueDeclaration()
+				}
+				event.declaration = declaration
+				event.typeNode = nil
+				event.replaceOpacity = true
+			}
+			resolvedEvents = append(resolvedEvents, event)
+		}
+		declarationEvents = resolvedEvents
 		// Components and their bindings are now complete, so every assignment can
 		// be associated exactly once, including assignments before a declaration.
 		for _, assignmentNode := range propTypeAssignments {
