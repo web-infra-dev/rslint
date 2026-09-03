@@ -13,6 +13,10 @@ import (
 func TestStaticPropertyPlacementExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StaticPropertyPlacementRule,
 		[]rule_tester.ValidTestCase{
+			// ---- Upstream MemberExpression boundary behavior ----
+			{Code: `class MyComponent extends React.Component {} MyComponent?.propTypes = {};`, Tsx: true},
+			{Code: `class MyComponent extends React.Component {} MyComponent?.[displayName] = {};`, Tsx: true},
+			{Code: `class MyComponent extends React.Component {} MyComponent.propTypes, value;`, Tsx: true},
 			// ---- Dimension 4: receiver wrappers on a component assignment ----
 			{Code: `class MyComponent extends React.Component {} (MyComponent).propTypes = {};`, Options: []interface{}{propertyAssignment}, Tsx: true},
 			{Code: `class MyComponent extends React.Component {} ((MyComponent)).propTypes = {};`, Options: []interface{}{propertyAssignment}, Tsx: true},
@@ -48,6 +52,9 @@ func TestStaticPropertyPlacementExtras(t *testing.T) {
 			// ---- Real-user: per-property migration from getter to public fields ----
 			{Code: `class Form extends React.Component { static get propTypes() { return {}; } static defaultProps = {}; }`, Options: []interface{}{staticPublicField, map[string]interface{}{"propTypes": staticGetter}}, Tsx: true},
 		}, []rule_tester.InvalidTestCase{
+			// The upstream MemberExpression listener reports non-comma binary
+			// parents, not only assignment expressions.
+			{Code: `class MyComponent extends React.Component {} MyComponent.propTypes + value;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notStaticClassProp"}}},
 			// ---- Dimension 4: class field mismatch reports the whole member ----
 			{Code: "class MyComponent extends React.Component {\n  static propTypes = {};\n}", Options: []interface{}{staticGetter}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGetterClassFunc", Message: "'propTypes' should be declared as a static getter class function.", Line: 2, Column: 3}}},
 			// ---- Dimension 4: getter mismatch reports the whole accessor ----

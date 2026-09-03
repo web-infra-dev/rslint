@@ -200,6 +200,9 @@ func isReactClass(node *ast.Node, pragma string) bool {
 
 func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) bool {
 	receiver = ast.SkipParentheses(receiver)
+	if ast.IsOptionalChain(receiver) {
+		return false
+	}
 	root, path, ok := componentPath(receiver)
 	if !ok || ctx.Refs == nil {
 		return false
@@ -324,6 +327,9 @@ func assignmentMember(node *ast.Node) (*ast.Node, *ast.Node, bool) {
 	if node == nil {
 		return nil, nil, false
 	}
+	if ast.IsOptionalChain(node) {
+		return nil, nil, false
+	}
 	var nameNode *ast.Node
 	var receiver *ast.Node
 	switch node.Kind {
@@ -349,7 +355,7 @@ func assignmentMember(node *ast.Node) (*ast.Node, *ast.Node, bool) {
 		return nil, nil, false
 	}
 	binary := parent.AsBinaryExpression()
-	if binary.OperatorToken == nil || !ast.IsAssignmentOperator(binary.OperatorToken.Kind) || binary.Left != current {
+	if binary.OperatorToken == nil || binary.OperatorToken.Kind == ast.KindCommaToken || binary.Right == nil {
 		return nil, nil, false
 	}
 	return node, receiver, true
