@@ -175,6 +175,12 @@ func reportShortcutPairs(ctx rule.RuleContext, node *ast.Node, value string) {
 		if !isASCIIWord(value[start]) || (start > 0 && isASCIIWord(value[start-1])) {
 			continue
 		}
+		const shortcut = "shortcut"
+		shortcutEnd := start + len(shortcut)
+		if shortcutEnd > len(value) || value[start:shortcutEnd] != shortcut ||
+			(shortcutEnd < len(value) && value[shortcutEnd] != ' ') {
+			continue
+		}
 		firstEnd := start
 		for firstEnd < len(value) {
 			r, size := utf8.DecodeRuneInString(value[firstEnd:])
@@ -260,33 +266,23 @@ func removeStaticValue(ctx rule.RuleContext, node *ast.Node, value string) rule.
 	return rule.RuleFixReplace(ctx.SourceFile, node, raw)
 }
 
-func literalRange(ctx rule.RuleContext, node *ast.Node, offset [2]int) core.TextRange {
+func literalSource(ctx rule.RuleContext, node *ast.Node) (core.TextRange, *ast.PositionMap) {
 	r := utils.TrimNodeTextRange(ctx.SourceFile, node)
 	raw := ctx.SourceFile.Text()[r.Pos():r.End()]
 	if len(raw) >= 2 {
-		inner := raw[1 : len(raw)-1]
-		return core.NewTextRange(
-			r.Pos()+1+rawByteOffsetForUTF16(inner, offset[0]),
-			r.Pos()+1+rawByteOffsetForUTF16(inner, offset[1]),
-		)
+		return r, ast.ComputePositionMap(raw[1 : len(raw)-1])
 	}
-	return core.NewTextRange(r.Pos()+offset[0], r.Pos()+offset[1])
+	return r, nil
 }
 
-func rawByteOffsetForUTF16(value string, target int) int {
-	if target <= 0 {
-		return 0
+func literalRange(r core.TextRange, positions *ast.PositionMap, offset [2]int) core.TextRange {
+	if positions == nil {
+		return core.NewTextRange(r.Pos()+offset[0], r.Pos()+offset[1])
 	}
-	units := 0
-	for pos := 0; pos < len(value); {
-		r, size := utf8.DecodeRuneInString(value[pos:])
-		if units >= target {
-			return pos
-		}
-		units += utf16Width(r)
-		pos += size
-	}
-	return len(value)
+	return core.NewTextRange(
+		r.Pos()+1+positions.UTF16ToUTF8(offset[0]),
+		r.Pos()+1+positions.UTF16ToUTF8(offset[1]),
+	)
 }
 
 // https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/lib/rules/no-invalid-html-attribute.js
@@ -313,6 +309,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 				})
 				return
 			}
+			nodeRange, positions := literalSource(ctx, valueNode)
 			for _, part := range stringParts(value) {
 				word := value[part.bytes[0]:part.bytes[1]]
 				tags, exists := relValues[word]
@@ -323,7 +320,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 					id, desc = "notValidFor", "“"+word+"” is not a valid “rel” attribute value for <"+element+">."
 				}
 				if id != "" {
-					partRange := literalRange(ctx, valueNode, part.units)
+					partRange := literalRange(nodeRange, positions, part.units)
 					ctx.ReportNodeWithDeferredSuggestions(valueNode, message(id, desc), func() []rule.RuleSuggestion {
 						return suggestion("suggestRemoveInvalid", "“remove invalid attribute "+word+"”", rule.RuleFixRemoveRange(partRange))
 					})
@@ -331,12 +328,11 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 			}
 			reportShortcutPairs(ctx, valueNode, value)
 			for _, part := range whitespaceParts(value) {
-				r := literalRange(ctx, valueNode, part.units)
+				r := literalRange(nodeRange, positions, part.units)
 				whitespace := value[part.bytes[0]:part.bytes[1]]
-				nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, valueNode)
 				if r.Pos() == nodeRange.Pos()+1 || r.End() == nodeRange.End()-1 || whitespace != " " {
 					replacement := " "
-					if part.units[0] == 0 || part.units[1] == int(core.UTF16Len(value)) {
+					if r.Pos() == nodeRange.Pos()+1 || r.End() == nodeRange.End()-1 {
 						replacement = ""
 					}
 					ctx.ReportNodeWithDeferredSuggestions(valueNode, message("spaceDelimited", "”rel“ attribute values should be space delimited."), func() []rule.RuleSuggestion {
