@@ -49,11 +49,6 @@ when it is declared as an arrow-function class field.
 
 The rule is automatically fixable by the `--fix` CLI option.
 
-## When Not To Use It
-
-If you do not want to enforce prototype placement for React lifecycle methods,
-you can disable this rule.
-
 ## Differences from ESLint
 
 The autofix preserves valid syntax in two cases where
