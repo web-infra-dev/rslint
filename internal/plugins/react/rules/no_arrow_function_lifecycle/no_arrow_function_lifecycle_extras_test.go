@@ -110,6 +110,24 @@ func TestNoArrowFunctionLifecycleRuleExtras(t *testing.T) {
 			Output: []string{"var Hello = createReactClass({ render: function({ value }, [item]) { return value; } });"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
 		},
+		{
+			Code:   "/* @jsx Preact.h */ class Hello extends Preact.Component { render = () => null; }",
+			Tsx:    true,
+			Output: []string{"/* @jsx Preact.h */ class Hello extends Preact.Component { render() { return null; } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "/** @extends React.Component */ class Hello { render = () => null; }",
+			Tsx:    true,
+			Output: []string{"/** @extends React.Component */ class Hello { render() { return null; } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "/** @augments React.PureComponent */ class Hello { render = () => null; }",
+			Tsx:    true,
+			Output: []string{"/** @augments React.PureComponent */ class Hello { render() { return null; } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArrowFunctionLifecycleRule, valid, invalid)

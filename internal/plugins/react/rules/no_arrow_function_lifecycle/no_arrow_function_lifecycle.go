@@ -111,6 +111,49 @@ func isLifecycleMethod(member *ast.Node, name string) bool {
 	return methods[name]
 }
 
+func hasExplicitReactComponentJSDoc(classNode *ast.Node) bool {
+	if classNode == nil {
+		return false
+	}
+	for _, doc := range classNode.JSDoc(nil) {
+		jd := doc.AsJSDoc()
+		if jd == nil || jd.Tags == nil {
+			continue
+		}
+		for _, tag := range jd.Tags.Nodes {
+			if !ast.IsJSDocAugmentsTag(tag) {
+				continue
+			}
+			className := tag.AsJSDocAugmentsTag().ClassName
+			if className == nil {
+				continue
+			}
+			if isExplicitReactComponentType(className) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isExplicitReactComponentType(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindExpressionWithTypeArguments {
+		return isExplicitReactComponentType(node.AsExpressionWithTypeArguments().Expression)
+	}
+	if node.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	property := node.AsPropertyAccessExpression()
+	object := ast.SkipParentheses(property.Expression)
+	name := property.Name()
+	return object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "React" &&
+		name != nil && name.Kind == ast.KindIdentifier &&
+		(name.AsIdentifier().Text == "Component" || name.AsIdentifier().Text == "PureComponent")
+}
+
 func parameterText(sf *ast.SourceFile, fn *ast.Node) string {
 	params := reactutil.FunctionParameters(fn)
 	if len(params) == 0 {
@@ -235,7 +278,7 @@ var NoArrowFunctionLifecycleRule = rule.Rule{
 	Name:   "react/no-arrow-function-lifecycle",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		pragma := reactutil.GetReactPragma(ctx.Settings)
+		pragma := reactutil.GetReactPragmaFromContext(ctx)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		var visit ast.Visitor
 		visit = func(node *ast.Node) bool {
@@ -244,7 +287,7 @@ var NoArrowFunctionLifecycleRule = rule.Rule{
 			}
 			switch node.Kind {
 			case ast.KindClassDeclaration, ast.KindClassExpression:
-				if reactutil.ExtendsReactComponent(node, pragma) {
+				if reactutil.ExtendsReactComponent(node, pragma) || hasExplicitReactComponentJSDoc(node) {
 					reportComponent(ctx, node)
 				}
 			case ast.KindObjectLiteralExpression:
