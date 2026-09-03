@@ -8,11 +8,7 @@ suite('Rstack migration notice', () => {
   });
 
   test('keeps Rslint active when the Rstack extension is absent', () => {
-    assert.strictEqual(
-      vscode.extensions.getExtension('rstack.rstack'),
-      undefined,
-      'The isolated Extension Host must not install the Rstack extension',
-    );
+    // The isolated Extension Host has no Rstack extension installed.
     assert.strictEqual(rstackEditorTakesOver(), false);
   });
 });

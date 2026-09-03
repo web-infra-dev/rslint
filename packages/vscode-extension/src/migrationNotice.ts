@@ -9,7 +9,7 @@ import {
   type ExtensionContext,
   type StatusBarItem,
 } from 'vscode';
-import { Logger } from './logger';
+import type { Logger } from './logger';
 
 const RSTACK_EXTENSION_ID = 'rstack.rstack';
 const OPEN_EXTENSION_COMMAND = 'rslint.openRstackExtension';
@@ -30,47 +30,6 @@ export function rstackEditorTakesOver(): boolean {
 
 type NoticeState = 'migrate' | 'off' | 'reload';
 
-const NOTICES: Record<
-  NoticeState,
-  { text: string; tooltip: MarkdownString; log: string }
-> = {
-  migrate: {
-    text: '$(sparkle-filled) Rslint → Rstack',
-    tooltip: new MarkdownString(
-      [
-        '**The standalone Rslint extension is retired.**',
-        '',
-        `New editor features land in the unified **Rstack** extension (\`${RSTACK_EXTENSION_ID}\`), which covers testing, linting and formatting. Click to open it in the Extensions view.`,
-        '',
-        `Settings move from \`rslint.*\` to \`rstack.rslint.*\` and are not migrated automatically — see the [migration notes](${MIGRATION_NOTES_URL}).`,
-      ].join('\n'),
-    ),
-    log: `The standalone Rslint extension is retired; new features land in ${RSTACK_EXTENSION_ID}. Migration notes: ${MIGRATION_NOTES_URL}`,
-  },
-  off: {
-    text: '$(sparkle-filled) Rslint: off',
-    tooltip: new MarkdownString(
-      [
-        `**Rstack (\`${RSTACK_EXTENSION_ID}\`) is running Rslint, so this extension is inactive.**`,
-        '',
-        'Click to open this extension in the Extensions view and uninstall it.',
-      ].join('\n'),
-    ),
-    log: `${RSTACK_EXTENSION_ID} is active, so the standalone Rslint extension stands down. Uninstall it to remove this notice.`,
-  },
-  reload: {
-    text: '$(sparkle-filled) Rslint: reload window',
-    tooltip: new MarkdownString(
-      [
-        `**Rstack (\`${RSTACK_EXTENSION_ID}\`) changed after this window started.**`,
-        '',
-        'Click to reload the window so exactly one copy of Rslint runs.',
-      ].join('\n'),
-    ),
-    log: `${RSTACK_EXTENSION_ID} changed after activation. Reload the window so exactly one copy of Rslint runs.`,
-  },
-};
-
 /**
  * Shows a non-modal reminder that the Rstack extension supersedes this one.
  * A running language server cannot be created or torn down safely when the
@@ -79,19 +38,14 @@ const NOTICES: Record<
 export function createMigrationNotice(
   context: ExtensionContext,
   standingDown: boolean,
+  logger: Logger,
 ): void {
-  Logger.setDefaultLogLevel(context);
-  const logger = new Logger('Rslint migration').useDefaultLogLevel();
-  context.subscriptions.push(logger);
-
   context.subscriptions.push(
-    commands.registerCommand(
-      OPEN_EXTENSION_COMMAND,
-      (extensionId: string = RSTACK_EXTENSION_ID) =>
-        commands.executeCommand(
-          'workbench.extensions.search',
-          `@id:${extensionId}`,
-        ),
+    commands.registerCommand(OPEN_EXTENSION_COMMAND, () =>
+      commands.executeCommand(
+        'workbench.extensions.search',
+        `@id:${RSTACK_EXTENSION_ID}`,
+      ),
     ),
   );
 
@@ -103,39 +57,83 @@ export function createMigrationNotice(
   item.backgroundColor = new ThemeColor('statusBarItem.warningBackground');
   context.subscriptions.push(item);
 
-  const noticeCommands: Record<NoticeState, StatusBarItem['command']> = {
-    migrate: OPEN_EXTENSION_COMMAND,
-    off: {
+  const notices: Record<
+    NoticeState,
+    {
+      text: string;
+      tooltip: MarkdownString;
+      command: StatusBarItem['command'];
+      log: string;
+    }
+  > = {
+    migrate: {
+      text: '$(sparkle-filled) Rslint → Rstack',
+      tooltip: new MarkdownString(
+        [
+          '**The standalone Rslint extension is retired.**',
+          '',
+          `New editor features land in the unified **Rstack** extension (\`${RSTACK_EXTENSION_ID}\`), which covers testing, linting and formatting. Click to open it in the Extensions view.`,
+          '',
+          `Settings move from \`rslint.*\` to \`rstack.rslint.*\` and are not migrated automatically — see the [migration notes](${MIGRATION_NOTES_URL}).`,
+        ].join('\n'),
+      ),
       command: OPEN_EXTENSION_COMMAND,
-      title: 'Uninstall the standalone Rslint extension',
-      arguments: [context.extension.id],
+      log: `The standalone Rslint extension is retired; new features land in ${RSTACK_EXTENSION_ID}. Migration notes: ${MIGRATION_NOTES_URL}`,
     },
-    reload: 'workbench.action.reloadWindow',
+    off: {
+      text: '$(sparkle-filled) Rslint: off',
+      tooltip: new MarkdownString(
+        [
+          `**Rstack (\`${RSTACK_EXTENSION_ID}\`) is running Rslint, so this extension is inactive.**`,
+          '',
+          'Click to open this extension in the Extensions view and uninstall it.',
+        ].join('\n'),
+      ),
+      command: {
+        command: 'workbench.extensions.search',
+        title: 'Uninstall the standalone Rslint extension',
+        arguments: [`@id:${context.extension.id}`],
+      },
+      log: `${RSTACK_EXTENSION_ID} is active, so the standalone Rslint extension stands down. Uninstall it to remove this notice.`,
+    },
+    reload: {
+      text: '$(sparkle-filled) Rslint: reload window',
+      tooltip: new MarkdownString(
+        [
+          `**Rstack (\`${RSTACK_EXTENSION_ID}\`) changed after this window started.**`,
+          '',
+          'Click to reload the window so exactly one copy of Rslint runs.',
+        ].join('\n'),
+      ),
+      command: 'workbench.action.reloadWindow',
+      log: `${RSTACK_EXTENSION_ID} changed after activation. Reload the window so exactly one copy of Rslint runs.`,
+    },
   };
 
+  const initial: NoticeState = standingDown ? 'off' : 'migrate';
   let state: NoticeState | undefined;
   const apply = (takesOver: boolean): void => {
-    const next: NoticeState =
-      takesOver !== standingDown ? 'reload' : standingDown ? 'off' : 'migrate';
+    const next: NoticeState = takesOver === standingDown ? initial : 'reload';
     if (next === state) return;
 
     state = next;
-    const notice = NOTICES[next];
+    const notice = notices[next];
     item.text = notice.text;
     item.tooltip = notice.tooltip;
-    item.command = noticeCommands[next];
+    item.command = notice.command;
     item.show();
     logger.warn(notice.log);
+  };
+  const refresh = (): void => {
+    apply(rstackEditorTakesOver());
   };
 
   apply(standingDown);
   context.subscriptions.push(
-    extensions.onDidChange(() => {
-      apply(rstackEditorTakesOver());
-    }),
+    extensions.onDidChange(refresh),
     workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('rstack.rslint.enable')) {
-        apply(rstackEditorTakesOver());
+        refresh();
       }
     }),
   );
