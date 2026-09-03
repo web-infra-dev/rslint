@@ -1,9 +1,17 @@
 import { ExtensionContext } from 'vscode';
 import { Extension } from './Extension';
+import {
+  createMigrationNotice,
+  rstackEditorTakesOver,
+} from './migrationNotice';
 
 let extension: Extension | undefined;
 
 export async function activate(context: ExtensionContext): Promise<void> {
+  const standingDown = rstackEditorTakesOver();
+  createMigrationNotice(context, standingDown);
+  if (standingDown) return;
+
   extension = new Extension(context);
 
   try {
