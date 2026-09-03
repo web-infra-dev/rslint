@@ -131,7 +131,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-new-buffer': 'error', // not implemented
     // 'unicorn/no-non-function-verb-prefix': 'error', // not implemented
     // 'unicorn/no-nonstandard-builtin-properties': 'error', // not implemented
-    // 'unicorn/no-null': 'error', // not implemented
+    'unicorn/no-null': 'error',
     'unicorn/no-object-as-default-parameter': 'error',
     // 'unicorn/no-object-methods-with-collections': 'error', // not implemented
     // 'unicorn/no-optional-chaining-on-undeclared-variable': 'error', // not implemented
