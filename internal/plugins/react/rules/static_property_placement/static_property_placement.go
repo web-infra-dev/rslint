@@ -69,6 +69,8 @@ func propertyName(node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindIdentifier:
 		name = node.AsIdentifier().Text
+	case ast.KindPrivateIdentifier:
+		name = reactutil.IdentifierOrPrivateName(node)
 	case ast.KindStringLiteral:
 		// displayName is the one property whose upstream predicate accepts
 		// a Literal key. The other predicates read key.name and therefore do
@@ -280,8 +282,15 @@ func resolveComponentPath(node *ast.Node, path []string) *ast.Node {
 		node = reactutil.SkipExpressionWrappers(node.AsVariableDeclaration().Initializer)
 	}
 	for _, name := range path {
-		if node == nil || node.Kind != ast.KindObjectLiteralExpression {
+		if node == nil {
 			return nil
+		}
+		// eslint-plugin-react keeps the component node when a later path
+		// segment is accessed on a class, because class nodes do not have
+		// object-literal `properties`. Preserve that behavior so paths such
+		// as `Box.C.foo.propTypes` still resolve to the component class.
+		if node.Kind != ast.KindObjectLiteralExpression {
+			continue
 		}
 		var next *ast.Node
 		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
@@ -292,6 +301,9 @@ func resolveComponentPath(node *ast.Node, path []string) *ast.Node {
 				next = property.AsPropertyAssignment().Initializer
 			}
 			break
+		}
+		if next == nil {
+			return nil
 		}
 		node = reactutil.SkipExpressionWrappers(next)
 	}
