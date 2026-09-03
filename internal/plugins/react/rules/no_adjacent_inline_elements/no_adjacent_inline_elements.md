@@ -1,4 +1,4 @@
-# react/no-adjacent-inline-elements
+# no-adjacent-inline-elements
 
 ## Rule Details
 
