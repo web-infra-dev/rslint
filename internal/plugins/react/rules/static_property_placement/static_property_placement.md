@@ -3,8 +3,8 @@
 Enforce where React component static properties are declared in an ES6 class.
 
 The rule checks `childContextTypes`, `contextTypes`, `contextType`,
-`defaultProps`, `displayName`, and `propTypes`. The default placement is
-`static public field`.
+`defaultProps` (including legacy `getDefaultProps`), `displayName`, and
+`propTypes`. The default placement is `static public field`.
 
 ## Options
 

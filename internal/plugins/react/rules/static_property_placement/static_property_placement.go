@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed static_property_placement.schema.json
@@ -66,9 +65,33 @@ func propertyName(node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
-	name, ok := utils.GetStaticPropertyName(node)
-	if !ok {
+	var name string
+	switch node.Kind {
+	case ast.KindIdentifier:
+		name = node.AsIdentifier().Text
+	case ast.KindStringLiteral:
+		// displayName is the one property whose upstream predicate accepts
+		// a Literal key. The other predicates read key.name and therefore do
+		// not match string-literal keys.
+		if node.AsStringLiteral().Text == "displayName" {
+			name = "displayName"
+		}
+	case ast.KindComputedPropertyName:
+		expr := ast.SkipParentheses(node.AsComputedPropertyName().Expression)
+		if expr == nil {
+			return ""
+		}
+		if expr.Kind == ast.KindIdentifier {
+			name = expr.AsIdentifier().Text
+		} else if expr.Kind == ast.KindStringLiteral && expr.AsStringLiteral().Text == "displayName" {
+			name = "displayName"
+		}
+	}
+	if name == "" {
 		return ""
+	}
+	if name == "getDefaultProps" {
+		return "defaultProps"
 	}
 	if _, ok := propertyNames[name]; !ok {
 		return ""
@@ -76,11 +99,49 @@ func propertyName(node *ast.Node) string {
 	return name
 }
 
+func classMemberName(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	if name := propertyName(node.Name()); name != "" {
+		return name
+	}
+	if node.Kind != ast.KindPropertyDeclaration {
+		return ""
+	}
+	property := node.AsPropertyDeclaration()
+	if property.Type == nil {
+		return ""
+	}
+	nameNode := property.Name()
+	if nameNode == nil {
+		return ""
+	}
+	var name string
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		name = nameNode.AsIdentifier().Text
+	case ast.KindComputedPropertyName:
+		expr := ast.SkipParentheses(nameNode.AsComputedPropertyName().Expression)
+		if expr != nil && expr.Kind == ast.KindIdentifier {
+			name = expr.AsIdentifier().Text
+		}
+	}
+	// typescript-eslint's Flow compatibility branch also applies to the
+	// TypeScript ESTree shape: typed `props` and `context` fields are treated
+	// as propTypes and contextTypes respectively.
+	switch name {
+	case "props":
+		return "propTypes"
+	case "context":
+		return "contextTypes"
+	default:
+		return ""
+	}
+}
+
 func reportClassMember(name, expected string, node *ast.Node, isStatic bool, ctx rule.RuleContext) {
 	if expected == propertyAssignment {
-		if !isStatic {
-			return
-		}
 		ctx.ReportNode(node, rule.RuleMessage{
 			Id:          "declareOutsideClass",
 			Description: fmt.Sprintf("'%s' should be declared outside the class body.", name),
@@ -139,21 +200,20 @@ func isReactClass(node *ast.Node, pragma string) bool {
 
 func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) bool {
 	receiver = ast.SkipParentheses(receiver)
-	if receiver == nil || receiver.Kind != ast.KindIdentifier || ctx.Refs == nil {
+	root, path, ok := componentPath(receiver)
+	if !ok || ctx.Refs == nil {
 		return false
 	}
-	symbol := ctx.Refs.Resolve(receiver)
+	symbol := ctx.Refs.Resolve(root)
 	if symbol != nil && symbol.ValueDeclaration != nil {
 		declaration := symbol.ValueDeclaration
-		if isReactClass(declaration, pragma) {
+		if isReactClass(resolveComponentPath(declaration, path), pragma) {
 			return true
 		}
-		if declaration.Kind == ast.KindVariableDeclaration {
-			initializer := declaration.AsVariableDeclaration().Initializer
-			if isReactClass(reactutil.SkipExpressionWrappers(initializer), pragma) {
-				return true
-			}
-		}
+		// A successfully resolved local binding is authoritative. Falling
+		// back to a same-name class elsewhere in the file would cross a
+		// shadowing boundary and report a non-component binding.
+		return false
 	}
 	// The checker/ref store can leave a declaration unresolved in a JS/TSX
 	// file without a usable project symbol. Keep the same-file fallback
@@ -163,7 +223,10 @@ func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) 
 	if source == nil {
 		return false
 	}
-	want := receiver.AsIdentifier().Text
+	if len(path) != 0 {
+		return false
+	}
+	want := root.AsIdentifier().Text
 	found := false
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
@@ -183,9 +246,74 @@ func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) 
 	return found
 }
 
+func componentPath(node *ast.Node) (*ast.Node, []string, bool) {
+	if node == nil {
+		return nil, nil, false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return node, nil, true
+	case ast.KindPropertyAccessExpression:
+		property := node.AsPropertyAccessExpression()
+		if property.Name() == nil || property.Name().Kind != ast.KindIdentifier {
+			return nil, nil, false
+		}
+		root, path, ok := componentPath(property.Expression)
+		if !ok {
+			return nil, nil, false
+		}
+		return root, append(path, property.Name().AsIdentifier().Text), true
+	default:
+		return nil, nil, false
+	}
+}
+
+func resolveComponentPath(node *ast.Node, path []string) *ast.Node {
+	node = reactutil.SkipExpressionWrappers(node)
+	if node == nil {
+		return nil
+	}
+	if node.Kind == ast.KindVariableDeclaration {
+		node = reactutil.SkipExpressionWrappers(node.AsVariableDeclaration().Initializer)
+	}
+	for _, name := range path {
+		if node == nil || node.Kind != ast.KindObjectLiteralExpression {
+			return nil
+		}
+		var next *ast.Node
+		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+			if property == nil || property.Name() == nil || propertyIdentifierName(property.Name()) != name {
+				continue
+			}
+			if property.Kind == ast.KindPropertyAssignment {
+				next = property.AsPropertyAssignment().Initializer
+			}
+			break
+		}
+		node = reactutil.SkipExpressionWrappers(next)
+	}
+	return node
+}
+
+func propertyIdentifierName(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	if node.Kind == ast.KindIdentifier {
+		return node.AsIdentifier().Text
+	}
+	if node.Kind == ast.KindComputedPropertyName {
+		expr := ast.SkipParentheses(node.AsComputedPropertyName().Expression)
+		if expr != nil && expr.Kind == ast.KindIdentifier {
+			return expr.AsIdentifier().Text
+		}
+	}
+	return ""
+}
+
 func isInsideClass(node *ast.Node) bool {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		if parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression {
+		if parent.Kind == ast.KindClassDeclaration {
 			return true
 		}
 	}
@@ -237,7 +365,7 @@ var StaticPropertyPlacementRule = rule.Rule{
 			if reactutil.GetParentReactComponentScopeBased(node, pragma, reactutil.GetReactCreateClass(ctx.Settings)) == nil {
 				return
 			}
-			name := propertyName(node.Name())
+			name := classMemberName(node)
 			if name == "" {
 				return
 			}

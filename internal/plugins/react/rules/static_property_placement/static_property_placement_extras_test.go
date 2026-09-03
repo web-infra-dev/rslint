@@ -41,8 +41,6 @@ func TestStaticPropertyPlacementExtras(t *testing.T) {
 			// ---- Dimension 4: graceful degradation ----
 			{Code: `class MyComponent extends React.Component { static propTypes = {...props}; static defaultProps = {}; }`, Tsx: true},
 			{Code: `class MyComponent extends React.Component {}`, Options: []interface{}{propertyAssignment}, Tsx: true},
-			// ---- Branch lock-in: instance field is allowed for property assignment ----
-			{Code: `class MyComponent extends React.Component { propTypes = {}; }`, Options: []interface{}{propertyAssignment}, Tsx: true},
 			// ---- Branch lock-in: assignments inside a class scope are skipped ----
 			{Code: `class MyComponent extends React.Component { method() { MyComponent.propTypes = {}; } }`, Options: []interface{}{propertyAssignment}, Tsx: true},
 			// ---- Real-user: class expression used for a component binding ----
