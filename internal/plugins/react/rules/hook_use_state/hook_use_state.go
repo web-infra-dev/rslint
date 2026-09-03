@@ -111,23 +111,314 @@ func reactImportInfo(node *ast.Node) importInfo {
 	return info
 }
 
-func firstReactHookReference(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, ident *ast.Node) *scope.Reference {
-	if ident == nil || imports.namedHookNames == nil {
-		return nil
+// hookReferenceIndex keeps the original scope references intact and adds only
+// references whose upstream ordering is unambiguous. This matters because
+// Components does not resolve the call itself: it inspects the first
+// hook-shaped reference in SourceCode#getScope(call).
+type hookReferenceIndex struct {
+	referenceScopes map[*ast.Node]*scope.Scope
+	scopeByBlock    map[*ast.Node]*scope.Scope
+	extraReferences map[*scope.Scope][]hookReferenceCandidate
+}
+
+type hookReferenceKey struct {
+	from *scope.Scope
+	name string
+}
+
+type hookReferenceCandidate struct {
+	from      *scope.Scope
+	reference *scope.Reference
+	position  int
+	tieBreak  int
+}
+
+func newHookReferenceIndex(manager *scope.Manager, referenceNames map[string]struct{}) *hookReferenceIndex {
+	index := &hookReferenceIndex{
+		referenceScopes: make(map[*ast.Node]*scope.Scope, len(manager.References)),
+		scopeByBlock:    make(map[*ast.Node]*scope.Scope, len(manager.Scopes)),
 	}
-	from := referenceScopes[ident]
-	if from == nil {
-		return nil
+	var parameterDecoratorScopes map[*scope.Scope]struct{}
+	for _, current := range manager.Scopes {
+		// Named function expressions have two scopes for one tsgo node; the
+		// later scope is the inner function scope SourceCode#getScope acquires.
+		index.scopeByBlock[current.Block] = current
+		if current.Kind == scope.KindFunction && len(current.References) == 0 &&
+			current.Block.SubtreeFacts()&ast.SubtreeContainsDecorators != 0 {
+			for _, parameter := range current.Block.Parameters() {
+				if !ast.HasDecorators(parameter) {
+					continue
+				}
+				if parameterDecoratorScopes == nil {
+					parameterDecoratorScopes = make(map[*scope.Scope]struct{})
+				}
+				parameterDecoratorScopes[current] = struct{}{}
+				break
+			}
+		}
 	}
-	for _, reference := range from.References {
-		if _, ok := imports.namedHookNames[reference.Identifier.Text()]; ok {
-			return reference
+	for _, reference := range manager.References {
+		index.referenceScopes[reference.Identifier] = reference.From
+	}
+
+	// Unlike the shared scope model, typescript-eslint does not create a scope
+	// for a non-generic alias or interface. Projecting a partial reference
+	// timeline is unsafe, though: computed keys and typeof operands are visited
+	// by its value referencer, whose order is context-sensitive. If a target
+	// scope contains any such candidate (or a conditional check candidate),
+	// leave all aliases for that target untouched instead of recreating its
+	// TypeVisitor/PatternVisitor in this rule.
+	var firstByKey map[hookReferenceKey]hookReferenceCandidate
+	var blockedTypeTargets map[*scope.Scope]bool
+	for _, reference := range manager.References {
+		from, ok := transparentTypeScopeParent(reference.From)
+		if !ok || !scopeNeedsHookExtras(from, parameterDecoratorScopes) {
+			continue
+		}
+		if reference.IsValueReference() || isConditionalCheckReference(reference.Identifier, reference.From.Block) {
+			if blockedTypeTargets == nil {
+				blockedTypeTargets = make(map[*scope.Scope]bool)
+			}
+			blockedTypeTargets[from] = true
+			continue
+		}
+		if firstByKey == nil {
+			firstByKey = make(map[hookReferenceKey]hookReferenceCandidate)
+		}
+		keepFirstHookReference(firstByKey, hookReferenceCandidate{
+			from:      from,
+			reference: reference,
+			position:  reference.Identifier.Pos(),
+			tieBreak:  reference.Identifier.Pos(),
+		})
+	}
+	for key := range firstByKey {
+		if blockedTypeTargets[key.from] {
+			delete(firstByKey, key)
+		}
+	}
+
+	// eslint-scope emits an initialization write for declarations. The shared
+	// scope intentionally omits declaration-shaped references, so synthesize
+	// only candidate Hook names and retain the earliest merged declaration.
+	for _, current := range manager.Scopes {
+		for _, variable := range current.Vars {
+			if variable == nil || variable.ID == nil || variable.DeclareModifier {
+				continue
+			}
+			if _, relevant := referenceNames[variable.Name]; !relevant {
+				continue
+			}
+			position, initialized := hookInitializationPosition(variable)
+			if !initialized {
+				continue
+			}
+			from := index.scopeForDeclaration(variable.ID)
+			if !scopeNeedsHookExtras(from, parameterDecoratorScopes) {
+				continue
+			}
+			if firstByKey == nil {
+				firstByKey = make(map[hookReferenceKey]hookReferenceCandidate)
+			}
+			keepFirstHookReference(firstByKey, hookReferenceCandidate{
+				from: from,
+				reference: &scope.Reference{
+					Identifier:   variable.ID,
+					From:         from,
+					Declarations: variable.Scope.Declarations(variable.Name),
+				},
+				position: position,
+				tieBreak: variable.ID.Pos(),
+			})
+		}
+	}
+
+	if len(firstByKey) != 0 {
+		index.extraReferences = make(map[*scope.Scope][]hookReferenceCandidate)
+		for _, candidate := range firstByKey {
+			index.extraReferences[candidate.from] = append(index.extraReferences[candidate.from], candidate)
+		}
+	}
+	return index
+}
+
+func scopeNeedsHookExtras(current *scope.Scope, parameterDecoratorScopes map[*scope.Scope]struct{}) bool {
+	if current == nil {
+		return false
+	}
+	if len(current.References) != 0 {
+		return true
+	}
+	if current.Kind == scope.KindClass {
+		return ast.HasDecorators(current.Block)
+	}
+	if current.Kind == scope.KindFunction {
+		_, ok := parameterDecoratorScopes[current]
+		return ok
+	}
+	return false
+}
+
+func transparentTypeScopeParent(current *scope.Scope) (*scope.Scope, bool) {
+	if current == nil || current.Kind != scope.KindType || current.Block == nil || current.Parent == nil ||
+		(current.Block.Kind != ast.KindTypeAliasDeclaration && current.Block.Kind != ast.KindInterfaceDeclaration) ||
+		current.Block.TypeParameterList() != nil {
+		return nil, false
+	}
+	return current.Parent, true
+}
+
+func isConditionalCheckReference(identifier, boundary *ast.Node) bool {
+	var child *ast.Node
+	for current := identifier; current != nil && current != boundary; current = current.Parent {
+		if current.Kind == ast.KindConditionalType &&
+			current.AsConditionalTypeNode().CheckType == child {
+			return true
+		}
+		child = current
+	}
+	return false
+}
+
+func keepFirstHookReference(firstByKey map[hookReferenceKey]hookReferenceCandidate, candidate hookReferenceCandidate) {
+	key := hookReferenceKey{from: candidate.from, name: candidate.reference.Identifier.Text()}
+	if previous, exists := firstByKey[key]; !exists || hookReferenceCandidateLess(candidate, previous) {
+		firstByKey[key] = candidate
+	}
+}
+
+func hookReferenceCandidateLess(left, right hookReferenceCandidate) bool {
+	return left.position < right.position || left.position == right.position && left.tieBreak < right.tieBreak
+}
+
+func hookInitializationPosition(variable *scope.Variable) (int, bool) {
+	hasBindingDefault := false
+	for current := variable.ID; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindBindingElement:
+			hasBindingDefault = hasBindingDefault || current.Initializer() != nil
+		case ast.KindVariableDeclaration:
+			if variable.Kind != scope.DefVariable {
+				if hasBindingDefault {
+					return current.Pos(), true
+				}
+				return 0, false
+			}
+			declaration := current.AsVariableDeclaration()
+			if hasBindingDefault || declaration != nil && declaration.Initializer != nil {
+				return current.Pos(), true
+			}
+			if declaration != nil && utils.IsVarDeclInForInOrOf(current) {
+				// Pattern defaults and computed keys precede the loop write.
+				list := current.Parent.AsVariableDeclarationList()
+				return current.End(), list != nil && list.Declarations != nil &&
+					len(list.Declarations.Nodes) != 0 && list.Declarations.Nodes[0] == current
+			}
+			return 0, false
+		case ast.KindParameter:
+			return current.Pos(), variable.Kind == scope.DefParameter &&
+				(hasBindingDefault || current.Initializer() != nil)
+		}
+	}
+	if hasBindingDefault {
+		// A catch binding has no Parameter/VariableDeclaration wrapper.
+		return variable.ID.Pos(), true
+	}
+	return 0, false
+}
+
+func (index *hookReferenceIndex) scopeForDeclaration(node *ast.Node) *scope.Scope {
+	for current := node; current != nil; current = current.Parent {
+		if candidate := index.scopeByBlock[current]; candidate != nil {
+			return candidate
 		}
 	}
 	return nil
 }
 
-func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, ident *ast.Node) bool {
+func isDescendantOf(node, ancestor *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current == ancestor {
+			return true
+		}
+	}
+	return false
+}
+
+func (index *hookReferenceIndex) decoratorAcquiredScope(node *ast.Node) *scope.Scope {
+	var decorator *ast.Node
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindDecorator {
+			decorator = current
+			break
+		}
+	}
+	if decorator == nil || decorator.Parent == nil {
+		return nil
+	}
+	for current := node; current != decorator; current = current.Parent {
+		if candidate := index.scopeByBlock[current]; candidate != nil {
+			// ESTree keeps a method's computed key outside the FunctionExpression
+			// that owns its parameters and body.
+			if name := current.Name(); candidate.Kind == scope.KindFunction && name != nil &&
+				name.Kind == ast.KindComputedPropertyName && isDescendantOf(node, name) {
+				continue
+			}
+			return candidate
+		}
+	}
+	target := decorator.Parent
+	if target.Kind == ast.KindParameter {
+		for target = target.Parent; target != nil && !ast.IsFunctionLikeDeclaration(target); target = target.Parent {
+		}
+		if target == nil || target.Body() == nil || utils.IsInAmbientContext(target) ||
+			ast.HasSyntacticModifier(target, ast.ModifierFlagsAbstract) {
+			return nil
+		}
+		return index.scopeByBlock[target]
+	}
+	for current := target; current != nil; current = current.Parent {
+		if ast.IsClassLike(current) {
+			return index.scopeByBlock[current]
+		}
+	}
+	return nil
+}
+
+func (index *hookReferenceIndex) firstMatchingReference(from *scope.Scope, augmented bool, matches func(string) bool) *scope.Reference {
+	if from == nil {
+		return nil
+	}
+	var first *scope.Reference
+	firstCandidate := hookReferenceCandidate{}
+	for _, reference := range from.References {
+		if reference.Identifier != nil && matches(reference.Identifier.Text()) {
+			first = reference
+			firstCandidate = hookReferenceCandidate{position: reference.Identifier.Pos(), tieBreak: reference.Identifier.Pos()}
+			break
+		}
+	}
+	if augmented {
+		for _, candidate := range index.extraReferences[from] {
+			if (first == nil || hookReferenceCandidateLess(candidate, firstCandidate)) && matches(candidate.reference.Identifier.Text()) {
+				first = candidate.reference
+				firstCandidate = candidate
+			}
+		}
+	}
+	return first
+}
+
+func firstReactHookReference(index *hookReferenceIndex, imports importInfo, from *scope.Scope, augmented bool) *scope.Reference {
+	if index == nil || imports.namedHookNames == nil {
+		return nil
+	}
+	return index.firstMatchingReference(from, augmented, func(name string) bool {
+		return imports.namedHookNames[name] != ""
+	})
+}
+
+func resolvesToNamedUseState(index *hookReferenceIndex, imports importInfo, ident *ast.Node, from *scope.Scope, augmented bool) bool {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -137,7 +428,7 @@ func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports
 	if len(name) < 4 || name[:3] != "use" || name[3] < 'A' || name[3] > 'Z' {
 		return false
 	}
-	reference := firstReactHookReference(referenceScopes, imports, ident)
+	reference := firstReactHookReference(index, imports, from, augmented)
 	if reference == nil {
 		return false
 	}
@@ -151,27 +442,20 @@ func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports
 	return imports.namedHookNames[name] == "" || imports.namedHookNames[name] == "useState"
 }
 
-func firstReference(referenceScopes map[*ast.Node]*scope.Scope, ident *ast.Node, name string) *scope.Reference {
-	if ident == nil || ident.Kind != ast.KindIdentifier {
+func firstReference(index *hookReferenceIndex, from *scope.Scope, name string, augmented bool) *scope.Reference {
+	if index == nil {
 		return nil
 	}
-	from := referenceScopes[ident]
-	if from == nil {
-		return nil
-	}
-	for _, reference := range from.References {
-		if reference.Identifier != nil && reference.Identifier.Text() == name {
-			return reference
-		}
-	}
-	return nil
+	return index.firstMatchingReference(from, augmented, func(candidate string) bool {
+		return candidate == name
+	})
 }
 
-func resolvesToDefaultReactImport(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, ident *ast.Node) bool {
+func resolvesToDefaultReactImport(index *hookReferenceIndex, imports importInfo, from *scope.Scope, augmented bool) bool {
 	if imports.defaultName == "" || imports.defaultSpecifier == nil {
 		return false
 	}
-	reference := firstReference(referenceScopes, ident, imports.defaultName)
+	reference := firstReference(index, from, imports.defaultName, augmented)
 	if reference == nil {
 		return false
 	}
@@ -190,7 +474,7 @@ func resolvesToDefaultReactImport(referenceScopes map[*ast.Node]*scope.Scope, im
 // isReactUseStateCall ports Components#isReactHookCall(node, ["useState"]).
 // Parentheses are transparent because ESTree drops them; TS assertion wrappers
 // deliberately are not, matching the upstream parser's explicit TS nodes.
-func isReactUseStateCall(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, node *ast.Node) bool {
+func isReactUseStateCall(index *hookReferenceIndex, imports importInfo, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -206,7 +490,12 @@ func isReactUseStateCall(referenceScopes map[*ast.Node]*scope.Scope, imports imp
 		return false
 	}
 	if callee.Kind == ast.KindIdentifier {
-		return resolvesToNamedUseState(referenceScopes, imports, callee)
+		from := index.referenceScopes[callee]
+		if acquired := index.decoratorAcquiredScope(node); acquired != nil && acquired != from {
+			return firstReactHookReference(index, imports, acquired, true) != nil &&
+				resolvesToNamedUseState(index, imports, callee, from, false)
+		}
+		return resolvesToNamedUseState(index, imports, callee, from, true)
 	}
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return false
@@ -220,7 +509,12 @@ func isReactUseStateCall(referenceScopes map[*ast.Node]*scope.Scope, imports imp
 	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.AsIdentifier().Text != imports.defaultName {
 		return false
 	}
-	return resolvesToDefaultReactImport(referenceScopes, imports, receiver)
+	from := index.referenceScopes[receiver]
+	if acquired := index.decoratorAcquiredScope(node); acquired != nil && acquired != from {
+		return firstReference(index, acquired, imports.defaultName, true) != nil &&
+			resolvesToDefaultReactImport(index, imports, from, false)
+	}
+	return resolvesToDefaultReactImport(index, imports, from, true)
 }
 
 func isDestructuringBinding(node *ast.Node) bool {
@@ -312,10 +606,7 @@ var HookUseStateRule = rule.Rule{
 		// lookup without collecting every identifier in the file.
 		namedHookNames["useState"] = struct{}{}
 		manager := scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true, ReferenceNames: namedHookNames})
-		referenceScopes := make(map[*ast.Node]*scope.Scope, len(manager.References))
-		for _, reference := range manager.References {
-			referenceScopes[reference.Identifier] = reference.From
-		}
+		references := newHookReferenceIndex(manager, namedHookNames)
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				info := reactImportInfo(node)
@@ -338,7 +629,7 @@ var HookUseStateRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if !isReactUseStateCall(referenceScopes, imports, node) {
+				if !isReactUseStateCall(references, imports, node) {
 					return
 				}
 				// ESTree wraps an optional call in ChainExpression, so it is not

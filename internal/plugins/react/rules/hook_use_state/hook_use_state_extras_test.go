@@ -40,6 +40,26 @@ func TestHookUseStateExtras(t *testing.T) {
 		// Components has not seen an import declared after the call yet.
 		{Code: `const result = useState(); import { useState } from 'react'`, Tsx: true},
 		{Code: `const result = React.useState(); import React from 'react'`, Tsx: true},
+		// Uninitialized declarations do not create eslint-scope write references.
+		{Code: `import { useEffect, useState } from 'react'; function f() { let useEffect; function useState() {} useState(); }`, Tsx: true},
+		// Generic declarations retain their type-parameter scope.
+		{Code: `import { useEffect, useState } from 'react'; function f() { type T<X = useEffect> = X; function useState() {} useState(); }`, Tsx: true},
+		// A value reference makes the non-generic type timeline unsafe to project
+		// partially; retain the existing result instead of guessing visitor order.
+		{Code: `import { useEffect, useState } from 'react'; function f() { type T = { [consume<useEffect>(useState)]: 0 }; function useState() {} useState(); }`, Tsx: true},
+		{Code: `import { useState } from 'react'; function f() { let useState; type A = { [useState]: 0 }; type B = useState; useState(); }`, Tsx: true},
+		// A reliable pure-type reference can also be the authoritative first
+		// reference and suppress a value-space import match.
+		{Code: `import { useState } from 'react'; function f() { type useState = unknown; type T = useState; useState(); }`, Tsx: true},
+		// A hoisted var initializer runs in its authored inner block, not in the
+		// function scope where the binding lives.
+		{Code: `import { useEffect, useState } from 'react'; function f() { { var useEffect = 1; } function useState() {} useState(); }`, Tsx: true},
+		// Initialization writes from one pattern keep binding order.
+		{Code: `import { useEffect, useState } from 'react'; function f() { const { useState, useEffect } = value; useState(); }`, Tsx: true},
+		// SourceCode#getScope acquires an otherwise-empty class scope here.
+		{Code: `import { useState } from 'react'; @dec(useState()) class C {}`, Tsx: true},
+		{Code: `import { useState } from 'react'; class C { method(@dec(useState()) value: unknown) {} }`, Tsx: true},
+		{Code: `import { useState } from 'react'; @dec({ [useState()]() {} }) class C {}`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// Locks in upstream CallExpression arm 1: an immediate return is ignored; non-return expression reports.
 		hookUseStateError(`import { useState } from 'react';
@@ -190,6 +210,23 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 				}},
 			}},
 		},
+		// Components observes initialization writes before later call references.
+		hookUseStateErrors(`import { useEffect, useState } from 'react'; function f() { const useEffect = 1; function useState() {} useState(); }`, 1),
+		hookUseStateErrors(`import { useEffect, useState } from 'react'; function f(useEffect = 1) { function useState() {} useState(); }`, 1),
+		hookUseStateErrors(`import { useEffect, useState } from 'react'; function f() { const { useEffect, useState } = value; useState(); }`, 1),
+		// Non-generic aliases and interfaces do not introduce a TypeScope upstream.
+		hookUseStateErrors(`import { useEffect, useState } from 'react'; function f() { type T = useEffect; function useState() {} useState(); }`, 1),
+		hookUseStateErrors(`import { useEffect, useState } from 'react'; function f() { interface T { value: useEffect } function useState() {} useState(); }`, 1),
+		// Keep mixed type/value timelines on the original path in both directions.
+		hookUseStateErrors(`import { useState } from 'react'; function f() { type useState = unknown; type T = { [consume<useState>(useState)]: 0 }; useState(); }`, 1),
+		// Acquired-scope handling is limited to direct decorator execution;
+		// nested functions keep their own scopes, and class members remain visible.
+		hookUseStateErrors(`import { useState } from 'react'; @dec(() => useState()) class C {}`, 1),
+		hookUseStateError(`import { useState } from 'react'; @dec(useState()) class C { method() { useState(); } }`, useStateErrorText, 1, 73),
+		hookUseStateErrors(`import { useState } from 'react'; @dec(useState()) class C { [useState()]() {} }`, 2),
+		hookUseStateErrors(`import { useState } from 'react'; class C { method(@dec(useState()) value: unknown) { useState(); } }`, 2),
+		hookUseStateErrors(`import { useState } from 'react'; class C { @dec(useState()) method() {} }`, 1),
+		hookUseStateErrors(`import { useState } from 'react'; @dec(class Inner { field = useState(); }) class C {}`, 1),
 	})
 }
 
@@ -208,4 +245,12 @@ func hookUseStateError(code, message string, line, column int) rule_tester.Inval
 			Column:    column,
 		}},
 	}
+}
+
+func hookUseStateErrors(code string, count int) rule_tester.InvalidTestCase {
+	errors := make([]rule_tester.InvalidTestCaseError, count)
+	for i := range errors {
+		errors[i] = rule_tester.InvalidTestCaseError{MessageId: "useStateErrorMessage", Message: useStateErrorText}
+	}
+	return rule_tester.InvalidTestCase{Code: code, Tsx: true, Errors: errors}
 }
