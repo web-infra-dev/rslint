@@ -32,12 +32,13 @@ var NoUnusedExpressionsRule = rule.Rule{
 					return
 				}
 
+				if !utils.IsDisallowedUnusedExpression(stmt.Expression, opts) {
+					return
+				}
 				if utils.IsDirectivePrologueStatement(node) {
 					return
 				}
-				if utils.IsDisallowedUnusedExpression(stmt.Expression, opts) {
-					ctx.ReportNode(node, messageUnusedExpression())
-				}
+				ctx.ReportNode(node, messageUnusedExpression())
 			},
 		}
 	},
