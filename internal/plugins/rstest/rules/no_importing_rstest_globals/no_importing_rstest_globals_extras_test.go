@@ -23,6 +23,20 @@ func TestNoImportingRstestGlobalsExtras(t *testing.T) {
 			{Code: `import { defineConfig /* keep */, expect } from '@rstest/core';`, Output: []string{`import { defineConfig /* keep */ } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 35}}},
 			// Locks in import removal with a surviving type-only specifier.
 			{Code: `import { type Mock, test } from '@rstest/core';`, Output: []string{`import { type Mock } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 21}}},
+			// ---- Real-user: an aliased sibling keeps the declaration alive ----
+			{Code: `import { expect, it as test } from '@rstest/core'; expect(1); test('x');`, Output: []string{`import { it as test } from '@rstest/core'; expect(1); test('x');`}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10},
+				{MessageId: "noImportingRstestGlobals", Line: 1, Column: 18},
+			}},
+			{Code: `const { expect, it: test } = require('@rstest/core'); expect(1); test('x');`, Output: []string{`const { it: test } = require('@rstest/core'); expect(1); test('x');`}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9},
+				{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 17},
+			}},
+			// A sibling used as a value, not invoked, keeps the declaration alive too.
+			{Code: `import { expect, test } from '@rstest/core'; expect(1); const runner = test;`, Output: []string{`import { test } from '@rstest/core'; expect(1); const runner = test;`}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10},
+				{MessageId: "noImportingRstestGlobals", Line: 1, Column: 18},
+			}},
 			// ---- Real-user: namespace member invocation remains valid as a global ----
 			{Code: "import { rs } from '@rstest/core';\nrs.fn();", Output: []string{"\nrs.fn();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10}}},
 		},

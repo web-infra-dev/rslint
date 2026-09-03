@@ -28,8 +28,19 @@ beforeEach(setup);`, Output: []string{`import { beforeEach, defineConfig } from 
 beforeEach(setup);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			// ---- Real-user: preserve an existing import alias while merging ----
 			{Code: `import { it as testCase } from '@rstest/core';
-expect(value);`, Output: []string{`import { expect, it as testCase } from '@rstest/core';
+expect(value);`, Output: []string{`import { it as testCase, expect } from '@rstest/core';
 expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// ---- Real-user: merging keeps a default binding on the same import ----
+			{Code: `import core, { defineConfig } from '@rstest/core';
+expect(value);`, Output: []string{`import core, { defineConfig, expect } from '@rstest/core';
+expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// ---- Real-user: merging keeps a comment inside the existing braces ----
+			{Code: `import { defineConfig /* keep */ } from '@rstest/core';
+expect(value);`, Output: []string{`import { defineConfig, expect /* keep */ } from '@rstest/core';
+expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// Locks in that only a string literal opens the directive prologue.
+			{Code: "`use strict`;\nexpect(value);", Output: []string{"import { expect } from '@rstest/core';\n`use strict`;\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: "('use strict');\nexpect(value);", Output: []string{"import { expect } from '@rstest/core';\n('use strict');\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			// Locks in de-duplication and source-order diagnostics for all 13 names.
 			{Code: `test; describe; it; expect; afterAll; afterEach; beforeAll; beforeEach; rstest; rs; assert; onTestFinished; onTestFailed; test;`, Output: []string{`import { afterAll, afterEach, assert, beforeAll, beforeEach, describe, expect, it, onTestFailed, onTestFinished, rs, rstest, test } from '@rstest/core';
 test; describe; it; expect; afterAll; afterEach; beforeAll; beforeEach; rstest; rs; assert; onTestFinished; onTestFailed; test;`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 1, Column: 1}}},

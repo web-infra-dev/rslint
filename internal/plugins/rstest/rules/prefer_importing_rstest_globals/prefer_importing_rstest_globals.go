@@ -90,37 +90,48 @@ func createImport(isModule bool, module, names string) string {
 	return "const { " + names + " } = require('" + module + "');"
 }
 
+// isUseStrictDirective reports whether the statement is a `use strict`
+// directive. Only a bare string-literal expression statement belongs to the
+// directive prologue, so a template literal or a parenthesized string is an
+// ordinary statement and must not shift the insertion point.
 func isUseStrictDirective(statement *ast.Node) bool {
 	if statement == nil || statement.Kind != ast.KindExpressionStatement {
 		return false
 	}
-	expression := ast.SkipParentheses(statement.AsExpressionStatement().Expression)
-	return internalUtils.GetStaticStringValue(expression) == "use strict"
+	expression := statement.AsExpressionStatement().Expression
+	if expression == nil || expression.Kind != ast.KindStringLiteral {
+		return false
+	}
+	return expression.AsStringLiteral().Text == "use strict"
 }
 
-func importName(specifier *ast.ImportSpecifier) string {
-	if specifier == nil || specifier.Name() == nil {
-		return ""
+// mergeIntoImport appends the missing names to an existing rstest import
+// instead of rewriting it. Regenerating the declaration would drop everything
+// the generated text cannot express, such as a default binding or a comment
+// between the specifiers, so the fix only inserts after the last specifier.
+func mergeIntoImport(declaration *ast.ImportDeclaration, names *nameSet) []rule.RuleFix {
+	elements := rstestUtils.NamedImportElements(declaration)
+	if len(elements) == 0 {
+		return nil
 	}
-	local := specifier.Name().Text()
-	imported := local
-	if specifier.PropertyName != nil {
-		imported = specifier.PropertyName.Text()
+	present := make(map[string]struct{}, len(elements))
+	for _, element := range elements {
+		specifier := element.AsImportSpecifier()
+		if specifier != nil && specifier.Name() != nil {
+			present[specifier.Name().Text()] = struct{}{}
+		}
 	}
-	name := imported
-	if local != imported {
-		name += " as " + local
+	additions := newNameSet(len(names.order))
+	for _, name := range names.order {
+		if _, exists := present[name]; !exists {
+			additions.add(name)
+		}
 	}
-	if specifier.IsTypeOnly {
-		name = "type " + name
+	if len(additions.order) == 0 {
+		return nil
 	}
-	return name
-}
-
-func collectImportNames(declaration *ast.ImportDeclaration, names *nameSet) {
-	for _, element := range rstestUtils.NamedImportElements(declaration) {
-		names.add(importName(element.AsImportSpecifier()))
-	}
+	last := elements[len(elements)-1]
+	return []rule.RuleFix{rule.RuleFixInsertAfter(last, ", "+additions.sortedJoined())}
 }
 
 func collectRequireNames(binding *ast.Node, names *nameSet) {
@@ -151,12 +162,7 @@ func collectRequireNames(binding *ast.Node, names *nameSet) {
 	}
 }
 
-type existingImport struct {
-	node   *ast.Node
-	module string
-}
-
-func findImport(statements []*ast.Node) *existingImport {
+func findImport(statements []*ast.Node) *ast.ImportDeclaration {
 	for _, statement := range statements {
 		if statement == nil || statement.Kind != ast.KindImportDeclaration {
 			continue
@@ -166,7 +172,7 @@ func findImport(statements []*ast.Node) *existingImport {
 			continue
 		}
 		if len(rstestUtils.NamedImportElements(declaration)) > 0 {
-			return &existingImport{node: statement, module: declaration.ModuleSpecifier.Text()}
+			return declaration
 		}
 	}
 	return nil
@@ -228,8 +234,7 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 		return []rule.RuleFix{rule.RuleFixInsertAfter(first, "\n"+lineIndent(ctx, first)+createImport(isModule, defaultModule, names.sortedJoined()))}
 	}
 	if existing := findImport(statements); existing != nil {
-		collectImportNames(existing.node.AsImportDeclaration(), names)
-		return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, existing.node, createImport(isModule, existing.module, names.sortedJoined()))}
+		return mergeIntoImport(existing, names)
 	}
 	if existing := findRequire(statements); existing != nil {
 		collectRequireNames(existing.declaration.Name(), names)

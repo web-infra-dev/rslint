@@ -133,19 +133,26 @@ func bindingCanBeRemoved(ctx rule.RuleContext, element *ast.Node, importedName s
 	return true
 }
 
+// allBindingsRemovable reports whether every binding of the declaration is an
+// rstest global that is independently safe to drop. Only then may the whole
+// declaration go: a sibling binding that is aliased, or referenced as a value
+// rather than invoked, still needs its import.
+func allBindingsRemovable(ctx rule.RuleContext, elements []*ast.Node, importedName func(*ast.Node) string) bool {
+	for _, element := range elements {
+		name := importedName(element)
+		if !rstestUtils.IsRstestGlobal(name) || !bindingCanBeRemoved(ctx, element, name) {
+			return false
+		}
+	}
+	return true
+}
+
 func importFix(ctx rule.RuleContext, statement *ast.Node, declaration *ast.ImportDeclaration, elements []*ast.Node, index int, name string) []rule.RuleFix {
 	if !bindingCanBeRemoved(ctx, elements[index], name) {
 		return nil
 	}
-	allGlobals := true
-	for _, element := range elements {
-		if !rstestUtils.IsRstestGlobal(rstestUtils.ImportedSpecifierName(element)) {
-			allGlobals = false
-			break
-		}
-	}
 	clause := declaration.ImportClause.AsImportClause()
-	if allGlobals && clause.Name() == nil {
+	if clause.Name() == nil && allBindingsRemovable(ctx, elements, rstestUtils.ImportedSpecifierName) {
 		return []rule.RuleFix{rule.RuleFixRemove(ctx.SourceFile, statement)}
 	}
 	if len(elements) > 1 {
@@ -182,14 +189,7 @@ func requireFix(ctx rule.RuleContext, declarationNode *ast.Node, elements []*ast
 	if !bindingCanBeRemoved(ctx, elements[index], name) {
 		return nil
 	}
-	allGlobals := true
-	for _, element := range elements {
-		if !rstestUtils.IsRstestGlobal(rstestUtils.RequireBindingImportedName(element)) {
-			allGlobals = false
-			break
-		}
-	}
-	if allGlobals {
+	if allBindingsRemovable(ctx, elements, rstestUtils.RequireBindingImportedName) {
 		statement, list := enclosingVariableStatement(declarationNode)
 		if statement != nil && list != nil && list.Declarations != nil && len(list.Declarations.Nodes) == 1 {
 			return []rule.RuleFix{rule.RuleFixRemove(ctx.SourceFile, statement)}

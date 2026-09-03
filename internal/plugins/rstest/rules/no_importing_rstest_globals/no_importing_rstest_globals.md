@@ -26,6 +26,6 @@ test('formats a user name', () => {
 
 ## Autofix
 
-The autofix removes each redundant import specifier or destructured property. When every imported property is redundant, it removes the import or variable statement.
+The autofix removes each redundant import specifier or destructured property. It removes the whole import or variable statement only when every binding it declares is itself safe to remove; otherwise the surviving bindings keep the declaration.
 
 An aliased binding, a binding used outside an invocation, or a destructuring pattern containing a default value or rest element is reported without a fix because removing it could leave a reference undefined or change destructuring behavior.
