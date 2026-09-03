@@ -66,7 +66,10 @@ The rule accepts an array of restriction entries. Each entry is either:
 ### Supported selector forms
 
 The implementation follows the esquery 1.7 selector forms used by ESLint
-10.9.1, including the complete upstream `no-restricted-syntax` test suite:
+10.9.1, including the complete upstream `no-restricted-syntax` test suite.
+Malformed selectors are a deliberate compatibility divergence: rslint drops
+the malformed entry so one bad selector does not disable the rest of the
+configuration, while ESLint rejects the whole rule configuration:
 
 - ESTree node names (e.g. `Identifier`, `FunctionDeclaration`,
   `BinaryExpression`) and supported TS-ESTree names such as

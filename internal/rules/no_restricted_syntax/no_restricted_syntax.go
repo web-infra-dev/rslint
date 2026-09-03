@@ -91,6 +91,7 @@ type ruleEntry struct {
 	selector string
 	compiled selector
 	message  string
+	exit     bool
 }
 
 const maxCachedRulePlans = 64
@@ -169,14 +170,22 @@ func buildRulePlan(options []any) *rulePlan {
 	perKind := make(map[ast.Kind][]ruleEntry)
 	for _, entry := range entries {
 		kinds := candidateKinds(entry.compiled)
+		listenerKind := func(kind ast.Kind) ast.Kind {
+			if entry.exit {
+				return rule.ListenerOnExit(kind)
+			}
+			return kind
+		}
 		if kinds.universe {
 			for _, kind := range allInterestingKinds {
-				perKind[kind] = append(perKind[kind], entry)
+				key := listenerKind(kind)
+				perKind[key] = append(perKind[key], entry)
 			}
 			continue
 		}
 		for kind := range kinds.kinds {
-			perKind[kind] = append(perKind[kind], entry)
+			key := listenerKind(kind)
+			perKind[key] = append(perKind[key], entry)
 		}
 	}
 	plan.buckets = make(map[ast.Kind]*ruleBucket, len(perKind))
@@ -294,7 +303,8 @@ func supportsSingleDispatch(path []string) bool {
 }
 
 func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
-	if selectorTargetsClassBody(sel) || selectorTargetsJSXEmptyExpression(sel) {
+	if selectorTargetsClassBody(sel) || selectorTargetsJSXEmptyExpression(sel) ||
+		selectorTargetsEstreeType(sel, "TSEnumBody") || selectorTargetsEstreeType(sel, "FunctionExpression") {
 		return attrs
 	}
 	switch value := sel.(type) {
@@ -400,19 +410,23 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 		Id:          "restrictedSyntax",
 		Description: entry.formatMessage(),
 	}
-
 	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
-	classBodyMatch := isClassLikeNode(node) && selectorTargetsClassBody(compiled) &&
-		matchesInScopeTarget(compiled, node, mc, nil, "ClassBody")
-	jsxEmptyMatch := isEmptyJSXExpression(node) && selectorTargetsJSXEmptyExpression(compiled) &&
-		matchesInScopeTarget(compiled, node, mc, nil, "JSXEmptyExpression")
 
-	if classBodyMatch {
-		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
-	}
-	if jsxEmptyMatch {
-		nodeRange := utils.TrimNodeTextRange(mc.sf, node)
-		ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
+	for _, target := range virtualTargets(node) {
+		if !matchesInScopeTarget(compiled, node, mc, nil, target) {
+			continue
+		}
+		switch target {
+		case "ClassBody":
+			ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
+		case "TSEnumBody":
+			ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
+		case "JSXEmptyExpression":
+			nodeRange := utils.TrimNodeTextRange(mc.sf, node)
+			ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
+		default:
+			ctx.ReportNode(node, message)
+		}
 	}
 	if physicalMatch {
 		ctx.ReportNode(node, message)
@@ -435,20 +449,34 @@ func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
 		return core.NewTextRange(node.Pos(), node.End())
 	}
 
-	text := sf.Text()
-	leftLimit := max(node.Pos(), 0)
-	rightLimit := min(max(members.Pos()+1, leftLimit), len(text))
-	openOffset := strings.LastIndex(text[leftLimit:rightLimit], "{")
-	if openOffset < 0 {
+	return listBodyTextRange(sf, node, members)
+}
+
+func enumBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	if node == nil || node.Kind != ast.KindEnumDeclaration {
+		return core.TextRange{}
+	}
+	return listBodyTextRange(sf, node, node.AsEnumDeclaration().Members)
+}
+
+func listBodyTextRange(sf *ast.SourceFile, node *ast.Node, members *ast.NodeList) core.TextRange {
+	if sf == nil || node == nil || members == nil {
 		return core.NewTextRange(node.Pos(), node.End())
 	}
-	open := leftLimit + openOffset
-	closeStart := min(max(members.End(), open+1), len(text))
-	closeOffset := strings.Index(text[closeStart:min(node.End(), len(text))], "}")
-	if closeOffset < 0 {
+	open, closeEnd := -1, -1
+	for _, token := range utils.TokensOfNode(sf, node) {
+		if token.Kind == ast.KindOpenBraceToken && token.Start <= members.Pos() {
+			open = token.Start
+		}
+		if open >= 0 && token.Kind == ast.KindCloseBraceToken && token.Start >= members.End() {
+			closeEnd = token.End
+			break
+		}
+	}
+	if open < 0 || closeEnd < 0 {
 		return core.NewTextRange(node.Pos(), node.End())
 	}
-	return core.NewTextRange(open, closeStart+closeOffset+1)
+	return core.NewTextRange(open, closeEnd)
 }
 
 func deduplicateRuleEntries(entries []ruleEntry) []ruleEntry {
@@ -543,9 +571,9 @@ func visitPseudoSpecificity(value pseudoSelector, result *selectorSpecificity, v
 
 // parseRuleOptions turns the rule's options — a variadic list of selectors,
 // each either a string or a `{ selector, message? }` object — into ruleEntry
-// values. Selectors that fail to parse are silently dropped; ESLint rejects
-// the whole config in that case, but for runtime resilience we prefer to drop
-// the offending entry over panicking.
+// values. Selectors that fail to parse are silently dropped. This is a
+// deliberate compatibility divergence from ESLint, whose config validation
+// rejects the whole rule configuration for malformed selectors.
 func parseRuleOptions(options []any) []ruleEntry {
 	var entries []ruleEntry
 	for _, item := range options {
@@ -568,11 +596,11 @@ func parseRuleOptions(options []any) []ruleEntry {
 }
 
 func buildEntryFromString(sel string) ruleEntry {
-	compiled, err := parseRuleSelector(sel)
+	compiled, exit, err := parseRuleSelector(sel)
 	if err != nil {
 		return ruleEntry{selector: sel}
 	}
-	return ruleEntry{selector: sel, compiled: compiled, message: defaultRuleMessage(sel)}
+	return ruleEntry{selector: sel, compiled: compiled, message: defaultRuleMessage(sel), exit: exit}
 }
 
 func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
@@ -580,7 +608,7 @@ func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
 	if rawSel == "" {
 		return ruleEntry{}, false
 	}
-	compiled, err := parseRuleSelector(rawSel)
+	compiled, exit, err := parseRuleSelector(rawSel)
 	if err != nil {
 		return ruleEntry{}, false
 	}
@@ -588,14 +616,16 @@ func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
 	if msg == "" {
 		msg = defaultRuleMessage(rawSel)
 	}
-	return ruleEntry{selector: rawSel, compiled: compiled, message: msg}, true
+	return ruleEntry{selector: rawSel, compiled: compiled, message: msg, exit: exit}, true
 }
 
-// ESLint handles the event-phase suffix outside esquery. This rule emits the
-// same diagnostic on enter or exit, so matching can discard the suffix while
-// retaining it in the diagnostic text.
-func parseRuleSelector(sel string) (selector, error) {
-	return parseSelector(strings.TrimSuffix(sel, ":exit"))
+// ESLint handles the event-phase suffix outside esquery. Keep the phase on the
+// entry so the linter can register the selector on the matching enter or exit
+// listener while retaining the original suffix in the diagnostic text.
+func parseRuleSelector(sel string) (selector, bool, error) {
+	exit := strings.HasSuffix(sel, ":exit")
+	compiled, err := parseSelector(strings.TrimSuffix(sel, ":exit"))
+	return compiled, exit, err
 }
 
 func defaultRuleMessage(selector string) string {

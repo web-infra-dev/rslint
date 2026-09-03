@@ -51,9 +51,11 @@ var estreeKindMap = map[string][]ast.Kind{
 	"VariableDeclaration":     {ast.KindVariableStatement, ast.KindVariableDeclarationList},
 	"VariableDeclarator":      {ast.KindVariableDeclaration},
 	"FunctionDeclaration":     {ast.KindFunctionDeclaration},
-	"FunctionExpression":      {ast.KindFunctionExpression},
+	"FunctionExpression":      {ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
 	"ArrowFunctionExpression": {ast.KindArrowFunction},
 	"TSEnumDeclaration":       {ast.KindEnumDeclaration},
+	"TSEnumBody":              {ast.KindEnumDeclaration},
+	"TSEnumMember":            {ast.KindEnumMember},
 
 	// Classes
 	"ClassDeclaration": {ast.KindClassDeclaration},

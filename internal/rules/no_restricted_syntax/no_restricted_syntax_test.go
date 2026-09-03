@@ -1396,6 +1396,129 @@ foo;`,
 					{MessageId: "restrictedSyntax"},
 				},
 			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`[type='ClassBody']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`ClassDeclaration ClassBody`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`ClassDeclaration:has(> ClassBody)`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `class C {}`,
+				Options: []interface{}{`ClassBody[id]`},
+			},
+			{
+				Code:    `class C {}`,
+				Options: []interface{}{`ClassBody:not([id])`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `const x = <div>{/* hi */}</div>;`,
+				Options: []interface{}{`[type='JSXEmptyExpression']`},
+				Tsx:     true,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `const x = <div>{/* hi */}</div>;`,
+				Options: []interface{}{`JSXExpressionContainer JSXEmptyExpression`},
+				Tsx:     true,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `const x = <div>{/* hi */}</div>;`,
+				Options: []interface{}{`JSXExpressionContainer:has(> JSXEmptyExpression)`},
+				Tsx:     true,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `const x = <Foo.Bar />;`,
+				Options: []interface{}{`JSXMemberExpression[type='JSXMemberExpression']`},
+				Tsx:     true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
+				},
+			},
+			{
+				Code:    `const x = <Foo.Bar />;`,
+				Options: []interface{}{`JSXMemberExpression[object.type='JSXIdentifier']`},
+				Tsx:     true,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`MethodDefinition[value.parent.type='MethodDefinition']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`MethodDefinition > FunctionExpression`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`FunctionExpression > BlockStatement`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `enum E { A, B }`,
+				Options: []interface{}{`TSEnumDeclaration[id.name='E']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `enum E { A, B }`,
+				Options: []interface{}{`TSEnumDeclaration[body.type='TSEnumBody']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `enum E { A, B }`,
+				Options: []interface{}{`TSEnumBody[members.length=2]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `enum E { A, B }`,
+				Options: []interface{}{`TSEnumBody > TSEnumMember`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
+					{MessageId: "restrictedSyntax"},
+				},
+			},
+			{
+				Code:    `const x = 0x1n + 1_000n;`,
+				Options: []interface{}{`Literal[bigint='1']`, `Literal[bigint='1000']`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
+					{MessageId: "restrictedSyntax"},
+				},
+			},
+			{
+				Code:    `class C { m() {} /* } */ }`,
+				Options: []interface{}{`ClassBody`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedSyntax",
+					Line:      1, Column: 9, EndLine: 1, EndColumn: 27,
+				}},
+			},
+			{
+				Code:    `@sealed() class A {}`,
+				Options: []interface{}{`Decorator[expression.type='CallExpression']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `foo();`,
+				Options: []interface{}{`CallExpression:exit`, `Identifier`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Using 'Identifier' is not allowed."},
+					{MessageId: "restrictedSyntax", Message: "Using 'CallExpression:exit' is not allowed."},
+				},
+			},
 		},
 	)
 }
