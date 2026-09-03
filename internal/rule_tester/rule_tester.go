@@ -93,8 +93,6 @@ type TestSuite struct {
 type ESLintTestCase struct {
 	Code     string                 `json:"code"`
 	Filename string                 `json:"filename,omitempty"`
-	Tsx      bool                   `json:"tsx,omitempty"`
-	Globals  map[string]interface{} `json:"globals,omitempty"`
 	Options  []interface{}          `json:"options,omitempty"`
 	Settings map[string]interface{} `json:"settings,omitempty"`
 	Only     bool                   `json:"only,omitempty"`
@@ -430,7 +428,7 @@ func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
 	}
 
 	fileName := ""
-	tsx := tc.Tsx
+	tsx := false
 	if tc.Filename != "" {
 		fileName = tc.Filename
 		if filepath.Ext(fileName) == ".tsx" || filepath.Ext(fileName) == ".jsx" {
@@ -445,7 +443,6 @@ func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
 		Skip:     tc.Skip,
 		Options:  options,
 		Settings: tc.Settings,
-		Globals:  tc.Globals,
 		Tsx:      tsx,
 	}
 }
@@ -462,7 +459,7 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 	}
 
 	fileName := ""
-	tsx := tc.Tsx
+	tsx := false
 	if tc.Filename != "" {
 		fileName = tc.Filename
 		if filepath.Ext(fileName) == ".tsx" || filepath.Ext(fileName) == ".jsx" {
@@ -506,7 +503,6 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 		Errors:   errors,
 		Options:  options,
 		Settings: tc.Settings,
-		Globals:  tc.Globals,
 		Tsx:      tsx,
 	}
 }
