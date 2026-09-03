@@ -17,6 +17,12 @@ type PropWrapperEntry struct {
 	// Property is the function name (e.g. `"assign"` for `Object.assign`,
 	// or `"forbidExtraProps"` for a bare-identifier wrapper).
 	Property string
+	// FromString records that this entry came from the string form of the
+	// setting. Some upstream rules compare the raw string with a bare callee
+	// name instead of using the normalized object/property pair.
+	FromString bool
+	// Raw is the original string setting when FromString is true.
+	Raw string
 }
 
 // GetPropWrapperFunctions reads `settings.propWrapperFunctions` from the
@@ -41,9 +47,9 @@ func GetPropWrapperFunctions(settings map[string]interface{}) []PropWrapperEntry
 				if dot := strings.IndexByte(t, '.'); dot > 0 && dot < len(t)-1 {
 					// Allow `"Object.assign"` style strings (legacy upstream
 					// shape) by splitting on the first dot.
-					out = append(out, PropWrapperEntry{Object: t[:dot], Property: t[dot+1:]})
+					out = append(out, PropWrapperEntry{Object: t[:dot], Property: t[dot+1:], FromString: true, Raw: t})
 				} else {
-					out = append(out, PropWrapperEntry{Property: t})
+					out = append(out, PropWrapperEntry{Property: t, FromString: true, Raw: t})
 				}
 			}
 		case map[string]interface{}:

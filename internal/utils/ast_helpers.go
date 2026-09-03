@@ -516,22 +516,53 @@ func IsJSDocTypeCastWrapper(node *ast.Node) bool {
 	return node.Kind == ast.KindAsExpression && node.Parent != nil && ast.IsJSDocTypeAssertion(node.Parent)
 }
 
+func estreeRuntimeExpression(node *ast.Node) (*ast.Node, bool) {
+	hadParentheses := false
+	for node != nil {
+		if node.Kind == ast.KindParenthesizedExpression {
+			parenthesized := node.AsParenthesizedExpression()
+			if parenthesized == nil {
+				return nil, hadParentheses
+			}
+			hadParentheses = true
+			node = parenthesized.Expression
+			continue
+		}
+		if node.Kind != ast.KindAsExpression && node.Kind != ast.KindSatisfiesExpression {
+			return node, hadParentheses
+		}
+		expression := JSDocTypeCastExpression(node)
+		if expression == nil {
+			return node, hadParentheses
+		}
+		node = expression
+	}
+	return nil, hadParentheses
+}
+
 // ESTreeRuntimeExpression removes syntax that ESTree does not expose around a
 // runtime expression: source parentheses and wrappers synthesized from JSDoc
 // @type/@satisfies casts. Authored TypeScript assertions remain intact.
 func ESTreeRuntimeExpression(node *ast.Node) *ast.Node {
-	for node != nil {
-		node = ast.SkipParentheses(node)
-		if node.Kind != ast.KindAsExpression && node.Kind != ast.KindSatisfiesExpression {
-			return node
-		}
-		expression := JSDocTypeCastExpression(node)
-		if expression == nil {
-			return node
-		}
-		node = expression
+	expression, _ := estreeRuntimeExpression(node)
+	return expression
+}
+
+// ESTreeCallCallee converts a raw CallExpression.Expression to the node ESTree
+// exposes as its callee. Parentheses are normally transparent, except when
+// they terminate an optional chain: ESTree exposes that callee as a
+// ChainExpression, so callers looking for a direct Identifier or member access
+// must not match it. Wrappers synthesized from JavaScript JSDoc casts remain
+// transparent, while authored TypeScript assertions remain intact.
+//
+// Callers must pass the unprocessed CallExpression.Expression so this helper
+// can observe every authored parenthesis in the wrapper chain.
+func ESTreeCallCallee(node *ast.Node) *ast.Node {
+	expression, hadParentheses := estreeRuntimeExpression(node)
+	if expression != nil && hadParentheses && ast.IsOptionalChain(expression) {
+		return nil
 	}
-	return nil
+	return expression
 }
 
 // ESTreeParent returns the first parent that ESTree exposes, skipping source

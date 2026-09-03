@@ -134,3 +134,61 @@ func StringToNumber(value string) (float64, bool) {
 	}
 	return number, true
 }
+
+// StringToBigInt applies JavaScript's StringToBigInt operation. Decimal
+// strings, including those with leading zeroes, are decimal; only unsigned
+// 0x, 0o, and 0b prefixes select another radix. The boolean is false exactly
+// when JavaScript would produce a syntax error while converting the string.
+func StringToBigInt(value string) (*big.Int, bool) {
+	value = StringTrim(value)
+	if value == "" {
+		return new(big.Int), true
+	}
+
+	sign := 1
+	hasSign := false
+	if value[0] == '+' || value[0] == '-' {
+		hasSign = true
+		if value[0] == '-' {
+			sign = -1
+		}
+		value = value[1:]
+		if value == "" {
+			return nil, false
+		}
+	}
+
+	base := 10
+	digits := value
+	if len(value) >= 2 && value[0] == '0' {
+		switch value[1] {
+		case 'x', 'X':
+			if hasSign {
+				return nil, false
+			}
+			base, digits = 16, value[2:]
+		case 'o', 'O':
+			if hasSign {
+				return nil, false
+			}
+			base, digits = 8, value[2:]
+		case 'b', 'B':
+			if hasSign {
+				return nil, false
+			}
+			base, digits = 2, value[2:]
+		}
+	}
+	if digits == "" || digits[0] == '+' || digits[0] == '-' {
+		return nil, false
+	}
+
+	n, ok := new(big.Int).SetString(digits, base)
+	if !ok {
+		return nil, false
+	}
+	if sign < 0 {
+		n.Neg(n)
+	}
+	return n, true
+}
