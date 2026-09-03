@@ -73,3 +73,15 @@ func TestRunRuleTesterPropagatesLanguageOptions(t *testing.T) {
 		}},
 	)
 }
+
+func TestConvertESLintTestSuiteSkipsParserErrors(t *testing.T) {
+	suite := ConvertESLintTestSuite(&ESLintTestSuite{
+		Invalid: []ESLintInvalidTestCase{
+			{ESLintTestCase: ESLintTestCase{Code: "<"}, Errors: []ESLintError{{Message: "Parsing error"}}},
+			{ESLintTestCase: ESLintTestCase{Code: "<a />"}, Errors: []ESLintError{{MessageId: "inlineElement"}}},
+		},
+	})
+	if len(suite.Invalid) != 1 || suite.Invalid[0].Code != "<a />" {
+		t.Fatalf("converted invalid cases = %+v, want only rule diagnostic case", suite.Invalid)
+	}
+}

@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -228,6 +230,29 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		assert.NilError(t, err, "couldn't create program. code: "+code)
 
 		sourceFile := program.GetSourceFile(fileName)
+		if sourceFile == nil {
+			// Explicit filenames such as `.jsx` may not be included by the
+			// fixture tsconfig. Rebuild the test file as an explicit root so
+			// RuleTester can still exercise the rule instead of dereferencing a
+			// missing SourceFile below.
+			fallbackOptions := &core.CompilerOptions{
+				AllowJs: core.TSTrue,
+				Jsx:     core.JsxEmitPreserve,
+				Module:  core.ModuleKindCommonJS,
+				Target:  core.ScriptTargetESNext,
+			}
+			program, err = utils.CreateProgramFromOptionsLenient(
+				true,
+				fallbackOptions,
+				[]string{tspath.ResolvePath(root.Dir, fileName)},
+				utils.CreateCompilerHost(root.Dir, bundled.WrapFS(fs)),
+			)
+			assert.NilError(t, err, "couldn't create explicit test program. code: "+code)
+			sourceFile = program.GetSourceFile(fileName)
+		}
+		if sourceFile == nil {
+			t.Fatalf("test program did not contain %q. code: %s", fileName, code)
+		}
 		allowedFiles := []string{sourceFile.FileName()}
 		programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
 		lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
@@ -516,14 +541,34 @@ func ConvertESLintTestSuite(suite *ESLintTestSuite) *TestSuite {
 	}
 
 	invalid := make([]InvalidTestCase, len(suite.Invalid))
-	for i, tc := range suite.Invalid {
-		invalid[i] = ConvertESLintInvalidTestCase(tc)
+	invalid = invalid[:0]
+	for _, tc := range suite.Invalid {
+		// ESLint's flat-config runner also serializes parser diagnostics in
+		// the invalid list. They are not rule diagnostics and cannot be
+		// compared by RunRuleTester, so leave those cases out of the Go rule
+		// differential suite.
+		if isParserErrorTestCase(tc) {
+			continue
+		}
+		invalid = append(invalid, ConvertESLintInvalidTestCase(tc))
 	}
 
 	return &TestSuite{
 		Valid:   valid,
 		Invalid: invalid,
 	}
+}
+
+func isParserErrorTestCase(tc ESLintInvalidTestCase) bool {
+	if len(tc.Errors) == 0 {
+		return false
+	}
+	for _, err := range tc.Errors {
+		if err.MessageId != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // RunRuleTesterFromJSON loads and runs tests from a JSON file

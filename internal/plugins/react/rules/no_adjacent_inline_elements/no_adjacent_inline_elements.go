@@ -141,6 +141,12 @@ var NoAdjacentInlineElementsRule = rule.Rule{
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
+				callee := ast.SkipParentheses(call.Expression)
+				if ctx.TypeChecker == nil && callee != nil && callee.Kind == ast.KindIdentifier {
+					// The syntax-only import fallback cannot distinguish a bare
+					// createElement binding from a same-named local shadow.
+					return
+				}
 				if !reactutil.IsCreateElementCallWithChecker(call.Expression, pragma, ctx.TypeChecker) {
 					return
 				}
