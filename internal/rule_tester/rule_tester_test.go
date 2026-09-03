@@ -1,6 +1,7 @@
 package rule_tester
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -8,6 +9,27 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+func TestResolveTestCaseFileName(t *testing.T) {
+	t.Parallel()
+
+	first := resolveTestCaseFileName("", false)
+	second := resolveTestCaseFileName("", false)
+	tsx := resolveTestCaseFileName("", true)
+
+	if first == second {
+		t.Fatalf("default test filenames must be unique, got %q twice", first)
+	}
+	if !strings.HasPrefix(first, "filename-") || !strings.HasSuffix(first, ".ts") {
+		t.Fatalf("default TypeScript filename = %q, want filename-<id>.ts", first)
+	}
+	if !strings.HasPrefix(tsx, "filename-") || !strings.HasSuffix(tsx, ".tsx") {
+		t.Fatalf("default TSX filename = %q, want filename-<id>.tsx", tsx)
+	}
+	if explicit := resolveTestCaseFileName("explicit.jsx", false); explicit != "explicit.jsx" {
+		t.Fatalf("explicit filename = %q, want explicit.jsx", explicit)
+	}
+}
 
 func TestRunRuleTesterPropagatesLanguageOptions(t *testing.T) {
 	probe := rule.Rule{
