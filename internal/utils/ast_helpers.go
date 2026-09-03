@@ -637,6 +637,22 @@ func IsInJSDocSyntax(node *ast.Node) bool {
 // attributes, or qualifier of an ImportType. Type arguments are siblings of
 // those fields and remain references.
 func IsImportTypeSyntax(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	if node.Kind == ast.KindIdentifier {
+		// Ordinary value identifiers are the dominant caller path. An
+		// ImportType can contain an identifier only through a type node, a
+		// qualified name, or its attributes, so avoid walking to SourceFile for
+		// every expression reference.
+		parentKind := node.Parent.Kind
+		if (parentKind < ast.KindFirstTypeNode || parentKind > ast.KindLastTypeNode) &&
+			parentKind != ast.KindQualifiedName &&
+			parentKind != ast.KindImportAttribute &&
+			parentKind != ast.KindImportAttributes {
+			return false
+		}
+	}
 	current := node
 	for current.Parent != nil && current.Parent.Kind != ast.KindImportType {
 		current = current.Parent

@@ -18,7 +18,7 @@ func TestDefaultTypeScriptTypeGlobals(t *testing.T) {
 		t.Fatal("defaultTypeScriptTypeGlobals must be sorted for binary search")
 	}
 	if got, want := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(defaultTypeScriptTypeGlobals[:], "\n")))), "ed4f69d96156ce34f2d1e402a13f234744bb9e26fdb3eec2eda444bfa2272745"; got != want {
-		t.Fatalf("defaultTypeScriptTypeGlobals SHA-256 = %s, want @typescript-eslint/scope-manager 8.68 esnext set %s", got, want)
+		t.Fatalf("defaultTypeScriptTypeGlobals SHA-256 = %s, want @typescript-eslint/scope-manager 8.69 esnext set %s", got, want)
 	}
 
 	for _, name := range []string{

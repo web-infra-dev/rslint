@@ -21,7 +21,17 @@ const y = 42 as number;
 const z = value as const;
 ```
 
+## Compatibility Notes
+
+The rule is aligned with `typescript-eslint` v8.69.0 for diagnostic selection,
+message IDs, ranges, suggestions, and autofixes. Literal-assertion diagnostics
+use context-aware descriptions: an untyped variable initializer recommends a
+type annotation or the `satisfies` operator, while other expressions recommend
+only `satisfies`. Upstream always recommends `const x: T = ...`, including in
+return expressions, class fields, and other positions where that replacement
+cannot be applied.
+
 ## Original Documentation
 
 - [typescript-eslint: consistent-type-assertions](https://typescript-eslint.io/rules/consistent-type-assertions)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/consistent-type-assertions.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/src/rules/consistent-type-assertions.ts)

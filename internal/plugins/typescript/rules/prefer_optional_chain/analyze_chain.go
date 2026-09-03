@@ -14,8 +14,8 @@ import (
 type ChainAnalyzer struct {
 	ctx        rule.RuleContext
 	opts       PreferOptionalChainOptions
+	subChain   []Operand
 	chainParts []chainPart
-	partFlags  []uint8
 }
 
 func NewChainAnalyzer(ctx rule.RuleContext, opts PreferOptionalChainOptions) *ChainAnalyzer {
@@ -133,7 +133,12 @@ func (ca *ChainAnalyzer) analyzeRun(
 	// A pair of strict checks on the same access, such as
 	// `x !== null && x !== undefined`, is one link of the chain even though it
 	// contributes two operands, so links are counted separately from operands.
-	subChain := make([]Operand, 0, total)
+	if cap(ca.subChain) < total {
+		ca.subChain = make([]Operand, 0, total)
+	} else {
+		ca.subChain = ca.subChain[:0]
+	}
+	subChain := ca.subChain
 	links := 0
 	var lastChain *Operand
 
@@ -375,10 +380,9 @@ func (ca *ChainAnalyzer) reportChain(
 	operator ast.Kind,
 	parentNode *ast.Node,
 ) {
-	// The fixes are built lazily, after subChain's backing array has been
-	// reused for the next chain, so keep a copy.
-	chain := make([]Operand, 0, len(subChain)+1)
-	chain = append(chain, subChain...)
+	// Deferred edit builders run synchronously during this report call, so the
+	// analyzer-owned buffer cannot be reused until they have finished.
+	chain := subChain
 	if lastChain != nil {
 		chain = append(chain, *lastChain)
 	}
@@ -402,7 +406,7 @@ func (ca *ChainAnalyzer) reportChain(
 			return ca.shouldUseFix(chain, hasLastChain, operator)
 		},
 		func() []rule.RuleFix {
-			fixCode := ca.buildOptionalChainCode(chain, operator)
+			fixCode := ca.buildOptionalChainCode(chain)
 			if fixCode == "" {
 				return nil
 			}
@@ -553,154 +557,60 @@ func (ca *ChainAnalyzer) nodeTypeHasFlags(node *ast.Node, flags checker.TypeFlag
 	return utils.IsTypeFlagSetWithUnion(t, flags)
 }
 
-func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand, operator ast.Kind) string {
+func (ca *ChainAnalyzer) buildOptionalChainCode(operands []Operand) string {
 	if len(operands) < 2 {
 		return ""
 	}
 
-	// The last operand is the actual expression we want to convert to optional chain
 	lastOperand := operands[len(operands)-1]
 	if lastOperand.ComparedNode == nil {
 		return ""
 	}
 
-	// Flatten the last operand's node into a chain of accesses
-	parts := ca.flattenChainExpression(lastOperand.ComparedNode)
+	// Build the chain from left to right. Each operand contributes only the
+	// access suffix that has not appeared before, so every emitted part keeps
+	// the exact source spelling from the operand that introduced it. Besides
+	// matching upstream's diff-based construction, this prevents a later
+	// repeated call from discarding comments or formatting in an earlier call.
+	partCount := chainDepth(lastOperand.ComparedNode) + 1
+	if cap(ca.chainParts) < partCount {
+		ca.chainParts = make([]chainPart, 0, partCount)
+	} else {
+		ca.chainParts = ca.chainParts[:0]
+	}
+	parts := ca.chainParts
+	for _, operand := range operands {
+		if operand.ComparedNode == nil {
+			continue
+		}
+		previousLen := len(parts)
+		ca.appendChainExpressionSuffix(operand.ComparedNode, previousLen, &parts)
+		if previousLen > 0 && len(parts) > previousLen {
+			// The first newly introduced access replaces the logical guard.
+			parts[previousLen].isAlreadyOptional = true
+		}
+	}
+	ca.chainParts = parts
+
 	if len(parts) == 0 {
 		return ca.getNodeText(lastOperand.ComparedNode)
 	}
 
-	// A guard matching at part[j] means the access at part[j+1] should use ?.
-	// Keep all per-part output state in one compact slice.
-	var partFlags []uint8
-	if cap(ca.partFlags) < len(parts) {
-		ca.partFlags = make([]uint8, len(parts))
-		partFlags = ca.partFlags
-	} else {
-		ca.partFlags = ca.partFlags[:len(parts)]
-		clear(ca.partFlags)
-		partFlags = ca.partFlags
-	}
-	hasOptionalIndex := false
-
-	// Track the deepest guard match so we can use its base for output.
-	var deepestGuardNode *ast.Node
-	deepestGuardPartIdx := -1
-
-	for i := range len(operands) - 1 {
-		guard := operands[i]
-		if guard.ComparedNode == nil {
-			continue
-		}
-
-		// Equal chain expressions have the same access depth, so only the
-		// corresponding part can match. Avoid comparing the guard against
-		// every shallower prefix.
-		j := chainDepth(guard.ComparedNode)
-		if j < len(parts) &&
-			compareNodesUncached(guard.ComparedNode, parts[j].node) == NodeComparisonEqual {
-			if j+1 < len(parts) {
-				partFlags[j+1] |= chainPartFlagInsertedOptional
-				hasOptionalIndex = true
-			}
-			// Track the deepest guard for output generation
-			if j > deepestGuardPartIdx {
-				deepestGuardPartIdx = j
-				deepestGuardNode = guard.ComparedNode
-			}
-		}
-	}
-
-	// If no optional indices were found, try a simpler approach:
-	// the first guard is a prefix of the last operand
-	if !hasOptionalIndex {
-		firstGuard := operands[0]
-		if firstGuard.ComparedNode != nil {
-			j := chainDepth(firstGuard.ComparedNode)
-			if j+1 < len(parts) &&
-				compareNodesUncached(firstGuard.ComparedNode, parts[j].node) == NodeComparisonEqual {
-				partFlags[j+1] |= chainPartFlagInsertedOptional
-				deepestGuardPartIdx = j
-				deepestGuardNode = firstGuard.ComparedNode
-			}
-		}
-	}
-
-	// Build the output with ?. inserted at appropriate positions
 	var sb strings.Builder
 	sb.Grow(len(ca.getNodeText(lastOperand.ComparedNode)) + len(parts))
 
-	// Merge ?. and ! annotations from guards into the output.
-	// tsgo's AST QuestionDotToken flags may be on the wrong operand's nodes,
-	// so we scan the guard's source text (via GetSourceTextOfNodeFromSourceFile)
-	// to determine the correct ?. positions.
-	if deepestGuardPartIdx >= 0 {
-		// Scan each guard's source text for ?. positions
-		for gi := range len(operands) - 1 {
-			guard := operands[gi]
-			if guard.ComparedNode == nil {
-				continue
-			}
-			guardText := ca.getNodeText(guard.ComparedNode)
-			depth := 0
-			for ci := 0; ci < len(guardText); ci++ {
-				if ci+1 < len(guardText) && guardText[ci] == '?' && guardText[ci+1] == '.' {
-					depth++
-					if depth < len(partFlags) {
-						partFlags[depth] |= chainPartFlagPreservedOptional
-					}
-					ci++ // skip the '.'
-				} else if guardText[ci] == '.' {
-					depth++
-				}
-			}
-		}
-		collectNonNullPositions(operands[0:len(operands)-1], partFlags)
-		// Align base node NonNull with the guard:
-		// - If guard has NonNull base and target doesn't: use guard's base
-		// - If target has NonNull base but guard doesn't: strip it (use inner expression)
-		if deepestGuardNode != nil {
-			guardBase := chainBase(deepestGuardNode)
-			if ast.IsNonNullExpression(guardBase) && !ast.IsNonNullExpression(parts[0].node) {
-				parts[0].node = guardBase
-			} else if !ast.IsNonNullExpression(guardBase) && ast.IsNonNullExpression(parts[0].node) {
-				// Guard has no NonNull but target does — strip it
-				parts[0].node = ast.SkipParentheses(parts[0].node.Expression())
-			}
-		}
+	baseNode := parts[0].node
+	baseText := ca.getNodeText(baseNode)
+	if needsParensAsBase(baseNode) {
+		sb.WriteString("(")
+		sb.WriteString(baseText)
+		sb.WriteString(")")
+	} else {
+		sb.WriteString(baseText)
 	}
 
-	// Write the base expression
-	if len(parts) > 0 {
-		baseNode := parts[0].node
-		baseText := ca.getNodeText(baseNode)
-
-		if needsParensAsBase(baseNode) {
-			sb.WriteString("(")
-			sb.WriteString(baseText)
-			sb.WriteString(")")
-		} else {
-			sb.WriteString(baseText)
-		}
-	}
-
-	// Write each accessor, inserting ?. where needed
 	for i := 1; i < len(parts); i++ {
-		// Keep optional accesses carried by guard operands through the guarded
-		// prefix. Beyond that prefix, the target operand owns the syntax. This
-		// deliberately ignores target-only ?. tokens inside the guarded prefix,
-		// matching upstream's "randomly placed optional chain tokens" cases.
-		guardOptional := i <= deepestGuardPartIdx && partFlags[i]&chainPartFlagPreservedOptional != 0
-		targetOptional := i > deepestGuardPartIdx && parts[i].isAlreadyOptional
-		useOptional := partFlags[i]&chainPartFlagInsertedOptional != 0 || guardOptional || targetOptional
-
-		// Check NonNull from guard (skip position 0 if base is already NonNull)
-		hasNonNull := false
-		if i-1 < deepestGuardPartIdx && (i-1 != 0 || !ast.IsNonNullExpression(parts[0].node)) {
-			hasNonNull = partFlags[i-1]&chainPartFlagPreservedNonNull != 0
-		}
-
-		ca.writeChainPart(&sb, parts[i], useOptional, hasNonNull)
+		ca.writeChainPart(&sb, parts[i], parts[i].isAlreadyOptional, parts[i-1].hasNonNullAfter)
 	}
 
 	return sb.String()
@@ -714,97 +624,62 @@ const (
 	accessKindCall
 )
 
-const (
-	chainPartFlagInsertedOptional uint8 = 1 << iota
-	chainPartFlagPreservedOptional
-	chainPartFlagPreservedNonNull
-)
-
 type chainPart struct {
 	node              *ast.Node
 	accessKind        accessKind
 	accessName        string
 	accessArgument    *ast.Node
 	callArgsText      string
-	typeArgs          []*ast.Node
+	typeArgsText      string
 	isAlreadyOptional bool
 	hasNonNullAfter   bool // the chain result up to this part is wrapped in NonNullExpression (!)
 }
 
-func (ca *ChainAnalyzer) flattenChainExpression(node *ast.Node) []chainPart {
-	n := ast.SkipParentheses(node)
-	partCount := chainDepth(n) + 1
-	if cap(ca.chainParts) < partCount {
-		ca.chainParts = make([]chainPart, 0, partCount)
-	} else {
-		ca.chainParts = ca.chainParts[:0]
-	}
-	ca.flattenChainExpressionRec(n, &ca.chainParts)
-	return ca.chainParts
+func (ca *ChainAnalyzer) appendChainExpressionSuffix(node *ast.Node, skip int, parts *[]chainPart) {
+	index := 0
+	ca.appendChainExpressionSuffixRec(ast.SkipParentheses(node), skip, &index, parts)
 }
 
-func chainBase(node *ast.Node) *ast.Node {
+func (ca *ChainAnalyzer) appendChainExpressionSuffixRec(node *ast.Node, skip int, index *int, parts *[]chainPart) {
 	n := ast.SkipParentheses(node)
-	for {
-		switch n.Kind {
-		case ast.KindNonNullExpression:
-			inner := ast.SkipParentheses(n.Expression())
-			if inner.Kind != ast.KindPropertyAccessExpression &&
-				inner.Kind != ast.KindElementAccessExpression &&
-				inner.Kind != ast.KindCallExpression {
-				return n
-			}
-			n = inner
-		case ast.KindPropertyAccessExpression:
-			n = ast.SkipParentheses(n.AsPropertyAccessExpression().Expression)
-		case ast.KindElementAccessExpression:
-			n = ast.SkipParentheses(n.AsElementAccessExpression().Expression)
-		case ast.KindCallExpression:
-			n = ast.SkipParentheses(n.AsCallExpression().Expression)
-		default:
-			return n
+	appendPart := func(part chainPart) {
+		if *index >= skip {
+			*parts = append(*parts, part)
 		}
+		*index++
 	}
-}
-
-func (ca *ChainAnalyzer) flattenChainExpressionRec(node *ast.Node, parts *[]chainPart) {
-	n := ast.SkipParentheses(node)
 
 	switch n.Kind {
 	case ast.KindNonNullExpression:
-		// For foo!, check if the inner expression is a chain access like (foo.bar)!
 		inner := ast.SkipParentheses(n.Expression())
 		if inner.Kind == ast.KindPropertyAccessExpression ||
 			inner.Kind == ast.KindElementAccessExpression ||
 			inner.Kind == ast.KindCallExpression {
-			// The NonNullExpression wraps a chain access - recurse into it
-			prevLen := len(*parts)
-			ca.flattenChainExpressionRec(inner, parts)
-			// Mark the last added part as having NonNull after it (e.g., foo.bar! → .bar has NonNull)
-			if len(*parts) > prevLen {
-				(*parts)[len(*parts)-1].hasNonNullAfter = true
+			ca.appendChainExpressionSuffixRec(inner, skip, index, parts)
+			wrappedIndex := *index - 1
+			if wrappedIndex >= skip {
+				(*parts)[wrappedIndex].hasNonNullAfter = true
 			}
 		} else {
-			// Base-level NonNullExpression like foo! - preserve it as the base node
-			*parts = append(*parts, chainPart{node: n})
+			appendPart(chainPart{node: n})
 		}
 		return
 
 	case ast.KindPropertyAccessExpression:
 		prop := n.AsPropertyAccessExpression()
-		ca.flattenChainExpressionRec(prop.Expression, parts)
-		*parts = append(*parts, chainPart{
+		ca.appendChainExpressionSuffixRec(prop.Expression, skip, index, parts)
+		appendPart(chainPart{
 			node:              n,
 			accessKind:        accessKindProperty,
-			accessName:        prop.Name().Text(),
+			accessName:        ca.getNodeText(prop.Name()),
 			isAlreadyOptional: prop.QuestionDotToken != nil,
 		})
 		return
 
 	case ast.KindElementAccessExpression:
 		elem := n.AsElementAccessExpression()
-		ca.flattenChainExpressionRec(elem.Expression, parts)
-		*parts = append(*parts, chainPart{
+		ca.appendChainExpressionSuffixRec(elem.Expression, skip, index, parts)
+		appendPart(chainPart{
 			node:              n,
 			accessKind:        accessKindElement,
 			accessArgument:    elem.ArgumentExpression,
@@ -814,25 +689,18 @@ func (ca *ChainAnalyzer) flattenChainExpressionRec(node *ast.Node, parts *[]chai
 
 	case ast.KindCallExpression:
 		call := n.AsCallExpression()
-		ca.flattenChainExpressionRec(call.Expression, parts)
-		var typeArgs []*ast.Node
-		if call.TypeArguments != nil {
-			typeArgs = call.TypeArguments.Nodes
-		}
-		*parts = append(*parts, chainPart{
+		ca.appendChainExpressionSuffixRec(call.Expression, skip, index, parts)
+		appendPart(chainPart{
 			node:              n,
 			accessKind:        accessKindCall,
 			callArgsText:      ca.callArgumentsText(call),
-			typeArgs:          typeArgs,
+			typeArgsText:      ca.callTypeArgumentsText(call),
 			isAlreadyOptional: call.QuestionDotToken != nil,
 		})
 		return
 	}
 
-	// Base case: identifier, this, etc.
-	*parts = append(*parts, chainPart{
-		node: n,
-	})
+	appendPart(chainPart{node: n})
 }
 
 // writeChainPart writes a single accessor part to the string builder,
@@ -865,49 +733,8 @@ func (ca *ChainAnalyzer) writeChainPart(sb *strings.Builder, part chainPart, nee
 		} else if prevHasNonNull {
 			sb.WriteString("!")
 		}
-		if len(part.typeArgs) > 0 {
-			sb.WriteString("<")
-			for j, ta := range part.typeArgs {
-				if j > 0 {
-					sb.WriteString(", ")
-				}
-				sb.WriteString(ca.getNodeText(ta))
-			}
-			sb.WriteString(">")
-		}
+		sb.WriteString(part.typeArgsText)
 		sb.WriteString(part.callArgsText)
-	}
-}
-
-// collectNonNullPositions walks the guard operands' ASTs to determine at which
-// chain depths a NonNullExpression (!) wraps the chain result.
-func collectNonNullPositions(guards []Operand, partFlags []uint8) {
-	for _, guard := range guards {
-		if guard.ComparedNode == nil {
-			continue
-		}
-		collectNonNullRec(ast.SkipParentheses(guard.ComparedNode), partFlags)
-	}
-}
-
-func collectNonNullRec(node *ast.Node, partFlags []uint8) {
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		prop := node.AsPropertyAccessExpression()
-		collectNonNullRec(ast.SkipParentheses(prop.Expression), partFlags)
-	case ast.KindElementAccessExpression:
-		elem := node.AsElementAccessExpression()
-		collectNonNullRec(ast.SkipParentheses(elem.Expression), partFlags)
-	case ast.KindCallExpression:
-		call := node.AsCallExpression()
-		collectNonNullRec(ast.SkipParentheses(call.Expression), partFlags)
-	case ast.KindNonNullExpression:
-		inner := ast.SkipParentheses(node.Expression())
-		depth := chainDepth(inner)
-		if depth < len(partFlags) {
-			partFlags[depth] |= chainPartFlagPreservedNonNull
-		}
-		collectNonNullRec(inner, partFlags)
 	}
 }
 
@@ -980,6 +807,39 @@ func (ca *ChainAnalyzer) callArgumentsText(call *ast.CallExpression) string {
 		pos++
 	}
 	return text[pos:call.End()]
+}
+
+// callTypeArgumentsText returns the complete type argument list, including its
+// angle brackets and trivia. NodeList positions exclude the delimiters and can
+// also exclude trivia adjacent to them, so find the surrounding tokens.
+func (ca *ChainAnalyzer) callTypeArgumentsText(call *ast.CallExpression) string {
+	if call.TypeArguments == nil {
+		return ""
+	}
+	text := ca.ctx.SourceFile.Text()
+	start := -1
+	openScanner := scanner.GetScannerForSourceFile(ca.ctx.SourceFile, call.Expression.End())
+	for openScanner.TokenStart() < call.TypeArguments.Pos() {
+		if openScanner.Token() == ast.KindLessThanToken {
+			start = openScanner.TokenStart()
+			break
+		}
+		openScanner.Scan()
+	}
+
+	end := -1
+	closeScanner := scanner.GetScannerForSourceFile(ca.ctx.SourceFile, call.TypeArguments.End())
+	for closeScanner.TokenStart() < call.End() {
+		if closeScanner.Token() == ast.KindGreaterThanToken {
+			end = closeScanner.TokenEnd()
+			break
+		}
+		closeScanner.Scan()
+	}
+	if start < 0 || end > len(text) || start >= end {
+		return ""
+	}
+	return text[start:end]
 }
 
 func (ca *ChainAnalyzer) getNodeText(node *ast.Node) string {

@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
 func build(t *testing.T, source string) *Manager {
@@ -332,6 +333,9 @@ func TestBuildReferenceIdentifierPositions(t *testing.T) {
 	assertReferences(t, `let x: typeof Foo.Bar;`, "Foo->?")
 	// ...but an `import(...)` type names another module's exports.
 	assertReferences(t, `type T = typeof import('./m').a.b;`)
+	assertReferences(t, `export as namespace Missing;`, "Missing->?")
+	assertReferences(t, `const Present = {}; export as namespace Present;`, "Present->declared")
+	assertReferences(t, `interface TypeOnly {}; export as namespace TypeOnly;`, "TypeOnly->?")
 	// JSX: a lower-case tag is an intrinsic element, not a binding.
 	assertReferences(t, `<div />;`)
 	assertReferences(t, `<App />;`, "App->?")
@@ -639,6 +643,79 @@ func TestIsReferenceIdentifierRejectsReExportAndImportTypeNames(t *testing.T) {
 				t.Errorf("%s: Subject unexpectedly classified as a local reference", source)
 			}
 		}
+	}
+}
+
+func TestIsReferenceIdentifierMatchesTypeScriptParserEdges(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		identifier string
+		want       bool
+	}{
+		{name: "type query this", source: `type T = typeof this;`, identifier: "this"},
+		{name: "qualified type query this", source: `type T = typeof this.member;`, identifier: "this"},
+		{name: "namespace export", source: `export as namespace Missing;`, identifier: "Missing", want: true},
+		{name: "import type source", source: `type T = import(Missing).Box;`, identifier: "Missing"},
+		{name: "import type qualifier", source: `type T = typeof import("pkg").Missing;`, identifier: "Missing"},
+		{name: "import type attributes", source: `type T = import("pkg", { with: { type: Missing } }).Box;`, identifier: "Missing"},
+		{name: "import type argument", source: `type T = import("pkg").Box<Missing>;`, identifier: "Missing", want: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, test.source, core.ScriptKindTS)
+			identifiers := identifiersWithText(sourceFile.AsNode(), test.identifier)
+			if len(identifiers) != 1 {
+				t.Fatalf("found %d %q identifiers, want 1", len(identifiers), test.identifier)
+			}
+			if got := IsReferenceIdentifier(identifiers[0]); got != test.want {
+				t.Errorf("IsReferenceIdentifier(%q) = %t, want %t", test.identifier, got, test.want)
+			}
+		})
+	}
+}
+
+func TestIsTypeScriptJsxThisReference(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileName   string
+		scriptKind core.ScriptKind
+		source     string
+		want       []bool
+	}{
+		{name: "self closing TSX", fileName: "/test.tsx", scriptKind: core.ScriptKindTSX, source: `<this />`, want: []bool{true}},
+		{name: "paired TSX", fileName: "/test.tsx", scriptKind: core.ScriptKindTSX, source: `<this></this>`, want: []bool{true, true}},
+		{name: "member TSX", fileName: "/test.tsx", scriptKind: core.ScriptKindTSX, source: `<this.Member />`, want: []bool{false}},
+		{name: "expression TSX", fileName: "/test.tsx", scriptKind: core.ScriptKindTSX, source: `const value = this;`, want: []bool{false}},
+		{name: "Espree JSX", fileName: "/test.jsx", scriptKind: core.ScriptKindJSX, source: `<this />`, want: []bool{false}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: test.fileName,
+				Path:     tspath.Path(test.fileName),
+			}, test.source, test.scriptKind)
+			var got []bool
+			var visit func(*ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if node.Kind == ast.KindThisKeyword {
+					got = append(got, IsTypeScriptJsxThisReference(node))
+				}
+				return node.ForEachChild(visit)
+			}
+			sourceFile.AsNode().ForEachChild(visit)
+			if len(got) != len(test.want) {
+				t.Fatalf("found %d this nodes, want %d", len(got), len(test.want))
+			}
+			for i := range test.want {
+				if got[i] != test.want[i] {
+					t.Errorf("this node %d = %t, want %t", i, got[i], test.want[i])
+				}
+			}
+		})
 	}
 }
 

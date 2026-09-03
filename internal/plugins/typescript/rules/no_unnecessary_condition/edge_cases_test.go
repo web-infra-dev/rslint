@@ -68,10 +68,16 @@ func TestEdgeCases_CheckNodeForNullish(t *testing.T) {
 		{Code: "declare const x: any;\nconst y = x ?? 1;\n"},
 		{Code: "declare const x: unknown;\nconst y = x ?? 1;\n"},
 		{Code: "function f<T>(x: T) { const y = x ?? 1; }\n"},
+		// void is possibly nullish, but not always nullish
+		{Code: "declare const x: void;\nconst y = x ?? 1;\n"},
+		{Code: "declare const x: undefined | void;\nconst y = x ?? 1;\n"},
+		{Code: "declare let x: number | void;\nx ??= 1;\n"},
 		// Optional property access — nullish because property is optional
 		{Code: "declare const obj: { a?: string };\nconst x = obj.a ?? 'default';\n"},
 		// Array index ?? — unsound without noUncheckedIndexedAccess
 		{Code: "declare const arr: string[];\nconst x = arr[0] ?? '';\n"},
+		// A dynamic tuple index is unsound, while a literal tuple index is exact
+		{Code: "declare const tuple: readonly [string, string];\ndeclare const index: number;\nconst x = tuple[index] ?? '';\n"},
 		// Chain with optional array index — should skip
 		{Code: "declare const arr: string[];\narr[0]?.length ?? 0;\n"},
 		// Nullable union with ??
@@ -85,6 +91,11 @@ func TestEdgeCases_CheckNodeForNullish(t *testing.T) {
 		// Non-nullish object in ??
 		{
 			Code:   "declare const x: { a: string };\nconst y = x ?? {};\n",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 11}},
+		},
+		// Literal tuple indexes are sound and remain reportable
+		{
+			Code:   "declare const tuple: readonly [string, string];\nconst x = tuple[0] ?? '';\n",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "neverNullish", Line: 2, Column: 11}},
 		},
 		// null | undefined — always nullish
