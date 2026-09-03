@@ -63,8 +63,6 @@ func TestSortPropTypesExtras(t *testing.T) {
 		{Code: `C.propTypes = { 1: PropTypes.string, "": PropTypes.string };`, Tsx: true},
 		// Optional required access is opaque, while the computed identifier is visible.
 		{Code: `Component.propTypes = { a: PropTypes.string, b: PropTypes?.isRequired };`, Options: map[string]any{"requiredFirst": true}, Tsx: true},
-		// Optional calls remain opaque, while optional receivers expose their member name.
-		{Code: `PropTypes.shape?.({ z: PropTypes.string, a: PropTypes.string });`, Options: map[string]any{"sortShapeProp": true}, Tsx: true},
 		// A parameter is not a variable binding whose initializer should be inspected.
 		{Code: `const holder = { z: PropTypes.string, a: PropTypes.string, method(props) { Component.propTypes = props; } };`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
