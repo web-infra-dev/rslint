@@ -65,7 +65,8 @@ func equalityKind(node *ast.Node) ast.Kind {
 
 func directCallOrNewArgumentParent(node *ast.Node) *ast.Node {
 	parent := utils.ESTreeParent(node)
-	if parent == nil || (!ast.IsCallExpression(parent) && !ast.IsNewExpression(parent)) {
+	if parent == nil || ast.IsImportCall(parent) ||
+		(!ast.IsCallExpression(parent) && !ast.IsNewExpression(parent)) {
 		return nil
 	}
 	for _, argument := range parent.Arguments() {

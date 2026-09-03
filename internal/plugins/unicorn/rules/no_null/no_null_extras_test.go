@@ -95,6 +95,9 @@ func TestNoNullExtras(t *testing.T) {
 			replacementCase(`fn({value: null})`, ignoreArguments, 1),
 			replacementCase(`new Box([null])`, ignoreArguments, 1),
 
+			// ---- Dimension 4: ts-go CallExpression maps to ESTree ImportExpression ----
+			replacementCase(`import(null)`, ignoreArguments, 1),
+
 			// ---- Dimension 4: variable declaration shapes and TSESTree id ranges ----
 			typescriptMutableVariableCase(
 				`let value: string | null = null;`,
