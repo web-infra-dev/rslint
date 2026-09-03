@@ -31,6 +31,14 @@ func TestNoAdjacentInlineElementsExtras(t *testing.T) {
 		{Code: `(React).createElement("div", null, [React.createElement("a"), " ", React.createElement("a")]);`, Tsx: true},
 		{Code: `React?.createElement("div", null, [React.createElement("a"), " ", React.createElement("a")]);`, Tsx: true},
 		{Code: `(React as any).createElement("div", null, [React.createElement("a"), React.createElement("a")]);`, Tsx: true},
+		// Optional calls are ChainExpression nodes upstream, so they are not
+		// considered inline children by astUtil.isCallExpression.
+		{Code: `React.createElement("div", null, [React?.createElement("a"), React.createElement("span")]);`, Tsx: true},
+		{Code: `React.createElement("div", null, [React.createElement?.("a"), React.createElement("span")]);`, Tsx: true},
+		{Code: `React.createElement("div", null, [foo?.("a"), React.createElement("span")]);`, Tsx: true},
+		{Code: `React.createElement("div", null, [foo?.bar("a"), React.createElement("span")]);`, Tsx: true},
+		{Code: `React.createElement("div", null, [foo.bar?.("a"), React.createElement("span")]);`, Tsx: true},
+		{Code: `React.createElement("div", null, [(foo?.("a")), React.createElement("span")]);`, Tsx: true},
 		// N/A: receiver type wrappers are deliberately not recognized by the
 		// upstream isCreateElement predicate; this case locks that behavior.
 		// ---- Real-user: issue #2620, one React.createElement child ----

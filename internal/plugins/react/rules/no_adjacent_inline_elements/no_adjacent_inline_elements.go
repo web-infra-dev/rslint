@@ -83,6 +83,13 @@ func isInline(node *ast.Node) bool {
 		_, ok := inlineNames[jsxElementName(node)]
 		return ok
 	case ast.KindCallExpression:
+		// typescript-eslint wraps optional calls and optional-member calls in a
+		// ChainExpression, so eslint-plugin-react's astUtil.isCallExpression
+		// does not classify them as inline children. ts-go keeps them as
+		// KindCallExpression with an optional-chain flag.
+		if ast.IsOptionalChain(node) {
+			return false
+		}
 		call := node.AsCallExpression()
 		if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 			// Upstream's `node.arguments[0].value` assumes a first argument.
