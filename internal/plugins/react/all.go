@@ -47,6 +47,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_invalid_html_attribute"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_multi_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
@@ -69,6 +70,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -132,6 +134,7 @@ func GetAllRules() []rule.Rule {
 		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
 		no_is_mounted.NoIsMountedRule,
+		no_invalid_html_attribute.NoInvalidHtmlAttributeRule,
 		no_multi_comp.NoMultiCompRule,
 		no_unstable_nested_components.NoUnstableNestedComponentsRule,
 		no_unused_class_component_methods.NoUnusedClassComponentMethodsRule,
@@ -153,6 +156,7 @@ func GetAllRules() []rule.Rule {
 		require_optimization.RequireOptimizationRule,
 		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
+		sort_prop_types.SortPropTypesRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
 		jsx_child_element_spacing.JsxChildElementSpacingRule,

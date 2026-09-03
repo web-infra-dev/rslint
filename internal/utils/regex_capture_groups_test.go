@@ -35,6 +35,7 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		{`\uZZZZ(a)`, u},
 		{`\p(a)`, u},
 		{`(a)\p{NotAProperty}`, u},
+		{`\p{Greek}(a)`, u},
 		{`\k(a)`, u},
 		{`\01(a)`, u},
 		{`(a)`, uv},
@@ -78,6 +79,19 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 		// Once a named capture exists, `\k<...>` is a named backreference even
 		// outside u/v mode and must resolve.
 		{`(?<x>a)\k<y>(b)`, RegexFlags{}},
+		{`(?<x>a)\k(b)`, RegexFlags{}},
+		{`(?<x>a)[\k](b)`, RegexFlags{}},
+		{`[\k](b)(?<x>a)`, RegexFlags{}},
+
+		// Strict u/v character-class grammar is validated as a whole, not as a
+		// sequence of loosely parsed class elements.
+		{`[\d-a](b)`, u},
+		{`(a)[()]`, v},
+		{`(a)[\q{(}]`, v},
+		{`(a)[ab&&c]`, v},
+		{`(a)[a&&bc]`, v},
+		{`(a)[ab--c]`, v},
+		{`(a)[a--bc]`, v},
 
 		// Assertions can't be quantified. Annex B exempts lookahead; u/v doesn't.
 		{`^*(a)`, RegexFlags{}},
@@ -119,8 +133,8 @@ func TestRegexCapturingGroups_Rejects(t *testing.T) {
 }
 
 // TestRegexCapturingGroups_Accepts is the other half of the same comparison:
-// patterns regexpp accepts, with the groups it finds. Offsets are byte offsets,
-// where regexpp counts UTF-16 code units.
+// patterns regexpp accepts, with the groups it finds. These expectations use
+// Go/tsgo UTF-8 byte offsets; regexpp's JavaScript AST uses UTF-16 indices.
 func TestRegexCapturingGroups_Accepts(t *testing.T) {
 	u := RegexFlags{Unicode: true}
 	v := RegexFlags{UnicodeSets: true}
@@ -145,6 +159,8 @@ func TestRegexCapturingGroups_Accepts(t *testing.T) {
 		{`\a(b)`, RegexFlags{}, []RegexCapturingGroup{{Start: 2, End: 5}}},
 		{`\8(a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 2, End: 5}}},
 		{`\k<n>(a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 5, End: 8}}},
+		{`\k(b)`, RegexFlags{}, []RegexCapturingGroup{{Start: 2, End: 5}}},
+		{`\\k(b)`, RegexFlags{}, []RegexCapturingGroup{{Start: 3, End: 6}}},
 
 		// Resolvable backreferences under u/v.
 		{`(a)\1`, u, []RegexCapturingGroup{{Start: 0, End: 3}}},
@@ -165,11 +181,18 @@ func TestRegexCapturingGroups_Accepts(t *testing.T) {
 
 		// The escapes u/v does spell out.
 		{`\p{L}(a)`, u, []RegexCapturingGroup{{Start: 5, End: 8}}},
+		{`\p{Emoji}(a)`, u, []RegexCapturingGroup{{Start: 9, End: 12}}},
+		{`\p{ASCII}(a)`, u, []RegexCapturingGroup{{Start: 9, End: 12}}},
+		{`\p{Script=Greek}(a)`, u, []RegexCapturingGroup{{Start: 16, End: 19}}},
 		{`\u{41}(a)`, u, []RegexCapturingGroup{{Start: 6, End: 9}}},
 		{`\x41(a)`, u, []RegexCapturingGroup{{Start: 4, End: 7}}},
 		{`\0(a)`, u, []RegexCapturingGroup{{Start: 2, End: 5}}},
 		{`\/(a)`, u, []RegexCapturingGroup{{Start: 2, End: 5}}},
 		{`[\q{ab}](c)`, v, []RegexCapturingGroup{{Start: 8, End: 11}}},
+		{`(a)[[b--c]&&d]`, v, []RegexCapturingGroup{{Start: 0, End: 3}}},
+		{`(a)[[b&&c]--d]`, v, []RegexCapturingGroup{{Start: 0, End: 3}}},
+		{`[\q{\}\]\(}](a)`, v, []RegexCapturingGroup{{Start: 12, End: 15}}},
+		{`[[\q{\}\]\(}]--[x]](a)`, v, []RegexCapturingGroup{{Start: 19, End: 22}}},
 
 		// Well-formed modifier-group headers, including an empty set on either
 		// side of the `-`.
@@ -192,6 +215,7 @@ func TestRegexCapturingGroups_Accepts(t *testing.T) {
 		{`(?<n\u0041>a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 0, End: 13, Name: `n\u0041`}}},
 
 		// Non-ASCII characters advance by their UTF-8 width.
+		{`😀(a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 4, End: 7}}},
 		{`\é(a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 3, End: 6}}},
 		{`\😀(a)`, RegexFlags{}, []RegexCapturingGroup{{Start: 5, End: 8}}},
 

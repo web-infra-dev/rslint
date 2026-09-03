@@ -96,3 +96,36 @@ func TestStringToNumber(t *testing.T) {
 		})
 	}
 }
+
+func TestStringToBigInt(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+		ok    bool
+	}{
+		{name: "empty", value: "", want: "0", ok: true},
+		{name: "decimal leading zero", value: "010", want: "10", ok: true},
+		{name: "decimal invalid octal digit", value: "08", want: "8", ok: true},
+		{name: "signed decimal", value: "+10", want: "10", ok: true},
+		{name: "negative decimal", value: "-10", want: "-10", ok: true},
+		{name: "hex", value: "0x10", want: "16", ok: true},
+		{name: "octal", value: "0o10", want: "8", ok: true},
+		{name: "binary", value: "0b10", want: "2", ok: true},
+		{name: "signed hex", value: "-0x10", ok: false},
+		{name: "numeric separator", value: "1_000", ok: false},
+		{name: "text", value: "value", ok: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := StringToBigInt(test.value)
+			if ok != test.ok {
+				t.Fatalf("StringToBigInt(%q) ok = %v, want %v", test.value, ok, test.ok)
+			}
+			if ok && got.String() != test.want {
+				t.Errorf("StringToBigInt(%q) = %s, want %s", test.value, got, test.want)
+			}
+		})
+	}
+}
