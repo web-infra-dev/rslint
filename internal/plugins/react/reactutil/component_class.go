@@ -216,6 +216,20 @@ func EnclosingClass(node *ast.Node) *ast.Node {
 // Pass `sourceFile.Text()` as `text` so trailing trivia after the
 // modifier list is properly skipped.
 func ClassKeywordStart(text string, node *ast.Node) int {
+	return DeclarationKeywordStart(text, node)
+}
+
+// DeclarationKeywordStart returns the offset of a declaration's own leading
+// keyword (`class`, `function`, `var`, ...), skipping the `export` and
+// `default` modifiers that tsgo keeps on the declaration node but ESTree
+// lifts into a separate ExportNamedDeclaration / ExportDefaultDeclaration
+// wrapper. Any other modifier (decorators, `abstract`, `declare`,
+// accessibility, `async`) is PART of the declaration's range in ESTree too,
+// so trimming stops at the first one.
+//
+// Pass `sourceFile.Text()` as `text` so trivia after the modifier list is
+// skipped as well.
+func DeclarationKeywordStart(text string, node *ast.Node) int {
 	mods := node.Modifiers()
 	pos := node.Pos()
 	if mods != nil {
