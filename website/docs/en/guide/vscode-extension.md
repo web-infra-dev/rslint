@@ -2,6 +2,13 @@
 
 Install the official extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rslint). It provides:
 
+- Real-time diagnostics as you type
+- Code actions for auto-fixable rules
+- Auto-fix on save via `source.fixAll.rslint`
+- Multi-workspace support
+
+The extension works out of the box — it uses the built-in rslint binary and automatically picks up your `rslint.config.ts`.
+
 :::tip Rstack extension
 
 The unified [Rstack extension](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) (`rstack.rstack`) ships the same Rslint integration plus Rstest and formatting in one install, and is where new editor features land. We recommend it for new setups. It is also available from [Open VSX](https://open-vsx.org/extension/rstack/rstack) for Cursor, Trae, and VSCodium.
@@ -9,13 +16,6 @@ The unified [Rstack extension](https://marketplace.visualstudio.com/items?itemNa
 When switching, disable or uninstall `rstack.rslint` so only one copy of Rslint runs, then re-enter settings under `rstack.rslint.*` as described in the [migration notes](https://github.com/rstackjs/rstack-editor/blob/main/packages/vscode/README.md#coming-from-the-standalone-extensions).
 
 :::
-
-- Real-time diagnostics as you type
-- Code actions for auto-fixable rules
-- Auto-fix on save via `source.fixAll.rslint`
-- Multi-workspace support
-
-The extension works out of the box — it uses the built-in rslint binary and automatically picks up your `rslint.config.ts`.
 
 ## Auto-fix on Save
 
