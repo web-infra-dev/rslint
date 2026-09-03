@@ -348,6 +348,20 @@ func indexOfMember(infos []memberInfo, node *ast.Node) int {
 	return -1
 }
 
+func referenceDistance(indexA, indexB int) int {
+	// math.MaxInt represents JavaScript's Infinity for an unmatched member.
+	// Keep that distance infinite instead of making it appear closer to one
+	// finite group than another.
+	if indexA == math.MaxInt || indexB == math.MaxInt {
+		return math.MaxInt
+	}
+	distance := indexA - indexB
+	if distance < 0 {
+		return -distance
+	}
+	return distance
+}
+
 type storedError struct {
 	node     *ast.Node
 	key      int
@@ -444,10 +458,7 @@ func checkComponent(ctx rule.RuleContext, node *ast.Node, order []pattern, error
 			if propertyName(getMemberInfo(stored.node)) != propertyName(a) {
 				continue
 			}
-			distance := result.indexA - result.indexB
-			if distance < 0 {
-				distance = -distance
-			}
+			distance := referenceDistance(result.indexA, result.indexB)
 			if distance > stored.distance {
 				continue
 			}

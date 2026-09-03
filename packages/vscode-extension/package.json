@@ -40,6 +40,13 @@
     }
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "rslint.openRstackExtension",
+        "title": "Migrate to Rstack",
+        "category": "Rslint"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "Rslint",

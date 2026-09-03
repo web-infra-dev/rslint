@@ -41,6 +41,15 @@ func TestSortCompExtras(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{
 		// ---- Dimension 1/4: optional / computed names remain unmatched. ----
 		{Code: `class Foo extends React.Component { render() {} displayName() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "displayName")}},
+		// ---- Unmatched members retain JavaScript's Infinity distance when everything-else is absent. ----
+		{Code: `class Foo extends React.Component { unknown() {} render() {} displayName() {} }`, Tsx: true, Options: sortCompOrder("lifecycle", "render"), Errors: []rule_tester.InvalidTestCaseError{
+			sortCompError("unknown", "after", "displayName"),
+			sortCompError("render", "after", "displayName"),
+		}},
+		{Code: `var Foo = createReactClass({ ...defaults, render() {}, displayName: "Foo" });`, Tsx: true, Options: sortCompOrder("lifecycle", "/^on.+$/", "render"), Errors: []rule_tester.InvalidTestCaseError{
+			sortCompError("", "after", "displayName"),
+			sortCompError("render", "after", "displayName"),
+		}},
 		// ---- Dimension 4: class expression is checked independently. ----
 		{Code: `const Foo = class extends React.Component { render() {} componentDidMount() {} };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		// ---- Branch lock-in: custom group can be overridden while lifecycle remains. ----

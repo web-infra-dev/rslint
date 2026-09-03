@@ -344,7 +344,6 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				if expected.Message != "" && expected.Message != diagnostic.Message.Description {
 					t.Errorf("Invalid message text %q. Expected %q", diagnostic.Message.Description, expected.Message)
 				}
-
 				lineIndex, columnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
 				line, column := lineIndex+1, int(columnIndex)+1
 				endLineIndex, endColumnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.End())
