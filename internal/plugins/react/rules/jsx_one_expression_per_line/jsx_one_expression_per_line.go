@@ -52,20 +52,7 @@ func nodeSource(source string, node *ast.Node) string {
 }
 
 func fixSource(source string) string {
-	source = strings.TrimLeft(source, " ")
-	if strings.HasSuffix(source, "\n") {
-		// The upstream regular expression trims spaces before LF, but not
-		// before CRLF because the carriage return sits between the spaces and
-		// the line feed.
-		if len(source) >= 2 && source[len(source)-2] == '\r' {
-			return source
-		}
-		return strings.TrimRight(source[:len(source)-1], " ") + source[len(source)-1:]
-	}
-	if strings.HasSuffix(source, "\r") {
-		return strings.TrimRight(source[:len(source)-1], " ") + source[len(source)-1:]
-	}
-	return strings.TrimRight(source, " ")
+	return strings.TrimRight(strings.TrimLeft(source, " "), " ")
 }
 
 func isJSXText(node *ast.Node) bool {

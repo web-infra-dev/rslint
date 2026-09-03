@@ -58,7 +58,13 @@ func TestJsxOneExpressionPerLineExtras(t *testing.T) {
 			{MessageId: "moveToNewLine", Message: "`foo ` must be placed on a new line"},
 			{MessageId: "moveToNewLine", Message: "`{value}` must be placed on a new line"},
 		}},
+		{Code: "<App>foo \n</App>", Tsx: true, Output: []string{"<App>\nfoo \n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+		}},
 		{Code: "<App>foo \r\n</App>\r\n", Tsx: true, Output: []string{"<App>\nfoo \r\n</App>\r\n"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: "<App>foo \r</App>", Tsx: true, Output: []string{"<App>\nfoo \r\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "moveToNewLine"},
 		}},
 		// Locks in upstream single-child allow arms: literal allows text, not an expression container.
