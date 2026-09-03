@@ -75,25 +75,25 @@ func parseOptions(opts []any) options {
 		return parsed
 	}
 	optsMap, _ := opts[0].(map[string]any)
-	if list := readStringOrList(optsMap["namedComponents"]); len(list) > 0 {
+	if list, ok := readStringOrList(optsMap["namedComponents"]); ok {
 		parsed.named = list
 	}
-	if list := readStringOrList(optsMap["unnamedComponents"]); len(list) > 0 {
+	if list, ok := readStringOrList(optsMap["unnamedComponents"]); ok {
 		parsed.unnamed = list
 	}
 	return parsed
 }
 
 // readStringOrList mirrors JS's `[].concat(value)` coercion for the
-// `string | string[]` option shape. An empty array stays empty, which lets
-// the caller fall back to the default exactly like upstream's `|| default`
-// does for `undefined` — note that upstream keeps an explicitly configured
-// empty array as-is, so we only substitute the default when the key is
-// absent or not a recognized shape.
-func readStringOrList(raw any) []string {
+// `string | string[]` option shape. The bool result says whether the key was
+// present in a recognized shape at all: upstream's `configuration.x || default`
+// substitutes the default only for `undefined`, and an explicitly configured
+// `[]` is truthy in JS and therefore kept as an empty list. So an empty array
+// returns `(nil, true)` and must NOT fall back to the default.
+func readStringOrList(raw any) ([]string, bool) {
 	switch v := raw.(type) {
 	case string:
-		return []string{v}
+		return []string{v}, true
 	case []any:
 		out := make([]string, 0, len(v))
 		for _, item := range v {
@@ -101,9 +101,9 @@ func readStringOrList(raw any) []string {
 				out = append(out, s)
 			}
 		}
-		return out
+		return out, true
 	}
-	return nil
+	return nil, false
 }
 
 var FunctionComponentDefinitionRule = rule.Rule{
@@ -241,11 +241,17 @@ func (w *walker) validate(node *ast.Node, functionType string) {
 	}
 
 	named := hasName(node)
-	if named && !contains(w.cfg.named, functionType) {
+	// An explicitly configured empty list allows nothing, so upstream reaches
+	// `report({ messageId: config[0] })` with `config[0] === undefined` and
+	// ESLint aborts the whole lint run with "Missing `message` property in
+	// report() call". rslint has no equivalent of that crash; staying silent is
+	// the closest safe behavior and, unlike falling back to the default list,
+	// it never invents a diagnostic upstream would not have produced.
+	if named && len(w.cfg.named) > 0 && !contains(w.cfg.named, functionType) {
 		target := w.cfg.named[0]
 		w.report(node, target, namedFunctionTemplates[target], w.namedFixRange(node))
 	}
-	if !named && !contains(w.cfg.unnamed, functionType) {
+	if !named && len(w.cfg.unnamed) > 0 && !contains(w.cfg.unnamed, functionType) {
 		target := w.cfg.unnamed[0]
 		w.report(node, target, unnamedFunctionTemplates[target], utils.TrimNodeTextRange(w.ctx.SourceFile, node))
 	}
@@ -470,10 +476,19 @@ func (w *walker) paramsText(node *ast.Node) string {
 
 // bodyText mirrors upstream's `getBody`: a block body is copied verbatim,
 // while an arrow's expression body is wrapped into an explicit block.
+//
+// Upstream slices `node.body.range`, and ESTree has no node for parentheses,
+// so `const Hello = (props) => (cond ? <A /> : null);` yields the body text
+// WITHOUT the source parentheses. tsgo keeps a ParenthesizedExpression node,
+// so the outer parens have to be peeled back explicitly to produce the same
+// fix.
 func (w *walker) bodyText(node *ast.Node) (string, bool) {
 	body := reactutil.FunctionBody(node)
 	if body == nil {
 		return "", false
+	}
+	if body.Kind != ast.KindBlock {
+		body = ast.SkipParentheses(body)
 	}
 	bodyRange := utils.TrimNodeTextRange(w.ctx.SourceFile, body)
 	if body.Kind != ast.KindBlock {

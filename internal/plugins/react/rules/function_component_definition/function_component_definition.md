@@ -137,6 +137,10 @@ The autofix rewrites the function's head, so an `async` component loses its
   later `Hello.propTypes = {}` / `Hello.defaultProps = {}` assignment marks it as
   one. ESLint reports `var Hello = function(props) { return 1; }` in that file;
   rslint does not.
+- `namedComponents: []` / `unnamedComponents: []` allows no function form at all.
+  The schema accepts an empty array, but ESLint then has no message to report and
+  aborts the whole lint run with "Missing `message` property in report() call".
+  rslint reports nothing for that category instead of failing the run.
 
 ## Original Documentation
 

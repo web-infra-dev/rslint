@@ -126,6 +126,54 @@ func TestFunctionComponentDefinitionExtras(t *testing.T) {
 			Tsx:     true,
 			Options: []interface{}{map[string]interface{}{}},
 		},
+
+		// ---- Dimension 4: TS type-expression wrapper on the RETURNED value ----
+		// TSESTree keeps `as` / `satisfies` / `!` / `<T>x` as real nodes and
+		// upstream's `isJSXValue` falls through to `default: return false` for
+		// every one of them, so a function whose only `return` is TS-wrapped
+		// does not return JSX upstream and is not a component at all.
+		{
+			Code:    `function Hello() { return <div/> as ReactNode; }`,
+			Tsx:     true,
+			Options: named("arrow-function"),
+		},
+		{
+			Code:    `function Hello() { return <div/> as ReactNode; }`,
+			Tsx:     true,
+			Options: named("function-expression"),
+		},
+		// `satisfies` binds inside the arrow body here, so the arrow's own
+		// parent is still the declarator — the component would be reported as
+		// a NAMED one if the wrapper were peeled back.
+		{
+			Code: `const Hello = (props) => <div/> satisfies ReactNode;`,
+			Tsx:  true,
+		},
+
+		// ---- Explicitly configured empty option arrays ----
+		// `[]` is truthy in JS, so upstream's
+		// `[].concat(configuration.namedComponents || 'function-declaration')`
+		// keeps it empty; nothing then matches and upstream reports with
+		// `messageId: undefined`, which makes ESLint abort the run with
+		// "Missing `message` property in report() call". rslint cannot
+		// reproduce that crash, so it stays silent — the point is that it must
+		// NOT quietly fall back to the default list and report a component the
+		// configuration never asked about.
+		{
+			Code:    `function Hello() { return <div/>; }`,
+			Tsx:     true,
+			Options: named([]interface{}{}),
+		},
+		{
+			Code:    `const Hello = (props) => { return <div/>; };`,
+			Tsx:     true,
+			Options: named([]interface{}{}),
+		},
+		{
+			Code:    `function wrap() { return function() { return <div/>; }; }`,
+			Tsx:     true,
+			Options: unnamed([]interface{}{}),
+		},
 	}, []rule_tester.InvalidTestCase{
 		// Schema defaults: omitting the options entirely and passing an empty
 		// object must produce byte-identical output.
@@ -186,6 +234,25 @@ func TestFunctionComponentDefinitionExtras(t *testing.T) {
 			Options: named("function-expression"),
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "function-expression", Line: 1, Column: 13, EndLine: 1, EndColumn: 30}},
 		},
+		// ---- Dimension 4: parenthesized arrow expression body ----
+		// Upstream slices `node.body.range`, and ESTree has no node for the
+		// parentheses, so the synthesized block body carries the inner
+		// expression only. tsgo keeps a ParenthesizedExpression node, so the
+		// parentheses have to be peeled back to produce the same fix.
+		{
+			Code:   `const Hello = (props) => (condition ? <A/> : null);`,
+			Tsx:    true,
+			Output: []string{"function Hello(props) {\n  return condition ? <A/> : null\n}"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "function-declaration", Line: 1, Column: 15, EndLine: 1, EndColumn: 51}},
+		},
+		{
+			Code:    `const Hello = (props) => (condition ? <A/> : null);`,
+			Tsx:     true,
+			Output:  []string{"const Hello = function(props) {\n  return condition ? <A/> : null\n}"},
+			Options: named("function-expression"),
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "function-expression", Line: 1, Column: 15, EndLine: 1, EndColumn: 51}},
+		},
+
 		// ---- Dimension 4: parameter with a leading comment ----
 		// ESTree parameter ranges exclude leading comments, and so does the
 		// trimmed tsgo range, so the comment is dropped from the rewritten
