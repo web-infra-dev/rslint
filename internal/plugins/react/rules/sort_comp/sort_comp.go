@@ -518,7 +518,7 @@ var SortCompRule = rule.Rule{
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		errors := map[int]*storedError{}
 		checkClass := func(node *ast.Node) {
-			if reactutil.ExtendsReactComponent(node, pragma) {
+			if reactutil.ExtendsReactComponent(node, pragma) || reactutil.IsExplicitReactComponent(node) {
 				checkComponent(ctx, node, order, errors)
 			}
 		}

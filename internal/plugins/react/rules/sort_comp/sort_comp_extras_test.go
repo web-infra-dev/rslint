@@ -82,5 +82,8 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `class Foo extends React.Component { render() {} foo = (function() {}) }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "foo")}},
 		{Code: `class Foo extends React.Component { render() {} foo = (() => {}) }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "foo")}},
 		{Code: `class Foo extends React.Component { render() {} static foo(): void; static foo() {} }`, Tsx: true, Options: sortCompOrder("static-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("foo", "before", "render")}},
+		// ---- Compatibility: JSDoc-only React component declarations. ----
+		{Code: `/** @extends React.Component */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		{Code: `/** @augments React.PureComponent */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 	})
 }

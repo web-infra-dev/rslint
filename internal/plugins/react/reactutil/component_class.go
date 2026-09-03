@@ -92,6 +92,60 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 	return false
 }
 
+// IsExplicitReactComponent reports whether a class has a JSDoc @extends or
+// @augments tag naming React.Component or React.PureComponent. This is kept
+// separate from ExtendsReactComponent because eslint-plugin-react treats the
+// JSDoc marker as an additional detection path, while other callers may need
+// to preserve the distinction between an actual extends clause and a JSDoc
+// annotation.
+func IsExplicitReactComponent(classNode *ast.Node) bool {
+	if classNode == nil {
+		return false
+	}
+	for _, doc := range classNode.JSDoc(nil) {
+		jsDoc := doc.AsJSDoc()
+		if jsDoc == nil || jsDoc.Tags == nil {
+			continue
+		}
+		for _, tag := range jsDoc.Tags.Nodes {
+			if !ast.IsJSDocAugmentsTag(tag) {
+				continue
+			}
+			augments := tag.AsJSDocAugmentsTag()
+			if augments == nil || augments.ClassName == nil {
+				continue
+			}
+			if sourceFile := ast.GetSourceFileOfNode(classNode); sourceFile != nil {
+				text := sourceFile.Text()
+				start, end := tag.Pos(), augments.ClassName.Pos()
+				if start < 0 || end < start || end > len(text) || containsJSDocTypeBraces(text[start:end]) {
+					continue
+				}
+			}
+			name := ast.SkipParentheses(augments.ClassName.AsExpressionWithTypeArguments().Expression)
+			if name == nil || name.Kind != ast.KindPropertyAccessExpression {
+				continue
+			}
+			access := name.AsPropertyAccessExpression()
+			object := ast.SkipParentheses(access.Expression)
+			property := access.Name()
+			if object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "React" && property != nil && property.Kind == ast.KindIdentifier && isComponentName(property.AsIdentifier().Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func containsJSDocTypeBraces(text string) bool {
+	for index := 0; index < len(text); index++ {
+		if text[index] == '{' || text[index] == '}' {
+			return true
+		}
+	}
+	return false
+}
+
 func isComponentName(name string) bool {
 	return name == "Component" || name == "PureComponent"
 }
