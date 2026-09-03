@@ -87,7 +87,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-console-spaces': 'error', // not implemented
     // 'unicorn/no-constant-zero-expression': 'error', // not implemented
     // 'unicorn/no-declarations-before-early-exit': 'error', // not implemented
-    // 'unicorn/no-document-cookie': 'error', // not implemented
+    'unicorn/no-document-cookie': 'error',
     // 'unicorn/no-double-comparison': 'error', // not implemented
     // 'unicorn/no-duplicate-if-branches': 'error', // not implemented
     // 'unicorn/no-duplicate-logical-operands': 'error', // not implemented

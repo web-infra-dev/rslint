@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_instanceof_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
@@ -54,6 +55,7 @@ func GetAllRules() []rule.Rule {
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
 		no_array_front_mutation.NoArrayFrontMutationRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
+		no_document_cookie.NoDocumentCookieRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
 		no_instanceof_builtins.NoInstanceofBuiltinsRule,
 		no_invalid_fetch_options.NoInvalidFetchOptionsRule,
