@@ -35,6 +35,7 @@ func TestNoRestrictedRstestMethods(t *testing.T) {
 	noMock := []any{map[string]any{"mock": nil}}
 	noImportActual := []any{map[string]any{"importActual": nil}}
 	noImportMock := []any{map[string]any{"importMock": nil}}
+	noUnknownMember := []any{map[string]any{"notAnRstestMember": nil}}
 	empty := []any{map[string]any{}}
 
 	rule_tester.RunRuleTester(
@@ -49,6 +50,10 @@ func TestNoRestrictedRstestMethods(t *testing.T) {
 			{Code: `helpers.fn();`, Options: noFn},
 			{Code: `helpers.mock('./m');`, Options: noMock},
 			{Code: `fn();`, Options: noFn},
+			{Code: `helpers.notAnRstestMember();`, Options: noUnknownMember},
+			// A whole-module require binds the module namespace, not the
+			// utilities object, which is the `rs` on it.
+			{Code: `const rs = require('@rstest/core'); rs.fn();`, Options: noFn},
 
 			// ---- The ordinary members follow the binding ----
 			// A receiver the file declares itself is a different object.
@@ -109,6 +114,32 @@ func TestNoRestrictedRstestMethods(t *testing.T) {
 				Code:    `import.meta.rstest.rs.fn();`,
 				Options: noFn,
 				Errors:  disallowed("fn", 1, 23, 25),
+			},
+			// A require reaches the same bindings as an import: the utilities
+			// object destructured off the module, under either name, and the
+			// module namespace it is a member of.
+			{
+				Code:    `const { rs } = require('@rstest/core'); rs.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 44, 46),
+			},
+			{
+				Code:    `const { rs: mocker } = require('@rstest/core'); mocker.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 56, 58),
+			},
+			{
+				Code:    `const core = require('@rstest/core'); core.rs.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 47, 49),
+			},
+			// The option object is taken as written: a name that is not a
+			// member of the utilities object matches nothing real, but it is
+			// still matched where it is written on the object.
+			{
+				Code:    `rs.notAnRstestMember();`,
+				Options: noUnknownMember,
+				Errors:  disallowed("notAnRstestMember", 1, 4, 21),
 			},
 
 			// ---- The plugin-managed members are read as written ----

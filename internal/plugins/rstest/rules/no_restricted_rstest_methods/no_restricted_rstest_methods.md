@@ -46,7 +46,7 @@ test('charges the card after the retry window', async () => {
 }
 ```
 
-The option object maps a member name to the message reported in its place, or to `null` for the default message. A name that is not a member of the utilities object never matches anything.
+The option object maps a member name to the message reported in its place, or to `null` for the default message. The name is matched wherever it is written on the utilities object, so a name the object does not carry matches nothing a test would really write.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
