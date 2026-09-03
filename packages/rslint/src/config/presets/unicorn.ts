@@ -63,7 +63,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
     // 'unicorn/no-array-from-fill': 'error', // not implemented
-    // 'unicorn/no-array-front-mutation': 'off', // not implemented
+    'unicorn/no-array-front-mutation': 'off',
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented
     // 'unicorn/no-array-reduce': 'error', // not implemented
     // 'unicorn/no-array-reverse': 'error', // not implemented
