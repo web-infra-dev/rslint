@@ -13,8 +13,11 @@ import (
 	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoNamespaceSourceOnlyRespectsShadowing(t *testing.T) {
@@ -35,6 +38,43 @@ function f() {
 		{
 			name: "imported createElement is recognized",
 			code: `import { createElement } from "react";
+createElement("ns:Panel");`,
+			want: 1,
+		},
+		{
+			name: "default React import is recognized",
+			code: `import createElement from "react";
+createElement("ns:Panel");`,
+			want: 1,
+		},
+		{
+			name: "namespace React import is recognized",
+			code: `import * as createElement from "react";
+createElement("ns:Panel");`,
+			want: 1,
+		},
+		{
+			name: "computed React member is recognized",
+			code: `const createElement = React["anything"];
+createElement("ns:Panel");`,
+			want: 1,
+		},
+		{
+			name: "optional React member is not recognized",
+			code: `const createElement = React?.anything;
+createElement("ns:Panel");`,
+			want: 0,
+		},
+		{
+			name: "wrapped React member is not recognized",
+			code: `const createElement = React.anything as any;
+createElement("ns:Panel");`,
+			want: 0,
+		},
+		{
+			name: "latest variable definition wins over function",
+			code: `function createElement() {}
+var createElement = React.anything;
 createElement("ns:Panel");`,
 			want: 1,
 		},
@@ -190,6 +230,36 @@ createElement("Ns:Panel");`,
 				Line:      2, Column: 1, EndLine: 2, EndColumn: 26,
 			}},
 		},
+		{
+			Code: `import createElement from "react";
+createElement("Ns:Panel");`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "noNamespace",
+				Message:   "React component Ns:Panel must not be in a namespace, as React does not support them",
+				Line:      2, Column: 1, EndLine: 2, EndColumn: 26,
+			}},
+		},
+		{
+			Code: `import * as createElement from "react";
+createElement("Ns:Panel");`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "noNamespace",
+				Message:   "React component Ns:Panel must not be in a namespace, as React does not support them",
+				Line:      2, Column: 1, EndLine: 2, EndColumn: 26,
+			}},
+		},
+		{
+			Code: `const createElement = React["anything"];
+createElement("Ns:Panel");`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "noNamespace",
+				Message:   "React component Ns:Panel must not be in a namespace, as React does not support them",
+				Line:      2, Column: 1, EndLine: 2, EndColumn: 26,
+			}},
+		},
 		// Dimension 4: parenthesized argument and receiver stay equivalent to
 		// the unwrapped ESTree Literal / MemberExpression shapes.
 		{
@@ -232,4 +302,42 @@ createElement("Ns:Panel");`,
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNamespaceRule, valid, invalid)
+}
+
+func TestNoNamespaceDoesNotUseMergedGlobalDeclarationOrder(t *testing.T) {
+	root := fixtures.GetRootDir()
+	declarationFile := tspath.ResolvePath(root.Dir, "declaration.ts")
+	usageFile := tspath.ResolvePath(root.Dir, "usage.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{
+		declarationFile: `var createElement = React.createElement;`,
+		usageFile: `var createElement = other;
+createElement("ns:Panel");`,
+	})
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatalf("create fixture program: %v", err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program: lintprogram.NewFromCompiler(program),
+		Files:   []string{usageFile},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     NoNamespaceRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return NoNamespaceRule.Run(ctx, nil)
+				},
+			}}
+		},
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	})
+
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
+	}
 }

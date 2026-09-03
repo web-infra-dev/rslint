@@ -47,6 +47,7 @@ type RefStore struct {
 	resolver   binder.NameResolver
 	tc         *checker.Checker
 	init       RefStoreInit
+	scope      *scope.Manager
 	walked     bool
 	// candidates maps identifier text to the reference-position identifiers
 	// still awaiting resolution; entries move into refs on first query.
@@ -262,6 +263,36 @@ func (s *RefStore) ResolveInFile(node *ast.Node) *ast.Symbol {
 		return nil
 	}
 	return s.binderReferenceSymbol(node, referenceMeaning(node))
+}
+
+// LatestValueDefinitionInFile returns the last value definition of the local
+// binding read by node, in the order ESLint's scope manager exposes it. It is
+// deliberately based on the file-local scope model rather than a checker
+// symbol: checker symbols can merge declarations from several global script
+// files, where AST offsets are not comparable.
+func (s *RefStore) LatestValueDefinitionInFile(node *ast.Node) *ast.Node {
+	if s == nil || node == nil || !scope.IsReferenceIdentifier(node) {
+		return nil
+	}
+	if s.scope == nil {
+		s.scope = scope.Build(s.sourceFile, scope.Options{
+			CollectReferences: true,
+			ReferenceNames:    map[string]struct{}{node.Text(): {}},
+		})
+	}
+	for _, reference := range s.scope.References {
+		if reference.Identifier != node {
+			continue
+		}
+		for i := len(reference.Declarations) - 1; i >= 0; i-- {
+			declaration := reference.Declarations[i]
+			if declaration != nil && declaration.IsValueBinding {
+				return declaration.DefNode
+			}
+		}
+		return nil
+	}
+	return nil
 }
 
 // ResolveInFileWithMeaning is ResolveInFile with an explicit declaration-space
