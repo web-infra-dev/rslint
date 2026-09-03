@@ -370,3 +370,53 @@ func TestValidExpectInPromiseRule(t *testing.T) {
 		},
 	)
 }
+
+// The rule reports a floating promise only when it carries an Rstest
+// assertion, so `expect` and `assert` have to resolve through
+// `rstack/test` — the Rstack CLI's re-export of the Rstest core API — as well.
+func TestValidExpectInPromiseRstackTestModule(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&valid_expect_in_promise.ValidExpectInPromiseRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `import { expect, test } from "rstack/test"; test("case", async () => { await promise.then(value => expect(value).toBe(1)); });`},
+			{Code: `import { assert, test } from "rstack/test"; test("case", async () => { await promise.then(value => assert.equal(value, 1)); });`},
+			// An `assert` out of a sibling subpath is not the Rstest assertion.
+			{Code: `import { assert } from "rstack/lib"; test("case", () => { promise.then(value => assert.equal(value, 1)); });`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `import { expect, test } from "rstack/test"; test("case", () => { promise.then(value => expect(value).toBe(1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Line:      1,
+					Column:    66,
+				}},
+			},
+			{
+				Code: `import { assert, test } from "rstack/test"; test("case", () => { promise.then(value => assert.equal(value, 1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Line:      1,
+					Column:    66,
+				}},
+			},
+			{
+				Code: `import * as rstest from "rstack/test"; rstest.test("case", () => { promise.then(value => rstest.assert.equal(value, 1)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+					Line:      1,
+					Column:    68,
+				}},
+			},
+			{
+				Code: `import * as rstest from "rstack/test"; rstest.test("case", () => { promise.then(value => rstest.assert(value)); });`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectInFloatingPromise",
+				}},
+			},
+		},
+	)
+}

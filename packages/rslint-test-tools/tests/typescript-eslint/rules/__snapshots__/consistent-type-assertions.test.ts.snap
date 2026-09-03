@@ -1318,7 +1318,7 @@ exports[`consistent-type-assertions > invalid 51`] = `
   "code": "const x = {} as Foo<int>;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1344,7 +1344,7 @@ exports[`consistent-type-assertions > invalid 52`] = `
   "code": "const x = {} as a | b;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1370,7 +1370,7 @@ exports[`consistent-type-assertions > invalid 53`] = `
   "code": "const x = ({} as A) + b;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1396,7 +1396,7 @@ exports[`consistent-type-assertions > invalid 54`] = `
   "code": "const x = <Foo<int>>{};",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1422,7 +1422,7 @@ exports[`consistent-type-assertions > invalid 55`] = `
   "code": "const x = <a | b>{};",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1448,7 +1448,7 @@ exports[`consistent-type-assertions > invalid 56`] = `
   "code": "const x = <A>{} + b;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1474,7 +1474,7 @@ exports[`consistent-type-assertions > invalid 57`] = `
   "code": "const x = {} as Foo<int>;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1500,7 +1500,7 @@ exports[`consistent-type-assertions > invalid 58`] = `
   "code": "const x = {} as a | b;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1526,7 +1526,7 @@ exports[`consistent-type-assertions > invalid 59`] = `
   "code": "const x = ({} as A) + b;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1552,7 +1552,7 @@ exports[`consistent-type-assertions > invalid 60`] = `
   "code": "print({ bar: 5 } as Foo);",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1578,7 +1578,7 @@ exports[`consistent-type-assertions > invalid 61`] = `
   "code": "new print({ bar: 5 } as Foo);",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1608,7 +1608,7 @@ function foo() {
       ",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1634,7 +1634,7 @@ exports[`consistent-type-assertions > invalid 63`] = `
   "code": "function b(x = {} as Foo.Bar) {}",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1660,7 +1660,7 @@ exports[`consistent-type-assertions > invalid 64`] = `
   "code": "function c(x = {} as Foo) {}",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1686,7 +1686,7 @@ exports[`consistent-type-assertions > invalid 65`] = `
   "code": "print?.({ bar: 5 } as Foo);",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1712,7 +1712,7 @@ exports[`consistent-type-assertions > invalid 66`] = `
   "code": "print?.call({ bar: 5 } as Foo);",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1738,7 +1738,7 @@ exports[`consistent-type-assertions > invalid 67`] = `
   "code": "print\`\${{ bar: 5 } as Foo}\`;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1764,7 +1764,7 @@ exports[`consistent-type-assertions > invalid 68`] = `
   "code": "const x = <Foo<int>>{};",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1790,7 +1790,7 @@ exports[`consistent-type-assertions > invalid 69`] = `
   "code": "const x = <a | b>{};",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1816,7 +1816,7 @@ exports[`consistent-type-assertions > invalid 70`] = `
   "code": "const x = <A>{} + b;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1842,7 +1842,7 @@ exports[`consistent-type-assertions > invalid 71`] = `
   "code": "print(<Foo>{ bar: 5 });",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1868,7 +1868,7 @@ exports[`consistent-type-assertions > invalid 72`] = `
   "code": "new print(<Foo>{ bar: 5 });",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1898,7 +1898,7 @@ function foo() {
       ",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1924,7 +1924,7 @@ exports[`consistent-type-assertions > invalid 74`] = `
   "code": "print?.(<Foo>{ bar: 5 });",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1950,7 +1950,7 @@ exports[`consistent-type-assertions > invalid 75`] = `
   "code": "print?.call(<Foo>{ bar: 5 });",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -1976,7 +1976,7 @@ exports[`consistent-type-assertions > invalid 76`] = `
   "code": "print\`\${<Foo>{ bar: 5 }}\`;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T = { ... }.",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for object literals.",
       "messageId": "unexpectedObjectTypeAssertion",
       "range": {
         "end": {
@@ -2337,7 +2337,7 @@ exports[`consistent-type-assertions > invalid 89`] = `
   "code": "const x = [] as string[];",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2363,7 +2363,7 @@ exports[`consistent-type-assertions > invalid 90`] = `
   "code": "const x = <string[]>[];",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2389,7 +2389,7 @@ exports[`consistent-type-assertions > invalid 91`] = `
   "code": "print([5] as Foo);",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2415,7 +2415,7 @@ exports[`consistent-type-assertions > invalid 92`] = `
   "code": "new print([5] as Foo);",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2441,7 +2441,7 @@ exports[`consistent-type-assertions > invalid 93`] = `
   "code": "function b(x = [5] as Foo.Bar) {}",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2471,7 +2471,7 @@ function foo() {
       ",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2497,7 +2497,7 @@ exports[`consistent-type-assertions > invalid 95`] = `
   "code": "print\`\${[5] as Foo}\`;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2523,7 +2523,7 @@ exports[`consistent-type-assertions > invalid 96`] = `
   "code": "const foo = () => [5] as Foo;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2549,7 +2549,7 @@ exports[`consistent-type-assertions > invalid 97`] = `
   "code": "new print(<Foo>[5]);",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2575,7 +2575,7 @@ exports[`consistent-type-assertions > invalid 98`] = `
   "code": "function b(x = <Foo.Bar>[5]) {}",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2605,7 +2605,7 @@ function foo() {
       ",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2631,7 +2631,7 @@ exports[`consistent-type-assertions > invalid 100`] = `
   "code": "print\`\${<Foo>[5]}\`;",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {
@@ -2657,7 +2657,7 @@ exports[`consistent-type-assertions > invalid 101`] = `
   "code": "const foo = <Foo>[5];",
   "diagnostics": [
     {
-      "message": "Always prefer const x: T[] = [ ... ].",
+      "message": "Use a type annotation or the \`satisfies\` operator instead of a type assertion for array literals.",
       "messageId": "unexpectedArrayTypeAssertion",
       "range": {
         "end": {

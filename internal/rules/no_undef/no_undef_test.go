@@ -577,7 +577,7 @@ function f(x = new Foo()) { function Foo() {} }`},
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2025},
 				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "undef", Line: 1, Column: 1}},
 			},
-			// TypeScript exposes AsyncIterator only as a type; ESLint 10.8
+			// TypeScript exposes AsyncIterator only as a type; ESLint 10.9
 			// does not provide it as a runtime language global.
 			{
 				Code:   `AsyncIterator;`,
