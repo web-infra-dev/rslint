@@ -157,10 +157,15 @@ func getMemberInfo(member *ast.Node) memberInfo {
 	info.getter = member.Kind == ast.KindGetAccessor
 	info.setter = member.Kind == ast.KindSetAccessor
 	value := memberValue(member)
-	classField := member.Kind == ast.KindPropertyDeclaration
+	propertyDeclaration := member.Kind == ast.KindPropertyDeclaration
+	// tsgo represents abstract properties and auto-accessors as
+	// PropertyDeclaration, but typescript-eslint exposes them as
+	// TSAbstractPropertyDefinition / AccessorProperty. Only plain class
+	// fields participate in the static/instance variable or method groups.
+	classField := propertyDeclaration && utils.IsPlainClassMember(member)
 	static := ast.IsStatic(member)
 	functionValue := isFunctionLikeExpression(value) || member.Kind == ast.KindMethodDeclaration || member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor || member.Kind == ast.KindConstructor
-	if classField && member.AsPropertyDeclaration().Type != nil && value == nil {
+	if propertyDeclaration && member.AsPropertyDeclaration().Type != nil && value == nil {
 		info.typeAnnotation = true
 	}
 	if classField {
@@ -467,7 +472,7 @@ var SortCompRule = rule.Rule{
 		for index, entry := range expanded {
 			order[index] = parsePattern(entry)
 		}
-		pragma := reactutil.GetReactPragma(ctx.Settings)
+		pragma := reactutil.GetReactPragmaFromContext(ctx)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		errors := map[int]*storedError{}
 		checkClass := func(node *ast.Node) {

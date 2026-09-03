@@ -22,6 +22,13 @@ func TestSortCompExtras(t *testing.T) {
 		// ---- Dimension 4: wrappers around the createReactClass object. ----
 		{Code: `var Foo = createReactClass(({ onClick() {}, render() {} }));`, Tsx: true},
 		{Code: `class Foo extends React.Component { static #private = 1; render() {} }`, Tsx: true},
+		// ---- Compatibility: @jsx changes the component pragma. ----
+		{Code: `/** @jsx Preact */ class Foo extends React.Component { render() {} componentDidMount() {} }`, Tsx: true},
+		// ---- Compatibility: non-plain class members are not variable/method groups. ----
+		{Code: `abstract class Foo extends React.Component { render() {} abstract props: string; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
+		{Code: `class Foo extends React.Component { render() {} accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
+		{Code: `class Foo extends React.Component { render() {} accessor foo = () => {}; }`, Tsx: true, Options: sortCompOrder("instance-methods", "render")},
+		{Code: `class Foo extends React.Component { render() {} static accessor foo = 1; }`, Tsx: true, Options: sortCompOrder("static-variables", "render")},
 		// ---- Real-user: issue #2000 has an async arrow field referring to a prior field. ----
 		{Code: `class Test extends React.PureComponent { fetch = async () => {}; lazyFetch = _.debounce(this.fetch, 1000); }`, Tsx: true},
 		// ---- Branch lock-in: a named method can also match a custom regex group. ----
@@ -35,6 +42,8 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `const Foo = class extends React.Component { render() {} componentDidMount() {} };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		// ---- Branch lock-in: custom group can be overridden while lifecycle remains. ----
 		{Code: `class Foo extends React.Component { render() {} componentDidMount() {} }`, Tsx: true, Options: map[string]any{"order": []any{"lifecycle", "custom", "render"}, "groups": map[string]any{"custom": []any{"componentDidMount"}}}, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		{Code: `/** @jsx Preact */ class Foo extends Preact.Component { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		{Code: `/** @jsx Preact */ const Foo = Preact.createReactClass({ render() {}, displayName() {} });`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "displayName")}},
 		// ---- Real-user: fields with an explicit custom order are still classified. ----
 		{Code: `class App extends React.Component { render() {} handler = () => {}; }`, Tsx: true, Options: sortCompOrder("instance-methods", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "handler")}},
 		// ---- Real-user: issue #1814 demonstrates the interaction between
