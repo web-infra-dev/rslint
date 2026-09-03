@@ -4,11 +4,21 @@
 package prefer_read_only_props
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestPreferReadOnlyPropsExtras(t *testing.T) {
@@ -64,8 +74,11 @@ func TestPreferReadOnlyPropsExtras(t *testing.T) {
 		{Code: `type Props = { name: string }; const Hello = forwardRef((props: Props) => <div/>);`, Tsx: true},
 
 		// ---- Review regressions: TypeScript-only boundary cases ----
+		{Code: `import { forwardRef } from "react"; forwardRef<HTMLDivElement>((props: { name: string }, ref) => <div/>);`, Tsx: true},
 		{Code: `function Hello(input: { name: string }) { return <div/>; }`, Tsx: true},
 		{Code: `import { forwardRef } from "react"; type Props = { name: string }; function Demo() { const forwardRef = (value: unknown) => value; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>); return Hello; }`, Tsx: true},
+		{Code: `import React from "react"; type Props = { name: string }; type Other = { React: { FC: Props } }; const Hello: Other.React.FC<Props> = (props) => <div/>;`, Tsx: true},
+		{Code: `const makeProps = () => make<{ name: string }>(); function Hello(props: ReturnType<typeof ns.makeProps>) { return <div/>; }`, Tsx: true},
 		{Code: `type Props = { name: string }; const Hello = React.forwardRef<HTMLDivElement, Props>((props, ref) => <div/>);`, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "R"}}, Tsx: true},
 		{Code: `type Props = { name: string }; async function* Hello(props: Props) { yield 1; return <div/>; }`, Tsx: true},
 		{Code: `type Props = { name: string }; const Hello: FC<Props> = (props) => <div/>; import { FC } from "react";`, Tsx: true},
@@ -286,6 +299,39 @@ function Hello(props: Props) {
 			Output: []string{`type Props = { readonly name: string }; class Hello extends React.Component<(Props)> { render() { return <div/>; } }`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
+		{
+			Code:   `function Hello(props: Props) { return <div/>; } type Props = { name: string };`,
+			Tsx:    true,
+			Output: []string{`function Hello(props: Props) { return <div/>; } type Props = { readonly name: string };`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `import React from "react"; type Props = { name: string }; const Hello: React.FC<Props> = (((props) => <div/>));`,
+			Tsx:    true,
+			Output: []string{`import React from "react"; type Props = { readonly name: string }; const Hello: React.FC<Props> = (((props) => <div/>));`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `const makeProps = () => { return make<{ name: string }>(); }; function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`const makeProps = () => { return make<{ readonly name: string }>(); }; function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `const makeProps = () => ({ ...make<{ name: string }>() }); function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`const makeProps = () => ({ ...make<{ readonly name: string }>() }); function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `const other = () => make<{ other: string }>(), makeProps = () => make<{ name: string }>(); function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`const other = () => make<{ readonly other: string }>(), makeProps = () => make<{ readonly name: string }>(); function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "readOnlyProp", Message: "Prop 'other' should be read-only."},
+				{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."},
+			},
+		},
 	})
 }
 
@@ -316,4 +362,55 @@ func TestPreferReadOnlyPropsLongAliasChain(t *testing.T) {
 			Message:   "Prop 'name' should be read-only.",
 		}},
 	}})
+}
+
+func TestPreferReadOnlyPropsSourceOnlyForwardRefShadowing(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	fileName := tspath.NormalizePath(filepath.Join(dir, "file.tsx"))
+	code := `import { forwardRef } from "react"; type Props = { name: string }; function Demo() { const forwardRef = (value: unknown) => value; return forwardRef<HTMLDivElement, Props>((props, ref) => <div/>); }`
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: code})
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            utils.CreateCompilerHost(dir, fs),
+		CompilerOptions: &core.CompilerOptions{Target: core.ScriptTargetESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("create source-only program: %v", err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceProgram},
+		TargetsByProgram: [][]string{{fileName}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     PreferReadOnlyPropsRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != nil {
+						t.Fatal("source-only fixture unexpectedly received a TypeChecker")
+					}
+					return PreferReadOnlyPropsRule.Run(ctx, nil)
+				},
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatalf("prepare source-only lint plan: %v", err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		}},
+	})
+	if err != nil {
+		t.Fatalf("lint source-only program: %v", err)
+	}
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
+	}
 }

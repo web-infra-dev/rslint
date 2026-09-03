@@ -25,12 +25,9 @@ import (
 // against ImportDeclaration / require argument uses
 // `ecmascript.StringToLowerCase(pragma)` to match upstream's
 // `pragma.toLocaleLowerCase()` semantic. `tc` may be nil — when no
-// TypeChecker is available the function falls back to a syntax-only
-// SourceFile-wide scan via `findPragmaBindingByName`. That fallback is
-// strictly a subset of TC-based resolution (no scope precision) but
-// covers the idiomatic top-level pragma-import patterns, keeping the
-// observable wrapper-recognition behavior aligned with upstream in
-// no-tsconfig modes.
+// TypeChecker is available the function falls back to a syntax-only scan. It
+// checks enclosing block/function bindings before the SourceFile-wide import
+// scan so a local binding cannot masquerade as an imported pragma helper.
 func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.Checker) bool {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
@@ -41,12 +38,9 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 	pragmaLower := ecmascript.StringToLowerCase(pragma)
 
 	if tc == nil {
-		// Syntax-only fallback: walk up to the SourceFile and scan it
-		// for any binding that introduces `ident.Text` from the pragma
-		// module. This is strictly less precise than TC-based
-		// resolution (no scope handling, no shadowing detection) but
-		// catches the canonical top-level patterns that account for
-		// virtually all real-world React pragma imports.
+		if hasEnclosingBinding(ident, ident.AsIdentifier().Text) {
+			return false
+		}
 		return findPragmaBindingByName(getSourceFileNode(ident), ident.AsIdentifier().Text, pragma, pragmaLower)
 	}
 
@@ -109,6 +103,92 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 	}
 
 	return false
+}
+
+func hasEnclosingBinding(ident *ast.Node, name string) bool {
+	if ident == nil || name == "" {
+		return false
+	}
+	for current := ident.Parent; current != nil; current = current.Parent {
+		if params := functionParameters(current); params != nil {
+			for _, param := range params {
+				if param == nil {
+					continue
+				}
+				parameter := param.AsParameterDeclaration()
+				if parameter != nil && bindingPatternBindsName(parameter.Name(), name) {
+					return true
+				}
+			}
+		}
+		switch current.Kind {
+		case ast.KindBlock, ast.KindCaseBlock, ast.KindModuleBlock:
+			if blockDeclaresBinding(current, name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func functionParameters(node *ast.Node) []*ast.Node {
+	if node == nil {
+		return nil
+	}
+	if params := FunctionParameters(node); params != nil {
+		return params
+	}
+	switch node.Kind {
+	case ast.KindMethodDeclaration:
+		return node.AsMethodDeclaration().Parameters.Nodes
+	case ast.KindGetAccessor:
+		return node.AsGetAccessorDeclaration().Parameters.Nodes
+	case ast.KindSetAccessor:
+		return node.AsSetAccessorDeclaration().Parameters.Nodes
+	}
+	return nil
+}
+
+func bindingPatternBindsName(node *ast.Node, name string) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindIdentifier {
+		return node.AsIdentifier().Text == name
+	}
+	if node.Kind == ast.KindObjectBindingPattern {
+		return objectBindingPatternBindsName(node, name)
+	}
+	return false
+}
+
+func blockDeclaresBinding(block *ast.Node, name string) bool {
+	var found bool
+	block.ForEachChild(func(statement *ast.Node) bool {
+		if statement == nil {
+			return false
+		}
+		switch statement.Kind {
+		case ast.KindVariableStatement:
+			declarations := statement.AsVariableStatement().DeclarationList
+			if declarations == nil || declarations.AsVariableDeclarationList() == nil {
+				return false
+			}
+			for _, declaration := range declarations.AsVariableDeclarationList().Declarations.Nodes {
+				if declaration != nil && bindingPatternBindsName(declaration.Name(), name) {
+					found = true
+					return true
+				}
+			}
+		case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
+			if bindingPatternBindsName(statement.Name(), name) {
+				found = true
+				return true
+			}
+		}
+		return false
+	})
+	return found
 }
 
 // getSourceFileNode walks up from `node` to its enclosing SourceFile,

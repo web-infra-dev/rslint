@@ -79,20 +79,30 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		}, map[*ast.Node]bool{})
 	}
 
-	return rule.RuleListeners{
-		ast.KindTypeAliasDeclaration: func(node *ast.Node) {
-			if isTopLevelDeclaration(node) {
-				collectTypeAlias(node, typeAliases)
+	// eslint-plugin-react resolves TypeScript declarations by searching the
+	// complete Program body, so a component may refer to a type declared later
+	// in the file. Imports remain source-order sensitive and are collected by
+	// their listener below.
+	if ctx.SourceFile != nil {
+		ctx.SourceFile.Node.ForEachChild(func(node *ast.Node) bool {
+			switch node.Kind {
+			case ast.KindTypeAliasDeclaration:
+				if isTopLevelDeclaration(node) {
+					collectTypeAlias(node, typeAliases)
+				}
+			case ast.KindInterfaceDeclaration:
+				if isTopLevelDeclaration(node) && ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsDefault == 0 {
+					collectInterface(node, typeAliases)
+				}
 			}
-		},
+			return false
+		})
+	}
+
+	return rule.RuleListeners{
 		ast.KindImportDeclaration: func(node *ast.Node) {
 			if isTopLevelDeclaration(node) {
 				collectReactGenericImports(node, genericImports)
-			}
-		},
-		ast.KindInterfaceDeclaration: func(node *ast.Node) {
-			if isTopLevelDeclaration(node) && ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsDefault == 0 {
-				collectInterface(node, typeAliases)
 			}
 		},
 		ast.KindClassDeclaration: func(node *ast.Node) {
@@ -183,9 +193,11 @@ func checkFunction(node *ast.Node, tc *checker.Checker, pragma string, genericIm
 	}
 	// The forwardRef arm is checked before component-return heuristics in the
 	// upstream collector. Its second type argument is the props type.
-	if call := parentCall(node); call != nil && call.TypeArguments != nil && len(call.TypeArguments.Nodes) >= 2 &&
+	if call := parentCall(node); call != nil && call.TypeArguments != nil &&
 		isForwardRefWrapper(call, node, wrappers, pragma, tc) {
-		validateType(node, call.TypeArguments.Nodes[1])
+		if len(call.TypeArguments.Nodes) >= 2 {
+			validateType(node, call.TypeArguments.Nodes[1])
+		}
 		return
 	}
 
@@ -207,7 +219,7 @@ func checkFunction(node *ast.Node, tc *checker.Checker, pragma string, genericIm
 
 	// For `const Component: React.FC<Props> = (...) => ...` without a parameter
 	// annotation, the upstream collector uses the variable's annotation.
-	parent := node.Parent
+	parent := reactutil.SkipExpressionWrappersUp(node)
 	if !hasParameterType && parent != nil && parent.Kind == ast.KindVariableDeclaration {
 		vd := parent.AsVariableDeclaration()
 		if vd != nil && vd.Type != nil {
@@ -477,7 +489,7 @@ func reactGenericTypeName(name *ast.Node, imports map[string]string) (string, bo
 	if qualified == nil || qualified.Left == nil || qualified.Right == nil {
 		return "", false
 	}
-	left := reactutil.EntityNameRightmost(qualified.Left)
+	left := entityNameLeftmost(qualified.Left)
 	right := reactutil.EntityNameRightmost(qualified.Right)
 	if left == nil || right == nil || !isGenericTypeName(right.AsIdentifier().Text) {
 		return "", false
@@ -598,7 +610,10 @@ func validateReturnTypeArgument(node *ast.Node, aliases map[string][]*ast.Node, 
 		if query == nil || query.ExprName == nil {
 			return
 		}
-		name := entityNameText(query.ExprName)
+		if query.ExprName.Kind != ast.KindIdentifier {
+			return
+		}
+		name := query.ExprName.AsIdentifier().Text
 		for _, value := range topLevelVariableValues(ast.GetSourceFileOfNode(node), name) {
 			validateReturnValue(value, aliases, genericImports, report, seen)
 		}
@@ -609,6 +624,7 @@ func validateReturnValue(node *ast.Node, aliases map[string][]*ast.Node, generic
 	if node == nil {
 		return
 	}
+	node = reactutil.SkipExpressionWrappers(node)
 	if ast.IsFunctionLike(node) {
 		node = functionReturnExpression(node)
 	}
@@ -622,6 +638,22 @@ func validateReturnValue(node *ast.Node, aliases map[string][]*ast.Node, generic
 				validateTypeNode(typeArgument, aliases, genericImports, report, seen)
 			}
 		}
+		return
+	}
+	if node.Kind == ast.KindObjectLiteralExpression {
+		object := node.AsObjectLiteralExpression()
+		if object == nil || object.Properties == nil {
+			return
+		}
+		for _, property := range object.Properties.Nodes {
+			if property == nil || property.Kind != ast.KindSpreadAssignment {
+				continue
+			}
+			spread := property.AsSpreadAssignment()
+			if spread != nil {
+				validateReturnValue(spread.Expression, aliases, genericImports, report, seen)
+			}
+		}
 	}
 }
 
@@ -631,7 +663,11 @@ func functionReturnExpression(node *ast.Node) *ast.Node {
 	}
 	switch node.Kind {
 	case ast.KindArrowFunction:
-		return node.AsArrowFunction().Body
+		body := node.AsArrowFunction().Body
+		if body != nil && body.Kind == ast.KindBlock {
+			return functionBodyReturnExpression(body)
+		}
+		return reactutil.SkipExpressionWrappers(body)
 	case ast.KindFunctionDeclaration:
 		return functionBodyReturnExpression(node.AsFunctionDeclaration().Body)
 	case ast.KindFunctionExpression:
@@ -672,29 +708,41 @@ func topLevelVariableValues(source *ast.SourceFile, name string) []*ast.Node {
 		if declarationList == nil || declarationList.Declarations == nil {
 			return false
 		}
+		matched := false
 		for _, declaration := range declarationList.Declarations.Nodes {
-			if declaration == nil || declaration.Name() == nil || declaration.Name().Kind != ast.KindIdentifier ||
-				declaration.Name().AsIdentifier().Text != name {
-				continue
+			if declaration != nil && declaration.Name() != nil && declaration.Name().Kind == ast.KindIdentifier &&
+				declaration.Name().AsIdentifier().Text == name {
+				matched = true
+				break
 			}
-			values = append(values, declaration.Initializer())
+		}
+		if matched {
+			for _, declaration := range declarationList.Declarations.Nodes {
+				if declaration != nil {
+					values = append(values, declaration.Initializer())
+				}
+			}
 		}
 		return false
 	})
 	return values
 }
 
-func entityNameText(node *ast.Node) string {
-	if node == nil {
-		return ""
+func entityNameLeftmost(node *ast.Node) *ast.Node {
+	for node != nil {
+		if node.Kind == ast.KindIdentifier {
+			return node
+		}
+		if node.Kind != ast.KindQualifiedName {
+			return nil
+		}
+		qualified := node.AsQualifiedName()
+		if qualified == nil {
+			return nil
+		}
+		node = qualified.Left
 	}
-	if node.Kind == ast.KindIdentifier {
-		return node.AsIdentifier().Text
-	}
-	if node.Kind == ast.KindQualifiedName {
-		return entityNameText(node.AsQualifiedName().Right)
-	}
-	return ""
+	return nil
 }
 
 func checkPropertySignature(node *ast.Node, report func(*ast.Node, string, bool)) {

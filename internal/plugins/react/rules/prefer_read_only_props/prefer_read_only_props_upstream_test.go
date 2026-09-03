@@ -1,7 +1,7 @@
-// TestPreferReadOnlyPropsUpstream migrates the TypeScript cases from
-// eslint-plugin-react v7.37.5's prefer-read-only-props suite.
-// The upstream file also contains Flow/parser cases; those are not part of
-// this TypeScript-only mirror because rslint does not support Flow.
+// TestPreferReadOnlyPropsUpstream migrates the TypeScript and parser-neutral
+// cases from eslint-plugin-react v7.37.5's prefer-read-only-props suite.
+// The 17 upstream Flow cases are intentionally omitted because rslint does not
+// support Flow syntax; the two parser-neutral valid cases are retained below.
 // rslint-specific edge and branch cases live in prefer_read_only_props_extras_test.go.
 package prefer_read_only_props
 
@@ -14,6 +14,10 @@ import (
 
 func TestPreferReadOnlyPropsUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferReadOnlyPropsRule, []rule_tester.ValidTestCase{
+		// Parser-neutral upstream case: a class without a TypeScript props type.
+		{Code: `class Hello extends React.Component { render() { return <div>Hello {this.props.name}</div>; } }`, Tsx: true},
+		// Parser-neutral upstream case: PropTypes variance is unrelated to this rule.
+		{Code: `class Hello extends React.Component { render() { return <div>Hello {this.props.name}</div>; } } Hello.propTypes = { name: PropTypes.string };`, Tsx: true},
 		{
 			Code: `
         import React from "react";
