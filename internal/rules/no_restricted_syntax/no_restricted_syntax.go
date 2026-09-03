@@ -414,6 +414,12 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
 
 	for _, target := range virtualTargets(node) {
+		// A self-closing JSX element is represented by the physical tsgo node
+		// as JSXElement already. Do not report that same ESTree identity twice;
+		// JSXOpeningElement remains a distinct virtual node.
+		if target == "JSXElement" && physicalMatch && estreeNameForKind(node) == target {
+			continue
+		}
 		if !selectorTargetsEstreeType(entry.compiled, target) {
 			continue
 		}
@@ -469,7 +475,7 @@ func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
 	}
 	start := tokens[openIndex].Start
 	if openIndex > 0 && tokens[openIndex-1].Kind == ast.KindGreaterThanToken {
-		depth := 1
+		depth := 0
 		for index := openIndex - 1; index >= 0; index-- {
 			switch tokens[index].Kind {
 			case ast.KindGreaterThanToken:
