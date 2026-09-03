@@ -66,17 +66,14 @@ jobs:
       - name: Unit Test (Windows)
         if: matrix.runner == 'rspack-windows-2022-large'
         shell: pwsh
+        env:
+          # Our server only have 96 cores
+          GOMAXPROCS: 8
         run: |
-          # The Windows runner can exhaust its commit limit with up to 64
-          # package builds/test binaries in flight. Keep every package and
-          # test, but cap inter-package concurrency to bound peak memory use.
-          $packageParallelism = 32
-
-          # Pre-build shared dependencies to warm the build cache
-          go build -p $packageParallelism ./cmd/... ./internal/...
+          go build ./cmd/... ./internal/...
 
           $packages = go list ./cmd/... ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 64
+          $batchSize = 16
           $batch = @()
 
           foreach ($pkg in $packages) {
@@ -84,7 +81,7 @@ jobs:
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
-              go test -p $packageParallelism -count=1 $batch
+              go test -count=1 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
               $batch = @()
             }
@@ -93,7 +90,7 @@ jobs:
           # Run remaining packages
           if ($batch.Count -gt 0) {
             Write-Host "Running final batch of $($batch.Count) packages..."
-            go test -p $packageParallelism -count=1 $batch
+            go test -count=1 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
