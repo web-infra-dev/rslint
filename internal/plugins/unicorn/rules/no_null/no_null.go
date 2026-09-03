@@ -202,7 +202,7 @@ func reportNull(ctx rule.RuleContext, node *ast.Node, opts options) {
 		declarationList := parent.Parent
 		if declaration != nil && declarationList != nil &&
 			declarationList.Kind == ast.KindVariableDeclarationList &&
-			declarationList.Flags&ast.NodeFlagsConst == 0 &&
+			!ast.IsVarConst(declarationList) &&
 			utils.ESTreeRuntimeExpression(declaration.Initializer) == node {
 			start := variableIDEnd(ctx, declaration)
 			if start > 0 {

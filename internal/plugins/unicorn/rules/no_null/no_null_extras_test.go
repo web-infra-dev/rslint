@@ -110,6 +110,14 @@ func TestNoNullExtras(t *testing.T) {
 				`for (let value = null; ; ) {}`,
 				`for (let value; ; ) {}`,
 			),
+			mutableVariableCase(
+				`using value = null;`,
+				`using value;`,
+			),
+			mutableVariableCase(
+				`async function f() { await using value = null; }`,
+				`async function f() { await using value; }`,
+			),
 
 			// ---- Dimension 4: same-kind nesting reports each null independently ----
 			replacementCase(`const first = null, second = null;`, nil, 1, 2),
