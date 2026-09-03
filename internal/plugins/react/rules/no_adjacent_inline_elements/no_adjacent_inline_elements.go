@@ -62,6 +62,7 @@ func jsxElementName(node *ast.Node) string {
 }
 
 func isInline(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
 	if node == nil {
 		return false
 	}

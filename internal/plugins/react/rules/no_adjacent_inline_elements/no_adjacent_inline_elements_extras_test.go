@@ -80,6 +80,10 @@ func TestNoAdjacentInlineElementsExtras(t *testing.T) {
 		// Locks in upstream isInline() call-expression branch: the first string
 		// argument names the rendered element.
 		{Code: `React.createElement("div", null, [foo("a"), foo("span")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 58)}},
+		// Parentheses are transparent in ESTree child lists; ts-go retains them.
+		{Code: `React.createElement("div", null, [(foo("a")), (foo("span"))]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 62)}},
+		{Code: `React.createElement("div", null, [("a"), ("span")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 52)}},
+		{Code: `React.createElement("div", null, [(<a />), (<span />)]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 56)}},
 		// ---- Real-user: adjacent React.createElement children ----
 		{Code: `React.createElement("div", undefined, [React.createElement("button"), React.createElement("input")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 101)}},
 		// ---- Real-user: inline links in a list ----
