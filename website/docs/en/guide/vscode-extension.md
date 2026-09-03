@@ -9,6 +9,14 @@ Install the official extension from the [VS Code Marketplace](https://marketplac
 
 The extension works out of the box — it uses the built-in rslint binary and automatically picks up your `rslint.config.ts`.
 
+:::tip Rstack extension
+
+The unified Rstack extension (`rstack.rstack`) brings Rslint, Rstest, and formatting together in one install and is where new editor features land. This standalone `rstack.rslint` extension will be deprecated in the future, so we recommend that existing users migrate now and that new setups use `rstack.rstack`.
+
+To switch, install `rstack.rstack` from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) or, for Cursor, Trae, and VSCodium, from [Open VSX](https://open-vsx.org/extension/rstack/rstack). Disable or uninstall `rstack.rslint` so only one copy of Rslint runs, then re-enter settings under `rstack.rslint.*` as described in the [migration notes](https://github.com/rstackjs/rstack-editor/blob/main/packages/vscode/README.md#coming-from-the-standalone-extensions).
+
+:::
+
 ## Auto-fix on Save
 
 To automatically fix lint issues when you save a file, add the following to your VS Code settings (`.vscode/settings.json`):

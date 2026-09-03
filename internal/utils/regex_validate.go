@@ -1091,6 +1091,13 @@ func normalizeRegexCaptureName(name string) (string, bool) {
 	return result.String(), !first
 }
 
+// NormalizeRegexCaptureName validates and decodes a RegExpIdentifierName.
+// Callers that compare authored capture names must use the decoded value so
+// raw and Unicode-escaped spellings name the same group.
+func NormalizeRegexCaptureName(name string) (string, bool) {
+	return normalizeRegexCaptureName(ecmascript.CombineSurrogatePairs(name))
+}
+
 // decodeRegexCaptureNameEscape decodes one `\u` escape. fixed is true only
 // for the four-digit form; the grammar permits a surrogate pair only when both
 // halves use that fixed form.

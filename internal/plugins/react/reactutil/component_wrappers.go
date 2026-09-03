@@ -22,10 +22,8 @@ import (
 // hardcoded defaults (memo / forwardRef, pragma-qualified or bare).
 // Upstream's `isDestructuredFromPragmaImport` adds a runtime guard to
 // bare default entries — they only match when the bare callee was
-// destructure-imported from the pragma module. We have no import
-// resolver, so we approximate by matching default bare entries on
-// non-optional calls only, and matching user-configured bare entries
-// freely (since they don't depend on import resolution).
+// destructure-imported from the pragma module. User-configured bare
+// entries match freely because they do not depend on import resolution.
 type ComponentWrapperEntry struct {
 	Object           string
 	Property         string
@@ -115,18 +113,12 @@ func GetComponentWrapperFunctions(settings map[string]interface{}, pragma string
 //
 // Optional-chain handling mirrors upstream's `isPragmaComponentWrapper`:
 //
-//   - Member-level optional (`React?.memo(arg)`) — recognized; Babel
-//     emits the callee as MemberExpression with `optional: true` and
-//     upstream's `callee.type === 'MemberExpression'` check still passes.
+//   - Member-level and call-level optional forms (`React?.memo(arg)` and
+//     `(React.memo)?.(arg)`) are recognized because the ESTree callee remains
+//     a MemberExpression in both cases.
 //
-//   - Call-level optional (`memo?.(arg)`) on a bare Identifier callee —
-//     recognized only against `IsUserConfigured: true` entries.
-//     Hardcoded bare-default entries (`memo` / `forwardRef` without
-//     pragma object) are upstream-gated by
-//     `isDestructuredFromPragmaImport`, which we cannot enforce without
-//     an import resolver. Restricting hardcoded bare defaults to
-//     non-optional matches keeps us conservative; user wrappers don't
-//     need that gate (they're explicit user opt-in).
+//   - A call-level optional bare Identifier (`memo?.(arg)`) follows the same
+//     configured-wrapper or pragma-import gate as its non-optional form.
 func MatchesAnyComponentWrapper(call, fn *ast.Node, wrappers []ComponentWrapperEntry) bool {
 	return matchesAnyComponentWrapperCore(call, fn, wrappers, "", nil)
 }
@@ -146,9 +138,8 @@ func MatchesAnyComponentWrapper(call, fn *ast.Node, wrappers []ComponentWrapperE
 // gate. Without this, `memo(arrow)` would silently classify when `memo`
 // is a user-defined function unrelated to React — leading to over-reports
 // where upstream skips. Use this variant whenever a TypeChecker is
-// available; otherwise the import-resolution check is skipped (matching
-// the non-checker variant's conservative behavior — call-level optional
-// rejected for hardcoded bare defaults).
+// available; otherwise the same helper falls back to its syntax-only import
+// scan.
 func MatchesAnyComponentWrapperWithChecker(call, fn *ast.Node, wrappers []ComponentWrapperEntry, pragma string, tc *checker.Checker) bool {
 	return matchesAnyComponentWrapperCore(call, fn, wrappers, pragma, tc)
 }
@@ -164,7 +155,6 @@ func matchesAnyComponentWrapperCore(call, fn *ast.Node, wrappers []ComponentWrap
 	if SkipExpressionWrappers(c.Arguments.Nodes[0]) != fn {
 		return false
 	}
-	callLevelOptional := c.QuestionDotToken != nil
 	callee := SkipExpressionWrappers(c.Expression)
 	for _, w := range wrappers {
 		if w.Property == "" {
@@ -221,28 +211,23 @@ func matchesAnyComponentWrapperCore(call, fn *ast.Node, wrappers []ComponentWrap
 				continue
 			}
 			return true
-		case ast.KindPropertyAccessExpression:
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 			if w.Object == "" {
 				continue
 			}
-			// Call-level optional on a member callee (`(R.memo)?.()`)
-			// is structurally distinct from member-level optional
-			// (`R?.memo()` — flag on the PropertyAccess) and upstream
-			// also rejects it (`callee.name` undefined on the call's
-			// own optional shape). Reject regardless of IsUserConfigured.
-			if callLevelOptional {
-				continue
+			var object, property *ast.Node
+			if callee.Kind == ast.KindPropertyAccessExpression {
+				member := callee.AsPropertyAccessExpression()
+				object, property = member.Expression, member.Name()
+			} else {
+				member := callee.AsElementAccessExpression()
+				object, property = member.Expression, ast.SkipParentheses(member.ArgumentExpression)
 			}
-			pa := callee.AsPropertyAccessExpression()
-			obj := SkipExpressionWrappers(pa.Expression)
+			obj := SkipExpressionWrappers(object)
 			if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != w.Object {
 				continue
 			}
-			name := pa.Name()
-			if name == nil || name.Kind != ast.KindIdentifier {
-				continue
-			}
-			if name.AsIdentifier().Text == w.Property {
+			if EsTreeName(property) == w.Property {
 				return true
 			}
 		}

@@ -15,9 +15,9 @@ import (
 // syntax: `as`, `satisfies` and `!` are erased before it runs, and it reads
 // through parentheses. So `(rs as any).mock('./dep')`, `rs!.mock('./dep')` and
 // `(rs.mock)(('./dep'))` are rewritten exactly like the bare form.
-// rstestUtils.ParseRstestUtilityCall reads the receiver and the callee that
-// way; the argument here is read through utils.SkipAssertionsAndParens for the
-// same reason.
+// rstestUtils.ParseRstestPluginManagedCall reads the receiver and the callee
+// that way; the argument here is read through utils.SkipAssertionsAndParens for
+// the same reason.
 
 //go:embed prefer_import_in_mock.schema.json
 var schemaJSON []byte
@@ -104,7 +104,7 @@ var PreferImportInMockRule = rule.Rule{
 // call that Rstest's mock transform rewrites, together with the plain string
 // naming the module inside it. Both are nil when the call is anything else.
 func mockPathArgument(node *ast.Node) (*ast.Node, *ast.Node) {
-	utility := rstestUtils.ParseRstestUtilityCall(node)
+	utility := rstestUtils.ParseRstestPluginManagedCall(node)
 	if utility == nil || !mockMethods[utility.Member] || !isTransformablePosition(node) {
 		return nil, nil
 	}
