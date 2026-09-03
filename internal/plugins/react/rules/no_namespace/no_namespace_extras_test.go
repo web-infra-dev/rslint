@@ -38,6 +38,20 @@ function f() {
 createElement("ns:Panel");`,
 			want: 1,
 		},
+		{
+			name: "latest unrelated redeclaration suppresses imported binding",
+			code: `var createElement = React.createElement;
+var createElement = other;
+createElement("ns:Panel");`,
+			want: 0,
+		},
+		{
+			name: "latest React redeclaration is recognized",
+			code: `var createElement = other;
+var createElement = React.createElement;
+createElement("ns:Panel");`,
+			want: 1,
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{

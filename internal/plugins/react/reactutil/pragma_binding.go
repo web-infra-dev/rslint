@@ -89,16 +89,19 @@ func isDestructuredFromPragmaSymbol(symbol *ast.Symbol, pragma, pragmaLower stri
 		return false
 	}
 
-	// Pick the most relevant declaration. Upstream walks `latestDef` —
-	// for value bindings ValueDeclaration is the right one; for
-	// ImportSpecifier (which has no Initializer of its own), upstream
-	// walks `latestDef.parent.type === 'ImportDeclaration'`. We mirror
-	// by trying ValueDeclaration first then Declarations[0].
+	// Pick the latest definition. Upstream walks `defs[defs.length - 1]`,
+	// whereas ts-go's ValueDeclaration is the symbol's primary declaration
+	// and can point at an earlier redeclaration. Declarations are source
+	// nodes, so selecting the one with the greatest position mirrors the
+	// latest definition regardless of the binder's primary declaration.
 	var decl *ast.Node
-	if symbol.ValueDeclaration != nil {
+	for _, candidate := range symbol.Declarations {
+		if candidate != nil && (decl == nil || candidate.Pos() > decl.Pos()) {
+			decl = candidate
+		}
+	}
+	if decl == nil {
 		decl = symbol.ValueDeclaration
-	} else if len(symbol.Declarations) > 0 {
-		decl = symbol.Declarations[0]
 	}
 	if decl == nil {
 		return false
