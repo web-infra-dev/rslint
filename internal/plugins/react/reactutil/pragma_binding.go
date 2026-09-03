@@ -45,10 +45,10 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 }
 
 // IsDestructuredFromPragmaImportWithRefs is the RefStore-aware variant. When
-// no TypeChecker is available, refs resolves bindings through the file's
-// lexical scopes before the legacy source-file scan is considered. This keeps
-// source-only linting from treating a shadowed local binding as an imported
-// React helper.
+// refs is provided, it resolves bindings through the file's lexical scopes and
+// is authoritative: an absent value definition means the bare identifier is
+// not a React helper in this file. This keeps checker-backed linting from
+// treating a declaration in another global script as a local React binding.
 func IsDestructuredFromPragmaImportWithRefs(
 	ident *ast.Node,
 	pragma string,
@@ -67,9 +67,7 @@ func IsDestructuredFromPragmaImportWithRefs(
 		if declaration := refs.LatestValueDefinitionInFile(ident); declaration != nil {
 			return isDestructuredFromPragmaDeclaration(declaration, pragma, pragmaLower)
 		}
-		if tc == nil {
-			return false
-		}
+		return false
 	}
 
 	if tc == nil {

@@ -44,10 +44,9 @@ func IsCreateElementCallWithChecker(callee *ast.Node, pragma string, tc *checker
 	return isCreateElementCallCore(callee, pragma, tc)
 }
 
-// IsCreateElementCallWithRefs is the source-only-aware variant. The resolver
-// is used only when TypeChecker is nil, so existing TypeChecker behavior stays
-// unchanged while bare imported createElement calls no longer ignore lexical
-// shadowing in source-only runs.
+// IsCreateElementCallWithRefs is the file-scope-aware variant. When refs is
+// provided, it is authoritative for bare imported createElement calls so
+// checker-backed linting cannot resolve a binding from another global script.
 func IsCreateElementCallWithRefs(
 	callee *ast.Node,
 	pragma string,

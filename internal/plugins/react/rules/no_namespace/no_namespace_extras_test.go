@@ -341,3 +341,40 @@ createElement("ns:Panel");`,
 		t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
 	}
 }
+
+func TestNoNamespaceDoesNotUseCrossFileCheckerBinding(t *testing.T) {
+	root := fixtures.GetRootDir()
+	declarationFile := tspath.ResolvePath(root.Dir, "declaration.ts")
+	usageFile := tspath.ResolvePath(root.Dir, "usage.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{
+		declarationFile: `var createElement = React.createElement;`,
+		usageFile:       `createElement("ns:Panel");`,
+	})
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
+	if err != nil {
+		t.Fatalf("create fixture program: %v", err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program: lintprogram.NewFromCompiler(program),
+		Files:   []string{usageFile},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     NoNamespaceRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return NoNamespaceRule.Run(ctx, nil)
+				},
+			}}
+		},
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	})
+
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
+	}
+}
