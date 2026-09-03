@@ -68,12 +68,12 @@ jobs:
         shell: pwsh
         env:
           # Our server only have 96 cores
-          GOMAXPROCS: 8
+          GOMAXPROCS: 16
         run: |
           go build ./cmd/... ./internal/...
 
           $packages = go list ./cmd/... ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 16
+          $batchSize = 32
           $batch = @()
 
           foreach ($pkg in $packages) {
