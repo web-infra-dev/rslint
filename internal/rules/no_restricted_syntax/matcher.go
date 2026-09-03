@@ -918,7 +918,10 @@ func selectorTargetsEstreeType(sel selector, nodeType string) bool {
 	case combinedPseudo:
 		return selectorTargetsEstreeType(value.Inner, nodeType)
 	case pseudoSelector:
-		if value.Name == "is" || value.Name == "matches" {
+		switch value.Name {
+		case "statement", "expression", "declaration", "function", "pattern":
+			return semanticClassMatchesEstreeType(value.Name, nodeType)
+		case "is", "matches":
 			for _, child := range value.Args {
 				if selectorTargetsEstreeType(child, nodeType) {
 					return true
@@ -933,6 +936,22 @@ func selectorTargetsEstreeType(sel selector, nodeType string) bool {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+func semanticClassMatchesEstreeType(class, nodeType string) bool {
+	switch class {
+	case "statement":
+		return strings.HasSuffix(nodeType, "Statement") || strings.HasSuffix(nodeType, "Declaration")
+	case "declaration":
+		return strings.HasSuffix(nodeType, "Declaration")
+	case "function":
+		return nodeType == "FunctionDeclaration" || nodeType == "FunctionExpression" || nodeType == "ArrowFunctionExpression"
+	case "expression", "pattern":
+		return strings.HasSuffix(nodeType, "Expression") ||
+			strings.HasSuffix(nodeType, "Literal") ||
+			nodeType == "MetaProperty" || nodeType == "Identifier"
 	}
 	return false
 }

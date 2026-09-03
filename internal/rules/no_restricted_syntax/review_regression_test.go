@@ -79,6 +79,30 @@ func TestNoRestrictedSyntaxReviewRegressions(t *testing.T) {
 				}},
 			},
 			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`:function`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedSyntax",
+					Line:      1, Column: 12, EndLine: 1, EndColumn: 17,
+				}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`MethodDefinition > :function`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedSyntax",
+					Line:      1, Column: 12, EndLine: 1, EndColumn: 17,
+				}},
+			},
+			{
+				Code:    `class C { m() {} }`,
+				Options: []interface{}{`:function[body.type='BlockStatement']`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "restrictedSyntax",
+					Line:      1, Column: 12, EndLine: 1, EndColumn: 17,
+				}},
+			},
+			{
 				Code:    `const x = <Foo />;`,
 				Tsx:     true,
 				Options: []interface{}{`:is(JSXElement, JSXOpeningElement)`},
