@@ -159,8 +159,9 @@ func ResolveFunctionIdentifierReferenceFromSymbolModules(
 
 // ResolveTypeIdentifierReferenceFromSymbolModules resolves an identifier used
 // in a type position against every specifier that exports the same type
-// surface. Unlike the function-reference resolver, it accepts an inline
-// type-only specifier such as `import { type Mock } from "@rstest/core"`.
+// surface. Unlike the function-reference resolver, it accepts a type-only
+// import, written either as `import type { Mock } from "@rstest/core"` or as
+// `import { type Mock } from "@rstest/core"`.
 func ResolveTypeIdentifierReferenceFromSymbolModules(
 	localName string,
 	identifier *ast.Node,
@@ -201,6 +202,11 @@ func resolveIdentifierReferenceFromSymbolModules(
 
 		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules, allowTypeOnlySpecifier); ok {
 			return name, originalNode, ReferenceModeImport
+		}
+		// A type-only import of the module binds no value: it is not the
+		// runtime API, and it does not shadow the global that is.
+		if isTypeOnlyModuleImportSpecifier(declaration, importModules) {
+			continue
 		}
 		if name, originalNode, ok := resolveModuleRequireBinding(declaration, importModules); ok {
 			return name, originalNode, ReferenceModeImport
@@ -278,7 +284,10 @@ func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string,
 	}
 
 	specifier := declaration.AsImportSpecifier()
-	if specifier == nil || (specifier.IsTypeOnly && !allowTypeOnly) {
+	// A type-only binding names no value at runtime, so a caller resolving a
+	// function reference must not accept one. The check covers the inline
+	// `type` modifier and the one on the enclosing clause alike.
+	if specifier == nil || (ast.IsTypeOnlyImportDeclaration(declaration) && !allowTypeOnly) {
 		return "", nil, false
 	}
 	if specifier.PropertyName != nil {
@@ -289,6 +298,21 @@ func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string,
 		return "", nil, false
 	}
 	return name.Text(), name, true
+}
+
+// isTypeOnlyModuleImportSpecifier reports whether declaration is a type-only
+// import specifier for one of importModules, written either with the inline
+// `type` modifier or with one on the enclosing clause.
+func isTypeOnlyModuleImportSpecifier(declaration *ast.Node, importModules []string) bool {
+	if declaration == nil ||
+		declaration.Kind != ast.KindImportSpecifier ||
+		!ast.IsTypeOnlyImportDeclaration(declaration) {
+		return false
+	}
+	importDeclaration := FindImportDeclaration(declaration)
+	return importDeclaration != nil &&
+		importDeclaration.ModuleSpecifier != nil &&
+		matchesModule(importDeclaration.ModuleSpecifier.Text(), importModules)
 }
 
 func resolveModuleRequireBinding(declaration *ast.Node, importModules []string) (string, *ast.Node, bool) {
