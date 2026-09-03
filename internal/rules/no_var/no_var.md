@@ -21,4 +21,4 @@ const CONFIG = {};
 ## Original Documentation
 
 - [ESLint: no-var](https://eslint.org/docs/latest/rules/no-var)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.1/lib/rules/no-var.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-var.js)

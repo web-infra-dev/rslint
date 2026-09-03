@@ -45,6 +45,37 @@ const (
 	arraySatisfiesSuggestionTemplate   = "Use const x = [ ... ] satisfies {{cast}} instead."
 )
 
+type literalAssertionMessages struct {
+	diagnosticID                     string
+	annotationOrSatisfiesDescription string
+	satisfiesDescription             string
+	annotationSuggestionID           string
+	annotationSuggestionTemplate     string
+	satisfiesSuggestionID            string
+	satisfiesSuggestionTemplate      string
+}
+
+var (
+	objectLiteralAssertionMessages = literalAssertionMessages{
+		diagnosticID:                     "unexpectedObjectTypeAssertion",
+		annotationOrSatisfiesDescription: "Use a type annotation or the `satisfies` operator instead of a type assertion for object literals.",
+		satisfiesDescription:             "Use the `satisfies` operator instead of a type assertion for object literals.",
+		annotationSuggestionID:           objectAnnotationSuggestionID,
+		annotationSuggestionTemplate:     objectAnnotationSuggestionTemplate,
+		satisfiesSuggestionID:            objectSatisfiesSuggestionID,
+		satisfiesSuggestionTemplate:      objectSatisfiesSuggestionTemplate,
+	}
+	arrayLiteralAssertionMessages = literalAssertionMessages{
+		diagnosticID:                     "unexpectedArrayTypeAssertion",
+		annotationOrSatisfiesDescription: "Use a type annotation or the `satisfies` operator instead of a type assertion for array literals.",
+		satisfiesDescription:             "Use the `satisfies` operator instead of a type assertion for array literals.",
+		annotationSuggestionID:           arrayAnnotationSuggestionID,
+		annotationSuggestionTemplate:     arrayAnnotationSuggestionTemplate,
+		satisfiesSuggestionID:            arraySatisfiesSuggestionID,
+		satisfiesSuggestionTemplate:      arraySatisfiesSuggestionTemplate,
+	}
+)
+
 var asExpressionPrecedence = ast.GetOperatorPrecedence(
 	ast.KindAsExpression,
 	ast.KindUnknown,
@@ -63,6 +94,67 @@ func skipParensUp(node *ast.Node) *ast.Node {
 		parent = parent.Parent
 	}
 	return parent
+}
+
+// isParameterPosition mirrors upstream isAsParameter after skipParensUp has
+// reconciled tsgo's explicit parenthesis nodes with ESTree.
+func isParameterPosition(parent *ast.Node) bool {
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindNewExpression, ast.KindCallExpression, ast.KindThrowStatement,
+		ast.KindJsxExpression, ast.KindParameter, ast.KindBindingElement,
+		ast.KindShorthandPropertyAssignment:
+		// Parameter / BindingElement / ShorthandPropertyAssignment cover the
+		// ESTree AssignmentPattern default-value cases; the assertion can only
+		// be the default/initializer in those nodes.
+		return true
+	case ast.KindTemplateSpan:
+		// Only tagged templates count: the substitution's TemplateExpression
+		// must itself be the argument of a TaggedTemplateExpression.
+		return parent.Parent != nil && parent.Parent.Parent != nil &&
+			parent.Parent.Parent.Kind == ast.KindTaggedTemplateExpression
+	}
+	return false
+}
+
+// annotationTarget returns the binding after which upstream can insert a type
+// annotation. Keeping this decision outside the deferred builder lets the
+// diagnostic text describe exactly the suggestions that can be produced.
+func annotationTarget(parent *ast.Node) *ast.Node {
+	if parent == nil || parent.Kind != ast.KindVariableDeclaration {
+		return nil
+	}
+	declaration := parent.AsVariableDeclaration()
+	if declaration == nil || declaration.Type != nil {
+		return nil
+	}
+	return declaration.Name()
+}
+
+func isConstType(typeNode *ast.Node) bool {
+	if typeNode == nil || typeNode.Kind != ast.KindTypeReference {
+		return false
+	}
+	typeReference := typeNode.AsTypeReferenceNode()
+	return typeReference != nil &&
+		typeReference.TypeName != nil &&
+		typeReference.TypeName.Kind == ast.KindIdentifier &&
+		typeReference.TypeName.AsIdentifier().Text == "const"
+}
+
+// shouldReportLiteralType mirrors upstream checkType: only bare any/unknown
+// keywords and const assertions are exempt.
+func shouldReportLiteralType(typeNode *ast.Node) bool {
+	switch typeNode.Kind {
+	case ast.KindAnyKeyword, ast.KindUnknownKeyword:
+		return false
+	case ast.KindTypeReference:
+		return !isConstType(typeNode)
+	default:
+		return true
+	}
 }
 
 func substituteCast(template, cast string) string {
@@ -96,35 +188,29 @@ func (e consistentTypeAssertionsEdits) literalSuggestions(
 	node *ast.Node,
 	expression *ast.Node,
 	typeNode *ast.Node,
-	annotationID string,
-	annotationTemplate string,
-	satisfiesID string,
-	satisfiesTemplate string,
+	annotationTarget *ast.Node,
+	messages *literalAssertionMessages,
 ) []rule.RuleSuggestion {
 	typeText := e.text(typeNode)
 	expressionText := e.textWithParentheses(expression)
 	suggestions := make([]rule.RuleSuggestion, 0, 2)
-	if effectiveParent := skipParensUp(node); effectiveParent != nil && effectiveParent.Kind == ast.KindVariableDeclaration {
-		if declaration := effectiveParent.AsVariableDeclaration(); declaration.Type == nil {
-			if name := declaration.Name(); name != nil {
-				suggestions = append(suggestions, rule.RuleSuggestion{
-					Message: rule.RuleMessage{
-						Id:          annotationID,
-						Description: substituteCast(annotationTemplate, typeText),
-						Data:        map[string]string{"cast": typeText},
-					},
-					FixesArr: []rule.RuleFix{
-						rule.RuleFixInsertAfter(name, ": "+typeText),
-						rule.RuleFixReplace(e.sourceFile, node, expressionText),
-					},
-				})
-			}
-		}
+	if annotationTarget != nil {
+		suggestions = append(suggestions, rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          messages.annotationSuggestionID,
+				Description: substituteCast(messages.annotationSuggestionTemplate, typeText),
+				Data:        map[string]string{"cast": typeText},
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixInsertAfter(annotationTarget, ": "+typeText),
+				rule.RuleFixReplace(e.sourceFile, node, expressionText),
+			},
+		})
 	}
 	suggestions = append(suggestions, rule.RuleSuggestion{
 		Message: rule.RuleMessage{
-			Id:          satisfiesID,
-			Description: substituteCast(satisfiesTemplate, typeText),
+			Id:          messages.satisfiesSuggestionID,
+			Description: substituteCast(messages.satisfiesSuggestionTemplate, typeText),
 			Data:        map[string]string{"cast": typeText},
 		},
 		FixesArr: []rule.RuleFix{
@@ -133,38 +219,6 @@ func (e consistentTypeAssertionsEdits) literalSuggestions(
 		},
 	})
 	return suggestions
-}
-
-func (e consistentTypeAssertionsEdits) objectLiteralSuggestions(
-	node *ast.Node,
-	expression *ast.Node,
-	typeNode *ast.Node,
-) []rule.RuleSuggestion {
-	return e.literalSuggestions(
-		node,
-		expression,
-		typeNode,
-		objectAnnotationSuggestionID,
-		objectAnnotationSuggestionTemplate,
-		objectSatisfiesSuggestionID,
-		objectSatisfiesSuggestionTemplate,
-	)
-}
-
-func (e consistentTypeAssertionsEdits) arrayLiteralSuggestions(
-	node *ast.Node,
-	expression *ast.Node,
-	typeNode *ast.Node,
-) []rule.RuleSuggestion {
-	return e.literalSuggestions(
-		node,
-		expression,
-		typeNode,
-		arrayAnnotationSuggestionID,
-		arrayAnnotationSuggestionTemplate,
-		arraySatisfiesSuggestionID,
-		arraySatisfiesSuggestionTemplate,
-	)
 }
 
 // angleToAsFix converts an angle-bracket assertion into an as assertion,
@@ -216,8 +270,11 @@ func (e consistentTypeAssertionsEdits) angleToAsFix(
 
 // ConsistentTypeAssertionsRule is the rslint port of upstream
 // `@typescript-eslint/consistent-type-assertions`. It mirrors upstream v8
-// observably: the same diagnostics (message ids + texts), the same
+// observably: the same diagnostic locations and message ids, the same
 // `annotation`/`satisfies` suggestions, and the same angle-bracket→as autofix.
+// Literal-assertion descriptions intentionally name only replacements that
+// are valid in the assertion's context; upstream always recommends a const
+// declaration even when the assertion is not a variable initializer.
 //
 // AST note: upstream runs on ESTree, where parentheses are not nodes, so
 // `node.expression` / `node.parent` transparently see through them. tsgo
@@ -237,101 +294,51 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 	edits := consistentTypeAssertionsEdits{sourceFile: ctx.SourceFile}
 
-	// isConst reports whether the assertion target is `const` (the `as const` /
-	// `<const>` assertion). Mirrors upstream `isConst`.
-	isConst := func(typeNode *ast.Node) bool {
-		if typeNode == nil || typeNode.Kind != ast.KindTypeReference {
-			return false
+	// Upstream implements object and array literal checks separately. Selecting
+	// the literal once avoids duplicate parenthesis walks and keeps each
+	// diagnostic coupled to the exact suggestions its context permits.
+	checkLiteral := func(node, expression, typeNode *ast.Node) {
+		if opts.AssertionStyle == AssertionStyleNever ||
+			(opts.ObjectLiteralTypeAssertions == LiteralAssertionAllow &&
+				opts.ArrayLiteralTypeAssertions == LiteralAssertionAllow) {
+			return
 		}
-		tr := typeNode.AsTypeReferenceNode()
-		if tr == nil || tr.TypeName == nil || tr.TypeName.Kind != ast.KindIdentifier {
-			return false
-		}
-		return tr.TypeName.AsIdentifier().Text == "const"
-	}
 
-	// checkType reports whether a literal assertion to `typeNode` should be
-	// flagged. Mirrors upstream `checkType`: only the *bare* `any` / `unknown`
-	// keywords are exempt (a union such as `any | string` is NOT), and `as
-	// const` is exempt.
-	checkType := func(typeNode *ast.Node) bool {
-		switch typeNode.Kind {
-		case ast.KindAnyKeyword, ast.KindUnknownKeyword:
-			return false
-		case ast.KindTypeReference:
-			return !isConst(typeNode)
+		var literalOption LiteralAssertion
+		var messages *literalAssertionMessages
+		switch ast.SkipParentheses(expression).Kind {
+		case ast.KindObjectLiteralExpression:
+			literalOption = opts.ObjectLiteralTypeAssertions
+			messages = &objectLiteralAssertionMessages
+		case ast.KindArrayLiteralExpression:
+			literalOption = opts.ArrayLiteralTypeAssertions
+			messages = &arrayLiteralAssertionMessages
 		default:
-			return true
+			return
 		}
-	}
+		if literalOption == LiteralAssertionAllow {
+			return
+		}
 
-	// isAsParameter mirrors upstream `isAsParameter`: the assertion is in a
-	// position where an object/array literal is "passed" rather than assigned to
-	// a typeable binding (call / new / throw arguments, JSX expression
-	// containers, default values, tagged-template substitutions).
-	isAsParameter := func(node *ast.Node) bool {
-		p := skipParensUp(node)
-		if p == nil {
-			return false
+		parent := skipParensUp(node)
+		if literalOption == LiteralAssertionAllowAsParam && isParameterPosition(parent) {
+			return
 		}
-		switch p.Kind {
-		case ast.KindNewExpression, ast.KindCallExpression, ast.KindThrowStatement,
-			ast.KindJsxExpression, ast.KindParameter, ast.KindBindingElement,
-			ast.KindShorthandPropertyAssignment:
-			// Parameter / BindingElement / ShorthandPropertyAssignment cover the
-			// ESTree `AssignmentPattern` default-value cases; the assertion can
-			// only be the default/initializer in those nodes.
-			return true
-		case ast.KindTemplateSpan:
-			// Only tagged templates count: the substitution's TemplateExpression
-			// must itself be the argument of a TaggedTemplateExpression.
-			return p.Parent != nil && p.Parent.Parent != nil &&
-				p.Parent.Parent.Kind == ast.KindTaggedTemplateExpression
+		if !shouldReportLiteralType(typeNode) {
+			return
 		}
-		return false
-	}
 
-	// checkObject / checkArray mirror upstream's checkExpressionForObjectAssertion
-	// / checkExpressionForArrayAssertion. `exprRaw` is the assertion's raw
-	// expression; the literal check uses the paren-stripped form.
-	checkObject := func(node, exprRaw, typeNode *ast.Node) {
-		expr := ast.SkipParentheses(exprRaw)
-		if opts.AssertionStyle == AssertionStyleNever ||
-			opts.ObjectLiteralTypeAssertions == LiteralAssertionAllow ||
-			expr.Kind != ast.KindObjectLiteralExpression {
-			return
+		annotationNode := annotationTarget(parent)
+		description := messages.satisfiesDescription
+		if annotationNode != nil {
+			description = messages.annotationOrSatisfiesDescription
 		}
-		if opts.ObjectLiteralTypeAssertions == LiteralAssertionAllowAsParam && isAsParameter(node) {
-			return
-		}
-		if checkType(typeNode) {
-			ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
-				Id:          "unexpectedObjectTypeAssertion",
-				Description: "Always prefer const x: T = { ... }.",
-			}, func() []rule.RuleSuggestion {
-				return edits.objectLiteralSuggestions(node, exprRaw, typeNode)
-			})
-		}
-	}
-
-	checkArray := func(node, exprRaw, typeNode *ast.Node) {
-		expr := ast.SkipParentheses(exprRaw)
-		if opts.AssertionStyle == AssertionStyleNever ||
-			opts.ArrayLiteralTypeAssertions == LiteralAssertionAllow ||
-			expr.Kind != ast.KindArrayLiteralExpression {
-			return
-		}
-		if opts.ArrayLiteralTypeAssertions == LiteralAssertionAllowAsParam && isAsParameter(node) {
-			return
-		}
-		if checkType(typeNode) {
-			ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
-				Id:          "unexpectedArrayTypeAssertion",
-				Description: "Always prefer const x: T[] = [ ... ].",
-			}, func() []rule.RuleSuggestion {
-				return edits.arrayLiteralSuggestions(node, exprRaw, typeNode)
-			})
-		}
+		ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
+			Id:          messages.diagnosticID,
+			Description: description,
+		}, func() []rule.RuleSuggestion {
+			return edits.literalSuggestions(node, expression, typeNode, annotationNode, messages)
+		})
 	}
 
 	// reportIncorrectAssertionType handles the assertion-style mismatch reports
@@ -340,7 +347,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	reportIncorrectAssertionType := func(node, exprRaw, typeNode *ast.Node) {
 		style := opts.AssertionStyle
 		// `as const` / `<const>` is never reported under `never`.
-		if style == AssertionStyleNever && isConst(typeNode) {
+		if style == AssertionStyleNever && isConstType(typeNode) {
 			return
 		}
 		switch style {
@@ -378,8 +385,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				reportIncorrectAssertionType(node, asExpr.Expression, asExpr.Type)
 				return
 			}
-			checkObject(node, asExpr.Expression, asExpr.Type)
-			checkArray(node, asExpr.Expression, asExpr.Type)
+			checkLiteral(node, asExpr.Expression, asExpr.Type)
 		},
 		ast.KindTypeAssertionExpression: func(node *ast.Node) {
 			typeAssertion := node.AsTypeAssertion()
@@ -390,8 +396,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				reportIncorrectAssertionType(node, typeAssertion.Expression, typeAssertion.Type)
 				return
 			}
-			checkObject(node, typeAssertion.Expression, typeAssertion.Type)
-			checkArray(node, typeAssertion.Expression, typeAssertion.Type)
+			checkLiteral(node, typeAssertion.Expression, typeAssertion.Type)
 		},
 	}
 }

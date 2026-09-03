@@ -1062,3 +1062,63 @@ func TestNoEmptyObjectTypeAllowWithNameLookbehind(t *testing.T) {
 		},
 	})
 }
+
+func TestNoEmptyObjectTypeMergedInterfaceSuggestions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoEmptyObjectTypeRule, nil, []rule_tester.InvalidTestCase{
+		{
+			Code: `
+interface Box<T> {}
+interface Box<T> {
+  value: T;
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      2,
+					Column:    11,
+					EndLine:   2,
+					EndColumn: 14,
+				},
+			},
+		},
+		{
+			Code: `
+interface Box {
+  value: string;
+}
+interface Box {}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      5,
+					Column:    11,
+					EndLine:   5,
+					EndColumn: 14,
+				},
+			},
+		},
+		{
+			Code: `
+namespace Box {
+  export interface Value {}
+}
+namespace Box {
+  export interface Value {
+    value: string;
+  }
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      3,
+					Column:    20,
+					EndLine:   3,
+					EndColumn: 25,
+				},
+			},
+		},
+	})
+}
