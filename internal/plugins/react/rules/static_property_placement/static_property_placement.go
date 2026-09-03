@@ -225,6 +225,9 @@ func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) 
 		if isReactClass(resolveComponentPath(declaration, path), pragma) {
 			return true
 		}
+		if relatedReactClassAssignment(ctx, symbol, path, pragma) {
+			return true
+		}
 		// A successfully resolved local binding is authoritative. Falling
 		// back to a same-name class elsewhere in the file would cross a
 		// shadowing boundary and report a non-component binding.
@@ -259,6 +262,48 @@ func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) 
 	}
 	visit(source.AsNode())
 	return found
+}
+
+func relatedReactClassAssignment(ctx rule.RuleContext, symbol *ast.Symbol, path []string, pragma string) bool {
+	if ctx.Refs == nil || symbol == nil {
+		return false
+	}
+	for _, reference := range ctx.Refs.References(symbol) {
+		if reference == nil || reference.Parent == nil {
+			continue
+		}
+		memberRoot, memberPath, ok := componentPath(reference.Parent)
+		if !ok || memberRoot != reference || !samePath(memberPath, path) {
+			continue
+		}
+		parent := reference.Parent.Parent
+		for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+			parent = parent.Parent
+		}
+		if parent == nil || parent.Kind != ast.KindBinaryExpression {
+			continue
+		}
+		binary := parent.AsBinaryExpression()
+		if binary.OperatorToken == nil || binary.OperatorToken.Kind == ast.KindCommaToken || binary.Right == nil {
+			continue
+		}
+		if isReactClass(reactutil.SkipExpressionWrappers(binary.Right), pragma) {
+			return true
+		}
+	}
+	return false
+}
+
+func samePath(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func componentPath(node *ast.Node) (*ast.Node, []string, bool) {
