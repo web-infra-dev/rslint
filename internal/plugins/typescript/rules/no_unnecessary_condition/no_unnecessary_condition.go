@@ -19,13 +19,18 @@ import (
 //go:embed no_unnecessary_condition.schema.json
 var schemaJSON []byte
 
-// strictNullishFlag matches the original typescript-eslint behavior:
-// only null and undefined are considered "nullish" for isAlwaysNullish.
-var strictNullishFlag = checker.TypeFlagsUndefined | checker.TypeFlagsNull
+// Only null and undefined are always nullish. Void is intentionally excluded:
+// it participates in possibly-nullish checks, but TypeScript permits functions
+// returning other values to satisfy a void return type.
+const alwaysNullishFlag = checker.TypeFlagsUndefined | checker.TypeFlagsNull
+
+// Upstream treats void as possibly nullish because a void-returning expression
+// can evaluate to undefined at runtime.
+const possiblyNullishFlag = alwaysNullishFlag | checker.TypeFlagsVoid
 
 // isNullishType checks if a type is strictly null or undefined.
 func isNullishType(t *checker.Type) bool {
-	return utils.IsTypeFlagSet(t, strictNullishFlag)
+	return utils.IsTypeFlagSet(t, alwaysNullishFlag)
 }
 
 // isAlwaysNullish checks if ALL union constituents are null or undefined.
@@ -35,12 +40,9 @@ func isAlwaysNullish(t *checker.Type) bool {
 	})
 }
 
-// isPossiblyNullish checks if ANY union constituent is null or undefined.
-// Matches original typescript-eslint: only Null and Undefined, not Void.
+// isPossiblyNullish checks if any union constituent is null, undefined, or void.
 func isPossiblyNullish(t *checker.Type) bool {
-	return utils.Some(utils.UnionTypeParts(t), func(part *checker.Type) bool {
-		return utils.IsTypeFlagSet(part, checker.TypeFlagsUndefined|checker.TypeFlagsNull)
-	})
+	return utils.IsTypeFlagSetWithUnion(t, possiblyNullishFlag)
 }
 
 // Sentinel types for distinguishing null and undefined in comparisons.
@@ -75,13 +77,20 @@ func toStaticValue(t *checker.Type) staticValue {
 	return staticValue{ok: false}
 }
 
-var boolOperators = map[string]bool{
-	"<": true, ">": true, "<=": true, ">=": true,
-	"==": true, "===": true, "!=": true, "!==": true,
-}
-
-func isBoolOperator(op string) bool {
-	return boolOperators[op]
+func boolOperatorText(kind ast.Kind) (string, bool) {
+	switch kind {
+	case ast.KindLessThanToken,
+		ast.KindGreaterThanToken,
+		ast.KindLessThanEqualsToken,
+		ast.KindGreaterThanEqualsToken,
+		ast.KindEqualsEqualsToken,
+		ast.KindEqualsEqualsEqualsToken,
+		ast.KindExclamationEqualsToken,
+		ast.KindExclamationEqualsEqualsToken:
+		return scanner.TokenToString(kind), true
+	default:
+		return "", false
+	}
 }
 
 // booleanComparison mimics JavaScript comparison semantics for literal types.
@@ -347,28 +356,19 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 		// --- Helper functions ---
 
-		nodeIsArrayType := func(node *ast.Node) bool {
-			nodeType := utils.GetConstrainedTypeAtLocation(tc, node)
-			return utils.Some(utils.UnionTypeParts(nodeType), func(part *checker.Type) bool {
-				return checker.Checker_isArrayType(tc, part)
-			})
-		}
-
-		nodeIsTupleType := func(node *ast.Node) bool {
-			nodeType := utils.GetConstrainedTypeAtLocation(tc, node)
-			return utils.Some(utils.UnionTypeParts(nodeType), func(part *checker.Type) bool {
-				return checker.IsTupleType(part)
-			})
-		}
-
 		isArrayIndexExpression := func(node *ast.Node) bool {
 			if !ast.IsElementAccessExpression(node) {
 				return false
 			}
 			elem := node.AsElementAccessExpression()
-			obj := elem.Expression
-			return nodeIsArrayType(obj) ||
-				(nodeIsTupleType(obj) && !ast.IsLiteralExpression(elem.ArgumentExpression))
+			isDynamicIndex := !ast.IsLiteralExpression(elem.ArgumentExpression)
+			objectType := utils.GetConstrainedTypeAtLocation(tc, elem.Expression)
+			for _, part := range utils.UnionTypeParts(objectType) {
+				if checker.Checker_isArrayType(tc, part) || (isDynamicIndex && checker.IsTupleType(part)) {
+					return true
+				}
+			}
+			return false
 		}
 
 		// Conditional is always necessary if it involves any, unknown, or a naked type variable
@@ -484,16 +484,24 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			isMemberExpr := ast.IsAccessExpression(node)
-			if !isPossiblyNullish(t) && (!isMemberExpr || !isNullableMemberExpression(node)) {
-				// Skip array index expressions without noUncheckedIndexedAccess
-				if isNoUncheckedIndexedAccess ||
-					(!isArrayIndexExpression(node) &&
-						!isChainExpressionWithOptionalArrayIndex(node, isArrayIndexExpression)) {
-					ctx.ReportNode(node, buildNeverNullishMessage())
+			if !isPossiblyNullish(t) {
+				// Skip unsound array index expressions before nullable-member analysis;
+				// the latter performs additional property and index-signature queries.
+				if !isNoUncheckedIndexedAccess && isArrayIndexExpression(node) {
 					return
 				}
-			} else if isAlwaysNullish(t) {
+				if ast.IsAccessExpression(node) && isNullableMemberExpression(node) {
+					return
+				}
+				if !isNoUncheckedIndexedAccess &&
+					isChainExpressionWithOptionalArrayIndex(node, isArrayIndexExpression) {
+					return
+				}
+				ctx.ReportNode(node, buildNeverNullishMessage())
+				return
+			}
+
+			if isAlwaysNullish(t) {
 				ctx.ReportNode(node, buildAlwaysNullishMessage())
 				return
 			}
@@ -850,8 +858,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Boolean comparison operators
-				opStr := scanner.TokenToString(op)
-				if isBoolOperator(opStr) {
+				if opStr, ok := boolOperatorText(op); ok {
 					checkIfBoolExpressionIsNecessaryConditional(node, binExpr.Left, binExpr.Right, opStr)
 					return
 				}

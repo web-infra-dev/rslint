@@ -2,11 +2,10 @@ package no_undef
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
@@ -48,47 +47,60 @@ var NoUndefRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		return rule.RuleListeners{
+		listeners := rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				// Skip identifiers that do not create scope references.
-				if shouldSkip(node, opts.checkTypeof) {
+				if !scope.IsReferenceIdentifier(node) || (!opts.checkTypeof && isTypeOfOperand(node)) {
 					return
 				}
-
-				name := node.Text()
-				if ctx.Globals.Access(name).IsDeclared() {
-					return
-				}
-				referenceSpace := noUndefReferenceSpace(node)
-				// An explicit `off` removes only implicit globals. A declaration or
-				// import authored in this file still defines its references.
-				if ctx.Refs.ResolveInFileWithMeaning(node, referenceSpace.DeclarationMeaning()) != nil {
-					return
-				}
-				// CommonJS's wrapper-level `arguments` binding is lexical rather than
-				// a configurable global, so it remains defined even when a same-named
-				// global is disabled.
-				if ctx.Refs.HasImplicitWrapperBinding(name) {
-					return
-				}
-				// typescript-eslint's scope manager seeds its default `esnext`
-				// library in a separate type namespace. A name such as `Record`
-				// therefore resolves in `type T = Record<string, unknown>`, but the
-				// same spelling in `Record;` remains undefined. Keep this check after
-				// same-file resolution so authored declarations retain normal scope
-				// behavior, and do not consult the TypeChecker: ambient, cross-file,
-				// and host-library symbols are outside core no-undef's inputs.
-				if referenceSpace.IncludesType() && rule.IsDefaultTypeScriptTypeGlobal(name) {
-					return
-				}
-
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "undef",
-					Description: fmt.Sprintf("'%s' is not defined.", name),
-				})
+				reportUndefinedReference(&ctx, node, node.Text())
 			},
 		}
+		// TSESTree represents bare `<this>` tag names as JSXIdentifiers and
+		// records them as references. tsgo preserves `this` as a keyword, so it
+		// needs its own listener; member tags such as `<this.Component>` are not
+		// references and are rejected by the shared scope classifier.
+		if ctx.SourceFile.ScriptKind == core.ScriptKindTSX {
+			listeners[ast.KindThisKeyword] = func(node *ast.Node) {
+				if scope.IsTypeScriptJsxThisReference(node) {
+					reportUndefinedReference(&ctx, node, "this")
+				}
+			}
+		}
+		return listeners
 	},
+}
+
+func reportUndefinedReference(ctx *rule.RuleContext, node *ast.Node, name string) {
+	if ctx.Globals.Access(name).IsDeclared() {
+		return
+	}
+	referenceSpace := noUndefReferenceSpace(node)
+	// An explicit `off` removes only implicit globals. A declaration or
+	// import authored in this file still defines its references.
+	if ctx.Refs.ResolveInFileWithMeaning(node, referenceSpace.DeclarationMeaning()) != nil {
+		return
+	}
+	// CommonJS's wrapper-level `arguments` binding is lexical rather than
+	// a configurable global, so it remains defined even when a same-named
+	// global is disabled.
+	if ctx.Refs.HasImplicitWrapperBinding(name) {
+		return
+	}
+	// typescript-eslint's scope manager seeds its default `esnext`
+	// library in a separate type namespace. A name such as `Record`
+	// therefore resolves in `type T = Record<string, unknown>`, but the
+	// same spelling in `Record;` remains undefined. Keep this check after
+	// same-file resolution so authored declarations retain normal scope
+	// behavior, and do not consult the TypeChecker: ambient, cross-file,
+	// and host-library symbols are outside core no-undef's inputs.
+	if referenceSpace.IncludesType() && rule.IsDefaultTypeScriptTypeGlobal(name) {
+		return
+	}
+
+	ctx.ReportNode(node, rule.RuleMessage{
+		Id:          "undef",
+		Description: "'" + name + "' is not defined.",
+	})
 }
 
 // noUndefReferenceSpace preserves the rule's established Espree-facing
@@ -107,124 +119,6 @@ func noUndefReferenceSpace(node *ast.Node) scope.ReferenceSpace {
 		}
 	}
 	return scope.ESLintReferenceSpace(node)
-}
-
-// shouldSkip returns true if the identifier does not create a scope reference.
-// This includes property/declaration names, labels, ImportType metadata,
-// synthetic JSDoc syntax, and typeof operands (when checkTypeof is false).
-func shouldSkip(node *ast.Node, checkTypeof bool) bool {
-	if node.Parent == nil {
-		return true
-	}
-
-	parent := node.Parent
-
-	// Skip declaration names (var x, function x, class x, import x, etc.)
-	// Exceptions: ShorthandPropertyAssignment names ({x}) and the name of a
-	// non-aliased local export (export { x }) are declaration names but also
-	// value references, so they must NOT be skipped. Re-exports
-	// (export { x } from 'mod') reference the other module's binding instead,
-	// and the alias label of export { x as y } is only a label.
-	if ast.IsDeclarationName(node) && parent.Kind != ast.KindShorthandPropertyAssignment {
-		if parent.Kind != ast.KindExportSpecifier || parent.PropertyName() != nil || utils.IsReExportSpecifier(parent) {
-			return true
-		}
-	}
-
-	// Skip property names in member access (obj.prop -> skip "prop")
-	if parent.Kind == ast.KindPropertyAccessExpression &&
-		parent.AsPropertyAccessExpression().Name() == node {
-		return true
-	}
-
-	// Skip property names in object literals ({key: value} -> skip "key")
-	if parent.Kind == ast.KindPropertyAssignment && parent.Name() == node {
-		return true
-	}
-
-	// Skip property names in binding patterns ({key: newName} destructuring -> skip "key")
-	if parent.Kind == ast.KindBindingElement && parent.PropertyName() == node {
-		return true
-	}
-
-	// Skip the original name in aliased imports (import { Original as Alias } -> skip "Original")
-	// The propertyName of an ImportSpecifier is the module's export name, not a local reference.
-	if parent.Kind == ast.KindImportSpecifier && parent.PropertyName() == node {
-		return true
-	}
-
-	// Skip the original name in re-export aliases (export { Original as Alias } from 'module')
-	// The propertyName of an ExportSpecifier in a re-export is the source module's export name.
-	// Note: without `from`, export { X as Y } refers to local X, so only skip when moduleSpecifier exists.
-	if parent.Kind == ast.KindExportSpecifier && parent.PropertyName() == node {
-		if utils.IsReExportSpecifier(parent) {
-			return true
-		}
-	}
-
-	// Skip label identifiers
-	if parent.Kind == ast.KindLabeledStatement ||
-		parent.Kind == ast.KindBreakStatement ||
-		parent.Kind == ast.KindContinueStatement {
-		return true
-	}
-
-	// Skip typeof operands (typeof x -> skip "x" unless checkTypeof is true).
-	// Walk through ParenthesizedExpression nodes because typeof (x) and
-	// typeof ((x)) are semantically identical to typeof x, but TypeScript's
-	// AST inserts ParenthesizedExpression nodes unlike ESTree.
-	if !checkTypeof && isTypeOfOperand(node) {
-		return true
-	}
-
-	// `import("pkg").Name` treats both the module argument and qualifier as
-	// module syntax rather than references. Its type arguments remain normal
-	// type references and are deliberately not skipped.
-	if utils.IsImportTypeSyntax(node) {
-		return true
-	}
-
-	// In a qualified type name (`Namespace.Name`), only the leftmost root is a
-	// reference. Every right-hand identifier names a member of that root.
-	if parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Right == node {
-		return true
-	}
-
-	// Skip enum member names
-	if parent.Kind == ast.KindEnumMember && parent.Name() == node {
-		return true
-	}
-
-	// Skip meta-property names (`target` in `new.target`, `meta` in
-	// `import.meta`, `defer` in `import.defer`) — syntactic, not identifiers
-	// that reference a variable.
-	if parent.Kind == ast.KindMetaProperty {
-		return true
-	}
-
-	// Skip import attribute keys (`type` in `with { type: "json" }`) —
-	// syntactic names, not references to same-named variables.
-	if parent.Kind == ast.KindImportAttribute && parent.AsImportAttribute().Name() == node {
-		return true
-	}
-
-	// Skip the namespace/name parts of a namespaced JSX tag or attribute
-	// (`<foo:bar attr:name="v" />`) — syntactic, never variable references.
-	if parent.Kind == ast.KindJsxNamespacedName {
-		return true
-	}
-
-	// Skip lowercase JSX tag names (`<div>`): these are JSX intrinsics, not
-	// identifier references. Uppercase tag names (`<Foo>`) reference a
-	// component value and are checked normally.
-	if ast.IsJsxTagName(node) {
-		text := node.Text()
-		if len(text) == 0 || (text[0] >= 'a' && text[0] <= 'z') {
-			return true
-		}
-	}
-
-	return false
 }
 
 // isTypeOfOperand checks if the identifier is the sole operand of a typeof

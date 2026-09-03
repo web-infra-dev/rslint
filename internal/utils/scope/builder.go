@@ -448,6 +448,11 @@ func (b *builder) visitStatement(stmt *ast.Node, parent *Scope) {
 		}
 	case ast.KindExportDeclaration:
 		b.visitExportDeclaration(stmt, parent)
+	case ast.KindNamespaceExportDeclaration:
+		// `export as namespace Name` reads the exported value. Keep the
+		// scope-manager view consistent with IsReferenceIdentifier instead of
+		// letting the generic statement walk discard its identifier child.
+		b.reference(stmt.Name(), parent)
 	case ast.KindImportDeclaration:
 		// Bindings only; nothing to reference and no new scopes.
 	case ast.KindImportEqualsDeclaration:

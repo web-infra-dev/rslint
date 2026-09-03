@@ -661,7 +661,8 @@ myTag` + "`" + `abc` + "`" + `;
 
         it('...', () => {});
       `,
-			Options: map[string]interface{}{"allowForKnownSafeCalls": []interface{}{map[string]interface{}{"from": "file", "name": []interface{}{"it"}, "path": "file.ts"}}},
+			FileName: "file.ts",
+			Options:  map[string]interface{}{"allowForKnownSafeCalls": []interface{}{map[string]interface{}{"from": "file", "name": []interface{}{"it"}, "path": "file.ts"}}},
 		},
 		{
 			Code: `

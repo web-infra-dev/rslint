@@ -26,8 +26,8 @@ func TestNoCycleUpstream(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&no_cycle.NoCycleRule,
-		withDisableSccValid(noCycleUpstreamValidCases()),
-		withDisableSccInvalid(noCycleUpstreamInvalidCases()),
+		withDefaultNoCycleValidFileName(withDisableSccValid(noCycleUpstreamValidCases())),
+		withDefaultNoCycleInvalidFileName(withDisableSccInvalid(noCycleUpstreamInvalidCases())),
 	)
 }
 
@@ -346,4 +346,22 @@ func cycleError(message string) rule_tester.InvalidTestCaseError {
 		Line:      1,
 		Column:    1,
 	}
+}
+
+func withDefaultNoCycleValidFileName(cases []rule_tester.ValidTestCase) []rule_tester.ValidTestCase {
+	for i := range cases {
+		if cases[i].FileName == "" {
+			cases[i].FileName = "file.ts"
+		}
+	}
+	return cases
+}
+
+func withDefaultNoCycleInvalidFileName(cases []rule_tester.InvalidTestCase) []rule_tester.InvalidTestCase {
+	for i := range cases {
+		if cases[i].FileName == "" {
+			cases[i].FileName = "file.ts"
+		}
+	}
+	return cases
 }
