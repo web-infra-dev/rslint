@@ -50,6 +50,9 @@ type namespaceState struct {
 	available bool
 	imported  bool
 	used      bool
+	// localName is the name the file binds the namespace to, which an aliased
+	// import makes something other than the canonical spelling.
+	localName string
 }
 
 // fileNamespaces computes only the file-wide facts needed to choose a safe
@@ -68,11 +71,12 @@ func (file *fileNamespaces) scan() {
 		return
 	}
 	file.scanned = true
-	file.rs.available = true
-	file.rstest.available = true
+	file.rs = namespaceState{available: true, localName: namespaceRs}
+	file.rstest = namespaceState{available: true, localName: namespaceRstest}
 	if file.ctx.SourceFile == nil {
 		return
 	}
+	file.collectImports()
 
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
@@ -83,10 +87,14 @@ func (file *fileNamespaces) scan() {
 			file.hasImportMeta = true
 		}
 		if node.Kind == ast.KindIdentifier {
-			switch node.AsIdentifier().Text {
-			case namespaceRs:
+			// The names watched are the ones the file binds, so an aliased
+			// import is followed under its alias rather than under the
+			// spelling it was imported from.
+			text := node.AsIdentifier().Text
+			if text == file.rs.localName {
 				file.observeIdentifier(&file.rs, node)
-			case namespaceRstest:
+			}
+			if text == file.rstest.localName {
 				file.observeIdentifier(&file.rstest, node)
 			}
 		}
@@ -98,10 +106,69 @@ func (file *fileNamespaces) scan() {
 	visit(file.ctx.SourceFile.AsNode())
 }
 
+// collectImports records which namespaces the file imports from Rstest core and
+// under which local name, because an edit has to write the name the file
+// actually binds rather than the spelling the namespace is exported under.
+func (file *fileNamespaces) collectImports() {
+	for _, statement := range file.ctx.SourceFile.Statements.Nodes {
+		if statement.Kind != ast.KindImportDeclaration {
+			continue
+		}
+		declaration := statement.AsImportDeclaration()
+		if declaration == nil ||
+			declaration.ModuleSpecifier == nil ||
+			!rstestUtils.IsRstestCoreImportModule(declaration.ModuleSpecifier.Text()) ||
+			declaration.ImportClause == nil ||
+			declaration.ImportClause.IsTypeOnly() {
+			continue
+		}
+		clause := declaration.ImportClause.AsImportClause()
+		if clause == nil ||
+			clause.NamedBindings == nil ||
+			clause.NamedBindings.Kind != ast.KindNamedImports {
+			continue
+		}
+		named := clause.NamedBindings.AsNamedImports()
+		if named == nil || named.Elements == nil {
+			continue
+		}
+		for _, element := range named.Elements.Nodes {
+			file.collectImportSpecifier(element)
+		}
+	}
+}
+
+func (file *fileNamespaces) collectImportSpecifier(element *ast.Node) {
+	specifier := element.AsImportSpecifier()
+	if specifier == nil || ast.IsTypeOnlyImportDeclaration(element) {
+		return
+	}
+	local := specifier.Name()
+	if local == nil || local.Kind != ast.KindIdentifier {
+		return
+	}
+	imported := specifier.PropertyName
+	if imported == nil {
+		imported = local
+	}
+	if imported.Kind != ast.KindIdentifier {
+		return
+	}
+	switch imported.AsIdentifier().Text {
+	case namespaceRs:
+		file.rs.imported = true
+		file.rs.localName = local.AsIdentifier().Text
+	case namespaceRstest:
+		file.rstest.imported = true
+		file.rstest.localName = local.AsIdentifier().Text
+	}
+}
+
 func (file *fileNamespaces) observeIdentifier(state *namespaceState, identifier *ast.Node) {
 	if ast.IsDeclarationName(identifier) {
+		// An Rstest utilities import binds the very namespace an edit reaches
+		// for, so it does not make the name unavailable.
 		if isRstestUtilitiesImportName(identifier) {
-			state.imported = true
 			return
 		}
 		if declaresBinding(identifier.Parent) {
@@ -169,13 +236,13 @@ func (file *fileNamespaces) fixNamespace() string {
 	rsImported := file.rs.available && file.rs.imported
 	rstestImported := file.rstest.available && file.rstest.imported
 	if rsImported && !rstestImported {
-		return namespaceRs
+		return file.rs.localName
 	}
 	if rstestImported && !rsImported {
-		return namespaceRstest
+		return file.rstest.localName
 	}
 	if rsImported && rstestImported {
-		return namespaceRs
+		return file.rs.localName
 	}
 
 	// With no utilities import, a free global spelling is usable only when both

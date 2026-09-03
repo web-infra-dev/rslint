@@ -112,6 +112,29 @@ import type { Mock } from '@rstest/core';
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
 			},
 			{
+				// An aliased import is written under the name the file binds.
+				Code: `import { rs as r, type Mock } from '@rstest/core';
+(getUser as Mock).mockReturnValue(user);`,
+				Output: []string{`import { rs as r, type Mock } from '@rstest/core';
+(r.mocked(getUser)).mockReturnValue(user);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 2, Column: 2}},
+			},
+			{
+				Code: `import { rstest as helper, type Mocked } from '@rstest/core';
+(mod as Mocked<typeof mod>).init();`,
+				Output: []string{`import { rstest as helper, type Mocked } from '@rstest/core';
+(helper.mocked(mod)).init();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 2, Column: 2}},
+			},
+			{
+				// A binding that captures the alias leaves the report unfixed.
+				Code: `import { rs as helper, type Mock } from '@rstest/core';
+function run(helper: unknown) {
+  (getUser as Mock).mockReturnValue(user);
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 4}},
+			},
+			{
 				// `import type { rs }` binds no runtime namespace to call.
 				Code: `import type { rs, Mock } from '@rstest/core';
 (getUser as Mock).mockReturnValue(user);`,

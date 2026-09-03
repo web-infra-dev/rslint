@@ -24,7 +24,7 @@ rs.mocked(loadUser).mockReturnValue({ id: 1, name: 'Ada' });
 
 ## Autofix
 
-The autofix replaces the complete assertion with `rs.mocked(expression)` or `rstest.mocked(expression)`. It uses an imported utilities namespace when present. Otherwise, both global names must be free; the fix follows the spelling already used by the file and defaults to `rs`. No autofix is offered when an unrelated declaration makes the available global namespace uncertain.
+The autofix replaces the complete assertion with `rs.mocked(expression)` or `rstest.mocked(expression)`. It uses an imported utilities namespace when present, written under the name the import binds, so an aliased import is used under its alias. A type-only import binds no value and is not used. Otherwise, both global names must be free; the fix follows the spelling already used by the file and defaults to `rs`. No autofix is offered when an unrelated declaration makes the available global namespace uncertain.
 
 ## Suggestions
 
