@@ -1,0 +1,12 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["rel"] }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
