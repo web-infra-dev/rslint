@@ -59,6 +59,9 @@ func TestNoAdjacentInlineElementsExtras(t *testing.T) {
 		{Code: "<div>\n  <a /><span />\n</div>;", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: inlineElementMessage, Line: 1, Column: 1, EndLine: 3, EndColumn: 7}}},
 		// Locks in upstream isCreateElement() destructured-import branch.
 		{Code: "import { createElement } from \"react\";\ncreateElement(\"div\", null, [createElement(\"a\"), createElement(\"span\")]);", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: inlineElementMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 72}}},
+		// Locks in upstream's computed-identifier callee branch.
+		{Code: `React[createElement]("div", null, [React.createElement("a"), React.createElement("span")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 91)}},
+		{Code: `React?.[createElement]("div", null, [React.createElement("a"), React.createElement("span")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 93)}},
 		{Code: `<div><img /><input /></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 28)}},
 		{Code: `<div><img></img><input></input></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 38)}},
 		{Code: `<div><a /><span /></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 25)}},
