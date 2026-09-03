@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_foreign_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forward_ref_uses_ref"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/hook_use_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_bracket_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
@@ -47,6 +48,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_invalid_html_attribute"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_multi_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_namespace"
@@ -70,6 +72,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -97,6 +100,7 @@ func GetAllRules() []rule.Rule {
 		forbid_foreign_prop_types.ForbidForeignPropTypesRule,
 		forbid_prop_types.ForbidPropTypesRule,
 		forward_ref_uses_ref.ForwardRefUsesRefRule,
+		hook_use_state.HookUseStateRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_bracket_location.JsxClosingBracketLocationRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
@@ -133,6 +137,7 @@ func GetAllRules() []rule.Rule {
 		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
 		no_is_mounted.NoIsMountedRule,
+		no_invalid_html_attribute.NoInvalidHtmlAttributeRule,
 		no_multi_comp.NoMultiCompRule,
 		no_namespace.NoNamespaceRule,
 		no_unstable_nested_components.NoUnstableNestedComponentsRule,
@@ -155,6 +160,7 @@ func GetAllRules() []rule.Rule {
 		require_optimization.RequireOptimizationRule,
 		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
+		sort_prop_types.SortPropTypesRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
 		jsx_child_element_spacing.JsxChildElementSpacingRule,

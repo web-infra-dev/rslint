@@ -1,3 +1,5 @@
+// cspell:ignore pener
+
 package ecmascript
 
 import "testing"
@@ -40,6 +42,28 @@ func TestJSXTextTokenValuesEqual(t *testing.T) {
 			t.Parallel()
 			if got := JSXTextTokenValuesEqual(tt.left, tt.right); got != tt.want {
 				t.Errorf("JSXTextTokenValuesEqual(%q, %q) = %v, want %v", tt.left, tt.right, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDecodeJSXEntities(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name, raw, want string
+	}{
+		{name: "named entity", raw: "no&amp;pener", want: "no&pener"},
+		{name: "hex entity", raw: "no&#x6f;pener", want: "noopener"},
+		{name: "invalid entity", raw: "no&#xZZ;pener", want: "no&#xZZ;pener"},
+		{name: "adjacent surrogate entities", raw: "&#xD83D;&#xDE00;", want: "😀"},
+		{name: "lone surrogate entity uses replacement rune", raw: "&#xD83D;", want: "�"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := DecodeJSXEntities(tt.raw); got != tt.want {
+				t.Errorf("DecodeJSXEntities(%q) = %q, want %q", tt.raw, got, tt.want)
 			}
 		})
 	}

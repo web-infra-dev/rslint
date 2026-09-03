@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_instanceof_builtins"
@@ -20,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_thenable"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_assignment"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
@@ -49,6 +51,7 @@ func GetAllRules() []rule.Rule {
 		new_for_builtins.NewForBuiltinsRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
+		no_array_front_mutation.NoArrayFrontMutationRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
 		no_instanceof_builtins.NoInstanceofBuiltinsRule,
@@ -60,6 +63,7 @@ func GetAllRules() []rule.Rule {
 		no_static_only_class.NoStaticOnlyClassRule,
 		no_thenable.NoThenableRule,
 		no_this_assignment.NoThisAssignmentRule,
+		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,

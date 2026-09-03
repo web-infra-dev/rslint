@@ -7,6 +7,16 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
+func TestNormalizeRegexCaptureName(t *testing.T) {
+	high := ecmascript.StringFromCodeUnits([]uint16{0xD835})
+	low := ecmascript.StringFromCodeUnits([]uint16{0xDC9C})
+
+	got, ok := NormalizeRegexCaptureName(high + low)
+	if !ok || got != "𝒜" {
+		t.Fatalf("NormalizeRegexCaptureName(raw surrogate pair) = (%q, %v), want (%q, true)", got, ok, "𝒜")
+	}
+}
+
 func TestRegexPatternLiteral(t *testing.T) {
 	high := ecmascript.StringFromCodeUnits([]uint16{0xD800})
 	tests := []struct {

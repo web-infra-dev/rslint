@@ -63,7 +63,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
     // 'unicorn/no-array-from-fill': 'error', // not implemented
-    // 'unicorn/no-array-front-mutation': 'off', // not implemented
+    'unicorn/no-array-front-mutation': 'off',
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented
     // 'unicorn/no-array-reduce': 'error', // not implemented
     // 'unicorn/no-array-reverse': 'error', // not implemented
@@ -167,7 +167,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unreadable-array-destructuring': 'error', // not implemented
     // 'unicorn/no-unreadable-for-of-expression': 'error', // not implemented
     // 'unicorn/no-unreadable-iife': 'error', // not implemented
-    // 'unicorn/no-unreadable-new-expression': 'off', // not implemented
+    'unicorn/no-unreadable-new-expression': 'off',
     // 'unicorn/no-unreadable-object-destructuring': 'error', // not implemented
     // 'unicorn/no-unsafe-buffer-conversion': 'error', // not implemented
     // 'unicorn/no-unsafe-dom-html': 'off', // not implemented

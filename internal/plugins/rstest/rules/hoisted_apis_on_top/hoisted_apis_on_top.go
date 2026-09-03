@@ -118,7 +118,7 @@ func useNonHoistedAPIMessage(namespace, api, replacement string) rule.RuleMessag
 // lifts, and returns the API's name node, the receiver's name, and the API's
 // name.
 func hoistedAPICall(node *ast.Node) (*ast.Node, string, string, bool) {
-	utility := rstestUtils.ParseRstestUtilityCall(node)
+	utility := rstestUtils.ParseRstestPluginManagedCall(node)
 	if utility == nil {
 		return nil, "", "", false
 	}
