@@ -30,4 +30,4 @@ describe('user service', () => {
 
 ## Autofix
 
-The autofix adds the missing names to an existing named import or destructured `require()` from `@rstest/core` or `rstack/test`. Otherwise, it inserts a new `@rstest/core` import, or a `require()` declaration for CommonJS files, after an initial `"use strict"` directive or before the first statement. Names added to an existing named import are appended after its last specifier, in sorted order, so a default binding, existing aliases, and comments stay untouched.
+The autofix adds the missing names to an existing named import or destructured `require()` from `@rstest/core` or `rstack/test`. Otherwise, it inserts a new `@rstest/core` import, or a `require()` declaration for CommonJS files, after the directive prologue when that prologue makes the file strict, and before the first statement otherwise. Names added to an existing declaration are appended after its last specifier or binding, in sorted order, so a default binding, existing aliases, a trailing rest element, and comments stay untouched.

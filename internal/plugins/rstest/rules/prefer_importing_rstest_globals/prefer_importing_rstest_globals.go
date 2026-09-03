@@ -51,9 +51,36 @@ func preferMessage(names string) rule.RuleMessage {
 	}
 }
 
+// isShorthandPropertyRead reports whether the identifier is the value side of
+// a shorthand property such as `{ expect }`. The AST also treats it as the
+// property's declaration name, so the name filters below would drop it even
+// though it reads the global. A shorthand that is written to, as in
+// `({ expect } = value)` or a `for` destructuring head, is not a read.
+func isShorthandPropertyRead(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Kind != ast.KindShorthandPropertyAssignment || parent.Name() != node ||
+		parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
+		return false
+	}
+	object := parent.Parent
+	if object == nil || object.Parent == nil {
+		return false
+	}
+	switch owner := object.Parent; owner.Kind {
+	case ast.KindBinaryExpression:
+		binary := owner.AsBinaryExpression()
+		return binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left != object
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		return owner.AsForInOrOfStatement().Initializer != object
+	}
+	return true
+}
+
 func shouldReportIdentifier(ctx rule.RuleContext, node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindIdentifier || !rstestUtils.IsRstestGlobal(node.AsIdentifier().Text) ||
-		ast.IsIdentifierName(node) || ast.IsDeclarationNameOrImportPropertyName(node) {
+	if node == nil || node.Kind != ast.KindIdentifier || !rstestUtils.IsRstestGlobal(node.AsIdentifier().Text) {
+		return false
+	}
+	if !isShorthandPropertyRead(node) && (ast.IsIdentifierName(node) || ast.IsDeclarationNameOrImportPropertyName(node)) {
 		return false
 	}
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
@@ -90,19 +117,42 @@ func createImport(isModule bool, module, names string) string {
 	return "const { " + names + " } = require('" + module + "');"
 }
 
-// isUseStrictDirective reports whether the statement is a `use strict`
-// directive. Only a bare string-literal expression statement belongs to the
-// directive prologue, so a template literal or a parenthesized string is an
-// ordinary statement and must not shift the insertion point.
-func isUseStrictDirective(statement *ast.Node) bool {
+// directiveText returns the text of a directive statement. Only a bare
+// string-literal expression statement belongs to the directive prologue, so a
+// template literal or a parenthesized string is an ordinary statement and must
+// not shift the insertion point.
+func directiveText(statement *ast.Node) (string, bool) {
 	if statement == nil || statement.Kind != ast.KindExpressionStatement {
-		return false
+		return "", false
 	}
 	expression := statement.AsExpressionStatement().Expression
 	if expression == nil || expression.Kind != ast.KindStringLiteral {
-		return false
+		return "", false
 	}
-	return expression.AsStringLiteral().Text == "use strict"
+	return expression.AsStringLiteral().Text, true
+}
+
+// strictDirectivePrologue returns the last statement of the directive prologue
+// when the prologue turns the file strict. Inserting anywhere inside or before
+// the prologue would end it early and silently drop strict mode, so the whole
+// prologue has to be scanned rather than only its first statement.
+func strictDirectivePrologue(statements []*ast.Node) *ast.Node {
+	var last *ast.Node
+	strict := false
+	for _, statement := range statements {
+		text, ok := directiveText(statement)
+		if !ok {
+			break
+		}
+		if text == "use strict" {
+			strict = true
+		}
+		last = statement
+	}
+	if !strict {
+		return nil
+	}
+	return last
 }
 
 // mergeIntoImport appends the missing names to an existing rstest import
@@ -134,32 +184,52 @@ func mergeIntoImport(declaration *ast.ImportDeclaration, names *nameSet) []rule.
 	return []rule.RuleFix{rule.RuleFixInsertAfter(last, ", "+additions.sortedJoined())}
 }
 
-func collectRequireNames(binding *ast.Node, names *nameSet) {
+// mergeIntoRequire adds the missing names to an existing destructured require
+// the same way mergeIntoImport does for an import. Rewriting the statement as
+// an import instead would have to translate `{ it: testCase }` into import
+// syntax, and would drop whatever the generated text cannot express.
+func mergeIntoRequire(sourceFile *ast.SourceFile, binding *ast.Node, names *nameSet) []rule.RuleFix {
 	if binding == nil || binding.Kind != ast.KindObjectBindingPattern {
-		return
+		return nil
 	}
 	pattern := binding.AsBindingPattern()
-	if pattern == nil || pattern.Elements == nil {
-		return
+	if pattern == nil || pattern.Elements == nil || len(pattern.Elements.Nodes) == 0 {
+		return nil
 	}
+	present := make(map[string]struct{}, len(pattern.Elements.Nodes))
+	var last *ast.Node
+	var rest *ast.Node
 	for _, element := range pattern.Elements.Nodes {
 		be := element.AsBindingElement()
-		if be == nil || be.DotDotDotToken != nil || be.Initializer != nil {
+		if be == nil {
+			return nil
+		}
+		if be.DotDotDotToken != nil {
+			rest = element
 			continue
 		}
-		imported := rstestUtils.RequireBindingImportedName(element)
-		if imported == "" {
-			continue
-		}
-		local := ""
 		if be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
-			local = be.Name().AsIdentifier().Text
+			present[be.Name().AsIdentifier().Text] = struct{}{}
 		}
-		if local != "" && local != imported {
-			imported += ": " + local
-		}
-		names.add(imported)
+		last = element
 	}
+	additions := newNameSet(len(names.order))
+	for _, name := range names.order {
+		if _, exists := present[name]; !exists {
+			additions.add(name)
+		}
+	}
+	if len(additions.order) == 0 {
+		return nil
+	}
+	// A rest element has to stay last, so names go in front of it.
+	if last == nil {
+		if rest == nil {
+			return nil
+		}
+		return []rule.RuleFix{rule.RuleFixInsertBefore(sourceFile, rest, additions.sortedJoined()+", ")}
+	}
+	return []rule.RuleFix{rule.RuleFixInsertAfter(last, ", "+additions.sortedJoined())}
 }
 
 func findImport(statements []*ast.Node) *ast.ImportDeclaration {
@@ -178,13 +248,9 @@ func findImport(statements []*ast.Node) *ast.ImportDeclaration {
 	return nil
 }
 
-type existingRequire struct {
-	node        *ast.Node
-	declaration *ast.VariableDeclaration
-	module      string
-}
-
-func findRequire(statements []*ast.Node) *existingRequire {
+// findRequire returns the object binding pattern of an existing destructured
+// require of an rstest module.
+func findRequire(statements []*ast.Node) *ast.Node {
 	for _, statement := range statements {
 		if statement == nil || statement.Kind != ast.KindVariableStatement {
 			continue
@@ -197,9 +263,8 @@ func findRequire(statements []*ast.Node) *existingRequire {
 		if declaration == nil || declaration.Name() == nil || declaration.Name().Kind != ast.KindObjectBindingPattern {
 			continue
 		}
-		module, ok := rstestUtils.RstestCoreModuleFromRequireCall(declaration.Initializer)
-		if ok {
-			return &existingRequire{node: statement, declaration: declaration, module: module}
+		if _, ok := rstestUtils.RstestCoreModuleFromRequireCall(declaration.Initializer); ok {
+			return declaration.Name()
 		}
 	}
 	return nil
@@ -230,15 +295,14 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 	}
 	statements := ctx.SourceFile.Statements.Nodes
 	first := statements[0]
-	if isUseStrictDirective(first) {
-		return []rule.RuleFix{rule.RuleFixInsertAfter(first, "\n"+lineIndent(ctx, first)+createImport(isModule, defaultModule, names.sortedJoined()))}
+	if prologue := strictDirectivePrologue(statements); prologue != nil {
+		return []rule.RuleFix{rule.RuleFixInsertAfter(prologue, "\n"+lineIndent(ctx, prologue)+createImport(isModule, defaultModule, names.sortedJoined()))}
 	}
 	if existing := findImport(statements); existing != nil {
 		return mergeIntoImport(existing, names)
 	}
 	if existing := findRequire(statements); existing != nil {
-		collectRequireNames(existing.declaration.Name(), names)
-		return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, existing.node, createImport(isModule, existing.module, names.sortedJoined()))}
+		return mergeIntoRequire(ctx.SourceFile, existing, names)
 	}
 	return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, first, createImport(isModule, defaultModule, names.sortedJoined())+"\n"+lineIndent(ctx, first))}
 }

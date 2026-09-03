@@ -5,6 +5,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_importing_rstest_globals"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -17,6 +18,8 @@ func TestPreferImportingRstestGlobalsExtras(t *testing.T) {
 			{Code: `service.expect(); const value = { describe: callback };`},
 			// N/A: optional-chain flags do not change identifier binding resolution.
 			{Code: `const rs = service?.rs; rs.fn();`},
+			// A shorthand that is assigned to writes the binding instead of reading it.
+			{Code: `({ expect } = holder);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: globals used through member and optional-call chains ----
@@ -24,8 +27,16 @@ func TestPreferImportingRstestGlobalsExtras(t *testing.T) {
 expect.any(String); rs?.fn();`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 1, Column: 1}}},
 			// ---- Real-user: merge into an existing destructured require ----
 			{Code: `const { defineConfig } = require('rstack/test');
-beforeEach(setup);`, Output: []string{`import { beforeEach, defineConfig } from 'rstack/test';
+beforeEach(setup);`, Output: []string{`const { defineConfig, beforeEach } = require('rstack/test');
 beforeEach(setup);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// ---- Real-user: an aliased require binding keeps its own syntax ----
+			{Code: `const { it: testCase } = require('@rstest/core');
+expect(value);`, Output: []string{`const { it: testCase, expect } = require('@rstest/core');
+expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// A rest element has to stay last in the pattern.
+			{Code: `const { defineConfig, ...others } = require('@rstest/core');
+expect(value);`, Output: []string{`const { defineConfig, expect, ...others } = require('@rstest/core');
+expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			// ---- Real-user: preserve an existing import alias while merging ----
 			{Code: `import { it as testCase } from '@rstest/core';
 expect(value);`, Output: []string{`import { it as testCase, expect } from '@rstest/core';
@@ -41,6 +52,12 @@ expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer
 			// Locks in that only a string literal opens the directive prologue.
 			{Code: "`use strict`;\nexpect(value);", Output: []string{"import { expect } from '@rstest/core';\n`use strict`;\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			{Code: "('use strict');\nexpect(value);", Output: []string{"import { expect } from '@rstest/core';\n('use strict');\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// Locks in that the insertion clears the whole directive prologue, so
+			// `use strict` keeps applying to the file.
+			{Code: "\"use asm\";\n'use strict';\nexpect(value);", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}, Output: []string{"\"use asm\";\n'use strict';\nconst { expect } = require('@rstest/core');\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 3, Column: 1}}},
+			// ---- Dimension 4: a shorthand property value reads the global ----
+			{Code: `const value = { expect };`, Output: []string{`import { expect } from '@rstest/core';
+const value = { expect };`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 1, Column: 17}}},
 			// Locks in de-duplication and source-order diagnostics for all 13 names.
 			{Code: `test; describe; it; expect; afterAll; afterEach; beforeAll; beforeEach; rstest; rs; assert; onTestFinished; onTestFailed; test;`, Output: []string{`import { afterAll, afterEach, assert, beforeAll, beforeEach, describe, expect, it, onTestFailed, onTestFinished, rs, rstest, test } from '@rstest/core';
 test; describe; it; expect; afterAll; afterEach; beforeAll; beforeEach; rstest; rs; assert; onTestFinished; onTestFailed; test;`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 1, Column: 1}}},

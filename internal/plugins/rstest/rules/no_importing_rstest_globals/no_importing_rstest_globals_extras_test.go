@@ -21,6 +21,9 @@ func TestNoImportingRstestGlobalsExtras(t *testing.T) {
 			{Code: `const { test } = (require('@rstest/core'));`, Output: []string{""}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
 			// ---- Real-user: preserve a comment owned by the remaining import ----
 			{Code: `import { defineConfig /* keep */, expect } from '@rstest/core';`, Output: []string{`import { defineConfig /* keep */ } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 35}}},
+			// ---- Real-user: a comma inside a comment is not the separator ----
+			{Code: `import { defineConfig, /* comma, in comment */ expect } from '@rstest/core';`, Output: []string{`import { defineConfig } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 48}}},
+			{Code: `import { expect /* comma, in comment */, defineConfig } from '@rstest/core';`, Output: []string{`import { defineConfig } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10}}},
 			// Locks in import removal with a surviving type-only specifier.
 			{Code: `import { type Mock, test } from '@rstest/core';`, Output: []string{`import { type Mock } from '@rstest/core';`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 21}}},
 			// ---- Real-user: an aliased sibling keeps the declaration alive ----

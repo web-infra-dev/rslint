@@ -17,8 +17,8 @@ func SpecifierRemovalRange(sourceFile *ast.SourceFile, elements []*ast.Node, ind
 		text := sourceFile.Text()
 		previousEnd := internalUtils.TrimNodeTextRange(sourceFile, elements[index-1]).End()
 		start := previousEnd
-		if comma := strings.LastIndexByte(text[previousEnd:elementRange.Pos()], ','); comma >= 0 {
-			start = previousEnd + comma
+		if comma := separatorComma(text, previousEnd, elementRange.Pos()); comma >= 0 {
+			start = comma
 		}
 		limit := specifierListEnd(sourceFile, elements, index)
 		return core.NewTextRange(start, commentsEnd(text, elementRange.End(), limit))
@@ -72,22 +72,47 @@ func firstSpecifierRemovalEnd(text string, start int, end int) int {
 	if start < 0 || end > len(text) || start >= end {
 		return end
 	}
-	between := text[start:end]
-	comma := strings.IndexByte(between, ',')
+	comma := separatorComma(text, start, end)
 	if comma < 0 {
 		return end
 	}
-	comment := firstCommentOffset(between)
-	if comment < 0 {
-		return end
-	}
-	if comment > comma {
-		return start + comment
-	}
-	if afterComma := firstCommentOffset(between[comma+1:]); afterComma >= 0 {
-		return start + comma + 1 + afterComma
+	// Comments past the separator belong to the surviving specifier, so the
+	// removal stops at the first of them. Without one the whole gap goes.
+	if comment := firstCommentOffset(text[comma+1 : end]); comment >= 0 {
+		return comma + 1 + comment
 	}
 	return end
+}
+
+// separatorComma returns the index of the comma separating two specifiers, or
+// -1 when the range holds none. Comment trivia is skipped, so a comma written
+// inside a comment is never mistaken for the separator.
+func separatorComma(text string, start int, end int) int {
+	if start < 0 || end > len(text) || start >= end {
+		return -1
+	}
+	for position := start; position < end; {
+		rest := text[position:end]
+		switch {
+		case rest[0] == ',':
+			return position
+		case strings.HasPrefix(rest, "//"):
+			length := strings.IndexByte(rest, '\n')
+			if length < 0 {
+				return -1
+			}
+			position += length + 1
+		case strings.HasPrefix(rest, "/*"):
+			length := strings.Index(rest, "*/")
+			if length < 0 {
+				return -1
+			}
+			position += length + 2
+		default:
+			position++
+		}
+	}
+	return -1
 }
 
 func firstCommentOffset(text string) int {
