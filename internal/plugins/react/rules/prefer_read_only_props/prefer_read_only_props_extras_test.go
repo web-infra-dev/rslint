@@ -63,6 +63,17 @@ func TestPreferReadOnlyPropsExtras(t *testing.T) {
 		{Code: `type Props = { name: string }; const Hello = memo((props: Props) => <div/>);`, Tsx: true},
 		{Code: `type Props = { name: string }; const Hello = forwardRef((props: Props) => <div/>);`, Tsx: true},
 
+		// ---- Review regressions: TypeScript-only boundary cases ----
+		{Code: `function Hello(input: { name: string }) { return <div/>; }`, Tsx: true},
+		{Code: `import { forwardRef } from "react"; type Props = { name: string }; function Demo() { const forwardRef = (value: unknown) => value; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>); return Hello; }`, Tsx: true},
+		{Code: `type Props = { name: string }; const Hello = React.forwardRef<HTMLDivElement, Props>((props, ref) => <div/>);`, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "R"}}, Tsx: true},
+		{Code: `type Props = { name: string }; async function* Hello(props: Props) { yield 1; return <div/>; }`, Tsx: true},
+		{Code: `type Props = { name: string }; const Hello: FC<Props> = (props) => <div/>; import { FC } from "react";`, Tsx: true},
+		{Code: `export default interface Props { name: string } class Hello extends React.Component<Props> { render() { return <div/>; } }`, Tsx: true},
+		{Code: `type Props = { name: string }; class Hello extends React.Component { public readonly props: Props; render() { return <div/>; } }`, Tsx: true},
+		{Code: `type Props = { '__proto__': string }; function Hello(props: Props) { return <div/>; }`, Tsx: true},
+		{Code: `interface A { readonly name: string } interface B extends A { name: string } class Hello extends React.Component<B> { render() { return <div/>; } }`, Tsx: true},
+
 		// N/A: receiver/member access and element access — the rule inspects type
 		// declarations, not JavaScript expressions.
 		// N/A: RestElement bindings — function parameter binding shape is irrelevant
@@ -177,6 +188,48 @@ function Hello(props: Props) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
 		{
+			Code:   `import React from "react"; type Props = { name: string }; const Hello: React.FC<Props> = (input: Q) => <div/>;`,
+			Tsx:    true,
+			Output: []string{`import React from "react"; type Props = { readonly name: string }; const Hello: React.FC<Props> = (input: Q) => <div/>;`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `type Props = { name: string }; type State = { count: number }; class Hello extends React.Component<Props, State, unknown> { render() { return <div/>; } }`,
+			Tsx:    true,
+			Output: []string{`type Props = { name: string }; type State = { readonly count: number }; class Hello extends React.Component<Props, State, unknown> { render() { return <div/>; } }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'count' should be read-only."}},
+		},
+		{
+			Code:   `interface A { name: string } interface B extends A { readonly name: string } class Hello extends React.Component<B> { render() { return <div/>; } }`,
+			Tsx:    true,
+			Output: []string{`interface A { readonly name: string } interface B extends A { readonly name: string } class Hello extends React.Component<B> { render() { return <div/>; } }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `type Props = { name: string }; import { forwardRef } from "react"; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>);`,
+			Tsx:    true,
+			Output: []string{`type Props = { readonly name: string }; import { forwardRef } from "react"; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>);`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `type Props = { name: string }; /* @jsx R */ class Hello extends R.Component<Props> { render() { return <div/>; } }`,
+			Tsx:    true,
+			Output: []string{`type Props = { readonly name: string }; /* @jsx R */ class Hello extends R.Component<Props> { render() { return <div/>; } }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `type Props = { name: string }; const makeProps = () => make<{ name: string }>(); function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`type Props = { name: string }; const makeProps = () => make<{ readonly name: string }>(); function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
+			Code:   `type Props = { name: string }; /** @extends React.Component */ class Hello extends BaseComponent<Props> { render() { return <div/>; } }`,
+			Tsx:    true,
+			Output: []string{`type Props = { readonly name: string }; /** @extends React.Component */ class Hello extends BaseComponent<Props> { render() { return <div/>; } }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
 			Code:   `type Props = { [true]: string }; function Hello(props: Props) { return <div/>; }`,
 			Tsx:    true,
 			Output: []string{`type Props = { readonly [true]: string }; function Hello(props: Props) { return <div/>; }`},
@@ -238,7 +291,7 @@ function Hello(props: Props) {
 
 func TestPreferReadOnlyPropsLongAliasChain(t *testing.T) {
 	var source strings.Builder
-	for i := 0; i < 34; i++ {
+	for i := range 34 {
 		name := string(rune('A' + i))
 		next := string(rune('A' + i + 1))
 		if i == 25 {

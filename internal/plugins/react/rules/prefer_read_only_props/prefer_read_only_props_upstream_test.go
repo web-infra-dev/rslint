@@ -1,5 +1,7 @@
 // TestPreferReadOnlyPropsUpstream migrates the TypeScript cases from
 // eslint-plugin-react v7.37.5's prefer-read-only-props suite.
+// The upstream file also contains Flow/parser cases; those are not part of
+// this TypeScript-only mirror because rslint does not support Flow.
 // rslint-specific edge and branch cases live in prefer_read_only_props_extras_test.go.
 package prefer_read_only_props
 
