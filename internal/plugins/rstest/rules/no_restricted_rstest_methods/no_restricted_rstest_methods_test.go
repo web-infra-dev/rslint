@@ -133,6 +133,20 @@ func TestNoRestrictedRstestMethods(t *testing.T) {
 				Options: noFn,
 				Errors:  disallowed("fn", 1, 47, 49),
 			},
+			// An assertion on the require call is erased before runtime, so
+			// the binding is still the module namespace.
+			{
+				Code:    `const core = require('@rstest/core') as any; core.rs.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 54, 56),
+			},
+			// `import x = require(...)` binds the module namespace the same
+			// way a namespace import does.
+			{
+				Code:    `import core = require('@rstest/core'); core.rs.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 48, 50),
+			},
 			// The option object is taken as written: a name that is not a
 			// member of the utilities object matches nothing real, but it is
 			// still matched where it is written on the object.

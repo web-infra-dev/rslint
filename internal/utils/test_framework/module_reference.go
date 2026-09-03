@@ -221,9 +221,36 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 				return true
 			}
 		}
+
+		// `import core = require('m')` binds the module namespace the same way
+		// a namespace import does.
+		if declaration.Kind == ast.KindImportEqualsDeclaration {
+			if isImportEqualsOfModules(declaration, importModules) {
+				return true
+			}
+		}
 	}
 
 	return false
+}
+
+// isImportEqualsOfModules reports whether declaration is
+// `import name = require(module)` for any of importModules.
+func isImportEqualsOfModules(declaration *ast.Node, importModules []string) bool {
+	importEquals := declaration.AsImportEqualsDeclaration()
+	if importEquals == nil || importEquals.ModuleReference == nil ||
+		importEquals.ModuleReference.Kind != ast.KindExternalModuleReference {
+		return false
+	}
+	reference := importEquals.ModuleReference.AsExternalModuleReference()
+	if reference == nil || reference.Expression == nil {
+		return false
+	}
+	specifier := internalUtils.SkipAssertionsAndParens(reference.Expression)
+	if specifier == nil || !ast.IsStringLiteralLike(specifier) {
+		return false
+	}
+	return matchesModule(specifier.Text(), importModules)
 }
 
 func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string) (string, *ast.Node, bool) {
@@ -291,7 +318,9 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 		return false
 	}
 
-	node = ast.SkipParentheses(node)
+	// TypeScript assertions are erased before runtime, so
+	// `require('m') as any` still binds the module.
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil || !ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
 		return false
 	}

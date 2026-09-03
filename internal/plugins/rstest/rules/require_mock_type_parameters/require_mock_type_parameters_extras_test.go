@@ -95,11 +95,7 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			// takes the implementation to infer from, and a tag is handed a
 			// `TemplateStringsArray` that no `FunctionLike` accepts.
 			{Code: "import { rs } from '@rstest/core'; rs.fn`service`;"},
-			// `import = require` binds the module namespace, but the shared
-			// resolver in internal/utils/test_framework recognizes only a
-			// namespace import and a `require` initializer as one.
-			{Code: `import core = require('@rstest/core'); core.rs.fn();`},
-			// The same resolver has no branch for a dynamic import, so a
+			// The shared resolver has no branch for a dynamic import, so a
 			// destructure of one — renamed or not — is not resolved either.
 			{Code: `async function setup() { const { rs } = await import('@rstest/core'); rs.fn(); }`},
 			{Code: `async function setup() { const { rs: mocker } = await import('@rstest/core'); mocker.fn(); }`},
@@ -163,6 +159,9 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			{Code: `rs!.fn()`, Errors: missing("fn", 1, 5, 7)},
 			{Code: `(rs as any).fn()`, Errors: missing("fn", 1, 13, 15)},
 			{Code: `(rs satisfies object).fn()`, Errors: missing("fn", 1, 23, 25)},
+			// `import = require` binds the module namespace the same way a
+			// namespace import does, so the utilities object is the `rs` on it.
+			{Code: `import core = require('@rstest/core'); core.rs.fn();`, Errors: missing("fn", 1, 48, 50)},
 			{Code: `(rs.fn)()`, Errors: missing("fn", 1, 5, 7)},
 			{Code: `(rs.fn as any)()`, Errors: missing("fn", 1, 5, 7)},
 			// An optional chain still reaches the same function, so the mock it
