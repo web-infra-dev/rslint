@@ -69,6 +69,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/static_property_placement"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -153,6 +154,7 @@ func GetAllRules() []rule.Rule {
 		require_optimization.RequireOptimizationRule,
 		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
+		static_property_placement.StaticPropertyPlacementRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
 		jsx_child_element_spacing.JsxChildElementSpacingRule,
