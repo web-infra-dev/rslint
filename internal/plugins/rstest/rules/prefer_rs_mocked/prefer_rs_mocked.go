@@ -110,13 +110,33 @@ func (file *fileNamespaces) scan() {
 // under which local name, because an edit has to write the name the file
 // actually binds rather than the spelling the namespace is exported under. Both
 // ESM named imports and the CommonJS `const { rs } = require(...)` form bind a
-// namespace, so both are collected.
+// namespace, so both are collected. A `require` may sit anywhere a declaration
+// may, so the whole file is walked for one rather than only its statement list.
 func (file *fileNamespaces) collectImports() {
-	for _, statement := range file.ctx.SourceFile.Statements.Nodes {
-		if statement.Kind == ast.KindVariableStatement {
-			file.collectRequireStatement(statement)
-			continue
+	file.collectImportDeclarations()
+
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
 		}
+		if node.Kind == ast.KindVariableDeclaration {
+			for _, element := range rstestRequireBindingElements(node) {
+				file.collectRequireBindingElement(element)
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(file.ctx.SourceFile.AsNode())
+}
+
+// collectImportDeclarations records the namespaces bound by ESM named imports,
+// which only ever appear in the file's own statement list.
+func (file *fileNamespaces) collectImportDeclarations() {
+	for _, statement := range file.ctx.SourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindImportDeclaration {
 			continue
 		}
@@ -160,25 +180,6 @@ func (file *fileNamespaces) collectImportSpecifier(element *ast.Node) {
 	case namespaceRstest:
 		file.rstest.imported = true
 		file.rstest.localName = local.AsIdentifier().Text
-	}
-}
-
-// collectRequireStatement follows the namespaces destructured out of a
-// `require` of Rstest core, so a CommonJS file is fixed under the name it binds
-// just as an ESM one is.
-func (file *fileNamespaces) collectRequireStatement(statement *ast.Node) {
-	variableStatement := statement.AsVariableStatement()
-	if variableStatement == nil || variableStatement.DeclarationList == nil {
-		return
-	}
-	declarationList := variableStatement.DeclarationList.AsVariableDeclarationList()
-	if declarationList == nil || declarationList.Declarations == nil {
-		return
-	}
-	for _, declaration := range declarationList.Declarations.Nodes {
-		for _, element := range rstestRequireBindingElements(declaration) {
-			file.collectRequireBindingElement(element)
-		}
 	}
 }
 
@@ -236,9 +237,40 @@ func requireBindingNames(element *ast.Node) (local string, required string) {
 		return "", ""
 	}
 	if binding.PropertyName != nil {
-		return name.Text(), binding.PropertyName.Text()
+		required, ok := bindingPropertyName(binding.PropertyName)
+		if !ok {
+			return "", ""
+		}
+		return name.Text(), required
 	}
 	return name.Text(), name.Text()
+}
+
+// bindingPropertyName reads the property a binding element renames. Unlike an
+// import specifier, a binding element may name the property with a computed
+// expression, which carries no text of its own and only names a property the
+// rule can write when it is spelled by a static string.
+func bindingPropertyName(propertyName *ast.Node) (string, bool) {
+	switch propertyName.Kind {
+	case ast.KindIdentifier, ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		return propertyName.Text(), true
+	case ast.KindComputedPropertyName:
+		computed := propertyName.AsComputedPropertyName()
+		if computed == nil || computed.Expression == nil {
+			return "", false
+		}
+		expression := ast.SkipParentheses(computed.Expression)
+		if expression == nil {
+			return "", false
+		}
+		switch expression.Kind {
+		case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+			return expression.Text(), true
+		}
+		return "", false
+	default:
+		return "", false
+	}
 }
 
 // isRstestUtilitiesRequireName reports whether identifier is the local name a

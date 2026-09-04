@@ -165,6 +165,40 @@ const { rstest: helper } = require('rstack/test');
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
 			},
 			{
+				// A `require` inside a block binds the namespace just as a
+				// top-level one does.
+				Code: `import type { Mock } from '@rstest/core';
+function run() {
+  const { rstest: helper } = require('@rstest/core');
+  (getUser as Mock).mockReturnValue(user);
+}`,
+				Output: []string{`import type { Mock } from '@rstest/core';
+function run() {
+  const { rstest: helper } = require('@rstest/core');
+  (helper.mocked(getUser)).mockReturnValue(user);
+}`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 4, Column: 4}},
+			},
+			{
+				// A computed property name spelled by a static string names the
+				// namespace as plainly as an identifier does.
+				Code: `import type { Mock } from '@rstest/core';
+const { ["rs"]: helper } = require('@rstest/core');
+(getUser as Mock).mockReturnValue(user);`,
+				Output: []string{`import type { Mock } from '@rstest/core';
+const { ["rs"]: helper } = require('@rstest/core');
+(helper.mocked(getUser)).mockReturnValue(user);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
+			},
+			{
+				// A computed property that is not a static string names no
+				// namespace the rule can write, so no edit is offered.
+				Code: `import type { Mock } from '@rstest/core';
+const { [key]: rs } = require('@rstest/core');
+(getUser as Mock).mockReturnValue(user);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
+			},
+			{
 				// A `require` of an unrelated module binds nothing the rule may
 				// reach for, and the name it captures blocks the edit.
 				Code: `import type { Mock } from '@rstest/core';
