@@ -85,5 +85,9 @@ func TestSortCompExtras(t *testing.T) {
 		// ---- Compatibility: JSDoc-only React component declarations. ----
 		{Code: `/** @extends React.Component */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		{Code: `/** @augments React.PureComponent */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		// ---- Compatibility: computed React component inheritance. ----
+		{Code: `class Foo extends React[Component] { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		// ---- Compatibility: error deduplication uses the original entry snapshot. ----
+		{Code: `class Foo extends React.Component { render() {} static foo() {} componentDidMount() {} onClick() {} displayName() {} }`, Tsx: true, Options: sortCompOrder("lifecycle", "render"), Errors: []rule_tester.InvalidTestCaseError{sortCompError("displayName", "before", "componentDidMount")}},
 	})
 }

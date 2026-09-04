@@ -88,6 +88,14 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 			return false
 		}
 		return isComponentName(nameNode.AsIdentifier().Text)
+	case ast.KindElementAccessExpression:
+		element := expr.AsElementAccessExpression()
+		object := ast.SkipParentheses(element.Expression)
+		name := ast.SkipParentheses(element.ArgumentExpression)
+		if object.Kind != ast.KindIdentifier || object.AsIdentifier().Text != pragma || name == nil || name.Kind != ast.KindIdentifier {
+			return false
+		}
+		return isComponentName(name.AsIdentifier().Text)
 	}
 	return false
 }

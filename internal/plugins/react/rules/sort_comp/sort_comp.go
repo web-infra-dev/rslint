@@ -468,13 +468,17 @@ func checkComponent(ctx rule.RuleContext, node *ast.Node, order []pattern, error
 }
 
 func reportErrors(ctx rule.RuleContext, errors map[int]*storedError) {
-	keys := make([]int, 0, len(errors))
-	for key := range errors {
-		keys = append(keys, key)
+	type errorEntry struct {
+		key   int
+		value *storedError
 	}
-	sort.Ints(keys)
-	for _, key := range keys {
-		stored := errors[key]
+	entries := make([]errorEntry, 0, len(errors))
+	for key := range errors {
+		entries = append(entries, errorEntry{key: key, value: errors[key]})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })
+	for _, entry := range entries {
+		stored := entry.value
 		if stored == nil {
 			continue
 		}
