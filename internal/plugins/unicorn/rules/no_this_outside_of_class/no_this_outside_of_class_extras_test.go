@@ -245,6 +245,11 @@ function validator(this: TrackedModel) {
 			invalidCase("abstract class C { abstract method(): typeof this.foo; }"),
 			invalidCase("abstract class C { abstract method(x: typeof this.foo): void; }"),
 			invalidCase("class C { constructor(x: typeof this.foo); constructor(x: any) {} }"),
+			// Occurrence 1 is 'this: C' (parameter name, ignored); occurrence 2 is 'typeof this.foo' (reported).
+			invalidCase("declare function f(this: C): typeof this.foo;", 2),
+			invalidCase("declare class C { method(this: C): typeof this.foo; }", 2),
+			invalidCase("interface I { method(this: C): typeof this.foo; }", 2),
+			invalidCase("type T = { method(this: C): typeof this.foo; };", 2),
 		},
 	)
 }
