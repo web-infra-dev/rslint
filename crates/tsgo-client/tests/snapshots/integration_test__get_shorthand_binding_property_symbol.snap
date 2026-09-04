@@ -1,0 +1,18 @@
+---
+source: crates/tsgo-client/tests/integration_test.rs
+expression: mappings
+---
+[
+  {
+    "local_decl_span": "52:867..880",
+    "local_symbol_name": "destructured",
+    "property_symbol_name": "destructured",
+    "property_decl_span": "52:723..747"
+  },
+  {
+    "local_decl_span": "52:881..895",
+    "local_symbol_name": "defaulted",
+    "property_symbol_name": "defaulted",
+    "property_decl_span": "52:747..769"
+  }
+]

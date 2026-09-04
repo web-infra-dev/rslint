@@ -55,6 +55,9 @@ pub struct Semantic {
     // Shorthand property assignment value symbols (node -> value_symbol_id)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub shorthand_symbols: Vec<(NodeReference, u32)>,
+    // Shorthand object binding symbols (local_symbol_id -> property_symbol_id).
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub shorthand_binding_symbols: Vec<(u32, u32)>,
     // Parameter property declarations create another symbol at the same name node; node2sym keeps the primary symbol.
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub parameter_property_symbols: Vec<(NodeReference, u32)>,
@@ -255,6 +258,17 @@ impl Semantic {
                     && node_ref.start == location.start
                     && node_ref.end == location.end
             })
+            .map(|(_, sym_id)| *sym_id)
+    }
+
+    /// Returns the source property symbol of a shorthand object binding name.
+    ///
+    /// In `const { x } = value`, this maps the newly declared local `x` symbol
+    /// to the property symbol equivalent to `x` in `value.x`.
+    pub fn get_shorthand_binding_property_symbol(&self, local_symbol: u32) -> Option<u32> {
+        self.shorthand_binding_symbols
+            .iter()
+            .find(|(symbol, _)| *symbol == local_symbol)
             .map(|(_, sym_id)| *sym_id)
     }
 
