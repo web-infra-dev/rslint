@@ -35,6 +35,26 @@ func TestNoRestrictedSyntaxReviewRegressions(t *testing.T) {
 			{
 				Code: `class C { m() {} }`,
 				Options: []interface{}{
+					`[type=/^(ClassBody|FunctionExpression)$/]`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
+					{MessageId: "restrictedSyntax"},
+				},
+			},
+			{
+				Code: `class C { m() {} }`,
+				Options: []interface{}{
+					`:not(Identifier):not(ClassDeclaration):not(MethodDefinition):not(BlockStatement):not(Program)`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax"},
+					{MessageId: "restrictedSyntax"},
+				},
+			},
+			{
+				Code: `class C { m() {} }`,
+				Options: []interface{}{
 					map[string]interface{}{"selector": `:is(ClassDeclaration, ClassBody)`, "message": "union"},
 					map[string]interface{}{"selector": `[type='ClassDeclaration']`, "message": "physical"},
 				},

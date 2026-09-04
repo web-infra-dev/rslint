@@ -443,7 +443,10 @@ func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, mc *matchConte
 		Description: entry.formatMessage(),
 	}
 	for _, target := range virtualTargets(node) {
-		if !selectorTargetsEstreeType(entry.compiled, target) {
+		// A bare universe selector intentionally walks only the physical tsgo
+		// tree. Other broad selectors, including regex attributes and negative
+		// pseudos, still need to be evaluated against virtual ESTree targets.
+		if isBareWildcardSelector(entry.compiled) {
 			continue
 		}
 		// Dispatch predicates are stripped only for the physical path.

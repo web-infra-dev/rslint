@@ -900,6 +900,17 @@ func selectorTargetsJSXEmptyExpression(sel selector) bool {
 	return selectorTargetsEstreeType(sel, "JSXEmptyExpression")
 }
 
+func isBareWildcardSelector(sel selector) bool {
+	switch value := sel.(type) {
+	case subjectSelector:
+		return isBareWildcardSelector(value.Inner)
+	case identifierSelector:
+		return value.Name == "*"
+	default:
+		return false
+	}
+}
+
 func selectorTargetsEstreeType(sel selector, nodeType string) bool {
 	switch value := sel.(type) {
 	case subjectSelector:
