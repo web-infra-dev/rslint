@@ -41,10 +41,17 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
 			},
 			{Code: "let RegExp; new RegExp('(a)');"},
+			{Code: "namespace RegExp {} RegExp('(a)');"},
+			{
+				Code:            "interface RegExp {} RegExp('(a)');",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
 			// ReferenceTracker ignores every global RegExp use when the global has
 			// been reassigned anywhere in the file.
 			{Code: "RegExp = custom; RegExp('(a)' + '');"},
+			{Code: "RegExp('(a)' + ''); RegExp = custom;"},
 			{Code: "globalThis = custom; globalThis.RegExp('(a)' + '');", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}},
+			{Code: "globalThis.RegExp('(a)' + ''); globalThis = custom;", LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}},
 
 			// ---- Config `/* global RegExp: off */` / `languageOptions.globals` un-declares the builtin ----
 			{Code: "new RegExp('(a)');", Globals: map[string]any{"RegExp": "off"}},
@@ -58,14 +65,20 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			{Code: "const pattern = '(a)'; new RegExp(pattern);"},
 			{Code: "const pattern = '(a)'; new RegExp('a' + pattern);"},
 
-			// Documented difference from ESLint: rslint traces supported call-site
-			// expressions back to the global constructor, but doesn't follow a local
-			// alias assigned from that constructor.
-			{Code: "const R = RegExp; new R('(a)');"},
+			// ---- Documented difference: aliases that are not stable initialized bindings ----
+			{Code: "let R; R = RegExp; R('(a)');"},
+			{Code: "let R = RegExp; R = other; R('(a)');"},
+			{
+				Code:            "const { RegExp: R } = globalThis; R('(a)');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+			},
+			{Code: "function f(RegExp) { const R = RegExp; R('(a)'); }"},
+			{Code: "const R = RegExp; RegExp = custom; R('(a)');"},
 
 			// ---- Dimension 4: empty pattern stays valid regardless of form ----
 			{Code: "new RegExp(``);"},
 			{Code: "RegExp('' + '');"},
+			{Code: `RegExp('\\x28a\\x29');`},
 
 			// ---- Dimension 4: lookaround constructs are not capturing groups ----
 			{Code: "/(?=foo)/;"},
@@ -105,6 +118,15 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			{Code: `RegExp('(a)[a-]', 'v');`},
 			{Code: `RegExp('(a)[-a]', 'v');`},
 			{Code: `RegExp('(a)[a&&b--c]', 'v');`},
+			{Code: `RegExp('\\p{Greek}(a)', 'u');`},
+			{Code: `RegExp('(?<x>a)\\k(b)');`},
+			{Code: `RegExp('(?<x>a)[\\k](b)');`},
+			{Code: `RegExp('[\\k](b)(?<x>a)');`},
+			{Code: `RegExp('[\\d-a](b)', 'u');`},
+			{Code: `RegExp('(a)[()]', 'v');`},
+			{Code: `RegExp('(a)[\\q{(}]', 'v');`},
+			{Code: `RegExp('(a)[ab&&c]', 'v');`},
+			{Code: `RegExp('(a)[a&&bc]', 'v');`},
 
 			// N/A: declaration/container forms (class/function shape) do not affect
 			// this expression-only rule — every observable branch is reached through
@@ -115,6 +137,111 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			// invalid case below.
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Source identifier gate: escaped builtin spellings are normalized ----
+			{
+				Code: `R\u0065gExp('(a)' + '');`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      1,
+					Column:    1,
+				}},
+			},
+
+			// ---- RefStore keeps TypeScript declaration spaces and program scope aligned with ESLint ----
+			{
+				Code: "interface RegExp {}\nRegExp('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+
+			// ---- Performance guard: cooked literal values still reach capture analysis ----
+			{
+				Code: `RegExp('\x28a\x29');`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      1,
+					Column:    1,
+				}},
+			},
+			{
+				Code: "RegExp(`\\u0028a)`);",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      1,
+					Column:    1,
+				}},
+			},
+
+			// ---- Existing binding analysis: stable aliases resolve through RefStore-backed evaluation ----
+			{
+				Code: "const R = RegExp;\nR('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+			{
+				Code: "let R = RegExp;\nR('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+			{
+				Code: "const A = RegExp;\nconst R = A;\nR('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      3,
+					Column:    1,
+				}},
+			},
+			{
+				Code:            "const G = globalThis;\nG.RegExp('(a)' + '');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      2,
+					Column:    1,
+				}},
+			},
+			{
+				Code: "const R = RegExp || RegExp;\nR('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "required", Line: 2, Column: 1},
+					{MessageId: "required", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code: "const A = true ? RegExp : B;\nconst B = A;\nA('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      3,
+					Column:    1,
+				}},
+			},
+			{
+				Code: "(R = RegExp)('(a)' + '');",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      1,
+					Column:    1,
+				}},
+			},
+			{
+				Code:            "(G = globalThis).RegExp('(a)' + '');",
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Line:      1,
+					Column:    1,
+				}},
+			},
+
 			// ReferenceTracker follows conditional/logical pass-through values and
 			// global-object aliases wrapped in a comma expression. Concatenated
 			// patterns intentionally have no source-mapped suggestions.
@@ -171,6 +298,26 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 			},
 			{
 				Code:   `RegExp('(a)\\p{RGI_Emoji}', 'v');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('\\p{Emoji}(a)', 'u');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('\\p{ASCII}(a)', 'u');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('\\p{Script=Greek}(a)', 'u');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('(a)[[b--c]&&d]' + '', 'v');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
+			},
+			{
+				Code:   `RegExp('[\\q{\\}\\]\\(}](a)', 'v');`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "required"}},
 			},
 			{
@@ -632,8 +779,8 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 						Column:    1,
 						EndColumn: 18,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-							{MessageId: "addGroupName", Output: "new RegExp(/(a?<temp1>)/);"},
-							{MessageId: "addNonCapture", Output: "new RegExp(/(a?:)/);"},
+							{MessageId: "addGroupName", Output: "new RegExp(/(?<temp1>a)/);"},
+							{MessageId: "addNonCapture", Output: "new RegExp(/(?:a)/);"},
 						},
 					},
 					{
@@ -644,6 +791,103 @@ func TestPreferNamedCaptureGroupExtras(t *testing.T) {
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{MessageId: "addGroupName", Output: "new RegExp(/(?<temp1>a)/);"},
 							{MessageId: "addNonCapture", Output: "new RegExp(/(?:a)/);"},
+						},
+					},
+				},
+			},
+			{
+				Code: `new RegExp(/\/😀(a)/u);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: `new RegExp(/\/😀(?<temp1>a)/u);`},
+							{MessageId: "addNonCapture", Output: `new RegExp(/\/😀(?:a)/u);`},
+						},
+					},
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: `new RegExp(/\/😀(?<temp1>a)/u);`},
+							{MessageId: "addNonCapture", Output: `new RegExp(/\/😀(?:a)/u);`},
+						},
+					},
+				},
+			},
+			{
+				Code: `/(?<\u0074emp1>a)(b)/u;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: `/(?<\u0074emp1>a)(?<temp2>b)/u;`},
+						{MessageId: "addNonCapture", Output: `/(?<\u0074emp1>a)(?:b)/u;`},
+					},
+				}},
+			},
+			{
+				// The normal candidate reaches MaxInt, but that normalized name is
+				// already occupied. A globally fresh fallback keeps one shared
+				// suggestion-safety probe valid for both unnamed groups.
+				Code: `/temp9223372036854775806(?:(?<\u0074emp9223372036854775807>a)|(b))(c)/;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: `/temp9223372036854775806(?:(?<\u0074emp9223372036854775807>a)|(?<temp1>b))(c)/;`},
+							{MessageId: "addNonCapture", Output: `/temp9223372036854775806(?:(?<\u0074emp9223372036854775807>a)|(?:b))(c)/;`},
+						},
+					},
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: `/temp9223372036854775806(?:(?<\u0074emp9223372036854775807>a)|(b))(?<temp1>c)/;`},
+							{MessageId: "addNonCapture", Output: `/temp9223372036854775806(?:(?<\u0074emp9223372036854775807>a)|(b))(?:c)/;`},
+						},
+					},
+				},
+			},
+			{
+				Code: `/(a)\k(b)/;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addNonCapture", Output: `/(?:a)\k(b)/;`},
+						},
+					},
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addNonCapture", Output: `/(a)\k(?:b)/;`},
+						},
+					},
+				},
+			},
+			{
+				Code: `/(a)\1/u;`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "required",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "addGroupName", Output: `/(?<temp1>a)\1/u;`},
+					},
+				}},
+			},
+			{
+				// The constructor view validates the whole `/.../u` string in its
+				// own flags context, but its edit must also remain a valid regex
+				// literal under the literal's `u` flag.
+				Code: `new RegExp(/(a)\1/u);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: `new RegExp(/(?<temp1>a)\1/u);`},
+						},
+					},
+					{
+						MessageId: "required",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addGroupName", Output: `new RegExp(/(?<temp1>a)\1/u);`},
 						},
 					},
 				},
@@ -739,7 +983,7 @@ func TestPreferNamedCaptureGroupEditDemand(t *testing.T) {
 				diagnostics = append(diagnostics, diagnostic)
 			},
 		})
-		checkRegex(ctx, literalNode, literalNode, "(a)", "")
+		checkRegex(ctx, literalNode, literalNode, "(a)", "", 1)
 		if len(diagnostics) != 1 {
 			t.Fatalf("demand %d: diagnostics = %d, want 1", demand, len(diagnostics))
 		}

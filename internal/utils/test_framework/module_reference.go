@@ -200,13 +200,17 @@ func resolveIdentifierReferenceFromSymbolModules(
 			continue
 		}
 
+		// A type-only import is erased before runtime, so it neither binds the
+		// module's export nor shadows anything: the call is the global
+		// registration, whether the `type` sits on the clause or the specifier.
+		// A caller resolving an identifier in a type position asks for the
+		// opposite and opts out.
+		if !allowTypeOnlySpecifier && ast.IsTypeOnlyImportDeclaration(declaration) {
+			continue
+		}
+
 		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules, allowTypeOnlySpecifier); ok {
 			return name, originalNode, ReferenceModeImport
-		}
-		// A type-only import of the module binds no value: it is not the
-		// runtime API, and it does not shadow the global that is.
-		if isTypeOnlyModuleImportSpecifier(declaration, importModules) {
-			continue
 		}
 		if name, originalNode, ok := resolveModuleRequireBinding(declaration, importModules); ok {
 			return name, originalNode, ReferenceModeImport
@@ -251,6 +255,12 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 			continue
 		}
 
+		// A type-only import is erased before runtime: it binds a name in the
+		// type world only, so nothing reaches the module namespace through it.
+		if ast.IsTypeOnlyImportDeclaration(declaration) {
+			continue
+		}
+
 		if declaration.Kind == ast.KindNamespaceImport {
 			importDeclaration := FindImportDeclaration(declaration)
 			if importDeclaration != nil &&
@@ -266,9 +276,36 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 				return true
 			}
 		}
+
+		// `import core = require('m')` binds the module namespace the same way
+		// a namespace import does.
+		if declaration.Kind == ast.KindImportEqualsDeclaration {
+			if isImportEqualsOfModules(declaration, importModules) {
+				return true
+			}
+		}
 	}
 
 	return false
+}
+
+// isImportEqualsOfModules reports whether declaration is
+// `import name = require(module)` for any of importModules.
+func isImportEqualsOfModules(declaration *ast.Node, importModules []string) bool {
+	importEquals := declaration.AsImportEqualsDeclaration()
+	if importEquals == nil || importEquals.ModuleReference == nil ||
+		importEquals.ModuleReference.Kind != ast.KindExternalModuleReference {
+		return false
+	}
+	reference := importEquals.ModuleReference.AsExternalModuleReference()
+	if reference == nil || reference.Expression == nil {
+		return false
+	}
+	specifier := internalUtils.SkipAssertionsAndParens(reference.Expression)
+	if specifier == nil || !ast.IsStringLiteralLike(specifier) {
+		return false
+	}
+	return matchesModule(specifier.Text(), importModules)
 }
 
 func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string, allowTypeOnly bool) (string, *ast.Node, bool) {
@@ -298,21 +335,6 @@ func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string,
 		return "", nil, false
 	}
 	return name.Text(), name, true
-}
-
-// isTypeOnlyModuleImportSpecifier reports whether declaration is a type-only
-// import specifier for one of importModules, written either with the inline
-// `type` modifier or with one on the enclosing clause.
-func isTypeOnlyModuleImportSpecifier(declaration *ast.Node, importModules []string) bool {
-	if declaration == nil ||
-		declaration.Kind != ast.KindImportSpecifier ||
-		!ast.IsTypeOnlyImportDeclaration(declaration) {
-		return false
-	}
-	importDeclaration := FindImportDeclaration(declaration)
-	return importDeclaration != nil &&
-		importDeclaration.ModuleSpecifier != nil &&
-		matchesModule(importDeclaration.ModuleSpecifier.Text(), importModules)
 }
 
 func resolveModuleRequireBinding(declaration *ast.Node, importModules []string) (string, *ast.Node, bool) {
@@ -354,8 +376,12 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 		return false
 	}
 
-	node = ast.SkipParentheses(node)
-	if node == nil || !ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
+	// TypeScript assertions are erased before runtime, so
+	// `require('m') as any` still binds the module.
+	node = internalUtils.SkipAssertionsAndParens(node)
+	// The argument is checked below rather than by IsRequireCall, which would
+	// reject `require('m' as any)` before the assertion is skipped.
+	if node == nil || !ast.IsRequireCall(node, false /* requireStringLiteralLikeArgument */) {
 		return false
 	}
 
@@ -363,7 +389,7 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 	if len(arguments) == 0 || arguments[0] == nil {
 		return false
 	}
-	specifier := ast.SkipParentheses(arguments[0])
+	specifier := internalUtils.SkipAssertionsAndParens(arguments[0])
 	if specifier == nil {
 		return false
 	}

@@ -1,10 +1,23 @@
 import { ExtensionContext } from 'vscode';
 import { Extension } from './Extension';
+import { Logger } from './logger';
+import {
+  createMigrationNotice,
+  rstackEditorTakesOver,
+} from './migrationNotice';
 
 let extension: Extension | undefined;
 
 export async function activate(context: ExtensionContext): Promise<void> {
-  extension = new Extension(context);
+  Logger.setDefaultLogLevel(context);
+  const logger = new Logger('Rslint (extension)').useDefaultLogLevel();
+  context.subscriptions.push(logger);
+
+  const standingDown = rstackEditorTakesOver();
+  createMigrationNotice(context, standingDown, logger);
+  if (standingDown) return;
+
+  extension = new Extension(logger);
 
   try {
     extension.activate();

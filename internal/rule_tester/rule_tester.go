@@ -93,6 +93,8 @@ type TestSuite struct {
 type ESLintTestCase struct {
 	Code     string                 `json:"code"`
 	Filename string                 `json:"filename,omitempty"`
+	Tsx      bool                   `json:"tsx,omitempty"`
+	Globals  map[string]interface{} `json:"globals,omitempty"`
 	Options  []interface{}          `json:"options,omitempty"`
 	Settings map[string]interface{} `json:"settings,omitempty"`
 	Only     bool                   `json:"only,omitempty"`
@@ -344,7 +346,6 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 				if expected.Message != "" && expected.Message != diagnostic.Message.Description {
 					t.Errorf("Invalid message text %q. Expected %q", diagnostic.Message.Description, expected.Message)
 				}
-
 				lineIndex, columnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
 				line, column := lineIndex+1, int(columnIndex)+1
 				endLineIndex, endColumnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.End())
@@ -429,7 +430,7 @@ func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
 	}
 
 	fileName := ""
-	tsx := false
+	tsx := tc.Tsx
 	if tc.Filename != "" {
 		fileName = tc.Filename
 		if filepath.Ext(fileName) == ".tsx" || filepath.Ext(fileName) == ".jsx" {
@@ -444,6 +445,7 @@ func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
 		Skip:     tc.Skip,
 		Options:  options,
 		Settings: tc.Settings,
+		Globals:  tc.Globals,
 		Tsx:      tsx,
 	}
 }
@@ -460,7 +462,7 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 	}
 
 	fileName := ""
-	tsx := false
+	tsx := tc.Tsx
 	if tc.Filename != "" {
 		fileName = tc.Filename
 		if filepath.Ext(fileName) == ".tsx" || filepath.Ext(fileName) == ".jsx" {
@@ -504,6 +506,7 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 		Errors:   errors,
 		Options:  options,
 		Settings: tc.Settings,
+		Globals:  tc.Globals,
 		Tsx:      tsx,
 	}
 }

@@ -10,15 +10,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// utilityCallProbe reports every call ParseRstestUtilityCall matches, naming
-// the receiver and member it read, so a test case's code doubles as the
+// utilityCallProbe reports every call ParseRstestPluginManagedCall matches,
+// naming the receiver and member it read, so a test case's code doubles as the
 // expected parse.
 var utilityCallProbe = rule.Rule{
 	Name: "rstest/utility-call-probe",
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				parsed := rstestUtils.ParseRstestUtilityCall(node)
+				parsed := rstestUtils.ParseRstestPluginManagedCall(node)
 				if parsed == nil {
 					return
 				}
@@ -42,11 +42,11 @@ func matched(description string, column, endColumn int) []rule_tester.InvalidTes
 	}}
 }
 
-// ParseRstestUtilityCall matches the receiver on the name written at the call
-// site, because Rstest's build does: where the binding came from never enters
-// into it, and the wrappers TypeScript erases before the build runs are
-// transparent.
-func TestParseRstestUtilityCall(t *testing.T) {
+// ParseRstestPluginManagedCall matches the receiver on the name written at the
+// call site, because Rstest's build does: where the binding came from never
+// enters into it, and the wrappers TypeScript erases before the build runs are
+// transparent. Which shapes it accepts is per member, from the shared table.
+func TestParseRstestPluginManagedCall(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(), "tsconfig.json", t, &utilityCallProbe,
 		[]rule_tester.ValidTestCase{
@@ -55,12 +55,24 @@ func TestParseRstestUtilityCall(t *testing.T) {
 			{Code: `import { rs as vi } from '@rstest/core'; vi.mock('./m');`},
 			{Code: `import * as core from '@rstest/core'; core.rs.mock('./m');`},
 			{Code: `mocker.mock('./m');`},
-			// Computed members and optional chains are the shapes no API
-			// accepts, so they are not parsed for any of them.
+			// A member the build does not manage is not this parser's
+			// business: `fn`, `spyOn`, `mocked` and the rest are ordinary
+			// functions, matched by resolving the receiver instead.
+			{Code: `rs.fn();`},
+			{Code: `rs.spyOn(target, 'method');`},
+			{Code: `rs.somethingElse();`},
+			// The mock family is matched on the name as written and nothing
+			// else: a bracketed key, an optional call and an optional receiver
+			// all stay the throwing stub.
 			{Code: `rs['mock']('./m');`},
-			{Code: `rs?.mock('./m');`},
 			{Code: `rs.mock?.('./m');`},
+			{Code: `rs?.mock('./m');`},
 			{Code: `rs?.foo.mock('./m');`},
+			// The two members that do read a bracketed key read a plain quoted
+			// string only, and never an optional receiver.
+			{Code: "rs[`importActual`]('./m');"},
+			{Code: `rs[member]('./m');`},
+			{Code: `rs?.importActual('./m');`},
 			// Not a member call at all.
 			{Code: `rs('./m');`},
 			{Code: `mock('./m');`},
@@ -68,10 +80,11 @@ func TestParseRstestUtilityCall(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{Code: `rs.mock('./m');`, Errors: matched("rs.mock", 4, 8)},
 			{Code: `rstest.hoisted(setup);`, Errors: matched("rstest.hoisted", 8, 15)},
-			// The member is read as written, whether or not it is one Rstest
-			// manages: naming the API is the caller's job.
-			{Code: `rs.fn();`, Errors: matched("rs.fn", 4, 6)},
-			{Code: `rs.somethingElse();`, Errors: matched("rs.somethingElse", 4, 17)},
+			// `importActual` and `requireActual` are the two members whose
+			// rewrite reads a bracketed string key and an optional call.
+			{Code: `rs['importActual']('./m');`, Errors: matched("rs.importActual", 4, 18)},
+			{Code: `rs.requireActual?.('./m');`, Errors: matched("rs.requireActual", 4, 17)},
+			{Code: `(rs as any)['importActual']('./m');`, Errors: matched("rs.importActual", 13, 27)},
 			// A binding that has nothing to do with `@rstest/core` is still
 			// matched, because the build matches it too.
 			{

@@ -721,3 +721,13 @@ ZWSP
 Дelta
 дelta
 Keycap
+alternatex
+basefont
+bgsound
+modulepreload
+noframes
+nobr
+pingback
+prerender
+reparses
+batgo
