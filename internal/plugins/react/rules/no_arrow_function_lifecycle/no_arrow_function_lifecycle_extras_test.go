@@ -128,6 +128,10 @@ func TestNoArrowFunctionLifecycleRuleExtras(t *testing.T) {
 			Output: []string{"/** @augments React.PureComponent */ class Hello { render() { return null; } }"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
 		},
+		{
+			Code: "/** @extends {React.Component} */ class Hello { render = () => null; }",
+			Tsx:  true,
+		},
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArrowFunctionLifecycleRule, valid, invalid)

@@ -111,7 +111,11 @@ func isLifecycleMethod(member *ast.Node, name string) bool {
 	return methods[name]
 }
 
-func hasExplicitReactComponentJSDoc(classNode *ast.Node) bool {
+// hasExplicitReactComponentJSDoc reports whether a class has an unbraced JSDoc
+// `@extends React.Component` / `@augments React.Component` tag. This matches
+// eslint-plugin-react's doctrine-based check, whose tag.name is nil for the
+// braced `@extends {React.Component}` form.
+func hasExplicitReactComponentJSDoc(sf *ast.SourceFile, classNode *ast.Node) bool {
 	if classNode == nil {
 		return false
 	}
@@ -124,6 +128,9 @@ func hasExplicitReactComponentJSDoc(classNode *ast.Node) bool {
 			if !ast.IsJSDocAugmentsTag(tag) {
 				continue
 			}
+			if !isUnbracedJSDocAugmentsTag(sf, tag) {
+				continue
+			}
 			className := tag.AsJSDocAugmentsTag().ClassName
 			if className == nil {
 				continue
@@ -134,6 +141,19 @@ func hasExplicitReactComponentJSDoc(classNode *ast.Node) bool {
 		}
 	}
 	return false
+}
+
+func isUnbracedJSDocAugmentsTag(sf *ast.SourceFile, tag *ast.Node) bool {
+	if sf == nil || tag == nil || !ast.IsJSDocAugmentsTag(tag) {
+		return false
+	}
+	tagName := tag.TagName()
+	className := tag.ClassName()
+	if tagName == nil || className == nil {
+		return false
+	}
+	between := sourceSlice(sf, tagName.End(), className.Pos())
+	return !strings.Contains(between, "{")
 }
 
 func isExplicitReactComponentType(node *ast.Node) bool {
@@ -293,7 +313,7 @@ var NoArrowFunctionLifecycleRule = rule.Rule{
 			}
 			switch node.Kind {
 			case ast.KindClassDeclaration, ast.KindClassExpression:
-				if reactutil.ExtendsReactComponent(node, pragma) || hasExplicitReactComponentJSDoc(node) {
+				if reactutil.ExtendsReactComponent(node, pragma) || hasExplicitReactComponentJSDoc(ctx.SourceFile, node) {
 					reportComponent(ctx, node)
 				}
 			case ast.KindObjectLiteralExpression:
