@@ -51,6 +51,11 @@ func TestPreferStringTrimStartEndExtras(t *testing.T) {
 			// Locks in the authored TypeScript assertion path.
 			{Code: `(foo as number[]).trimLeft()`, FileName: "file.ts"},
 
+			// ---- Regression: checker boolean literals are known non-strings ----
+			{Code: `const value = true; value.trimLeft()`, FileName: "file.ts"},
+			{Code: `({flag: true} as const).flag.trimRight()`, FileName: "file.ts"},
+			{Code: `type Box = {flag: true}; declare const value: Box["flag"]; value.trimLeft()`, FileName: "file.ts"},
+
 			// N/A Dimension 4 declaration/container forms: the rule targets call
 			// expressions, not function or class declarations.
 			// N/A Dimension 4 body-absent forms: overloads, abstract members, and
@@ -91,6 +96,11 @@ func TestPreferStringTrimStartEndExtras(t *testing.T) {
 			trimInvalid(`(1).trimLeft()`, "file.ts", "trimLeft", "trimStart", 0),
 			trimInvalid(`const value = 1; value.trimRight()`, "file.ts", "trimRight", "trimEnd", 0),
 			trimInvalid(`([1, 2] as const).trimLeft()`, "file.ts", "trimLeft", "trimStart", 0),
+
+			// ---- Regression: syntax string targets precede checker results ----
+			trimInvalid(`function f() { function String(): number { return 1 } String().trimLeft() }`, "file.ts", "trimLeft", "trimStart", 0),
+			trimInvalid(`function f() { const String = {fromCharCode() { return 1 }}; String.fromCharCode().trimRight() }`, "file.ts", "trimRight", "trimEnd", 0),
+			trimInvalid(`function f() { const String = {fromCodePoint() { return {} }}; String.fromCodePoint().trimLeft() }`, "file.ts", "trimLeft", "trimStart", 0),
 		},
 	)
 }
@@ -183,9 +193,10 @@ func TestPreferStringTrimStartEndSourceOnly(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		code string
-		want int
+		name     string
+		fileName string
+		code     string
+		want     int
 	}{
 		{
 			name: "parameter array annotation",
@@ -322,13 +333,29 @@ func TestPreferStringTrimStartEndSourceOnly(t *testing.T) {
 			code: `(foo satisfies number[]).trimRight();`,
 			want: 1,
 		},
+		{
+			name:     "JSDoc declaration annotation is ignored",
+			fileName: "file.js",
+			code:     `/** @type {number} */ let value; value.trimLeft();`,
+			want:     1,
+		},
+		{
+			name:     "JSDoc cast annotation is ignored",
+			fileName: "file.js",
+			code:     `(/** @type {number} */ (value)).trimRight();`,
+			want:     1,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			diagnostics := lintPreferStringTrimStartEndSourceOnly(t, test.code)
+			fileName := test.fileName
+			if fileName == "" {
+				fileName = "file.ts"
+			}
+			diagnostics := lintPreferStringTrimStartEndSourceOnly(t, fileName, test.code)
 			if len(diagnostics) != test.want {
 				t.Fatalf("diagnostics = %d, want %d: %+v", len(diagnostics), test.want, diagnostics)
 			}
@@ -336,11 +363,11 @@ func TestPreferStringTrimStartEndSourceOnly(t *testing.T) {
 	}
 }
 
-func lintPreferStringTrimStartEndSourceOnly(t *testing.T, code string) []rule.RuleDiagnostic {
+func lintPreferStringTrimStartEndSourceOnly(t *testing.T, baseName, code string) []rule.RuleDiagnostic {
 	t.Helper()
 
 	dir := tspath.NormalizePath(t.TempDir())
-	fileName := tspath.NormalizePath(filepath.Join(dir, "file.ts"))
+	fileName := tspath.NormalizePath(filepath.Join(dir, baseName))
 	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: code})
 	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
 		RootFileNames:   []string{fileName},

@@ -92,6 +92,9 @@ func classifyStringReceiver(ctx rule.RuleContext, node *ast.Node, state *stringR
 			return class
 		}
 	}
+	if isSyntacticStringCall(node) {
+		return TypeTarget
+	}
 
 	if ctx.TypeChecker != nil {
 		return classifyStringType(ctx, node)
@@ -158,7 +161,7 @@ func classifyStringTypeNode(
 	node *ast.Node,
 	visitedSymbols map[*ast.Symbol]bool,
 ) TypeClass {
-	if node == nil {
+	if node == nil || utils.IsJSDocSyntaxNode(node) {
 		return TypeUnknown
 	}
 	for node.Kind == ast.KindParenthesizedType {
@@ -386,6 +389,31 @@ func combineStringIntersection(classes []TypeClass) TypeClass {
 	return TypeUnknown
 }
 
+func isSyntacticStringCall(node *ast.Node) bool {
+	if node == nil || !ast.IsCallExpression(node) || ast.IsOptionalChainRoot(node) {
+		return false
+	}
+	callee := utils.ESTreeCallCallee(node.AsCallExpression().Expression)
+	if callee == nil {
+		return false
+	}
+	if ast.IsIdentifier(callee) {
+		return callee.AsIdentifier().Text == "String"
+	}
+	if !ast.IsPropertyAccessExpression(callee) || ast.IsOptionalChainRoot(callee) {
+		return false
+	}
+	access := callee.AsPropertyAccessExpression()
+	object := utils.ESTreeRuntimeExpression(access.Expression)
+	property := access.Name()
+	if object == nil || !ast.IsIdentifier(object) || object.AsIdentifier().Text != "String" ||
+		property == nil || !ast.IsIdentifier(property) {
+		return false
+	}
+	method := property.AsIdentifier().Text
+	return method == "fromCharCode" || method == "fromCodePoint"
+}
+
 func classifyStringType(ctx rule.RuleContext, node *ast.Node) TypeClass {
 	t := ctx.TypeChecker.GetTypeAtLocation(node)
 	return classifyStringCheckerType(ctx, t)
@@ -424,6 +452,11 @@ func classifyStringCheckerType(ctx rule.RuleContext, t *checker.Type) TypeClass 
 	if utils.IsTypeFlagSet(t, checker.TypeFlagsStringLiteral) ||
 		(utils.IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "string") {
 		return TypeTarget
+	}
+	// TypeScript's public API exposes true/false as intrinsic types, but tsgo
+	// carries them under TypeFlagsBooleanLiteral without TypeFlagsIntrinsic.
+	if utils.IsTypeFlagSet(t, checker.TypeFlagsBooleanLiteral) {
+		return TypeNonTarget
 	}
 
 	constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
