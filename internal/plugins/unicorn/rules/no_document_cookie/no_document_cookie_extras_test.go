@@ -33,6 +33,9 @@ func TestNoDocumentCookieExtras(t *testing.T) {
 			extraValid(`document.cookie = "foo=bar"; document = replacement`),
 			extraValid(`window = replacement; window.document.cookie = "foo=bar"`),
 
+			// Locks in ReferenceTracker's variable-identity cycle guard.
+			extraValid(`let a = globalThis; let b = a.document; a = b; a.cookie = "foo=bar"`),
+
 			// Locks in global-reference checks for local shadowing and disabled globals.
 			extraValid(`function set(document) { document.cookie = "foo=bar" }`),
 			{
@@ -76,13 +79,16 @@ func TestNoDocumentCookieExtras(t *testing.T) {
 			// ---- Dimension 4: static element-access key forms are tracked ----
 			extraInvalid(`document["cookie"] = "foo=bar"`, `document["cookie"]`),
 			extraInvalid("document[`cookie`] = \"foo=bar\"", "document[`cookie`]"),
+			extraInvalid(`document[["cookie"]] = "foo=bar"`, `document[["cookie"]]`),
 
 			// Locks in ReferenceTracker's assignment-alias branch.
 			extraInvalid(`let doc; doc = document; doc.cookie = "foo=bar"`, `doc.cookie`),
 
 			// Locks in ReferenceTracker's object-pattern alias branch.
 			extraInvalid(`const {document: doc} = globalThis; doc.cookie = "foo=bar"`, `doc.cookie`),
+			extraInvalid(`const {[["document"]]: doc} = globalThis; doc.cookie = "foo=bar"`, `doc.cookie`),
 			extraInvalid(`let doc; ({document: doc} = globalThis); doc.cookie = "foo=bar"`, `doc.cookie`),
+			extraInvalid(`({document} = globalThis); document.cookie = "foo=bar"`, `document.cookie`),
 
 			// Locks in ReferenceTracker's parameter/default AssignmentPattern branch.
 			extraInvalid(`function set(doc = document) { doc.cookie = "foo=bar" }`, `doc.cookie`),

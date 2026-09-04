@@ -17,16 +17,6 @@ const (
 	tracedGlobalObject
 )
 
-type tracedVariable struct {
-	symbol *ast.Symbol
-	value  tracedValue
-}
-
-type tracedGlobal struct {
-	name  string
-	value tracedValue
-}
-
 // documentReferenceTracker follows the global document object through the
 // flow-insensitive aliases supported by @eslint-community/eslint-utils'
 // ReferenceTracker. The active stacks prevent cycles without suppressing the
@@ -35,8 +25,8 @@ type documentReferenceTracker struct {
 	ctx               rule.RuleContext
 	identifiersByName map[string][]*ast.Node
 	propertyEvaluator *utils.StaticStringEvaluator
-	variableStack     map[tracedVariable]bool
-	globalStack       map[tracedGlobal]bool
+	variableStack     map[*ast.Symbol]bool
+	globalStack       map[string]bool
 	problems          []*ast.Node
 }
 
@@ -282,29 +272,25 @@ func (tracker *documentReferenceTracker) trackIdentifier(identifier *ast.Node, v
 }
 
 func documentBindingSymbol(identifier *ast.Node) *ast.Symbol {
-	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.Parent == nil {
+	if identifier == nil || identifier.Kind != ast.KindIdentifier ||
+		!utils.IsDeclarationIdentifier(identifier) {
 		return nil
 	}
-	declaration := identifier.Parent
-	if declaration.Name() != identifier {
-		return nil
-	}
-	return declaration.Symbol()
+	return identifier.Parent.Symbol()
 }
 
 func (tracker *documentReferenceTracker) trackVariable(symbol *ast.Symbol, value tracedValue) {
 	if tracker.ctx.Refs == nil || symbol == nil {
 		return
 	}
-	key := tracedVariable{symbol: symbol, value: value}
-	if tracker.variableStack != nil && tracker.variableStack[key] {
+	if tracker.variableStack != nil && tracker.variableStack[symbol] {
 		return
 	}
 	if tracker.variableStack == nil {
-		tracker.variableStack = make(map[tracedVariable]bool)
+		tracker.variableStack = make(map[*ast.Symbol]bool)
 	}
-	tracker.variableStack[key] = true
-	defer delete(tracker.variableStack, key)
+	tracker.variableStack[symbol] = true
+	defer delete(tracker.variableStack, symbol)
 
 	for _, reference := range tracker.ctx.Refs.References(symbol) {
 		if !ast.IsWriteOnlyAccess(reference) {
@@ -314,15 +300,14 @@ func (tracker *documentReferenceTracker) trackVariable(symbol *ast.Symbol, value
 }
 
 func (tracker *documentReferenceTracker) trackGlobalVariable(name string, value tracedValue) {
-	key := tracedGlobal{name: name, value: value}
-	if tracker.globalStack != nil && tracker.globalStack[key] {
+	if tracker.globalStack != nil && tracker.globalStack[name] {
 		return
 	}
 	if tracker.globalStack == nil {
-		tracker.globalStack = make(map[tracedGlobal]bool)
+		tracker.globalStack = make(map[string]bool)
 	}
-	tracker.globalStack[key] = true
-	defer delete(tracker.globalStack, key)
+	tracker.globalStack[name] = true
+	defer delete(tracker.globalStack, name)
 
 	for _, reference := range tracker.identifiersByName[name] {
 		if !ast.IsWriteOnlyAccess(reference) && tracker.isGlobalReference(reference, name) {
@@ -337,7 +322,7 @@ func (tracker *documentReferenceTracker) accessExpressionStaticName(node *ast.No
 		if tracker.propertyEvaluator == nil {
 			tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithoutScope()
 		}
-		return tracker.propertyEvaluator.Eval(argument)
+		return tracker.propertyEvaluator.EvalToString(argument)
 	}
 	return utils.AccessExpressionStaticName(node)
 }
@@ -347,7 +332,7 @@ func (tracker *documentReferenceTracker) staticPropertyName(node *ast.Node) (str
 		if tracker.propertyEvaluator == nil {
 			tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithoutScope()
 		}
-		return tracker.propertyEvaluator.Eval(node.AsComputedPropertyName().Expression)
+		return tracker.propertyEvaluator.EvalToString(node.AsComputedPropertyName().Expression)
 	}
 	return utils.GetStaticPropertyName(node)
 }
