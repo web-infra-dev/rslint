@@ -146,7 +146,9 @@ func StringToBigInt(value string) (*big.Int, bool) {
 	}
 
 	sign := 1
+	hasSign := false
 	if value[0] == '+' || value[0] == '-' {
+		hasSign = true
 		if value[0] == '-' {
 			sign = -1
 		}
@@ -161,23 +163,23 @@ func StringToBigInt(value string) (*big.Int, bool) {
 	if len(value) >= 2 && value[0] == '0' {
 		switch value[1] {
 		case 'x', 'X':
-			if sign != 1 {
+			if hasSign {
 				return nil, false
 			}
 			base, digits = 16, value[2:]
 		case 'o', 'O':
-			if sign != 1 {
+			if hasSign {
 				return nil, false
 			}
 			base, digits = 8, value[2:]
 		case 'b', 'B':
-			if sign != 1 {
+			if hasSign {
 				return nil, false
 			}
 			base, digits = 2, value[2:]
 		}
 	}
-	if digits == "" {
+	if digits == "" || digits[0] == '+' || digits[0] == '-' {
 		return nil, false
 	}
 
