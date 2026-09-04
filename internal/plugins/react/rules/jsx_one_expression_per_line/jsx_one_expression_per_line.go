@@ -336,7 +336,7 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 		ctx.ReportRangeWithDeferredFixes(core.NewTextRange(child.Pos(), child.End()), message, func() []rule.RuleFix {
 			rawSource := nodeSource(source, child)
 			fixedSource := fixSource(rawSource)
-			if isJSXText(child) && !currentDetails.firstChild && hasTrailingTextSpace(rawSource) {
+			if isJSXText(child) && !currentDetails.firstChild && !currentDetails.trailingSpace && hasTrailingTextSpace(rawSource) {
 				fixedSource += " "
 			}
 			leadingSpace := ""

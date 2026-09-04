@@ -63,6 +63,10 @@ func TestJsxOneExpressionPerLineExtras(t *testing.T) {
 			{MessageId: "moveToNewLine", Message: "`a ` must be placed on a new line"},
 			{MessageId: "moveToNewLine", Message: "`{y}` must be placed on a new line"},
 		}},
+		{Code: `<A>{x}a </A>`, Tsx: true, Output: []string{"<A>\n{x}\na\n{' '}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine", Message: "`{x}` must be placed on a new line"},
+			{MessageId: "moveToNewLine", Message: "`a ` must be placed on a new line"},
+		}},
 		{Code: "<App>foo \n</App>", Tsx: true, Output: []string{"<App>\nfoo \n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "moveToNewLine"},
 		}},
