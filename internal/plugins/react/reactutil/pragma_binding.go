@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 // IsDestructuredFromPragmaImport mirrors upstream eslint-plugin-react's
@@ -24,10 +25,9 @@ import (
 // `pragma` is the React pragma name (e.g. "React") — the comparison
 // against ImportDeclaration / require argument uses
 // `ecmascript.StringToLowerCase(pragma)` to match upstream's
-// `pragma.toLocaleLowerCase()` semantic. `tc` may be nil — when no
-// TypeChecker is available the function falls back to a syntax-only scan. It
-// checks enclosing block/function bindings before the SourceFile-wide import
-// scan so a local binding cannot masquerade as an imported pragma helper.
+// `pragma.toLocaleLowerCase()` semantic. `tc` may be nil — when no TypeChecker
+// is available the function uses rslint's shared lexical scope model so every
+// local binding shape is resolved before checking its import origin.
 func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.Checker) bool {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
@@ -38,10 +38,7 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 	pragmaLower := ecmascript.StringToLowerCase(pragma)
 
 	if tc == nil {
-		if hasEnclosingBinding(ident, ident.AsIdentifier().Text) {
-			return false
-		}
-		return findPragmaBindingByName(getSourceFileNode(ident), ident.AsIdentifier().Text, pragma, pragmaLower)
+		return sourceOnlyPragmaBinding(ident, pragma, pragmaLower)
 	}
 
 	symbol := tc.GetSymbolAtLocation(ident)
@@ -105,151 +102,36 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 	return false
 }
 
-func hasEnclosingBinding(ident *ast.Node, name string) bool {
-	if ident == nil || name == "" {
+func sourceOnlyPragmaBinding(ident *ast.Node, pragma, pragmaLower string) bool {
+	sourceFile := ast.GetSourceFileOfNode(ident)
+	if sourceFile == nil {
 		return false
 	}
-	for current := ident.Parent; current != nil; current = current.Parent {
-		if params := functionParameters(current); params != nil {
-			for _, param := range params {
-				if param == nil {
-					continue
-				}
-				parameter := param.AsParameterDeclaration()
-				if parameter != nil && bindingPatternBindsName(parameter.Name(), name) {
-					return true
-				}
-			}
+	manager := scope.Build(sourceFile, scope.Options{
+		CollectReferences: true,
+		ReferenceNames:    map[string]struct{}{ident.AsIdentifier().Text: {}},
+	})
+	for _, reference := range manager.References {
+		if reference.Identifier != ident {
+			continue
 		}
-		switch current.Kind {
-		case ast.KindBlock, ast.KindCaseBlock, ast.KindModuleBlock:
-			if blockDeclaresBinding(current, name) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func functionParameters(node *ast.Node) []*ast.Node {
-	if node == nil {
-		return nil
-	}
-	if params := FunctionParameters(node); params != nil {
-		return params
-	}
-	switch node.Kind {
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().Parameters.Nodes
-	case ast.KindGetAccessor:
-		return node.AsGetAccessorDeclaration().Parameters.Nodes
-	case ast.KindSetAccessor:
-		return node.AsSetAccessorDeclaration().Parameters.Nodes
-	}
-	return nil
-}
-
-func bindingPatternBindsName(node *ast.Node, name string) bool {
-	if node == nil {
-		return false
-	}
-	if node.Kind == ast.KindIdentifier {
-		return node.AsIdentifier().Text == name
-	}
-	if node.Kind == ast.KindObjectBindingPattern {
-		return objectBindingPatternBindsName(node, name)
-	}
-	return false
-}
-
-func blockDeclaresBinding(block *ast.Node, name string) bool {
-	var found bool
-	block.ForEachChild(func(statement *ast.Node) bool {
-		if statement == nil {
+		declaration := reference.Resolved()
+		if declaration == nil {
 			return false
 		}
-		switch statement.Kind {
-		case ast.KindVariableStatement:
-			declarations := statement.AsVariableStatement().DeclarationList
-			if declarations == nil || declarations.AsVariableDeclarationList() == nil {
-				return false
-			}
-			for _, declaration := range declarations.AsVariableDeclarationList().Declarations.Nodes {
-				if declaration != nil && bindingPatternBindsName(declaration.Name(), name) {
-					found = true
-					return true
-				}
-			}
-		case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
-			if bindingPatternBindsName(statement.Name(), name) {
-				found = true
-				return true
-			}
+		if declaration.Kind == scope.DefImport {
+			return importDeclBindsNameFromPragma(declaration.DefNode, ident.AsIdentifier().Text, pragmaLower)
 		}
-		return false
-	})
-	return found
-}
-
-// getSourceFileNode walks up from `node` to its enclosing SourceFile,
-// returning it as an `*ast.Node`, or nil when no SourceFile ancestor is
-// found (extremely unlikely outside of synthesized nodes).
-func getSourceFileNode(node *ast.Node) *ast.Node {
-	sf := ast.GetSourceFileOfNode(node)
-	if sf == nil {
-		return nil
-	}
-	return sf.AsNode()
-}
-
-// findPragmaBindingByName is the syntax-only fallback for
-// `IsDestructuredFromPragmaImport` when no TypeChecker is available. It
-// scans the SourceFile rooted at `root` for any declaration that
-// introduces a binding named `name` whose source is the pragma module:
-//
-//   - `import { name } from '<pragma>'`
-//   - `import { x as name } from '<pragma>'` (renamed import — local
-//     binding is `name`)
-//   - `const { name } = <pragma>` / `const { name } = require('<pragma>')`
-//   - `const name = <pragma>.name` / `const name = require('<pragma>').name`
-//   - `const { x: name } = <pragma>` / require — destructure-with-rename
-//
-// Walks the entire SourceFile rather than tracking lexical scope. This
-// is a deliberate trade-off: shadowing in inner scopes (e.g. a deeply
-// nested `function memo() {}` overriding a top-level
-// `import { memo } from 'react'`) is NOT modeled — but the recognition
-// only matters for bare callees that already passed name + non-shadow
-// checks at the call site, which makes shadowing edge-cases vanish in
-// practice.
-func findPragmaBindingByName(root *ast.Node, name string, pragma string, pragmaLower string) bool {
-	if root == nil || name == "" {
-		return false
-	}
-	var found bool
-	var visit func(n *ast.Node)
-	visit = func(n *ast.Node) {
-		if found || n == nil {
-			return
+		if declaration.Kind != scope.DefVariable {
+			return false
 		}
-		switch n.Kind {
-		case ast.KindImportDeclaration:
-			if importDeclBindsNameFromPragma(n, name, pragmaLower) {
-				found = true
-				return
-			}
-		case ast.KindVariableDeclaration:
-			if variableDeclBindsNameFromPragma(n, name, pragma, pragmaLower) {
-				found = true
-				return
-			}
+		defNode := declaration.DefNode
+		if defNode != nil && defNode.Kind == ast.KindBindingElement {
+			defNode = findEnclosingVariableDeclaration(defNode)
 		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return found
-		})
+		return variableDeclBindsNameFromPragma(defNode, ident.AsIdentifier().Text, pragma, pragmaLower)
 	}
-	visit(root)
-	return found
+	return false
 }
 
 // importDeclBindsNameFromPragma reports whether `decl`

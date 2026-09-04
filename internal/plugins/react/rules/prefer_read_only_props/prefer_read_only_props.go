@@ -28,6 +28,7 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	pragma := reactutil.GetReactPragmaFromContext(ctx)
 	typeAliases := map[string][]*ast.Node{}
 	genericImports := map[string]string{}
+	classExpressions := make([]*ast.Node, 0)
 	wrapperFunctions := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
 	type reportKey struct {
 		owner *ast.Node
@@ -114,12 +115,7 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			}
 		},
 		ast.KindClassExpression: func(node *ast.Node) {
-			if !isReactComponentClass(node, pragma, ctx) {
-				return
-			}
-			if propsType := classPropsTypeArgument(node); propsType != nil {
-				validateType(node, propsType)
-			}
+			classExpressions = append(classExpressions, node)
 		},
 		ast.KindPropertyDeclaration: func(node *ast.Node) {
 			pd := node.AsPropertyDeclaration()
@@ -155,6 +151,14 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, validateType)
 		},
 		ast.KindEndOfFile: func(_ *ast.Node) {
+			for _, node := range classExpressions {
+				if !isReactComponentClass(node, pragma, ctx) {
+					continue
+				}
+				if propsType := classPropsTypeArgument(node); propsType != nil {
+					validateType(node, propsType)
+				}
+			}
 			flushReports()
 		},
 	}
@@ -489,7 +493,10 @@ func reactGenericTypeName(name *ast.Node, imports map[string]string) (string, bo
 	if qualified == nil || qualified.Left == nil || qualified.Right == nil {
 		return "", false
 	}
-	left := entityNameLeftmost(qualified.Left)
+	if qualified.Left.Kind != ast.KindIdentifier || qualified.Right.Kind != ast.KindIdentifier {
+		return "", false
+	}
+	left := qualified.Left
 	right := reactutil.EntityNameRightmost(qualified.Right)
 	if left == nil || right == nil || !isGenericTypeName(right.AsIdentifier().Text) {
 		return "", false
@@ -680,15 +687,43 @@ func functionBodyReturnExpression(body *ast.Node) *ast.Node {
 	if body == nil || body.Kind != ast.KindBlock {
 		return nil
 	}
-	var result *ast.Node
-	body.ForEachChild(func(node *ast.Node) bool {
-		if node.Kind == ast.KindReturnStatement {
-			result = node.AsReturnStatement().Expression
-			return true
+	block := body.AsBlock()
+	if block == nil || block.Statements == nil {
+		return nil
+	}
+	return lastReturnExpression(block.Statements.Nodes)
+}
+
+// lastReturnExpression mirrors eslint-plugin-react's ast.loopNodes helper:
+// scan statements backwards, and when the trailing relevant statement is a
+// switch, recurse only into its final case.
+func lastReturnExpression(statements []*ast.Node) *ast.Node {
+	for i := len(statements) - 1; i >= 0; i-- {
+		statement := statements[i]
+		if statement == nil {
+			continue
 		}
-		return false
-	})
-	return result
+		if statement.Kind == ast.KindReturnStatement {
+			return statement.AsReturnStatement().Expression
+		}
+		if statement.Kind != ast.KindSwitchStatement {
+			continue
+		}
+		switchStatement := statement.AsSwitchStatement()
+		if switchStatement == nil || switchStatement.CaseBlock == nil {
+			continue
+		}
+		caseBlock := switchStatement.CaseBlock.AsCaseBlock()
+		if caseBlock == nil || caseBlock.Clauses == nil || len(caseBlock.Clauses.Nodes) == 0 {
+			continue
+		}
+		lastClause := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1].AsCaseOrDefaultClause()
+		if lastClause == nil || lastClause.Statements == nil {
+			return nil
+		}
+		return lastReturnExpression(lastClause.Statements.Nodes)
+	}
+	return nil
 }
 
 func topLevelVariableValues(source *ast.SourceFile, name string) []*ast.Node {
@@ -726,23 +761,6 @@ func topLevelVariableValues(source *ast.SourceFile, name string) []*ast.Node {
 		return false
 	})
 	return values
-}
-
-func entityNameLeftmost(node *ast.Node) *ast.Node {
-	for node != nil {
-		if node.Kind == ast.KindIdentifier {
-			return node
-		}
-		if node.Kind != ast.KindQualifiedName {
-			return nil
-		}
-		qualified := node.AsQualifiedName()
-		if qualified == nil {
-			return nil
-		}
-		node = qualified.Left
-	}
-	return nil
 }
 
 func checkPropertySignature(node *ast.Node, report func(*ast.Node, string, bool)) {
