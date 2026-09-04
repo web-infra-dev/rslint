@@ -55,6 +55,11 @@ func fixSource(source string) string {
 	return strings.TrimRight(strings.TrimLeft(source, " "), " ")
 }
 
+func hasTrailingTextSpace(source string) bool {
+	trimmed := strings.TrimRight(source, " ")
+	return len(trimmed) < len(source) && !strings.HasSuffix(trimmed, "\n") && !strings.HasSuffix(trimmed, "\r")
+}
+
 func isJSXText(node *ast.Node) bool {
 	return node != nil && (node.Kind == ast.KindJsxText || node.Kind == ast.KindJsxTextAllWhiteSpaces)
 }
@@ -175,6 +180,7 @@ func isSpaceBetween(previous, current *ast.Node) bool {
 type fixDetails struct {
 	child            *ast.Node
 	descriptor       string
+	firstChild       bool
 	leadingSpace     bool
 	leadingSpaceFrom []*ast.Node
 	leadingNewline   bool
@@ -184,7 +190,8 @@ type fixDetails struct {
 
 func shouldKeepLeadingSpace(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
 	for _, previous := range details.leadingSpaceFrom {
-		if !isJSXText(previous) || detailsByChild[previous] == nil {
+		previousDetails := detailsByChild[previous]
+		if !isJSXText(previous) || previousDetails == nil || !previousDetails.firstChild {
 			return true
 		}
 	}
@@ -283,6 +290,9 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 				detailsByChild[child] = details
 			}
 			if previous != nil {
+				if previous == opening {
+					details.firstChild = true
+				}
 				previousRaw := nodeSource(source, previous)
 				childRaw := nodeSource(source, child)
 				if (isJSXText(previous) && strings.HasSuffix(previousRaw, " ")) ||
@@ -324,7 +334,11 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 		}
 		child := currentDetails.child
 		ctx.ReportRangeWithDeferredFixes(core.NewTextRange(child.Pos(), child.End()), message, func() []rule.RuleFix {
-			fixedSource := fixSource(nodeSource(source, child))
+			rawSource := nodeSource(source, child)
+			fixedSource := fixSource(rawSource)
+			if isJSXText(child) && !currentDetails.firstChild && hasTrailingTextSpace(rawSource) {
+				fixedSource += " "
+			}
 			leadingSpace := ""
 			if currentDetails.leadingSpace && shouldKeepLeadingSpace(&currentDetails, detailsByChild) {
 				leadingSpace = "\n{' '}"
