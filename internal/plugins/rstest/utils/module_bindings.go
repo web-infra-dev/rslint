@@ -6,8 +6,14 @@ import (
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
+// RstestCoreModuleFromRequireCall returns the module an rstest `require` call
+// names. TypeScript assertions are erased before runtime, so they are skipped
+// on both the call and its argument, matching what IsModuleRequireCallModules
+// accepts: unwrapping only parentheses would let `require('@rstest/core') as
+// any` pass the check and then read no argument at all, and would leave the
+// module name of `require('@rstest/core' as any)` empty.
 func RstestCoreModuleFromRequireCall(node *ast.Node) (string, bool) {
-	node = ast.SkipParentheses(node)
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil || !testFramework.IsModuleRequireCallModules(node, RstestCoreImportModules) {
 		return "", false
 	}
@@ -15,7 +21,7 @@ func RstestCoreModuleFromRequireCall(node *ast.Node) (string, bool) {
 	if len(arguments) == 0 {
 		return "", false
 	}
-	specifier := ast.SkipParentheses(arguments[0])
+	specifier := internalUtils.SkipAssertionsAndParens(arguments[0])
 	if specifier == nil {
 		return "", false
 	}

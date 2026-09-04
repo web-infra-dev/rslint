@@ -118,7 +118,7 @@ func shouldReportIdentifier(ctx rule.RuleContext, node *ast.Node) bool {
 	if mode == testFramework.ReferenceModeImport && resolved != "" {
 		return false
 	}
-	return !internalUtils.IsValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+	return !internalUtils.IsRuntimeValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
 }
 
 func createImport(isModule bool, module, names string) string {
@@ -243,6 +243,50 @@ func mergeIntoRequire(sourceFile *ast.SourceFile, binding *ast.Node, names *name
 	return []rule.RuleFix{rule.RuleFixInsertAfter(last, ", "+additions.sortedJoined())}
 }
 
+// bindsTypeOnly reports whether the file already imports one of names from an
+// rstest module as a type. Such a binding provides no value, so the rule still
+// asks for the import, but every fix it could write would declare the name a
+// second time: adding a value specifier beside the type-only one, or a second
+// declaration next to a whole `import type` clause, is a duplicate identifier
+// either way. Turning the existing binding into a value import is the edit a
+// reader would make, and it is not one this rule is in a position to choose,
+// so the diagnostic is reported without a fix.
+func bindsTypeOnly(statements []*ast.Node, names *nameSet) bool {
+	for _, statement := range statements {
+		if statement == nil || statement.Kind != ast.KindImportDeclaration {
+			continue
+		}
+		declaration := statement.AsImportDeclaration()
+		if declaration == nil || declaration.ModuleSpecifier == nil ||
+			!rstestUtils.IsRstestCoreImportModule(declaration.ModuleSpecifier.Text()) ||
+			declaration.ImportClause == nil {
+			continue
+		}
+		clause := declaration.ImportClause.AsImportClause()
+		if clause == nil || clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
+			continue
+		}
+		named := clause.NamedBindings.AsNamedImports()
+		if named == nil || named.Elements == nil {
+			continue
+		}
+		clauseIsTypeOnly := declaration.ImportClause.IsTypeOnly()
+		for _, element := range named.Elements.Nodes {
+			specifier := element.AsImportSpecifier()
+			if specifier == nil || specifier.Name() == nil {
+				continue
+			}
+			if !clauseIsTypeOnly && !specifier.IsTypeOnly {
+				continue
+			}
+			if _, exists := names.seen[specifier.Name().Text()]; exists {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func findImport(statements []*ast.Node) *ast.ImportDeclaration {
 	for _, statement := range statements {
 		if statement == nil || statement.Kind != ast.KindImportDeclaration {
@@ -305,6 +349,9 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 		return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(0, 0), createImport(isModule, defaultModule, names.sortedJoined()))}
 	}
 	statements := ctx.SourceFile.Statements.Nodes
+	if bindsTypeOnly(statements, names) {
+		return nil
+	}
 	first := statements[0]
 	if prologue := strictDirectivePrologue(statements); prologue != nil {
 		return []rule.RuleFix{rule.RuleFixInsertAfter(prologue, "\n"+lineIndent(ctx, prologue)+createImport(isModule, defaultModule, names.sortedJoined()))}

@@ -53,6 +53,10 @@ func TestNoImportingRstestGlobalsExtras(t *testing.T) {
 			// identifier key, so it is reported and removed the same way ----
 			{Code: `const { 'expect': expect, defineConfig } = require('@rstest/core');`, Output: []string{`const { defineConfig } = require('@rstest/core');`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
 			{Code: `const { ['expect']: expect, defineConfig } = require('@rstest/core');`, Output: []string{`const { defineConfig } = require('@rstest/core');`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
+			// ---- Real-user: a TypeScript assertion is erased before runtime, so
+			// it does not hide the require ----
+			{Code: `const { expect, defineConfig } = require('@rstest/core' as any);`, Output: []string{`const { defineConfig } = require('@rstest/core' as any);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
+			{Code: `const { expect, defineConfig } = require('@rstest/core') as any;`, Output: []string{`const { defineConfig } = require('@rstest/core') as any;`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
 			// ---- Real-user: namespace member invocation remains valid as a global ----
 			{Code: "import { rs } from '@rstest/core';\nrs.fn();", Output: []string{"\nrs.fn();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10}}},
 		},

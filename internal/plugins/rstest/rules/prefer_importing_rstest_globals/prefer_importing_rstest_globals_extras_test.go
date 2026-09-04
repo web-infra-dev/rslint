@@ -64,6 +64,13 @@ expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer
 			// Locks in that the insertion clears the whole directive prologue, so
 			// `use strict` keeps applying to the file.
 			{Code: "\"use asm\";\n'use strict';\nexpect(value);", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}, Output: []string{"\"use asm\";\n'use strict';\nconst { expect } = require('@rstest/core');\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 3, Column: 1}}},
+			// ---- Real-user: a type-only import binds no runtime value, so the
+			// file still needs the import this rule asks for ----
+			// No fix: every edit available here would bind the name twice.
+			{Code: "import { type expect } from '@rstest/core';\nexpect(value);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: "import type { expect } from '@rstest/core';\nexpect(value);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// A type-only import of a different name still merges normally.
+			{Code: "import type { Mock } from '@rstest/core';\nexpect(value);", Output: []string{"import { expect } from '@rstest/core';\nimport type { Mock } from '@rstest/core';\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			// ---- Dimension 4: a shorthand property value reads the global ----
 			{Code: `const value = { expect };`, Output: []string{`import { expect } from '@rstest/core';
 const value = { expect };`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 1, Column: 17}}},
