@@ -205,9 +205,66 @@ func isReactClass(node *ast.Node, pragma string) bool {
 	}
 	switch node.Kind {
 	case ast.KindClassDeclaration, ast.KindClassExpression:
-		return reactutil.ExtendsReactComponent(node, pragma)
+		return reactutil.ExtendsReactComponent(node, pragma) || isExplicitReactClass(node)
 	}
 	return false
+}
+
+func isExplicitReactClass(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, doc := range node.JSDoc(nil) {
+		jsDoc := doc.AsJSDoc()
+		if jsDoc == nil || jsDoc.Tags == nil {
+			continue
+		}
+		for _, tag := range jsDoc.Tags.Nodes {
+			if !ast.IsJSDocAugmentsTag(tag) {
+				continue
+			}
+			augments := tag.AsJSDocAugmentsTag()
+			if augments != nil && isExplicitReactType(augments.ClassName) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isExplicitReactType(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	if node.Kind == ast.KindExpressionWithTypeArguments {
+		return isExplicitReactType(node.AsExpressionWithTypeArguments().Expression)
+	}
+	if node.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	property := node.AsPropertyAccessExpression()
+	object := ast.SkipParentheses(property.Expression)
+	name := property.Name()
+	return object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "React" &&
+		name != nil && name.Kind == ast.KindIdentifier &&
+		(name.AsIdentifier().Text == "Component" || name.AsIdentifier().Text == "PureComponent")
+}
+
+func parentReactClass(node *ast.Node, pragma string) *ast.Node {
+	if component := reactutil.GetParentReactComponentScopeBased(node, pragma, ""); component != nil {
+		return component
+	}
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if parent.Kind != ast.KindClassDeclaration && parent.Kind != ast.KindClassExpression {
+			continue
+		}
+		if isReactClass(parent, pragma) {
+			return parent
+		}
+		return nil
+	}
+	return nil
 }
 
 func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) bool {
@@ -482,7 +539,7 @@ var StaticPropertyPlacementRule = rule.Rule{
 			if hasModifier(node, ast.KindAbstractKeyword) {
 				return
 			}
-			if reactutil.GetParentReactComponentScopeBased(node, pragma, reactutil.GetReactCreateClass(ctx.Settings)) == nil {
+			if parentReactClass(node, pragma) == nil {
 				return
 			}
 			name := classMemberName(node)

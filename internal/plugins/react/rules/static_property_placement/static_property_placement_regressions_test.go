@@ -29,6 +29,8 @@ func TestStaticPropertyPlacementRegressions(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `let Box = {}; Box.C = class extends React.Component {}; Box.C.propTypes = {};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notStaticClassProp", Message: "'propTypes' should be declared as a static class property."}}},
+			{Code: `/** @extends React.Component */ class C { propTypes = {}; }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notStaticClassProp", Message: "'propTypes' should be declared as a static class property."}}},
+			{Code: `/** @augments React.Component */ class C {} C.propTypes = {};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notStaticClassProp", Message: "'propTypes' should be declared as a static class property."}}},
 			{Code: `class C extends React.Component { static #propTypes = {}; }`, Options: []interface{}{staticGetter}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGetterClassFunc", Message: "'propTypes' should be declared as a static getter class function."}}},
 			{Code: `class C extends React.Component { #propTypes = {}; }`, Options: []interface{}{staticGetter}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notGetterClassFunc", Message: "'propTypes' should be declared as a static getter class function."}}},
 			{Code: `const Box = { C: class extends React.Component {} }; Box.C.foo.propTypes = {};`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notStaticClassProp", Message: "'propTypes' should be declared as a static class property."}}},
