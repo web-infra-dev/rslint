@@ -3,6 +3,7 @@ package sort_comp
 
 import (
 	_ "embed"
+	"fmt"
 	"math"
 	"slices"
 	"sort"
@@ -241,11 +242,11 @@ type pattern struct {
 	re   *esregexp.RegExp
 }
 
-func parsePattern(text string) pattern {
+func parsePattern(text string) (pattern, error) {
 	first := strings.IndexByte(text, '/')
 	last := strings.LastIndexByte(text, '/')
 	if first < 0 || first == last || last == 0 {
-		return pattern{text: text}
+		return pattern{text: text}, nil
 	}
 	flags := text[last+1:]
 	flagEnd := 0
@@ -255,9 +256,9 @@ func parsePattern(text string) pattern {
 	flags = flags[:flagEnd]
 	re, err := esregexp.Compile(text[first+1:last], flags)
 	if err != nil {
-		return pattern{text: text}
+		return pattern{}, fmt.Errorf("invalid regular expression %q: %w", text, err)
 	}
-	return pattern{re: re}
+	return pattern{re: re}, nil
 }
 
 func referenceIndexes(info memberInfo, order []pattern) []int {
@@ -516,7 +517,11 @@ var SortCompRule = rule.Rule{
 		expanded := expandedOrder(opts)
 		order := make([]pattern, len(expanded))
 		for index, entry := range expanded {
-			order[index] = parsePattern(entry)
+			parsed, err := parsePattern(entry)
+			if err != nil {
+				panic(fmt.Errorf("react/sort-comp: %w", err))
+			}
+			order[index] = parsed
 		}
 		pragma := reactutil.GetReactPragmaFromContext(ctx)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

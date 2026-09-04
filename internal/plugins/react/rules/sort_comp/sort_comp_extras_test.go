@@ -3,11 +3,30 @@
 package sort_comp
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestSortCompRejectsInvalidRegexPattern(t *testing.T) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected invalid regex pattern to panic")
+		}
+		if message := fmt.Sprint(recovered); !strings.Contains(message, `react/sort-comp: invalid regular expression "/[/"`) {
+			t.Fatalf("unexpected panic: %v", recovered)
+		}
+	}()
+
+	SortCompRule.Run(rule.RuleContext{}, []any{
+		map[string]any{"order": []any{"/[/", "render"}},
+	})
+}
 
 func TestSortCompExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &SortCompRule, []rule_tester.ValidTestCase{
