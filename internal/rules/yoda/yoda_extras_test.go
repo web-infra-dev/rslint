@@ -455,6 +455,26 @@ func TestYodaExtras(t *testing.T) {
 				Options: []any{"never", map[string]any{"exceptRange": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 16}},
 			},
+			// big.Int accepts a sign in the digit substring, but StringToBigInt
+			// rejects signs after a radix prefix and a second leading sign.
+			{
+				Code:    `if ('0x+1' <= x && x < 2n) {}`,
+				Output:  []string{`if (x >= '0x+1' && x < 2n) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code:    `if ('0x-1' <= x && x < 2n) {}`,
+				Output:  []string{`if (x >= '0x-1' && x < 2n) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code:    `if ('++1' <= x && x < 2n) {}`,
+				Output:  []string{`if (x >= '++1' && x < 2n) {}`},
+				Options: []any{"never", map[string]any{"exceptRange": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expected", Line: 1, Column: 5, EndLine: 1, EndColumn: 15}},
+			},
 		},
 	)
 }
