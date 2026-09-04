@@ -123,6 +123,33 @@ func TestNoRestrictedSyntaxReviewRegressions(t *testing.T) {
 				Options: []interface{}{`JSXOpeningElement > JSXIdentifier`},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
 			},
+			{
+				Code:    `const x = <Foo a b={c} />;`,
+				Tsx:     true,
+				Options: []interface{}{`JSXOpeningElement[attributes.length=2]`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code:    `const x = <Foo a b={c} />;`,
+				Tsx:     true,
+				Options: []interface{}{`JSXOpeningElement[attributes.0.name.name='a']`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
+			},
+			{
+				Code: `const x = <Foo />;`,
+				Tsx:  true,
+				Options: []interface{}{
+					map[string]interface{}{"selector": `:is(JSXElement, JSXOpeningElement)`, "message": "union"},
+					map[string]interface{}{"selector": `[type='JSXElement']`, "message": "physical"},
+					map[string]interface{}{"selector": `JSXElement > JSXOpeningElement`, "message": "opening"},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "union"},
+					{MessageId: "restrictedSyntax", Message: "physical"},
+					{MessageId: "restrictedSyntax", Message: "union"},
+					{MessageId: "restrictedSyntax", Message: "opening"},
+				},
+			},
 		},
 	)
 }

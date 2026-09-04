@@ -2968,7 +2968,15 @@ func readVirtualNodeAttr(facade virtualNodeFacade, name string, mc *matchContext
 			return jsxFacade(node.AsJsxSelfClosingElement().TagName), true
 		}
 		if name == "attributes" {
-			return node.AsJsxSelfClosingElement().Attributes, true
+			attributes := node.AsJsxSelfClosingElement().Attributes
+			if attributes == nil {
+				return []*ast.Node{}, true
+			}
+			properties := attributes.AsJsxAttributes().Properties
+			if properties == nil {
+				return []*ast.Node{}, true
+			}
+			return properties.Nodes, true
 		}
 		if name == "type" || name == "parent" {
 			return nil, false

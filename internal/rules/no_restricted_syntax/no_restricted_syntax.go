@@ -41,38 +41,56 @@ var NoRestrictedSyntaxRule = rule.Rule{
 				return
 			}
 			first, second, useAll := bucket.candidates(node, mc)
-			if useAll {
-				for index := range bucket.entries {
-					bucket.matchAndReport(index, node, mc, &ctx, false)
+			visitCandidates := func(match func(index int, indexed bool)) {
+				if useAll {
+					for index := range bucket.entries {
+						match(index, false)
+					}
+					return
+				}
+
+				// Both candidate lists retain ESLint specificity order. Merge them so a
+				// dispatch hit cannot reorder diagnostics relative to selectors
+				// that do not participate in the index.
+				left, right := 0, 0
+				for left < len(first) || right < len(second) {
+					var index int
+					indexed := false
+					switch {
+					case right == len(second):
+						index = first[left]
+						left++
+					case left == len(first):
+						index = second[right]
+						right++
+						indexed = true
+					case first[left] < second[right]:
+						index = first[left]
+						left++
+					default:
+						index = second[right]
+						right++
+						indexed = true
+					}
+					match(index, indexed)
+				}
+			}
+
+			if node.Kind == ast.KindJsxSelfClosingElement {
+				// tsgo folds JSXElement and JSXOpeningElement into one physical node.
+				// Visit the two ESTree identities in their logical order so reports
+				// from selectors on the physical JSXElement remain ahead of the
+				// synthetic opening element.
+				for _, target := range []string{"JSXElement", "JSXOpeningElement"} {
+					visitCandidates(func(index int, indexed bool) {
+						bucket.matchAndReportSelfClosing(index, node, mc, &ctx, indexed, target)
+					})
 				}
 				return
 			}
-
-			// Both candidate lists retain ESLint specificity order. Merge them so a
-			// dispatch hit cannot reorder diagnostics relative to selectors
-			// that do not participate in the index.
-			left, right := 0, 0
-			for left < len(first) || right < len(second) {
-				var index int
-				indexed := false
-				switch {
-				case right == len(second):
-					index = first[left]
-					left++
-				case left == len(first):
-					index = second[right]
-					right++
-					indexed = true
-				case first[left] < second[right]:
-					index = first[left]
-					left++
-				default:
-					index = second[right]
-					right++
-					indexed = true
-				}
+			visitCandidates(func(index int, indexed bool) {
 				bucket.matchAndReport(index, node, mc, &ctx, indexed)
-			}
+			})
 		}
 
 		listeners := make(rule.RuleListeners, len(plan.buckets))
@@ -446,6 +464,33 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 	if physicalMatch {
 		ctx.ReportNode(node, message)
 	}
+}
+
+func (bucket *ruleBucket) matchAndReportSelfClosing(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool, target string) {
+	entry := &bucket.entries[index]
+	compiled := entry.compiled
+	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
+		compiled = bucket.dispatch.matched[index]
+	}
+
+	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
+	if target == "JSXElement" && physicalMatch {
+		ctx.ReportNode(node, rule.RuleMessage{
+			Id:          "restrictedSyntax",
+			Description: entry.formatMessage(),
+		})
+		return
+	}
+	if !selectorTargetsEstreeType(entry.compiled, target) {
+		return
+	}
+	if !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
+		return
+	}
+	ctx.ReportNode(node, rule.RuleMessage{
+		Id:          "restrictedSyntax",
+		Description: entry.formatMessage(),
+	})
 }
 
 func (e ruleEntry) formatMessage() string {
