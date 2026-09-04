@@ -251,6 +251,15 @@ createElement("Ns:Panel");`,
 			}},
 		},
 		{
+			Code: `React[createElement]("ns:Panel");`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "noNamespace",
+				Message:   "React component ns:Panel must not be in a namespace, as React does not support them",
+				Line:      1, Column: 1, EndLine: 1, EndColumn: 33,
+			}},
+		},
+		{
 			Code: `const createElement = React["anything"];
 createElement("Ns:Panel");`,
 			Tsx: true,

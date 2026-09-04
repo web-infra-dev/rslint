@@ -125,20 +125,31 @@ func isPragmaFactoryCallCore(
 		return IsDestructuredFromPragmaImportWithRefs(callee, pragma, tc, refs)
 	}
 
-	// Member-access callee: `<pragma>.<name>(arg)`. Optional-chain access
+	// Member-access callee: `<pragma>.<name>(arg)` or
+	// `<pragma>[name](arg)`. Optional-chain access
 	// (`React?.createElement(...)`) is accepted — upstream's `isCreateElement`
 	// / `isCreateCloneElement` see `node.callee` as a (possibly optional)
 	// MemberExpression and match it just the same.
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	var nameNode, pragmaExpr *ast.Node
+	switch callee.Kind {
+	case ast.KindPropertyAccessExpression:
+		prop := callee.AsPropertyAccessExpression()
+		nameNode = prop.Name()
+		// JSDoc casts and parentheses are absent from ESTree, while an authored
+		// TypeScript wrapper on the receiver remains visible and does not match.
+		pragmaExpr = utils.ESTreeRuntimeExpression(prop.Expression)
+	case ast.KindElementAccessExpression:
+		access := callee.AsElementAccessExpression()
+		// ESTree's MemberExpression property has a `name` only when the
+		// computed property is an Identifier. String literals such as
+		// React["createElement"] therefore remain unmatched.
+		nameNode = utils.ESTreeRuntimeExpression(access.ArgumentExpression)
+		pragmaExpr = utils.ESTreeRuntimeExpression(access.Expression)
+	default:
 		return false
 	}
-	prop := callee.AsPropertyAccessExpression()
-	nameNode := prop.Name()
-	if nameNode.Kind != ast.KindIdentifier || !names.matches(nameNode.AsIdentifier().Text) {
+	if nameNode == nil || nameNode.Kind != ast.KindIdentifier || !names.matches(nameNode.AsIdentifier().Text) {
 		return false
 	}
-	// JSDoc casts and parentheses are absent from ESTree, while an authored
-	// TypeScript wrapper on the receiver remains visible and does not match.
-	pragmaExpr := utils.ESTreeRuntimeExpression(prop.Expression)
 	return pragmaExpr != nil && pragmaExpr.Kind == ast.KindIdentifier && pragmaExpr.AsIdentifier().Text == pragma
 }
