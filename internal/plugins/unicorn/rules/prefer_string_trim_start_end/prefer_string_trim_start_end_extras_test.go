@@ -233,6 +233,21 @@ func TestPreferStringTrimStartEndSourceOnly(t *testing.T) {
 			want: 0,
 		},
 		{
+			name: "direct class expression heritage remains unknown",
+			code: `class Collection extends class {} {} function f(foo: Collection) { foo.trimLeft(); }`,
+			want: 1,
+		},
+		{
+			name: "using binding is not a const alias",
+			code: `using Alias = class {}; class Collection extends Alias {} function f(foo: Collection) { foo.trimRight(); }`,
+			want: 1,
+		},
+		{
+			name: "await using binding is not a const alias",
+			code: `await using Alias = class {}; class Collection extends Alias {} function f(foo: Collection) { foo.trimLeft(); }`,
+			want: 1,
+		},
+		{
 			name: "constrained type parameter",
 			code: `function f<T extends number[]>(foo: T) { foo.trimRight(); }`,
 			want: 0,

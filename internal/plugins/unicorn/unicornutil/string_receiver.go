@@ -294,7 +294,14 @@ func classifyStringClass(
 		if heritage == nil {
 			return TypeUnknown
 		}
-		return classifyStringClassReference(ctx, heritage.Expression, visitedSymbols)
+		// Upstream only enters class-reference resolution when the direct
+		// superclass is an identifier. Class expressions are handled only when
+		// reached through a const alias initializer.
+		superClass := ast.SkipParentheses(heritage.Expression)
+		if superClass == nil || !ast.IsIdentifier(superClass) {
+			return TypeUnknown
+		}
+		return classifyStringClassReference(ctx, superClass, visitedSymbols)
 	}
 	return TypeNonTarget
 }
@@ -335,6 +342,7 @@ func classifyStringClassReference(
 			declarationList := declaration.Parent
 			variable := declaration.AsVariableDeclaration()
 			if declarationList == nil || !ast.IsVariableDeclarationList(declarationList) ||
+				ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) ||
 				declarationList.Flags&ast.NodeFlagsConst == 0 || variable.Name() == nil ||
 				!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
 				return TypeUnknown
