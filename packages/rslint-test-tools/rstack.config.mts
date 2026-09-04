@@ -3,6 +3,8 @@ import { define } from 'rstack';
 define.test({
   testEnvironment: 'node',
   globals: true,
+  // CI pods expose the shared host's CPU count, so cap worker-process churn.
+  pool: { maxWorkers: 16 },
   // Normal completion is event-driven. This is only the final in-process
   // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
   testTimeout: 35 * 60_000,
