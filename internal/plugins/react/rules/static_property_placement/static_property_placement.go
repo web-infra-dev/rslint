@@ -225,7 +225,7 @@ func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) 
 		if isReactClass(resolveComponentPath(declaration, path), pragma) {
 			return true
 		}
-		if relatedReactClassAssignment(ctx, symbol, path, pragma) {
+		if relatedReactClassAssignment(ctx, symbol, path, receiver, pragma) {
 			return true
 		}
 		// A successfully resolved local binding is authoritative. Falling
@@ -264,12 +264,17 @@ func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) 
 	return found
 }
 
-func relatedReactClassAssignment(ctx rule.RuleContext, symbol *ast.Symbol, path []string, pragma string) bool {
+func relatedReactClassAssignment(ctx rule.RuleContext, symbol *ast.Symbol, path []string, currentReceiver *ast.Node, pragma string) bool {
 	if ctx.Refs == nil || symbol == nil {
 		return false
 	}
 	for _, reference := range ctx.Refs.References(symbol) {
 		if reference == nil || reference.Parent == nil {
+			continue
+		}
+		// getRelatedComponent stops at the current reference, so assignments
+		// after the property write cannot define the component for that write.
+		if currentReceiver != nil && reference.Pos() >= currentReceiver.Pos() {
 			continue
 		}
 		memberRoot, memberPath, ok := componentPath(reference.Parent)
