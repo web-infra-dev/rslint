@@ -67,6 +67,12 @@ func TestJsxOneExpressionPerLineExtras(t *testing.T) {
 			{MessageId: "moveToNewLine", Message: "`{x}` must be placed on a new line"},
 			{MessageId: "moveToNewLine", Message: "`a ` must be placed on a new line"},
 		}},
+		{Code: `<App>foo <A /> bar <B /></App>`, Tsx: true, Output: []string{"<App>\nfoo\n<A />\n{' '}\nbar\n<B />\n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine", Message: "`foo ` must be placed on a new line"},
+			{MessageId: "moveToNewLine", Message: "`A` must be placed on a new line"},
+			{MessageId: "moveToNewLine", Message: "` bar ` must be placed on a new line"},
+			{MessageId: "moveToNewLine", Message: "`B` must be placed on a new line"},
+		}},
 		{Code: "<App>foo \n</App>", Tsx: true, Output: []string{"<App>\nfoo \n</App>"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "moveToNewLine"},
 		}},

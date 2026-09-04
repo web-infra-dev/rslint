@@ -188,14 +188,40 @@ type fixDetails struct {
 	trailingNewline  bool
 }
 
+func hasSuppressedJSXPredecessor(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
+	for _, previous := range details.leadingSpaceFrom {
+		previousDetails := detailsByChild[previous]
+		if reactutil.IsJsxLike(previous) && previousDetails != nil &&
+			!previousDetails.firstChild && !shouldKeepLeadingSpace(previousDetails, detailsByChild) {
+			return true
+		}
+		if isJSXText(previous) && previousDetails != nil &&
+			hasSuppressedJSXPredecessor(previousDetails, detailsByChild) {
+			return true
+		}
+	}
+	return false
+}
+
 func shouldKeepLeadingSpace(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
 	for _, previous := range details.leadingSpaceFrom {
 		previousDetails := detailsByChild[previous]
+		if isJSXText(previous) && previousDetails != nil &&
+			hasSuppressedJSXPredecessor(previousDetails, detailsByChild) {
+			return false
+		}
 		if !isJSXText(previous) || previousDetails == nil || !previousDetails.firstChild {
 			return true
 		}
 	}
 	return false
+}
+
+func shouldKeepTrailingTextSpace(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
+	if details.firstChild || details.trailingSpace {
+		return false
+	}
+	return !hasSuppressedJSXPredecessor(details, detailsByChild)
 }
 
 func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
@@ -336,7 +362,7 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 		ctx.ReportRangeWithDeferredFixes(core.NewTextRange(child.Pos(), child.End()), message, func() []rule.RuleFix {
 			rawSource := nodeSource(source, child)
 			fixedSource := fixSource(rawSource)
-			if isJSXText(child) && !currentDetails.firstChild && !currentDetails.trailingSpace && hasTrailingTextSpace(rawSource) {
+			if isJSXText(child) && hasTrailingTextSpace(rawSource) && shouldKeepTrailingTextSpace(&currentDetails, detailsByChild) {
 				fixedSource += " "
 			}
 			leadingSpace := ""
