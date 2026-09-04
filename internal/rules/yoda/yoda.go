@@ -169,58 +169,14 @@ func (v literalValue) lessOrEqual(other literalValue) bool {
 	// operand via StringToBigInt for an exact BigInt comparison rather than
 	// parsing it as a Number.
 	if v.kind == "bigint" && other.kind == "string" {
-		n, ok := stringToBigInt(other.str)
+		n, ok := ecmascript.StringToBigInt(other.str)
 		return ok && v.big.Cmp(n) <= 0
 	}
 	if v.kind == "string" && other.kind == "bigint" {
-		n, ok := stringToBigInt(v.str)
+		n, ok := ecmascript.StringToBigInt(v.str)
 		return ok && n.Cmp(other.big) <= 0
 	}
 	return v.numeric() <= other.numeric()
-}
-
-// stringToBigInt parses s the way JS's StringToBigInt does: surrounding
-// whitespace is trimmed, an empty string is 0, and the remainder must be a
-// (optionally signed) decimal integer or an unsigned 0x/0o/0b-prefixed
-// integer — no decimal point, exponent, or trailing garbage. Anything else
-// fails to parse, matching JS returning undefined (which makes the
-// comparison false, not a numeric fallback).
-func stringToBigInt(s string) (*big.Int, bool) {
-	rest := ecmascript.StringTrim(s)
-	if rest == "" {
-		return big.NewInt(0), true
-	}
-	hasSign := false
-	neg := false
-	if rest[0] == '+' || rest[0] == '-' {
-		hasSign = true
-		neg = rest[0] == '-'
-		rest = rest[1:]
-	}
-	base := 10
-	if len(rest) > 1 && rest[0] == '0' {
-		switch rest[1] {
-		case 'x', 'X':
-			base, rest = 16, rest[2:]
-		case 'o', 'O':
-			base, rest = 8, rest[2:]
-		case 'b', 'B':
-			base, rest = 2, rest[2:]
-		}
-	}
-	if base != 10 && hasSign {
-		// JS's StringIntegerLiteral only allows a sign before a decimal
-		// StrNumericLiteral; a signed 0x/0o/0b literal never parses.
-		return nil, false
-	}
-	n, ok := new(big.Int).SetString(rest, base)
-	if !ok {
-		return nil, false
-	}
-	if neg {
-		n.Neg(n)
-	}
-	return n, true
 }
 
 // compareBigIntFloat compares b against f using exact arithmetic, matching
