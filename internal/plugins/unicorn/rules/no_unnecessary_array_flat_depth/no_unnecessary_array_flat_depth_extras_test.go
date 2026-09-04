@@ -4,7 +4,9 @@
 package no_unnecessary_array_flat_depth_test
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -69,6 +71,19 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 			{Code: `Object.seal({}).flat(1)`, FileName: "file.js"},
 			{Code: `Object.preventExtensions({}).flat(1)`, FileName: "file.js"},
 			{Code: `Object.freeze("x").flat(1)`, FileName: "file.js"},
+			{Code: `Object.freeze(1n).flat(1)`, FileName: "file.js"},
+			{Code: `Object.freeze(Math.PI).flat(1)`, FileName: "file.js"},
+			{Code: `Object.preventExtensions({...{value: 1}}).flat(1)`, FileName: "file.js"},
+			{Code: `const value = 1n; Object.freeze(value).flat(1)`, FileName: "file.js"},
+			{Code: `Object.freeze(Number).flat(1)`, FileName: "file.js"},
+			{Code: `const value = Number; Object.freeze(value).flat(1)`, FileName: "file.js"},
+			{Code: `Object.freeze({value: Number}).flat(1)`, FileName: "file.js"},
+			{Code: `Object.freeze({...Number}).flat(1)`, FileName: "file.js"},
+			{Code: `Object.freeze([1, 2].length).flat(1)`, FileName: "file.js"},
+			{
+				Code:     `const value = Object.freeze(1); Object.freeze({value}).flat(1)`,
+				FileName: "file.js",
+			},
 			{Code: `const obj = {}; Object.freeze(obj).flat(1)`, FileName: "file.js"},
 			{Code: `const obj = {}; Object.seal(obj).flat(1)`, FileName: "file.js"},
 			{Code: `const obj = {}; Object.preventExtensions(obj).flat(1)`, FileName: "file.js"},
@@ -214,6 +229,99 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 				"file.js",
 				1,
 			),
+			depthInvalid(
+				`const value = {}; const alias = value; alias.member = []; Object.freeze(value.member).flat(1)`,
+				`1`,
+				`const value = {}; const alias = value; alias.member = []; Object.freeze(value.member).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const value = {member: {}}; Object.freeze(value.member).flat(1)`,
+				`1`,
+				`const value = {member: {}}; Object.freeze(value.member).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const Math = {PI: []}; Object.freeze(Math.PI).flat(1)`,
+				`1`,
+				`const Math = {PI: []}; Object.freeze(Math.PI).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const Number = getValue(); Object.freeze(Number).flat(1)`,
+				`1`,
+				`const Number = getValue(); Object.freeze(Number).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const value = Math.PI; Object.freeze(value).flat(1)`,
+				`1`,
+				`const value = Math.PI; Object.freeze(value).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`Object.freeze({...unknown}).flat(1)`,
+				`1`,
+				`Object.freeze({...unknown}).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`Object.freeze({method() {}}).flat(1)`,
+				`1`,
+				`Object.freeze({method() {}}).flat()`,
+				"file.js",
+			),
+			depthInvalidAt(
+				`Object.freeze({get value() { return 1 }}).flat(1)`,
+				`1`,
+				`Object.freeze({get value() { return 1 }}).flat()`,
+				"file.js",
+				1,
+			),
+			depthInvalid(
+				`Object.freeze({value: () => {}}).flat(1)`,
+				`1`,
+				`Object.freeze({value: () => {}}).flat()`,
+				"file.js",
+			),
+			depthInvalidAt(
+				`Object.freeze({value: Object.freeze(1)}).flat(1)`,
+				`1`,
+				`Object.freeze({value: Object.freeze(1)}).flat()`,
+				"file.js",
+				1,
+			),
+			depthInvalid(
+				`const x = {a: {}}; const y = x; y.a = []; Object.freeze((true ? x : {}).a).flat(1)`,
+				`1`,
+				`const x = {a: {}}; const y = x; y.a = []; Object.freeze((true ? x : {}).a).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`const x = {a: {}}; const y = x; y.a = []; Object.freeze((0, x).a).flat(1)`,
+				`1`,
+				`const x = {a: {}}; const y = x; y.a = []; Object.freeze((0, x).a).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`Object.freeze(({}).missing).flat(1)`,
+				`1`,
+				`Object.freeze(({}).missing).flat()`,
+				"file.js",
+			),
+			depthInvalid(
+				`Object.freeze([][0]).flat(1)`,
+				`1`,
+				`Object.freeze([][0]).flat()`,
+				"file.js",
+			),
+			depthInvalidAt(
+				`Object.freeze("x"[1]).flat(1)`,
+				`1`,
+				`Object.freeze("x"[1]).flat()`,
+				"file.js",
+				1,
+			),
 
 			// ---- Dimension 4: single- and multi-level receiver parentheses are
 			// transparent for detection and remain intact after the fix. ----
@@ -305,6 +413,36 @@ func TestNoUnnecessaryArrayFlatDepthExtras(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoUnnecessaryArrayFlatDepthBoundsRepeatedAliases(t *testing.T) {
+	var source strings.Builder
+	source.WriteString("const value0 = [];\n")
+	for index := 1; index <= 24; index++ {
+		fmt.Fprintf(&source, "const value%d = [value%d, value%d];\n", index, index-1, index-1)
+	}
+	source.WriteString("Object.freeze(value24).flat(1);\n")
+
+	compilerProgram, sourceFile := createNoUnnecessaryArrayFlatDepthProgram(t, "repeated-aliases.js", source.String())
+	diagnostics := lintNoUnnecessaryArrayFlatDepthWithDemand(compilerProgram, sourceFile, rule.EditDemandNone)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+	}
+}
+
+func TestNoUnnecessaryArrayFlatDepthBoundsScalarAliases(t *testing.T) {
+	var source strings.Builder
+	source.WriteString("const value0 = 0;\n")
+	for index := 1; index <= 24; index++ {
+		fmt.Fprintf(&source, "const value%d = value%d + value%d;\n", index, index-1, index-1)
+	}
+	source.WriteString("Object.freeze(value24).flat(1);\n")
+
+	compilerProgram, sourceFile := createNoUnnecessaryArrayFlatDepthProgram(t, "scalar-aliases.js", source.String())
+	diagnostics := lintNoUnnecessaryArrayFlatDepthWithDemand(compilerProgram, sourceFile, rule.EditDemandNone)
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1", len(diagnostics))
+	}
 }
 
 func TestNoUnnecessaryArrayFlatDepthEditDemand(t *testing.T) {
