@@ -106,8 +106,8 @@ func functionReturnsJSXInternal(fn *ast.Node, acceptNull bool, pragma string, tc
 
 // isJSXExpression reports whether `expr` may evaluate to JSX (or to `null`
 // when `acceptNull` is true) on at least one control-flow path. Walks through
-// ParenthesizedExpression, TS expression wrappers (`as` / `satisfies` / `<T>x`
-// / `x!`), ConditionalExpression and LogicalExpression (NON-strict semantics:
+// ParenthesizedExpression, ConditionalExpression and LogicalExpression
+// (NON-strict semantics:
 // either side qualifying is enough), comma-sequence right-most operands, and
 // optional chains. A `<pragma>.createElement(...)` CallExpression also
 // qualifies — upstream's jsxUtil.isReturningJSX treats `createElement` calls
@@ -137,8 +137,18 @@ func functionReturnsJSXInternal(fn *ast.Node, acceptNull bool, pragma string, tc
 // recurse. No depth bookkeeping needed because the function does not
 // recurse on Identifier; the only recursion sites (Conditional / comma /
 // `&&` / `||` / `??`) walk strictly smaller AST subtrees.
+//
+// TS expression wrappers (`as` / `satisfies` / `<T>x` / `x!`) are deliberately
+// NOT peeled back here. ESTree has no node for parentheses, so upstream's
+// `isJSXValue` sees straight through them, but TSESTree DOES keep
+// TSAsExpression / TSSatisfiesExpression / TSTypeAssertion /
+// TSNonNullExpression as real nodes, and `isJSXValue` falls through to its
+// `default: return false` for every one of them. So
+// `function Hello() { return <div /> as ReactNode; }` is not a component
+// upstream, and peeling the wrapper here would report components ESLint never
+// reports.
 func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker.Checker) bool {
-	expr = SkipExpressionWrappers(expr)
+	expr = ast.SkipParentheses(expr)
 	if expr == nil {
 		return false
 	}
@@ -161,7 +171,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 		if init == nil {
 			return false
 		}
-		init = SkipExpressionWrappers(init)
+		init = ast.SkipParentheses(init)
 		switch init.Kind {
 		case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 			return true

@@ -415,28 +415,12 @@ func hasTranspilerNameForClass(node *ast.Node) bool {
 	return false
 }
 
-// outermostWrapperCall walks up through nested pragma-wrapper calls and
-// returns the outer-most CallExpression that matches `wrappers`. Mirrors
-// upstream's `getPragmaComponentWrapper` loop. Used for the
-// `Components.detect` redirect from inner FunctionLike to its outer wrapper
-// call, so that the report node's range tracks upstream's
-// `getStatelessComponent` output.
+// outermostWrapperCall returns the outer-most component-wrapper
+// CallExpression around `fn`, using this walker's memoized wrapper matcher.
+// See reactutil.OutermostComponentWrapperCallFunc for the upstream
+// `getPragmaComponentWrapper` semantics it mirrors.
 func (w *nodeWalker) outermostWrapperCall(fn *ast.Node) *ast.Node {
-	cur := reactutil.SkipExpressionWrappersUp(fn)
-	if cur == nil || cur.Kind != ast.KindCallExpression ||
-		!w.matchesComponentWrapper(cur, fn) {
-		return nil
-	}
-	for {
-		next := reactutil.SkipExpressionWrappersUp(cur)
-		if next == nil || next.Kind != ast.KindCallExpression {
-			return cur
-		}
-		if !w.matchesComponentWrapper(next, cur) {
-			return cur
-		}
-		cur = next
-	}
+	return reactutil.OutermostComponentWrapperCallFunc(fn, w.matchesComponentWrapper)
 }
 
 func (w *nodeWalker) matchesComponentWrapper(call, fn *ast.Node) bool {
@@ -867,44 +851,6 @@ func (w *nodeWalker) resolveDeepRelatedComponent(member *ast.Node) *ast.Node {
 	return reactutil.SkipExpressionWrappers(node)
 }
 
-// isAsyncGenerator reports whether `node` is a function expression /
-// declaration / shorthand method that is BOTH `async` AND a generator.
-// Mirrors upstream's `Components.detect` listener gate
-// `node.async && node.generator → components.add(node, 0)` — confidence 0
-// nodes are PERMANENTLY banned from `components.list()`. Arrow functions
-// cannot be generators (syntax) so this never fires on KindArrowFunction.
-//
-// In tsgo, the syntactic generator marker is `AsteriskToken` on the
-// FunctionDeclaration / FunctionExpression / MethodDeclaration; the
-// `async` modifier is in the modifiers list.
-func isAsyncGenerator(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	mods := node.Modifiers()
-	hasAsync := false
-	if mods != nil {
-		for _, m := range mods.Nodes {
-			if m.Kind == ast.KindAsyncKeyword {
-				hasAsync = true
-				break
-			}
-		}
-	}
-	if !hasAsync {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		return node.AsFunctionDeclaration().AsteriskToken != nil
-	case ast.KindFunctionExpression:
-		return node.AsFunctionExpression().AsteriskToken != nil
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().AsteriskToken != nil
-	}
-	return false
-}
-
 // classifyAndRegisterFunctionLike runs the upstream FunctionLike component
 // classification (Branch 11 of `getStatelessComponent` plus the pragma
 // wrapper redirect) and registers the node. `componentNode` is the node
@@ -918,7 +864,7 @@ func (w *nodeWalker) classifyAndRegisterFunctionLike(n *ast.Node) {
 	// silently classify here as a component and report. Arrow functions
 	// can't be generators by syntax, so the gate is naturally a no-op for
 	// KindArrowFunction.
-	if isAsyncGenerator(n) {
+	if reactutil.IsAsyncGeneratorFunction(n) {
 		return
 	}
 	directParent := reactutil.SkipExpressionWrappersUp(n)

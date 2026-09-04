@@ -1,6 +1,7 @@
 package rule_tester
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -72,4 +73,48 @@ func TestRunRuleTesterPropagatesLanguageOptions(t *testing.T) {
 			}},
 		}},
 	)
+}
+
+func TestConvertESLintTestCasesPreservesFilenameGlobalsAndTSX(t *testing.T) {
+	var suite ESLintTestSuite
+	err := json.Unmarshal([]byte(`{
+		"valid": [{
+			"code": "<div />;",
+			"filename": "example.tsx",
+			"globals": {"console": "readonly"},
+			"tsx": true
+		}],
+		"invalid": [{
+			"code": "<div />;",
+			"filename": "example.tsx",
+			"globals": {"window": "writable"},
+			"tsx": true,
+			"errors": []
+		}]
+	}`), &suite)
+	if err != nil {
+		t.Fatalf("unmarshal ESLint test suite: %v", err)
+	}
+
+	valid := ConvertESLintTestCase(suite.Valid[0])
+	if valid.FileName != "example.tsx" {
+		t.Fatalf("valid filename = %q, want example.tsx", valid.FileName)
+	}
+	if !valid.Tsx {
+		t.Fatal("valid tsx = false, want true")
+	}
+	if valid.Globals["console"] != "readonly" {
+		t.Fatalf("valid globals = %+v, want console readonly", valid.Globals)
+	}
+
+	invalid := ConvertESLintInvalidTestCase(suite.Invalid[0])
+	if invalid.FileName != "example.tsx" {
+		t.Fatalf("invalid filename = %q, want example.tsx", invalid.FileName)
+	}
+	if !invalid.Tsx {
+		t.Fatal("invalid tsx = false, want true")
+	}
+	if invalid.Globals["window"] != "writable" {
+		t.Fatalf("invalid globals = %+v, want window writable", invalid.Globals)
+	}
 }

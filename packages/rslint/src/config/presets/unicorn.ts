@@ -87,7 +87,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-console-spaces': 'error', // not implemented
     // 'unicorn/no-constant-zero-expression': 'error', // not implemented
     // 'unicorn/no-declarations-before-early-exit': 'error', // not implemented
-    // 'unicorn/no-document-cookie': 'error', // not implemented
+    'unicorn/no-document-cookie': 'error',
     // 'unicorn/no-double-comparison': 'error', // not implemented
     // 'unicorn/no-duplicate-if-branches': 'error', // not implemented
     // 'unicorn/no-duplicate-logical-operands': 'error', // not implemented
@@ -131,7 +131,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-new-buffer': 'error', // not implemented
     // 'unicorn/no-non-function-verb-prefix': 'error', // not implemented
     // 'unicorn/no-nonstandard-builtin-properties': 'error', // not implemented
-    // 'unicorn/no-null': 'error', // not implemented
+    'unicorn/no-null': 'error',
     'unicorn/no-object-as-default-parameter': 'error',
     // 'unicorn/no-object-methods-with-collections': 'error', // not implemented
     // 'unicorn/no-optional-chaining-on-undeclared-variable': 'error', // not implemented
@@ -145,7 +145,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-subtraction-comparison': 'error', // not implemented
     'unicorn/no-thenable': 'error',
     'unicorn/no-this-assignment': 'error',
-    // 'unicorn/no-this-outside-of-class': 'error', // not implemented
+    'unicorn/no-this-outside-of-class': 'error',
     // 'unicorn/no-top-level-assignment-in-function': 'error', // not implemented
     // 'unicorn/no-top-level-side-effects': 'error', // not implemented
     // 'unicorn/no-transition-all': 'error', // not implemented
