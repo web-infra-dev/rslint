@@ -286,15 +286,16 @@ func relatedReactClassAssignment(ctx rule.RuleContext, symbol *ast.Symbol, path 
 			parent = parent.Parent
 		}
 		if parent == nil || parent.Kind != ast.KindBinaryExpression {
-			continue
+			return false
 		}
 		binary := parent.AsBinaryExpression()
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind == ast.KindCommaToken || binary.Right == nil {
-			continue
+			return false
 		}
 		if isReactClass(reactutil.SkipExpressionWrappers(binary.Right), pragma) {
 			return true
 		}
+		return false
 	}
 	return false
 }

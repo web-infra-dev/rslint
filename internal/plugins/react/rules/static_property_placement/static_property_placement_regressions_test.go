@@ -12,6 +12,7 @@ func TestStaticPropertyPlacementRegressions(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `abstract class C extends React.Component { abstract propTypes: Props; abstract context: Context; }`, Tsx: true},
 			{Code: `let Box = { C: {} }; Box.C.propTypes = {}; Box.C = class extends React.Component {};`, Tsx: true},
+			{Code: `let Box = {}; Box.C = {}; Box.C = class extends React.Component {}; Box.C.propTypes = {};`, Tsx: true},
 			{Code: `const Box = { C: class extends React.Component {} }; Box.C["displayName"] = {};`, Options: []interface{}{staticGetter}, Tsx: true},
 			{Code: `const Box = { C: class extends React.Component {} }; Box.C['displayName'] = {};`, Tsx: true},
 			{Code: `class C extends React.Component { static ["propTypes"] = {}; }`, Options: []interface{}{staticGetter}, Tsx: true},
