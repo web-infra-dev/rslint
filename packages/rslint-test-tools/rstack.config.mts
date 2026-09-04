@@ -683,6 +683,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-concat-in-loop.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-fill-with-reference-type.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-array-from-fill.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-front-mutation.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-document-cookie.test.ts',
