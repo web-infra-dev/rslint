@@ -184,7 +184,7 @@ func (file *fileNamespaces) collectImportSpecifier(element *ast.Node) {
 }
 
 // rstestRequireBindingElements returns the object-pattern elements of a
-// variable declaration initialised by a `require` of Rstest core, and nothing
+// variable declaration initialized by a `require` of Rstest core, and nothing
 // for any other declaration.
 func rstestRequireBindingElements(declaration *ast.Node) []*ast.Node {
 	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
