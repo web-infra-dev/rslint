@@ -62,11 +62,23 @@ func isAllowedThisBinding(node *ast.Node) bool {
 		}
 
 		if parent.Kind == ast.KindFunctionDeclaration || parent.Kind == ast.KindFunctionExpression {
+			// In TypeScript, an overload signature without a body has no ESTree
+			// FunctionExpression representation (TSDeclareFunction) and does not
+			// bind `this`; it passes through to the enclosing scope.
+			if parent.Body() == nil {
+				child = parent
+				parent = parent.Parent
+				continue
+			}
 			return hasThisParameter(parent)
 		}
 
 		if isMethodLike(parent) {
-			if isInsideMethodFunction(parent, child) {
+			// In ESTree, a class method's FunctionExpression wraps parameters,
+			// type parameters, return type, and body — but only when implemented.
+			// Body-less signatures (overloads, abstract methods) do not bind `this`
+			// and continue upward to the enclosing scope.
+			if isInsideImplementedMethodFunction(parent, child) {
 				return (parent.Parent != nil && ast.IsClassLike(parent.Parent)) || hasThisParameter(parent)
 			}
 			child = parent
@@ -107,15 +119,16 @@ func isMethodLike(node *ast.Node) bool {
 	}
 }
 
-func isInsideMethodFunction(method *ast.Node, child *ast.Node) bool {
-	if child == nil {
+func isInsideImplementedMethodFunction(method *ast.Node, child *ast.Node) bool {
+	if child == nil || method.Body() == nil {
 		return false
 	}
-	if child.Kind == ast.KindParameter {
-		return true
+	// Name (computed property name) is the method's key in ESTree terms,
+	// and modifiers (decorators) attach to the MethodDefinition, outside the FunctionExpression.
+	if child == method.Name() || child.Kind == ast.KindDecorator {
+		return false
 	}
-	body := method.Body()
-	return body != nil && child == body
+	return true
 }
 
 func hasThisParameter(node *ast.Node) bool {

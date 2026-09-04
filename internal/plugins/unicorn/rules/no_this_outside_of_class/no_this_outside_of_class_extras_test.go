@@ -145,6 +145,16 @@ class Foo {
 }
 `,
 			},
+			// ---- Lock-in: Implemented class method return type and type parameter constraints ----
+			{
+				Code: "class C { method(): typeof this.foo { return null as any; } }",
+			},
+			{
+				Code: "class C { method<T extends typeof this.foo>(): void {} }",
+			},
+			{
+				Code: "class C { method() { function foo(x: typeof this.bar): void; function foo(x: any) {} } }",
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 1: Async and generator functions outside class ----
@@ -230,6 +240,11 @@ function validator(this: TrackedModel) {
 // Occurrence 1 is 'this: TrackedModel' (parameter name, ignored).
 // Occurrence 2 is 'this.subValue' (expression inside helper, reported).
 `, 2),
+			// ---- Lock-in: Body-less method/constructor signatures and abstract methods report ----
+			invalidCase("class C { method(value: typeof this.foo): void; method(value: unknown) {} }"),
+			invalidCase("abstract class C { abstract method(): typeof this.foo; }"),
+			invalidCase("abstract class C { abstract method(x: typeof this.foo): void; }"),
+			invalidCase("class C { constructor(x: typeof this.foo); constructor(x: any) {} }"),
 		},
 	)
 }
