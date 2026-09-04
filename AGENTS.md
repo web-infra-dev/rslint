@@ -54,8 +54,24 @@ This document summarizes how to work on rslint effectively and consistently.
 - By default, run tests for the packages containing changed code. If a change affects shared behavior or an exported API, also run tests for its direct consumer packages.
 - Run the full `pnpm run test:go` (Go) and `pnpm run test` (JS) suites only for broad or cross-cutting changes, changes to shared test or build infrastructure, changes whose impact cannot be scoped reliably, or when explicitly requested by CI or a reviewer.
 
+## Pre-commit Verification
+
+- Before every commit, run `pnpm run check-spell` and `pnpm run format:check`.
+- For Go changes, run `pnpm run lint:go -- --new-from-merge-base=<base-branch>` (normally `origin/main`) so only issues introduced by the current branch are reported. Do not run an unfiltered repository-wide Go lint for an ordinary scoped change.
+- Run tests only for the affected language modules:
+
+  | Changed area                        | Required tests                                                                                                                      |
+  | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+  | Go                                  | Run `go test` for changed packages. Include direct consumer packages when shared behavior or exported APIs change.                  |
+  | JavaScript/TypeScript               | Run the affected pnpm workspace tests or specific test files, not the monorepo-wide `pnpm run test`.                                |
+  | Rust                                | Run `cargo test -p <crate>` for affected crates.                                                                                    |
+  | Cross-language boundaries           | Test both the changed producer and its directly affected consumers.                                                                 |
+  | Documentation or configuration only | No language test suite is required unless executable examples, generated content, build behavior, or runtime configuration changes. |
+
 ## Commit & Pull Request Guidelines
 
+- For each user-requested code or documentation change, work on a dedicated branch whose name reflects the request. If currently on the default branch, create it before editing; reuse an appropriate existing task branch when already on one. Name new branches `<type>/<short-kebab-case-description>`, selecting the type from the requested work using Conventional Commit-style categories such as `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, or `perf`. Honor an explicit branch name from the user.
+- Do not create a branch for read-only investigation or status requests unless the user explicitly asks for one.
 - Use Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `ci:`, etc.
 - PRs should be small, with clear description, repro steps, and linked issues.
 - Include examples (commands or code) and update docs when behavior changes.
