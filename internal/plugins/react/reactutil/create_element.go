@@ -129,7 +129,9 @@ func isPragmaFactoryCallCore(
 	// `<pragma>[name](arg)`. Optional-chain access
 	// (`React?.createElement(...)`) is accepted — upstream's `isCreateElement`
 	// / `isCreateCloneElement` see `node.callee` as a (possibly optional)
-	// MemberExpression and match it just the same.
+	// MemberExpression and match it just the same. For computed access,
+	// upstream reads `node.callee.property.name`, so an identifier argument is
+	// also a match while a string literal argument is not.
 	var nameNode, pragmaExpr *ast.Node
 	switch callee.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -148,8 +150,13 @@ func isPragmaFactoryCallCore(
 	default:
 		return false
 	}
-	if nameNode == nil || nameNode.Kind != ast.KindIdentifier || !names.matches(nameNode.AsIdentifier().Text) {
+	if nameNode == nil || pragmaExpr == nil {
 		return false
 	}
-	return pragmaExpr != nil && pragmaExpr.Kind == ast.KindIdentifier && pragmaExpr.AsIdentifier().Text == pragma
+	if nameNode.Kind != ast.KindIdentifier || !names.matches(nameNode.AsIdentifier().Text) {
+		return false
+	}
+	// JSDoc casts and parentheses are absent from ESTree, while an authored
+	// TypeScript wrapper on the receiver remains visible and does not match.
+	return pragmaExpr.Kind == ast.KindIdentifier && pragmaExpr.AsIdentifier().Text == pragma
 }
