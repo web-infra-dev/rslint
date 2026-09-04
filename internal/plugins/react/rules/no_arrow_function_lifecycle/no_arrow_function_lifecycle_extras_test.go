@@ -132,6 +132,44 @@ func TestNoArrowFunctionLifecycleRuleExtras(t *testing.T) {
 			Code: "/** @extends {React.Component} */ class Hello { render = () => null; }",
 			Tsx:  true,
 		},
+		{Code: "/** @extends {React.Component<Props>} */ class Hello { render = () => null; }", Tsx: true},
+		{Code: "/** @extends React.Component */ /** other */ class Hello { render = () => null; }", Tsx: true},
+		{
+			Code:   "class Hello extends React.Component { componentDidMount = async () => { await connect(); } }",
+			Tsx:    true,
+			Output: []string{"class Hello extends React.Component { async componentDidMount() { await connect(); } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "componentDidMount" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "class Hello extends React.Component { render = <T,>(x: T): T => x }",
+			Tsx:    true,
+			Output: []string{"class Hello extends React.Component { render<T,>(x: T) { return x; } }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "class Hello extends React.Component { readonly render = () => null; }",
+			Tsx:    true,
+			Output: []string{},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "class Hello extends React.Component { accessor render = () => null; }",
+			Tsx:    true,
+			Output: []string{},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "new createReactClass({ render: () => null });",
+			Tsx:    true,
+			Output: []string{"new createReactClass({ render: function() { return null; } });"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
+		{
+			Code:   "class Hello extends React.Component { render = () => /*keep*/ {} }",
+			Tsx:    true,
+			Output: []string{"class Hello extends React.Component { render() {} }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "lifecycle", Message: "render" + upstreamLifecycleMessage}},
+		},
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArrowFunctionLifecycleRule, valid, invalid)

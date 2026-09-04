@@ -59,6 +59,12 @@ eslint-plugin-react v7.37.5 produces malformed text:
 - For computed keys such as `[render]`, rslint preserves the brackets in the
   fix, while ESLint removes them and emits malformed code such as `[render() ...`.
 
+The fixer also preserves async and TypeScript generic arrow-function
+signatures, which avoids the upstream fix dropping those semantics. For class
+fields with `readonly` or `accessor` modifiers, the rule reports the problem
+but does not offer an autofix because those modifiers are incompatible with
+methods.
+
 ## Original Documentation
 
 - [eslint-plugin-react: no-arrow-function-lifecycle](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/no-arrow-function-lifecycle.md)
