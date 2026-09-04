@@ -189,6 +189,7 @@ define.test({
     './tests/eslint-plugin-react/rules/forbid-foreign-prop-types.test.ts',
     './tests/eslint-plugin-react/rules/forbid-prop-types.test.ts',
     './tests/eslint-plugin-react/rules/prop-types.test.ts',
+    './tests/eslint-plugin-react/rules/sort-comp.test.ts',
     './tests/eslint-plugin-react/rules/forward-ref-uses-ref.test.ts',
     './tests/eslint-plugin-react/rules/function-component-definition.test.ts',
     './tests/eslint-plugin-react/rules/hook-use-state.test.ts',

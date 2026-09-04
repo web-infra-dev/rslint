@@ -73,6 +73,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_optimization"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
@@ -162,6 +163,7 @@ func GetAllRules() []rule.Rule {
 		require_optimization.RequireOptimizationRule,
 		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
+		sort_comp.SortCompRule,
 		sort_prop_types.SortPropTypesRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
