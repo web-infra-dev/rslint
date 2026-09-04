@@ -136,5 +136,5 @@ func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 	}
 	// JSDoc casts and parentheses are absent from ESTree, while an authored
 	// TypeScript wrapper on the receiver remains visible and does not match.
-	return pragmaExpr != nil && pragmaExpr.Kind == ast.KindIdentifier && pragmaExpr.AsIdentifier().Text == pragma
+	return pragmaExpr.Kind == ast.KindIdentifier && pragmaExpr.AsIdentifier().Text == pragma
 }
