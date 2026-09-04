@@ -1,0 +1,23 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkArguments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to check null used as a direct function call or constructor argument."
+        },
+        "checkStrictEquality": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to check strict equality comparisons against null."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
