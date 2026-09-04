@@ -88,6 +88,68 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 			return false
 		}
 		return isComponentName(nameNode.AsIdentifier().Text)
+	case ast.KindElementAccessExpression:
+		element := expr.AsElementAccessExpression()
+		object := ast.SkipParentheses(element.Expression)
+		name := ast.SkipParentheses(element.ArgumentExpression)
+		if object.Kind != ast.KindIdentifier || object.AsIdentifier().Text != pragma || name == nil || name.Kind != ast.KindIdentifier {
+			return false
+		}
+		return isComponentName(name.AsIdentifier().Text)
+	}
+	return false
+}
+
+// IsExplicitReactComponent reports whether a class has a JSDoc @extends or
+// @augments tag naming React.Component or React.PureComponent. This is kept
+// separate from ExtendsReactComponent because eslint-plugin-react treats the
+// JSDoc marker as an additional detection path, while other callers may need
+// to preserve the distinction between an actual extends clause and a JSDoc
+// annotation.
+func IsExplicitReactComponent(classNode *ast.Node) bool {
+	if classNode == nil {
+		return false
+	}
+	for _, doc := range classNode.JSDoc(nil) {
+		jsDoc := doc.AsJSDoc()
+		if jsDoc == nil || jsDoc.Tags == nil {
+			continue
+		}
+		for _, tag := range jsDoc.Tags.Nodes {
+			if !ast.IsJSDocAugmentsTag(tag) {
+				continue
+			}
+			augments := tag.AsJSDocAugmentsTag()
+			if augments == nil || augments.ClassName == nil {
+				continue
+			}
+			if sourceFile := ast.GetSourceFileOfNode(classNode); sourceFile != nil {
+				text := sourceFile.Text()
+				start, end := tag.Pos(), augments.ClassName.Pos()
+				if start < 0 || end < start || end > len(text) || containsJSDocTypeBraces(text[start:end]) {
+					continue
+				}
+			}
+			name := ast.SkipParentheses(augments.ClassName.AsExpressionWithTypeArguments().Expression)
+			if name == nil || name.Kind != ast.KindPropertyAccessExpression {
+				continue
+			}
+			access := name.AsPropertyAccessExpression()
+			object := ast.SkipParentheses(access.Expression)
+			property := access.Name()
+			if object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "React" && property != nil && property.Kind == ast.KindIdentifier && isComponentName(property.AsIdentifier().Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func containsJSDocTypeBraces(text string) bool {
+	for index := range len(text) {
+		if text[index] == '{' || text[index] == '}' {
+			return true
+		}
 	}
 	return false
 }
@@ -216,6 +278,20 @@ func EnclosingClass(node *ast.Node) *ast.Node {
 // Pass `sourceFile.Text()` as `text` so trailing trivia after the
 // modifier list is properly skipped.
 func ClassKeywordStart(text string, node *ast.Node) int {
+	return DeclarationKeywordStart(text, node)
+}
+
+// DeclarationKeywordStart returns the offset of a declaration's own leading
+// keyword (`class`, `function`, `var`, ...), skipping the `export` and
+// `default` modifiers that tsgo keeps on the declaration node but ESTree
+// lifts into a separate ExportNamedDeclaration / ExportDefaultDeclaration
+// wrapper. Any other modifier (decorators, `abstract`, `declare`,
+// accessibility, `async`) is PART of the declaration's range in ESTree too,
+// so trimming stops at the first one.
+//
+// Pass `sourceFile.Text()` as `text` so trivia after the modifier list is
+// skipped as well.
+func DeclarationKeywordStart(text string, node *ast.Node) int {
 	mods := node.Modifiers()
 	pos := node.Pos()
 	if mods != nil {

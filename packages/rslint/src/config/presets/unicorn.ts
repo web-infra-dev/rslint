@@ -62,7 +62,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-array-callback-reference': 'error', // not implemented
     'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
-    // 'unicorn/no-array-from-fill': 'error', // not implemented
+    'unicorn/no-array-from-fill': 'error',
     'unicorn/no-array-front-mutation': 'off',
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented
     // 'unicorn/no-array-reduce': 'error', // not implemented
@@ -145,7 +145,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-subtraction-comparison': 'error', // not implemented
     'unicorn/no-thenable': 'error',
     'unicorn/no-this-assignment': 'error',
-    // 'unicorn/no-this-outside-of-class': 'error', // not implemented
+    'unicorn/no-this-outside-of-class': 'error',
     // 'unicorn/no-top-level-assignment-in-function': 'error', // not implemented
     // 'unicorn/no-top-level-side-effects': 'error', // not implemented
     // 'unicorn/no-transition-all': 'error', // not implemented

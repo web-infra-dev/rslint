@@ -47,82 +47,6 @@ type componentEntry struct {
 	pos  int
 }
 
-// isAsyncGenerator reports whether `node` is a function expression /
-// declaration / object-literal shorthand method that is BOTH `async` AND a
-// generator (`function*` or `async *Foo() {}`). Mirrors upstream's
-// `node.async && node.generator` gate inside the `Components.detect` FE / FD
-// listeners — the only path that adds a node with `confidence 0` and excludes
-// it from `components.list()`. Arrow functions cannot be generators, so this
-// never fires on KindArrowFunction.
-//
-// MethodDeclaration is included because ESTree's
-// `Property { method: true, value: FunctionExpression }` shape funnels object-
-// literal shorthand methods through the same FE listener upstream — so a
-// `{ async *Foo() {...} }` declaration is banned upstream as an async-generator
-// FE. tsgo collapses this into a MethodDeclaration whose AsteriskToken / async
-// modifier carry the same signal; we honor it here.
-func isAsyncGenerator(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	mods := node.Modifiers()
-	hasAsync := false
-	if mods != nil {
-		for _, m := range mods.Nodes {
-			if m.Kind == ast.KindAsyncKeyword {
-				hasAsync = true
-				break
-			}
-		}
-	}
-	if !hasAsync {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		return node.AsFunctionDeclaration().AsteriskToken != nil
-	case ast.KindFunctionExpression:
-		return node.AsFunctionExpression().AsteriskToken != nil
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().AsteriskToken != nil
-	}
-	return false
-}
-
-// outermostWrapperCall walks up through nested pragma-wrapper calls (paren /
-// TS-wrapper transparent) and returns the outer-most CallExpression that
-// matches `wrappers`. Mirrors upstream's `getPragmaComponentWrapper` which
-// loops while `isPragmaComponentWrapper(currentNode.parent)` keeps yielding
-// truthy and tracks the last truthy ancestor. Returns nil when the immediate
-// effective parent is not a matching wrapper.
-//
-// Why upstream walks up: for `React.memo(React.forwardRef(arrow))`, the inner
-// arrow's getStatelessComponent returns `pragmaComponentWrapper` — the
-// OUTER-MOST wrapper, not the inner forwardRef call. The component is then
-// registered against the memo call's range, which on multi-line source
-// changes the report's line number compared to picking the inner wrapper.
-func outermostWrapperCall(fn *ast.Node, pragma string, wrappers []reactutil.ComponentWrapperEntry, tc *checker.Checker) *ast.Node {
-	cur := reactutil.SkipExpressionWrappersUp(fn)
-	if cur == nil || cur.Kind != ast.KindCallExpression ||
-		!reactutil.MatchesAnyComponentWrapperWithChecker(cur, fn, wrappers, pragma, tc) {
-		return nil
-	}
-	for {
-		// Try ascending one more level: the parent of the current
-		// wrapper call (paren/TS-wrapper transparent) must itself be a
-		// CallExpression matching the wrappers list, with `cur` as its
-		// FIRST argument.
-		next := reactutil.SkipExpressionWrappersUp(cur)
-		if next == nil || next.Kind != ast.KindCallExpression {
-			return cur
-		}
-		if !reactutil.MatchesAnyComponentWrapperWithChecker(next, cur, wrappers, pragma, tc) {
-			return cur
-		}
-		cur = next
-	}
-}
-
 // collectComponents walks the source file once and returns every node the
 // upstream `Components.detect` pipeline would register at confidence ≥ 2,
 // deduplicated by node pointer and sorted by source position. Mirrors
@@ -188,8 +112,8 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 			// MethodDeclaration form does not slip past
 			// IsStatelessReactComponentWithWrappers (which lacks this
 			// gate). Getters / setters cannot be generators by syntax,
-			// so `isAsyncGenerator` always returns false on them.
-			if isAsyncGenerator(n) {
+			// so `IsAsyncGeneratorFunction` always returns false on them.
+			if reactutil.IsAsyncGeneratorFunction(n) {
 				break
 			}
 			if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, tc, wrappers) {
@@ -203,7 +127,7 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 			// adds the node with confidence 0, which never surfaces in
 			// `components.list()`. Arrow functions can't be generators
 			// (syntax) so this gate only fires on FE/FD.
-			if n.Kind != ast.KindArrowFunction && isAsyncGenerator(n) {
+			if n.Kind != ast.KindArrowFunction && reactutil.IsAsyncGeneratorFunction(n) {
 				break
 			}
 			directParent := reactutil.SkipExpressionWrappersUp(n)
@@ -234,7 +158,7 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 				// must mirror that ascent to keep the report node's
 				// line number aligned with upstream when wrappers span
 				// multiple lines.
-				if outer := outermostWrapperCall(n, pragma, wrappers, tc); outer != nil {
+				if outer := reactutil.OutermostComponentWrapperCall(n, pragma, wrappers, tc); outer != nil {
 					add(outer)
 				} else {
 					add(n)
@@ -246,7 +170,7 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 				// only honors wrappers in its Branch 11; user wrappers
 				// applied to a FunctionLike that doesn't satisfy a
 				// branch's structural gates need this explicit check.
-				if outer := outermostWrapperCall(n, pragma, wrappers, tc); outer != nil {
+				if outer := reactutil.OutermostComponentWrapperCall(n, pragma, wrappers, tc); outer != nil {
 					add(outer)
 				}
 			}

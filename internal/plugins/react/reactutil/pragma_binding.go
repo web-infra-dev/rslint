@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 // ReferenceResolver is the file-local portion of rule.RefStore needed by
@@ -34,13 +35,9 @@ type ReferenceResolver interface {
 // `pragma` is the React pragma name (e.g. "React") — the comparison
 // against ImportDeclaration / require argument uses
 // `ecmascript.StringToLowerCase(pragma)` to match upstream's
-// `pragma.toLocaleLowerCase()` semantic. `tc` may be nil — when no
-// TypeChecker is available the function falls back to a syntax-only
-// SourceFile-wide scan via `findPragmaBindingByName`. That fallback is
-// strictly a subset of TC-based resolution (no scope precision) but
-// covers the idiomatic top-level pragma-import patterns, keeping the
-// observable wrapper-recognition behavior aligned with upstream in
-// no-tsconfig modes.
+// `pragma.toLocaleLowerCase()` semantic. `tc` may be nil — when no TypeChecker
+// is available the function uses rslint's shared lexical scope model so every
+// local binding shape is resolved before checking its import origin.
 func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.Checker) bool {
 	return IsDestructuredFromPragmaImportWithRefs(ident, pragma, tc, nil)
 }
@@ -72,13 +69,7 @@ func IsDestructuredFromPragmaImportWithRefs(
 	}
 
 	if tc == nil {
-		// Syntax-only fallback: walk up to the SourceFile and scan it
-		// for any binding that introduces `ident.Text` from the pragma
-		// module. This is strictly less precise than TC-based
-		// resolution (no scope handling, no shadowing detection) but
-		// catches the canonical top-level patterns that account for
-		// virtually all real-world React pragma imports.
-		return findPragmaBindingByName(getSourceFileNode(ident), ident.AsIdentifier().Text, pragma, pragmaLower)
+		return sourceOnlyPragmaBinding(ident, pragma, pragmaLower)
 	}
 
 	symbol := tc.GetSymbolAtLocation(ident)
@@ -150,65 +141,45 @@ func isDestructuredFromPragmaSymbol(symbol *ast.Symbol, pragma, pragmaLower stri
 	return false
 }
 
-// getSourceFileNode walks up from `node` to its enclosing SourceFile,
-// returning it as an `*ast.Node`, or nil when no SourceFile ancestor is
-// found (extremely unlikely outside of synthesized nodes).
-func getSourceFileNode(node *ast.Node) *ast.Node {
-	sf := ast.GetSourceFileOfNode(node)
-	if sf == nil {
-		return nil
-	}
-	return sf.AsNode()
-}
-
-// findPragmaBindingByName is the syntax-only fallback for
-// `IsDestructuredFromPragmaImport` when no TypeChecker is available. It
-// scans the SourceFile rooted at `root` for any declaration that
-// introduces a binding named `name` whose source is the pragma module:
-//
-//   - `import { name } from '<pragma>'`
-//   - `import { x as name } from '<pragma>'` (renamed import — local
-//     binding is `name`)
-//   - `const { name } = <pragma>` / `const { name } = require('<pragma>')`
-//   - `const name = <pragma>.name` / `const name = require('<pragma>').name`
-//   - `const { x: name } = <pragma>` / require — destructure-with-rename
-//
-// Walks the entire SourceFile rather than tracking lexical scope. This
-// is a deliberate trade-off: shadowing in inner scopes (e.g. a deeply
-// nested `function memo() {}` overriding a top-level
-// `import { memo } from 'react'`) is NOT modeled — but the recognition
-// only matters for bare callees that already passed name + non-shadow
-// checks at the call site, which makes shadowing edge-cases vanish in
-// practice.
-func findPragmaBindingByName(root *ast.Node, name string, pragma string, pragmaLower string) bool {
-	if root == nil || name == "" {
+func sourceOnlyPragmaBinding(ident *ast.Node, pragma, pragmaLower string) bool {
+	sourceFile := ast.GetSourceFileOfNode(ident)
+	if sourceFile == nil {
 		return false
 	}
-	var found bool
-	var visit func(n *ast.Node)
-	visit = func(n *ast.Node) {
-		if found || n == nil {
-			return
+	manager := scope.Build(sourceFile, scope.Options{
+		CollectReferences: true,
+		ReferenceNames:    map[string]struct{}{ident.AsIdentifier().Text: {}},
+	})
+	for _, reference := range manager.References {
+		if reference.Identifier != ident {
+			continue
 		}
-		switch n.Kind {
-		case ast.KindImportDeclaration:
-			if importDeclBindsNameFromPragma(n, name, pragmaLower) {
-				found = true
-				return
-			}
-		case ast.KindVariableDeclaration:
-			if variableDeclBindsNameFromPragma(n, name, pragma, pragmaLower) {
-				found = true
-				return
+		var declaration *scope.Variable
+		for i := len(reference.Declarations) - 1; i >= 0; i-- {
+			if reference.Declarations[i] != nil {
+				declaration = reference.Declarations[i]
+				break
 			}
 		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return found
-		})
+		if declaration == nil {
+			return false
+		}
+		if declaration.Kind == scope.DefImport {
+			if declaration.DefNode == nil || declaration.DefNode.Kind != ast.KindImportDeclaration {
+				return false
+			}
+			return importDeclBindsNameFromPragma(declaration.DefNode, ident.AsIdentifier().Text, pragmaLower)
+		}
+		if declaration.Kind != scope.DefVariable {
+			return false
+		}
+		defNode := declaration.DefNode
+		if defNode != nil && defNode.Kind == ast.KindBindingElement {
+			defNode = findEnclosingVariableDeclaration(defNode)
+		}
+		return variableDeclBindsNameFromPragma(defNode, ident.AsIdentifier().Text, pragma, pragmaLower)
 	}
-	visit(root)
-	return found
+	return false
 }
 
 // importDeclBindsNameFromPragma reports whether `decl`
@@ -218,6 +189,9 @@ func findPragmaBindingByName(root *ast.Node, name string, pragma string, pragmaL
 // (`import { x as name } from '...'`) named imports — the local binding
 // is the second identifier, which is what we match against `name`.
 func importDeclBindsNameFromPragma(decl *ast.Node, name string, pragmaLower string) bool {
+	if decl == nil || decl.Kind != ast.KindImportDeclaration {
+		return false
+	}
 	id := decl.AsImportDeclaration()
 	if id.ModuleSpecifier == nil || id.ModuleSpecifier.Kind != ast.KindStringLiteral {
 		return false

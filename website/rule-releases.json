@@ -772,5 +772,42 @@
       "rstest:require-test-timeout",
       "rstest:warn-todo"
     ]
+  },
+  {
+    "version": "0.9.1",
+    "rules": [
+      "eslint-plugin-react:hook-use-state",
+      "eslint-plugin-react:jsx-props-no-spreading",
+      "eslint-plugin-react:jsx-sort-props",
+      "eslint-plugin-react:no-adjacent-inline-elements",
+      "eslint-plugin-react:no-invalid-html-attribute",
+      "eslint-plugin-react:prop-types",
+      "eslint-plugin-react:sort-prop-types",
+      "eslint-plugin-unicorn:consistent-date-clone",
+      "eslint-plugin-unicorn:consistent-tuple-labels",
+      "eslint-plugin-unicorn:no-array-front-mutation",
+      "eslint-plugin-unicorn:no-document-cookie",
+      "eslint-plugin-unicorn:no-null",
+      "eslint-plugin-unicorn:no-object-as-default-parameter",
+      "eslint-plugin-unicorn:no-unnecessary-array-flat-depth",
+      "eslint-plugin-unicorn:no-unreadable-new-expression",
+      "eslint-plugin-unicorn:prefer-add-event-listener-options",
+      "eslint-plugin-unicorn:prefer-blob-reading-methods",
+      "eslint-plugin-unicorn:prefer-then-catch",
+      "eslint:camelcase",
+      "eslint:func-style",
+      "eslint:no-implicit-globals",
+      "eslint:prefer-named-capture-group",
+      "eslint:require-unicode-regexp",
+      "rstest:consistent-each-for",
+      "rstest:consistent-rstest-namespace",
+      "rstest:consistent-test-filename",
+      "rstest:no-conditional-tests",
+      "rstest:prefer-strict-boolean-matchers",
+      "rstest:prefer-to-be-falsy",
+      "rstest:prefer-to-be-truthy",
+      "rstest:require-awaited-expect-poll",
+      "rstest:require-mock-type-parameters"
+    ]
   }
 ]
