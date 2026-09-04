@@ -89,7 +89,10 @@ var NoRestrictedSyntaxRule = rule.Rule{
 				return
 			}
 			visitCandidates(func(index int, indexed bool) {
-				bucket.matchAndReport(index, node, mc, &ctx, indexed)
+				bucket.matchPhysical(index, node, mc, &ctx, indexed)
+			})
+			visitCandidates(func(index int, indexed bool) {
+				bucket.matchVirtual(index, node, mc, &ctx)
 			})
 		}
 
@@ -419,25 +422,27 @@ func (bucket *ruleBucket) candidates(node *ast.Node, mc *matchContext) (first, s
 	return bucket.dispatch.fallback, bucket.dispatch.byValue[value], false
 }
 
-func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool) {
+func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool) {
 	entry := &bucket.entries[index]
 	compiled := entry.compiled
 	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
 		compiled = bucket.dispatch.matched[index]
 	}
+	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
+		ctx.ReportNode(node, rule.RuleMessage{
+			Id:          "restrictedSyntax",
+			Description: entry.formatMessage(),
+		})
+	}
+}
+
+func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext) {
+	entry := &bucket.entries[index]
 	message := rule.RuleMessage{
 		Id:          "restrictedSyntax",
 		Description: entry.formatMessage(),
 	}
-	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
-
 	for _, target := range virtualTargets(node) {
-		// A self-closing JSX element is represented by the physical tsgo node
-		// as JSXElement already. Do not report that same ESTree identity twice;
-		// JSXOpeningElement remains a distinct virtual node.
-		if target == "JSXElement" && physicalMatch && estreeNameForKind(node) == target {
-			continue
-		}
 		if !selectorTargetsEstreeType(entry.compiled, target) {
 			continue
 		}
@@ -460,9 +465,6 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 		default:
 			ctx.ReportNode(node, message)
 		}
-	}
-	if physicalMatch {
-		ctx.ReportNode(node, message)
 	}
 }
 

@@ -33,6 +33,30 @@ func TestNoRestrictedSyntaxReviewRegressions(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				Code: `class C { m() {} }`,
+				Options: []interface{}{
+					map[string]interface{}{"selector": `:is(ClassDeclaration, ClassBody)`, "message": "union"},
+					map[string]interface{}{"selector": `[type='ClassDeclaration']`, "message": "physical"},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "union"},
+					{MessageId: "restrictedSyntax", Message: "physical"},
+					{MessageId: "restrictedSyntax", Message: "union"},
+				},
+			},
+			{
+				Code: `class C { m() {} }`,
+				Options: []interface{}{
+					map[string]interface{}{"selector": `:is(MethodDefinition, FunctionExpression)`, "message": "union"},
+					map[string]interface{}{"selector": `[type='MethodDefinition']`, "message": "physical"},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "union"},
+					{MessageId: "restrictedSyntax", Message: "physical"},
+					{MessageId: "restrictedSyntax", Message: "union"},
+				},
+			},
+			{
 				Code:    `const f = () => {};`,
 				Options: []interface{}{`ArrowFunctionExpression > BlockStatement`},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax"}},
