@@ -176,6 +176,10 @@ func TestNoNamespaceExtras(t *testing.T) {
 		// Dimension 4: optional chains retain the createElement member shape.
 		{Code: `React?.createElement("Panel");`, Tsx: true},
 		{Code: `(React?.createElement)("Panel");`, Tsx: true},
+		// Authored TypeScript wrappers remain visible to ESTree and therefore do
+		// not match require()'s string/callee shape.
+		{Code: `const { createElement } = require("react" as string); createElement("ns:Panel");`, Tsx: true},
+		{Code: `const { createElement } = (require as any)("react"); createElement("ns:Panel");`, Tsx: true},
 
 		// Real-user: eslint-plugin-react#3082 — React's validator passes undefined
 		// as a component type; the rule must remain silent and must not crash.
@@ -183,9 +187,34 @@ func TestNoNamespaceExtras(t *testing.T) {
 		// Real-user: eslint-plugin-react#3082 — React's validator also passes an
 		// object component type with fields.
 		{Code: `React.createElement({ x: 17 });`, Tsx: true},
+		// A type-only definition is still the latest ESLint scope definition.
+		{Code: `const createElement = React.createElement; type createElement = {}; createElement("ns:Panel");`, Tsx: true},
+		{Code: `const createElement = React.createElement; interface createElement {} createElement("ns:Panel");`, Tsx: true},
 	}
 
 	invalid := []rule_tester.InvalidTestCase{
+		// A JSDoc cast is absent from ESTree, so it is transparent around the
+		// first argument and still leaves a Literal to inspect.
+		{
+			Code:     `React.createElement(/** @type {any} */ ("ns:Panel"));`,
+			FileName: "jsdoc-create-element-argument.js",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNamespace"}},
+		},
+		// The same ESTree runtime view applies to pragma initializers.
+		{
+			Code:     `const createElement = /** @type {any} */ (React.anything); createElement("ns:Panel");`,
+			FileName: "jsdoc-create-element-initializer.js",
+			TSConfig: "tsconfig.allow-js.json",
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNamespace"}},
+		},
+		// Upstream uses the latest scope definition even when it is type-only;
+		// an import type therefore still follows the import declaration path.
+		{
+			Code:   `import type { createElement } from "react"; createElement("ns:Panel");`,
+			Tsx:    true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamespace"}},
+		},
 		// The file pragma selects the createElement factory used by the rule.
 		{
 			Code:     `/* @jsx h */ h.createElement("ns:Panel");`,

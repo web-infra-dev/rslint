@@ -3,6 +3,7 @@ package reactutil
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -318,7 +319,7 @@ func objectBindingPatternBindsName(pat *ast.Node, name string) bool {
 // introduce a `name` binding pulled from the pragma module without
 // going through a destructure pattern.
 func initializerIsPragmaMember(init *ast.Node, name, pragma, pragmaLower string) bool {
-	init = ast.SkipParentheses(init)
+	init = utils.ESTreeRuntimeExpression(init)
 	if init == nil || (init.Kind != ast.KindPropertyAccessExpression && init.Kind != ast.KindElementAccessExpression) ||
 		ast.IsOptionalChain(init) {
 		return false
@@ -334,7 +335,7 @@ func initializerIsPragmaMember(init *ast.Node, name, pragma, pragmaLower string)
 	} else {
 		obj = init.AsElementAccessExpression().Expression
 	}
-	obj = ast.SkipParentheses(obj)
+	obj = utils.ESTreeRuntimeExpression(obj)
 	if obj == nil {
 		return false
 	}
@@ -371,7 +372,7 @@ func initializerMatchesPragma(init *ast.Node, pragma, pragmaLower string) bool {
 	if init == nil {
 		return false
 	}
-	init = ast.SkipParentheses(init)
+	init = utils.ESTreeRuntimeExpression(init)
 
 	// `init` is the pragma identifier itself (`= React`).
 	if init.Kind == ast.KindIdentifier && init.AsIdentifier().Text == pragma {
@@ -389,7 +390,7 @@ func initializerMatchesPragma(init *ast.Node, pragma, pragmaLower string) bool {
 		} else {
 			obj = init.AsElementAccessExpression().Expression
 		}
-		obj = ast.SkipParentheses(obj)
+		obj = utils.ESTreeRuntimeExpression(obj)
 		if obj != nil && obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == pragma {
 			return true
 		}
@@ -416,7 +417,7 @@ func isRequireCallOfPragma(call *ast.Node, pragmaLower string) bool {
 		return false
 	}
 	c := call.AsCallExpression()
-	callee := SkipExpressionWrappers(c.Expression)
+	callee := utils.ESTreeRuntimeExpression(c.Expression)
 	if callee == nil || callee.Kind != ast.KindIdentifier ||
 		callee.AsIdentifier().Text != "require" {
 		return false
@@ -424,7 +425,7 @@ func isRequireCallOfPragma(call *ast.Node, pragmaLower string) bool {
 	if c.Arguments == nil || len(c.Arguments.Nodes) == 0 {
 		return false
 	}
-	arg := SkipExpressionWrappers(c.Arguments.Nodes[0])
+	arg := utils.ESTreeRuntimeExpression(c.Arguments.Nodes[0])
 	if arg == nil || arg.Kind != ast.KindStringLiteral {
 		return false
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const msgNoNamespace = "React component {{name}} must not be in a namespace, as React does not support them"
@@ -46,7 +47,7 @@ var NoNamespaceRule = rule.Rule{
 
 				// Upstream checks Literal, not TemplateLiteral or a TypeScript
 				// wrapper. Parentheses are skipped because ESTree flattens them.
-				argument := ast.SkipParentheses(call.Arguments.Nodes[0])
+				argument := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
 				if argument == nil || argument.Kind != ast.KindStringLiteral {
 					return
 				}
