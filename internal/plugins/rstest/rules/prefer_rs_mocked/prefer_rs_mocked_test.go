@@ -143,6 +143,36 @@ import type { Mock } from '@rstest/core';
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 2, Column: 2}},
 			},
 			{
+				// A namespace destructured out of a `require` binds the same
+				// namespace an ESM named import does.
+				Code: `import type { Mock } from '@rstest/core';
+const { rs } = require('@rstest/core');
+(getUser as Mock).mockReturnValue(user);`,
+				Output: []string{`import type { Mock } from '@rstest/core';
+const { rs } = require('@rstest/core');
+(rs.mocked(getUser)).mockReturnValue(user);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
+			},
+			{
+				// A renamed `require` binding is written under the name it
+				// binds, not under the property it reads.
+				Code: `import type { Mock } from '@rstest/core';
+const { rstest: helper } = require('rstack/test');
+(getUser as Mock).mockReturnValue(user);`,
+				Output: []string{`import type { Mock } from '@rstest/core';
+const { rstest: helper } = require('rstack/test');
+(helper.mocked(getUser)).mockReturnValue(user);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
+			},
+			{
+				// A `require` of an unrelated module binds nothing the rule may
+				// reach for, and the name it captures blocks the edit.
+				Code: `import type { Mock } from '@rstest/core';
+const { rs } = require('./helpers');
+(getUser as Mock).mockReturnValue(user);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferRsMocked", Line: 3, Column: 2}},
+			},
+			{
 				// A binding that captures the alias leaves the report unfixed.
 				Code: `import { rs as helper, type Mock } from '@rstest/core';
 function run(helper: unknown) {

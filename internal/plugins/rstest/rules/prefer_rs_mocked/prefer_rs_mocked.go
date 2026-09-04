@@ -108,9 +108,15 @@ func (file *fileNamespaces) scan() {
 
 // collectImports records which namespaces the file imports from Rstest core and
 // under which local name, because an edit has to write the name the file
-// actually binds rather than the spelling the namespace is exported under.
+// actually binds rather than the spelling the namespace is exported under. Both
+// ESM named imports and the CommonJS `const { rs } = require(...)` form bind a
+// namespace, so both are collected.
 func (file *fileNamespaces) collectImports() {
 	for _, statement := range file.ctx.SourceFile.Statements.Nodes {
+		if statement.Kind == ast.KindVariableStatement {
+			file.collectRequireStatement(statement)
+			continue
+		}
 		if statement.Kind != ast.KindImportDeclaration {
 			continue
 		}
@@ -157,11 +163,118 @@ func (file *fileNamespaces) collectImportSpecifier(element *ast.Node) {
 	}
 }
 
+// collectRequireStatement follows the namespaces destructured out of a
+// `require` of Rstest core, so a CommonJS file is fixed under the name it binds
+// just as an ESM one is.
+func (file *fileNamespaces) collectRequireStatement(statement *ast.Node) {
+	variableStatement := statement.AsVariableStatement()
+	if variableStatement == nil || variableStatement.DeclarationList == nil {
+		return
+	}
+	declarationList := variableStatement.DeclarationList.AsVariableDeclarationList()
+	if declarationList == nil || declarationList.Declarations == nil {
+		return
+	}
+	for _, declaration := range declarationList.Declarations.Nodes {
+		for _, element := range rstestRequireBindingElements(declaration) {
+			file.collectRequireBindingElement(element)
+		}
+	}
+}
+
+// rstestRequireBindingElements returns the object-pattern elements of a
+// variable declaration initialised by a `require` of Rstest core, and nothing
+// for any other declaration.
+func rstestRequireBindingElements(declaration *ast.Node) []*ast.Node {
+	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
+		return nil
+	}
+	variable := declaration.AsVariableDeclaration()
+	if variable == nil ||
+		!testFramework.IsModuleRequireCallModules(variable.Initializer, rstestUtils.RstestCoreImportModules) {
+		return nil
+	}
+	name := variable.Name()
+	if name == nil || name.Kind != ast.KindObjectBindingPattern {
+		return nil
+	}
+	pattern := name.AsBindingPattern()
+	if pattern == nil || pattern.Elements == nil {
+		return nil
+	}
+	return pattern.Elements.Nodes
+}
+
+func (file *fileNamespaces) collectRequireBindingElement(element *ast.Node) {
+	local, required := requireBindingNames(element)
+	if local == "" {
+		return
+	}
+	switch required {
+	case namespaceRs:
+		file.rs.imported = true
+		file.rs.localName = local
+	case namespaceRstest:
+		file.rstest.imported = true
+		file.rstest.localName = local
+	}
+}
+
+// requireBindingNames reports the name a binding element binds locally and the
+// property it reads off the required module. A rest element or a nested pattern
+// binds no single name and yields nothing.
+func requireBindingNames(element *ast.Node) (local string, required string) {
+	if element == nil || element.Kind != ast.KindBindingElement {
+		return "", ""
+	}
+	binding := element.AsBindingElement()
+	if binding == nil || binding.DotDotDotToken != nil {
+		return "", ""
+	}
+	name := binding.Name()
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return "", ""
+	}
+	if binding.PropertyName != nil {
+		return name.Text(), binding.PropertyName.Text()
+	}
+	return name.Text(), name.Text()
+}
+
+// isRstestUtilitiesRequireName reports whether identifier is the local name a
+// `require` of Rstest core binds a namespace to. Such a binding is the very
+// namespace an edit reaches for, so it does not make the name unavailable.
+func isRstestUtilitiesRequireName(identifier *ast.Node) bool {
+	if identifier == nil || identifier.Parent == nil || identifier.Parent.Kind != ast.KindBindingElement {
+		return false
+	}
+	element := identifier.Parent
+	if element.Name() != identifier {
+		return false
+	}
+	declaration := utils.EnclosingVariableDeclarationOfBindingElement(element)
+	if declaration == nil {
+		return false
+	}
+	found := false
+	for _, candidate := range rstestRequireBindingElements(declaration) {
+		if candidate == element {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+	_, required := requireBindingNames(element)
+	return required == namespaceRs || required == namespaceRstest
+}
+
 func (file *fileNamespaces) observeIdentifier(state *namespaceState, identifier *ast.Node) {
 	if ast.IsDeclarationName(identifier) {
 		// An Rstest utilities import binds the very namespace an edit reaches
 		// for, so it does not make the name unavailable.
-		if isRstestUtilitiesImportName(identifier) {
+		if isRstestUtilitiesImportName(identifier) || isRstestUtilitiesRequireName(identifier) {
 			return
 		}
 		if declaresBinding(identifier.Parent) {
