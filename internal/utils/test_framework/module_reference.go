@@ -160,6 +160,13 @@ func ResolveFunctionIdentifierReferenceFromSymbolModules(
 			continue
 		}
 
+		// A type-only import is erased before runtime, so it neither binds the
+		// module's export nor shadows anything: the call is the global
+		// registration, whether the `type` sits on the clause or the specifier.
+		if ast.IsTypeOnlyImportDeclaration(declaration) {
+			continue
+		}
+
 		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules); ok {
 			return name, originalNode, ReferenceModeImport
 		}
@@ -203,6 +210,12 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 
 	for _, declaration := range symbol.Declarations {
 		if declaration == nil {
+			continue
+		}
+
+		// A type-only import is erased before runtime: it binds a name in the
+		// type world only, so nothing reaches the module namespace through it.
+		if ast.IsTypeOnlyImportDeclaration(declaration) {
 			continue
 		}
 
@@ -321,7 +334,9 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 	// TypeScript assertions are erased before runtime, so
 	// `require('m') as any` still binds the module.
 	node = internalUtils.SkipAssertionsAndParens(node)
-	if node == nil || !ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
+	// The argument is checked below rather than by IsRequireCall, which would
+	// reject `require('m' as any)` before the assertion is skipped.
+	if node == nil || !ast.IsRequireCall(node, false /* requireStringLiteralLikeArgument */) {
 		return false
 	}
 
@@ -329,7 +344,7 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 	if len(arguments) == 0 || arguments[0] == nil {
 		return false
 	}
-	specifier := ast.SkipParentheses(arguments[0])
+	specifier := internalUtils.SkipAssertionsAndParens(arguments[0])
 	if specifier == nil {
 		return false
 	}

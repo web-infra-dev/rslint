@@ -54,6 +54,22 @@ func TestNoRestrictedRstestMethods(t *testing.T) {
 			// A whole-module require binds the module namespace, not the
 			// utilities object, which is the `rs` on it.
 			{Code: `const rs = require('@rstest/core'); rs.fn();`, Options: noFn},
+			// A type-only import is erased before runtime, so a namespace it
+			// binds reaches nothing: `core` stands for no value at all.
+			{
+				Code:    `import type core = require('@rstest/core'); core.rs.fn();`,
+				Options: noFn,
+			},
+			{
+				Code:    `import type * as core from '@rstest/core'; core.rs.fn();`,
+				Options: noFn,
+			},
+			// Erased under a further name, the call reaches neither the import
+			// nor a global: nothing named `mocker` is Rstest's.
+			{
+				Code:    `import type { rs as mocker } from '@rstest/core'; mocker.fn();`,
+				Options: noFn,
+			},
 
 			// ---- The ordinary members follow the binding ----
 			// A receiver the file declares itself is a different object.
@@ -146,6 +162,30 @@ func TestNoRestrictedRstestMethods(t *testing.T) {
 				Code:    `import core = require('@rstest/core'); core.rs.fn();`,
 				Options: noFn,
 				Errors:  disallowed("fn", 1, 48, 50),
+			},
+			// A type-only import of the utilities object binds no value, so
+			// the call is the global `rs` under `globals: true` rather than
+			// the erased binding — the same reading the registrations get.
+			{
+				Code:    `import type { rs } from '@rstest/core'; rs.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 44, 46),
+			},
+			{
+				Code:    `import { type rs } from '@rstest/core'; rs.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 44, 46),
+			},
+			{
+				Code:    `import type rs = require('@rstest/core'); rs.importActual('./m');`,
+				Options: noImportActual,
+				Errors:  disallowed("importActual", 1, 46, 58),
+			},
+			// An assertion on the specifier is erased too.
+			{
+				Code:    `const core = require('@rstest/core' as any); core.rs.fn();`,
+				Options: noFn,
+				Errors:  disallowed("fn", 1, 54, 56),
 			},
 			// The option object is taken as written: a name that is not a
 			// member of the utilities object matches nothing real, but it is
