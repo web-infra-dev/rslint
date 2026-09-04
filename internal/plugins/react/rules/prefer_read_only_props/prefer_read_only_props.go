@@ -473,6 +473,25 @@ func reactGenericPropsType(node *ast.Node, imports map[string]string) *ast.Node 
 	return ref.TypeArguments.Nodes[index]
 }
 
+func reactGenericPropsTypeForTraversal(node *ast.Node, imports map[string]string) *ast.Node {
+	ref := node.AsTypeReferenceNode()
+	if ref == nil || ref.TypeArguments == nil || len(ref.TypeArguments.Nodes) == 0 {
+		return nil
+	}
+	genericName, ok := reactGenericTypeNameForTraversal(ref.TypeName, imports)
+	if !ok {
+		return nil
+	}
+	index := 0
+	if genericName == "forwardRef" || genericName == "ForwardRefRenderFunction" {
+		index = 1
+	}
+	if len(ref.TypeArguments.Nodes) <= index {
+		return nil
+	}
+	return ref.TypeArguments.Nodes[index]
+}
+
 func isReactGenericType(name *ast.Node, imports map[string]string) bool {
 	_, ok := reactGenericTypeName(name, imports)
 	return ok
@@ -503,6 +522,37 @@ func reactGenericTypeName(name *ast.Node, imports map[string]string) (string, bo
 	}
 	_, ok := imports[left.AsIdentifier().Text]
 	return right.AsIdentifier().Text, ok
+}
+
+func reactGenericTypeNameForTraversal(name *ast.Node, imports map[string]string) (string, bool) {
+	if name == nil {
+		return "", false
+	}
+	if name.Kind == ast.KindIdentifier {
+		imported, ok := imports[name.AsIdentifier().Text]
+		return imported, ok && imported != "" && imported != "*" && isGenericTypeName(imported)
+	}
+	if name.Kind != ast.KindQualifiedName {
+		return "", false
+	}
+	left := entityNameLeftmost(name)
+	right := reactutil.EntityNameRightmost(name)
+	if left == nil || right == nil || left.Kind != ast.KindIdentifier || right.Kind != ast.KindIdentifier || !isGenericTypeName(right.AsIdentifier().Text) {
+		return "", false
+	}
+	_, ok := imports[left.AsIdentifier().Text]
+	return right.AsIdentifier().Text, ok
+}
+
+func entityNameLeftmost(name *ast.Node) *ast.Node {
+	for name != nil && name.Kind == ast.KindQualifiedName {
+		qualified := name.AsQualifiedName()
+		if qualified == nil {
+			return nil
+		}
+		name = qualified.Left
+	}
+	return name
 }
 
 func isGenericTypeName(name string) bool {
@@ -569,7 +619,7 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImp
 		if ref == nil {
 			return
 		}
-		if propsType := reactGenericPropsType(node, genericImports); propsType != nil {
+		if propsType := reactGenericPropsTypeForTraversal(node, genericImports); propsType != nil {
 			validateTypeNode(propsType, aliases, genericImports, report, seen)
 			return
 		}

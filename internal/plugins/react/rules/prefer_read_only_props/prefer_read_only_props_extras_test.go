@@ -142,6 +142,12 @@ function Hello(props: Props) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
 		},
 		{
+			Code:   `import React from "react"; function Hello(props: React.X.FC<{ name: string }>) { return <div/>; }`,
+			Tsx:    true,
+			Output: []string{`import React from "react"; function Hello(props: React.X.FC<{ readonly name: string }>) { return <div/>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp", Message: "Prop 'name' should be read-only."}},
+		},
+		{
 			Code:     `type Props = { name: string }; const Hello = customMemo((props: Props) => <div/>);`,
 			Settings: map[string]interface{}{"componentWrapperFunctions": []interface{}{"customMemo"}},
 			Tsx:      true,
