@@ -56,6 +56,22 @@ func TestFunctionComponentDefinitionExtras(t *testing.T) {
 			Options: named("arrow-function"),
 		},
 
+		// ---- TS `export =` is not an `export default` ----
+		// tsgo gives `export default <expr>` and `export = <expr>` the same
+		// KindExportAssignment node, but typescript-eslint models the latter as
+		// TSExportAssignment, which eslint-plugin-react's component detection
+		// never matches — so neither of these is a component upstream.
+		{
+			Code:    `export = function Hello() { return <div/>; };`,
+			Tsx:     true,
+			Options: named("arrow-function"),
+		},
+		{
+			Code:    `export = () => <div/>;`,
+			Tsx:     true,
+			Options: unnamed("function-expression"),
+		},
+
 		// ---- Dimension 4: body-absent function forms ----
 		// An overload signature and an ambient declaration have no body, so
 		// they can never return JSX and are never components.
