@@ -83,6 +83,17 @@ func shouldReportIdentifier(ctx rule.RuleContext, node *ast.Node) bool {
 	if !isShorthandPropertyRead(node) && (ast.IsIdentifierName(node) || ast.IsDeclarationNameOrImportPropertyName(node)) {
 		return false
 	}
+	// A type position never touches the value at runtime, so `const value:
+	// expect = input;` does not need the API imported.
+	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
+		return false
+	}
+	// A write such as `expect = value;` assigns to the global. Importing the
+	// name would turn the target into a read-only module binding, so the write
+	// is not a use that the import can satisfy.
+	if internalUtils.IsWriteReference(node) {
+		return false
+	}
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
 		switch parent.Kind {
 		case ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport,

@@ -6,6 +6,8 @@ This rule requires test files to import every Rstest API they use when Rstest gl
 
 It recognizes all APIs provided by Rstest's `globals` setting, including `expect`, `assert`, `rs`, `rstest`, and the lifecycle hooks. Imports and destructured `require()` calls from either `@rstest/core` or `rstack/test` satisfy the rule. Local value declarations with the same names are ignored. Do not enable this rule together with `rstest/no-importing-rstest-globals`.
 
+Only a runtime read of the API counts. A type position such as `const value: expect = input` never reaches the value, and a write such as `expect = value` assigns to the global rather than reading it — an import binding is read-only, so an import could not stand in for either one. Both are left alone.
+
 ## Incorrect
 
 ```javascript

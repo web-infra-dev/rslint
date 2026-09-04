@@ -15,6 +15,10 @@ func TestNoImportingRstestGlobalsExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// N/A: optional chains and literal kinds do not affect import discovery.
 			{Code: `const value = ({ test: local }).test;`},
+			// A computed key that is not a static string names no known export;
+			// `expect` here is read as a value, not used as the property name.
+			{Code: `const { [expect]: local } = require('@rstest/core');`},
+			{Code: `const { [key]: local } = require('@rstest/core');`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: a parenthesized require initializer ----
@@ -45,6 +49,10 @@ func TestNoImportingRstestGlobalsExtras(t *testing.T) {
 				{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10},
 				{MessageId: "noImportingRstestGlobals", Line: 1, Column: 18},
 			}},
+			// ---- Real-user: a string-literal key names the same export as an
+			// identifier key, so it is reported and removed the same way ----
+			{Code: `const { 'expect': expect, defineConfig } = require('@rstest/core');`, Output: []string{`const { defineConfig } = require('@rstest/core');`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
+			{Code: `const { ['expect']: expect, defineConfig } = require('@rstest/core');`, Output: []string{`const { defineConfig } = require('@rstest/core');`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
 			// ---- Real-user: namespace member invocation remains valid as a global ----
 			{Code: "import { rs } from '@rstest/core';\nrs.fn();", Output: []string{"\nrs.fn();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10}}},
 		},

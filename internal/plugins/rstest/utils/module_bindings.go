@@ -52,6 +52,13 @@ func ImportedSpecifierName(element *ast.Node) string {
 	return name.Text()
 }
 
+// RequireBindingImportedName returns the name a destructured `require` binding
+// pulls off the module. An identifier key and a string-literal key name the
+// same export, so `{ expect }` and `{ 'expect': local }` both report `expect`.
+// A computed key only counts when it is a static string: `{ [expect]: local }`
+// reads whatever `expect` holds at runtime and names no known export, so
+// treating its text as the key would report a binding the module never
+// provides.
 func RequireBindingImportedName(element *ast.Node) string {
 	binding := element.AsBindingElement()
 	if binding == nil || binding.DotDotDotToken != nil {
@@ -60,14 +67,23 @@ func RequireBindingImportedName(element *ast.Node) string {
 	name := binding.PropertyName
 	if name == nil {
 		name = binding.Name()
-	} else if name.Kind == ast.KindComputedPropertyName {
-		name = ast.SkipParentheses(name.AsComputedPropertyName().Expression)
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return ""
+		}
+		return name.AsIdentifier().Text
 	}
-	if name == nil || (name.Kind != ast.KindIdentifier && !ast.IsStringLiteralLike(name)) {
-		return ""
+	if name.Kind == ast.KindComputedPropertyName {
+		value, ok := internalUtils.GetStaticStringLiteralValue(ast.SkipParentheses(name.AsComputedPropertyName().Expression))
+		if !ok {
+			return ""
+		}
+		return value
 	}
 	if name.Kind == ast.KindIdentifier {
 		return name.AsIdentifier().Text
+	}
+	if !ast.IsStringLiteralLike(name) {
+		return ""
 	}
 	return internalUtils.GetStaticStringValue(name)
 }

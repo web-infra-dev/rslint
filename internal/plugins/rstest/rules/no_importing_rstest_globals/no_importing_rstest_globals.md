@@ -6,6 +6,8 @@ This rule disallows importing Rstest test APIs when the project enables Rstest g
 
 It checks named imports and destructured `require()` calls from `@rstest/core` and `rstack/test`, including aliased bindings. Type-only, default, and namespace imports are ignored. Do not enable this rule together with `rstest/prefer-importing-rstest-globals`.
 
+In a destructured `require()`, the property key decides which export a binding pulls in, so a string-literal key is treated exactly like an identifier key: `const { 'expect': expect } = require('@rstest/core')` names the same export as `const { expect } = require('@rstest/core')` and is reported. A computed key counts only when it is a static string; `const { [expect]: local } = require('@rstest/core')` reads `expect` as a value rather than naming an export, so it is left alone.
+
 ## Incorrect
 
 ```javascript

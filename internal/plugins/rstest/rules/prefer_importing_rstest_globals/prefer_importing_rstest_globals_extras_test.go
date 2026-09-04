@@ -20,6 +20,15 @@ func TestPreferImportingRstestGlobalsExtras(t *testing.T) {
 			{Code: `const rs = service?.rs; rs.fn();`},
 			// A shorthand that is assigned to writes the binding instead of reading it.
 			{Code: `({ expect } = holder);`},
+			// A write to the global cannot be satisfied by an import, whose
+			// binding is read-only.
+			{Code: `expect = value;`},
+			{Code: `expect += 1;`},
+			{Code: `expect++;`},
+			{Code: `[expect] = holder;`},
+			// A type position does not use the API at runtime.
+			{Code: `const value: expect = input;`},
+			{Code: `type Alias = typeof expect;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: globals used through member and optional-call chains ----
