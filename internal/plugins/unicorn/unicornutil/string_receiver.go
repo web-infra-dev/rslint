@@ -27,7 +27,7 @@ func IsKnownNonStringType(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 
-	return classifyStringType(ctx, node) == TypeNonTarget
+	return classifyRequiredStringType(ctx, node) == TypeNonTarget
 }
 
 type stringReceiverWalkState struct {
@@ -294,9 +294,55 @@ func classifyStringClass(
 		if heritage == nil {
 			return TypeUnknown
 		}
-		return classifyStringTypeReference(ctx, heritage.Expression, visitedSymbols)
+		return classifyStringClassReference(ctx, heritage.Expression, visitedSymbols)
 	}
 	return TypeNonTarget
+}
+
+func classifyStringClassReference(
+	ctx rule.RuleContext,
+	node *ast.Node,
+	visitedSymbols map[*ast.Symbol]bool,
+) TypeClass {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return TypeUnknown
+	}
+	if node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression {
+		return classifyStringClass(ctx, node, visitedSymbols)
+	}
+	if !ast.IsIdentifier(node) || ctx.Refs == nil {
+		return TypeUnknown
+	}
+
+	symbol := ctx.Refs.ResolveInFileWithMeaning(
+		node, ast.SymbolFlagsValue|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
+	)
+	if symbol == nil || visitedSymbols[symbol] {
+		return TypeUnknown
+	}
+	visitedSymbols[symbol] = true
+	defer delete(visitedSymbols, symbol)
+
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil {
+			continue
+		}
+		switch declaration.Kind {
+		case ast.KindClassDeclaration, ast.KindClassExpression:
+			return classifyStringClass(ctx, declaration, visitedSymbols)
+		case ast.KindVariableDeclaration:
+			declarationList := declaration.Parent
+			variable := declaration.AsVariableDeclaration()
+			if declarationList == nil || !ast.IsVariableDeclarationList(declarationList) ||
+				declarationList.Flags&ast.NodeFlagsConst == 0 || variable.Name() == nil ||
+				!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
+				return TypeUnknown
+			}
+			return classifyStringClassReference(ctx, variable.Initializer, visitedSymbols)
+		}
+	}
+	return TypeUnknown
 }
 
 func combineStringUnion(classes []TypeClass) TypeClass {
@@ -333,6 +379,81 @@ func combineStringIntersection(classes []TypeClass) TypeClass {
 }
 
 func classifyStringType(ctx rule.RuleContext, node *ast.Node) TypeClass {
+	t := ctx.TypeChecker.GetTypeAtLocation(node)
+	return classifyStringCheckerType(ctx, t)
+}
+
+func classifyStringCheckerType(ctx rule.RuleContext, t *checker.Type) TypeClass {
+	if t == nil || utils.IsTypeAnyType(t) || utils.IsTypeUnknownType(t) || utils.IsIntrinsicErrorType(t) {
+		return TypeUnknown
+	}
+	if utils.IsTypeFlagSet(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
+		return TypeNonTarget
+	}
+	if utils.IsTypeParameter(t) {
+		constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
+		if constraint == nil {
+			return TypeUnknown
+		}
+		return classifyStringCheckerType(ctx, constraint)
+	}
+	if utils.IsUnionType(t) {
+		parts := utils.UnionTypeParts(t)
+		classes := make([]TypeClass, 0, len(parts))
+		for _, part := range parts {
+			classes = append(classes, classifyStringCheckerType(ctx, part))
+		}
+		return combineStringUnion(classes)
+	}
+	if utils.IsIntersectionType(t) {
+		parts := utils.IntersectionTypeParts(t)
+		classes := make([]TypeClass, 0, len(parts))
+		for _, part := range parts {
+			classes = append(classes, classifyStringCheckerType(ctx, part))
+		}
+		return combineStringIntersection(classes)
+	}
+	if utils.IsTypeFlagSet(t, checker.TypeFlagsStringLiteral) ||
+		(utils.IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "string") {
+		return TypeTarget
+	}
+
+	constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
+	if constraint != nil && constraint != t {
+		return classifyStringCheckerType(ctx, constraint)
+	}
+	if stringTypeHasTargetBase(ctx, t) {
+		return TypeTarget
+	}
+	if utils.IsIntrinsicType(t) {
+		return TypeNonTarget
+	}
+	if _, ok := TypeSymbolName(t); !ok {
+		return TypeUnknown
+	}
+	// is-string.js configures createTypeCheckers with no target type names, so
+	// every named non-intrinsic type is a known non-string at this point.
+	return TypeNonTarget
+}
+
+func stringTypeHasTargetBase(ctx rule.RuleContext, t *checker.Type) bool {
+	symbol := checker.Type_symbol(t)
+	if symbol == nil || symbol.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) == 0 {
+		return false
+	}
+	declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)
+	if declared == nil {
+		return false
+	}
+	for _, base := range checker.Checker_getBaseTypes(ctx.TypeChecker, declared) {
+		if classifyStringCheckerType(ctx, base) == TypeTarget {
+			return true
+		}
+	}
+	return false
+}
+
+func classifyRequiredStringType(ctx rule.RuleContext, node *ast.Node) TypeClass {
 	t := ctx.TypeChecker.GetTypeAtLocation(node)
 	return ClassifyType(ctx, t, TypeClassifierOptions{
 		HeritageSymbolFlags:          ast.SymbolFlagsClass | ast.SymbolFlagsInterface,

@@ -84,6 +84,13 @@ func TestPreferStringTrimStartEndExtras(t *testing.T) {
 
 			// ---- Dimension 3: autofix comment boundary ----
 			trimInvalid(`foo./* before */trimLeft/* after */()`, "file.js", "trimLeft", "trimStart", 0),
+
+			// ---- Regression: symbol-less checker types remain unknown ----
+			// Unicorn reports literal primitives and symbol-less object types
+			// because the checker cannot prove a named non-string type for them.
+			trimInvalid(`(1).trimLeft()`, "file.ts", "trimLeft", "trimStart", 0),
+			trimInvalid(`const value = 1; value.trimRight()`, "file.ts", "trimRight", "trimEnd", 0),
+			trimInvalid(`([1, 2] as const).trimLeft()`, "file.ts", "trimLeft", "trimStart", 0),
 		},
 	)
 }
@@ -213,6 +220,16 @@ func TestPreferStringTrimStartEndSourceOnly(t *testing.T) {
 		{
 			name: "local class heritage",
 			code: `class Base {} class Collection extends Base {} function f(foo: Collection) { foo.trimLeft(); }`,
+			want: 0,
+		},
+		{
+			name: "const alias in class heritage",
+			code: `class Base {} const Alias = Base; class Collection extends Alias {} function f(foo: Collection) { foo.trimLeft(); }`,
+			want: 0,
+		},
+		{
+			name: "const class expression in heritage",
+			code: `const Alias = class {}; class Collection extends Alias {} function f(foo: Collection) { foo.trimRight(); }`,
 			want: 0,
 		},
 		{
