@@ -2,6 +2,7 @@ package no_document_cookie
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -111,18 +112,11 @@ func (tracker *documentReferenceTracker) trackGlobalRoot(name string, value trac
 func (tracker *documentReferenceTracker) globalReferences(name string) []*ast.Node {
 	var references []*ast.Node
 	for _, identifier := range tracker.identifiersByName[name] {
-		if tracker.isGlobalReference(identifier, name) {
+		if unicornutil.IsGlobalReference(tracker.ctx, identifier) {
 			references = append(references, identifier)
 		}
 	}
 	return references
-}
-
-func (tracker *documentReferenceTracker) isGlobalReference(identifier *ast.Node, name string) bool {
-	if tracker.ctx.Refs != nil {
-		return tracker.ctx.Refs.IsGlobalReference(identifier)
-	}
-	return !utils.IsShadowed(identifier, name)
 }
 
 func (tracker *documentReferenceTracker) trackExpression(node *ast.Node, value tracedValue) {
@@ -266,7 +260,7 @@ func (tracker *documentReferenceTracker) trackIdentifier(identifier *ast.Node, v
 		return
 	}
 	name := identifier.AsIdentifier().Text
-	if tracker.ctx.Globals.Access(name).IsDeclared() && tracker.isGlobalReference(identifier, name) {
+	if tracker.ctx.Globals.Access(name).IsDeclared() && unicornutil.IsGlobalReference(tracker.ctx, identifier) {
 		tracker.trackGlobalVariable(name, value)
 	}
 }
@@ -310,7 +304,7 @@ func (tracker *documentReferenceTracker) trackGlobalVariable(name string, value 
 	defer delete(tracker.globalStack, name)
 
 	for _, reference := range tracker.identifiersByName[name] {
-		if !ast.IsWriteOnlyAccess(reference) && tracker.isGlobalReference(reference, name) {
+		if !ast.IsWriteOnlyAccess(reference) && unicornutil.IsGlobalReference(tracker.ctx, reference) {
 			tracker.trackExpression(reference, value)
 		}
 	}

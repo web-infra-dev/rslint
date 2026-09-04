@@ -1,6 +1,10 @@
 package unicornutil
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import (
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
 
 // PlainParameterIdentifier returns the identifier declared by a parameter
 // whose ESTree shape is a plain Identifier. Type annotations are allowed;
@@ -30,4 +34,16 @@ func IsSameIdentifier(left *ast.Node, right *ast.Node) bool {
 	return left != nil && right != nil &&
 		ast.IsIdentifier(left) && ast.IsIdentifier(right) &&
 		left.AsIdentifier().Text == right.AsIdentifier().Text
+}
+
+// IsGlobalReference reports whether an identifier refers to an environment
+// global rather than an authored declaration in the current file.
+func IsGlobalReference(ctx rule.RuleContext, identifier *ast.Node) bool {
+	if identifier == nil || !ast.IsIdentifier(identifier) {
+		return false
+	}
+	if ctx.Refs != nil {
+		return ctx.Refs.IsGlobalReference(identifier)
+	}
+	return !utils.IsShadowed(identifier, identifier.AsIdentifier().Text)
 }

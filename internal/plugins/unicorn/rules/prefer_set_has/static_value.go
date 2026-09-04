@@ -43,6 +43,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -167,23 +168,8 @@ func getObjectLength(ctx rule.RuleContext, node *ast.Node) (int, bool) {
 // whose `value` is the key Identifier, so upstream resolves it through scope;
 // tsgo gives shorthand its own kind, so handle it explicitly.
 func lengthPropertyValue(property *ast.Node) (*ast.Node, bool) {
-	if property == nil {
-		return nil, false
-	}
-
-	var name *ast.Node
-	var value *ast.Node
-	switch property.Kind {
-	case ast.KindPropertyAssignment:
-		name = property.AsPropertyAssignment().Name()
-		value = property.AsPropertyAssignment().Initializer
-	case ast.KindShorthandPropertyAssignment:
-		name = property.AsShorthandPropertyAssignment().Name()
-		value = name
-	default:
-		return nil, false
-	}
-	if name == nil || value == nil {
+	name, value, ok := unicornutil.ObjectDataProperty(property)
+	if !ok {
 		return nil, false
 	}
 
