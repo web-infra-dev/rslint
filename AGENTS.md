@@ -51,22 +51,21 @@ This document summarizes how to work on rslint effectively and consistently.
 - Use `.txtar` only for portable regular text files. Construct symlinks, permissions, concurrency, and other OS behavior directly in Go tests.
 - Fixture helpers must reject missing or empty selections instead of allowing a test to pass without exercising a case.
 - Keep tests minimal and behavior-focused; avoid unrelated scenarios.
-- By default, run tests for the packages containing changed code. If a change affects shared behavior or an exported API, also run tests for its direct consumer packages.
-- Run the full `pnpm run test:go` (Go) and `pnpm run test` (JS) suites only for broad or cross-cutting changes, changes to shared test or build infrastructure, changes whose impact cannot be scoped reliably, or when explicitly requested by CI or a reviewer.
 
 ## Pre-commit Verification
 
 - Before every commit, run `pnpm run check-spell` and `pnpm run format:check`.
 - For Go changes, run `pnpm run lint:go -- --new-from-merge-base=<base-branch>` (normally `origin/main`) so only issues introduced by the current branch are reported. Do not run an unfiltered repository-wide Go lint for an ordinary scoped change.
-- Run tests only for the affected language modules:
+- Run tests only for affected modules. Include direct consumers when shared behavior or exported APIs change; for cross-language boundaries, test both the changed producer and its directly affected consumers.
 
-  | Changed area                        | Required tests                                                                                                                      |
-  | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-  | Go                                  | Run `go test` for changed packages. Include direct consumer packages when shared behavior or exported APIs change.                  |
-  | JavaScript/TypeScript               | Run the affected pnpm workspace tests or specific test files, not the monorepo-wide `pnpm run test`.                                |
-  | Rust                                | Run `cargo test -p <crate>` for affected crates.                                                                                    |
-  | Cross-language boundaries           | Test both the changed producer and its directly affected consumers.                                                                 |
-  | Documentation or configuration only | No language test suite is required unless executable examples, generated content, build behavior, or runtime configuration changes. |
+| Changed area                        | Scoped test requirement                                                                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Go                                  | Run `go test` for changed packages.                                                                                                |
+| JavaScript/TypeScript               | Run affected pnpm workspace tests or specific test files.                                                                          |
+| Rust                                | Run `cargo test -p <crate>` for affected crates.                                                                                   |
+| Documentation or configuration only | No language test suite is required unless executable examples, generated content, build behavior, or runtime configuration change. |
+
+- Run repository-wide lint or test suites only for broad or cross-cutting changes, shared test or build infrastructure changes, changes whose impact cannot be scoped reliably, or when explicitly requested by the user, CI, or a reviewer.
 
 ## Commit & Pull Request Guidelines
 
