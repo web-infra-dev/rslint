@@ -46,16 +46,18 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 		return false
 	}
 
-	// Pick the most relevant declaration. Upstream walks `latestDef` —
-	// for value bindings ValueDeclaration is the right one; for
-	// ImportSpecifier (which has no Initializer of its own), upstream
-	// walks `latestDef.parent.type === 'ImportDeclaration'`. We mirror
-	// by trying ValueDeclaration first then Declarations[0].
+	// Pick the latest declaration. Upstream walks `latestDef` — for
+	// ImportSpecifier (which has no Initializer of its own), upstream walks
+	// `latestDef.parent.type === 'ImportDeclaration'`.
 	var decl *ast.Node
-	if symbol.ValueDeclaration != nil {
+	for i := len(symbol.Declarations) - 1; i >= 0; i-- {
+		if symbol.Declarations[i] != nil {
+			decl = symbol.Declarations[i]
+			break
+		}
+	}
+	if decl == nil {
 		decl = symbol.ValueDeclaration
-	} else if len(symbol.Declarations) > 0 {
-		decl = symbol.Declarations[0]
 	}
 	if decl == nil {
 		return false
@@ -115,11 +117,20 @@ func sourceOnlyPragmaBinding(ident *ast.Node, pragma, pragmaLower string) bool {
 		if reference.Identifier != ident {
 			continue
 		}
-		declaration := reference.Resolved()
+		var declaration *scope.Variable
+		for i := len(reference.Declarations) - 1; i >= 0; i-- {
+			if reference.Declarations[i] != nil {
+				declaration = reference.Declarations[i]
+				break
+			}
+		}
 		if declaration == nil {
 			return false
 		}
 		if declaration.Kind == scope.DefImport {
+			if declaration.DefNode == nil || declaration.DefNode.Kind != ast.KindImportDeclaration {
+				return false
+			}
 			return importDeclBindsNameFromPragma(declaration.DefNode, ident.AsIdentifier().Text, pragmaLower)
 		}
 		if declaration.Kind != scope.DefVariable {
@@ -141,6 +152,9 @@ func sourceOnlyPragmaBinding(ident *ast.Node, pragma, pragmaLower string) bool {
 // (`import { x as name } from '...'`) named imports — the local binding
 // is the second identifier, which is what we match against `name`.
 func importDeclBindsNameFromPragma(decl *ast.Node, name string, pragmaLower string) bool {
+	if decl == nil || decl.Kind != ast.KindImportDeclaration {
+		return false
+	}
 	id := decl.AsImportDeclaration()
 	if id.ModuleSpecifier == nil || id.ModuleSpecifier.Kind != ast.KindStringLiteral {
 		return false

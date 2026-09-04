@@ -75,6 +75,7 @@ func TestPreferReadOnlyPropsExtras(t *testing.T) {
 
 		// ---- Review regressions: TypeScript-only boundary cases ----
 		{Code: `import { forwardRef } from "react"; forwardRef<HTMLDivElement>((props: { name: string }, ref) => <div/>);`, Tsx: true},
+		{Code: `declare function makeFactory<T>(): () => T; const makeProps = makeFactory<{ a: string }>(); function Hello(props: ReturnType<typeof makeProps>) { return <div/>; }`, Tsx: true},
 		{Code: `function Hello(input: { name: string }) { return <div/>; }`, Tsx: true},
 		{Code: `import { forwardRef } from "react"; type Props = { name: string }; function Demo() { const forwardRef = (value: unknown) => value; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>); return Hello; }`, Tsx: true},
 		{Code: `import React from "react"; type Props = { name: string }; type Other = { React: { FC: Props } }; const Hello: Other.React.FC<Props> = (props) => <div/>;`, Tsx: true},
@@ -404,57 +405,95 @@ func TestPreferReadOnlyPropsSourceOnlyForwardRefShadowing(t *testing.T) {
 			name: "catch parameter",
 			code: `import { forwardRef } from "react"; type Props = { name: string }; function Demo() { try { throw value; } catch (forwardRef) { const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>); return Hello; } }`,
 		},
+		{
+			name: "import equals declaration",
+			code: `import forwardRef = React.forwardRef; type Props = { name: string }; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>);`,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dir := tspath.NormalizePath(t.TempDir())
-			fileName := tspath.NormalizePath(filepath.Join(dir, "file.tsx"))
-			fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: test.code})
-			sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
-				RootFileNames:   []string{fileName},
-				Host:            utils.CreateCompilerHost(dir, fs),
-				CompilerOptions: &core.CompilerOptions{Target: core.ScriptTargetESNext},
-				SingleThreaded:  true,
-			})
-			if err != nil {
-				t.Fatalf("create source-only program: %v", err)
-			}
-
-			var diagnostics []rule.RuleDiagnostic
-			lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
-				Programs:         []*lintprogram.Program{sourceProgram},
-				TargetsByProgram: [][]string{{fileName}},
-				SingleThreaded:   true,
-				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
-					return []rule.ConfiguredRule{{
-						Name:     PreferReadOnlyPropsRule.Name,
-						Severity: rule.SeverityError,
-						Run: func(ctx rule.RuleContext) rule.RuleListeners {
-							if ctx.TypeChecker != nil {
-								t.Fatal("source-only fixture unexpectedly received a TypeChecker")
-							}
-							return PreferReadOnlyPropsRule.Run(ctx, nil)
-						},
-					}}
-				},
-			})
-			if err != nil {
-				t.Fatalf("prepare source-only lint plan: %v", err)
-			}
-			_, err = linter.RunLinter(linter.RunLinterOptions{
-				SingleThreaded: true,
-				LintPlan:       lintPlan,
-				Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
-					diagnostics = append(diagnostics, diagnostic)
-				}},
-			})
-			if err != nil {
-				t.Fatalf("lint source-only program: %v", err)
-			}
+			diagnostics := runSourceOnlyPreferReadOnlyProps(t, test.code)
 			if len(diagnostics) != 0 {
 				t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
 			}
 		})
 	}
+}
+
+func TestPreferReadOnlyPropsSourceOnlyMergedForwardRef(t *testing.T) {
+	tests := []struct {
+		name            string
+		code            string
+		wantDiagnostics int
+	}{
+		{
+			name:            "later non-React declaration wins",
+			code:            `import { forwardRef } from "react"; type Props = { name: string }; var forwardRef = React.forwardRef; var forwardRef = other; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>);`,
+			wantDiagnostics: 0,
+		},
+		{
+			name:            "later React declaration wins",
+			code:            `import { forwardRef } from "react"; type Props = { name: string }; var forwardRef = other; var forwardRef = React.forwardRef; const Hello = forwardRef<HTMLDivElement, Props>((props, ref) => <div/>);`,
+			wantDiagnostics: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			diagnostics := runSourceOnlyPreferReadOnlyProps(t, test.code)
+			if len(diagnostics) != test.wantDiagnostics {
+				t.Fatalf("diagnostic count = %d, want %d: %+v", len(diagnostics), test.wantDiagnostics, diagnostics)
+			}
+		})
+	}
+}
+
+func runSourceOnlyPreferReadOnlyProps(t *testing.T, code string) []rule.RuleDiagnostic {
+	t.Helper()
+	dir := tspath.NormalizePath(t.TempDir())
+	fileName := tspath.NormalizePath(filepath.Join(dir, "file.tsx"))
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: code})
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            utils.CreateCompilerHost(dir, fs),
+		CompilerOptions: &core.CompilerOptions{Target: core.ScriptTargetESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("create source-only program: %v", err)
+	}
+
+	var diagnostics []rule.RuleDiagnostic
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceProgram},
+		TargetsByProgram: [][]string{{fileName}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     PreferReadOnlyPropsRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != nil {
+						t.Fatal("source-only fixture unexpectedly received a TypeChecker")
+					}
+					return PreferReadOnlyPropsRule.Run(ctx, nil)
+				},
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatalf("prepare source-only lint plan: %v", err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		}},
+	})
+	if err != nil {
+		t.Fatalf("lint source-only program: %v", err)
+	}
+	return diagnostics
 }

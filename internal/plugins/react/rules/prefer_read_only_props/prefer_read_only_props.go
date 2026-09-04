@@ -622,6 +622,10 @@ func validateReturnTypeArgument(node *ast.Node, aliases map[string][]*ast.Node, 
 		}
 		name := query.ExprName.AsIdentifier().Text
 		for _, value := range topLevelVariableValues(ast.GetSourceFileOfNode(node), name) {
+			value = reactutil.SkipExpressionWrappers(value)
+			if !ast.IsFunctionLike(value) {
+				continue
+			}
 			validateReturnValue(value, aliases, genericImports, report, seen)
 		}
 	}
