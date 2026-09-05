@@ -57,6 +57,19 @@ func TestNoImportingRstestGlobalsExtras(t *testing.T) {
 			// it does not hide the require ----
 			{Code: `const { expect, defineConfig } = require('@rstest/core' as any);`, Output: []string{`const { defineConfig } = require('@rstest/core' as any);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
 			{Code: `const { expect, defineConfig } = require('@rstest/core') as any;`, Output: []string{`const { defineConfig } = require('@rstest/core') as any;`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 9}}},
+			// ---- Real-user: an exported binding is part of the module surface ----
+			// Removing it would delete an export that consumers import, so the
+			// violation is reported without a fix.
+			{Code: "export const { expect } = require('@rstest/core');\nexpect(1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 16}}},
+			{Code: "export const { expect, test } = require('@rstest/core');\nexpect(1);\ntest('x');", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 16},
+				{MessageId: "noRequiringRstestGlobals", Line: 1, Column: 24},
+			}},
+			// ---- Real-user: a require in a loop head is not owned by the
+			// nearest enclosing variable statement ----
+			// Deleting that statement would drop the surrounding declaration, so
+			// the loop-head binding is reported without a fix.
+			{Code: "const run = () => {\n  for (const { expect } = require('@rstest/core'); ready;) {\n    expect(1);\n  }\n};\nrun();", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noRequiringRstestGlobals", Line: 2, Column: 16}}},
 			// ---- Real-user: namespace member invocation remains valid as a global ----
 			{Code: "import { rs } from '@rstest/core';\nrs.fn();", Output: []string{"\nrs.fn();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noImportingRstestGlobals", Line: 1, Column: 10}}},
 		},

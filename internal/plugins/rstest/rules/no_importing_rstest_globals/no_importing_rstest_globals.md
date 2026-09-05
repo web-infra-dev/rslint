@@ -31,3 +31,5 @@ test('formats a user name', () => {
 The autofix removes each redundant import specifier or destructured property. It removes the whole import or variable statement only when every binding it declares is itself safe to remove; otherwise the surviving bindings keep the declaration.
 
 An aliased binding, a binding used outside an invocation, or a destructuring pattern containing a default value or rest element is reported without a fix because removing it could leave a reference undefined or change destructuring behavior.
+
+A binding the file exports, as in `export const { expect } = require('@rstest/core')`, is reported without a fix as well: it belongs to the module's public surface, and removing it would delete an export that consumers rely on. So is a `require()` in a loop head, such as `for (const { expect } = require('@rstest/core'); ready;)`, which no variable statement of its own owns.

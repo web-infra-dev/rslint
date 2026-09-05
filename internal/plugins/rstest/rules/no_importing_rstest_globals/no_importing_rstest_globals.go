@@ -116,9 +116,28 @@ func exportUsesName(sourceFile *ast.SourceFile, name string) bool {
 	return used
 }
 
+// isExportedBinding reports whether the binding belongs to an exported
+// declaration such as `export const { expect } = require('@rstest/core')`.
+// The binding is part of the module's public surface there, so dropping it —
+// or the statement around it — would delete an export its consumers import.
+// exportUsesName only sees `export { expect }`, which names an existing
+// binding rather than declaring one.
+func isExportedBinding(element *ast.Node) bool {
+	for current := element; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindVariableStatement:
+			return ast.HasSyntacticModifier(current, ast.ModifierFlagsExport)
+		case ast.KindSourceFile:
+			return false
+		}
+	}
+	return false
+}
+
 func bindingCanBeRemoved(ctx rule.RuleContext, element *ast.Node, importedName string) bool {
 	local := localBindingName(element)
-	if local == "" || local != importedName || ctx.Refs == nil || exportUsesName(ctx.SourceFile, local) {
+	if local == "" || local != importedName || ctx.Refs == nil ||
+		exportUsesName(ctx.SourceFile, local) || isExportedBinding(element) {
 		return false
 	}
 	symbol := element.Symbol()
@@ -166,17 +185,26 @@ func importFix(ctx rule.RuleContext, statement *ast.Node, declaration *ast.Impor
 	return nil
 }
 
-func enclosingVariableStatement(node *ast.Node) (*ast.Node, *ast.VariableDeclarationList) {
-	for current := node; current != nil; current = current.Parent {
-		if current.Kind == ast.KindVariableStatement {
-			statement := current.AsVariableStatement()
-			if statement != nil && statement.DeclarationList != nil {
-				return current, statement.DeclarationList.AsVariableDeclarationList()
-			}
-			return current, nil
-		}
+// owningVariableStatement returns the variable statement that directly holds
+// the declaration and declares nothing else. Walking up to the nearest
+// enclosing statement instead would cross function and loop boundaries: the
+// declaration in `for (const { expect } = require('@rstest/core'); ready;)`
+// belongs to the loop head, and the first variable statement above it can be
+// an unrelated outer binding that must not be deleted.
+func owningVariableStatement(declarationNode *ast.Node) *ast.Node {
+	list := declarationNode.Parent
+	if list == nil || list.Kind != ast.KindVariableDeclarationList {
+		return nil
 	}
-	return nil, nil
+	statement := list.Parent
+	if statement == nil || statement.Kind != ast.KindVariableStatement {
+		return nil
+	}
+	declarations := list.AsVariableDeclarationList().Declarations
+	if declarations == nil || len(declarations.Nodes) != 1 {
+		return nil
+	}
+	return statement
 }
 
 func requireFix(ctx rule.RuleContext, declarationNode *ast.Node, elements []*ast.Node, index int, name string) []rule.RuleFix {
@@ -190,11 +218,9 @@ func requireFix(ctx rule.RuleContext, declarationNode *ast.Node, elements []*ast
 		return nil
 	}
 	if allBindingsRemovable(ctx, elements, rstestUtils.RequireBindingImportedName) {
-		statement, list := enclosingVariableStatement(declarationNode)
-		if statement != nil && list != nil && list.Declarations != nil && len(list.Declarations.Nodes) == 1 {
+		if statement := owningVariableStatement(declarationNode); statement != nil {
 			return []rule.RuleFix{rule.RuleFixRemove(ctx.SourceFile, statement)}
 		}
-		return nil
 	}
 	if len(elements) > 1 {
 		return []rule.RuleFix{rule.RuleFixRemoveRange(rstestUtils.SpecifierRemovalRange(ctx.SourceFile, elements, index))}
