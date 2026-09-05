@@ -141,16 +141,14 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 func TestCLIConfigPreparationProtocol(t *testing.T) {
 	for _, test := range []struct {
 		name     string
-		warmup   bool
 		plugins  bool
 		mismatch bool
 		fail     bool
 	}{
-		{name: "plugins warm up", warmup: true, plugins: true},
-		{name: "native only", warmup: true},
-		{name: "single threaded", plugins: true},
-		{name: "changed metadata", warmup: true, plugins: true, mismatch: true},
-		{name: "worker failure", warmup: true, plugins: true, fail: true},
+		{name: "plugins warm up", plugins: true},
+		{name: "native only"},
+		{name: "changed metadata", plugins: true, mismatch: true},
+		{name: "worker failure", plugins: true, fail: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			cli, peer := newCLIChannelPair(t)
@@ -177,7 +175,7 @@ func TestCLIConfigPreparationProtocol(t *testing.T) {
 			})
 			cli.Start()
 			peer.Start()
-			loader := &ipcConfigModuleLoader{channel: cli, warmup: test.warmup}
+			loader := &ipcConfigModuleLoader{channel: cli}
 			_, err := loader.ActivateConfigs(context.Background(), discovery.ConfigActivationRequest{
 				ProtocolVersion: discovery.ConfigDiscoveryProtocolVersion,
 				TransactionID:   "selected", EffectiveConfigIDs: []string{"root"},
@@ -185,11 +183,8 @@ func TestCLIConfigPreparationProtocol(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			wantKinds := []ipc.MessageKind{kindActivateConfigs}
-			if test.warmup {
-				wantKinds[0] = kindPrepareConfigs
-			}
-			if test.warmup && test.plugins {
+			wantKinds := []ipc.MessageKind{kindPrepareConfigs}
+			if test.plugins {
 				if loader.completeActivation == nil {
 					t.Fatal("plugin preparation has no completion barrier")
 				}
@@ -204,5 +199,65 @@ func TestCLIConfigPreparationProtocol(t *testing.T) {
 				t.Fatalf("requests = %v, want %v", kinds, wantKinds)
 			}
 		})
+	}
+}
+
+func TestDiscoverCLISingleThreadedConfigPreparesPlugins(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, "rslint.config.mjs")
+	if err := os.WriteFile(configPath, []byte("export default [];\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli, peer := newCLIChannelPair(t)
+	var kinds []ipc.MessageKind
+	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+		kinds = append(kinds, msg.Kind)
+		if msg.Kind == kindLoadConfigs {
+			var request discovery.ConfigLoadBatchRequest
+			if err := msg.Decode(&request); err != nil {
+				return nil, err
+			}
+			if !request.SingleThreaded || len(request.Candidates) != 1 {
+				return nil, errors.New("expected one config with single-threaded module evaluation")
+			}
+			return discovery.ConfigLoadBatchResponse{
+				TransactionID: request.TransactionID,
+				Results: []discovery.ConfigLoadResult{{
+					ID: request.Candidates[0].ID, Status: "loaded",
+					Entries: config.RslintConfig{{
+						Plugins: []string{"external"},
+						Rules:   config.Rules{"external/check": "error"},
+					}},
+				}},
+			}, nil
+		}
+		var request discovery.ConfigActivationRequest
+		if err := msg.Decode(&request); err != nil {
+			return nil, err
+		}
+		return discovery.ConfigActivationResponse{
+			TransactionID:       request.TransactionID,
+			EslintPluginEntries: []config.EslintPluginEntry{{Prefix: "external", RuleNames: []string{"check"}}},
+		}, nil
+	})
+	cli.Start()
+	peer.Start()
+	args := lintArgs{FS: osvfs.FS(), SingleThreaded: true}
+	payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
+	if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(kinds, []ipc.MessageKind{kindLoadConfigs, kindPrepareConfigs}) {
+		t.Fatalf("discovery requests = %v, want load then prepare", kinds)
+	}
+	if args.CompleteConfigActivation == nil {
+		t.Fatal("single-threaded preparation has no completion barrier")
+	}
+	if err := args.CompleteConfigActivation(); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(kinds, []ipc.MessageKind{kindLoadConfigs, kindPrepareConfigs, kindActivateConfigs}) {
+		t.Fatalf("completed requests = %v, want load then prepare then activate", kinds)
 	}
 }

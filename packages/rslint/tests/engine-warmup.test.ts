@@ -38,7 +38,7 @@ interface FixtureEvent {
   plugin?: WireResult;
 }
 
-function fixture() {
+function fixture(singleThreaded: boolean) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-worker-warmup-'));
   const configPath = path.join(root, 'rslint.config.mjs');
   fs.writeFileSync(configPath, '// original config bytes\n');
@@ -51,7 +51,8 @@ function fixture() {
     }
     return deferred;
   };
-  let beforeAcknowledge = async (_event: FixtureEvent): Promise<void> => {};
+  let beforeAcknowledge = (_event: FixtureEvent): Promise<void> =>
+    Promise.resolve();
   const stdout = new Writable({
     write(chunk: Buffer, _encoding, callback) {
       const event: FixtureEvent = JSON.parse(chunk.toString());
@@ -91,6 +92,7 @@ function fixture() {
         goArgs: [FAKE_BIN, configPath, mode],
         stdout,
         stderr: new PassThrough(),
+        runtime: { singleThreaded },
         configModuleHost: new ConfigModuleHost({
           loadCached: async () => PLUGIN_CONFIG,
         }),
@@ -103,164 +105,172 @@ function fixture() {
   };
 }
 
-describe('CLI worker warmup', () => {
-  test('returns planning metadata once and joins concurrent activation and plugin requests', async () => {
-    const peer = fixture();
-    const build = gate();
-    const buildStarted = gate();
-    let createCalls = 0;
-    let shutdownCalls = 0;
-    const lintRequests: unknown[] = [];
-    peer.setAcknowledge(async ({ event }) => {
-      if (event === 'waiters-started') await buildStarted.promise;
-    });
-    const run = peer.run('concurrent', {
-      createPluginLintHost: async () => {
-        createCalls++;
-        buildStarted.resolve();
-        await build.promise;
-        return {
-          async lint(request) {
-            lintRequests.push(request);
-            return { results: [] };
-          },
-          async shutdown() {
-            shutdownCalls++;
-          },
-        };
-      },
-    });
-    try {
-      const prepared = await peer.event('prepared');
-      expect(prepared.preparation).toMatchObject({
-        kind: 'response',
-        data: {
-          transactionId: 'cli-worker-warmup',
-          eslintPluginEntries: [{ prefix: 'local', ruleNames: ['example'] }],
+describe.each([false, true])(
+  'CLI worker warmup (singleThreaded=%s)',
+  (singleThreaded) => {
+    test('returns planning metadata once and joins concurrent activation and plugin requests', async () => {
+      const peer = fixture(singleThreaded);
+      const build = gate();
+      const buildStarted = gate();
+      let createCalls = 0;
+      let shutdownCalls = 0;
+      const lintRequests: unknown[] = [];
+      peer.setAcknowledge(async ({ event }) => {
+        if (event === 'waiters-started') await buildStarted.promise;
+      });
+      const run = peer.run('concurrent', {
+        createPluginLintHost: async (
+          _configs,
+          _onLog,
+          workerSingleThreaded,
+        ) => {
+          expect(workerSingleThreaded).toBe(singleThreaded);
+          createCalls++;
+          buildStarted.resolve();
+          await build.promise;
+          return {
+            async lint(request) {
+              lintRequests.push(request);
+              return { results: [] };
+            },
+            async shutdown() {
+              shutdownCalls++;
+            },
+          };
         },
       });
-      const repeated = await peer.event('repeated');
-      expect(repeated.duplicates).toHaveLength(2);
-      for (const duplicate of repeated.duplicates ?? []) {
-        expect(duplicate.data).toEqual(prepared.preparation?.data);
-        expect(duplicate.kind).toBe('response');
-      }
-      expect(repeated.conflicts).toHaveLength(2);
-      for (const conflict of repeated.conflicts ?? []) {
-        expect(conflict).toMatchObject({
-          kind: 'error',
-          data: { message: 'engine: conflicting config activation' },
-        });
-      }
-      expect(repeated.loadAfterActivation).toMatchObject({ kind: 'error' });
-      expect((await peer.event('waiters-pending')).settled).toEqual([
-        false,
-        false,
-        false,
-      ]);
-      expect(createCalls).toBe(1);
-      expect(lintRequests).toEqual([]);
-      build.resolve();
-      const completed = await peer.event('completed');
-      expect(completed.results?.map(({ kind }) => kind)).toEqual([
-        'response',
-        'response',
-        'response',
-      ]);
-      expect(completed.results?.[0].data).toEqual(prepared.preparation?.data);
-      expect(lintRequests).toEqual([
-        { request: 'first' },
-        { request: 'second' },
-      ]);
-      expect(await run).toBe(0);
-      expect(shutdownCalls).toBe(1);
-    } finally {
-      build.resolve();
-      await run;
-      peer.dispose();
-    }
-  });
-
-  test.each([
-    ['before preparation', 'changed while it was being loaded', 0],
-    ['during preparation', 'plugin host was being prepared', 1],
-    ['factory failure', 'mocked worker import failed', 0],
-    ['without tasks', 'mocked worker import failed', 0],
-  ] as const)(
-    'propagates failure %s to the activation barrier',
-    async (phase, message, expectedShutdowns) => {
-      const peer = fixture();
-      const build = gate();
-      let reads = 0;
-      let createCalls = 0;
-      let lintCalls = 0;
-      let shutdownCalls = 0;
-      const run = peer.run(
-        phase === 'without tasks' ? 'failure-without-tasks' : 'failure',
-        {
-          configModuleHost: new ConfigModuleHost({
-            loadCached: async () => PLUGIN_CONFIG,
-            readSource: async (sourcePath) => {
-              reads++;
-              if (phase === 'before preparation' && reads === 3) {
-                fs.writeFileSync(sourcePath, '// changed before preparation\n');
-              }
-              return fs.promises.readFile(sourcePath);
-            },
-          }),
-          createPluginLintHost: async () => {
-            createCalls++;
-            await build.promise;
-            if (phase !== 'during preparation') {
-              throw new Error('mocked worker import failed');
-            }
-            fs.writeFileSync(
-              peer.configPath,
-              '// changed during preparation\n',
-            );
-            return {
-              async lint() {
-                lintCalls++;
-                return { results: [] };
-              },
-              async shutdown() {
-                shutdownCalls++;
-              },
-            };
-          },
-        },
-      );
       try {
         const prepared = await peer.event('prepared');
-        expect(prepared.preparation?.kind).toBe(
-          phase === 'before preparation' ? 'error' : 'response',
-        );
+        expect(prepared.preparation).toMatchObject({
+          kind: 'response',
+          data: {
+            transactionId: 'cli-worker-warmup',
+            eslintPluginEntries: [{ prefix: 'local', ruleNames: ['example'] }],
+          },
+        });
+        const repeated = await peer.event('repeated');
+        expect(repeated.duplicates).toHaveLength(2);
+        for (const duplicate of repeated.duplicates ?? []) {
+          expect(duplicate.data).toEqual(prepared.preparation?.data);
+          expect(duplicate.kind).toBe('response');
+        }
+        expect(repeated.conflicts).toHaveLength(2);
+        for (const conflict of repeated.conflicts ?? []) {
+          expect(conflict).toMatchObject({
+            kind: 'error',
+            data: { message: 'engine: conflicting config activation' },
+          });
+        }
+        expect(repeated.loadAfterActivation).toMatchObject({ kind: 'error' });
+        expect((await peer.event('waiters-pending')).settled).toEqual([
+          false,
+          false,
+          false,
+        ]);
+        expect(createCalls).toBe(1);
+        expect(lintRequests).toEqual([]);
         build.resolve();
         const completed = await peer.event('completed');
-        expect(completed.activation?.kind).toBe('error');
-        expect(completed.activation?.data.message).toContain(message);
-        if (phase !== 'without tasks') {
-          expect(completed.plugin?.kind).toBe('error');
-          expect(completed.plugin?.data.message).toContain(message);
-        } else {
-          expect(completed.plugin).toBeUndefined();
-        }
+        expect(completed.results?.map(({ kind }) => kind)).toEqual([
+          'response',
+          'response',
+          'response',
+        ]);
+        expect(completed.results?.[0].data).toEqual(prepared.preparation?.data);
+        expect(lintRequests).toEqual([
+          { request: 'first' },
+          { request: 'second' },
+        ]);
         expect(await run).toBe(0);
-        expect(createCalls).toBe(phase === 'before preparation' ? 0 : 1);
-        expect(lintCalls).toBe(0);
-        expect(shutdownCalls).toBe(expectedShutdowns);
+        expect(shutdownCalls).toBe(1);
       } finally {
         build.resolve();
         await run;
         peer.dispose();
       }
-    },
-  );
+    });
 
-  test.each(['native-only', 'single-threaded'] as const)(
-    'keeps %s preparation synchronous',
-    async (mode) => {
-      const peer = fixture();
+    test.each([
+      ['before preparation', 'changed while it was being loaded', 0],
+      ['during preparation', 'plugin host was being prepared', 1],
+      ['factory failure', 'mocked worker import failed', 0],
+      ['without tasks', 'mocked worker import failed', 0],
+    ] as const)(
+      'propagates failure %s to the activation barrier',
+      async (phase, message, expectedShutdowns) => {
+        const peer = fixture(singleThreaded);
+        const build = gate();
+        let reads = 0;
+        let createCalls = 0;
+        let lintCalls = 0;
+        let shutdownCalls = 0;
+        const run = peer.run(
+          phase === 'without tasks' ? 'failure-without-tasks' : 'failure',
+          {
+            configModuleHost: new ConfigModuleHost({
+              loadCached: async () => PLUGIN_CONFIG,
+              readSource: async (sourcePath) => {
+                reads++;
+                if (phase === 'before preparation' && reads === 3) {
+                  fs.writeFileSync(
+                    sourcePath,
+                    '// changed before preparation\n',
+                  );
+                }
+                return fs.promises.readFile(sourcePath);
+              },
+            }),
+            createPluginLintHost: async () => {
+              createCalls++;
+              await build.promise;
+              if (phase !== 'during preparation') {
+                throw new Error('mocked worker import failed');
+              }
+              fs.writeFileSync(
+                peer.configPath,
+                '// changed during preparation\n',
+              );
+              return {
+                async lint() {
+                  lintCalls++;
+                  return { results: [] };
+                },
+                async shutdown() {
+                  shutdownCalls++;
+                },
+              };
+            },
+          },
+        );
+        try {
+          const prepared = await peer.event('prepared');
+          expect(prepared.preparation?.kind).toBe(
+            phase === 'before preparation' ? 'error' : 'response',
+          );
+          build.resolve();
+          const completed = await peer.event('completed');
+          expect(completed.activation?.kind).toBe('error');
+          expect(completed.activation?.data.message).toContain(message);
+          if (phase !== 'without tasks') {
+            expect(completed.plugin?.kind).toBe('error');
+            expect(completed.plugin?.data.message).toContain(message);
+          } else {
+            expect(completed.plugin).toBeUndefined();
+          }
+          expect(await run).toBe(0);
+          expect(createCalls).toBe(phase === 'before preparation' ? 0 : 1);
+          expect(lintCalls).toBe(0);
+          expect(shutdownCalls).toBe(expectedShutdowns);
+        } finally {
+          build.resolve();
+          await run;
+          peer.dispose();
+        }
+      },
+    );
+
+    test('keeps native-only preparation synchronous', async () => {
+      const peer = fixture(singleThreaded);
       const preparation = gate();
       const preparationStarted = gate();
       let reads = 0;
@@ -270,23 +280,19 @@ describe('CLI worker warmup', () => {
         if (event === 'waiters-started') await preparationStarted.promise;
       });
       const run = peer.run('blocked-prepare', {
-        runtime: { singleThreaded: mode === 'single-threaded' },
         configModuleHost: new ConfigModuleHost({
-          loadCached: async () => (mode === 'native-only' ? [] : PLUGIN_CONFIG),
+          loadCached: async () => [],
           readSource: async (sourcePath) => {
             reads++;
-            if (mode === 'native-only' && reads === 4) {
+            if (reads === 4) {
               preparationStarted.resolve();
               await preparation.promise;
             }
             return fs.promises.readFile(sourcePath);
           },
         }),
-        createPluginLintHost: async (_configs, _onLog, singleThreaded) => {
+        createPluginLintHost: async () => {
           createCalls++;
-          expect(singleThreaded).toBe(true);
-          preparationStarted.resolve();
-          await preparation.promise;
           return {
             async lint() {
               return { results: [] };
@@ -304,7 +310,7 @@ describe('CLI worker warmup', () => {
           'response',
         );
         expect(await run).toBe(0);
-        expect(createCalls).toBe(mode === 'native-only' ? 0 : 1);
+        expect(createCalls).toBe(0);
         expect(shutdownCalls).toBe(createCalls);
       } finally {
         preparation.resolve();
@@ -312,69 +318,71 @@ describe('CLI worker warmup', () => {
         await run;
         peer.dispose();
       }
-    },
-  );
-
-  test('joins shutdown for a warmed host that finishes after child exit', async () => {
-    const peer = fixture();
-    const childExited = gate();
-    const shutdownStarted = gate();
-    const shutdown = gate();
-    let shutdownCalls = 0;
-    let lintCalls = 0;
-    const originalOnce = ChildProcess.prototype.once;
-    let wrappedExit = false;
-    ChildProcess.prototype.once = function (event, listener) {
-      if (event !== 'exit' || wrappedExit) {
-        return originalOnce.call(this, event, listener);
-      }
-      wrappedExit = true;
-      return originalOnce.call(this, event, function (...args: unknown[]) {
-        Reflect.apply(listener, this, args);
-        childExited.resolve();
-      });
-    } as typeof ChildProcess.prototype.once;
-    let run: Promise<number>;
-    try {
-      run = peer.run('exit', {
-        createPluginLintHost: async () => {
-          await childExited.promise;
-          return {
-            async lint() {
-              lintCalls++;
-              return { results: [] };
-            },
-            async shutdown() {
-              shutdownCalls++;
-              shutdownStarted.resolve();
-              await shutdown.promise;
-            },
-          };
-        },
-      });
-    } finally {
-      ChildProcess.prototype.once = originalOnce;
-    }
-    let settled = false;
-    void run.then(() => {
-      settled = true;
     });
-    try {
-      expect((await peer.event('prepared')).preparation?.kind).toBe('response');
-      await shutdownStarted.promise;
-      await new Promise<void>((resolve) => setImmediate(resolve));
-      expect(settled).toBe(false);
-      expect(wrappedExit).toBe(true);
-      expect(shutdownCalls).toBe(1);
-      expect(lintCalls).toBe(0);
-      shutdown.resolve();
-      expect(await run).toBe(0);
-      expect(shutdownCalls).toBe(1);
-    } finally {
-      childExited.resolve();
-      shutdown.resolve();
-      await run;
-      peer.dispose();
-    }
-  });
-});
+
+    test('joins shutdown for a warmed host that finishes after child exit', async () => {
+      const peer = fixture(singleThreaded);
+      const childExited = gate();
+      const shutdownStarted = gate();
+      const shutdown = gate();
+      let shutdownCalls = 0;
+      let lintCalls = 0;
+      const originalOnce = ChildProcess.prototype.once;
+      let wrappedExit = false;
+      ChildProcess.prototype.once = function (event, listener) {
+        if (event !== 'exit' || wrappedExit) {
+          return originalOnce.call(this, event, listener);
+        }
+        wrappedExit = true;
+        return originalOnce.call(this, event, function (...args: unknown[]) {
+          Reflect.apply(listener, this, args);
+          childExited.resolve();
+        });
+      } as typeof ChildProcess.prototype.once;
+      let run: Promise<number>;
+      try {
+        run = peer.run('exit', {
+          createPluginLintHost: async () => {
+            await childExited.promise;
+            return {
+              async lint() {
+                lintCalls++;
+                return { results: [] };
+              },
+              async shutdown() {
+                shutdownCalls++;
+                shutdownStarted.resolve();
+                await shutdown.promise;
+              },
+            };
+          },
+        });
+      } finally {
+        ChildProcess.prototype.once = originalOnce;
+      }
+      let settled = false;
+      void run.then(() => {
+        settled = true;
+      });
+      try {
+        expect((await peer.event('prepared')).preparation?.kind).toBe(
+          'response',
+        );
+        await shutdownStarted.promise;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(settled).toBe(false);
+        expect(wrappedExit).toBe(true);
+        expect(shutdownCalls).toBe(1);
+        expect(lintCalls).toBe(0);
+        shutdown.resolve();
+        expect(await run).toBe(0);
+        expect(shutdownCalls).toBe(1);
+      } finally {
+        childExited.resolve();
+        shutdown.resolve();
+        await run;
+        peer.dispose();
+      }
+    });
+  },
+);

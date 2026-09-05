@@ -95,7 +95,6 @@ type configDiscoveryPayload struct {
 
 type ipcConfigModuleLoader struct {
 	channel            *ipc.Channel
-	warmup             bool
 	completeActivation func() error
 }
 
@@ -112,15 +111,11 @@ func (loader *ipcConfigModuleLoader) LoadConfigs(ctx context.Context, request di
 }
 
 func (loader *ipcConfigModuleLoader) ActivateConfigs(ctx context.Context, request discovery.ConfigActivationRequest) (discovery.ConfigActivationResponse, error) {
-	kind := kindActivateConfigs
-	if loader.warmup {
-		kind = kindPrepareConfigs
-	}
-	response, err := loader.requestActivation(ctx, kind, request)
+	response, err := loader.requestActivation(ctx, kindPrepareConfigs, request)
 	if err != nil {
 		return discovery.ConfigActivationResponse{}, err
 	}
-	if loader.warmup && len(response.EslintPluginEntries) > 0 {
+	if len(response.EslintPluginEntries) > 0 {
 		loader.completeActivation = func() error {
 			activated, err := loader.requestActivation(ctx, kindActivateConfigs, request)
 			if err != nil {
@@ -551,7 +546,7 @@ func discoverCLIConfigCatalog(
 			Explicit: true,
 		})
 	}
-	loader := &ipcConfigModuleLoader{channel: channel, warmup: !args.SingleThreaded}
+	loader := &ipcConfigModuleLoader{channel: channel}
 	var catalog *discovery.ConfigCatalog
 	if payload.ConfigDiscovery.ExplicitConfigPath != "" {
 		targetFiles := append([]discovery.DiscoveryFile(nil), request.Files...)
