@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -1732,9 +1733,9 @@ func isDirectGenericTypeArgumentUsage(identNode *ast.Node) bool {
 		return false
 	}
 	// The Array<T>/ReadonlyArray<T> exclusion only makes sense for an actual
-	// type reference (e.g. `Foo<T>`), not for a type argument attached to a
-	// call/new/tagged-template/JSX expression (e.g. `foo<T>()`).
-	if grandparent.Kind == ast.KindTypeReference {
+	// type reference (e.g. `Foo<T>`). Heritage targets, like call/new/tagged
+	// template/JSX expressions, have their own ESTree node kinds.
+	if grandparent.Kind == ast.KindTypeReference && !typescriptutil.IsClassImplementsOrInterfaceExtends(grandparent) {
 		outerName := grandparent.AsTypeReferenceNode().TypeName
 		if outerName != nil && outerName.Kind == ast.KindIdentifier {
 			switch outerName.AsIdentifier().Text {

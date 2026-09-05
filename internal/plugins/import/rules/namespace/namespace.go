@@ -35,6 +35,7 @@ var NamespaceRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindPropertyAccessExpression: checkAccess,
 			ast.KindElementAccessExpression:  checkAccess,
+			ast.KindQualifiedName:            checkAccess,
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				checkNamespaceDestructuring(ctx, namespaces, node)
 			},
@@ -236,8 +237,12 @@ func checkNamespaceAccess(ctx rule.RuleContext, namespaces map[string]*import_ut
 		return
 	}
 
-	object := ast.SkipParentheses(rslint_utils.AccessExpressionObject(access))
-	if object == nil || object.Kind != ast.KindIdentifier {
+	object, _ := rslint_utils.MemberExpressionParts(access)
+	if object == nil {
+		return
+	}
+	object = ast.SkipParentheses(object)
+	if object.Kind != ast.KindIdentifier {
 		return
 	}
 
@@ -259,7 +264,13 @@ func checkNamespaceAccess(ctx rule.RuleContext, namespaces map[string]*import_ut
 
 func validateNamespaceAccess(ctx rule.RuleContext, opts ruleOptions, access *ast.Node, namespace *import_utils.ExportMap, namePath []string, rootName string) {
 	current := access
-	for namespace != nil && current != nil && ast.IsAccessExpression(current) {
+	for namespace != nil && current != nil {
+		// Only heritage qualified names have ESTree MemberExpression
+		// semantics. Ordinary type names and type queries are excluded.
+		object, property := rslint_utils.MemberExpressionParts(current)
+		if object == nil {
+			return
+		}
 		if current.Kind == ast.KindElementAccessExpression {
 			argument := current.AsElementAccessExpression().ArgumentExpression
 			if !opts.allowComputed && argument != nil {
@@ -268,7 +279,6 @@ func validateNamespaceAccess(ctx rule.RuleContext, opts ruleOptions, access *ast
 			return
 		}
 
-		property := current.AsPropertyAccessExpression().Name()
 		if property == nil {
 			return
 		}
@@ -290,10 +300,8 @@ func validateNamespaceAccess(ctx rule.RuleContext, opts ruleOptions, access *ast
 		if parent != nil && parent.Kind == ast.KindParenthesizedExpression {
 			parent = ast.WalkUpParenthesizedExpressions(parent)
 		}
-		if parent == nil || !ast.IsAccessExpression(parent) {
-			return
-		}
-		if ast.SkipParentheses(rslint_utils.AccessExpressionObject(parent)) != current {
+		parentObject, _ := rslint_utils.MemberExpressionParts(parent)
+		if parentObject == nil || ast.SkipParentheses(parentObject) != current {
 			return
 		}
 		current = parent

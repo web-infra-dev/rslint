@@ -263,7 +263,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if len(extends) != 1 {
 			return true
 		}
-		expr := extends[0].AsTypeReferenceNode().TypeName
+		expr := ast.GetHeritageClauseElementName(extends[0])
 		if expr == nil || expr.Kind != ast.KindIdentifier || expr.AsIdentifier().Text != "Function" {
 			return true
 		}

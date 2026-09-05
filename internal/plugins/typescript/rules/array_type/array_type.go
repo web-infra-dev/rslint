@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -345,6 +346,11 @@ var ArrayTypeRule = rule.CreateRule(rule.Rule{
 			},
 
 			ast.KindTypeReference: func(node *ast.Node) {
+				// Heritage targets must remain entity names. Their type arguments
+				// are visited separately and can still use array syntax.
+				if typescriptutil.IsClassImplementsOrInterfaceExtends(node) {
+					return
+				}
 				typeRef := node.AsTypeReferenceNode()
 				if typeRef == nil {
 					return

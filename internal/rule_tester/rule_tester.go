@@ -209,6 +209,12 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
+	if onlyMode {
+		t.Fatal("focused rule test cases (Only) are not allowed; use go test -run to select tests")
+	}
+	if len(validTestCases)+len(invalidTestCases) == 0 {
+		t.Fatal("rule test suite must not be empty")
+	}
 
 	runLinter := func(t *testing.T, code string, rawOptions any, settings map[string]interface{}, languageOptions rule.LanguageOptions, rawGlobals map[string]any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		options := ResolveTestCaseOptions(t, r, rawOptions)
@@ -277,7 +283,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 	for i, testCase := range validTestCases {
 		t.Run("valid-"+strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
-			if (onlyMode && !testCase.Only) || testCase.Skip {
+			if testCase.Skip {
 				t.SkipNow()
 			}
 
@@ -299,7 +305,7 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		t.Run("invalid-"+strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 
-			if (onlyMode && !testCase.Only) || testCase.Skip {
+			if testCase.Skip {
 				t.SkipNow()
 			}
 

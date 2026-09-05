@@ -8,6 +8,7 @@ import (
 	jestutils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintutils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 // Message builders
@@ -240,7 +241,8 @@ var NoJasmineGlobalsRule = rule.Rule{
 				reportJasmineAssignedProperty(node, ctx)
 			},
 			ast.KindIdentifier: func(node *ast.Node) {
-				if node.AsIdentifier().Text != "jasmine" || isBindingResolved(node, ctx) {
+				if node.AsIdentifier().Text != "jasmine" || scope.InTypePosition(node) ||
+					ast.IsPartOfTypeQuery(node) || isBindingResolved(node, ctx) {
 					return
 				}
 

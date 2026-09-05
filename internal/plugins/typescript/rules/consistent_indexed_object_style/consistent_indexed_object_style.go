@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -58,6 +59,11 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	if parseOptions(options).Style == "index-signature" {
 		return rule.RuleListeners{
 			ast.KindTypeReference: func(node *ast.Node) {
+				// An object type literal cannot replace an extends/implements
+				// target. Nested type arguments remain ordinary type references.
+				if typescriptutil.IsClassImplementsOrInterfaceExtends(node) {
+					return
+				}
 				reportRecordAsIndexSignature(&ctx, node)
 			},
 		}
