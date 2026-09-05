@@ -17,6 +17,7 @@ import (
 var schemaJSON []byte
 
 const (
+	ruleName         = "react/jsx-one-expression-per-line"
 	allowNone        = "none"
 	allowLiteral     = "literal"
 	allowSingleChild = "single-child"
@@ -56,8 +57,7 @@ func fixSource(source string) string {
 }
 
 func hasTrailingTextSpace(source string) bool {
-	trimmed := strings.TrimRight(source, " ")
-	return len(trimmed) < len(source) && !strings.HasSuffix(trimmed, "\n") && !strings.HasSuffix(trimmed, "\r")
+	return strings.HasSuffix(source, " ") && !hasTrailingNewline(source)
 }
 
 func isJSXText(node *ast.Node) bool {
@@ -68,42 +68,17 @@ func isWhitespaceOnly(source string) bool {
 	return ecmascript.IsBlank(source)
 }
 
-// hasLeadingNewline mirrors the upstream `/^\s*\n/` test. The match count in
-// the original rule is the length of a non-global match, so this deliberately
-// returns a boolean rather than counting every line terminator.
+// hasLeadingNewline mirrors the upstream `/^\s*\n/g` test. Its anchored
+// match contributes one entry even when it spans several line terminators.
 func hasLeadingNewline(source string) bool {
-	foundLineFeed := false
-	for _, r := range source {
-		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			return foundLineFeed
-		}
-		if r == '\n' {
-			foundLineFeed = true
-		}
-	}
-	return foundLineFeed
+	end := ecmascript.SkipLeadingWhitespace(source, 0, len(source))
+	return strings.Contains(source[:end], "\n")
 }
 
 // hasTrailingNewline mirrors the upstream `/\n\s*$/` test.
 func hasTrailingNewline(source string) bool {
-	foundLineFeed := false
-	for _, r := range reverseRunes(source) {
-		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			return foundLineFeed
-		}
-		if r == '\n' {
-			foundLineFeed = true
-		}
-	}
-	return foundLineFeed
-}
-
-func reverseRunes(source string) []rune {
-	runes := []rune(source)
-	for left, right := 0, len(runes)-1; left < right; left, right = left+1, right-1 {
-		runes[left], runes[right] = runes[right], runes[left]
-	}
-	return runes
+	start := ecmascript.SkipTrailingWhitespace(source, 0, len(source))
+	return strings.Contains(source[start:], "\n")
 }
 
 func childDescriptor(source string, child *ast.Node) string {
@@ -278,13 +253,13 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 	}
 	lineMap := ctx.SourceFile.ECMALineMap()
 	source := ctx.SourceFile.Text()
-	openingStartLine := scanner.ComputeLineOfPosition(lineMap, opening.Pos())
 	openingEndLine := scanner.ComputeLineOfPosition(lineMap, opening.End())
 	closingStartLine := scanner.ComputeLineOfPosition(lineMap, closing.Pos())
-	closingEndLine := scanner.ComputeLineOfPosition(lineMap, closing.End())
 
-	if len(children) == 1 {
+	if len(children) == 1 && (options.allow == allowSingleChild || options.allow == allowLiteral) {
 		child := children[0]
+		openingStartLine := scanner.ComputeLineOfPosition(lineMap, scanner.SkipTrivia(source, opening.Pos()))
+		closingEndLine := scanner.ComputeLineOfPosition(lineMap, closing.End())
 		childStartLine := scanner.ComputeLineOfPosition(lineMap, child.Pos())
 		childEndLine := scanner.ComputeLineOfPosition(lineMap, child.End())
 		if openingStartLine == openingEndLine &&
@@ -377,13 +352,20 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 	}
 
 	detailsList := make([]*fixDetails, 0, len(detailsByChild))
-	for _, details := range detailsByChild {
+	// Children are already in source order. Only reports that survive disable
+	// directives can participate in ESLint's adjacent-fix selection.
+	for _, child := range children {
+		details := detailsByChild[child]
+		if details == nil {
+			continue
+		}
+		if ctx.DisableManager.IsRuleDisabled(ruleName, child.Pos()) {
+			delete(detailsByChild, child)
+			continue
+		}
 		detailsList = append(detailsList, details)
 	}
-	sort.Slice(detailsList, func(i, j int) bool {
-		return detailsList[i].child.Pos() < detailsList[j].child.Pos()
-	})
-	accepted := acceptedFixes(detailsList)
+	var accepted map[*ast.Node]bool
 	for _, details := range detailsList {
 		if details == nil || details.child == nil {
 			continue
@@ -396,10 +378,14 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 		}
 		child := currentDetails.child
 		ctx.ReportRangeWithDeferredFixes(core.NewTextRange(child.Pos(), child.End()), message, func() []rule.RuleFix {
+			if accepted == nil {
+				accepted = acceptedFixes(detailsList)
+			}
 			rawSource := nodeSource(source, child)
 			fixedSource := fixSource(rawSource)
 			if isJSXText(child) && hasTrailingTextSpace(rawSource) && shouldKeepTrailingTextSpace(&currentDetails, accepted) {
-				fixedSource += " "
+				// Preserve the whole trailing run when a following fix protects it.
+				fixedSource = strings.TrimLeft(rawSource, " ")
 			}
 			leadingSpace := ""
 			if currentDetails.leadingSpace && shouldKeepLeadingSpace(&currentDetails, detailsByChild, accepted) {
@@ -426,7 +412,7 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 }
 
 var JsxOneExpressionPerLineRule = rule.Rule{
-	Name:   "react/jsx-one-expression-per-line",
+	Name:   ruleName,
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
