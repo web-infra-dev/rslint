@@ -9,6 +9,31 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestPreferImportingRstestGlobalsJSX(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_importing_rstest_globals.PreferImportingRstestGlobalsRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `const view = <test />;`, Tsx: true},
+			{Code: `const view = <test><expect /></test>;`, Tsx: true},
+			{Code: `const view = <Component test={value} onTestFinished={handler} />;`, Tsx: true},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Expressions inside JSX still read globals; intrinsic tag names do not.
+			{
+				Code:   `const view = <test>{expect(value)}</test>;`,
+				Tsx:    true,
+				Output: []string{"import { expect } from '@rstest/core';\nconst view = <test>{expect(value)}</test>;"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Message: "Import `expect` from `@rstest/core`."}},
+			},
+			// A member tag reads its object even when the name starts with lowercase.
+			{
+				Code:   `const view = <test.Component />;`,
+				Tsx:    true,
+				Output: []string{"import { test } from '@rstest/core';\nconst view = <test.Component />;"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals"}},
+			},
+		})
+}
+
 // TestPreferImportingRstestGlobalsExtras locks in identifier shapes and merge
 // branches beyond the baseline suite in the sibling upstream file.
 func TestPreferImportingRstestGlobalsExtras(t *testing.T) {
