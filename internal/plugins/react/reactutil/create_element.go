@@ -1,8 +1,11 @@
 package reactutil
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -45,16 +48,15 @@ func IsCreateElementCallWithChecker(callee *ast.Node, pragma string, tc *checker
 	return isCreateElementCallCore(callee, pragma, tc)
 }
 
-// IsCreateElementCallWithRefs is the file-scope-aware variant. When refs is
-// provided, it is authoritative for bare imported createElement calls so
-// checker-backed linting cannot resolve a binding from another global script.
-func IsCreateElementCallWithRefs(
-	callee *ast.Node,
-	pragma string,
-	tc *checker.Checker,
-	refs ReferenceResolver,
-) bool {
-	return isPragmaFactoryCallCore(callee, pragma, tc, refs, createElementOnly)
+// NewCreateElementCallMatcher returns a per-file matcher with the definition
+// lookup used by eslint-plugin-react. Bindings are resolved lazily and cached,
+// independently of whether this file has a TypeChecker.
+func NewCreateElementCallMatcher(ctx rule.RuleContext) func(*ast.Node) bool {
+	pragma := GetReactPragmaFromContext(ctx)
+	isImported := newPragmaImportMatcher(ctx, pragma, "createElement")
+	return func(callee *ast.Node) bool {
+		return isPragmaFactoryCallCore(callee, pragma, nil, isImported, createElementOnly)
+	}
 }
 
 func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checker) bool {
@@ -101,7 +103,7 @@ func isPragmaFactoryCallCore(
 	callee *ast.Node,
 	pragma string,
 	tc *checker.Checker,
-	refs ReferenceResolver,
+	isImported func(*ast.Node) bool,
 	names pragmaFactoryNames,
 ) bool {
 	if callee == nil {
@@ -122,7 +124,10 @@ func isPragmaFactoryCallCore(
 		if !names.matches(callee.AsIdentifier().Text) {
 			return false
 		}
-		return IsDestructuredFromPragmaImportWithRefs(callee, pragma, tc, refs)
+		if isImported != nil {
+			return isImported(callee)
+		}
+		return IsDestructuredFromPragmaImport(callee, pragma, tc)
 	}
 
 	// Member-access callee: `<pragma>.<name>(arg)` or
@@ -153,7 +158,17 @@ func isPragmaFactoryCallCore(
 	if nameNode == nil || pragmaExpr == nil {
 		return false
 	}
-	if nameNode.Kind != ast.KindIdentifier || !names.matches(nameNode.AsIdentifier().Text) {
+	// ESTree exposes .name on both Identifier and PrivateIdentifier keys.
+	var propertyName string
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		propertyName = nameNode.Text()
+	case ast.KindPrivateIdentifier:
+		propertyName = strings.TrimPrefix(nameNode.Text(), "#")
+	default:
+		return false
+	}
+	if !names.matches(propertyName) {
 		return false
 	}
 	// JSDoc casts and parentheses are absent from ESTree, while an authored

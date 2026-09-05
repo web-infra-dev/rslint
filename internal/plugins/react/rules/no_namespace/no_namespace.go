@@ -15,7 +15,7 @@ var NoNamespaceRule = rule.Rule{
 	Name:   "react/no-namespace",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		pragma := reactutil.GetReactPragmaFromContext(ctx)
+		isCreateElement := reactutil.NewCreateElementCallMatcher(ctx)
 
 		reportIfNamespaced := func(node *ast.Node, name string) {
 			if name == "" || strings.IndexByte(name, ':') == -1 {
@@ -38,7 +38,8 @@ var NoNamespaceRule = rule.Rule{
 			ast.KindJsxSelfClosingElement: checkJSX,
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCallWithRefs(call.Expression, pragma, ctx.TypeChecker, ctx.Refs) {
+				// Unrelated bare calls are common and need no argument inspection.
+				if callee := call.Expression; callee != nil && callee.Kind == ast.KindIdentifier && callee.Text() != "createElement" {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
@@ -51,7 +52,13 @@ var NoNamespaceRule = rule.Rule{
 				if argument == nil || argument.Kind != ast.KindStringLiteral {
 					return
 				}
-				reportIfNamespaced(node, argument.AsStringLiteral().Text)
+				name := argument.AsStringLiteral().Text
+				// Most calls cannot report. Avoid building the binding model for
+				// files that contain no namespace-qualified string argument.
+				if strings.IndexByte(name, ':') == -1 || !isCreateElement(call.Expression) {
+					return
+				}
+				reportIfNamespaced(node, name)
 			},
 		}
 	},

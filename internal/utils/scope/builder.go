@@ -466,7 +466,7 @@ func (b *builder) visitStatement(stmt *ast.Node, parent *Scope) {
 		ws := stmt.AsWithStatement()
 		if ws != nil {
 			b.visitExpression(ws.Expression, parent)
-			b.visitStatement(ws.Statement, parent)
+			b.visitStatement(ws.Statement, b.push(KindWith, stmt, parent))
 		}
 	default:
 		// Catch-all — traverse children.
@@ -1009,7 +1009,11 @@ func (b *builder) visitModuleDecl(node *ast.Node, outer *Scope) {
 		}
 		return
 	}
-	moduleScope := b.push(KindModule, node, outer)
+	// TSESTree represents A.B.C as one qualified namespace declaration.
+	moduleScope := outer
+	if node.Parent == nil || node.Parent.Kind != ast.KindModuleDeclaration {
+		moduleScope = b.push(KindModule, node, outer)
+	}
 	// Inherit the global-augmentation flag from the parent chain.
 	if outer != nil && outer.GlobalAugmentation {
 		moduleScope.GlobalAugmentation = true
