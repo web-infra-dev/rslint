@@ -143,7 +143,7 @@ export const EditorTabs = ({
       rslintConfig:
         rslintEditorRef.current?.getValue() ?? initialState.rslintConfig,
       tsconfig: tsconfigEditorRef.current?.getValue() ?? initialState.tsconfig,
-      wasmVersion: wasmVersionRef.current,
+      wasmVersion: wasmVersionRef.current ?? initialState.wasmVersion,
     });
   }
 
