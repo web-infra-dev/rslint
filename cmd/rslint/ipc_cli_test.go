@@ -115,7 +115,7 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 					Status: "loaded",
 				}},
 			}, nil
-		case kindActivateConfigs:
+		case kindPrepareConfigs:
 			var request discovery.ConfigActivationRequest
 			if err := msg.Decode(&request); err != nil {
 				return nil, err
@@ -714,7 +714,7 @@ func serveCLITestPeer(
 				recordError(fmt.Errorf("write loadConfigs response: %w", err))
 			}
 
-		case msg.ID > 0 && msg.Kind == kindActivateConfigs:
+		case msg.ID > 0 && (msg.Kind == kindActivateConfigs || msg.Kind == kindPrepareConfigs):
 			var request discovery.ConfigActivationRequest
 			if err := msg.Decode(&request); err != nil {
 				recordError(fmt.Errorf("decode activateConfigs request: %w", err))
