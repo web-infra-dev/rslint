@@ -17,6 +17,11 @@ var NoProtoRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
+			ast.KindQualifiedName: func(node *ast.Node) {
+				if utils.IsHeritageQualifiedName(node) && node.AsQualifiedName().Right.Text() == "__proto__" {
+					ctx.ReportNode(node, msg)
+				}
+			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
 				propAccess := node.AsPropertyAccessExpression()
 				if propAccess.Name().Text() == "__proto__" {

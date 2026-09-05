@@ -125,9 +125,12 @@ func (state *noEvalState) checkIdentifier(node *ast.Node) {
 
 	// Property names are already identifier nodes, so handle dot access here
 	// instead of dispatching a listener for every PropertyAccessExpression.
-	if ast.IsPropertyAccessExpression(parent) && parent.AsPropertyAccessExpression().Name() == node {
-		state.checkMemberAccess(parent.AsPropertyAccessExpression().Expression, node)
-		return
+	if ast.IsPropertyAccessExpression(parent) || utils.IsHeritageQualifiedName(parent) {
+		object, property := utils.MemberExpressionParts(parent)
+		if property == node {
+			state.checkMemberAccess(object, node)
+			return
+		}
 	}
 
 	// Grouping parentheses are absent from ESTree. Walk through them so direct
@@ -211,9 +214,8 @@ func (state *noEvalState) isGlobalObjectChain(node *ast.Node) bool {
 				(chainName == "" || chainName == name) &&
 				state.isGlobalObjectReference(node, name)
 		}
-		if ast.IsPropertyAccessExpression(node) {
-			propertyAccess := node.AsPropertyAccessExpression()
-			name := propertyAccess.Name()
+		if ast.IsPropertyAccessExpression(node) || utils.IsHeritageQualifiedName(node) {
+			object, name := utils.MemberExpressionParts(node)
 			if name == nil || !isGlobalObjectName(name.Text()) {
 				return false
 			}
@@ -222,7 +224,7 @@ func (state *noEvalState) isGlobalObjectChain(node *ast.Node) bool {
 			} else if chainName != name.Text() {
 				return false
 			}
-			node = propertyAccess.Expression
+			node = object
 			continue
 		}
 		if ast.IsElementAccessExpression(node) {

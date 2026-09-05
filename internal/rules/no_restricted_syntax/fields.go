@@ -132,6 +132,9 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			return single(parent.AsJsxExpression().Expression)
 		}
 	case "object":
+		if utils.IsHeritageQualifiedName(parent) {
+			return single(parent.AsQualifiedName().Left)
+		}
 		switch parent.Kind {
 		case ast.KindPropertyAccessExpression:
 			return single(parent.AsPropertyAccessExpression().Expression)
@@ -139,6 +142,9 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			return single(parent.AsElementAccessExpression().Expression)
 		}
 	case "property":
+		if utils.IsHeritageQualifiedName(parent) {
+			return single(parent.AsQualifiedName().Right)
+		}
 		switch parent.Kind {
 		case ast.KindPropertyAccessExpression:
 			return single(parent.AsPropertyAccessExpression().Name())

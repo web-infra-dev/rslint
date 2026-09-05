@@ -70,6 +70,7 @@ define.test({
     './tests/cli/type-check/type-check-only.test.ts',
 
     // eslint
+    './tests/eslint/heritage-members.test.ts',
     './tests/eslint/rules/accessor-pairs.test.ts',
     './tests/eslint/rules/arrow-body-style.test.ts',
     './tests/eslint/rules/block-scoped-var.test.ts',

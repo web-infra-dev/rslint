@@ -81,7 +81,7 @@ var estreeKindMap = map[string][]ast.Kind{
 	"ConditionalExpression":    {ast.KindConditionalExpression},
 	"ImportExpression":         {ast.KindCallExpression},   // matcher checks the import callee
 	"LogicalExpression":        {ast.KindBinaryExpression}, // matcher checks operator
-	"MemberExpression":         {ast.KindPropertyAccessExpression, ast.KindElementAccessExpression},
+	"MemberExpression":         {ast.KindPropertyAccessExpression, ast.KindElementAccessExpression, ast.KindQualifiedName},
 	"MetaProperty":             {ast.KindMetaProperty},
 	"NewExpression":            {ast.KindNewExpression},
 	"ObjectExpression":         {ast.KindObjectLiteralExpression},

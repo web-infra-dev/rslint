@@ -239,6 +239,8 @@ func staticMemberPropertyName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		return utils.GetStaticPropertyName(node.AsPropertyAccessExpression().Name())
+	case ast.KindQualifiedName:
+		return utils.GetStaticPropertyName(node.AsQualifiedName().Right)
 	case ast.KindElementAccessExpression:
 		arg := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
 		return utils.GetStaticExpressionValue(arg)
@@ -388,12 +390,9 @@ var NoRestrictedPropertiesRule = rule.Rule{
 				return
 			}
 
-			var objectExpr *ast.Node
-			switch node.Kind {
-			case ast.KindPropertyAccessExpression:
-				objectExpr = node.AsPropertyAccessExpression().Expression
-			case ast.KindElementAccessExpression:
-				objectExpr = node.AsElementAccessExpression().Expression
+			objectExpr, property := utils.MemberExpressionParts(node)
+			if objectExpr == nil || property == nil {
+				return
 			}
 			objectName, hasObjectName := staticObjectName(objectExpr)
 			propertyName, hasPropertyName := staticMemberPropertyName(node)
@@ -403,6 +402,7 @@ var NoRestrictedPropertiesRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindPropertyAccessExpression: checkMemberAccess,
 			ast.KindElementAccessExpression:  checkMemberAccess,
+			ast.KindQualifiedName:            checkMemberAccess,
 			ast.KindObjectBindingPattern: func(node *ast.Node) {
 				checkPattern(ctx, r, node)
 			},

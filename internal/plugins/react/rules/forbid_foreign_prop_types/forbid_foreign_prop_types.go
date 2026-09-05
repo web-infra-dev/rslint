@@ -163,13 +163,7 @@ var ForbidForeignPropTypesRule = rule.Rule{
 			// semantics in ESTree, but the compiler now uses qualified names
 			// inside type references for these heritage clauses.
 			ast.KindQualifiedName: func(node *ast.Node) {
-				entityName := node
-				for entityName.Parent != nil && entityName.Parent.Kind == ast.KindQualifiedName {
-					entityName = entityName.Parent
-				}
-				ref := entityName.Parent
-				if ref == nil || ref.Kind != ast.KindTypeReference || ref.AsTypeReferenceNode().TypeName != entityName ||
-					ref.Parent == nil || ref.Parent.Kind != ast.KindHeritageClause {
+				if !utils.IsHeritageQualifiedName(node) {
 					return
 				}
 				name := node.AsQualifiedName().Right

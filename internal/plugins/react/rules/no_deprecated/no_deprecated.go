@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // deprecationInfo holds the triple upstream's `deprecated[method]` returns:
@@ -194,16 +195,15 @@ func buildDottedPath(node *ast.Node) string {
 	cur := node
 	for {
 		cur = ast.SkipParentheses(cur)
-		if cur.Kind != ast.KindPropertyAccessExpression {
+		if cur.Kind != ast.KindPropertyAccessExpression && !utils.IsHeritageQualifiedName(cur) {
 			break
 		}
-		pa := cur.AsPropertyAccessExpression()
-		nameNode := pa.Name()
+		object, nameNode := utils.MemberExpressionParts(cur)
 		if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
 			return ""
 		}
 		segs = append(segs, nameNode.AsIdentifier().Text)
-		cur = pa.Expression
+		cur = object
 	}
 	cur = ast.SkipParentheses(cur)
 	var base string
@@ -369,22 +369,24 @@ var NoDeprecatedRule = rule.Rule{
 			}
 		}
 
+		checkMember := func(node *ast.Node) {
+			_, name := utils.MemberExpressionParts(node)
+			if name == nil || name.Kind != ast.KindIdentifier || !canBeDeprecatedPropertyName(name.AsIdentifier().Text) {
+				return
+			}
+			path := buildDottedPath(node)
+			if path != "" {
+				check(node, path)
+			}
+		}
+
 		return rule.RuleListeners{
 			// `React.createClass`, `React.addons.TestUtils`,
 			// `this.transferPropsTo`, `ReactDOM.render`, … Each
 			// PropertyAccessExpression level is checked independently;
 			// `React.DOM.div` ⇒ inner `React.DOM` matches, outer doesn't.
-			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				name := node.AsPropertyAccessExpression().Name()
-				if name == nil || name.Kind != ast.KindIdentifier || !canBeDeprecatedPropertyName(name.AsIdentifier().Text) {
-					return
-				}
-				path := buildDottedPath(node)
-				if path == "" {
-					return
-				}
-				check(node, path)
-			},
+			ast.KindPropertyAccessExpression: checkMember,
+			ast.KindQualifiedName:            checkMember,
 
 			// `import { createClass, PropTypes } from 'react'` → check each
 			// named specifier as `<canonical>.<imported-name>`.

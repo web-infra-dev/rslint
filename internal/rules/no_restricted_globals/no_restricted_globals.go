@@ -252,7 +252,8 @@ func sourceHasNamedExpressionBinding(sourceFile *ast.SourceFile, name string) bo
 // in the rule's `Program:exit` handler.
 func checkGlobalObjectAccess(node *ast.Node, globalObjectName string, opts options, report func(*ast.Node, string, globalEntry)) {
 	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
-	for utils.IsSpecificMemberAccess(parent, "", globalObjectName) {
+	for utils.IsSpecificMemberAccess(parent, "", globalObjectName) ||
+		(utils.IsHeritageQualifiedName(parent) && parent.AsQualifiedName().Right.Text() == globalObjectName) {
 		parent = ast.WalkUpParenthesizedExpressions(parent.Parent)
 	}
 
@@ -274,6 +275,11 @@ func staticMemberProperty(node *ast.Node) (string, *ast.Node, bool) {
 		return "", nil, false
 	}
 	switch node.Kind {
+	case ast.KindQualifiedName:
+		if utils.IsHeritageQualifiedName(node) {
+			name := node.AsQualifiedName().Right
+			return name.Text(), name, true
+		}
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
 		propName, ok := utils.GetStaticPropertyName(name)
@@ -307,6 +313,9 @@ func shouldSkip(node *ast.Node) bool {
 	// declaration-name classification below.
 	if parent.Kind == ast.KindPropertyAccessExpression &&
 		parent.AsPropertyAccessExpression().Name() == node {
+		return true
+	}
+	if parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Right == node {
 		return true
 	}
 
@@ -388,8 +397,10 @@ func isInTypeContext(node *ast.Node) bool {
 		return false
 	}
 	switch parent.Kind {
-	case ast.KindTypeReference, ast.KindTypeQuery, ast.KindQualifiedName:
+	case ast.KindTypeReference, ast.KindTypeQuery:
 		return true
+	case ast.KindQualifiedName:
+		return !utils.IsHeritageQualifiedName(parent)
 	case ast.KindExpressionWithTypeArguments:
 		return !utils.IsClassExtendsHeritageClause(parent)
 	}

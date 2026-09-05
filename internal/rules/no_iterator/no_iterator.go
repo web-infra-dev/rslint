@@ -19,6 +19,11 @@ var NoIteratorRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
+			ast.KindQualifiedName: func(node *ast.Node) {
+				if utils.IsHeritageQualifiedName(node) && node.AsQualifiedName().Right.Text() == "__iterator__" {
+					report(node)
+				}
+			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
 				name := node.Name()
 				if name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "__iterator__" {

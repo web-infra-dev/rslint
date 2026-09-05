@@ -228,6 +228,9 @@ func shouldCheck(ctx rule.RuleContext, node *ast.Node) bool {
 		parent.AsPropertyAccessExpression().Name() == node {
 		return isAssignmentTarget(parent)
 	}
+	if utils.IsHeritageQualifiedName(parent) && parent.AsQualifiedName().Right == node {
+		return false
+	}
 
 	// A callee or an argument of a call or a `new` is never checked. tsgo
 	// spells `import(specifier, options)` as a CallExpression too, where
