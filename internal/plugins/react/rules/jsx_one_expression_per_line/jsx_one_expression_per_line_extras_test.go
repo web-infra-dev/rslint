@@ -6,8 +6,13 @@ package jsx_one_expression_per_line
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"gotest.tools/v3/assert"
 )
 
 func TestJsxOneExpressionPerLineExtras(t *testing.T) {
@@ -158,4 +163,89 @@ func TestJsxOneExpressionPerLineExtras(t *testing.T) {
 			{MessageId: "moveToNewLine"},
 		}},
 	})
+}
+
+func TestJsxOneExpressionPerLineTriviaAndSpacing(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	for _, prefix := range []string{"\n", "\r\n", "\r", "\u2028", "\u2029", "/* comment\n */", "// comment\n"} {
+		for _, allow := range []string{"literal", "single-child"} {
+			for _, jsx := range []string{"<A>text</A>", "<>text</>"} {
+				valid = append(valid, rule_tester.ValidTestCase{
+					Code: "const view = () => (" + prefix + jsx + ");", Tsx: true,
+					Options: map[string]any{"allow": allow},
+				})
+			}
+		}
+	}
+	valid = append(valid,
+		rule_tester.ValidTestCase{Code: "const view = () => (\n<A>{value as string}</A>\n);", Tsx: true, Options: map[string]any{"allow": "single-child"}},
+		rule_tester.ValidTestCase{Code: "const view = () => (\n<><A /></>\n);", Tsx: true, Options: map[string]any{"allow": "single-child"}},
+	)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &JsxOneExpressionPerLineRule, valid, []rule_tester.InvalidTestCase{
+		{Code: "const view = () => (\n<A>{value}</A>\n);", Tsx: true, Options: map[string]any{"allow": "literal"},
+			Output: []string{"const view = () => (\n<A>\n{value}\n</A>\n);"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine", Line: 2, Column: 4, EndLine: 2, EndColumn: 11}},
+		},
+		{Code: "<A\n>text</A>", Tsx: true, Options: map[string]any{"allow": "literal"},
+			Output: []string{"<A\n>\ntext\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}},
+		},
+		{Code: "<A>text</\nA>", Tsx: true, Options: map[string]any{"allow": "single-child"},
+			Output: []string{"<A>\ntext\n</\nA>"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}},
+		},
+		{Code: "<A>text\ntext</A>", Tsx: true, Options: map[string]any{"allow": "single-child"},
+			Output: []string{"<A>\ntext\ntext\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}},
+		},
+		{Code: "<A>{x}text  {y}</A>", Tsx: true,
+			Output: []string{"<A>\n{x}\ntext  \n{' '}\n{y}\n</A>"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}},
+		},
+		{Code: "<A><B />text  {y}</A>", Tsx: true, Options: map[string]any{"allow": "non-jsx"},
+			Output: []string{"<A>\n<B />\ntext  \n{' '}\n{y}\n</A>"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}},
+		},
+		{Code: "<A>{x}text\n more\n \t </A>", Tsx: true,
+			Output: []string{"<A>\n{x}\ntext\n more\n \t</A>"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}},
+		},
+		// Upstream's boundary adjustment recognizes LF, not a bare CR.
+		{Code: "<A>{x}text\r  {y}</A>", Tsx: true,
+			Output: []string{"<A>\n{x}\ntext\r  \n{' '}\n{y}\n</A>"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}},
+		},
+		// A suppressed report must not change which following text fixes land.
+		{Code: "<A>\n{/* eslint-disable-next-line react/jsx-one-expression-per-line */}\n{x}{(\nx\n)} text  {y}\n</A>", Tsx: true,
+			Output: []string{"<A>\n{/* eslint-disable-next-line react/jsx-one-expression-per-line */}\n{x}{(\nx\n)}\n{' '}\ntext\n{y}\n</A>"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine", Line: 5, Column: 3, EndLine: 5, EndColumn: 10}, {MessageId: "moveToNewLine", Line: 5, Column: 10, EndLine: 5, EndColumn: 13}},
+		},
+		{Code: "<A>{/* eslint-disable react/jsx-one-expression-per-line */}<B>{x}\n</B> text {y}{/* eslint-enable react/jsx-one-expression-per-line */} text {y}</A>", Tsx: true,
+			Output: []string{"<A>\n{/* eslint-disable react/jsx-one-expression-per-line */}<B>{x}\n</B> text {y}{/* eslint-enable react/jsx-one-expression-per-line */}\n{' '}\ntext\n{y}\n</A>"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}, {MessageId: "moveToNewLine"}},
+		},
+	})
+}
+
+func TestJsxOneExpressionPerLineEditDemand(t *testing.T) {
+	for _, demand := range []rule.EditDemand{rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion, rule.EditDemandAll} {
+		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: "/demand.tsx", Path: "/demand.tsx",
+		}, "<A>{x}text  {y}</A>", core.ScriptKindTSX)
+		comments := rule.NewCommentStore(sourceFile)
+		var diagnostics []rule.RuleDiagnostic
+		ctx := rule.RuleContext{SourceFile: sourceFile, Comments: comments, DisableManager: rule.NewDisableManager(sourceFile, comments)}.WithDiagnosticConsumer(ruleName, rule.SeverityError, rule.DiagnosticConsumer{
+			Demand: demand, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
+		})
+		listeners := JsxOneExpressionPerLineRule.Run(ctx, nil)
+		listeners[ast.KindJsxElement](sourceFile.Statements.Nodes[0].AsExpressionStatement().Expression)
+		assert.Equal(t, len(diagnostics), 3)
+		for i, expected := range []struct {
+			text       string
+			start, end int
+		}{{"{x}", 3, 6}, {"text  ", 6, 12}, {"{y}", 12, 15}} {
+			d := diagnostics[i]
+			assert.Equal(t, d.Message.Description, "`"+expected.text+"` must be placed on a new line")
+			assert.Equal(t, d.Range, core.NewTextRange(expected.start, expected.end))
+			assert.Equal(t, len(d.Fixes()) > 0, demand&rule.EditDemandAutofix != 0)
+			assert.Assert(t, d.Suggestions == nil)
+		}
+	}
 }

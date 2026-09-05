@@ -55,10 +55,17 @@ Defaults to `"none"`.
 - `"single-child"`: Allow any single child on the same line.
 - `"non-jsx"`: Allow children when there is no direct JSX element or fragment child.
 
+The `"literal"` and `"single-child"` checks apply to the lines occupied by the JSX
+itself. Line breaks and comments before its opening tag do not affect the exception.
+
 Examples of **correct** code with `"literal"`:
 
 ```jsx
 <App>Hello</App>
+
+const render = () => (
+  <App>Hello</App>
+);
 ```
 
 Examples of **correct** code with `"single-child"`:
