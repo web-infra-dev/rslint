@@ -43,6 +43,8 @@ func TestSortCompExtras(t *testing.T) {
 		{Code: `class Foo extends React.Component { static #private = 1; render() {} }`, Tsx: true},
 		// ---- Compatibility: @jsx changes the component pragma. ----
 		{Code: `/** @jsx Preact */ class Foo extends React.Component { render() {} componentDidMount() {} }`, Tsx: true},
+		{Code: "/** @extends React.Component */\n/** ordinary */ class Foo { render() {} componentDidMount() {} }", Tsx: true},
+		{Code: `/** @extends React.Component */ class Outer { Helper = class { render() {} componentDidMount() {} }; }`, Tsx: true},
 		// ---- Compatibility: non-plain class members are not variable/method groups. ----
 		{Code: `abstract class Foo extends React.Component { render() {} abstract props: string; }`, Tsx: true, Options: sortCompOrder("instance-variables", "render")},
 		{Code: `abstract class Foo extends React.Component { render() {} static abstract method(): void; }`, Tsx: true, Options: sortCompOrder("static-methods", "render")},
@@ -104,6 +106,7 @@ func TestSortCompExtras(t *testing.T) {
 		// ---- Compatibility: JSDoc-only React component declarations. ----
 		{Code: `/** @extends React.Component */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		{Code: `/** @augments React.PureComponent */ class Foo { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
+		{Code: `/** @extends React.Component */ const Foo = class { render() {} componentDidMount() {} };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		// ---- Compatibility: computed React component inheritance. ----
 		{Code: `class Foo extends React[Component] { render() {} componentDidMount() {} }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{sortCompError("render", "after", "componentDidMount")}},
 		// ---- Compatibility: error deduplication uses the original entry snapshot. ----

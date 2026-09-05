@@ -6,6 +6,18 @@ The rule checks `childContextTypes`, `contextTypes`, `contextType`,
 `defaultProps` (including legacy `getDefaultProps`), `displayName`, and
 `propTypes`. The default placement is `static public field`.
 
+Component detection follows `eslint-plugin-react`, including `settings.react.pragma`,
+file-level `@jsx` comments, and adjacent JSDoc `@extends React.Component` or
+`@augments React.PureComponent` markers. For class expressions assigned to a
+variable, put the JSDoc before the variable declaration:
+
+```tsx
+/** @extends React.Component */
+const Component = class {
+  static propTypes = {};
+};
+```
+
 ## Options
 
 The first option selects the default placement:

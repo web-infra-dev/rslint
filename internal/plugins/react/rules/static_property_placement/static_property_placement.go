@@ -3,10 +3,14 @@ package static_property_placement
 import (
 	_ "embed"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed static_property_placement.schema.json
@@ -35,7 +39,6 @@ type options struct {
 func parseOptions(raw []any) options {
 	o := options{
 		defaultPosition: staticPublicField,
-		overrides:       map[string]string{},
 	}
 	if len(raw) > 0 {
 		if position, ok := raw[0].(string); ok && position != "" {
@@ -44,6 +47,7 @@ func parseOptions(raw []any) options {
 	}
 	if len(raw) > 1 {
 		if m, ok := raw[1].(map[string]interface{}); ok {
+			o.overrides = make(map[string]string, len(m))
 			for name := range propertyNames {
 				if position, ok := m[name].(string); ok && position != "" {
 					o.overrides[name] = position
@@ -152,379 +156,238 @@ func classMemberName(node *ast.Node) string {
 	}
 }
 
-func reportClassMember(name, expected string, node *ast.Node, isStatic bool, ctx rule.RuleContext) {
-	if expected == propertyAssignment {
-		ctx.ReportNode(node, rule.RuleMessage{
-			Id:          "declareOutsideClass",
-			Description: fmt.Sprintf("'%s' should be declared outside the class body.", name),
-			Data:        map[string]string{"name": name},
-		})
-		return
-	}
-
-	if expected == staticPublicField && node.Kind == ast.KindPropertyDeclaration && isStatic {
-		return
-	}
-	if expected == staticGetter && node.Kind == ast.KindGetAccessor && isStatic {
-		return
-	}
-
-	messageID := "notStaticClassProp"
-	description := fmt.Sprintf("'%s' should be declared as a static class property.", name)
-	if expected == staticGetter {
-		messageID = "notGetterClassFunc"
-		description = fmt.Sprintf("'%s' should be declared as a static getter class function.", name)
-	}
-	ctx.ReportNode(node, rule.RuleMessage{
-		Id:          messageID,
-		Description: description,
-		Data:        map[string]string{"name": name},
-	})
-}
-
-func reportAssignment(name, expected string, node *ast.Node, ctx rule.RuleContext) {
-	if expected == propertyAssignment {
-		return
-	}
-	messageID := "notStaticClassProp"
-	description := fmt.Sprintf("'%s' should be declared as a static class property.", name)
-	if expected == staticGetter {
-		messageID = "notGetterClassFunc"
-		description = fmt.Sprintf("'%s' should be declared as a static getter class function.", name)
-	}
-	ctx.ReportNode(node, rule.RuleMessage{
-		Id:          messageID,
-		Description: description,
-		Data:        map[string]string{"name": name},
-	})
-}
-
-func isReactClass(node *ast.Node, pragma string) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindClassDeclaration, ast.KindClassExpression:
-		return reactutil.ExtendsReactComponent(node, pragma) || isExplicitReactClass(node)
-	}
-	return false
-}
-
-func isExplicitReactClass(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	for _, doc := range node.JSDoc(nil) {
-		jsDoc := doc.AsJSDoc()
-		if jsDoc == nil || jsDoc.Tags == nil {
-			continue
-		}
-		for _, tag := range jsDoc.Tags.Nodes {
-			if !ast.IsJSDocAugmentsTag(tag) {
-				continue
+// Messages are immutable; every diagnostic can reuse their formatted text and
+// data instead of allocating the same property names for each source member.
+var placementMessages = func() map[string]map[string]rule.RuleMessage {
+	messages := make(map[string]map[string]rule.RuleMessage, 3)
+	for _, position := range []string{staticPublicField, staticGetter, propertyAssignment} {
+		messages[position] = make(map[string]rule.RuleMessage, len(propertyNames))
+		for name := range propertyNames {
+			id, description := "notStaticClassProp", "'%s' should be declared as a static class property."
+			switch position {
+			case staticGetter:
+				id, description = "notGetterClassFunc", "'%s' should be declared as a static getter class function."
+			case propertyAssignment:
+				id, description = "declareOutsideClass", "'%s' should be declared outside the class body."
 			}
-			augments := tag.AsJSDocAugmentsTag()
-			if augments != nil && isExplicitReactType(augments.ClassName) {
-				return true
+			messages[position][name] = rule.RuleMessage{Id: id, Description: fmt.Sprintf(description, name), Data: map[string]string{"name": name}}
+		}
+	}
+	return messages
+}()
+
+type componentResolver struct {
+	ctx        rule.RuleContext
+	pragma     string
+	classes    map[*ast.Node]bool
+	scopes     *scope.Manager
+	firstChild map[*scope.Scope]*scope.Scope
+}
+
+func (r *componentResolver) isReactComponent(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if result, ok := r.classes[node]; ok {
+		return result
+	}
+	result := ((node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression) && reactutil.ExtendsReactComponent(node, r.pragma)) || reactutil.IsExplicitReactComponent(node)
+	if r.classes == nil {
+		r.classes = make(map[*ast.Node]bool)
+	}
+	r.classes[node] = result
+	return result
+}
+
+func (r *componentResolver) variable(node *ast.Node, name string) []*scope.Variable {
+	// A direct top-level assignment to a singly declared top-level binding
+	// cannot reach the child-scope fallback. Reuse the binder's declaration
+	// here; nested scopes and merged declarations use the complete model below.
+	if parent := ast.WalkUpParenthesizedExpressions(node.Parent); parent != nil {
+		statement := ast.WalkUpParenthesizedExpressions(parent.Parent)
+		if statement != nil && statement.Kind == ast.KindExpressionStatement && statement.Parent == r.ctx.SourceFile.AsNode() {
+			if symbol := r.ctx.SourceFile.Locals[name]; symbol != nil && len(symbol.Declarations) == 1 {
+				declaration := symbol.Declarations[0]
+				kind, topLevel := scope.DefVariable, false
+				switch declaration.Kind {
+				case ast.KindVariableDeclaration:
+					topLevel = declaration.Parent.Kind == ast.KindVariableDeclarationList && declaration.Parent.Parent.Kind == ast.KindVariableStatement && declaration.Parent.Parent.Parent == r.ctx.SourceFile.AsNode()
+				case ast.KindClassDeclaration:
+					kind, topLevel = scope.DefClassName, declaration.Parent == r.ctx.SourceFile.AsNode()
+				case ast.KindFunctionDeclaration:
+					kind, topLevel = scope.DefFunctionName, declaration.Parent == r.ctx.SourceFile.AsNode()
+				}
+				if topLevel && declaration.Name() != nil && declaration.Name().Kind == ast.KindIdentifier && declaration.Name().Text() == name {
+					return []*scope.Variable{{ID: declaration.Name(), DefNode: declaration, Kind: kind}}
+				}
 			}
 		}
 	}
-	return false
-}
-
-func isExplicitReactType(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	node = ast.SkipParentheses(node)
-	if node.Kind == ast.KindExpressionWithTypeArguments {
-		return isExplicitReactType(node.AsExpressionWithTypeArguments().Expression)
-	}
-	if node.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-	property := node.AsPropertyAccessExpression()
-	object := ast.SkipParentheses(property.Expression)
-	name := property.Name()
-	return object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "React" &&
-		name != nil && name.Kind == ast.KindIdentifier &&
-		(name.AsIdentifier().Text == "Component" || name.AsIdentifier().Text == "PureComponent")
-}
-
-// parentReactClass mirrors componentUtil.getParentES6Component: walk out to the
-// nearest enclosing class and treat it as the component only when that class is
-// itself a React class. The lookup is deliberately ES6-class-only, so a helper
-// class nested inside a createReactClass component is not attributed to that
-// surrounding ES5 component.
-func parentReactClass(node *ast.Node, pragma string) *ast.Node {
-	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		if parent.Kind != ast.KindClassDeclaration && parent.Kind != ast.KindClassExpression {
-			continue
+	if r.scopes == nil {
+		r.scopes = scope.Build(r.ctx.SourceFile, scope.Options{})
+		r.firstChild = make(map[*scope.Scope]*scope.Scope)
+		for _, s := range r.scopes.Scopes {
+			if s.Parent != nil && r.firstChild[s.Parent] == nil {
+				r.firstChild[s.Parent] = s
+			}
 		}
-		if isReactClass(parent, pragma) {
-			return parent
+	}
+	// React's variable helper also checks the first two child scopes before
+	// walking outward. The shared scope model preserves those boundaries.
+	for s := r.scopes.Acquire(node); s != nil; s = s.Parent {
+		child := s
+		for range 3 {
+			if child == nil {
+				break
+			}
+			if declarations := child.Declarations(name); len(declarations) != 0 {
+				return declarations
+			}
+			child = r.firstChild[child]
 		}
-		return nil
 	}
 	return nil
 }
 
-func relatedReactClass(ctx rule.RuleContext, receiver *ast.Node, pragma string) bool {
-	receiver = ast.SkipParentheses(receiver)
-	if ast.IsOptionalChain(receiver) {
-		return false
-	}
-	root, path, ok := componentPath(receiver)
-	if !ok || ctx.Refs == nil {
-		return false
-	}
-	symbol := ctx.Refs.Resolve(root)
-	if symbol != nil && symbol.ValueDeclaration != nil {
-		declaration := symbol.ValueDeclaration
-		if isReactClass(resolveComponentPath(declaration, path), pragma) {
-			return true
+func (r *componentResolver) related(node *ast.Node) bool {
+	// Build the complete ESTree member path. Literal/private keys are omitted,
+	// including a trailing ["displayName"], before separating the binding name.
+	var buffer [8]string
+	path := buffer[:0]
+	for current := node; current != nil; {
+		var object, property *ast.Node
+		switch current.Kind {
+		case ast.KindPropertyAccessExpression:
+			access := current.AsPropertyAccessExpression()
+			object, property = access.Expression, access.Name()
+		case ast.KindElementAccessExpression:
+			access := current.AsElementAccessExpression()
+			object, property = access.Expression, ast.SkipParentheses(access.ArgumentExpression)
+		default:
+			current = nil
+			continue
 		}
-		if relatedReactClassAssignment(ctx, symbol, path, receiver, pragma) {
-			return true
+		if property != nil && property.Kind == ast.KindIdentifier {
+			path = append(path, property.Text())
 		}
-		// A successfully resolved local binding is authoritative. Falling
-		// back to a same-name class elsewhere in the file would cross a
-		// shadowing boundary and report a non-component binding.
-		return false
-	}
-	// The checker/ref store can leave a declaration unresolved in a JS/TSX
-	// file without a usable project symbol. Keep the same-file fallback
-	// conservative and name-based, matching the plugin's related-component
-	// lookup for ordinary class declarations.
-	source := ast.GetSourceFileOfNode(receiver)
-	if source == nil {
-		return false
-	}
-	if len(path) != 0 {
-		return false
-	}
-	want := root.AsIdentifier().Text
-	found := false
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if found || node == nil {
-			return
+		object = ast.SkipParentheses(object)
+		if object != nil && object.Kind == ast.KindIdentifier {
+			path = append(path, object.Text())
 		}
-		if node.Kind == ast.KindClassDeclaration {
-			name := node.Name()
-			if name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == want && isReactClass(node, pragma) {
-				found = true
-				return
+		current = object
+	}
+	if len(path) == 0 {
+		return false
+	}
+	slices.Reverse(path)
+	declarations := r.variable(node, path[0])
+	if len(declarations) == 0 {
+		return false
+	}
+	componentName := strings.Join(path[:len(path)-1], ".")
+	// Initializer writes are ESLint references, but RefStore deliberately
+	// excludes declaration names. Compare the earliest matching initializer
+	// with its source-ordered index without copying or sorting that index.
+	var first *ast.Node
+	for _, declaration := range declarations {
+		if declaration.Kind == scope.DefVariable && declaration.DefNode.Kind == ast.KindVariableDeclaration && declaration.DefNode.AsVariableDeclaration().Initializer != nil {
+			id := declaration.ID
+			if utils.TrimmedNodeText(r.ctx.SourceFile, id) == componentName && (first == nil || id.Pos() < first.Pos()) {
+				first = id
 			}
 		}
-		node.ForEachChild(func(child *ast.Node) bool { visit(child); return found })
 	}
-	visit(source.AsNode())
-	return found
-}
-
-func relatedReactClassAssignment(ctx rule.RuleContext, symbol *ast.Symbol, path []string, currentReceiver *ast.Node, pragma string) bool {
-	if ctx.Refs == nil || symbol == nil {
-		return false
+	if componentName != "" {
+		for _, reference := range r.ctx.Refs.References(declarations[0].DefNode.Symbol()) {
+			if first != nil && reference.Pos() > first.Pos() {
+				break
+			}
+			ref := reference
+			if parent := ast.WalkUpParenthesizedExpressions(ref.Parent); parent != nil && (parent.Kind == ast.KindPropertyAccessExpression || parent.Kind == ast.KindElementAccessExpression) {
+				ref = parent
+			}
+			if utils.TrimmedNodeText(r.ctx.SourceFile, ref) == componentName {
+				first = ref
+				break
+			}
+		}
 	}
-	for _, reference := range ctx.Refs.References(symbol) {
-		if reference == nil || reference.Parent == nil {
-			continue
+	if first != nil {
+		var component *ast.Node
+		parent := ast.WalkUpParenthesizedExpressions(first.Parent)
+		if first.Kind == ast.KindPropertyAccessExpression || first.Kind == ast.KindElementAccessExpression {
+			component = binaryRight(parent)
+		} else if parent != nil && parent.Kind == ast.KindVariableDeclaration && parent.AsVariableDeclaration().Initializer != nil {
+			init := ast.SkipParentheses(parent.AsVariableDeclaration().Initializer)
+			if init != nil && init.Kind != ast.KindIdentifier {
+				component = init
+			}
 		}
-		// getRelatedComponent stops at the current reference, so assignments
-		// after the property write cannot define the component for that write.
-		if currentReceiver != nil && reference.Pos() >= currentReceiver.Pos() {
-			continue
+		if component != nil {
+			return r.isReactComponent(ast.SkipParentheses(component))
 		}
-		memberRoot, memberPath, ok := componentPath(reference.Parent)
-		if !ok || memberRoot != reference || !samePath(memberPath, path) {
-			continue
+		// The first textual match is authoritative even when it has no right
+		// side: then upstream falls back to the declaration, not a later write.
+	}
+	for _, declaration := range declarations {
+		switch declaration.Kind {
+		case scope.DefVariable, scope.DefClassName, scope.DefClassInnerName, scope.DefFunctionName, scope.DefFnExprName:
+			node := declaration.DefNode
+			if node.Kind == ast.KindBindingElement {
+				node = ast.FindAncestorKind(node, ast.KindVariableDeclaration)
+			}
+			if node != nil && node.Kind == ast.KindVariableDeclaration && node.AsVariableDeclaration().Initializer != nil {
+				node = node.AsVariableDeclaration().Initializer
+			}
+			return r.isReactComponent(resolveComponentPath(node, path[1:]))
 		}
-		parent := reference.Parent.Parent
-		for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-			parent = parent.Parent
-		}
-		if parent == nil || parent.Kind != ast.KindBinaryExpression {
-			return false
-		}
-		binary := parent.AsBinaryExpression()
-		if binary.OperatorToken == nil || binary.OperatorToken.Kind == ast.KindCommaToken || binary.Right == nil {
-			return false
-		}
-		if isReactClass(reactutil.SkipExpressionWrappers(binary.Right), pragma) {
-			return true
-		}
-		return false
 	}
 	return false
 }
 
-func samePath(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i := range left {
-		if left[i] != right[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func componentPath(node *ast.Node) (*ast.Node, []string, bool) {
-	if node == nil {
-		return nil, nil, false
-	}
-	switch node.Kind {
-	case ast.KindIdentifier:
-		return node, nil, true
-	case ast.KindPropertyAccessExpression:
-		property := node.AsPropertyAccessExpression()
-		root, path, ok := componentPath(property.Expression)
-		if !ok {
-			return nil, nil, false
-		}
-		// getRelatedComponent adds only ordinary ESTree Identifier
-		// properties to its path. Private and other non-Identifier names
-		// are skipped while the object prefix remains usable.
-		if name := property.Name(); name != nil && name.Kind == ast.KindIdentifier {
-			return root, append(path, name.AsIdentifier().Text), true
-		}
-		return root, path, true
-	case ast.KindElementAccessExpression:
-		property := node.AsElementAccessExpression()
-		root, path, ok := componentPath(property.Expression)
-		if !ok {
-			return nil, nil, false
-		}
-		// getRelatedComponent includes an ESTree computed identifier in the
-		// component path, but omits literal and other computed keys. Keep the
-		// resolved prefix for the latter so `Box.C["helper"].propTypes`
-		// still resolves through `Box.C` like upstream.
-		argument := ast.SkipParentheses(property.ArgumentExpression)
-		if argument != nil && argument.Kind == ast.KindIdentifier {
-			path = append(path, argument.AsIdentifier().Text)
-		}
-		return root, path, true
-	default:
-		return nil, nil, false
-	}
-}
-
 func resolveComponentPath(node *ast.Node, path []string) *ast.Node {
-	node = reactutil.SkipExpressionWrappers(node)
 	if node == nil {
 		return nil
 	}
-	if node.Kind == ast.KindVariableDeclaration {
-		node = reactutil.SkipExpressionWrappers(node.AsVariableDeclaration().Initializer)
-	}
+	node = ast.SkipParentheses(node)
 	for _, name := range path {
 		if node == nil {
 			return nil
 		}
-		// eslint-plugin-react keeps the component node when a later path
-		// segment is accessed on a class, because class nodes do not have
-		// object-literal `properties`. Preserve that behavior so paths such
-		// as `Box.C.foo.propTypes` still resolve to the component class.
+		// Only object literals have ESTree properties; class and TS wrapper nodes
+		// retain their identity when a later path segment is inspected.
 		if node.Kind != ast.KindObjectLiteralExpression {
 			continue
 		}
 		var next *ast.Node
 		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
-			if property == nil || property.Name() == nil || propertyIdentifierName(property.Name()) != name {
+			key := property.Name()
+			if key != nil && key.Kind == ast.KindComputedPropertyName {
+				key = ast.SkipParentheses(key.AsComputedPropertyName().Expression)
+			}
+			if key == nil || key.Kind != ast.KindIdentifier || key.Text() != name {
 				continue
 			}
 			if property.Kind == ast.KindPropertyAssignment {
 				next = property.AsPropertyAssignment().Initializer
+			} else if ast.IsFunctionLike(property) {
+				next = property
 			}
 			break
 		}
 		if next == nil {
 			return nil
 		}
-		node = reactutil.SkipExpressionWrappers(next)
+		node = ast.SkipParentheses(next)
 	}
 	return node
 }
 
-func propertyIdentifierName(node *ast.Node) string {
-	if node == nil {
-		return ""
+func binaryRight(node *ast.Node) *ast.Node {
+	if node == nil || node.Kind != ast.KindBinaryExpression || utils.IsCommaOperator(node) {
+		return nil
 	}
-	if node.Kind == ast.KindIdentifier {
-		return node.AsIdentifier().Text
-	}
-	if node.Kind == ast.KindComputedPropertyName {
-		expr := ast.SkipParentheses(node.AsComputedPropertyName().Expression)
-		if expr != nil && expr.Kind == ast.KindIdentifier {
-			return expr.AsIdentifier().Text
-		}
-	}
-	return ""
-}
-
-func isInsideClass(node *ast.Node) bool {
-	for parent := node.Parent; parent != nil; parent = parent.Parent {
-		if parent.Kind == ast.KindClassDeclaration {
-			return true
-		}
-	}
-	return false
-}
-
-func assignmentMember(node *ast.Node) (*ast.Node, *ast.Node, bool) {
-	if node == nil {
-		return nil, nil, false
-	}
-	if ast.IsOptionalChain(node) {
-		return nil, nil, false
-	}
-	var nameNode *ast.Node
-	var receiver *ast.Node
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		property := node.AsPropertyAccessExpression()
-		nameNode, receiver = property.Name(), property.Expression
-	case ast.KindElementAccessExpression:
-		property := node.AsElementAccessExpression()
-		nameNode, receiver = property.ArgumentExpression, property.Expression
-	default:
-		return nil, nil, false
-	}
-	name := propertyName(nameNode)
-	if name == "" {
-		return nil, nil, false
-	}
-	// eslint-plugin-react's getRelatedComponent builds the component path from
-	// the complete MemberExpression. A computed string property is omitted
-	// from that path, so a nested form such as `Box.C["displayName"]` does not
-	// resolve as a related component there. Keep the direct `C["displayName"]`
-	// form below, which upstream does recognize.
-	if node.Kind == ast.KindElementAccessExpression && isNestedComputedDisplayName(nameNode, receiver) {
-		return nil, nil, false
-	}
-	current := node
-	parent := current.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		current, parent = parent, parent.Parent
-	}
-	if parent == nil || parent.Kind != ast.KindBinaryExpression {
-		return nil, nil, false
-	}
-	binary := parent.AsBinaryExpression()
-	if binary.OperatorToken == nil || binary.OperatorToken.Kind == ast.KindCommaToken || binary.Right == nil {
-		return nil, nil, false
-	}
-	return node, receiver, true
-}
-
-func isNestedComputedDisplayName(nameNode, receiver *ast.Node) bool {
-	nameNode = ast.SkipParentheses(nameNode)
-	receiver = ast.SkipParentheses(receiver)
-	return nameNode != nil && nameNode.Kind == ast.KindStringLiteral &&
-		nameNode.AsStringLiteral().Text == "displayName" &&
-		receiver != nil && receiver.Kind == ast.KindPropertyAccessExpression
+	return node.AsBinaryExpression().Right
 }
 
 var StaticPropertyPlacementRule = rule.Rule{
@@ -532,75 +395,53 @@ var StaticPropertyPlacementRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		o := parseOptions(rawOptions)
-		pragma := reactutil.GetReactPragma(ctx.Settings)
-		checkClassMember := func(node *ast.Node, isStatic bool) {
-			// @typescript-eslint/parser represents abstract fields as
-			// TSAbstractPropertyDefinition, which is not matched by the upstream
-			// rule's ClassProperty/PropertyDefinition selector. tsgo exposes the
-			// same field as PropertyDeclaration, so filter abstract members here.
-			if hasModifier(node, ast.KindAbstractKeyword) {
+		resolver := componentResolver{ctx: ctx, pragma: reactutil.GetReactPragmaFromContext(ctx)}
+		checkClassMember := func(node *ast.Node) {
+			if !utils.IsPlainClassMember(node) {
 				return
 			}
-			if parentReactClass(node, pragma) == nil {
+			isStatic := ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic)
+			if node.Kind == ast.KindGetAccessor && !isStatic {
 				return
 			}
 			name := classMemberName(node)
 			if name == "" {
 				return
 			}
-			// MethodDefinition's upstream listener only handles static getters;
-			// ordinary methods and instance accessors are not class properties.
-			if node.Kind == ast.KindGetAccessor && !isStatic {
+			expected := o.position(name)
+			if isStatic && ((node.Kind == ast.KindPropertyDeclaration && expected == staticPublicField) || (node.Kind == ast.KindGetAccessor && expected == staticGetter)) {
 				return
 			}
-			reportClassMember(name, o.position(name), node, isStatic, ctx)
+			if resolver.isReactComponent(reactutil.EnclosingClass(node)) {
+				ctx.ReportNode(node, placementMessages[expected][name])
+			}
 		}
-
+		checkAssignment := func(node *ast.Node) {
+			if ast.IsOptionalChain(node) || binaryRight(ast.WalkUpParenthesizedExpressions(node.Parent)) == nil {
+				return
+			}
+			var name string
+			if node.Kind == ast.KindPropertyAccessExpression {
+				name = propertyName(node.AsPropertyAccessExpression().Name())
+			} else {
+				name = propertyName(node.AsElementAccessExpression().ArgumentExpression)
+			}
+			if name == "" {
+				return
+			}
+			expected := o.position(name)
+			if expected == propertyAssignment || ast.FindAncestorKind(node.Parent, ast.KindClassDeclaration) != nil {
+				return
+			}
+			if resolver.related(node) {
+				ctx.ReportNode(node, placementMessages[expected][name])
+			}
+		}
 		return rule.RuleListeners{
-			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				// TypeScript represents auto-accessors as PropertyDeclaration,
-				// while typescript-eslint exposes AccessorProperty, which is not
-				// included in the upstream rule's listener selector.
-				if hasModifier(node, ast.KindAccessorKeyword) {
-					return
-				}
-				checkClassMember(node, node.Modifiers() != nil && node.Modifiers().Nodes != nil && hasStaticModifier(node))
-			},
-			ast.KindGetAccessor: func(node *ast.Node) {
-				checkClassMember(node, hasStaticModifier(node))
-			},
-			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				member, receiver, ok := assignmentMember(node)
-				if !ok || isInsideClass(node) || !relatedReactClass(ctx, receiver, pragma) {
-					return
-				}
-				name := propertyName(member.AsPropertyAccessExpression().Name())
-				reportAssignment(name, o.position(name), member, ctx)
-			},
-			ast.KindElementAccessExpression: func(node *ast.Node) {
-				member, receiver, ok := assignmentMember(node)
-				if !ok || isInsideClass(node) || !relatedReactClass(ctx, receiver, pragma) {
-					return
-				}
-				name := propertyName(member.AsElementAccessExpression().ArgumentExpression)
-				reportAssignment(name, o.position(name), member, ctx)
-			},
+			ast.KindPropertyDeclaration:      checkClassMember,
+			ast.KindGetAccessor:              checkClassMember,
+			ast.KindPropertyAccessExpression: checkAssignment,
+			ast.KindElementAccessExpression:  checkAssignment,
 		}
 	},
-}
-
-func hasStaticModifier(node *ast.Node) bool {
-	return hasModifier(node, ast.KindStaticKeyword)
-}
-
-func hasModifier(node *ast.Node, kind ast.Kind) bool {
-	if node == nil || node.Modifiers() == nil {
-		return false
-	}
-	for _, modifier := range node.Modifiers().Nodes {
-		if modifier.Kind == kind {
-			return true
-		}
-	}
-	return false
 }

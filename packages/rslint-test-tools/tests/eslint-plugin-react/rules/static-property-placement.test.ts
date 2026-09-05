@@ -28,6 +28,27 @@ ruleTester.run('static-property-placement', {} as never, {
         MyComponent.defaultProps = {};`,
       options: ['property assignment'],
     },
+    {
+      code: `const Box = { C: class extends React.Component {} };
+        Box.C = {};
+        Box.C.propTypes = {};`,
+    },
+    {
+      code: `const Box = { C: class extends React.Component {} } as const;
+        Box.C.propTypes = {};`,
+    },
+    {
+      code: `/** @extends {React.Component} */
+        class C { propTypes = {}; }`,
+      filename: 'files/static-property-placement.jsx',
+    },
+    {
+      code: `/** @extends React.Component */
+        const C = class {
+          // eslint-disable-next-line react/static-property-placement
+          propTypes = {};
+        };`,
+    },
   ],
   invalid: [
     {
@@ -46,7 +67,12 @@ ruleTester.run('static-property-placement', {} as never, {
     {
       code: `class MyComponent extends React.Component {}
         MyComponent.propTypes = {};`,
-      errors: [{ messageId: 'declareOutsideClass' }],
+      errors: [
+        {
+          messageId: 'notStaticClassProp',
+          message: "'propTypes' should be declared as a static class property.",
+        },
+      ],
     },
     {
       code: `class MyComponent extends React.Component {
@@ -58,6 +84,39 @@ ruleTester.run('static-property-placement', {} as never, {
       errors: [
         { messageId: 'declareOutsideClass' },
         { messageId: 'declareOutsideClass' },
+      ],
+    },
+    {
+      code: `/** @extends React.Component */
+        const C = class { propTypes = {}; };`,
+      filename: 'files/static-property-placement.jsx',
+      errors: [
+        {
+          messageId: 'notStaticClassProp',
+          message: "'propTypes' should be declared as a static class property.",
+        },
+      ],
+    },
+    {
+      code: `const Box = { C: class extends React.Component {} };
+        (Box).C.propTypes = {};`,
+      options: ['static getter'],
+      errors: [
+        {
+          messageId: 'notGetterClassFunc',
+          message:
+            "'propTypes' should be declared as a static getter class function.",
+        },
+      ],
+    },
+    {
+      code: `/* @jsx Preact.h */
+        class C extends Preact.Component { propTypes = {}; }`,
+      errors: [
+        {
+          messageId: 'notStaticClassProp',
+          message: "'propTypes' should be declared as a static class property.",
+        },
       ],
     },
   ],
