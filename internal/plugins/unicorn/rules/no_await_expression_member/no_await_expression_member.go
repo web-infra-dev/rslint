@@ -7,8 +7,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+const messageID = "no-await-expression-member"
+
 var message = rule.RuleMessage{
-	Id:          "noAwaitExpressionMember",
+	Id:          messageID,
 	Description: "Do not access a member directly from an await expression.",
 }
 

@@ -91,7 +91,7 @@ func memberError(code, property string) rule_tester.InvalidTestCaseError {
 	}
 	end := start + len(property)
 	return rule_tester.InvalidTestCaseError{
-		MessageId: "noAwaitExpressionMember",
+		MessageId: "no-await-expression-member",
 		Message:   "Do not access a member directly from an await expression.",
 		Line:      strings.Count(code[:start], "\n") + 1,
 		Column:    start - strings.LastIndex(code[:start], "\n"),

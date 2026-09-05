@@ -55,7 +55,7 @@ ruleTester.run('no-await-expression-member', null as never, {
     filename: 'src/virtual.mts',
     errors: [
       {
-        messageId: 'noAwaitExpressionMember',
+        messageId: 'no-await-expression-member',
         message: 'Do not access a member directly from an await expression.',
       },
     ],
