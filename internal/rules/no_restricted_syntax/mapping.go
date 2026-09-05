@@ -51,12 +51,19 @@ var estreeKindMap = map[string][]ast.Kind{
 	"VariableDeclaration":     {ast.KindVariableStatement, ast.KindVariableDeclarationList},
 	"VariableDeclarator":      {ast.KindVariableDeclaration},
 	"FunctionDeclaration":     {ast.KindFunctionDeclaration},
-	"FunctionExpression":      {ast.KindFunctionExpression},
+	"FunctionExpression":      {ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
 	"ArrowFunctionExpression": {ast.KindArrowFunction},
+	"TSEnumDeclaration":       {ast.KindEnumDeclaration},
+	"TSEnumBody":              {ast.KindEnumDeclaration},
+	"TSEnumMember":            {ast.KindEnumMember},
 
 	// Classes
-	"ClassDeclaration":   {ast.KindClassDeclaration},
-	"ClassExpression":    {ast.KindClassExpression},
+	"ClassDeclaration": {ast.KindClassDeclaration},
+	"ClassExpression":  {ast.KindClassExpression},
+	// tsgo stores the class body directly on the class node. The matcher uses
+	// that same node as a virtual ClassBody facade when the selector asks for
+	// the ESTree wrapper.
+	"ClassBody":          {ast.KindClassDeclaration, ast.KindClassExpression},
 	"MethodDefinition":   {ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
 	"PropertyDefinition": {ast.KindPropertyDeclaration},
 	"StaticBlock":        {ast.KindClassStaticBlockDeclaration},
@@ -142,8 +149,11 @@ var estreeKindMap = map[string][]ast.Kind{
 	"JSXAttribute":           {ast.KindJsxAttribute},
 	"JSXSpreadAttribute":     {ast.KindJsxSpreadAttribute},
 	"JSXExpressionContainer": {ast.KindJsxExpression},
+	"JSXEmptyExpression":     {ast.KindJsxExpression},
+	"JSXSpreadChild":         {ast.KindJsxExpression},
 	"JSXText":                {ast.KindJsxText},
 	"JSXIdentifier":          {ast.KindIdentifier}, // identifiers inside JSX share the regular kind
+	"JSXMemberExpression":    {ast.KindPropertyAccessExpression},
 	"JSXNamespacedName":      {ast.KindJsxNamespacedName},
 }
 

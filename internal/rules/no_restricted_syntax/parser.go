@@ -138,6 +138,11 @@ func (p *parser) parseCompound() (selector, error) {
 // parseSequence parses a single selector with optional filters chained on
 // the same node (e.g. `Identifier[name="foo"]:not(...)`).
 func (p *parser) parseSequence() (selector, error) {
+	subject := false
+	if p.peek() == '!' {
+		subject = true
+		p.pos++
+	}
 	var head selector
 	c := p.peek()
 	switch {
@@ -150,6 +155,13 @@ func (p *parser) parseSequence() (selector, error) {
 		// Filters without an explicit head — equivalent to `*` followed by
 		// the filter.
 		head = newIdentifierSelector("*")
+	case c == '#':
+		p.pos++
+		name, err := p.parseIdent()
+		if err != nil {
+			return nil, err
+		}
+		head = newIdentifierSelector(name)
 	case isIdentStart(c):
 		name, err := p.parseIdent()
 		if err != nil {
@@ -187,8 +199,14 @@ func (p *parser) parseSequence() (selector, error) {
 			}
 			head = ps
 		default:
+			if subject {
+				return subjectSelector{Inner: head}, nil
+			}
 			return head, nil
 		}
+	}
+	if subject {
+		return subjectSelector{Inner: head}, nil
 	}
 	return head, nil
 }
@@ -206,7 +224,6 @@ func (p *parser) parseIdent() (string, error) {
 	if p.eof() || !isIdentStart(p.src[p.pos]) {
 		return "", fmt.Errorf("expected identifier at position %d", p.pos)
 	}
-	p.pos++
 	for !p.eof() && isIdentCont(p.src[p.pos]) {
 		p.pos++
 	}
@@ -267,29 +284,10 @@ func (p *parser) parseAttrPath() ([]string, error) {
 // hyphens (paths like `foo-bar` are not used by ESTree but esquery accepts
 // them).
 func (p *parser) parseAttrPathSegment() (string, error) {
-	start := p.pos
-	if p.eof() {
+	if p.eof() || !isIdentStart(p.peek()) {
 		return "", fmt.Errorf("expected identifier in attribute path at position %d", p.pos)
 	}
-	if p.peek() >= '0' && p.peek() <= '9' {
-		for !p.eof() && p.peek() >= '0' && p.peek() <= '9' {
-			p.pos++
-		}
-		return p.src[start:p.pos], nil
-	}
-	if !isIdentStart(p.peek()) {
-		return "", fmt.Errorf("expected identifier in attribute path at position %d", p.pos)
-	}
-	p.pos++
-	for !p.eof() {
-		c := p.peek()
-		if isIdentCont(c) {
-			p.pos++
-			continue
-		}
-		break
-	}
-	return p.src[start:p.pos], nil
+	return p.parseIdent()
 }
 
 func (p *parser) parseAttrOp() (attrOp, error) {
@@ -521,8 +519,12 @@ func (p *parser) parseNumber() (float64, error) {
 	}
 	if !p.eof() && p.src[p.pos] == '.' {
 		p.pos++
+		fractionStart := p.pos
 		for !p.eof() && p.src[p.pos] >= '0' && p.src[p.pos] <= '9' {
 			p.pos++
+		}
+		if p.pos == fractionStart {
+			return 0, fmt.Errorf("expected digit at position %d", p.pos)
 		}
 	}
 	val, err := strconv.ParseFloat(p.src[start:p.pos], 64)
@@ -638,19 +640,7 @@ type combinedPseudo struct {
 func (combinedPseudo) isSelector() {}
 
 func (p *parser) parsePseudoName() (string, error) {
-	start := p.pos
-	for !p.eof() {
-		c := p.src[p.pos]
-		if isIdentCont(c) {
-			p.pos++
-			continue
-		}
-		break
-	}
-	if p.pos == start {
-		return "", fmt.Errorf("expected pseudo name at position %d", p.pos)
-	}
-	return p.src[start:p.pos], nil
+	return p.parseIdent()
 }
 
 func (p *parser) parsePseudoNumberArg() (int, error) {
@@ -709,18 +699,9 @@ func (p *parser) parsePseudoSelectorArgs() ([]selector, error) {
 }
 
 func isIdentStart(c byte) bool {
-	return c == '_' || c == '#' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '$'
+	return c != 0 && !strings.ContainsRune(" \t\r\n[](),:#!=>\u003c~+.", rune(c))
 }
 
 func isIdentCont(c byte) bool {
-	if isIdentStart(c) {
-		return true
-	}
-	if c >= '0' && c <= '9' {
-		return true
-	}
-	if c == '-' {
-		return true
-	}
-	return false
+	return isIdentStart(c)
 }

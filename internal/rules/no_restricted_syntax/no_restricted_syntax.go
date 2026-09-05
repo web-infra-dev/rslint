@@ -8,7 +8,9 @@ import (
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_restricted_syntax.schema.json
@@ -39,38 +41,59 @@ var NoRestrictedSyntaxRule = rule.Rule{
 				return
 			}
 			first, second, useAll := bucket.candidates(node, mc)
-			if useAll {
-				for index := range bucket.entries {
-					bucket.matchAndReport(index, node, mc, &ctx, false)
+			visitCandidates := func(match func(index int, indexed bool)) {
+				if useAll {
+					for index := range bucket.entries {
+						match(index, false)
+					}
+					return
+				}
+
+				// Both candidate lists retain ESLint specificity order. Merge them so a
+				// dispatch hit cannot reorder diagnostics relative to selectors
+				// that do not participate in the index.
+				left, right := 0, 0
+				for left < len(first) || right < len(second) {
+					var index int
+					indexed := false
+					switch {
+					case right == len(second):
+						index = first[left]
+						left++
+					case left == len(first):
+						index = second[right]
+						right++
+						indexed = true
+					case first[left] < second[right]:
+						index = first[left]
+						left++
+					default:
+						index = second[right]
+						right++
+						indexed = true
+					}
+					match(index, indexed)
+				}
+			}
+
+			if node.Kind == ast.KindJsxSelfClosingElement {
+				// tsgo folds JSXElement and JSXOpeningElement into one physical node.
+				// Visit the two ESTree identities in their logical order so reports
+				// from selectors on the physical JSXElement remain ahead of the
+				// synthetic opening element.
+				for _, target := range []string{"JSXElement", "JSXOpeningElement"} {
+					visitCandidates(func(index int, indexed bool) {
+						bucket.matchAndReportSelfClosing(index, node, mc, &ctx, indexed, target)
+					})
 				}
 				return
 			}
-
-			// Both candidate lists retain ESLint specificity order. Merge them so a
-			// dispatch hit cannot reorder diagnostics relative to selectors
-			// that do not participate in the index.
-			left, right := 0, 0
-			for left < len(first) || right < len(second) {
-				var index int
-				indexed := false
-				switch {
-				case right == len(second):
-					index = first[left]
-					left++
-				case left == len(first):
-					index = second[right]
-					right++
-					indexed = true
-				case first[left] < second[right]:
-					index = first[left]
-					left++
-				default:
-					index = second[right]
-					right++
-					indexed = true
-				}
-				bucket.matchAndReport(index, node, mc, &ctx, indexed)
-			}
+			visitCandidates(func(index int, indexed bool) {
+				bucket.matchPhysical(index, node, mc, &ctx, indexed)
+			})
+			visitCandidates(func(index int, indexed bool) {
+				bucket.matchVirtual(index, node, mc, &ctx)
+			})
 		}
 
 		listeners := make(rule.RuleListeners, len(plan.buckets))
@@ -89,6 +112,7 @@ type ruleEntry struct {
 	selector string
 	compiled selector
 	message  string
+	exit     bool
 }
 
 const maxCachedRulePlans = 64
@@ -167,14 +191,22 @@ func buildRulePlan(options []any) *rulePlan {
 	perKind := make(map[ast.Kind][]ruleEntry)
 	for _, entry := range entries {
 		kinds := candidateKinds(entry.compiled)
+		listenerKind := func(kind ast.Kind) ast.Kind {
+			if entry.exit {
+				return rule.ListenerOnExit(kind)
+			}
+			return kind
+		}
 		if kinds.universe {
 			for _, kind := range allInterestingKinds {
-				perKind[kind] = append(perKind[kind], entry)
+				key := listenerKind(kind)
+				perKind[key] = append(perKind[key], entry)
 			}
 			continue
 		}
 		for kind := range kinds.kinds {
-			perKind[kind] = append(perKind[kind], entry)
+			key := listenerKind(kind)
+			perKind[key] = append(perKind[key], entry)
 		}
 	}
 	plan.buckets = make(map[ast.Kind]*ruleBucket, len(perKind))
@@ -292,7 +324,14 @@ func supportsSingleDispatch(path []string) bool {
 }
 
 func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
+	if selectorTargetsClassBody(sel) || selectorTargetsJSXEmptyExpression(sel) ||
+		selectorTargetsEstreeType(sel, "TSEnumBody") || selectorTargetsEstreeType(sel, "FunctionExpression") ||
+		selectorTargetsEstreeType(sel, "JSXElement") || selectorTargetsEstreeType(sel, "JSXOpeningElement") {
+		return attrs
+	}
 	switch value := sel.(type) {
+	case subjectSelector:
+		attrs = collectDispatchAttrs(value.Inner, attrs)
 	case attrSelector:
 		attrs = collectDispatchAttrs(value.Inner, attrs)
 		if value.Op == attrEqual {
@@ -316,6 +355,11 @@ func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
 
 func stripDispatchAttr(sel selector, pathKey, expected string) (selector, bool) {
 	switch value := sel.(type) {
+	case subjectSelector:
+		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
+			value.Inner = inner
+			return value, true
+		}
 	case attrSelector:
 		if inner, ok := stripDispatchAttr(value.Inner, pathKey, expected); ok {
 			value.Inner = inner
@@ -378,13 +422,74 @@ func (bucket *ruleBucket) candidates(node *ast.Node, mc *matchContext) (first, s
 	return bucket.dispatch.fallback, bucket.dispatch.byValue[value], false
 }
 
-func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool) {
+func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool) {
 	entry := &bucket.entries[index]
 	compiled := entry.compiled
 	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
 		compiled = bucket.dispatch.matched[index]
 	}
-	if !matches(compiled, node, mc) {
+	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
+		ctx.ReportNode(node, rule.RuleMessage{
+			Id:          "restrictedSyntax",
+			Description: entry.formatMessage(),
+		})
+	}
+}
+
+func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext) {
+	entry := &bucket.entries[index]
+	message := rule.RuleMessage{
+		Id:          "restrictedSyntax",
+		Description: entry.formatMessage(),
+	}
+	for _, target := range virtualTargets(node) {
+		// A bare universe selector intentionally walks only the physical tsgo
+		// tree. Other broad selectors, including regex attributes and negative
+		// pseudos, still need to be evaluated against virtual ESTree targets.
+		if isBareWildcardSelector(entry.compiled) {
+			continue
+		}
+		// Dispatch predicates are stripped only for the physical path.
+		// Virtual ESTree identities must be checked against the original
+		// selector, otherwise the stripped wildcard reports them again.
+		if !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
+			continue
+		}
+		switch target {
+		case "ClassBody":
+			ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
+		case "TSEnumBody":
+			ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
+		case "JSXEmptyExpression":
+			nodeRange := utils.TrimNodeTextRange(mc.sf, node)
+			ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
+		case "FunctionExpression":
+			ctx.ReportRange(functionValueTextRange(mc.sf, node), message)
+		default:
+			ctx.ReportNode(node, message)
+		}
+	}
+}
+
+func (bucket *ruleBucket) matchAndReportSelfClosing(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool, target string) {
+	entry := &bucket.entries[index]
+	compiled := entry.compiled
+	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
+		compiled = bucket.dispatch.matched[index]
+	}
+
+	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
+	if target == "JSXElement" && physicalMatch {
+		ctx.ReportNode(node, rule.RuleMessage{
+			Id:          "restrictedSyntax",
+			Description: entry.formatMessage(),
+		})
+		return
+	}
+	if !selectorTargetsEstreeType(entry.compiled, target) {
+		return
+	}
+	if !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
 		return
 	}
 	ctx.ReportNode(node, rule.RuleMessage{
@@ -395,6 +500,88 @@ func (bucket *ruleBucket) matchAndReport(index int, node *ast.Node, mc *matchCon
 
 func (e ruleEntry) formatMessage() string {
 	return e.message
+}
+
+func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	if sf == nil || node == nil || node.Body() == nil {
+		if node == nil {
+			return core.TextRange{}
+		}
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	tokens := utils.TokensOfNode(sf, node)
+	bodyStart := node.Body().Pos()
+	openIndex := -1
+	for index, token := range tokens {
+		if token.Start >= bodyStart {
+			break
+		}
+		if token.Kind == ast.KindOpenParenToken {
+			openIndex = index
+		}
+	}
+	if openIndex < 0 {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	start := tokens[openIndex].Start
+	if openIndex > 0 && tokens[openIndex-1].Kind == ast.KindGreaterThanToken {
+		depth := 0
+		for index := openIndex - 1; index >= 0; index-- {
+			switch tokens[index].Kind {
+			case ast.KindGreaterThanToken:
+				depth++
+			case ast.KindLessThanToken:
+				depth--
+				if depth == 0 {
+					start = tokens[index].Start
+					index = -1
+				}
+			}
+		}
+	}
+	return core.NewTextRange(start, node.Body().End())
+}
+
+func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	var members *ast.NodeList
+	switch node.Kind {
+	case ast.KindClassDeclaration:
+		members = node.AsClassDeclaration().Members
+	case ast.KindClassExpression:
+		members = node.AsClassExpression().Members
+	}
+	if sf == nil || members == nil {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+
+	return listBodyTextRange(sf, node, members)
+}
+
+func enumBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+	if node == nil || node.Kind != ast.KindEnumDeclaration {
+		return core.TextRange{}
+	}
+	return listBodyTextRange(sf, node, node.AsEnumDeclaration().Members)
+}
+
+func listBodyTextRange(sf *ast.SourceFile, node *ast.Node, members *ast.NodeList) core.TextRange {
+	if sf == nil || node == nil || members == nil {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	open, closeEnd := -1, -1
+	for _, token := range utils.TokensOfNode(sf, node) {
+		if token.Kind == ast.KindOpenBraceToken && token.Start <= members.Pos() {
+			open = token.Start
+		}
+		if open >= 0 && token.Kind == ast.KindCloseBraceToken && token.Start >= members.End() {
+			closeEnd = token.End
+			break
+		}
+	}
+	if open < 0 || closeEnd < 0 {
+		return core.NewTextRange(node.Pos(), node.End())
+	}
+	return core.NewTextRange(open, closeEnd)
 }
 
 func deduplicateRuleEntries(entries []ruleEntry) []ruleEntry {
@@ -445,6 +632,8 @@ func analyzeSelectorSpecificity(sel selector) selectorSpecificity {
 	var visit func(selector)
 	visit = func(current selector) {
 		switch value := current.(type) {
+		case subjectSelector:
+			visit(value.Inner)
 		case identifierSelector:
 			if value.Name != "*" {
 				result.identifiers++
@@ -487,9 +676,9 @@ func visitPseudoSpecificity(value pseudoSelector, result *selectorSpecificity, v
 
 // parseRuleOptions turns the rule's options — a variadic list of selectors,
 // each either a string or a `{ selector, message? }` object — into ruleEntry
-// values. Selectors that fail to parse are silently dropped; ESLint rejects
-// the whole config in that case, but for runtime resilience we prefer to drop
-// the offending entry over panicking.
+// values. Selectors that fail to parse are silently dropped. This is a
+// deliberate compatibility divergence from ESLint, whose config validation
+// rejects the whole rule configuration for malformed selectors.
 func parseRuleOptions(options []any) []ruleEntry {
 	var entries []ruleEntry
 	for _, item := range options {
@@ -512,11 +701,11 @@ func parseRuleOptions(options []any) []ruleEntry {
 }
 
 func buildEntryFromString(sel string) ruleEntry {
-	compiled, err := parseSelector(sel)
+	compiled, exit, err := parseRuleSelector(sel)
 	if err != nil {
 		return ruleEntry{selector: sel}
 	}
-	return ruleEntry{selector: sel, compiled: compiled, message: defaultRuleMessage(sel)}
+	return ruleEntry{selector: sel, compiled: compiled, message: defaultRuleMessage(sel), exit: exit}
 }
 
 func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
@@ -524,7 +713,7 @@ func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
 	if rawSel == "" {
 		return ruleEntry{}, false
 	}
-	compiled, err := parseSelector(rawSel)
+	compiled, exit, err := parseRuleSelector(rawSel)
 	if err != nil {
 		return ruleEntry{}, false
 	}
@@ -532,7 +721,16 @@ func buildEntryFromObject(m map[string]interface{}) (ruleEntry, bool) {
 	if msg == "" {
 		msg = defaultRuleMessage(rawSel)
 	}
-	return ruleEntry{selector: rawSel, compiled: compiled, message: msg}, true
+	return ruleEntry{selector: rawSel, compiled: compiled, message: msg, exit: exit}, true
+}
+
+// ESLint handles the event-phase suffix outside esquery. Keep the phase on the
+// entry so the linter can register the selector on the matching enter or exit
+// listener while retaining the original suffix in the diagnostic text.
+func parseRuleSelector(sel string) (selector, bool, error) {
+	exit := strings.HasSuffix(sel, ":exit")
+	compiled, err := parseSelector(strings.TrimSuffix(sel, ":exit"))
+	return compiled, exit, err
 }
 
 func defaultRuleMessage(selector string) string {
