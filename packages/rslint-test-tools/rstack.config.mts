@@ -262,6 +262,7 @@ define.test({
     './tests/eslint-plugin-react/rules/no-will-update-set-state.test.ts',
     './tests/eslint-plugin-react/rules/prefer-es6-class.test.ts',
     './tests/eslint-plugin-react/rules/prefer-read-only-props.test.ts',
+    './tests/eslint-plugin-react/rules/static-property-placement.test.ts',
     './tests/eslint-plugin-react/rules/prefer-stateless-function.test.ts',
     './tests/eslint-plugin-react/rules/require-optimization.test.ts',
     './tests/eslint-plugin-react/rules/require-render-return.test.ts',

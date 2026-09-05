@@ -78,6 +78,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_prop_types"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/static_property_placement"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -171,6 +172,7 @@ func GetAllRules() []rule.Rule {
 		self_closing_comp.SelfClosingCompRule,
 		sort_comp.SortCompRule,
 		sort_prop_types.SortPropTypesRule,
+		static_property_placement.StaticPropertyPlacementRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
 		jsx_child_element_spacing.JsxChildElementSpacingRule,
