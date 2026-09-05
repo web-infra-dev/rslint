@@ -235,6 +235,7 @@ define.test({
     './tests/eslint-plugin-react/rules/no-array-index-key.test.ts',
     './tests/eslint-plugin-react/rules/no-arrow-function-lifecycle.test.ts',
     './tests/eslint-plugin-react/rules/no-children-prop.test.ts',
+    './tests/eslint-plugin-react/rules/no-namespace.test.ts',
     './tests/eslint-plugin-react/rules/no-danger.test.ts',
     './tests/eslint-plugin-react/rules/no-danger-with-children.test.ts',
     './tests/eslint-plugin-react/rules/display-name.test.ts',

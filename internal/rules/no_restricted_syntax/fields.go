@@ -128,6 +128,8 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			return single(parent.AsExpressionStatement().Expression)
 		case ast.KindParenthesizedExpression:
 			return single(parent.AsParenthesizedExpression().Expression)
+		case ast.KindJsxExpression:
+			return single(parent.AsJsxExpression().Expression)
 		}
 	case "object":
 		switch parent.Kind {

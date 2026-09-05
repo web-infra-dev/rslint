@@ -206,6 +206,19 @@ func TestNoRestrictedSyntax_Round3Probes(t *testing.T) {
 					{MessageId: "restrictedSyntax", Message: "Using 'Literal[bigint]' is not allowed."},
 				},
 			},
+			// Literal.value is the JavaScript BigInt value, whose string
+			// representation omits the source suffix and normalizes the radix.
+			{
+				Code:    `const n = 1n;`,
+				Options: []interface{}{`Literal[value=/n$/]`},
+			},
+			{
+				Code:    `const n = 0x1n;`,
+				Options: []interface{}{`Literal[value='1']`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Using 'Literal[value='1']' is not allowed."},
+				},
+			},
 			// Literal[regex] — regex literal detection (vs other literals).
 			{
 				Code:    `const r = /abc/;`,
