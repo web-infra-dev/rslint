@@ -228,6 +228,27 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 
 // getChildrenFromNonJSDocNode from github.com/microsoft/TypeScript/tsc/internal/ls/utilities.go
 func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
+	var tokens *scanner.Scanner
+	return getChildrenWithScanner(node, sourceFile, &tokens)
+}
+
+// Reset each gap to the same defaults as GetScannerForSourceFile. The scanner
+// belongs to one walk; only its storage is reused, never lexical state.
+func resetTokenScanner(tokens **scanner.Scanner, sourceFile *ast.SourceFile, pos int) *scanner.Scanner {
+	if *tokens == nil {
+		*tokens = scanner.NewScanner()
+	} else {
+		(*tokens).Reset()
+	}
+	s := *tokens
+	s.SetText(sourceFile.Text())
+	s.SetLanguageVariant(sourceFile.LanguageVariant)
+	s.ResetPos(pos)
+	s.Scan()
+	return s
+}
+
+func getChildrenWithScanner(node *ast.Node, sourceFile *ast.SourceFile, tokens **scanner.Scanner) []*ast.Node {
 	var childNodes []*ast.Node
 	node.ForEachChild(func(child *ast.Node) bool {
 		// Skip reparsed nodes (synthesized from JSDoc) as they have positions
@@ -242,8 +263,23 @@ func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
 	var children []*ast.Node
 	pos := node.Pos()
 	for _, child := range childNodes {
-		scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
-		for pos < child.Pos() {
+		if pos < child.Pos() {
+			scanner := resetTokenScanner(tokens, sourceFile, pos)
+			for pos < child.Pos() {
+				token := scanner.Token()
+				tokenFullStart := scanner.TokenFullStart()
+				tokenEnd := scanner.TokenEnd()
+				children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node, ast.TokenFlagsNone))
+				pos = tokenEnd
+				scanner.Scan()
+			}
+		}
+		children = append(children, child)
+		pos = child.End()
+	}
+	if pos < node.End() {
+		scanner := resetTokenScanner(tokens, sourceFile, pos)
+		for pos < node.End() {
 			token := scanner.Token()
 			tokenFullStart := scanner.TokenFullStart()
 			tokenEnd := scanner.TokenEnd()
@@ -251,17 +287,6 @@ func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
 			pos = tokenEnd
 			scanner.Scan()
 		}
-		children = append(children, child)
-		pos = child.End()
-	}
-	scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
-	for pos < node.End() {
-		token := scanner.Token()
-		tokenFullStart := scanner.TokenFullStart()
-		tokenEnd := scanner.TokenEnd()
-		children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node, ast.TokenFlagsNone))
-		pos = tokenEnd
-		scanner.Scan()
 	}
 	return children
 }
@@ -331,6 +356,7 @@ func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *as
 // first matching token. Returning true from callback stops the traversal.
 func forEachToken(node *ast.Node, callback func(token *ast.Node) bool, sourceFile *ast.SourceFile) bool {
 	queue := make([]*ast.Node, 0)
+	var tokens *scanner.Scanner
 
 	for {
 		if ast.IsTokenKind(node.Kind) {
@@ -338,7 +364,7 @@ func forEachToken(node *ast.Node, callback func(token *ast.Node) bool, sourceFil
 				return true
 			}
 		} else {
-			children := GetChildren(node, sourceFile)
+			children := getChildrenWithScanner(node, sourceFile, &tokens)
 			for i := len(children) - 1; i >= 0; i-- {
 				queue = append(queue, children[i])
 			}
@@ -369,41 +395,38 @@ func forEachToken(node *ast.Node, callback func(token *ast.Node) bool, sourceFil
 func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), sourceFile *ast.SourceFile) {
 	fullText := sourceFile.Text()
 	notJsx := sourceFile.LanguageVariant != core.LanguageVariantJSX
-	// One factory reused across every token of this file instead of
-	// allocating two per token. scanner.GetLeading/TrailingCommentRanges
-	// only ever calls factory.NewCommentRange, which constructs a value
-	// and never reads or mutates the factory (see ast.NodeFactory.
-	// NewCommentRange) — so reuse changes nothing about the comments
-	// produced. The factory is goroutine-local: ForEachToken walks tokens
-	// serially within this single ForEachComment call, so the parallel
-	// per-file lint workers each get their own, never sharing one.
+	// The scanner only uses NewCommentRange, which creates a value without
+	// mutating the factory. Both the factory and visitor are local to this call.
 	commentFactory := &ast.NodeFactory{}
+	yieldComment := func(comment ast.CommentRange) bool {
+		callback(&comment)
+		return true
+	}
 	sawToken := false
 
-	ForEachToken(
+	forEachCommentTokenRange(
 		node,
-		func(token *ast.Node) {
-			if token.Pos() == token.End() {
+		func(kind ast.Kind, pos, end int, parent *ast.Node) {
+			if pos == end {
 				return
 			}
 			sawToken = true
 
-			if token.Kind != ast.KindJsxText {
-				pos := token.Pos()
-				if pos == 0 {
-					pos = len(scanner.GetShebang(fullText))
+			if kind != ast.KindJsxText {
+				commentPos := pos
+				if commentPos == 0 {
+					commentPos = len(scanner.GetShebang(fullText))
 				}
 
-				for comment := range scanner.GetLeadingCommentRanges(commentFactory, fullText, pos) {
-					callback(&comment)
+				if mayStartCommentTrivia(fullText, commentPos, false) {
+					scanner.GetLeadingCommentRanges(commentFactory, fullText, commentPos)(yieldComment)
 				}
 			}
 
-			if notJsx || canHaveTrailingTrivia(token) {
-				for comment := range scanner.GetTrailingCommentRanges(commentFactory, fullText, token.End()) {
-					callback(&comment)
+			if notJsx || canHaveTrailingTriviaRange(kind, end, parent) {
+				if mayStartCommentTrivia(fullText, end, true) {
+					scanner.GetTrailingCommentRanges(commentFactory, fullText, end)(yieldComment)
 				}
-				return
 			}
 		},
 		sourceFile,
@@ -425,26 +448,26 @@ func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), so
 //
 // Exclude trailing positions that would lead to scanning for trivia inside `JsxText`.
 // @internal
-func canHaveTrailingTrivia(token *ast.Node) bool {
-	switch token.Kind {
+func canHaveTrailingTriviaRange(kind ast.Kind, end int, parent *ast.Node) bool {
+	switch kind {
 	case ast.KindCloseBraceToken:
 		// after a JsxExpression inside a JsxElement's body can only be other JsxChild, but no trivia
-		return token.Parent.Kind != ast.KindJsxExpression || !isJsxElementOrFragment(token.Parent.Parent)
+		return parent.Kind != ast.KindJsxExpression || !isJsxElementOrFragment(parent.Parent)
 	case ast.KindGreaterThanToken:
-		switch token.Parent.Kind {
+		switch parent.Kind {
 		case ast.KindJsxClosingElement:
 		case ast.KindJsxClosingFragment:
 			// there's only trailing trivia if it's the end of the top element
-			return !isJsxElementOrFragment(token.Parent.Parent.Parent)
+			return !isJsxElementOrFragment(parent.Parent.Parent)
 		case ast.KindJsxOpeningElement:
 			// if end is not equal, this is part of the type arguments list. in all other cases it would be inside the element body
-			return token.End() != token.Parent.End()
+			return end != parent.End()
 		case ast.KindJsxOpeningFragment:
 			return false // would be inside the fragment
 		case ast.KindJsxSelfClosingElement:
 			// if end is not equal, this is part of the type arguments list
 			// there's only trailing trivia if it's the end of the top element
-			return token.End() != token.Parent.End() || !isJsxElementOrFragment(token.Parent.Parent)
+			return end != parent.End() || !isJsxElementOrFragment(parent.Parent)
 		}
 	}
 
@@ -584,4 +607,83 @@ func isConstituentPossiblyTruthy(t *checker.Type) bool {
 		return Every(t.Types(), isConstituentPossiblyTruthy)
 	}
 	return true
+}
+
+// This is a conservative rejection filter, not a comment lexer. Unknown
+// non-ASCII trivia goes to the TypeScript scanner unchanged.
+func mayStartCommentTrivia(text string, pos int, trailing bool) bool {
+	// Bound the lookahead so long trivia is scanned only by TypeScript.
+	// Exhausting this budget delegates to the scanner; it never rejects trivia.
+	const maxTriviaLookahead = 8
+	for inspected := 0; inspected < maxTriviaLookahead && pos >= 0 && pos < len(text); inspected++ {
+		switch text[pos] {
+		case ' ', '\t', '\v', '\f':
+			pos++
+		case '\r', '\n':
+			if trailing {
+				return false
+			}
+			pos++
+		case '/':
+			return pos+1 < len(text) && (text[pos+1] == '/' || text[pos+1] == '*')
+		default:
+			return text[pos] >= 0x80
+		}
+	}
+	return pos >= 0 && pos < len(text)
+}
+
+// A comment visitor needs token ranges and their AST owners, not token nodes.
+// Gap scans reset lexical state. The explicit stack preserves deep-tree safety.
+func forEachCommentTokenRange(root *ast.Node, callback func(ast.Kind, int, int, *ast.Node), sourceFile *ast.SourceFile) {
+	type item struct {
+		node, parent *ast.Node
+		kind         ast.Kind
+		pos, end     int
+	}
+	queue := []item{{node: root}}
+	var tokens *scanner.Scanner
+	var parent *ast.Node
+	var pos int
+	scanGap := func(end int) {
+		if pos >= end {
+			return
+		}
+		resetTokenScanner(&tokens, sourceFile, pos)
+		for pos < end {
+			queue = append(queue, item{parent: parent, kind: tokens.Token(), pos: tokens.TokenFullStart(), end: tokens.TokenEnd()})
+			pos = tokens.TokenEnd()
+			tokens.Scan()
+		}
+	}
+	appendChild := func(child *ast.Node) bool {
+		if child.Flags&ast.NodeFlagsReparsed != 0 {
+			return false
+		}
+		scanGap(child.Pos())
+		queue = append(queue, item{node: child})
+		pos = child.End()
+		return false
+	}
+	for len(queue) > 0 {
+		next := queue[len(queue)-1]
+		queue[len(queue)-1] = item{}
+		queue = queue[:len(queue)-1]
+		if next.node == nil {
+			callback(next.kind, next.pos, next.end, next.parent)
+			continue
+		}
+		node := next.node
+		if ast.IsTokenKind(node.Kind) {
+			callback(node.Kind, node.Pos(), node.End(), node.Parent)
+			continue
+		}
+		parent, pos = node, node.Pos()
+		start := len(queue)
+		node.ForEachChild(appendChild)
+		scanGap(node.End())
+		for left, right := start, len(queue)-1; left < right; left, right = left+1, right-1 {
+			queue[left], queue[right] = queue[right], queue[left]
+		}
+	}
 }
