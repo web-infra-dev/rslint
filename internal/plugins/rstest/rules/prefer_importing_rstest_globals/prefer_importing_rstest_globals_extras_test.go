@@ -26,6 +26,13 @@ func TestPreferImportingRstestGlobalsExtras(t *testing.T) {
 			{Code: `expect += 1;`},
 			{Code: `expect++;`},
 			{Code: `[expect] = holder;`},
+			// A label lives in its own namespace and never reads the global.
+			{Code: `test: for (const item of items) {
+  if (item) break test;
+}`},
+			{Code: `describe: while (ready) {
+  continue describe;
+}`},
 			// A type position does not use the API at runtime.
 			{Code: `const value: expect = input;`},
 			{Code: `type Alias = typeof expect;`},
@@ -42,10 +49,14 @@ beforeEach(setup);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "pr
 			{Code: `const { it: testCase } = require('@rstest/core');
 expect(value);`, Output: []string{`const { it: testCase, expect } = require('@rstest/core');
 expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
-			// A rest element has to stay last in the pattern.
+			// A rest element collects whatever the named bindings leave behind, so
+			// merging into the pattern would take that property out of the rest
+			// object. No fix: `others.expect` has to keep working.
 			{Code: `const { defineConfig, ...others } = require('@rstest/core');
-expect(value);`, Output: []string{`const { defineConfig, expect, ...others } = require('@rstest/core');
-expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+expect(value);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: `const { ...core } = require('@rstest/core');
+expect(1);
+core.expect(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			// ---- Real-user: preserve an existing import alias while merging ----
 			{Code: `import { it as testCase } from '@rstest/core';
 expect(value);`, Output: []string{`import { it as testCase, expect } from '@rstest/core';
@@ -71,6 +82,32 @@ expect(value);`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer
 			{Code: "import type { expect } from '@rstest/core';\nexpect(value);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			// A type-only import of a different name still merges normally.
 			{Code: "import type { Mock } from '@rstest/core';\nexpect(value);", Output: []string{"import { expect } from '@rstest/core';\nimport type { Mock } from '@rstest/core';\nexpect(value);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// ---- Real-user: a name the file also assigns to ----
+			// The read is still a use of the global, but an import binding is
+			// read-only, so importing the name would break the assignment that is
+			// already there. Reported without a fix.
+			{Code: `expect = customExpect;
+expect(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: `({ expect } = holder);
+expect(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: `expect(1);
+expect = customExpect;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 1, Column: 1}}},
+			// A different name that is only read still gets its import.
+			{Code: `expect = customExpect;
+test('x', () => {});`, Output: []string{`import { test } from '@rstest/core';
+expect = customExpect;
+test('x', () => {});`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// ---- Real-user: a type-only binding of the same name, from any
+			// module and in any import form ----
+			// Inserting a value import beside it would bind the name twice, so
+			// these are reported without a fix.
+			{Code: "import type { expect } from './types';\nexpect(1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: "import { type expect } from './types';\nexpect(1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: "import type expect from './types';\nexpect(1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: "import type * as expect from './types';\nexpect(1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			{Code: "import type expect = require('./types');\nexpect(1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
+			// A type-only binding of a different name does not collide.
+			{Code: "import type { Mock } from './types';\nexpect(1);", Output: []string{"import { expect } from '@rstest/core';\nimport type { Mock } from './types';\nexpect(1);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 2, Column: 1}}},
 			// ---- Dimension 4: a shorthand property value reads the global ----
 			{Code: `const value = { expect };`, Output: []string{`import { expect } from '@rstest/core';
 const value = { expect };`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferImportingRstestGlobals", Line: 1, Column: 17}}},

@@ -51,74 +51,67 @@ func preferMessage(names string) rule.RuleMessage {
 	}
 }
 
-// isShorthandPropertyRead reports whether the identifier is the value side of
-// a shorthand property such as `{ expect }`. The AST also treats it as the
-// property's declaration name, so the name filters below would drop it even
-// though it reads the global. A shorthand that is written to, as in
-// `({ expect } = value)` or a `for` destructuring head, is not a read.
-func isShorthandPropertyRead(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindShorthandPropertyAssignment || parent.Name() != node ||
-		parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
-		return false
-	}
-	object := parent.Parent
-	if object == nil || object.Parent == nil {
-		return false
-	}
-	switch owner := object.Parent; owner.Kind {
-	case ast.KindBinaryExpression:
-		binary := owner.AsBinaryExpression()
-		return binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left != object
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		return owner.AsForInOrOfStatement().Initializer != object
-	}
-	return true
-}
+type identifierUse int
 
-func shouldReportIdentifier(ctx rule.RuleContext, node *ast.Node) bool {
+const (
+	// useIrrelevant marks an identifier that only happens to be spelled like
+	// an Rstest global: a property key, a label, a declaration name, a type
+	// position, or a name the file declares itself.
+	useIrrelevant identifierUse = iota
+	// useWrite marks an assignment to the global, including a compound
+	// assignment, an update, and a destructuring target.
+	useWrite
+	// useRead marks a runtime read of the global, the only use an import can
+	// stand in for.
+	useRead
+)
+
+// classifyIdentifier decides what an identifier does with the Rstest global of
+// the same name. IsReadReference carries the shared classification of
+// reference positions, so labels (`test: for (...) { break test; }`), property
+// keys, and type positions are all excluded here rather than re-derived; a
+// shorthand property value stays a reference, and IsWriteReference then tells
+// its read form (`{ expect }`) from its destructuring form (`({ expect } =
+// holder)`).
+func classifyIdentifier(ctx rule.RuleContext, node *ast.Node) identifierUse {
 	if node == nil || node.Kind != ast.KindIdentifier || !rstestUtils.IsRstestGlobal(node.AsIdentifier().Text) {
-		return false
+		return useIrrelevant
 	}
-	if !isShorthandPropertyRead(node) && (ast.IsIdentifierName(node) || ast.IsDeclarationNameOrImportPropertyName(node)) {
-		return false
-	}
-	// A type position never touches the value at runtime, so `const value:
-	// expect = input;` does not need the API imported.
-	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
-		return false
-	}
-	// A write such as `expect = value;` assigns to the global. Importing the
-	// name would turn the target into a read-only module binding, so the write
-	// is not a use that the import can satisfy.
-	if internalUtils.IsWriteReference(node) {
-		return false
+	if !internalUtils.IsReadReference(node) {
+		return useIrrelevant
 	}
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
 		switch parent.Kind {
 		case ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport,
 			ast.KindExportSpecifier, ast.KindExportDeclaration:
-			return false
+			return useIrrelevant
 		}
 		if parent.Kind == ast.KindSourceFile || parent.Kind == ast.KindBlock || ast.IsExpression(parent) {
 			break
 		}
 	}
-	if ctx.Refs == nil {
-		return true
+	if ctx.Refs != nil {
+		if symbol := ctx.Refs.Resolve(node); symbol != nil {
+			name := node.AsIdentifier().Text
+			resolved, _, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
+				name, node, symbol, ctx.SourceFile, rstestUtils.RstestCoreImportModules,
+			)
+			if mode == testFramework.ReferenceModeImport && resolved != "" {
+				return useIrrelevant
+			}
+			if internalUtils.IsRuntimeValueSymbolDeclaredInFile(symbol, ctx.SourceFile) {
+				return useIrrelevant
+			}
+		}
 	}
-	symbol := ctx.Refs.Resolve(node)
-	if symbol == nil {
-		return true
+	// A write such as `expect = value;` assigns to the global. An import
+	// binding is read-only, so the write is not a use an import can satisfy —
+	// and, when the same name is read elsewhere, importing it would break the
+	// write that is already there.
+	if internalUtils.IsWriteReference(node) {
+		return useWrite
 	}
-	name := node.AsIdentifier().Text
-	resolved, _, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
-		name, node, symbol, ctx.SourceFile, rstestUtils.RstestCoreImportModules,
-	)
-	if mode == testFramework.ReferenceModeImport && resolved != "" {
-		return false
-	}
-	return !internalUtils.IsRuntimeValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+	return useRead
 }
 
 func createImport(isModule bool, module, names string) string {
@@ -199,7 +192,7 @@ func mergeIntoImport(declaration *ast.ImportDeclaration, names *nameSet) []rule.
 // the same way mergeIntoImport does for an import. Rewriting the statement as
 // an import instead would have to translate `{ it: testCase }` into import
 // syntax, and would drop whatever the generated text cannot express.
-func mergeIntoRequire(sourceFile *ast.SourceFile, binding *ast.Node, names *nameSet) []rule.RuleFix {
+func mergeIntoRequire(binding *ast.Node, names *nameSet) []rule.RuleFix {
 	if binding == nil || binding.Kind != ast.KindObjectBindingPattern {
 		return nil
 	}
@@ -209,15 +202,17 @@ func mergeIntoRequire(sourceFile *ast.SourceFile, binding *ast.Node, names *name
 	}
 	present := make(map[string]struct{}, len(pattern.Elements.Nodes))
 	var last *ast.Node
-	var rest *ast.Node
 	for _, element := range pattern.Elements.Nodes {
 		be := element.AsBindingElement()
 		if be == nil {
 			return nil
 		}
+		// A rest element collects every property the earlier bindings leave
+		// behind, so naming one more of them here would quietly take it out of
+		// the rest object and break the code that reads it off there. Putting
+		// the name after the rest element is not syntax, so the fix is dropped.
 		if be.DotDotDotToken != nil {
-			rest = element
-			continue
+			return nil
 		}
 		if be.Name() != nil && be.Name().Kind == ast.KindIdentifier {
 			present[be.Name().AsIdentifier().Text] = struct{}{}
@@ -233,54 +228,78 @@ func mergeIntoRequire(sourceFile *ast.SourceFile, binding *ast.Node, names *name
 	if len(additions.order) == 0 {
 		return nil
 	}
-	// A rest element has to stay last, so names go in front of it.
 	if last == nil {
-		if rest == nil {
-			return nil
-		}
-		return []rule.RuleFix{rule.RuleFixInsertBefore(sourceFile, rest, additions.sortedJoined()+", ")}
+		return nil
 	}
 	return []rule.RuleFix{rule.RuleFixInsertAfter(last, ", "+additions.sortedJoined())}
 }
 
-// bindsTypeOnly reports whether the file already imports one of names from an
-// rstest module as a type. Such a binding provides no value, so the rule still
-// asks for the import, but every fix it could write would declare the name a
-// second time: adding a value specifier beside the type-only one, or a second
+// bindsNameAsTypeOnly reports whether the file already binds one of names as
+// a type-only import. Such a binding provides no value, so the rule still asks
+// for the import, but every fix it could write would declare the name a second
+// time: adding a value specifier beside the type-only one, or a second
 // declaration next to a whole `import type` clause, is a duplicate identifier
 // either way. Turning the existing binding into a value import is the edit a
 // reader would make, and it is not one this rule is in a position to choose,
 // so the diagnostic is reported without a fix.
-func bindsTypeOnly(statements []*ast.Node, names *nameSet) bool {
+//
+// Every module and every import form counts, because the collision is with the
+// name in this file's scope, not with what the name was imported from. A
+// binding that does survive to runtime never gets here: the identifier
+// resolves to it and is not reported at all.
+func bindsNameAsTypeOnly(statements []*ast.Node, names *nameSet) bool {
+	collides := func(name *ast.Node) bool {
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return false
+		}
+		_, exists := names.seen[name.AsIdentifier().Text]
+		return exists
+	}
 	for _, statement := range statements {
-		if statement == nil || statement.Kind != ast.KindImportDeclaration {
+		if statement == nil {
 			continue
 		}
-		declaration := statement.AsImportDeclaration()
-		if declaration == nil || declaration.ModuleSpecifier == nil ||
-			!rstestUtils.IsRstestCoreImportModule(declaration.ModuleSpecifier.Text()) ||
-			declaration.ImportClause == nil {
-			continue
-		}
-		clause := declaration.ImportClause.AsImportClause()
-		if clause == nil || clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
-			continue
-		}
-		named := clause.NamedBindings.AsNamedImports()
-		if named == nil || named.Elements == nil {
-			continue
-		}
-		clauseIsTypeOnly := declaration.ImportClause.IsTypeOnly()
-		for _, element := range named.Elements.Nodes {
-			specifier := element.AsImportSpecifier()
-			if specifier == nil || specifier.Name() == nil {
-				continue
-			}
-			if !clauseIsTypeOnly && !specifier.IsTypeOnly {
-				continue
-			}
-			if _, exists := names.seen[specifier.Name().Text()]; exists {
+		switch statement.Kind {
+		case ast.KindImportEqualsDeclaration:
+			declaration := statement.AsImportEqualsDeclaration()
+			if declaration != nil && declaration.IsTypeOnly && collides(declaration.Name()) {
 				return true
+			}
+		case ast.KindImportDeclaration:
+			declaration := statement.AsImportDeclaration()
+			if declaration == nil || declaration.ImportClause == nil {
+				continue
+			}
+			clause := declaration.ImportClause.AsImportClause()
+			if clause == nil {
+				continue
+			}
+			clauseIsTypeOnly := declaration.ImportClause.IsTypeOnly()
+			if clauseIsTypeOnly && collides(clause.Name()) {
+				return true
+			}
+			bindings := clause.NamedBindings
+			if bindings == nil {
+				continue
+			}
+			if bindings.Kind == ast.KindNamespaceImport {
+				if clauseIsTypeOnly && collides(bindings.Name()) {
+					return true
+				}
+				continue
+			}
+			named := bindings.AsNamedImports()
+			if named == nil || named.Elements == nil {
+				continue
+			}
+			for _, element := range named.Elements.Nodes {
+				specifier := element.AsImportSpecifier()
+				if specifier == nil || (!clauseIsTypeOnly && !specifier.IsTypeOnly) {
+					continue
+				}
+				if collides(specifier.Name()) {
+					return true
+				}
 			}
 		}
 	}
@@ -339,9 +358,18 @@ func lineIndent(ctx rule.RuleContext, node *ast.Node) string {
 	return indent
 }
 
-func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
+// buildAutofix writes the import the diagnostic asks for. written carries the
+// names the file also assigns to: importing such a name would turn the target
+// of that assignment into a read-only module binding, so the whole fix is
+// withheld and the diagnostic stands on its own. Skipping only the write
+// reference is not enough — a single read of the same name would otherwise
+// still pull in the import that breaks the write.
+func buildAutofix(ctx rule.RuleContext, collected []string, written map[string]struct{}) []rule.RuleFix {
 	names := newNameSet(len(collected))
 	for _, name := range collected {
+		if _, assigned := written[name]; assigned {
+			return nil
+		}
 		names.add(name)
 	}
 	isModule := ctx.LanguageOptions.EffectiveSourceType() == "module"
@@ -349,7 +377,7 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 		return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(0, 0), createImport(isModule, defaultModule, names.sortedJoined()))}
 	}
 	statements := ctx.SourceFile.Statements.Nodes
-	if bindsTypeOnly(statements, names) {
+	if bindsNameAsTypeOnly(statements, names) {
 		return nil
 	}
 	first := statements[0]
@@ -360,7 +388,7 @@ func buildAutofix(ctx rule.RuleContext, collected []string) []rule.RuleFix {
 		return mergeIntoImport(existing, names)
 	}
 	if existing := findRequire(statements); existing != nil {
-		return mergeIntoRequire(ctx.SourceFile, existing, names)
+		return mergeIntoRequire(existing, names)
 	}
 	return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, first, createImport(isModule, defaultModule, names.sortedJoined())+"\n"+lineIndent(ctx, first))}
 }
@@ -370,15 +398,18 @@ var PreferImportingRstestGlobalsRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		names := newNameSet(4)
+		written := map[string]struct{}{}
 		var reportingNode *ast.Node
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				if !shouldReportIdentifier(ctx, node) {
-					return
-				}
-				names.add(node.AsIdentifier().Text)
-				if reportingNode == nil {
-					reportingNode = node
+				switch classifyIdentifier(ctx, node) {
+				case useWrite:
+					written[node.AsIdentifier().Text] = struct{}{}
+				case useRead:
+					names.add(node.AsIdentifier().Text)
+					if reportingNode == nil {
+						reportingNode = node
+					}
 				}
 			},
 			rule.ListenerOnExit(ast.KindEndOfFile): func(_ *ast.Node) {
@@ -387,7 +418,7 @@ var PreferImportingRstestGlobalsRule = rule.Rule{
 				}
 				collected := slices.Clone(names.order)
 				ctx.ReportNodeWithDeferredFixes(reportingNode, preferMessage(names.joined()), func() []rule.RuleFix {
-					return buildAutofix(ctx, collected)
+					return buildAutofix(ctx, collected, written)
 				})
 			},
 		}
