@@ -55,7 +55,7 @@ catalog:
   '@types/react': ^19.2.17
   '@types/vscode': ^1.125.0
   '@typescript/native-preview': 7.0.0-dev.20250904.1
-  typescript: 5.9.3
+  typescript: 6.0.3
   '@vscode/test-cli': ^0.0.15
   '@vscode/test-electron': ^2.5.2
   '@vscode/vsce': ^3.9.2

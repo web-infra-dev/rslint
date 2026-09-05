@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Rslint is a high-performance JavaScript and TypeScript linter, designed as a drop-in replacement for ESLint and TypeScript-ESLint. It leverages [typescript-go](https://github.com/microsoft/typescript-go) to achieve 20-40x speedup over traditional ESLint setups through native parsing, direct TypeScript AST usage, and parallel processing.
+Rslint is a high-performance JavaScript and TypeScript linter, designed as a drop-in replacement for ESLint and TypeScript-ESLint. It uses the [TypeScript Go compiler](https://github.com/microsoft/TypeScript) to achieve 20-40x speedup over traditional ESLint setups through native parsing, direct TypeScript AST usage, and parallel processing.
 
 ## Table of Contents
 
@@ -139,6 +139,15 @@ The directory map below folds the high-level module relationships into the packa
 | `shim/`                        | Generated bridge packages exposing ts-go internals                                                                             | Bridge layer between repository Go code and `typescript-go` internals; generated and updated by `tools/`                                                                                                                                                                                                                                                                                                                                    |
 | `tools/`                       | Shim generator and ts-go update scripts                                                                                        | Generates `shim/` code and maintains the pinned `typescript-go` integration                                                                                                                                                                                                                                                                                                                                                                 |
 | `crates/tsgo-client/`          | Rust client for communicating with `cmd/tsgo`                                                                                  | Spawns `cmd/tsgo` and consumes its semantic/project output from Rust                                                                                                                                                                                                                                                                                                                                                                        |
+
+The `typescript-go/` directory is the Git submodule for `microsoft/TypeScript`.
+`go.work` selects its `tsc/` compiler module, and the compiler and shim Go
+module/import/linkname paths use `github.com/microsoft/TypeScript/tsc`.
+`packages/rslint-api` imports the JS AST API from the same checkout's
+`packages/typescript` sources. The tsgo release workflow copies that compiler's
+bundled standard libraries through the upstream `lib` build task.
+See [the compiler dependency guide](./CONTRIBUTING.md#typescript-compiler-dependency)
+for the pinned revision, migration rationale, and update workflow.
 
 ## 4. Parsing Pipeline
 

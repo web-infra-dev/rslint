@@ -3,11 +3,11 @@
 
 package iovfs
 
-import "github.com/microsoft/typescript-go/internal/vfs/iovfs"
+import "github.com/microsoft/TypeScript/tsc/internal/vfs/iovfs"
 import "io/fs"
 import _ "unsafe"
 
-//go:linkname From github.com/microsoft/typescript-go/internal/vfs/iovfs.From
+//go:linkname From github.com/microsoft/TypeScript/tsc/internal/vfs/iovfs.From
 func From(fsys fs.FS, useCaseSensitiveFileNames bool) iovfs.FsWithSys
 type FsWithSys = iovfs.FsWithSys
 type RealpathFS = iovfs.RealpathFS

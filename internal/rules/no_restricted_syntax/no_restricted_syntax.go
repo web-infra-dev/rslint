@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -38,7 +38,8 @@ var NoRestrictedSyntaxRule = rule.Rule{
 		mc := &matchContext{sf: ctx.SourceFile}
 
 		visit := func(node *ast.Node, bucket *ruleBucket) {
-			if isTransparentEstreeContainer(node) {
+			if isTransparentEstreeContainer(node) ||
+				(node.Kind == ast.KindQualifiedName && !utils.IsHeritageQualifiedName(node)) {
 				return
 			}
 			first, second, useAll := bucket.candidates(node, mc)

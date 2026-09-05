@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -1242,15 +1242,29 @@ func watchedBuiltinName(path []string) (string, bool) {
 }
 
 func sourceHasPotentialReference(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
+	mayHaveReference := false
 	for root := range potentialReferenceRoots {
-		if _, ok := sourceFile.Identifiers[root]; ok {
-			return true
+		if sourceFile.HasIdentifier(root) {
+			mayHaveReference = true
+			break
 		}
 	}
-	return false
+	if !mayHaveReference {
+		return false
+	}
+	// The compiler's identifier cache also includes ordinary string literals.
+	// Only an identifier can be the root of a reference followed by this rule.
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && potentialReferenceRoots[node.Text()] {
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	return visit(sourceFile.AsNode())
 }
 
 func pathKey(path []string) string {

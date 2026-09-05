@@ -3,8 +3,8 @@ package unicornutil
 import (
 	"math"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -671,13 +671,13 @@ func classifyArrayInterfaceNode(
 			continue
 		}
 		for _, heritageNode := range clause.Types.Nodes {
-			heritage := heritageNode.AsExpressionWithTypeArguments()
+			heritage := heritageNode.AsTypeReferenceNode()
 			if heritage == nil {
 				classes = append(classes, arrayClassUnknown)
 				continue
 			}
 			classes = append(classes, classifyArrayTypeReference(
-				ctx, heritage.Expression, targetNames, nonTargetNames, visitedSymbols,
+				ctx, heritage.TypeName, targetNames, nonTargetNames, visitedSymbols,
 			))
 		}
 	}

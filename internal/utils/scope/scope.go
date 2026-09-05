@@ -12,7 +12,7 @@
 package scope
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // DefKind classifies what syntactic construct introduced a binding. It maps to

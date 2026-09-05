@@ -5,10 +5,10 @@ import (
 	"strings"
 	_ "unsafe"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
 // sanitizeSymbolName replaces the internal symbol name prefix (\xFE) with "__"
@@ -20,7 +20,7 @@ func sanitizeSymbolName(name string) []byte {
 	return []byte(name)
 }
 
-//go:linkname getAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetAliasedSymbol
+//go:linkname getAliasedSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).GetAliasedSymbol
 func getAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
 type CString = []byte

@@ -65,9 +65,8 @@ func TestNoUnsafeFunctionTypeExtras(t *testing.T) {
 
 		// ---- Branch lock-in: class extends Function is OUT of scope ----
 		// Upstream registers TSClassImplements + TSInterfaceHeritage, NOT a
-		// "class extends" listener. tsgo's KindExpressionWithTypeArguments is
-		// the same node kind for class extends, so the rule must filter on
-		// HeritageClause.Token to avoid reporting here.
+		// "class extends" listener. The compiler uses ExpressionWithTypeArguments
+		// for class extends and TypeReference for the type-only heritage entries.
 		{Code: `class Foo extends Function {}`},
 		{Code: `const Cls = class extends Function {};`},
 

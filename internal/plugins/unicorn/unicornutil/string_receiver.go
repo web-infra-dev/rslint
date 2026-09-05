@@ -1,8 +1,8 @@
 package unicornutil
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -265,12 +265,12 @@ func classifyStringInterface(
 			continue
 		}
 		for _, heritageNode := range clause.Types.Nodes {
-			heritage := heritageNode.AsExpressionWithTypeArguments()
+			heritage := heritageNode.AsTypeReferenceNode()
 			if heritage == nil {
 				classes = append(classes, TypeUnknown)
 				continue
 			}
-			classes = append(classes, classifyStringTypeReference(ctx, heritage.Expression, visitedSymbols))
+			classes = append(classes, classifyStringTypeReference(ctx, heritage.TypeName, visitedSymbols))
 		}
 	}
 	if len(classes) == 0 {

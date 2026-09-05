@@ -1,6 +1,6 @@
 package rule
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // DiagnosticSeverity represents the severity level of a diagnostic
 type DiagnosticSeverity int

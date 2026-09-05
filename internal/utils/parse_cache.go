@@ -6,12 +6,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
-	"github.com/microsoft/typescript-go/shim/project"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/project"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/zeebo/xxh3"
 )
 
@@ -26,7 +26,7 @@ import (
 // (FileName + Path + ExternalModuleIndicatorOptions) + ScriptKind + an xxh3
 // hash of the file content. This is exactly the condition under which tsgo's
 // own LSP shares SourceFile objects across projects (see
-// typescript-go/internal/project/parsecache.go), so a cache hit is by
+// typescript-go/tsc/internal/project/parsecache.go), so a cache hit is by
 // construction equivalent to an independent parse of the same inputs.
 //
 // Sharing is an optimization, never a correctness requirement: two Programs
@@ -117,7 +117,7 @@ func (c *ParseCache) acquire(opts ast.SourceFileParseOptions, text string) *ast.
 // immutable value prevents callers from accidentally tearing the pair.
 func (c *ParseCache) acquireSnapshot(opts ast.SourceFileParseOptions, snapshot sourceSnapshot) *ast.SourceFile {
 	// I6: derive ScriptKind exactly like the default host
-	// (typescript-go/internal/compiler/host.go) so the key always matches
+	// (typescript-go/tsc/internal/compiler/host.go) so the key always matches
 	// what the parse below actually uses.
 	scriptKind := core.GetScriptKindFromFileName(opts.FileName)
 	key := project.NewParseCacheKey(opts, snapshot.hash, scriptKind)

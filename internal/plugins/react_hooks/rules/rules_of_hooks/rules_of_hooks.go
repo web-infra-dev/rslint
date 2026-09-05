@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -221,19 +221,26 @@ func parseAdditionalHooks(options []any, settings map[string]interface{}) *esreg
 }
 
 func sourceMayUseHooks(sourceFile *ast.SourceFile) bool {
-	// Parsed identifier names are normalized, including Unicode escapes, and
-	// include property names such as the useState in React.useState. The table
-	// may also intern literal text, making computed properties a harmless false
-	// positive. Stay conservative for direct callers without parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	// Hook names have an open-ended prefix, so the compiler's exact-name
+	// HasIdentifier lookup cannot answer this gate. Stop at the first matching
+	// identifier, including normalized escapes and property-access names.
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	for name := range sourceFile.Identifiers {
-		if hasHookNameShape(name) {
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && hasHookNameShape(node.Text()) {
 			return true
 		}
+		if ast.IsElementAccessExpression(node) {
+			key := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
+			if key != nil && ast.IsStringLiteralLike(key) && hasHookNameShape(key.Text()) {
+				return true
+			}
+		}
+		return node.ForEachChild(visit)
 	}
-	return false
+	return visit(sourceFile.AsNode())
 }
 
 func hasHookNameShape(name string) bool {
@@ -263,10 +270,10 @@ func mayBeHookCallee(node *ast.Node) bool {
 }
 
 func sourceMayUseEffectEvent(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["useEffectEvent"]
+	ok := sourceFile.HasIdentifier("useEffectEvent")
 	return ok
 }
 

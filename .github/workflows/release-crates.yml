@@ -93,18 +93,11 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.26.0
-          cache-name: tsgo-server-libs
-
       - name: Build TypeScript standard libraries
         working-directory: typescript-go
         run: |
           npm ci
-          npm run build
-          rm -f built/local/tsgo built/local/tsgo.exe
+          npm exec hereby lib
 
       - name: Upload TypeScript standard libraries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

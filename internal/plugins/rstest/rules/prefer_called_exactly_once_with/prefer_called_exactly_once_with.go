@@ -5,10 +5,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
@@ -47,27 +47,23 @@ const (
 )
 
 // sourceMayContainMergePair cheaply rejects files that cannot contain both
-// halves of a merge. The parser interns property names and the cooked text of
-// string/template element-access keys, so the identifier table covers normal,
-// bracket and escaped spellings without scanning the AST.
-//
-// A key hidden behind parentheses is the one accepted form the table does not
-// intern, because GetMemberEntries reaches through them with SkipParentheses.
-// Only files containing such a bracket need the exact fallback walk.
+// halves of a merge. The compiler's lazy cache includes normalized identifiers
+// and literal keys. Conservatively check parenthesized accesses if the cache
+// cannot establish both matcher roles.
 func sourceMayContainMergePair(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
 
 	roles := mergeMatcherRoles(0)
 	for name := range onceMatchers {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			roles |= mergeMatcherRoleOnce
 			break
 		}
 	}
 	for name := range combinedMatchers {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			roles |= mergeMatcherRoleWith
 			break
 		}

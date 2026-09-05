@@ -3,6 +3,6 @@
 
 package trackingvfs
 
-import "github.com/microsoft/typescript-go/internal/vfs/trackingvfs"
+import "github.com/microsoft/TypeScript/tsc/internal/vfs/trackingvfs"
 
 type FS = trackingvfs.FS

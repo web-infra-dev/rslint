@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -22,10 +22,10 @@ var PreferNamedCaptureGroupRule = rule.Rule{
 				checkRegex(ctx, node, node, pattern, flags, 1)
 			},
 		}
-		if sourceFile := ctx.SourceFile; sourceFile != nil && sourceFile.Identifiers != nil {
+		if sourceFile := ctx.SourceFile; sourceFile != nil && sourceFile.AsNode().Kind == ast.KindSourceFile {
 			mayUseConstructor := false
 			for _, name := range [...]string{"RegExp", "globalThis", "window", "self", "global"} {
-				if _, ok := sourceFile.Identifiers[name]; ok {
+				if sourceFile.HasIdentifier(name) {
 					mayUseConstructor = true
 					break
 				}

@@ -3,8 +3,8 @@ package unbound_method
 import (
 	_ "embed"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -82,6 +82,8 @@ func isSafeUse(node *ast.Node) bool {
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression:
 			continue
+		case ast.KindQualifiedName:
+			return utils.IsHeritageQualifiedName(parent)
 		case ast.KindIfStatement,
 			ast.KindForStatement,
 			ast.KindPropertyAccessExpression,
@@ -143,6 +145,24 @@ func isNotImported(symbol *ast.Symbol, currentSourceFile *ast.SourceFile) bool {
 	}
 
 	return currentSourceFile != ast.GetSourceFileOfNode(decl)
+}
+
+// Heritage QualifiedNames resolve in type space in the compiler. ESTree still
+// exposes member expressions here, so recover their value-space symbols for
+// this rule, including names that do not form valid TypeScript base types.
+func heritageValueSymbol(tc *checker.Checker, node *ast.Node) *ast.Symbol {
+	if ast.IsIdentifier(node) {
+		return tc.ResolveName(node.Text(), node, ast.SymbolFlagsValue, false)
+	}
+	if node.Kind != ast.KindQualifiedName {
+		return nil
+	}
+	name := node.AsQualifiedName()
+	object := heritageValueSymbol(tc, name.Left)
+	if object == nil {
+		return nil
+	}
+	return checker.Checker_getPropertyOfType(tc, tc.GetTypeOfSymbol(object), name.Right.Text())
 }
 
 var supportedGlobalTypes = []string{
@@ -223,6 +243,9 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 			// See related discussion https://github.com/typescript-eslint/typescript-eslint/pull/8952#discussion_r1576543310
 			if ast.IsIdentifier(object) && ast.IsIdentifier(property) {
 				objectSymbol := ctx.TypeChecker.GetSymbolAtLocation(object)
+				if utils.IsHeritageQualifiedName(property.Parent) {
+					objectSymbol = heritageValueSymbol(ctx.TypeChecker, object)
+				}
 				notImported := objectSymbol != nil && isNotImported(objectSymbol, ctx.SourceFile)
 
 				if notImported {
@@ -286,6 +309,16 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 				}
 
 				checkIfMethodAndReport(node, ctx.TypeChecker.GetSymbolAtLocation(node))
+			},
+			ast.KindQualifiedName: func(node *ast.Node) {
+				if !utils.IsHeritageQualifiedName(node) {
+					return
+				}
+				object, property := utils.MemberExpressionParts(node)
+				if isSafeUse(node) || isNativelyBound(object, property) {
+					return
+				}
+				checkIfMethodAndReport(node, heritageValueSymbol(ctx.TypeChecker, node))
 			},
 
 			rule.ListenerOnAllowPattern(ast.KindObjectLiteralExpression): func(node *ast.Node) {

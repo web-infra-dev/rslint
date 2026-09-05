@@ -13,7 +13,7 @@ import (
 	_ "embed"
 	"os"
 
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -41,7 +41,7 @@ func parseOptions(options []any) bool {
 // detects stale cached stats after a fix rewrites only the mark.
 func hasBOM(ctx rule.RuleContext) bool {
 	fileSystem := ctx.Program().FS()
-	if fileSystem != nil && ctx.SourceFile != nil && !ctx.SourceFile.ContainsNonASCII {
+	if fileSystem != nil && ctx.SourceFile != nil && sourceIsASCII(ctx.SourceFile.Text()) {
 		path := ctx.SourceFile.FileName()
 		vfsInfo := fileSystem.Stat(path)
 		diskInfo, err := os.Stat(path)
@@ -55,6 +55,15 @@ func hasBOM(ctx rule.RuleContext) bool {
 	}
 
 	return ctx.HasBOM()
+}
+
+func sourceIsASCII(text string) bool {
+	for i := range len(text) {
+		if text[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 // UnicodeBomRule requires or disallows a Unicode BOM.

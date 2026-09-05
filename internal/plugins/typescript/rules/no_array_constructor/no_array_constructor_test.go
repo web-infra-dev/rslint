@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -336,7 +336,7 @@ func TestNoArrayConstructorExtras(t *testing.T) {
 			{Code: `new (Array)(value);`},
 		},
 		[]rule_tester.InvalidTestCase{
-			// SourceFile.Identifiers and the AST both normalize identifier
+			// SourceFile.HasIdentifier and the AST both normalize identifier
 			// escapes, so the file-level fast path must retain these reports.
 			{
 				Code: `Arr\u0061y(a, b);`,

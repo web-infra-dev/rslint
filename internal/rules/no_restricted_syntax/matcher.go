@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -213,7 +213,8 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 	case "JSXIdentifier":
 		return isJSXIdentifier(node)
 	case "MemberExpression":
-		return !isJSXMemberExpression(node)
+		return !isJSXMemberExpression(node) &&
+			(node.Kind != ast.KindQualifiedName || utils.IsHeritageQualifiedName(node))
 	case "JSXMemberExpression":
 		return isJSXMemberExpression(node)
 	case "JSXExpressionContainer":
@@ -1636,6 +1637,8 @@ func isTransparentEstreeContainer(node *ast.Node) bool {
 	case ast.KindParenthesizedExpression, ast.KindComputedPropertyName, ast.KindSemicolonClassElement,
 		ast.KindImportAttributes, ast.KindJsxAttributes, ast.KindHeritageClause, ast.KindExpressionWithTypeArguments:
 		return true
+	case ast.KindTypeReference:
+		return node.Parent != nil && node.Parent.Kind == ast.KindHeritageClause
 	case ast.KindBlock:
 		return node.Parent != nil && node.Parent.Kind == ast.KindClassStaticBlockDeclaration
 	case ast.KindVariableDeclarationList:
@@ -1961,6 +1964,9 @@ func readQuasiAttr(node *ast.Node) (interface{}, bool) {
 // can be unambiguously chosen. If multiple ESTree names map to the same
 // kind, the canonical one is returned.
 func estreeNameForKind(node *ast.Node) string {
+	if utils.IsHeritageQualifiedName(node) {
+		return "MemberExpression"
+	}
 	if isJSXIdentifier(node) {
 		return "JSXIdentifier"
 	}
@@ -2234,6 +2240,9 @@ func readRawAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 }
 
 func readOptionalAttr(node *ast.Node) (interface{}, bool) {
+	if utils.IsHeritageQualifiedName(node) {
+		return false, true
+	}
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 		return ast.IsOptionalChainRoot(node), true
@@ -2430,6 +2439,9 @@ func varListKind(dl *ast.Node) string {
 }
 
 func readComputedAttr(node *ast.Node) (interface{}, bool) {
+	if utils.IsHeritageQualifiedName(node) {
+		return false, true
+	}
 	switch node.Kind {
 	case ast.KindElementAccessExpression:
 		return true, true
@@ -2976,6 +2988,9 @@ func readRightAttr(node *ast.Node) (interface{}, bool) {
 }
 
 func readObjectAttr(node *ast.Node) (interface{}, bool) {
+	if utils.IsHeritageQualifiedName(node) {
+		return node.AsQualifiedName().Left, true
+	}
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		object := unwrapExpression(node.AsPropertyAccessExpression().Expression)
@@ -2990,6 +3005,9 @@ func readObjectAttr(node *ast.Node) (interface{}, bool) {
 }
 
 func readPropertyAttr(node *ast.Node) (interface{}, bool) {
+	if utils.IsHeritageQualifiedName(node) {
+		return node.AsQualifiedName().Right, true
+	}
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression().Name()

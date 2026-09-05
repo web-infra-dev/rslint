@@ -3,9 +3,9 @@ package prefer_called_exactly_once_with
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
 
 func TestSourceMayContainMergePair(t *testing.T) {
@@ -67,12 +67,11 @@ func TestSourceMayContainMergePairKeepsUnknownSourceFile(t *testing.T) {
 			FileName: "/source.test.ts",
 			Path:     "/source.test.ts",
 		},
-		`expect(spy).toHaveBeenCalledOnce()`,
+		`expect(spy).toHaveBeenCalledOnce(); expect(spy).toHaveBeenCalledWith(value);`,
 		core.ScriptKindTS,
 	)
-	sourceFile.Identifiers = nil
 	if !sourceMayContainMergePair(sourceFile) {
-		t.Error("missing identifier table must conservatively keep the rule enabled")
+		t.Error("the compiler must collect identifier names before checking an uncached source file")
 	}
 }
 

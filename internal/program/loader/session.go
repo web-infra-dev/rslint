@@ -8,8 +8,8 @@ import (
 	"errors"
 	"reflect"
 
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // Session owns Program-construction services for one immutable CLI/API source

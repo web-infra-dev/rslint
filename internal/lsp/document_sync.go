@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 )
 
 // lintDebounceDelay is how long to wait after the last keystroke before

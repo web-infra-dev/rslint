@@ -1,7 +1,7 @@
 package cfg
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 func (b *Builder[E]) expr(node *ast.Node) {

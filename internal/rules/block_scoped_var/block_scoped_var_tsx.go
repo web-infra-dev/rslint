@@ -3,8 +3,8 @@ package block_scoped_var
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -420,12 +420,12 @@ func isTSETypeDefinitionKind(kind ast.Kind) bool {
 
 func isTypeOnlyHeritageReference(identifier *ast.Node) bool {
 	entity := identifier
-	for entity.Parent != nil && entity.Parent.Kind == ast.KindPropertyAccessExpression &&
-		entity.Parent.AsPropertyAccessExpression().Expression == entity {
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindQualifiedName &&
+		entity.Parent.AsQualifiedName().Left == entity {
 		entity = entity.Parent
 	}
-	if entity.Parent == nil || entity.Parent.Kind != ast.KindExpressionWithTypeArguments ||
-		entity.Parent.AsExpressionWithTypeArguments().Expression != entity {
+	if entity.Parent == nil || entity.Parent.Kind != ast.KindTypeReference ||
+		entity.Parent.AsTypeReferenceNode().TypeName != entity {
 		return false
 	}
 	heritage := entity.Parent.Parent
@@ -1221,7 +1221,7 @@ func (timeline *jsxTimeline) visitClass(node *ast.Node) {
 	if classData.HeritageClauses != nil {
 		for _, clause := range classData.HeritageClauses.Nodes {
 			for _, item := range clause.AsHeritageClause().Types.Nodes {
-				typeArguments := item.AsExpressionWithTypeArguments().TypeArguments
+				typeArguments := item.TypeArgumentList()
 				if typeArguments != nil {
 					for _, typeArgument := range typeArguments.Nodes {
 						timeline.visit(typeArgument)

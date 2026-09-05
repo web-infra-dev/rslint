@@ -96,13 +96,13 @@ Before starting, familiarize yourself with these key source locations:
 
 ### AST & Type System
 
-| File/Directory                                        | Description                                                          |
-| ----------------------------------------------------- | -------------------------------------------------------------------- |
-| `typescript-go/_packages/ast/src/nodes.ts`            | **AST node type definitions** - All JS/TS syntax nodes               |
-| `typescript-go/_packages/ast/src/syntaxKind.enum.ts`  | **SyntaxKind enum** - Node type constants (maps to Go's `ast.Kind*`) |
-| `typescript-go/_packages/api/src/typeFlags.enum.ts`   | **TypeFlags enum** - Type checking flags                             |
-| `typescript-go/_packages/api/src/symbolFlags.enum.ts` | **SymbolFlags enum** - Symbol flags                                  |
-| `shim/ast/shim.go`                                    | Go-side AST shim implementation (auto-generated)                     |
+| File/Directory                                                    | Description                                                          |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `typescript-go/packages/typescript/src/ast/ast.generated.ts`      | **AST node type definitions** - All JS/TS syntax nodes               |
+| `typescript-go/packages/typescript/src/enums/syntaxKind.enum.ts`  | **SyntaxKind enum** - Node type constants (maps to Go's `ast.Kind*`) |
+| `typescript-go/packages/typescript/src/enums/typeFlags.enum.ts`   | **TypeFlags enum** - Type checking flags                             |
+| `typescript-go/packages/typescript/src/enums/symbolFlags.enum.ts` | **SymbolFlags enum** - Symbol flags                                  |
+| `shim/ast/shim.go`                                                | Go-side AST shim implementation (auto-generated)                     |
 
 ### Example Rules (Recommended Reading)
 
@@ -427,7 +427,7 @@ var MyCoreRule = rule.Rule{
 - **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. The planner admits it only when the unified Program can provide a checker for that file, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
 - **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
 
-**AST Shim API Warning**: In `github.com/microsoft/typescript-go/shim/ast`:
+**AST Shim API Warning**: In `github.com/microsoft/TypeScript/tsc/shim/ast`:
 
 - **General Nodes** (`*ast.Node`): Use methods (e.g., `node.Kind()`, `node.Text()`)
 - **Concrete Nodes** (e.g., `*ast.Identifier`): Use fields (e.g., `id.Text`)

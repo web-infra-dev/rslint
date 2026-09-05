@@ -1,6 +1,6 @@
 package scope
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // Acquire returns the innermost scope associated with node's ESTree position.
 // This is a syntactic query like SourceCode.getScope, not reference resolution:

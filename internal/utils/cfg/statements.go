@@ -3,7 +3,7 @@ package cfg
 import (
 	"slices"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 func (b *Builder[E]) statements(list *ast.NodeList) {

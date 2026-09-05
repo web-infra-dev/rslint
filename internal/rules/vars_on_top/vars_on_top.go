@@ -1,6 +1,6 @@
 package vars_on_top
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 import "github.com/web-infra-dev/rslint/internal/rule"
 

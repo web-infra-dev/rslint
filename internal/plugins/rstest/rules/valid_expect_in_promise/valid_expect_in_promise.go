@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
@@ -35,13 +35,13 @@ import (
 // name unless the key is escaped, so requiring both keeps the fallback sound
 // without paying for the brackets a test file spells everywhere else.
 func sourceMayContainPromiseChain(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	// Reading a nil identifier table is well defined; a file with no identifiers
+	// The compiler initializes its name cache on demand; a file with no names
 	// has no promise chain either way.
 	for _, name := range promiseChainMemberNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return nodeContainsPromiseChain(sourceFile.AsNode())
 		}
 	}

@@ -4,5 +4,5 @@ toolchain go1.26.0
 
 use (
 	.
-	./typescript-go
+	./typescript-go/tsc
 )

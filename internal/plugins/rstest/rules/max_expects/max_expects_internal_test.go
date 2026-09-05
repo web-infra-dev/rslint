@@ -3,7 +3,7 @@ package max_expects
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // popIfOwned and deactivateIfOwned mirror the exit listeners, which pair enter

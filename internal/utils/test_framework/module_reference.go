@@ -1,8 +1,8 @@
 package test_framework
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 

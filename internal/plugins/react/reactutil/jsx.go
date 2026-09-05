@@ -1,6 +1,6 @@
 package reactutil
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // GetJsxTagBaseIdentifier returns the leftmost Identifier of a JSX tag-name
 // node — i.e. the symbol a rule must resolve to classify the tag. Pass the

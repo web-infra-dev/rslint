@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
@@ -289,7 +289,12 @@ func referenceContainsTypeQuery(node *ast.Node) bool {
 // an identifier directly inside a TSTypeReference is covered here. Type queries
 // are handled separately by referenceContainsTypeQuery.
 func isTypeReference(node *ast.Node) bool {
-	return node != nil && node.Parent != nil && node.Parent.Kind == ast.KindTypeReference
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindTypeReference {
+		return false
+	}
+	// The compiler also uses TypeReference for heritage entries, which remain
+	// TSInterfaceHeritage/TSClassImplements rather than TSTypeReference in ESTree.
+	return node.Parent.Parent == nil || node.Parent.Parent.Kind != ast.KindHeritageClause
 }
 
 func leftMostQualifiedName(node *ast.Node) *ast.Node {

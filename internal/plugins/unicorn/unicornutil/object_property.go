@@ -1,6 +1,6 @@
 package unicornutil
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // ObjectDataProperty returns the name and value of an object-literal data
 // property. ESTree represents both `key: value` and shorthand `key` entries as

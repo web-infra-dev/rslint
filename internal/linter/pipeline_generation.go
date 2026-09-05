@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // releaseLease gives every acquired generation exact-once release semantics,

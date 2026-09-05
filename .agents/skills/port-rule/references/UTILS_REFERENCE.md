@@ -556,7 +556,7 @@ set.Clear()
 ## `shim/ast/` - AST Utilities
 
 ```go
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 ```
 
 Reach for these **before** writing a helper of your own — the shim already covers a wide surface. This list is curated to the functions most commonly reused when porting rules; see `shim/ast/shim.go` for the full inventory.
@@ -605,7 +605,7 @@ Use these instead of hand-rolled loops. See [AST_PATTERNS.md § ParenthesizedExp
 ## `shim/scanner/` - Scanner Utilities
 
 ```go
-import "github.com/microsoft/typescript-go/shim/scanner"
+import "github.com/microsoft/TypeScript/tsc/shim/scanner"
 ```
 
 ### SkipTrivia
@@ -635,7 +635,7 @@ Create a token-by-token scanner for more complex scanning needs. See [AST_PATTER
 ## `shim/checker/` - TypeChecker Native Methods
 
 ```go
-import "github.com/microsoft/typescript-go/shim/checker"
+import "github.com/microsoft/TypeScript/tsc/shim/checker"
 ```
 
 For type-aware rules, **check `internal/utils/ts_api_utils.go` and `internal/utils/ts_eslint.go` first** — they wrap the common patterns with the correct invariants (e.g. `IsPromiseLike` handles subclass resolution, `NeedsToBeAwaited` handles generic constraints). Only fall through to the raw `Checker_*` functions below when no wrapper exists. Do **not** hand-roll type analysis on top of AST shape alone — the checker already answers those questions authoritatively.

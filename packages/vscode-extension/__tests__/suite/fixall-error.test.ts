@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import {
-  waitForDiagnostics,
+  waitForTypeAssertionDiagnostics,
   waitForContentChange,
   findFixAllAction,
   requestFixAll,
@@ -55,7 +55,7 @@ suite('rslint fixAll - error flows', function () {
         editor,
         "const pVal: string = 'x';\nconst pRes = (pVal as string).trim();\n",
       );
-      const probeDiags = await waitForDiagnostics(doc);
+      const probeDiags = await waitForTypeAssertionDiagnostics(doc);
       assert.ok(
         probeDiags.some((d) =>
           d.message.includes('no-unnecessary-type-assertion'),

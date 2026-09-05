@@ -3,7 +3,7 @@ package use_isnan
 import (
 	_ "embed"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -157,14 +157,22 @@ func (checker *globalReferenceChecker) mayShadow(name string) bool {
 }
 
 func sourceMayUseNaN(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["NaN"]; ok {
-		return true
+	if !sourceFile.HasIdentifier("NaN") && !sourceFile.HasIdentifier("Number") {
+		return false
 	}
-	_, ok := sourceFile.Identifiers["Number"]
-	return ok
+	// HasIdentifier also matches ordinary strings; keep those files out of the
+	// comparison listeners unless a matching identifier is actually present.
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && (node.Text() == "NaN" || node.Text() == "Number") {
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	return visit(sourceFile.AsNode())
 }
 
 func isComparisonOperator(kind ast.Kind) bool {
