@@ -468,6 +468,39 @@ func findReference(t *testing.T, m *Manager, name string) *Reference {
 	return nil
 }
 
+func TestBuildTypeDeclarationReferences(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		declaration string
+		kinds       []Kind
+		owner       int
+	}{
+		{"alias", `type T = typeof value;`, []Kind{KindGlobal}, 0},
+		{"interface", `interface T { value: typeof value }`, []Kind{KindGlobal}, 0},
+		{"generic alias", `type T<U> = typeof value;`, []Kind{KindGlobal, KindType}, 1},
+		{"generic interface", `interface T<U> { value: typeof value }`, []Kind{KindGlobal, KindType}, 1},
+		{"function type", `type T = () => typeof value;`, []Kind{KindGlobal, KindFunctionType}, 1},
+		{"mapped type", `type T = { [K in keyof typeof value]: K };`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional check", `type T = typeof value extends unknown ? 1 : 2;`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional extends", `type T = unknown extends typeof value ? 1 : 2;`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional true", `type T = unknown extends unknown ? typeof value : 2;`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional false", `type T = unknown extends unknown ? 1 : typeof value;`, []Kind{KindGlobal, KindType}, 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			m := buildWithReferences(t, `declare const value: unknown; `+testCase.declaration)
+			assertKinds(t, m, testCase.kinds)
+			assertDeclares(t, m.Global, "T", DefType)
+			reference := findReference(t, m, "value")
+			if reference.From != m.Scopes[testCase.owner] {
+				t.Errorf("value reference belongs to kind %d, want kind %d", reference.From.Kind, m.Scopes[testCase.owner].Kind)
+			}
+			if reference.Resolved() != m.Global.Declarations("value")[0] {
+				t.Error("value reference should resolve to the outer declaration")
+			}
+		})
+	}
+}
+
 func TestBuildKeepsTheFirstFunctionOverloadAsTheBindingAnchor(t *testing.T) {
 	m := buildWithReferences(t, `function f(x: string): void; f(); function f(x: any) {}`)
 	declarations := m.Global.Declarations("f")
