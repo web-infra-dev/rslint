@@ -848,7 +848,8 @@ The transport and target phase differ by surface:
   remain fatal and can now appear through the ordinary aborted-run output
   after the interactive start line, before any diagnostics or fixes execute.
   Native-only configurations return fully verified metadata without a worker
-  or a second request; `--singleThreaded` retains synchronous activation.
+  or a second request. `--singleThreaded` still uses one JS worker and serial
+  Go work groups; that worker's initialization can overlap Go preparation.
   The engine owns one activation per invocation: identical requests share its
   completion, conflicting selections fail, and shutdown prevents late host
   publication while draining owned builds with the existing initialization
@@ -1392,7 +1393,9 @@ Other invariants:
 | Program source identity index | Canonical source paths are resolved serially through `core.NewWorkGroup(true)`.                               |
 
 These workload stages run serially with `--singleThreaded`; infrastructure
-goroutines remain outside that guarantee.
+goroutines remain outside that guarantee. CLI plugin initialization uses one
+JS worker and can overlap the serial Go target planning and Program loading;
+lint and fix execution still await full config activation.
 
 ## 10. Performance & Memory Considerations
 

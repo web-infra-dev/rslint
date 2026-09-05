@@ -115,7 +115,7 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 					Status: "loaded",
 				}},
 			}, nil
-		case kindActivateConfigs:
+		case kindPrepareConfigs:
 			var request discovery.ConfigActivationRequest
 			if err := msg.Decode(&request); err != nil {
 				return nil, err

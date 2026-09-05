@@ -437,10 +437,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
           selected,
           configAbort.signal,
           async (activation) => {
-            if (
-              activation.pluginConfigs.length > 0 &&
-              !opts.runtime?.singleThreaded
-            ) {
+            if (activation.pluginConfigs.length > 0) {
               // This response permits read-only Go planning, never execution.
               // The original activation still owns preparation and its second
               // fingerprint check; activateConfigs below awaits that result.
@@ -461,7 +458,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       }
     })();
     // Observe failure immediately, even before Go reaches its final barrier.
-    // Native-only and single-threaded runs receive fully validated metadata.
+    // Native-only runs receive fully validated metadata.
     void ready.then(resolveMetadata, rejectMetadata);
     configActivation = { request: selected, metadata, ready };
     return configActivation;
