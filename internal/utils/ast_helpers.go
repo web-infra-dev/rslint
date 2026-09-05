@@ -3,7 +3,7 @@ package utils
 import (
 	"slices"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // skipTransparentKinds matches parentheses + TS type assertions.

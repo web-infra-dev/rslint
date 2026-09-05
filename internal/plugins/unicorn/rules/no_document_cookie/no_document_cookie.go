@@ -1,7 +1,7 @@
 package no_document_cookie
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -57,14 +57,14 @@ var NoDocumentCookieRule = rule.Rule{
 }
 
 func sourceMayReferenceDocument(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["document"]; ok {
+	if sourceFile.HasIdentifier("document") {
 		return true
 	}
 	for _, name := range globalObjectNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

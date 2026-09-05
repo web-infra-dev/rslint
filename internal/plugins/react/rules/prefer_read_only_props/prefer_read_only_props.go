@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -594,21 +594,21 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImp
 					continue
 				}
 				for _, item := range heritage.Types.Nodes {
-					extends := item.AsExpressionWithTypeArguments()
-					if extends == nil || extends.Expression == nil {
+					extends := item.AsTypeReferenceNode()
+					if extends == nil || extends.TypeName == nil {
 						continue
 					}
-					if extends.Expression.Kind == ast.KindIdentifier &&
-						extends.Expression.AsIdentifier().Text == "ReturnType" {
+					if extends.TypeName.Kind == ast.KindIdentifier &&
+						extends.TypeName.AsIdentifier().Text == "ReturnType" {
 						if extends.TypeArguments != nil && len(extends.TypeArguments.Nodes) == 1 {
 							validateReturnTypeArgument(extends.TypeArguments.Nodes[0], aliases, genericImports, report, seen)
 						}
 						continue
 					}
-					if extends.Expression.Kind != ast.KindIdentifier {
+					if extends.TypeName.Kind != ast.KindIdentifier {
 						continue
 					}
-					for _, target := range aliases[extends.Expression.AsIdentifier().Text] {
+					for _, target := range aliases[extends.TypeName.AsIdentifier().Text] {
 						validateTypeNode(target, aliases, genericImports, report, seen)
 					}
 				}

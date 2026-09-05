@@ -3,7 +3,7 @@
 
 package jsonrpc
 
-import "github.com/microsoft/typescript-go/internal/jsonrpc"
+import "github.com/microsoft/TypeScript/tsc/internal/jsonrpc"
 import "io"
 import _ "unsafe"
 
@@ -24,15 +24,15 @@ type MessageKind = jsonrpc.MessageKind
 const MessageKindNotification = jsonrpc.MessageKindNotification
 const MessageKindRequest = jsonrpc.MessageKindRequest
 const MessageKindResponse = jsonrpc.MessageKindResponse
-//go:linkname NewID github.com/microsoft/typescript-go/internal/jsonrpc.NewID
+//go:linkname NewID github.com/microsoft/TypeScript/tsc/internal/jsonrpc.NewID
 func NewID(rawValue jsonrpc.IntegerOrString) *jsonrpc.ID
-//go:linkname NewIDInt github.com/microsoft/typescript-go/internal/jsonrpc.NewIDInt
+//go:linkname NewIDInt github.com/microsoft/TypeScript/tsc/internal/jsonrpc.NewIDInt
 func NewIDInt(i int32) *jsonrpc.ID
-//go:linkname NewIDString github.com/microsoft/typescript-go/internal/jsonrpc.NewIDString
+//go:linkname NewIDString github.com/microsoft/TypeScript/tsc/internal/jsonrpc.NewIDString
 func NewIDString(str string) *jsonrpc.ID
-//go:linkname NewReader github.com/microsoft/typescript-go/internal/jsonrpc.NewReader
+//go:linkname NewReader github.com/microsoft/TypeScript/tsc/internal/jsonrpc.NewReader
 func NewReader(r io.Reader) *jsonrpc.Reader
-//go:linkname NewWriter github.com/microsoft/typescript-go/internal/jsonrpc.NewWriter
+//go:linkname NewWriter github.com/microsoft/TypeScript/tsc/internal/jsonrpc.NewWriter
 func NewWriter(w io.Writer) *jsonrpc.Writer
 type Reader = jsonrpc.Reader
 type RequestMessage = jsonrpc.RequestMessage

@@ -4,7 +4,8 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -323,6 +324,14 @@ var NoInvalidVoidTypeRule = rule.CreateRule(rule.Rule{
 
 				// --- Generic type arguments (type-level) ---
 				case ast.KindTypeReference:
+					// Heritage entries remain distinct from TSTypeReference in
+					// ESTree, even though the compiler now shares their node kind.
+					if typescriptutil.IsClassImplementsOrInterfaceExtends(parent) {
+						if !allowAllGenerics {
+							ctx.ReportNode(node, notReturnMessage)
+						}
+						return
+					}
 					if !allowGeneric {
 						ctx.ReportNode(node, notReturnMessage)
 						return

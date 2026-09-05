@@ -3,15 +3,15 @@
 
 package vfsmatch
 
-import "github.com/microsoft/typescript-go/internal/vfs"
-import "github.com/microsoft/typescript-go/internal/vfs/vfsmatch"
+import "github.com/microsoft/TypeScript/tsc/internal/vfs"
+import "github.com/microsoft/TypeScript/tsc/internal/vfs/vfsmatch"
 import _ "unsafe"
 
-//go:linkname IsImplicitGlob github.com/microsoft/typescript-go/internal/vfs/vfsmatch.IsImplicitGlob
+//go:linkname IsImplicitGlob github.com/microsoft/TypeScript/tsc/internal/vfs/vfsmatch.IsImplicitGlob
 func IsImplicitGlob(lastPathComponent string) bool
-//go:linkname NewSpecMatcher github.com/microsoft/typescript-go/internal/vfs/vfsmatch.NewSpecMatcher
+//go:linkname NewSpecMatcher github.com/microsoft/TypeScript/tsc/internal/vfs/vfsmatch.NewSpecMatcher
 func NewSpecMatcher(specs []string, basePath string, usage vfsmatch.Usage, useCaseSensitiveFileNames bool) *vfsmatch.SpecMatcher
-//go:linkname ReadDirectory github.com/microsoft/typescript-go/internal/vfs/vfsmatch.ReadDirectory
+//go:linkname ReadDirectory github.com/microsoft/TypeScript/tsc/internal/vfs/vfsmatch.ReadDirectory
 func ReadDirectory(host vfs.FS, currentDir string, path string, extensions []string, excludes []string, includes []string, depth int) []string
 type SpecMatcher = vfsmatch.SpecMatcher
 const UnlimitedDepth = vfsmatch.UnlimitedDepth

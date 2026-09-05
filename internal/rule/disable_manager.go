@@ -3,8 +3,8 @@ package rule
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
 // blockDirective represents a block-level disable or enable event at a specific line

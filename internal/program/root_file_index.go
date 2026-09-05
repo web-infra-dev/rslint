@@ -3,8 +3,8 @@ package program
 import (
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // RootFileIndex identifies files selected directly by a parsed TypeScript

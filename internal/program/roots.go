@@ -7,13 +7,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/binder"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/module"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/module"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // RootOptions describes one parser/binder-built source universe.
@@ -72,7 +72,7 @@ func NewFromRoots(opts RootOptions) (*Program, error) {
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		options:          opts.CompilerOptions,
-		resolver:         module.NewResolver(opts.Host, opts.CompilerOptions, "", ""),
+		resolver:         module.NewResolver(opts.Host, opts.CompilerOptions, "", "", nil),
 		metadataByPath:   make(map[tspath.Path]ast.SourceFileMetaData, len(rootFileNames)),
 		sourcesByPath:    make(map[tspath.Path]*ast.SourceFile, len(rootFileNames)),
 		resolvedModules:  make(map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule], len(rootFileNames)),
@@ -208,7 +208,7 @@ func NewFromBoundSources(
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		options:          options,
-		resolver:         module.NewResolver(host, options, "", ""),
+		resolver:         module.NewResolver(host, options, "", "", nil),
 		metadataByPath:   make(map[tspath.Path]ast.SourceFileMetaData, len(files)),
 		sourcesByPath:    make(map[tspath.Path]*ast.SourceFile, len(files)),
 		resolvedModules:  make(map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule], len(files)),

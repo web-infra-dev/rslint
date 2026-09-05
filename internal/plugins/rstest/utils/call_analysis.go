@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"

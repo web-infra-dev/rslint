@@ -5,7 +5,7 @@ import (
 	"sync"
 	"weak"
 
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 )
 
 // derivedCache belongs to one immutable source generation. Compiler-backed

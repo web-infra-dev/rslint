@@ -3,7 +3,7 @@ package no_identical_title
 import (
 	"slices"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_identical_title"

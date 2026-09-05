@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // PathSpaceSnapshot freezes every authored config base used by one evaluation

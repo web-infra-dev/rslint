@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -2798,6 +2798,54 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 			t.Fatalf("activation count = %d, want 1", len(loader.activations))
 		}
 	})
+}
+
+func TestConfigDiscoveryCoalescesNativeCaseAliasesWithoutRealpathCaseNormalization(t *testing.T) {
+	root := t.TempDir()
+	upperRoot := tspath.NormalizePath(filepath.Join(root, "Project"))
+	lowerRoot := tspath.NormalizePath(filepath.Join(root, "project"))
+	upperConfig := writeConfigCandidate(t, upperRoot, "rslint.config.js")
+	lowerConfig := tspath.CombinePaths(lowerRoot, "rslint.config.js")
+	if _, err := os.Stat(lowerConfig); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("fixture requires native case-insensitive path lookup")
+		}
+		t.Fatal(err)
+	}
+	upperFile := writeDiscoveryFixture(t, upperRoot, "a.ts", "debugger;\n")
+	lowerFile := writeDiscoveryFixture(t, lowerRoot, "b.ts", "debugger;\n")
+	loader := newFixtureConfigLoader()
+	loader.configs[upperConfig] = namedConfig("owner")
+	// EvalSymlinks, now used by upstream on macOS, preserves the caller's
+	// spelling. Make that behavior explicit on every case-insensitive host.
+	fsys := &configDiscoveryCaseSensitivityFS{
+		FS: &configDiscoveryRealpathFS{
+			FS: discoveryTestFS(),
+			realPaths: map[string]string{
+				upperRoot:   upperRoot,
+				lowerRoot:   lowerRoot,
+				upperConfig: upperConfig,
+				lowerConfig: lowerConfig,
+			},
+		},
+		caseSensitive: false,
+	}
+	catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		CWD: root,
+		Files: []DiscoveryFile{
+			{Path: upperFile, Explicit: true},
+			{Path: lowerFile, Explicit: true},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Configs) != 1 || len(catalog.Scopes) != 1 {
+		t.Fatalf("native case aliases: configs=%v scopes=%v, want one owner", catalog.Configs, catalog.Scopes)
+	}
+	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{upperConfig}) {
+		t.Fatalf("requested configs = %v, want one representative", got)
+	}
 }
 
 func TestConfigDiscoveryReusesNativeCaseAliasAcrossLoadFrontiers(t *testing.T) {

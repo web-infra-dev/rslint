@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/evaluator"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/evaluator"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 

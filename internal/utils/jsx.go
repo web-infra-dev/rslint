@@ -1,6 +1,6 @@
 package utils
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // IsInJsxTagName reports whether node is part of a dotted JSX tag name such as
 // <Foo.Bar.Baz />. tsgo represents every dotted link as a

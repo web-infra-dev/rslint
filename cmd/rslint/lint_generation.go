@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 )

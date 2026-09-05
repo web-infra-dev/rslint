@@ -3,18 +3,18 @@
 
 package logging
 
-import "github.com/microsoft/typescript-go/internal/project/logging"
+import "github.com/microsoft/TypeScript/tsc/internal/project/logging"
 import "io"
 import _ "unsafe"
 
 type LogCollector = logging.LogCollector
 type LogTree = logging.LogTree
 type Logger = logging.Logger
-//go:linkname NewLogTree github.com/microsoft/typescript-go/internal/project/logging.NewLogTree
+//go:linkname NewLogTree github.com/microsoft/TypeScript/tsc/internal/project/logging.NewLogTree
 func NewLogTree(name string) *logging.LogTree
-//go:linkname NewLogger github.com/microsoft/typescript-go/internal/project/logging.NewLogger
+//go:linkname NewLogger github.com/microsoft/TypeScript/tsc/internal/project/logging.NewLogger
 func NewLogger(output io.Writer) logging.Logger
-//go:linkname NewNopLogger github.com/microsoft/typescript-go/internal/project/logging.NewNopLogger
+//go:linkname NewNopLogger github.com/microsoft/TypeScript/tsc/internal/project/logging.NewNopLogger
 func NewNopLogger() logging.Logger
-//go:linkname NewTestLogger github.com/microsoft/typescript-go/internal/project/logging.NewTestLogger
+//go:linkname NewTestLogger github.com/microsoft/TypeScript/tsc/internal/project/logging.NewTestLogger
 func NewTestLogger() logging.LogCollector

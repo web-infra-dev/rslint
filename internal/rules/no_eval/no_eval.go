@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -22,10 +22,10 @@ func sourceMayUseEval(sourceFile *ast.SourceFile) bool {
 	// text checks retain computed string accesses such as window['eval']; an
 	// escaped computed name necessarily contains both '[' and a backslash.
 	// Stay conservative for direct callers that do not provide parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["eval"]; ok {
+	if sourceFile.HasIdentifier("eval") {
 		return true
 	}
 	text := sourceFile.Text()

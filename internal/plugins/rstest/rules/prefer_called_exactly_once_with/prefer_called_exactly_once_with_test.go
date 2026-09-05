@@ -147,9 +147,8 @@ func TestPreferCalledExactlyOnceWithRule(t *testing.T) {
 			{Code: `expect(x).toHaveBeenCalledOnce(); const { b } = obj; expect(x).toHaveBeenCalledWith('a');`},
 		},
 		[]rule_tester.InvalidTestCase{
-			// Parenthesized computed matcher keys are deliberately absent from
-			// SourceFile.Identifiers, so the file gate must retain them through
-			// its narrow AST fallback.
+			// The lazy identifier cache includes parenthesized computed matcher
+			// keys, so the file gate must retain these pairs.
 			{
 				Code:   `expect(getMock())[("toHaveBeenCalledOnce")](); expect(getMock())[("toHaveBeenCalledWith")]('a');`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCalledExactlyOnceWith"}},

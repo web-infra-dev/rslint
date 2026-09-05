@@ -10,23 +10,22 @@
     "rootDir": "../..",
     // No source file in `src/**` references `#enums/*`. The mapping exists
     // purely so api-extractor (rslib's d.ts bundler) can resolve the Node
-    // subpath imports inside transitively pulled `_packages/native-preview`
+    // subpath imports inside transitively pulled `packages/typescript`
     // sources — `dts.alias` in rstack.config.mts is a no-op for `bundle: true`
     // because api-extractor reads its own tsconfig fresh from disk.
     "paths": {
       "#enums/*": [
-        "../../typescript-go/_packages/native-preview/src/enums/*.enum.ts"
+        "../../typescript-go/packages/typescript/src/enums/*.enum.ts"
       ]
     }
   },
 
   "include": [
     "src/**/*.ts",
-    "../../typescript-go/_packages/native-preview/src/api/node/**/*.ts",
-    "../../typescript-go/_packages/native-preview/src/api/timing.ts",
-    "../../typescript-go/_packages/native-preview/src/ast/**/*.ts",
-    "../../typescript-go/_packages/native-preview/src/enums/**/*.enum.ts",
-    "../../typescript-go/_packages/native-preview/src/internal/utils.ts"
+    "../../typescript-go/packages/typescript/src/api/**/*.ts",
+    "../../typescript-go/packages/typescript/src/ast/**/*.ts",
+    "../../typescript-go/packages/typescript/src/enums/**/*.enum.ts",
+    "../../typescript-go/packages/typescript/src/internal/utils.ts"
   ],
   "references": []
 }

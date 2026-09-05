@@ -3,9 +3,9 @@ package prefer_function_type
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -263,7 +263,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if len(extends) != 1 {
 			return true
 		}
-		expr := extends[0].AsExpressionWithTypeArguments().Expression
+		expr := extends[0].AsTypeReferenceNode().TypeName
 		if expr == nil || expr.Kind != ast.KindIdentifier || expr.AsIdentifier().Text != "Function" {
 			return true
 		}

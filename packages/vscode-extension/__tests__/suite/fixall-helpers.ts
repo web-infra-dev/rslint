@@ -20,6 +20,19 @@ export const waitForDiagnostics = waitForRslintDiagnostics;
 export const waitForDiagnosticsCount = waitForRslintDiagnosticsCount;
 export const waitForDiagnosticsToChange = waitForRslintDiagnosticsToChange;
 
+export function waitForTypeAssertionDiagnostics(
+  document: vscode.TextDocument,
+): Promise<vscode.Diagnostic[]> {
+  // A newly created file can first publish syntax-only lint while its
+  // tsconfig membership refreshes. Wait for the typed rule used by these
+  // fixAll fixtures, rather than accepting an earlier no-inferrable-types.
+  return waitForRslintDiagnostics(document, (diagnostics) =>
+    diagnostics.some((diagnostic) =>
+      diagnostic.message.includes('no-unnecessary-type-assertion'),
+    ),
+  );
+}
+
 export function getFixturesDir(): string {
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (!workspaceFolder)

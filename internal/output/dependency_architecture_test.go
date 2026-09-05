@@ -68,8 +68,8 @@ func prohibitedOutputDependency(importPath string) bool {
 		importPath == "github.com/web-infra-dev/rslint/internal/linter" ||
 		strings.HasPrefix(importPath, "github.com/web-infra-dev/rslint/internal/config") ||
 		strings.HasPrefix(importPath, "github.com/web-infra-dev/rslint/internal/program") ||
-		strings.HasPrefix(importPath, "github.com/microsoft/typescript-go/shim/ast") ||
-		strings.HasPrefix(importPath, "github.com/microsoft/typescript-go/shim/core") ||
-		strings.HasPrefix(importPath, "github.com/microsoft/typescript-go/shim/scanner") ||
-		strings.HasPrefix(importPath, "github.com/microsoft/typescript-go/shim/vfs")
+		strings.HasPrefix(importPath, "github.com/microsoft/TypeScript/tsc/shim/ast") ||
+		strings.HasPrefix(importPath, "github.com/microsoft/TypeScript/tsc/shim/core") ||
+		strings.HasPrefix(importPath, "github.com/microsoft/TypeScript/tsc/shim/scanner") ||
+		strings.HasPrefix(importPath, "github.com/microsoft/TypeScript/tsc/shim/vfs")
 }

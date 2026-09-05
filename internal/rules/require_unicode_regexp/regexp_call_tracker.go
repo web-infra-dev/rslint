@@ -1,7 +1,7 @@
 package require_unicode_regexp
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -40,17 +40,17 @@ var regexpGlobalObjectNames = [...]string{"globalThis", "window", "self", "globa
 
 // sourceMayUseRegexpConstructor reports whether the file spells one of the
 // syntactic roots from which this tracker can reach the built-in constructor.
-// SourceFile.Identifiers stores normalized names, so escaped identifiers such
-// as R\u0065gExp remain observable. A nil table is treated conservatively.
+// SourceFile.HasIdentifier collects normalized names, so escaped identifiers
+// such as R\u0065gExp remain observable. Unknown source files are kept.
 func sourceMayUseRegexpConstructor(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["RegExp"]; ok {
+	if sourceFile.HasIdentifier("RegExp") {
 		return true
 	}
 	for _, name := range regexpGlobalObjectNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

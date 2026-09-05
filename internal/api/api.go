@@ -17,9 +17,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/api/encoder"
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 )

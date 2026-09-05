@@ -1,6 +1,6 @@
 package unicornutil
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // HasOptionalChainElement reports whether node's callee/object path contains
 // an optional-chain link. Its transparent-node list is deliberately closed:

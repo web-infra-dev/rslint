@@ -3,7 +3,7 @@ package forbid_foreign_prop_types
 import (
 	_ "embed"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -159,6 +159,25 @@ var ForbidForeignPropTypesRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
+			// Interface extends and class implements retain MemberExpression
+			// semantics in ESTree, but the compiler now uses qualified names
+			// inside type references for these heritage clauses.
+			ast.KindQualifiedName: func(node *ast.Node) {
+				entityName := node
+				for entityName.Parent != nil && entityName.Parent.Kind == ast.KindQualifiedName {
+					entityName = entityName.Parent
+				}
+				ref := entityName.Parent
+				if ref == nil || ref.Kind != ast.KindTypeReference || ref.AsTypeReferenceNode().TypeName != entityName ||
+					ref.Parent == nil || ref.Parent.Kind != ast.KindHeritageClause {
+					return
+				}
+				name := node.AsQualifiedName().Right
+				if name.Text() == "propTypes" && !isAllowedAssignment(node, opts.allowInPropTypes) {
+					ctx.ReportNode(name, msg)
+				}
+			},
+
 			// Dotted access `<expr>.propTypes`. ESTree's `MemberExpression`
 			// non-computed branch with `property.type === 'Identifier'`.
 			// PrivateIdentifier (`#propTypes`) is intentionally ignored —

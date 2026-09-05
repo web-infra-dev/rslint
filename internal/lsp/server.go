@@ -15,13 +15,14 @@ import (
 	"time"
 
 	"github.com/go-json-experiment/json"
-	"github.com/microsoft/typescript-go/shim/collections"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/diagnostics"
-	"github.com/microsoft/typescript-go/shim/jsonrpc"
-	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
-	"github.com/microsoft/typescript-go/shim/project"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/collections"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/diagnostics"
+	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
+	"github.com/microsoft/TypeScript/tsc/shim/locale"
+	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/project"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -415,6 +416,16 @@ func (s *Server) SendTelemetry(ctx context.Context, telemetry lsproto.TelemetryE
 
 // IsActive implements project.Client.
 func (s *Server) IsActive() bool { return s.session != nil }
+
+// Rslint keeps its existing default diagnostic language.
+func (s *Server) GetLocale() locale.Locale { return locale.Default }
+func (s *Server) SetLocale(string)         {}
+
+// Rslint's supported document types are registered statically by the client.
+// Content mappers do not expand the lint target set.
+func (s *Server) RegisterContentMapperExtensions(context.Context, []string) error {
+	return nil
+}
 
 func (s *Server) Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

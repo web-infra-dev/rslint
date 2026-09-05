@@ -19,7 +19,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -134,7 +134,7 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `const R = globalThis.RegExp<string>; new R("x", "u")`}},
 				}},
 			},
-			// SourceFile.Identifiers normalizes escaped identifier spellings, so
+			// SourceFile.HasIdentifier normalizes escaped identifier spellings, so
 			// the constructor fast path cannot hide this global reference.
 			{
 				Code: `R\u0065gExp("x")`,

@@ -15,8 +15,8 @@ package no_restricted_paths_test
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_restricted_paths"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"

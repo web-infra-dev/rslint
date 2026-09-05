@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -248,20 +247,6 @@ var NoRestrictedTypesRule = rule.CreateRule(rule.Rule{
 			}
 			checkBannedTypes(ref.TypeName, "")
 			if ref.TypeArguments != nil {
-				checkBannedTypes(node, "")
-			}
-		}
-
-		listeners[ast.KindExpressionWithTypeArguments] = func(node *ast.Node) {
-			if !typescriptutil.IsClassImplementsOrInterfaceExtends(node) {
-				return
-			}
-			expr := node.AsExpressionWithTypeArguments()
-			if expr == nil {
-				return
-			}
-			checkBannedTypes(expr.Expression, "")
-			if expr.TypeArguments != nil {
 				checkBannedTypes(node, "")
 			}
 		}

@@ -1,9 +1,9 @@
 package no_array_constructor
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -17,10 +17,10 @@ func useLiteralMessage() rule.RuleMessage {
 func sourceMayUseArrayConstructor(sourceFile *ast.SourceFile) bool {
 	// Parsed identifier names are normalized, including Unicode escapes. Stay
 	// conservative for direct callers that do not provide parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["Array"]
+	ok := sourceFile.HasIdentifier("Array")
 	return ok
 }
 

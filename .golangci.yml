@@ -116,7 +116,7 @@ linters:
             - 'unicode/utf16'
           deny:
             - pkg: 'unicode'
-              desc: 'A character a rule reads is read the way JavaScript reads it, not the way Go does. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript" for case and whitespace, "github.com/web-infra-dev/rslint/internal/utils/unicode17" for a general category, and "github.com/microsoft/typescript-go/shim/scanner" for an identifier.'
+              desc: 'A character a rule reads is read the way JavaScript reads it, not the way Go does. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript" for case and whitespace, "github.com/web-infra-dev/rslint/internal/utils/unicode17" for a general category, and "github.com/microsoft/TypeScript/tsc/shim/scanner" for an identifier.'
             - pkg: 'github.com/dlclark/regexp2'
               desc: 'A pattern a rule is handed was written as a JavaScript regexp. Use "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp" instead.'
             - pkg: 'github.com/bmatcuk/doublestar'

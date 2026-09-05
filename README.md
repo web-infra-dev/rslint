@@ -75,7 +75,7 @@ Rslint has been inspired by several outstanding projects in the community:
 - The [typescript-eslint](https://github.com/typescript-eslint) team - Rslint's configuration design and test cases have been significantly influenced by and adapted from typescript-eslint's excellent implementation.
 - The [ESLint](https://github.com/eslint/eslint) team - Rslint builds upon the foundational work of ESLint, the pioneering JavaScript linter that established the standards and patterns for static code analysis in the JavaScript ecosystem.
 - The [Rust Clippy](https://github.com/rust-lang/rust-clippy) team - Rslint draws inspiration from Clippy's approach to compiler-integrated linting, bringing similar TypeScript-native analysis to the JavaScript ecosystem.
-- The [typescript-go](https://github.com/microsoft/typescript-go) project - Powers Rslint's high-performance TypeScript parsing and semantic analysis capabilities.
+- The [TypeScript](https://github.com/microsoft/TypeScript) project - Powers Rslint's high-performance TypeScript parsing and semantic analysis capabilities through its Go compiler.
 
 ## 📖 License
 

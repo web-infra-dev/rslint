@@ -3,7 +3,7 @@ package test_framework
 import (
 	"slices"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // FnKind classifies a parsed test-framework call without encoding one

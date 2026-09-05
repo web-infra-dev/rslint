@@ -3,10 +3,10 @@ package no_async_promise_executor
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/binder"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -21,10 +21,10 @@ func sourceMayUsePromise(sourceFile *ast.SourceFile) bool {
 	// async executor also spells the contextual keyword contiguously; matches in
 	// comments and strings are harmless false positives. Stay conservative for
 	// direct callers that do not provide parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["Promise"]
+	ok := sourceFile.HasIdentifier("Promise")
 	return ok && strings.Contains(sourceFile.Text(), "async")
 }
 

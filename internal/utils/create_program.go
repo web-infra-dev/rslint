@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/microsoft/typescript-go/shim/tsoptions"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // SyntacticError carries structured diagnostics for syntax errors.
@@ -29,7 +29,7 @@ func (e *SyntacticError) Error() string {
 
 func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
-	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, nil, nil)
+	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, nil, nil, nil)
 }
 
 func configNotFoundError(resolvedConfigPath string) error {
@@ -75,7 +75,7 @@ func CreateProgramLenient(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPa
 // CreateProgramFromOptions creates a program from in-memory compiler options and root file names,
 // without requiring a tsconfig file on disk.
 func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compiler.CompilerHost) (*compiler.Program, error) {
-	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, tspath.ComparePathsOptions{
+	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, nil, tspath.ComparePathsOptions{
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 		CurrentDirectory:          host.GetCurrentDirectory(),
 	})
@@ -87,7 +87,7 @@ func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.Compile
 // CreateProgramFromOptions but leaves syntax-diagnostic admission to its
 // caller.
 func CreateProgramFromOptionsLenient(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compiler.CompilerHost) (*compiler.Program, error) {
-	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, tspath.ComparePathsOptions{
+	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, nil, tspath.ComparePathsOptions{
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 		CurrentDirectory:          host.GetCurrentDirectory(),
 	})

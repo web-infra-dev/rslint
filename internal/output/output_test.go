@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 func newTestReport(diagnostics []Diagnostic, summary Summary) Report {

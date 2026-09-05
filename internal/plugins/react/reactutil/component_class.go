@@ -1,8 +1,8 @@
 package reactutil
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
 // IsCreateClassCall reports whether the given CallExpression's callee is

@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	no_await_in_promise_methods "github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"

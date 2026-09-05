@@ -6,7 +6,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 )
 
 // applyDocumentChanges applies LSP content changes in order. Partial ranges are

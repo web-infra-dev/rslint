@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	// cspell:ignore jestutils rslintutils
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestutils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintutils "github.com/web-infra-dev/rslint/internal/utils"

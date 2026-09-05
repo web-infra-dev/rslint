@@ -1,12 +1,13 @@
-module github.com/microsoft/typescript-go/shim/api
+module github.com/microsoft/TypeScript/tsc/shim/api
 
 go 1.26
 
-require github.com/microsoft/typescript-go v0.0.0-20260721214542-01cbcdd8643c
+require github.com/microsoft/TypeScript/tsc v0.0.0-20260904213532-1f70213d4922
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68 // indirect
+	github.com/klauspost/compress v1.19.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/mackerelio/go-osstat v0.2.7 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect

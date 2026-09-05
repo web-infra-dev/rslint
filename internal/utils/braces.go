@@ -1,6 +1,6 @@
 package utils
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // IsLexicalDeclaration mirrors ESLint astUtils.isLexicalDeclaration: true for
 // let/const/using/await-using variable declarations and function/class

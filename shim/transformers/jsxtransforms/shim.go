@@ -3,14 +3,14 @@
 
 package jsxtransforms
 
-import "github.com/microsoft/typescript-go/internal/transformers"
-import "github.com/microsoft/typescript-go/internal/transformers/jsxtransforms"
+import "github.com/microsoft/TypeScript/tsc/internal/transformers"
+import "github.com/microsoft/TypeScript/tsc/internal/transformers/jsxtransforms"
 import _ "unsafe"
 
 type JSXTransformer = jsxtransforms.JSXTransformer
-//go:linkname NewJSXTransformer github.com/microsoft/typescript-go/internal/transformers/jsxtransforms.NewJSXTransformer
+//go:linkname NewJSXTransformer github.com/microsoft/TypeScript/tsc/internal/transformers/jsxtransforms.NewJSXTransformer
 func NewJSXTransformer(opts *transformers.TransformOptions) *transformers.Transformer
-//go:linkname DecodeEntities github.com/microsoft/typescript-go/internal/transformers/jsxtransforms.decodeEntities
+//go:linkname DecodeEntities github.com/microsoft/TypeScript/tsc/internal/transformers/jsxtransforms.decodeEntities
 func DecodeEntities(text string) string
-//go:linkname DecodeEntity github.com/microsoft/typescript-go/internal/transformers/jsxtransforms.decodeEntity
+//go:linkname DecodeEntity github.com/microsoft/TypeScript/tsc/internal/transformers/jsxtransforms.decodeEntity
 func DecodeEntity(entity string) (rune, bool)

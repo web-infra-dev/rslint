@@ -3,7 +3,7 @@ package reactutil
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // PropWrapperEntry encodes one entry of `settings.propWrapperFunctions`. The

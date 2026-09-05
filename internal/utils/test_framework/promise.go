@@ -1,6 +1,6 @@
 package test_framework
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // IsPromiseChainCall reports promise-chain method calls: the callee is a
 // member access of then / catch / finally with a statically known name, and

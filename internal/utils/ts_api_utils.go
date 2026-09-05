@@ -4,10 +4,10 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
 func UnionTypeParts(t *checker.Type) []*checker.Type {
@@ -226,7 +226,7 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
 }
 
-// getChildrenFromNonJSDocNode from github.com/microsoft/typescript-go/internal/ls/utilities.go
+// getChildrenFromNonJSDocNode from github.com/microsoft/TypeScript/tsc/internal/ls/utilities.go
 func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
 	var childNodes []*ast.Node
 	node.ForEachChild(func(child *ast.Node) bool {

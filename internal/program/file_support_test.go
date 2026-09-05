@@ -3,7 +3,7 @@ package program
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 func TestCompilerOptionsSupportFileName(t *testing.T) {

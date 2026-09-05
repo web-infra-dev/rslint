@@ -445,7 +445,7 @@ var MyCoreRule = rule.Rule{
 
 ### Common TypeChecker Methods
 
-See `typescript-go/_packages/api/src/api.ts` for full API:
+See `typescript-go/packages/typescript/src/api/sync/api.ts` for the JS API and `shim/checker/shim.go` for the Go methods available to rules:
 
 | Method                            | Description             |
 | --------------------------------- | ----------------------- |
@@ -834,7 +834,7 @@ When implementing auto-fixes that need to locate specific tokens (parentheses, b
 When you just need to find the start position of the next token (skipping whitespace and comments), use `scanner.SkipTrivia`:
 
 ```go
-import "github.com/microsoft/typescript-go/shim/scanner"
+import "github.com/microsoft/TypeScript/tsc/shim/scanner"
 
 // Skip whitespace, line/block comments, BOM, shebang, and conflict markers
 sourceText := ctx.SourceFile.Text()
@@ -846,7 +846,7 @@ This is simpler and more efficient than creating a full scanner when you only ne
 ### Full Scanner — Token-by-Token Scanning
 
 ```go
-import "github.com/microsoft/typescript-go/shim/scanner"
+import "github.com/microsoft/TypeScript/tsc/shim/scanner"
 
 // Create scanner starting from a position
 s := scanner.GetScannerForSourceFile(ctx.SourceFile, startPos)

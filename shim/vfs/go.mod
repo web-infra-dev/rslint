@@ -1,5 +1,5 @@
-module github.com/microsoft/typescript-go/shim/vfs
+module github.com/microsoft/TypeScript/tsc/shim/vfs
 
 go 1.26
 
-require github.com/microsoft/typescript-go v0.0.0-20260721214542-01cbcdd8643c
+require github.com/microsoft/TypeScript/tsc v0.0.0-20260904213532-1f70213d4922

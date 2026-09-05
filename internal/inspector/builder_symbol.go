@@ -1,7 +1,7 @@
 package inspector
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // BuildShallowSymbolInfo builds minimal SymbolInfo for nested symbols
