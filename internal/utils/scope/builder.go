@@ -644,7 +644,7 @@ func (b *builder) visitConditionalType(node *ast.Node, outer *Scope) {
 	condScope := b.push(KindType, node, outer)
 	collectInferTypes(cond.ExtendsType, condScope)
 	if cond.CheckType != nil {
-		b.visitExpression(cond.CheckType, outer)
+		b.visitExpression(cond.CheckType, condScope)
 	}
 	if cond.ExtendsType != nil {
 		b.visitExpression(cond.ExtendsType, condScope)
@@ -945,8 +945,13 @@ func (b *builder) visitClass(node *ast.Node, outer *Scope, isExpression bool) {
 }
 
 func (b *builder) visitTypeDecl(node *ast.Node, outer *Scope) {
-	typeScope := b.push(KindType, node, outer)
-	b.addTypeParameters(node, typeScope)
+	// typescript-eslint only introduces a type scope for generic declarations.
+	// Without type parameters, references in the type belong to the outer scope.
+	typeScope := outer
+	if len(node.TypeParameters()) > 0 {
+		typeScope = b.push(KindType, node, outer)
+		b.addTypeParameters(node, typeScope)
+	}
 	// Recurse into type body / heritage / members to discover FunctionType
 	// and similar type-level scopes.
 	node.ForEachChild(func(child *ast.Node) bool {

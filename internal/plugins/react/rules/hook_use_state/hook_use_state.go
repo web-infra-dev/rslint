@@ -2,6 +2,7 @@ package hook_use_state
 
 import (
 	_ "embed"
+	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -38,7 +39,6 @@ func suggestMemoMessage() rule.RuleMessage {
 // hook-use-state uses for its suggestions and call recognition.
 type importInfo struct {
 	defaultName       string
-	defaultSpecifier  *ast.Node
 	useStateSpecifier *ast.Node
 	useMemoSpecifier  *ast.Node
 	useMemoName       string
@@ -84,7 +84,6 @@ func reactImportInfo(node *ast.Node) importInfo {
 	clause := decl.ImportClause.AsImportClause()
 	if clause.Name() != nil && clause.Name().Kind == ast.KindIdentifier {
 		info.defaultName = clause.Name().AsIdentifier().Text
-		info.defaultSpecifier = clause.Name()
 	}
 	if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
 		return info
@@ -131,12 +130,7 @@ func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
-	// Components#isReactHookCall requires the local hook spelling to match
-	// /^use[A-Z]/, even when it is imported under another name.
 	name := ident.AsIdentifier().Text
-	if len(name) < 4 || name[:3] != "use" || name[3] < 'A' || name[3] > 'Z' {
-		return false
-	}
 	reference := firstReactHookReference(referenceScopes, imports, ident)
 	if reference == nil {
 		return false
@@ -146,9 +140,19 @@ func resolvesToNamedUseState(referenceScopes map[*ast.Node]*scope.Scope, imports
 			return false
 		}
 	}
-	// Components#isReactHookCall falls back to the local spelling when the
-	// first hook-shaped reference is not mapped to a different imported name.
-	return imports.namedHookNames[name] == "" || imports.namedHookNames[name] == "useState"
+	return true
+}
+
+// Components applies the same local-to-imported mapping to bare callees and
+// member properties. Its prefix excludes digits, unlike reactutil.IsHookName.
+func isUseStateHookName(imports importInfo, name string) bool {
+	if len(name) < 4 || name[:3] != "use" || name[3] < 'A' || name[3] > 'Z' {
+		return false
+	}
+	if imported := imports.namedHookNames[name]; imported != "" {
+		name = imported
+	}
+	return name == "useState"
 }
 
 func firstReference(referenceScopes map[*ast.Node]*scope.Scope, ident *ast.Node, name string) *scope.Reference {
@@ -168,59 +172,57 @@ func firstReference(referenceScopes map[*ast.Node]*scope.Scope, ident *ast.Node,
 }
 
 func resolvesToDefaultReactImport(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, ident *ast.Node) bool {
-	if imports.defaultName == "" || imports.defaultSpecifier == nil {
+	if imports.defaultName == "" {
 		return false
 	}
 	reference := firstReference(referenceScopes, ident, imports.defaultName)
-	if reference == nil {
+	if reference == nil || len(reference.Declarations) == 0 {
 		return false
 	}
-	matchedImport := false
+	// Components checks the definition kind, even when a nested import
+	// binds the same spelling to a different module.
 	for _, declaration := range reference.Declarations {
 		if declaration == nil || declaration.Kind != scope.DefImport {
 			return false
 		}
-		if declaration.ID == imports.defaultSpecifier {
-			matchedImport = true
-		}
 	}
-	return matchedImport
+	return true
 }
 
 // isReactUseStateCall ports Components#isReactHookCall(node, ["useState"]).
-// Parentheses are transparent because ESTree drops them; TS assertion wrappers
-// deliberately are not, matching the upstream parser's explicit TS nodes.
-func isReactUseStateCall(referenceScopes map[*ast.Node]*scope.Scope, imports importInfo, node *ast.Node) bool {
+// Source parentheses and JSDoc casts are transparent; authored TypeScript
+// assertions remain explicit nodes in the upstream parser.
+func isReactUseStateCall(getReferenceScopes func() map[*ast.Node]*scope.Scope, imports importInfo, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
-	rawCallee := node.AsCallExpression().Expression
-	callee := ast.SkipParentheses(rawCallee)
+	callee := utils.ESTreeCallCallee(node.AsCallExpression().Expression)
 	if callee == nil {
 		return false
 	}
-	// A direct optional member call is still a MemberExpression to ESTree,
-	// while parentheses around the optional member make the callee a
-	// ChainExpression and prevent the upstream hook matcher from recognizing it.
-	if ast.IsOptionalChain(callee) && rawCallee != callee {
-		return false
-	}
 	if callee.Kind == ast.KindIdentifier {
-		return resolvesToNamedUseState(referenceScopes, imports, callee)
+		return len(imports.namedHookNames) > 0 && isUseStateHookName(imports, callee.Text()) &&
+			resolvesToNamedUseState(getReferenceScopes(), imports, callee)
 	}
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	if !ast.IsAccessExpression(callee) {
 		return false
 	}
-	access := callee.AsPropertyAccessExpression()
-	name := access.Name()
-	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "useState" {
+	var name *ast.Node
+	if ast.IsPropertyAccessExpression(callee) {
+		name = callee.Name()
+	} else {
+		// ESTree also accepts a computed Identifier property, but not a
+		// literal or a TS assertion around that identifier.
+		name = utils.ESTreeRuntimeExpression(callee.AsElementAccessExpression().ArgumentExpression)
+	}
+	if name == nil || name.Kind != ast.KindIdentifier || !isUseStateHookName(imports, name.Text()) {
 		return false
 	}
-	receiver := ast.SkipParentheses(access.Expression)
+	receiver := utils.ESTreeRuntimeExpression(utils.AccessExpressionObject(callee))
 	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.AsIdentifier().Text != imports.defaultName {
 		return false
 	}
-	return resolvesToDefaultReactImport(referenceScopes, imports, receiver)
+	return resolvesToDefaultReactImport(getReferenceScopes(), imports, receiver)
 }
 
 func isDestructuringBinding(node *ast.Node) bool {
@@ -271,15 +273,6 @@ func expectedSetterNames(value string) []string {
 	return []string{"set" + upperFirst + suffix, "set" + upperAll + suffix}
 }
 
-func contains(values []string, value string) bool {
-	for _, candidate := range values {
-		if candidate == value {
-			return true
-		}
-	}
-	return false
-}
-
 // HookUseStateRule ensures that a React useState call is destructured into a
 // symmetric [value, setValue] pair.
 var HookUseStateRule = rule.Rule{
@@ -294,27 +287,39 @@ var HookUseStateRule = rule.Rule{
 		}
 
 		imports := importInfo{}
-		namedHookNames := make(map[string]struct{})
-		if ctx.SourceFile != nil && ctx.SourceFile.Statements != nil {
-			for _, statement := range ctx.SourceFile.Statements.Nodes {
-				info := reactImportInfo(statement)
-				if info.defaultName != "" {
-					namedHookNames[info.defaultName] = struct{}{}
-				}
-				for local := range info.namedHookNames {
-					namedHookNames[local] = struct{}{}
-				}
-			}
-		}
 		// The upstream hook matcher can fall back to a bare `useState` spelling
 		// after finding another hook-shaped React reference in the scope. Keep
 		// that otherwise-unimported reference available to the first-reference
 		// lookup without collecting every identifier in the file.
-		namedHookNames["useState"] = struct{}{}
-		manager := scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true, ReferenceNames: namedHookNames})
-		referenceScopes := make(map[*ast.Node]*scope.Scope, len(manager.References))
-		for _, reference := range manager.References {
-			referenceScopes[reference.Identifier] = reference.From
+		var referenceScopes map[*ast.Node]*scope.Scope
+		getReferenceScopes := func() map[*ast.Node]*scope.Scope {
+			if referenceScopes == nil {
+				referenceNames := map[string]struct{}{"useState": {}}
+				// Collect every import once, including nested and later imports,
+				// without making it visible to the hook matcher before its visit.
+				// This keeps interleaved imports/calls from rebuilding the analysis.
+				if ctx.SourceFile != nil {
+					utils.VisitDescendants(ctx.SourceFile.AsNode(), func(node *ast.Node) bool {
+						if node.Kind != ast.KindImportDeclaration {
+							return true
+						}
+						info := reactImportInfo(node)
+						if info.defaultName != "" {
+							referenceNames[info.defaultName] = struct{}{}
+						}
+						for local := range info.namedHookNames {
+							referenceNames[local] = struct{}{}
+						}
+						return false
+					})
+				}
+				manager := scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true, ReferenceNames: referenceNames})
+				referenceScopes = make(map[*ast.Node]*scope.Scope, len(manager.References))
+				for _, reference := range manager.References {
+					referenceScopes[reference.Identifier] = reference.From
+				}
+			}
+			return referenceScopes
 		}
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
@@ -327,7 +332,6 @@ var HookUseStateRule = rule.Rule{
 				}
 				if imports.defaultName == "" && info.defaultName != "" {
 					imports.defaultName = info.defaultName
-					imports.defaultSpecifier = info.defaultSpecifier
 				}
 				if imports.useStateSpecifier == nil && info.useStateSpecifier != nil {
 					imports.useStateSpecifier = info.useStateSpecifier
@@ -338,20 +342,17 @@ var HookUseStateRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if !isReactUseStateCall(referenceScopes, imports, node) {
+				if !isReactUseStateCall(getReferenceScopes, imports, node) {
 					return
 				}
 				// ESTree wraps an optional call in ChainExpression, so it is not
 				// directly initialized by the variable declarator upstream.
-				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+				callee := utils.ESTreeCallCallee(node.AsCallExpression().Expression)
 				if ast.IsOptionalChain(node) || ast.IsOptionalChain(callee) {
 					ctx.ReportNode(node, useStateErrorMessage())
 					return
 				}
-				parent := node.Parent
-				for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-					parent = parent.Parent
-				}
+				parent := utils.ESTreeParent(node)
 				if parent != nil && parent.Kind == ast.KindReturnStatement {
 					return
 				}
@@ -380,15 +381,21 @@ var HookUseStateRule = rule.Rule{
 				valueName := identifierBindingName(value)
 				setterName := identifierBindingName(setter)
 				expected := expectedSetterNames(valueName)
-				if value != nil && setter != nil && len(elements) == 2 && contains(expected, setterName) {
+				if value != nil && setter != nil && len(elements) == 2 && slices.Contains(expected, setterName) {
 					return
 				}
+				// TSESTree includes the declaration's type annotation in the
+				// ArrayPattern range used by both reports and suggestions.
+				patternRange := utils.TrimNodeTextRange(ctx.SourceFile, pattern)
+				if annotation := utils.ESTreeType(parent); annotation != nil {
+					patternRange = patternRange.WithEnd(annotation.End())
+				}
 				if onlyDestructuredValue {
-					ctx.ReportNode(pattern, destructuredStateErrorMessage())
+					ctx.ReportRange(patternRange, destructuredStateErrorMessage())
 					return
 				}
 
-				ctx.ReportNodeWithDeferredSuggestions(pattern, useStateErrorMessage(), func() []rule.RuleSuggestion {
+				ctx.ReportRangeWithDeferredSuggestions(patternRange, useStateErrorMessage(), func() []rule.RuleSuggestion {
 					suggestions := make([]rule.RuleSuggestion, 0, 2)
 					if isPresentBinding(value) && len(elements) == 1 && node.AsCallExpression().Arguments != nil && len(node.AsCallExpression().Arguments.Nodes) == 1 {
 						argument := node.AsCallExpression().Arguments.Nodes[0]
@@ -417,8 +424,8 @@ var HookUseStateRule = rule.Rule{
 							fixes = append(fixes, *importFix)
 						}
 						fixes = append(fixes,
-							rule.RuleFixReplace(ctx.SourceFile, pattern, memoValueName),
-							rule.RuleFixReplace(ctx.SourceFile, node, memoName+"(() => "+utils.TrimmedNodeText(ctx.SourceFile, ast.SkipParentheses(argument))+
+							rule.RuleFixReplaceRange(patternRange, memoValueName),
+							rule.RuleFixReplace(ctx.SourceFile, node, memoName+"(() => "+utils.TrimmedNodeText(ctx.SourceFile, utils.ESTreeRuntimeExpression(argument))+
 								", [])"),
 						)
 						suggestions = append(suggestions, rule.RuleSuggestion{Message: suggestMemoMessage(), FixesArr: fixes})
@@ -426,7 +433,7 @@ var HookUseStateRule = rule.Rule{
 					if len(expected) > 0 {
 						suggestions = append(suggestions, rule.RuleSuggestion{
 							Message:  suggestPairMessage(),
-							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, pattern, "["+valueName+", "+expected[0]+"]")},
+							FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(patternRange, "["+valueName+", "+expected[0]+"]")},
 						})
 					}
 					return suggestions
