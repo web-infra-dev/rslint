@@ -238,3 +238,31 @@ func TestNamespaceExtras(t *testing.T) {
 		},
 	)
 }
+
+func TestNamespaceHeritage(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &namespace.NamespaceRule, []rule_tester.ValidTestCase{
+		{Code: `import * as names from './named-exports'; interface I extends names.a {}`},
+		{Code: `import * as names from './named-exports'; class C implements names.a {}`},
+		{Code: `import * as names from './named-exports'; type T = names.c;`},
+		{Code: `import * as names from './named-exports'; type T = typeof names.c;`},
+		{Code: `import * as names from './named-exports'; interface I extends Base<names.c> {}`},
+		{Code: `import * as names from './named-exports'; function f(names) { class C implements names.c {} return C; }`},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:   `import * as names from './named-exports'; interface I extends names.c {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: notFoundNamesC, Line: 1, Column: 69, EndLine: 1, EndColumn: 70}},
+		},
+		{
+			Code:   `import * as names from './named-exports'; class C implements names.c {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: notFoundNamesC, Line: 1, Column: 68, EndLine: 1, EndColumn: 69}},
+		},
+		{
+			Code:   `import * as names from './named-exports'; class C extends names.c {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: notFoundNamesC, Line: 1, Column: 65, EndLine: 1, EndColumn: 66}},
+		},
+		{
+			Code:   `import * as names from './named-exports'; interface I extends names.c.d {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: notFoundNamesC, Line: 1, Column: 69, EndLine: 1, EndColumn: 70}},
+		},
+	})
+}

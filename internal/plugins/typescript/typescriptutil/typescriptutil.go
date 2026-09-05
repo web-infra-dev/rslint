@@ -128,18 +128,17 @@ func hasTypeOrInterfaceInStatements(statements []*ast.Node, name string) bool {
 	return false
 }
 
-// IsClassImplementsOrInterfaceExtends reports whether the given
-// `ExpressionWithTypeArguments` sits in a heritage position the
-// typescript-eslint rules listen to as `TSClassImplements` or
+// IsClassImplementsOrInterfaceExtends reports whether the given node sits in a
+// heritage position typescript-eslint rules listen to as `TSClassImplements` or
 // `TSInterfaceHeritage`:
 //
 //   - `class X implements ...`
 //   - `interface X extends ...`
 //
 // `class X extends ...` is intentionally excluded: upstream does not register
-// a listener for it. Non-heritage uses of `ExpressionWithTypeArguments` (e.g.
-// JSDoc-style type contexts) are also rejected because upstream's listener
-// set never matches them.
+// a listener for it. The compiler represents a valid type heritage target as
+// TypeReference; malformed targets may remain ExpressionWithTypeArguments.
+// Ordinary type references, including heritage type arguments, are excluded.
 func IsClassImplementsOrInterfaceExtends(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil || !ast.IsHeritageClause(parent) {

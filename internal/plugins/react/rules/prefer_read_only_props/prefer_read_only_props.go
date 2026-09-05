@@ -594,6 +594,10 @@ func validateTypeNode(node *ast.Node, aliases map[string][]*ast.Node, genericImp
 					continue
 				}
 				for _, item := range heritage.Types.Nodes {
+					if item.Kind != ast.KindTypeReference {
+						// Recovery trees can retain an expression-shaped target.
+						continue
+					}
 					extends := item.AsTypeReferenceNode()
 					if extends == nil || extends.TypeName == nil {
 						continue

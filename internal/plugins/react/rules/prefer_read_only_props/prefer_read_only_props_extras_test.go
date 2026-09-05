@@ -503,3 +503,20 @@ func runSourceOnlyPreferReadOnlyProps(t *testing.T, code string) []rule.RuleDiag
 	}
 	return diagnostics
 }
+
+func TestPreferReadOnlyPropsRecoveryHeritage(t *testing.T) {
+	// Invalid type heritage remains ExpressionWithTypeArguments in the
+	// compiler's recovery tree. Keep checking the interface's own properties.
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferReadOnlyPropsRule, []rule_tester.ValidTestCase{
+		{Code: `interface Props extends Base() { readonly value: string } function Component(props: Props) { return <div>{props.value}</div>; }`, Tsx: true},
+		{Code: `interface Props extends (Base) { readonly value: string } function Component(props: Props) { return <div>{props.value}</div>; }`, Tsx: true},
+		{Code: `interface Props extends Base['Type'] { readonly value: string } function Component(props: Props) { return <div>{props.value}</div>; }`, Tsx: true},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:   `interface Props extends Base() { value: string } function Component(props: Props) { return <div>{props.value}</div>; }`,
+			Tsx:    true,
+			Output: []string{`interface Props extends Base() { readonly value: string } function Component(props: Props) { return <div>{props.value}</div>; }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "readOnlyProp"}},
+		},
+	})
+}

@@ -1,6 +1,7 @@
 package array_type
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -603,4 +604,32 @@ type ReadonlySimple = readonly Value[];`,
 			}
 		})
 	}
+}
+
+func TestArrayTypeHeritage(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	for _, declaration := range []string{"interface I extends", "class C implements", "class C extends"} {
+		for _, target := range []string{"Array<string>", "ReadonlyArray<string>", "Readonly<string[]>"} {
+			for _, options := range []any{nil, map[string]any{"default": "array-simple"}, map[string]any{"default": "generic", "readonly": "array"}} {
+				// Under generic style the nested string[] still needs a fix.
+				if target == "Readonly<string[]>" && options != nil {
+					if options.(map[string]any)["default"] == "generic" {
+						continue
+					}
+				}
+				valid = append(valid, rule_tester.ValidTestCase{Code: fmt.Sprintf("%s %s {}", declaration, target), Options: options})
+			}
+		}
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, declaration := range []string{"interface I extends", "class C implements", "class C extends"} {
+		for _, target := range []string{"Base", "Array"} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:   fmt.Sprintf("%s %s<Array<string>> {}", declaration, target),
+				Output: []string{fmt.Sprintf("%s %s<string[]> {}", declaration, target)},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "errorStringArray"}},
+			})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ArrayTypeRule, valid, invalid)
 }
