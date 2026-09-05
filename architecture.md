@@ -835,8 +835,25 @@ Automatic discovery uses these rules:
 
 The transport and target phase differ by surface:
 
-- CLI sends `loadConfigs` / `activateConfigs` as reverse framed-IPC requests
-  during initialization. The resulting catalog and the later Go lint-target
+- CLI sends `loadConfigs` and the CLI-only `prepareConfigs` as reverse
+  framed-IPC requests during initialization. After final effective-ID selection
+  and the first fingerprint check, Node starts the existing plugin-host build
+  and returns provisional plugin metadata. Go may use that metadata for
+  read-only target planning and Program construction. Before `RunPipeline`,
+  `activateConfigs` joins the same activation, including its second fingerprint
+  check and host publication. The CLI adapter validates that the completed
+  metadata matches the prepared metadata. This barrier also runs with zero
+  targets, disabled plugin rules, or `--type-check-only`; earlier command
+  failures join the pending activation before returning. Initialization errors
+  remain fatal and can now appear through the ordinary aborted-run output
+  after the interactive start line, before any diagnostics or fixes execute.
+  Native-only configurations return fully verified metadata without a worker
+  or a second request; `--singleThreaded` retains synchronous activation.
+  The engine owns one activation per invocation: identical requests share its
+  completion, conflicting selections fail, and shutdown prevents late host
+  publication while draining owned builds with the existing initialization
+  timeout. API and LSP activation/commit behavior is unchanged.
+  The resulting catalog and the later Go lint-target
   walker are separate traversals, but the staged catalog already freezes the
   Git sources observed on its reachable frontier. There is no second per-owner
   directory sweep. Automatic literal scopes and explicit file-only invocations
