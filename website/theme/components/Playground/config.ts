@@ -4,27 +4,20 @@ const CORE_IMPORT = /from ['"]@rslint\/core['"]/g;
 
 /**
  * A config is arbitrary JavaScript, and a playground link carries it, so the
- * page must never be the thing that runs it. It executes inside a sandboxed
- * iframe instead: without `allow-same-origin` the frame gets an opaque origin,
- * which puts this document's DOM, storage, caches and credentialed same-origin
- * requests out of its reach. It talks to us only through `postMessage`.
+ * page must never be the thing that runs it. It executes in a dedicated worker
+ * inside a sandboxed iframe: without `allow-same-origin` the frame gets an
+ * opaque origin, which puts this document's DOM, storage, caches and
+ * credentialed same-origin requests out of its reach. It talks to us only
+ * through `postMessage`.
  */
 const SANDBOX_ATTRIBUTE = 'allow-scripts';
 
 /**
- * The opaque origin keeps a config away from this page's data; this keeps it
- * from phoning home. Without it a config could still reach an attacker's server
- * — `fetch`, an image beacon, `sendBeacon`, a dynamic import — and a link that
- * looks like it points at the docs would quietly hand over the reader's address
- * the moment they opened it.
- *
- * Package CDNs stay reachable because a config is meant to import from one, and
- * allowing them costs nothing here: an attacker cannot read jsDelivr's logs, so
- * a request smuggled into a CDN URL tells them nothing about who made it.
- *
- * `'unsafe-inline'` is not a concession. Every script in this frame is the
- * config the reader is asking to run; the policy exists to bound where that
- * script can reach, not to keep it out.
+ * The Blob worker inherits this policy, which restricts its network access to
+ * the package CDNs. A worker has no DOM and cannot navigate its own location:
+ * running the config in the iframe itself would let it bypass this policy by
+ * navigating the frame to an arbitrary URL. Only the trusted bridge below runs
+ * in the iframe; config source is passed straight to the worker.
  */
 const MODULE_HOSTS = [
   'https://esm.sh',
@@ -35,31 +28,28 @@ const SANDBOX_POLICY = [
   "default-src 'none'",
   `script-src 'unsafe-inline' blob: ${MODULE_HOSTS}`,
   `connect-src ${MODULE_HOSTS}`,
+  'worker-src blob:',
 ].join('; ');
 
 /**
  * Generous, because the first evaluation of a session waits on `esm.sh` to
  * serve the core package — measured at 2.4s on a fast connection, and a reader
  * on a slow one should not be told their config failed. Nothing is lost by
- * waiting: a spinning frame cannot block this document, and a config that never
+ * waiting: a spinning worker cannot block this document, and a config that never
  * finishes never finishes at five seconds either.
  */
 const EVALUATION_TIMEOUT_MS = 20000;
 
 /**
- * Receives the config source, imports it as a module and hands back the default
- * export. The source travels as a message rather than inlined into this markup
- * so that a `</script` sequence in the config cannot break out of it.
+ * Receives the config source in a worker, imports it as a module and hands back
+ * the default export. Source is sent as a message, never inlined into markup.
  *
  * The result is serialized here because that is what the lint service does with
  * it anyway: anything that cannot survive JSON would not have reached the
  * linter under the old in-page evaluation either.
- *
- * The closing tag is written as `\u002F` so that the literal characters never
- * appear in a bundle that something might one day inline into a page.
  */
-const SANDBOX_MARKUP = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${SANDBOX_POLICY}"><script type="module">
-const post = (message) => parent.postMessage(message, '*');
+const SANDBOX_WORKER = `
+const post = (message) => self.postMessage(message);
 addEventListener('error', (event) => post({ error: String(event.message) }));
 addEventListener('unhandledrejection', (event) => post({ error: String(event.reason) }));
 addEventListener('message', async (event) => {
@@ -71,6 +61,27 @@ addEventListener('message', async (event) => {
     post({ error: String(error) });
   } finally {
     URL.revokeObjectURL(url);
+  }
+});`;
+
+// The closing tag is escaped so it cannot close an inlined application bundle.
+const SANDBOX_MARKUP = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${SANDBOX_POLICY}"><script type="module">
+const post = (message) => parent.postMessage(message, '*');
+addEventListener('error', (event) => post({ error: String(event.message) }));
+const url = URL.createObjectURL(new Blob([${JSON.stringify(SANDBOX_WORKER)}], { type: 'text/javascript' }));
+// A classic bootstrap can load its Blob URL from an opaque origin. It still
+// imports the user config as an ES module.
+const worker = new Worker(url);
+worker.addEventListener('error', (event) => post({ error: event.message || 'Unable to start the config worker.' }));
+worker.addEventListener('message', ({ data }) => {
+  if (typeof data?.config !== 'string' && typeof data?.error !== 'string') return;
+  worker.terminate();
+  URL.revokeObjectURL(url);
+  post(typeof data.config === 'string' ? { config: data.config } : { error: data.error });
+});
+addEventListener('message', (event) => {
+  if (event.source === parent && typeof event.data === 'string') {
+    worker.postMessage(event.data);
   }
 });
 post({ ready: true });
