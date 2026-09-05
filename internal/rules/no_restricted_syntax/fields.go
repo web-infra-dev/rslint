@@ -220,6 +220,9 @@ func nodesAtField(parent *ast.Node, field string) []*ast.Node {
 			}
 		}
 	case "params":
+		if !isFunctionLikeForParams(parent) {
+			return nil
+		}
 		params := utils.ESTreeParameters(parent)
 		if params == nil {
 			return nil
@@ -279,6 +282,8 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		add(statements(parent.AsSourceFile().Statements))
 	case ast.KindBlock:
 		add(statements(parent.AsBlock().Statements))
+	case ast.KindClassStaticBlockDeclaration:
+		add(statements(parent.AsClassStaticBlockDeclaration().Body.AsBlock().Statements))
 	case ast.KindArrayLiteralExpression:
 		add(statements(parent.AsArrayLiteralExpression().Elements))
 	case ast.KindObjectLiteralExpression:
@@ -303,6 +308,15 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		add(statements(parent.AsCaseBlock().Clauses))
 	case ast.KindVariableDeclarationList:
 		add(statements(parent.AsVariableDeclarationList().Declarations))
+	case ast.KindJsxElement:
+		add(statements(parent.AsJsxElement().Children))
+	case ast.KindJsxFragment:
+		add(statements(parent.AsJsxFragment().Children))
+	case ast.KindJsxOpeningElement:
+		add(statements(parent.AsJsxOpeningElement().Attributes.AsJsxAttributes().Properties))
+	case ast.KindJsxSelfClosingElement:
+		add(statements(parent.AsJsxSelfClosingElement().Attributes.AsJsxAttributes().Properties))
+
 	case ast.KindImportDeclaration:
 		if attributes := parent.AsImportDeclaration().Attributes; attributes != nil {
 			add(statements(attributes.AsImportAttributes().Attributes))
@@ -311,6 +325,15 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		if attributes := parent.AsExportDeclaration().Attributes; attributes != nil {
 			add(statements(attributes.AsImportAttributes().Attributes))
 		}
+	}
+	if modifiers := parent.Modifiers(); modifiers != nil {
+		var decorators []*ast.Node
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindDecorator {
+				decorators = append(decorators, modifier)
+			}
+		}
+		add(decorators)
 	}
 	if isFunctionLikeForParams(parent) {
 		if params := utils.ESTreeParameters(parent); len(params) > 0 {

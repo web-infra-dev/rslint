@@ -66,7 +66,7 @@ The rule accepts an array of restriction entries. Each entry is either:
 ### Supported selector forms
 
 The implementation follows the esquery 1.7 selector forms used by ESLint
-10.9.1, including the complete upstream `no-restricted-syntax` test suite.
+10.10.0, including the complete upstream `no-restricted-syntax` test suite.
 Malformed selectors are a deliberate compatibility divergence: rslint drops
 the malformed entry so one bad selector does not disable the rest of the
 configuration, while ESLint rejects the whole rule configuration:
@@ -74,8 +74,9 @@ configuration, while ESLint rejects the whole rule configuration:
 - ESTree node names (e.g. `Identifier`, `FunctionDeclaration`,
   `BinaryExpression`) and supported TS-ESTree names such as
   `TSEnumDeclaration`. ESTree-only wrapper shapes such as `ClassBody`,
-  `JSXEmptyExpression`, and `MethodDefinition.value` are exposed as virtual
-  facades over the tsgo AST.
+  `JSXEmptyExpression`, `ChainExpression`, and `MethodDefinition.value` are
+  exposed as virtual facades over the tsgo AST. Bodyless class methods expose
+  `TSEmptyBodyFunctionExpression` as their value.
 - Wildcard `*`.
 - Field selectors, including nested fields (e.g. `Literal.key` and
   `.body.declarations.init`).
@@ -83,9 +84,10 @@ configuration, while ESLint rejects the whole rule configuration:
   (`[name="x"]`, `[kind='using']`), inequality (`!=`), numeric comparisons
   (`[params.length>2]`), numeric path segments (`[arguments.0.type='Literal']`),
   `type(...)`, and regex matching (`[regex.flags=/i/]`). Attribute paths may
-  inspect ESLint's `parent` link. BigInt metadata and class-method function
-  fields are available through selectors such as `Literal[bigint]` and
-  `MethodDefinition[value.body.body.length=0]`.
+  inspect ESLint's `parent` link. BigInt values retain their JavaScript type:
+  `Literal[value=type(bigint)]` selects them, while a string regex equality
+  selector does not. Class-method function fields are available through
+  selectors such as `MethodDefinition[value.body.body.length=0]`.
 - Combinators `>` (direct child), descendant whitespace, `+`
   (adjacent sibling), `~` (general sibling), including decorator selectors
   such as `Decorator > CallExpression[callee.name='sealed']`.
@@ -100,13 +102,21 @@ configuration, while ESLint rejects the whole rule configuration:
 
 tsgo does not allocate separate nodes for every ESTree wrapper. Direct
 selectors and structural relationships for those wrappers are modeled, with
-ESLint-compatible ranges. A universe selector such as `*`, however, walks the
-physical tsgo tree and therefore does not emit an additional diagnostic for
-each virtual wrapper around the same physical node.
+ESLint-compatible ranges. The bare `*` selector retains the engine's physical
+tsgo traversal, which starts at the program's children and does not emit
+additional diagnostics for virtual wrappers. Other broad selectors evaluate
+each supported ESTree identity separately. `Program` and `Program:exit` can
+select the program itself.
+
+TS-ESTree coverage is limited to the supported node mappings; the rule does
+not materialize every TypeScript type annotation or type-parameter wrapper.
+Broad selectors on type-only syntax can therefore differ from the TypeScript
+ESLint parser. Runtime receiver attribute paths retain their existing behavior
+of looking through TypeScript assertions, such as `(console as any).log()`.
 
 ## Original Documentation
 
 - [ESLint: no-restricted-syntax](https://eslint.org/docs/latest/rules/no-restricted-syntax)
-- [Source code](https://github.com/eslint/eslint/blob/v10.9.1/lib/rules/no-restricted-syntax.js)
+- [Source code](https://github.com/eslint/eslint/blob/v10.10.0/lib/rules/no-restricted-syntax.js)
 
 [esquery]: https://github.com/estools/esquery
