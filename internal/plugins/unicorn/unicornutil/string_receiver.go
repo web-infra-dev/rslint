@@ -243,7 +243,7 @@ func classifyStringTypeReference(
 		case ast.KindInterfaceDeclaration:
 			return classifyStringInterface(ctx, declaration, visitedSymbols)
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return classifyStringClass(ctx, declaration, visitedSymbols)
+			return classifyStringClass(ctx, declaration, visitedSymbols, true)
 		}
 	}
 	return TypeUnknown
@@ -283,30 +283,20 @@ func classifyStringClass(
 	ctx rule.RuleContext,
 	node *ast.Node,
 	visitedSymbols map[*ast.Symbol]bool,
+	fromTypeReference bool,
 ) TypeClass {
-	heritageClauses := utils.GetHeritageClauses(node)
-	if heritageClauses == nil {
+	heritage := ast.GetClassExtendsHeritageElement(node)
+	if heritage == nil {
 		return TypeNonTarget
 	}
-	for _, clauseNode := range heritageClauses.Nodes {
-		clause := clauseNode.AsHeritageClause()
-		if clause == nil || clause.Token != ast.KindExtendsKeyword || clause.Types == nil || len(clause.Types.Nodes) == 0 {
-			continue
-		}
-		heritage := clause.Types.Nodes[0].AsExpressionWithTypeArguments()
-		if heritage == nil {
-			return TypeUnknown
-		}
-		// Upstream only enters class-reference resolution when the direct
-		// superclass is an identifier. Class expressions are handled only when
-		// reached through a const alias initializer.
-		superClass := ast.SkipParentheses(heritage.Expression)
-		if superClass == nil || !ast.IsIdentifier(superClass) {
-			return TypeUnknown
-		}
-		return classifyStringClassReference(ctx, superClass, visitedSymbols)
+	superClass := ast.SkipParentheses(heritage.AsExpressionWithTypeArguments().Expression)
+	// Unicorn's getClassHeritageType requires an identifier only when entering
+	// from a type reference. Its recursive getClassType also follows inline
+	// class expressions reached through a superclass or const initializer.
+	if superClass == nil || (fromTypeReference && !ast.IsIdentifier(superClass)) {
+		return TypeUnknown
 	}
-	return TypeNonTarget
+	return classifyStringClassReference(ctx, superClass, visitedSymbols)
 }
 
 func classifyStringClassReference(
@@ -319,7 +309,7 @@ func classifyStringClassReference(
 		return TypeUnknown
 	}
 	if node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression {
-		return classifyStringClass(ctx, node, visitedSymbols)
+		return classifyStringClass(ctx, node, visitedSymbols, false)
 	}
 	if !ast.IsIdentifier(node) || ctx.Refs == nil {
 		return TypeUnknown
@@ -328,30 +318,31 @@ func classifyStringClassReference(
 	symbol := ctx.Refs.ResolveInFileWithMeaning(
 		node, ast.SymbolFlagsValue|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
 	)
-	if symbol == nil || visitedSymbols[symbol] {
+	if symbol == nil || len(symbol.Declarations) == 0 || visitedSymbols[symbol] {
 		return TypeUnknown
 	}
 	visitedSymbols[symbol] = true
 	defer delete(visitedSymbols, symbol)
 
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil {
-			continue
+	// Match Unicorn's first definition, including merged type/value
+	// declarations. Skipping an earlier type declaration changes its answer.
+	declaration := symbol.Declarations[0]
+	if declaration == nil {
+		return TypeUnknown
+	}
+	switch declaration.Kind {
+	case ast.KindClassDeclaration, ast.KindClassExpression:
+		return classifyStringClass(ctx, declaration, visitedSymbols, false)
+	case ast.KindVariableDeclaration:
+		declarationList := declaration.Parent
+		variable := declaration.AsVariableDeclaration()
+		if declarationList == nil || !ast.IsVariableDeclarationList(declarationList) ||
+			ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) ||
+			declarationList.Flags&ast.NodeFlagsConst == 0 || variable.Name() == nil ||
+			!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
+			return TypeUnknown
 		}
-		switch declaration.Kind {
-		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return classifyStringClass(ctx, declaration, visitedSymbols)
-		case ast.KindVariableDeclaration:
-			declarationList := declaration.Parent
-			variable := declaration.AsVariableDeclaration()
-			if declarationList == nil || !ast.IsVariableDeclarationList(declarationList) ||
-				ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) ||
-				declarationList.Flags&ast.NodeFlagsConst == 0 || variable.Name() == nil ||
-				!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
-				return TypeUnknown
-			}
-			return classifyStringClassReference(ctx, variable.Initializer, visitedSymbols)
-		}
+		return classifyStringClassReference(ctx, variable.Initializer, visitedSymbols)
 	}
 	return TypeUnknown
 }
