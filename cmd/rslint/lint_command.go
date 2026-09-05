@@ -64,7 +64,20 @@ func resolveStartTime(startTimeMs int64) time.Time {
 // handleLintCommand handles one CLI invocation: it prepares command-owned
 // config/targets/Programs, delegates lint execution to linter.RunPipeline, and
 // projects the result to the selected output format.
-func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) int {
+func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) (exitCode int) {
+	completeActivation := args.CompleteConfigActivation
+	// Even a preflight/Program error must observe preparation failure and join
+	// the pending transaction. Cancellation is still owned by the IPC adapter.
+	defer func() {
+		if completeActivation != nil {
+			if err := completeActivation(); err != nil {
+				if ctx.Err() == nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				}
+				exitCode = 1
+			}
+		}
+	}()
 	// Unpack into locals so the command body below stays focused — only the
 	// flag-parse front matter lives in parseLintFlags.
 	init := args.Init
@@ -379,6 +392,17 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		programs = loadedPrograms.Programs
+	}
+
+	// Metadata was sufficient for planning, but execution requires the exact
+	// host validated by Node's post-prepare fingerprint check. Join even when
+	// there are no targets, no enabled plugin rules, or only type checking.
+	if completeActivation != nil {
+		complete := completeActivation
+		completeActivation = nil
+		if err := complete(); err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		}
 	}
 
 	// Only the default formatter consumes the completed-run summary. Freeze
