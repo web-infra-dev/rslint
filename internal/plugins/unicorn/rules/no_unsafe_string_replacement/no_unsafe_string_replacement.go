@@ -2,7 +2,6 @@ package no_unsafe_string_replacement
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -53,7 +52,7 @@ func checkCall(ctx rule.RuleContext, node *ast.Node) {
 	replacement := node.Arguments()[1]
 	if isAllowedReplacement(ctx, replacement) ||
 		isPlainObjectReplacement(ctx, replacement) ||
-		isKnownNonStringReceiver(ctx, call.Object) {
+		unicornutil.IsKnownNonStringType(ctx, call.Object) {
 		return
 	}
 
@@ -157,25 +156,4 @@ func isPlainObjectProperty(property *ast.Node) bool {
 		staticName, ok = utils.NormalizeBigIntLiteral(name.AsBigIntLiteral().Text), true
 	}
 	return ok && !objectCoercionPropertyNames[staticName]
-}
-
-// isKnownNonStringReceiver mirrors the type-information half of Unicorn's
-// createTypeCheckers. Unlike upstream there is no syntax-level fallback: the
-// rule declares RequiresTypeInfo, so a TypeChecker is always present.
-//
-// The rule reports unless the receiver is known not to be a string, so an
-// undecided type is a report. Every type the classifier cannot decide is
-// therefore a potential false positive, and types that are provably not
-// strings — numeric and bigint literals, tuples — must reach TypeNonTarget
-// even where Unicorn leaves them unknown and lets its syntax classifier
-// answer instead.
-func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
-	t := ctx.TypeChecker.GetTypeAtLocation(node)
-	return unicornutil.ClassifyType(ctx, t, unicornutil.TypeClassifierOptions{
-		HeritageSymbolFlags:          ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
-		NonTargetSymbolLessTypeFlags: checker.TypeFlagsObject,
-		IsTargetType: func(t *checker.Type) bool {
-			return utils.IsTypeFlagSet(t, checker.TypeFlagsStringLike)
-		},
-	}) == unicornutil.TypeNonTarget
 }

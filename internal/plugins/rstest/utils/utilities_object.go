@@ -41,14 +41,24 @@ func IsUtilitiesObject(ctx rule.RuleContext, receiver *ast.Node) bool {
 		return name == "rs" || name == "rstest"
 	}
 
-	// A namespace import or a whole-module require reaches the same object
-	// through one more member: `core.rs.fn()`.
+	// A namespace import, a whole-module require and `import.meta.rstest` all
+	// reach the same object through one more member: `core.rs.fn()`,
+	// `import.meta.rstest.rs.fn()`. The last one is the module namespace
+	// itself (packages/core/importMeta.d.ts types it as
+	// `typeof import('@rstest/core')`), so the utilities object is the `rs` or
+	// `rstest` on it rather than the property itself.
 	member, namespace := CalledPlainMember(receiver)
 	if member == nil || (member.Text() != "rs" && member.Text() != "rstest") {
 		return false
 	}
 	namespace = internalUtils.SkipAssertionsAndParens(namespace)
-	if namespace == nil || namespace.Kind != ast.KindIdentifier {
+	if namespace == nil {
+		return false
+	}
+	if isImportMetaRstest(namespace) {
+		return true
+	}
+	if namespace.Kind != ast.KindIdentifier {
 		return false
 	}
 	return testFramework.IsModuleNamespaceSymbolModules(

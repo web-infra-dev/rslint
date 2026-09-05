@@ -21,6 +21,8 @@ This document summarizes how to work on rslint effectively and consistently.
 
 ## Build, Test, and Development Commands
 
+These commands are reference entry points, not a checklist to run in full for every change. Use the scoped validation rules below to select the relevant commands.
+
 - Setup submodule: `git submodule update --init --depth 1`
 - Install Deps: `pnpm install`
 - Build JS/TS: `pnpm build`
@@ -37,6 +39,7 @@ This document summarizes how to work on rslint effectively and consistently.
 ## Coding Style & Naming Conventions
 
 - Go uses gofmt/goimports; keep functions focused and small.
+- For Go changes, run `pnpm run lint:go -- --new-from-merge-base=<base-branch>` (normally `origin/main`) so diagnostics are limited to code introduced by the current branch. Run an unfiltered repository-wide Go lint only for broad or cross-cutting changes, changes whose impact cannot be scoped reliably, or when explicitly requested by the user, CI, or a reviewer.
 - TS/JS/MD/CSS use Rstack CLI's formatter via `pnpm run format`.
 - Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
 - Prefer table-driven tests. Keep package-specific helpers beside their tests; put reusable test infrastructure in `internal/testutil`, not production utility packages.
@@ -51,11 +54,27 @@ This document summarizes how to work on rslint effectively and consistently.
 - Use `.txtar` only for portable regular text files. Construct symlinks, permissions, concurrency, and other OS behavior directly in Go tests.
 - Fixture helpers must reject missing or empty selections instead of allowing a test to pass without exercising a case.
 - Keep tests minimal and behavior-focused; avoid unrelated scenarios.
-- By default, run tests for the packages containing changed code. If a change affects shared behavior or an exported API, also run tests for its direct consumer packages.
-- Run the full `pnpm run test:go` (Go) and `pnpm run test` (JS) suites only for broad or cross-cutting changes, changes to shared test or build infrastructure, changes whose impact cannot be scoped reliably, or when explicitly requested by CI or a reviewer.
+- Run tests only for affected modules. Include direct consumers when shared behavior or exported APIs change; for cross-language boundaries, test both the changed producer and its directly affected consumers.
+
+| Changed area                        | Scoped test requirement                                                                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Go                                  | Run `go test` for changed packages.                                                                                                |
+| JavaScript/TypeScript               | Run affected pnpm workspace tests or specific test files.                                                                          |
+| Rust                                | Run `cargo test -p <crate>` for affected crates.                                                                                   |
+| Documentation or configuration only | No language test suite is required unless executable examples, generated content, build behavior, or runtime configuration change. |
+
+- Run repository-wide test suites only for broad or cross-cutting changes, shared test or build infrastructure changes, changes whose impact cannot be scoped reliably, or when explicitly requested by the user, CI, or a reviewer.
+- A passing test result remains valid until relevant code or configuration changes. Do not rerun tests solely because the commit step has started.
+
+## Pre-commit Checks
+
+- Before committing, ensure `pnpm run check-spell` and `pnpm run format:check` have passed after the final relevant edit.
+- Reuse results from the current task when no applicable files have changed since those checks passed; do not rerun them solely because the commit step has started.
 
 ## Commit & Pull Request Guidelines
 
+- For each user-requested code or documentation change, work on a dedicated branch whose name reflects the request. If currently on the default branch, create it before editing; reuse an appropriate existing task branch when already on one. Name new branches `<type>/<short-kebab-case-description>`, selecting the type from the requested work using Conventional Commit-style categories such as `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, or `perf`. Honor an explicit branch name from the user.
+- Do not create a branch for read-only investigation or status requests unless the user explicitly asks for one.
 - Use Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `ci:`, etc.
 - PRs should be small, with clear description, repro steps, and linked issues.
 - Include examples (commands or code) and update docs when behavior changes.

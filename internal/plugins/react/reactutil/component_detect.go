@@ -210,7 +210,8 @@ func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast
 // Only a restricted subset of upstream's heuristics is implemented — the
 // patterns covering production React code: named FunctionDeclaration,
 // FunctionExpression / ArrowFunction assigned to a capital-cased
-// VariableDeclarator, PropertyAssignment, or ExportAssignment (default export),
+// VariableDeclarator, PropertyAssignment, or ExportAssignment (`export
+// default` only — `export =` is not a component upstream),
 // plus function expression in a CallExpression (e.g. React.memo wrapper —
 // approximate match). This is intentionally conservative: missed detection
 // causes a rule miss, over-detection would cause false-positive reports in
@@ -427,7 +428,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	}
 
 	// Branch 1 — ExportDefault (strict isReturningJSX).
-	if parent.Kind == ast.KindExportAssignment {
+	if isExportDefaultAssignment(parent) {
 		return functionReturnsJSXInternal(fn, false, pragma, tc)
 	}
 
@@ -719,6 +720,19 @@ func functionReturnsOnlyNull(fn *ast.Node) bool {
 	return sawReturn && allNull
 }
 
+// isExportDefaultAssignment reports whether `node` is ESTree's
+// `ExportDefaultDeclaration`. tsgo represents both `export default <expr>`
+// and TypeScript's `export = <expr>` with a KindExportAssignment node and
+// tells them apart through `IsExportEquals`, while typescript-eslint keeps
+// them as distinct node types — `ExportDefaultDeclaration` versus
+// `TSExportAssignment`. eslint-plugin-react's component detection only ever
+// matches `ExportDefaultDeclaration`, so `export = function Hello() { ... }`
+// is not a component upstream and must not be classified as one here.
+func isExportDefaultAssignment(node *ast.Node) bool {
+	return node != nil && node.Kind == ast.KindExportAssignment &&
+		!node.AsExportAssignment().IsExportEquals
+}
+
 // isInAllowedPositionForComponent mirrors eslint-plugin-react's
 // `utils.isInAllowedPositionForComponent`: only parent node kinds in the
 // allow-list may host a stateless functional component. Sequence expressions
@@ -735,9 +749,10 @@ func isInAllowedPositionForComponent(fn *ast.Node) bool {
 	case ast.KindVariableDeclaration,
 		ast.KindPropertyAssignment,
 		ast.KindReturnStatement,
-		ast.KindExportAssignment,
 		ast.KindArrowFunction:
 		return true
+	case ast.KindExportAssignment:
+		return isExportDefaultAssignment(parent)
 	case ast.KindBinaryExpression:
 		bin := parent.AsBinaryExpression()
 		if bin.OperatorToken == nil {
