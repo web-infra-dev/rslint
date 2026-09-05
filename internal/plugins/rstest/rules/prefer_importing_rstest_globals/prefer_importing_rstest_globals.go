@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -67,17 +68,14 @@ const (
 )
 
 // classifyIdentifier decides what an identifier does with the Rstest global of
-// the same name. IsReadReference carries the shared classification of
-// reference positions, so labels (`test: for (...) { break test; }`), property
-// keys, and type positions are all excluded here rather than re-derived; a
-// shorthand property value stays a reference, and IsWriteReference then tells
-// its read form (`{ expect }`) from its destructuring form (`({ expect } =
-// holder)`).
+// the same name. IsReferenceIdentifier matches the positions Refs.Resolve
+// accepts, including JSX names. IsReadReference excludes type-only uses, and
+// IsWriteReference distinguishes runtime reads from assignments.
 func classifyIdentifier(ctx rule.RuleContext, node *ast.Node) identifierUse {
 	if node == nil || node.Kind != ast.KindIdentifier || !rstestUtils.IsRstestGlobal(node.AsIdentifier().Text) {
 		return useIrrelevant
 	}
-	if !internalUtils.IsReadReference(node) {
+	if !scope.IsReferenceIdentifier(node) || !internalUtils.IsReadReference(node) {
 		return useIrrelevant
 	}
 	for parent := node.Parent; parent != nil; parent = parent.Parent {

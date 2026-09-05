@@ -8,6 +8,8 @@ It recognizes all APIs provided by Rstest's `globals` setting, including `expect
 
 Only a runtime read of the API counts. A type position such as `const value: expect = input` never reaches the value, a write such as `expect = value` assigns to the global rather than reading it, and a label such as `test: for (...) {}` lives in its own namespace. None of them is reported.
 
+Intrinsic JSX tags such as `<test />` do not read a variable and are ignored. Expressions inside JSX and the object of a member tag such as `<test.Component />` still count as runtime reads.
+
 ## Incorrect
 
 ```javascript
