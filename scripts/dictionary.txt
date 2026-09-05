@@ -186,6 +186,7 @@ fatih
 fdescribe
 fdir
 FEFF
+fflate
 fieldset
 figcaption
 fileless
@@ -685,6 +686,7 @@ valuemin
 valuenow
 valuetext
 variabledeclaration
+varint
 vfsmatch
 visitchildren
 vitest

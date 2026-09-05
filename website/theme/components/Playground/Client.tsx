@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/theme/components/ui/select';
 import { ensureWasmService, fetchWasmVersions } from './wasm';
+import { readShareState } from './share-url';
 
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorTabsRef | null>(null);
@@ -36,6 +37,8 @@ const Playground: React.FC = () => {
   const [astInfoLoading, setAstInfoLoading] = useState(false);
   const [wasmVersions, setWasmVersions] = useState<string[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<string>();
+  // Captured before the editors get a chance to rewrite the URL.
+  const [pinnedVersion] = useState(() => readShareState().wasmVersion);
   const selectedVersionRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -43,7 +46,11 @@ const Playground: React.FC = () => {
     void fetchWasmVersions(controller.signal)
       .then((versions) => {
         setWasmVersions(versions);
-        setSelectedVersion(versions[0]);
+        setSelectedVersion(
+          pinnedVersion !== undefined && versions.includes(pinnedVersion)
+            ? pinnedVersion
+            : versions[0],
+        );
       })
       .catch((versionError) => {
         if (
@@ -60,7 +67,7 @@ const Playground: React.FC = () => {
         setLoading(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [pinnedVersion]);
 
   function isCurrentLintRun(runId: number, version: string) {
     return (
@@ -363,6 +370,7 @@ const Playground: React.FC = () => {
                 })
               }
               onConfigChange={() => scheduleRunLint()}
+              wasmVersion={selectedVersion}
               toolbarEnd={
                 <div className="flex items-center">
                   <Select
@@ -396,6 +404,7 @@ const Playground: React.FC = () => {
         }
         right={
           <ResultPanel
+            onBeforeShare={() => editorRef.current?.flushShareUrl()}
             initialized={initialized}
             diagnostics={diagnostics}
             ast={ast}

@@ -19,6 +19,11 @@ import { type Diagnostic } from '@rslint/core/service';
 import { useDark } from '@rspress/core/runtime';
 import { Button } from '@components/ui/button';
 import { evaluateConfig, type PlaygroundConfig } from './config';
+import {
+  DEFAULT_RSLINT_CONFIG,
+  readShareState,
+  writeShareState,
+} from './share-url';
 import { installRslintCoreTypes } from './config-types';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
@@ -54,6 +59,11 @@ export interface EditorTabsRef {
   highlightRange: (start: number, end: number) => void;
   /** Clear the temporary highlight decoration */
   clearHighlight: () => void;
+  /**
+   * Write the pending URL update now instead of when its debounce expires, so
+   * that a reader who edits and immediately shares copies what is on screen.
+   */
+  flushShareUrl: () => void;
 }
 
 interface EditorTabsProps {
@@ -61,34 +71,10 @@ interface EditorTabsProps {
   onChange: (value: string) => void;
   onSelectionChange?: (start: number, end: number) => void;
   onConfigChange?: () => void;
+  /** The `@rslint/wasm` version to pin in the link, once one is selected. */
+  wasmVersion?: string;
   toolbarEnd?: ReactNode;
 }
-
-const DEFAULT_RSLINT_CONFIG = `import { defineConfig, js, ts } from '@rslint/core';
-
-export default defineConfig([
-  js.configs.recommended,
-  ts.configs.recommendedTypeChecked,
-  {
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.json'],
-      },
-    },
-    rules: {
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-    },
-  },
-]);`;
-
-const DEFAULT_TSCONFIG = `{
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "strict": true,
-    "strictNullChecks": true
-  }
-}`;
 
 function parseJsonc(content: string): any | null {
   try {
@@ -109,9 +95,11 @@ export const EditorTabs = ({
   onChange,
   onSelectionChange,
   onConfigChange,
+  wasmVersion,
   toolbarEnd,
 }: EditorTabsProps) => {
   const [activeTab, setActiveTab] = useState<EditorTabType>('code');
+  const [initialState] = useState(readShareState);
   const isDark = useDark();
   const editorTheme = isDark ? 'vs-dark' : 'vs';
 
@@ -137,6 +125,7 @@ export const EditorTabs = ({
   const onChangeRef = useRef(onChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onConfigChangeRef = useRef(onConfigChange);
+  const wasmVersionRef = useRef(wasmVersion);
 
   const lastValidTsConfig = useRef<any>(null);
 
@@ -148,48 +137,45 @@ export const EditorTabs = ({
     onConfigChangeRef.current = onConfigChange;
   }, [onChange, onSelectionChange, onConfigChange]);
 
-  function getInitialCode(): string {
-    if (typeof window === 'undefined') {
-      return ['let a: any;', 'a.b = 10;'].join('\n');
-    }
-    const { search, hash } = window.location;
-    const searchParams = new URLSearchParams(search);
-    const fromSearch = searchParams.get('code');
-    if (fromSearch != null) return fromSearch;
-    if (hash && hash.startsWith('#')) {
-      const hashParams = new URLSearchParams(hash.slice(1));
-      const fromHash = hashParams.get('code');
-      if (fromHash != null) return fromHash;
-    }
-    return ['let a: any;', 'a.b = 10;'].join('\n');
+  function serializeToUrl() {
+    writeShareState({
+      code: codeEditorRef.current?.getValue() ?? initialState.code,
+      rslintConfig:
+        rslintEditorRef.current?.getValue() ?? initialState.rslintConfig,
+      tsconfig: tsconfigEditorRef.current?.getValue() ?? initialState.tsconfig,
+      wasmVersion: wasmVersionRef.current,
+    });
   }
 
-  function scheduleSerializeToUrl(value: string) {
-    if (typeof window === 'undefined') return;
+  function cancelPendingSerialize() {
     if (urlUpdateTimer.current) {
       window.clearTimeout(urlUpdateTimer.current);
       urlUpdateTimer.current = null;
     }
-    urlUpdateTimer.current = window.setTimeout(() => {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('code', value);
-        if (url.hash && url.hash.includes('code=')) {
-          url.hash = '';
-        }
-        window.history.replaceState(null, '', url.toString());
-      } catch {
-        // ignore URL update errors
-      }
-    }, 300);
   }
+
+  function scheduleSerializeToUrl() {
+    if (typeof window === 'undefined') return;
+    cancelPendingSerialize();
+    urlUpdateTimer.current = window.setTimeout(serializeToUrl, 300);
+  }
+
+  useEffect(() => {
+    wasmVersionRef.current = wasmVersion;
+    scheduleSerializeToUrl();
+  }, [wasmVersion]);
 
   // Initialize the last valid tsconfig.
   useEffect(() => {
-    lastValidTsConfig.current = parseJsonc(DEFAULT_TSCONFIG);
+    lastValidTsConfig.current = parseJsonc(initialState.tsconfig);
   }, []);
 
   useImperativeHandle(ref, () => ({
+    flushShareUrl: () => {
+      if (typeof window === 'undefined') return;
+      cancelPendingSerialize();
+      serializeToUrl();
+    },
     getValue: () => codeEditorRef.current?.getValue(),
     getCodeValue: () => codeEditorRef.current?.getValue(),
     getRslintConfig: async (wasmVersion) => {
@@ -325,7 +311,7 @@ export const EditorTabs = ({
     if (!codeContainerRef.current) return;
 
     const editor = monaco.editor.create(codeContainerRef.current, {
-      value: getInitialCode(),
+      value: initialState.code,
       language: 'typescript',
       theme: editorTheme,
       automaticLayout: true,
@@ -337,12 +323,12 @@ export const EditorTabs = ({
     // Trigger initial onChange
     const initialVal = editor.getValue() || '';
     onChangeRef.current(initialVal);
-    scheduleSerializeToUrl(initialVal);
+    scheduleSerializeToUrl();
 
     editor.onDidChangeModelContent(() => {
       const val = editor.getValue() || '';
       onChangeRef.current(val);
-      scheduleSerializeToUrl(val);
+      scheduleSerializeToUrl();
 
       // Mark as editing to prevent AST tree selection during typing
       isEditingRef.current = true;
@@ -421,7 +407,7 @@ export const EditorTabs = ({
       noSyntaxValidation: false,
     });
     const model = monaco.editor.createModel(
-      DEFAULT_RSLINT_CONFIG,
+      initialState.rslintConfig,
       'javascript',
       monaco.Uri.parse('file:///rslint.config.js'),
     );
@@ -436,6 +422,7 @@ export const EditorTabs = ({
 
     editor.onDidChangeModelContent(() => {
       onConfigChangeRef.current?.();
+      scheduleSerializeToUrl();
     });
 
     return () => {
@@ -449,7 +436,7 @@ export const EditorTabs = ({
     if (!tsconfigContainerRef.current) return;
 
     const editor = monaco.editor.create(tsconfigContainerRef.current, {
-      value: DEFAULT_TSCONFIG,
+      value: initialState.tsconfig,
       language: 'json',
       theme: editorTheme,
       automaticLayout: true,
@@ -460,6 +447,7 @@ export const EditorTabs = ({
 
     editor.onDidChangeModelContent(() => {
       onConfigChangeRef.current?.();
+      scheduleSerializeToUrl();
     });
 
     return () => {
