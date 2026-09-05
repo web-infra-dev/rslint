@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_falsy"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_truthy"
@@ -72,6 +73,7 @@ func GetAllRules() []rule.Rule {
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_import_in_mock.PreferImportInMockRule,
+		prefer_rs_mocked.PreferRsMockedRule,
 		prefer_strict_boolean_matchers.PreferStrictBooleanMatchersRule,
 		prefer_to_be_falsy.PreferToBeFalsyRule,
 		prefer_to_be_truthy.PreferToBeTruthyRule,
