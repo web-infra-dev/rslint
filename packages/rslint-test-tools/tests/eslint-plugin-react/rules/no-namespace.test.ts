@@ -7,6 +7,12 @@ const message = (name: string) =>
 
 ruleTester.run('no-namespace', {} as never, {
   valid: [
+    {
+      code: 'import { createElement } from "react"; function f() { type createElement = {}; createElement("ns:Panel"); }',
+    },
+    {
+      code: 'const { createElement } = require?.("react"); createElement("ns:Panel");',
+    },
     // ---- Upstream valid: JSX elements ----
     { code: '<testcomponent />' },
     { code: '<testComponent />' },
@@ -39,6 +45,28 @@ ruleTester.run('no-namespace', {} as never, {
     { code: 'React.createElement({})' },
   ],
   invalid: [
+    {
+      code: 'function child() { const createElement = React.createElement; } createElement("ns:Panel");',
+      errors: [{ message: message('ns:Panel') }],
+    },
+    {
+      code: 'namespace A.B.C { const createElement = React.createElement; } createElement("ns:Panel");',
+      errors: [{ message: message('ns:Panel') }],
+    },
+    {
+      code: 'class C { #createElement; f(React) { React.#createElement("ns:Panel"); } }',
+      errors: [{ message: message('ns:Panel') }],
+    },
+    ...[
+      '/* eslint-disable react/no-namespace */ React.createElement("ns:A"); /* eslint-enable react/no-namespace */ React.createElement("ns:B");',
+      '/* eslint-disable */ React.createElement("ns:A"); /* eslint-enable react/no-namespace */ React.createElement("ns:B");',
+      '/* eslint-disable react/no-namespace */ React.createElement("ns:A"); /* eslint-enable */ React.createElement("ns:B");',
+      '/* eslint-disable react/no-namespace */\nReact.createElement("ns:A");\n/* eslint-enable react/no-namespace */\nReact.createElement("ns:B");',
+    ].map((code) => ({ code, errors: [{ message: message('ns:B') }] })),
+    {
+      code: 'React.createElement("ns:A"); /* eslint-disable react/no-namespace */ React.createElement("ns:B");',
+      errors: [{ message: message('ns:A') }],
+    },
     // ---- Upstream invalid: lower-case namespace ----
     ...[
       'ns:testcomponent',

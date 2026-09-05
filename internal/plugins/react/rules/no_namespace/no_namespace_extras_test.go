@@ -27,6 +27,37 @@ func TestNoNamespaceSourceOnlyRespectsShadowing(t *testing.T) {
 		want int
 	}{
 		{
+			name: "inner type definition wins by name",
+			code: `import { createElement } from "react";
+function f() { type createElement = {}; createElement("ns:Panel"); }`,
+			want: 0,
+		},
+		{
+			name: "parameter default uses the latest body definition",
+			code: `const createElement = React.createElement;
+function f(x = createElement("ns:Panel")) { const createElement = other; }`,
+			want: 0,
+		},
+		{
+			name: "first child definitions follow upstream lookup",
+			code: `function child() { const createElement = React.createElement; }
+createElement("ns:Panel");`,
+			want: 1,
+		},
+		{
+			name: "cached bindings stay separate across functions",
+			code: `import { createElement } from "react";
+createElement("ns:One");
+function f(createElement) { createElement("ns:Ignored"); }
+createElement("ns:Two");`,
+			want: 2,
+		},
+		{
+			name: "optional require is not a React definition",
+			code: `const { createElement } = require?.("react"); createElement("ns:Panel");`,
+			want: 0,
+		},
+		{
 			name: "local createElement shadows imported binding",
 			code: `import { createElement } from "react";
 function f() {
@@ -415,4 +446,154 @@ func TestNoNamespaceDoesNotUseCrossFileCheckerBinding(t *testing.T) {
 	if len(diagnostics) != 0 {
 		t.Fatalf("diagnostic count = %d, want 0: %+v", len(diagnostics), diagnostics)
 	}
+}
+
+// TestNoNamespaceBindingCompatibility is checked against eslint-plugin-react
+// 7.37.5 and its current upstream implementation with ESLint 10 and the TS parser.
+func TestNoNamespaceBindingCompatibility(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		// An inner type declaration wins over an outer value import.
+		{Code: `import {createElement} from "react";
+function f(){ type createElement = {}; createElement("ns:Panel") }`,
+			Tsx: true},
+		// Interfaces participate in the same name lookup as runtime declarations.
+		{Code: `import {createElement} from "react";
+function f(){ interface createElement {} createElement("ns:Panel") }`,
+			Tsx: true},
+		// Type parameters shadow the imported name.
+		{Code: `import {createElement} from "react";
+function f<createElement>(){ createElement("ns:Panel") }`,
+			Tsx: true},
+		// Parameter defaults see the function body declarations in the upstream lookup.
+		{Code: `import {createElement} from "react";
+function f(x = createElement("ns:Panel")){ const createElement = other; }`,
+			Tsx: true},
+		// The first child block is searched before the enclosing import.
+		{Code: `import {createElement} from "react";
+function f(){ { const createElement = other; } createElement("ns:Panel") }`,
+			Tsx: true},
+		// A class decorator acquires the class environment, including its type parameters.
+		{Code: `import {createElement} from "react";
+@(createElement("ns:Panel")) class C<createElement> {}`,
+			Tsx: true},
+		// Computed method keys skip the method environment but still search its first child.
+		{Code: `import {createElement} from "react";
+class C { [createElement("ns:Panel")](){ const createElement = other; } }`,
+			Tsx: true},
+		// Parameter decorators acquire the function environment.
+		{Code: `import {createElement} from "react";
+class C { method(@(createElement("ns:Panel")) x, createElement){} }`,
+			Tsx: true},
+		// A non-React body declaration also blocks an otherwise unbound default call.
+		{Code: `function f(x = createElement("ns:Panel")){ const createElement = other; }`,
+			Tsx: true},
+		// The latest definition wins even when it has no initializer.
+		{Code: `var createElement=React.x; var createElement; createElement("ns:Panel");`,
+			Tsx: true},
+		// An optional require call is an ESTree ChainExpression, not a require initializer.
+		{Code: `const {createElement} = require?.("react");createElement("ns:Panel");`,
+			Tsx: true},
+		// Parentheses do not turn an optional require call into a plain CallExpression.
+		{Code: `const createElement = (require?.("react")).x;createElement("ns:Panel");`,
+			Tsx: true},
+		// JSDoc casts must preserve the optional-chain boundary.
+		{Code: `const {createElement} = /** @type {any} */ (require?.("react")); createElement("ns:Panel");`,
+			FileName: "compatibility-16.js",
+			TSConfig: "tsconfig.allow-js.json"},
+		// Configured script globals stop lookup before child declarations.
+		{Code: `function inner(){const createElement=React.x;} createElement("ns:Panel");`,
+			FileName:        "compatibility-17.js",
+			TSConfig:        "tsconfig.allow-js.json",
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			Globals:         map[string]any{"createElement": "readonly"}},
+		// Inline globals have the same effect as configured globals.
+		{Code: `/* global createElement:readonly */function inner(){const createElement=React.x;} createElement("ns:Panel");`,
+			FileName:        "compatibility-19.js",
+			TSConfig:        "tsconfig.allow-js.json",
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		// A with environment puts this declaration beyond the two-child search limit.
+		{Code: `with(obj){function f(){const createElement=React.x;}} createElement("ns:Panel");`,
+			FileName:        "compatibility-21.js",
+			TSConfig:        "tsconfig.allow-js.json",
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+		// Loop initializers search the loop body before outer environments.
+		{Code: `function f(){for(let i=createElement("ns:Panel"); i<1; i++){const createElement=other;}}`,
+			Tsx: true},
+		// Switch discriminants acquire the switch environment.
+		{Code: `switch(createElement("ns:Panel")){case 0:const createElement=other;}`,
+			Tsx: true},
+	}
+	invalid := []rule_tester.InvalidTestCase{
+		{
+			Code:   `class C { #createElement; f(React) { React.#createElement("ns:Panel"); } }`,
+			Tsx:    true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamespace", Line: 1, Column: 38, EndLine: 1, EndColumn: 70}},
+		},
+		{
+			Code: `React.createElement("ns:\ud800");`,
+			Tsx:  true,
+			// Compiler strings preserve a lone surrogate as WTF-8.
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNamespace", Message: "React component ns:\xed\xa0\x80 must not be in a namespace, as React does not support them", Line: 1, Column: 1, EndLine: 1, EndColumn: 33}},
+		},
+		// Only the first child and its first child are searched.
+		{Code: `import {createElement} from "react";
+function f(){ function child(){ function grandchild(){ const createElement = React.x; } } createElement("ns:Panel") }`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 2, Column: 91, EndLine: 2, EndColumn: 116},
+			}},
+		// A third child level is skipped, leaving the outer import visible.
+		{Code: `import {createElement} from "react";
+function f(){ function child(){ function grandchild(){ function ignored(){ const createElement = React.x; } } } createElement("ns:Panel") }`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 2, Column: 113, EndLine: 2, EndColumn: 138},
+			}},
+		// Later sibling environments are skipped, leaving the outer import visible.
+		{Code: `import {createElement} from "react";
+function f(){ function first(){} function second(){ const createElement = React.x; } createElement("ns:Panel") }`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 2, Column: 86, EndLine: 2, EndColumn: 111},
+			}},
+		// An otherwise unbound call can find the first child and grandchild.
+		{Code: `function child(){ {const createElement=React.x;} } createElement("ns:Panel");`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 1, Column: 52, EndLine: 1, EndColumn: 77},
+			}},
+		// Module bindings are searched before configured globals.
+		{Code: `function inner(){const createElement=React.x;} createElement("ns:Panel");`,
+			FileName:        "compatibility-18.js",
+			TSConfig:        "tsconfig.allow-js.json",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			Globals:         map[string]any{"createElement": "readonly"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 1, Column: 48, EndLine: 1, EndColumn: 73},
+			}},
+		// A disabled global does not stop child lookup.
+		{Code: `function inner(){const createElement=React.x;} createElement("ns:Panel");`,
+			FileName:        "compatibility-20.js",
+			TSConfig:        "tsconfig.allow-js.json",
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			Globals:         map[string]any{"createElement": "off"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 1, Column: 48, EndLine: 1, EndColumn: 73},
+			}},
+		// A with statement and its body are two separate child environments.
+		{Code: `with(obj){const createElement=React.x;} createElement("ns:Panel");`,
+			FileName:        "compatibility-22.js",
+			TSConfig:        "tsconfig.allow-js.json",
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 1, Column: 41, EndLine: 1, EndColumn: 66},
+			}},
+		// A dotted namespace introduces one environment for all name segments.
+		{Code: `namespace N.M.O {const createElement=React.x;} createElement("ns:Panel");`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noNamespace", Message: `React component ns:Panel must not be in a namespace, as React does not support them`, Line: 1, Column: 48, EndLine: 1, EndColumn: 73},
+			}},
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNamespaceRule, valid, invalid)
 }

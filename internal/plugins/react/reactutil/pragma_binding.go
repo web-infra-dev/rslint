@@ -8,15 +8,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
-// ReferenceResolver is the file-local portion of rule.RefStore needed by
-// import-aware helpers. Keeping this small interface here avoids coupling the
-// React utility package to the rule package while allowing source-only callers
-// to retain lexical-scope resolution without a TypeChecker.
-type ReferenceResolver interface {
-	ResolveInFile(node *ast.Node) *ast.Symbol
-	LatestValueDefinitionInFile(node *ast.Node) *ast.Node
-}
-
 // IsDestructuredFromPragmaImport mirrors upstream eslint-plugin-react's
 // `lib/util/isDestructuredFromPragmaImport.js`: reports whether the
 // Identifier `ident` (a bare callee like `memo`) was bound from the
@@ -39,20 +30,6 @@ type ReferenceResolver interface {
 // is available the function uses rslint's shared lexical scope model so every
 // local binding shape is resolved before checking its import origin.
 func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.Checker) bool {
-	return IsDestructuredFromPragmaImportWithRefs(ident, pragma, tc, nil)
-}
-
-// IsDestructuredFromPragmaImportWithRefs is the RefStore-aware variant. When
-// refs is provided, it resolves bindings through the file's lexical scopes and
-// is authoritative: an absent value definition means the bare identifier is
-// not a React helper in this file. This keeps checker-backed linting from
-// treating a declaration in another global script as a local React binding.
-func IsDestructuredFromPragmaImportWithRefs(
-	ident *ast.Node,
-	pragma string,
-	tc *checker.Checker,
-	refs ReferenceResolver,
-) bool {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -60,13 +37,6 @@ func IsDestructuredFromPragmaImportWithRefs(
 		pragma = DefaultReactPragma
 	}
 	pragmaLower := ecmascript.StringToLowerCase(pragma)
-
-	if refs != nil {
-		if declaration := refs.LatestValueDefinitionInFile(ident); declaration != nil {
-			return isDestructuredFromPragmaDeclaration(declaration, pragma, pragmaLower)
-		}
-		return false
-	}
 
 	if tc == nil {
 		return sourceOnlyPragmaBinding(ident, pragma, pragmaLower)
@@ -387,7 +357,7 @@ func initializerMatchesPragma(init *ast.Node, pragma, pragmaLower string) bool {
 // Upstream's helper checks `callee.name === 'require'` and
 // `arguments[0].value === pragma.toLocaleLowerCase()`.
 func isRequireCallOfPragma(call *ast.Node, pragmaLower string) bool {
-	if call == nil || call.Kind != ast.KindCallExpression {
+	if call == nil || call.Kind != ast.KindCallExpression || ast.IsOptionalChain(call) {
 		return false
 	}
 	c := call.AsCallExpression()

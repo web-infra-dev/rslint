@@ -4,12 +4,14 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
-// blockDirective represents a block-level disable or enable event at a specific line
+// blockDirective represents a block-level disable or enable event at a source location
 type blockDirective struct {
 	line      int
+	column    core.UTF16Offset
 	isDisable bool     // true = disable, false = enable
 	rules     []string // nil means all rules (wildcard)
 }
@@ -114,7 +116,7 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			continue
 		}
 
-		lineNum, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
+		lineNum, columnNum := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
 
 		switch kind {
 		case directiveLine:
@@ -139,12 +141,14 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 		case directiveBlock:
 			dm.blockDirectives = append(dm.blockDirectives, blockDirective{
 				line:      lineNum,
+				column:    columnNum,
 				isDisable: true,
 				rules:     rules,
 			})
 		case directiveEnable:
 			dm.blockDirectives = append(dm.blockDirectives, blockDirective{
 				line:      lineNum,
+				column:    columnNum,
 				isDisable: false,
 				rules:     rules,
 			})
@@ -207,10 +211,10 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 		return false
 	}
 
-	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
+	line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
 
 	// Check block disable/enable directives (range-based)
-	if dm.isBlockDisabled(ruleName, line) {
+	if dm.isBlockDisabled(ruleName, line, column) {
 		return true
 	}
 
@@ -236,14 +240,14 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 }
 
 // isBlockDisabled replays block directives in source order to determine
-// whether a rule is disabled at the given line.
-func (dm *DisableManager) isBlockDisabled(ruleName string, line int) bool {
+// whether a rule is disabled at the given source location.
+func (dm *DisableManager) isBlockDisabled(ruleName string, line int, column core.UTF16Offset) bool {
 	allDisabled := false
 	ruleDisabled := false
 	hasRuleSpecific := false
 
 	for _, d := range dm.blockDirectives {
-		if d.line > line {
+		if d.line > line || (d.line == line && d.column > column) {
 			break
 		}
 
