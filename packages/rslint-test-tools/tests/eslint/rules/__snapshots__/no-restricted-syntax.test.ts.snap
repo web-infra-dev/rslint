@@ -1838,7 +1838,7 @@ exports[`no-restricted-syntax > invalid 64`] = `
   "code": "const n = 1n;",
   "diagnostics": [
     {
-      "message": "Using 'Literal[value=/n$/]' is not allowed.",
+      "message": "Using 'Literal[value='1']' is not allowed.",
       "messageId": "restrictedSyntax",
       "range": {
         "end": {

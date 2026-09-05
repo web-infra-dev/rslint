@@ -62,7 +62,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-array-callback-reference': 'error', // not implemented
     'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
-    // 'unicorn/no-array-from-fill': 'error', // not implemented
+    'unicorn/no-array-from-fill': 'error',
     'unicorn/no-array-front-mutation': 'off',
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented
     // 'unicorn/no-array-reduce': 'error', // not implemented
@@ -318,7 +318,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-string-replace-all': 'error', // not implemented
     // 'unicorn/prefer-string-slice': 'error', // not implemented
     // 'unicorn/prefer-string-starts-ends-with': 'error', // not implemented
-    // 'unicorn/prefer-string-trim-start-end': 'error', // not implemented
+    'unicorn/prefer-string-trim-start-end': 'error',
     // 'unicorn/prefer-structured-clone': 'error', // not implemented
     // 'unicorn/prefer-switch': 'error', // not implemented
     // 'unicorn/prefer-temporal': 'off', // not implemented

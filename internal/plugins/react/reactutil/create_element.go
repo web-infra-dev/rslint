@@ -1,8 +1,11 @@
 package reactutil
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -45,8 +48,19 @@ func IsCreateElementCallWithChecker(callee *ast.Node, pragma string, tc *checker
 	return isCreateElementCallCore(callee, pragma, tc)
 }
 
+// NewCreateElementCallMatcher returns a per-file matcher with the definition
+// lookup used by eslint-plugin-react. Bindings are resolved lazily and cached,
+// independently of whether this file has a TypeChecker.
+func NewCreateElementCallMatcher(ctx rule.RuleContext) func(*ast.Node) bool {
+	pragma := GetReactPragmaFromContext(ctx)
+	isImported := newPragmaImportMatcher(ctx, pragma, "createElement")
+	return func(callee *ast.Node) bool {
+		return isPragmaFactoryCallCore(callee, pragma, nil, isImported, createElementOnly)
+	}
+}
+
 func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isPragmaFactoryCallCore(callee, pragma, tc, createElementOnly)
+	return isPragmaFactoryCallCore(callee, pragma, tc, nil, createElementOnly)
 }
 
 // IsCreateOrCloneElementCall reports whether the callee resolves to
@@ -65,7 +79,7 @@ func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 // skipped — that would over-match relative to ESLint's JS-only AST and
 // is a divergence we deliberately avoid.
 func IsCreateOrCloneElementCall(callee *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isPragmaFactoryCallCore(callee, pragma, tc, createOrCloneElement)
+	return isPragmaFactoryCallCore(callee, pragma, tc, nil, createOrCloneElement)
 }
 
 type pragmaFactoryNames int
@@ -85,7 +99,13 @@ func (k pragmaFactoryNames) matches(name string) bool {
 	return false
 }
 
-func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checker, names pragmaFactoryNames) bool {
+func isPragmaFactoryCallCore(
+	callee *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	isImported func(*ast.Node) bool,
+	names pragmaFactoryNames,
+) bool {
 	if callee == nil {
 		return false
 	}
@@ -104,6 +124,9 @@ func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 		if !names.matches(callee.AsIdentifier().Text) {
 			return false
 		}
+		if isImported != nil {
+			return isImported(callee)
+		}
 		return IsDestructuredFromPragmaImport(callee, pragma, tc)
 	}
 
@@ -114,24 +137,38 @@ func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 	// MemberExpression and match it just the same. For computed access,
 	// upstream reads `node.callee.property.name`, so an identifier argument is
 	// also a match while a string literal argument is not.
-	var nameNode *ast.Node
-	var pragmaExpr *ast.Node
+	var nameNode, pragmaExpr *ast.Node
 	switch callee.Kind {
 	case ast.KindPropertyAccessExpression:
 		prop := callee.AsPropertyAccessExpression()
 		nameNode = prop.Name()
+		// JSDoc casts and parentheses are absent from ESTree, while an authored
+		// TypeScript wrapper on the receiver remains visible and does not match.
 		pragmaExpr = utils.ESTreeRuntimeExpression(prop.Expression)
 	case ast.KindElementAccessExpression:
-		element := callee.AsElementAccessExpression()
-		nameNode = utils.ESTreeRuntimeExpression(element.ArgumentExpression)
-		pragmaExpr = utils.ESTreeRuntimeExpression(element.Expression)
+		access := callee.AsElementAccessExpression()
+		// ESTree's MemberExpression property has a `name` only when the
+		// computed property is an Identifier. String literals such as
+		// React["createElement"] therefore remain unmatched.
+		nameNode = utils.ESTreeRuntimeExpression(access.ArgumentExpression)
+		pragmaExpr = utils.ESTreeRuntimeExpression(access.Expression)
 	default:
 		return false
 	}
 	if nameNode == nil || pragmaExpr == nil {
 		return false
 	}
-	if nameNode.Kind != ast.KindIdentifier || !names.matches(nameNode.AsIdentifier().Text) {
+	// ESTree exposes .name on both Identifier and PrivateIdentifier keys.
+	var propertyName string
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		propertyName = nameNode.Text()
+	case ast.KindPrivateIdentifier:
+		propertyName = strings.TrimPrefix(nameNode.Text(), "#")
+	default:
+		return false
+	}
+	if !names.matches(propertyName) {
 		return false
 	}
 	// JSDoc casts and parentheses are absent from ESTree, while an authored

@@ -3,6 +3,8 @@ import { define } from 'rstack';
 define.test({
   testEnvironment: 'node',
   globals: true,
+  // CI pods expose the shared host's CPU count, so cap worker-process churn.
+  pool: { maxWorkers: 16 },
   // Normal completion is event-driven. This is only the final in-process
   // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
   testTimeout: 35 * 60_000,
@@ -233,6 +235,7 @@ define.test({
     './tests/eslint-plugin-react/rules/no-array-index-key.test.ts',
     './tests/eslint-plugin-react/rules/no-arrow-function-lifecycle.test.ts',
     './tests/eslint-plugin-react/rules/no-children-prop.test.ts',
+    './tests/eslint-plugin-react/rules/no-namespace.test.ts',
     './tests/eslint-plugin-react/rules/no-danger.test.ts',
     './tests/eslint-plugin-react/rules/no-danger-with-children.test.ts',
     './tests/eslint-plugin-react/rules/display-name.test.ts',
@@ -645,6 +648,7 @@ define.test({
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-import-in-mock.test.ts',
     './tests/rstest/rules/prefer-importing-rstest-globals.test.ts',
+    './tests/rstest/rules/prefer-rs-mocked.test.ts',
     './tests/rstest/rules/prefer-strict-boolean-matchers.test.ts',
     './tests/rstest/rules/prefer-to-be-falsy.test.ts',
     './tests/rstest/rules/prefer-to-be-truthy.test.ts',
@@ -683,6 +687,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-concat-in-loop.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-fill-with-reference-type.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-array-from-fill.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-front-mutation.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-document-cookie.test.ts',
@@ -711,6 +716,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-string-trim-start-end.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-then-catch.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',

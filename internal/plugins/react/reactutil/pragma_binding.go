@@ -3,6 +3,7 @@ package reactutil
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
@@ -46,61 +47,67 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 		return false
 	}
 
-	// Pick the latest declaration. Upstream walks `latestDef` — for
-	// ImportSpecifier (which has no Initializer of its own), upstream walks
-	// `latestDef.parent.type === 'ImportDeclaration'`.
-	var decl *ast.Node
-	for i := len(symbol.Declarations) - 1; i >= 0; i-- {
-		if symbol.Declarations[i] != nil {
-			decl = symbol.Declarations[i]
-			break
-		}
-	}
-	if decl == nil {
-		decl = symbol.ValueDeclaration
-	}
+	return isDestructuredFromPragmaSymbol(symbol, pragma, pragmaLower)
+}
+
+func isDestructuredFromPragmaDeclaration(decl *ast.Node, pragma, pragmaLower string) bool {
 	if decl == nil {
 		return false
 	}
-
-	// 1) Named import: `import { memo } from 'react'` — declaration is
-	//    an ImportSpecifier (or ImportClause for default imports, but
-	//    bare callee `memo` won't bind to a default).
-	if decl.Kind == ast.KindImportSpecifier {
-		// Walk up: ImportSpecifier → NamedImports → ImportClause →
-		// ImportDeclaration.
-		for p := decl.Parent; p != nil; p = p.Parent {
-			if p.Kind == ast.KindImportDeclaration {
-				ms := p.AsImportDeclaration().ModuleSpecifier
-				if ms != nil && ms.Kind == ast.KindStringLiteral &&
-					ms.Text() == pragmaLower {
-					return true
-				}
-				return false
+	if decl.Kind == ast.KindImportDeclaration {
+		return importDeclarationFromPragma(decl, pragmaLower)
+	}
+	if decl.Kind == ast.KindImportSpecifier || decl.Kind == ast.KindImportClause ||
+		decl.Kind == ast.KindNamespaceImport {
+		for parent := decl.Parent; parent != nil; parent = parent.Parent {
+			if parent.Kind == ast.KindImportDeclaration {
+				return importDeclarationFromPragma(parent, pragmaLower)
 			}
 		}
 		return false
 	}
+	return isDestructuredFromPragmaDefinition(decl, pragma, pragmaLower)
+}
 
-	// 2) BindingElement (object/array destructure): `const { memo } = React`
-	//    → declaration is BindingElement; walk up to VariableDeclaration
-	//    and inspect its Initializer.
-	if decl.Kind == ast.KindBindingElement {
+func isDestructuredFromPragmaDefinition(decl *ast.Node, pragma, pragmaLower string) bool {
+	switch decl.Kind {
+	case ast.KindBindingElement:
 		varDecl := findEnclosingVariableDeclaration(decl)
 		if varDecl == nil {
 			return false
 		}
-		init := varDecl.AsVariableDeclaration().Initializer
-		return initializerMatchesPragma(init, pragma, pragmaLower)
+		return initializerMatchesPragma(varDecl.AsVariableDeclaration().Initializer, pragma, pragmaLower)
+	case ast.KindVariableDeclaration:
+		return initializerMatchesPragma(decl.AsVariableDeclaration().Initializer, pragma, pragmaLower)
+	}
+	return false
+}
+
+func importDeclarationFromPragma(decl *ast.Node, pragmaLower string) bool {
+	if decl == nil || decl.Kind != ast.KindImportDeclaration {
+		return false
+	}
+	moduleSpecifier := decl.AsImportDeclaration().ModuleSpecifier
+	return moduleSpecifier != nil && moduleSpecifier.Kind == ast.KindStringLiteral &&
+		moduleSpecifier.Text() == pragmaLower
+}
+
+func isDestructuredFromPragmaSymbol(symbol *ast.Symbol, pragma, pragmaLower string) bool {
+	if symbol == nil {
+		return false
 	}
 
-	// 3) VariableDeclaration: `const memo = React.memo` /
-	//    `const memo = require('react').memo`
-	if decl.Kind == ast.KindVariableDeclaration {
-		init := decl.AsVariableDeclaration().Initializer
-		return initializerMatchesPragma(init, pragma, pragmaLower)
+	// This checker-only fallback has no reference scope with which to model
+	// ESLint's definitions. Preserve the declaration order supplied by the
+	// checker instead of comparing Pos values from potentially different files.
+	for i := len(symbol.Declarations) - 1; i >= 0; i-- {
+		if declaration := symbol.Declarations[i]; declaration != nil {
+			return isDestructuredFromPragmaDeclaration(declaration, pragma, pragmaLower)
+		}
 	}
-
+	if symbol.ValueDeclaration != nil {
+		return isDestructuredFromPragmaDeclaration(symbol.ValueDeclaration, pragma, pragmaLower)
+	}
 	return false
 }
 
@@ -166,8 +173,15 @@ func importDeclBindsNameFromPragma(decl *ast.Node, name string, pragmaLower stri
 		return false
 	}
 	ic := id.ImportClause.AsImportClause()
+	if ic.Name() != nil && ic.Name().Kind == ast.KindIdentifier && ic.Name().AsIdentifier().Text == name {
+		return true
+	}
 	if ic.NamedBindings == nil || ic.NamedBindings.Kind != ast.KindNamedImports {
-		// Default import / namespace import don't bind `name` directly.
+		if ic.NamedBindings != nil && ic.NamedBindings.Kind == ast.KindNamespaceImport {
+			ns := ic.NamedBindings.AsNamespaceImport()
+			return ns != nil && ns.Name() != nil && ns.Name().Kind == ast.KindIdentifier &&
+				ns.Name().AsIdentifier().Text == name
+		}
 		return false
 	}
 	ni := ic.NamedBindings.AsNamedImports()
@@ -249,16 +263,23 @@ func objectBindingPatternBindsName(pat *ast.Node, name string) bool {
 // introduce a `name` binding pulled from the pragma module without
 // going through a destructure pattern.
 func initializerIsPragmaMember(init *ast.Node, name, pragma, pragmaLower string) bool {
-	init = SkipExpressionWrappers(init)
-	if init == nil || init.Kind != ast.KindPropertyAccessExpression {
+	init = utils.ESTreeRuntimeExpression(init)
+	if init == nil || (init.Kind != ast.KindPropertyAccessExpression && init.Kind != ast.KindElementAccessExpression) ||
+		ast.IsOptionalChain(init) {
 		return false
 	}
-	pa := init.AsPropertyAccessExpression()
-	prop := pa.Name()
-	if prop == nil || prop.Kind != ast.KindIdentifier || prop.AsIdentifier().Text != name {
-		return false
+	var obj *ast.Node
+	if init.Kind == ast.KindPropertyAccessExpression {
+		pa := init.AsPropertyAccessExpression()
+		prop := pa.Name()
+		if prop == nil || prop.Kind != ast.KindIdentifier || prop.AsIdentifier().Text != name {
+			return false
+		}
+		obj = pa.Expression
+	} else {
+		obj = init.AsElementAccessExpression().Expression
 	}
-	obj := SkipExpressionWrappers(pa.Expression)
+	obj = utils.ESTreeRuntimeExpression(obj)
 	if obj == nil {
 		return false
 	}
@@ -295,7 +316,7 @@ func initializerMatchesPragma(init *ast.Node, pragma, pragmaLower string) bool {
 	if init == nil {
 		return false
 	}
-	init = SkipExpressionWrappers(init)
+	init = utils.ESTreeRuntimeExpression(init)
 
 	// `init` is the pragma identifier itself (`= React`).
 	if init.Kind == ast.KindIdentifier && init.AsIdentifier().Text == pragma {
@@ -303,14 +324,23 @@ func initializerMatchesPragma(init *ast.Node, pragma, pragmaLower string) bool {
 	}
 
 	// `init` is `pragma.something` — `= React.memo`.
-	if init.Kind == ast.KindPropertyAccessExpression {
-		obj := SkipExpressionWrappers(init.AsPropertyAccessExpression().Expression)
-		if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == pragma {
+	if init.Kind == ast.KindPropertyAccessExpression || init.Kind == ast.KindElementAccessExpression {
+		if ast.IsOptionalChain(init) {
+			return false
+		}
+		var obj *ast.Node
+		if init.Kind == ast.KindPropertyAccessExpression {
+			obj = init.AsPropertyAccessExpression().Expression
+		} else {
+			obj = init.AsElementAccessExpression().Expression
+		}
+		obj = utils.ESTreeRuntimeExpression(obj)
+		if obj != nil && obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == pragma {
 			return true
 		}
 		// `init` is `require('react').memo` — member access on a
 		// require call.
-		if obj.Kind == ast.KindCallExpression && isRequireCallOfPragma(obj, pragmaLower) {
+		if obj != nil && obj.Kind == ast.KindCallExpression && isRequireCallOfPragma(obj, pragmaLower) {
 			return true
 		}
 	}
@@ -327,11 +357,11 @@ func initializerMatchesPragma(init *ast.Node, pragma, pragmaLower string) bool {
 // Upstream's helper checks `callee.name === 'require'` and
 // `arguments[0].value === pragma.toLocaleLowerCase()`.
 func isRequireCallOfPragma(call *ast.Node, pragmaLower string) bool {
-	if call == nil || call.Kind != ast.KindCallExpression {
+	if call == nil || call.Kind != ast.KindCallExpression || ast.IsOptionalChain(call) {
 		return false
 	}
 	c := call.AsCallExpression()
-	callee := SkipExpressionWrappers(c.Expression)
+	callee := utils.ESTreeRuntimeExpression(c.Expression)
 	if callee == nil || callee.Kind != ast.KindIdentifier ||
 		callee.AsIdentifier().Text != "require" {
 		return false
@@ -339,7 +369,7 @@ func isRequireCallOfPragma(call *ast.Node, pragmaLower string) bool {
 	if c.Arguments == nil || len(c.Arguments.Nodes) == 0 {
 		return false
 	}
-	arg := SkipExpressionWrappers(c.Arguments.Nodes[0])
+	arg := utils.ESTreeRuntimeExpression(c.Arguments.Nodes[0])
 	if arg == nil || arg.Kind != ast.KindStringLiteral {
 		return false
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_from_fill"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
@@ -37,6 +38,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
@@ -55,6 +57,7 @@ func GetAllRules() []rule.Rule {
 		new_for_builtins.NewForBuiltinsRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
+		no_array_from_fill.NoArrayFromFillRule,
 		no_array_front_mutation.NoArrayFrontMutationRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
 		no_document_cookie.NoDocumentCookieRule,
@@ -83,6 +86,7 @@ func GetAllRules() []rule.Rule {
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		prefer_set_has.PreferSetHasRule,
+		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
 		prefer_then_catch.PreferThenCatchRule,
 		prefer_ternary.PreferTernaryRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,

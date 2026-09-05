@@ -140,6 +140,69 @@ namespace A.B { export const value = 1; }
 			t.Fatalf("scope %v unexpectedly declares dotted namespace segment B", candidate.Kind)
 		}
 	}
+	assertKinds(t, m, []Kind{KindGlobal, KindModule})
+	assertDeclares(t, m.Scopes[1], "value", DefVariable)
+}
+
+func TestBuildKeepsExplicitNestedNamespaces(t *testing.T) {
+	m := build(t, `namespace A { namespace B { namespace C { const value = 1; } } }`)
+	assertKinds(t, m, []Kind{KindGlobal, KindModule, KindModule, KindModule})
+	assertDeclares(t, m.Scopes[1], "B", DefNamespaceName)
+	assertDeclares(t, m.Scopes[2], "C", DefNamespaceName)
+	assertDeclares(t, m.Scopes[3], "value", DefVariable)
+}
+
+func TestBuildWithBodyHasItsOwnEnvironment(t *testing.T) {
+	m := build(t, `with (object) { function inner() {} }`)
+	assertKinds(t, m, []Kind{KindGlobal, KindWith, KindBlock, KindFunction})
+	assertDeclares(t, m.Scopes[2], "inner", DefFunctionName)
+	if m.Scopes[1].VariableScope() != m.Global {
+		t.Fatal("with must not introduce a var hoisting target")
+	}
+}
+
+func TestAcquireUsesTheESTreePosition(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		code    string
+		kind    Kind
+		binding string
+	}{
+		{"parameter default", `function f(x = probe()) { const local = 1; }`, KindFunction, "local"},
+		{"named function", `const f = function named(local) { probe(); };`, KindFunction, "local"},
+		{"method key", `class C<Local> { [probe()](Local) {} }`, KindClass, "Local"},
+		{"method decorator", `class C<Local> { @probe() method(Local) {} }`, KindClass, "Local"},
+		{"parameter decorator", `class C { method(@probe() x, local) {} }`, KindFunction, "local"},
+		{"class decorator", `@probe() class C<Local> {}`, KindClass, "Local"},
+		{"field initializer", `class C { field = probe(); }`, KindClassFieldInitializer, ""},
+		{"switch discriminant", `switch (probe()) { case 0: const local = 1; }`, KindBlock, "local"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			m := build(t, testCase.code)
+			var call *ast.Node
+			var visit func(*ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if node.Kind == ast.KindCallExpression && node.AsCallExpression().Expression.Kind == ast.KindIdentifier && node.AsCallExpression().Expression.Text() == "probe" {
+					call = node
+				}
+				return node.ForEachChild(visit)
+			}
+			m.SourceFile.AsNode().ForEachChild(visit)
+			if call == nil {
+				t.Fatal("missing probe call")
+			}
+			acquired := m.Acquire(call)
+			if acquired.Kind != testCase.kind {
+				t.Fatalf("kind = %v, want %v", acquired.Kind, testCase.kind)
+			}
+			if testCase.binding != "" && len(acquired.Declarations(testCase.binding)) == 0 {
+				t.Fatalf("missing declaration %q", testCase.binding)
+			}
+			if m.Acquire(call) != acquired {
+				t.Fatal("cached acquisition changed")
+			}
+		})
+	}
 }
 
 func TestBuildFunctionExpressionNameGetsItsOwnScope(t *testing.T) {
@@ -466,6 +529,39 @@ func findReference(t *testing.T, m *Manager, name string) *Reference {
 	}
 	t.Fatalf("reference %q not found", name)
 	return nil
+}
+
+func TestBuildTypeDeclarationReferences(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		declaration string
+		kinds       []Kind
+		owner       int
+	}{
+		{"alias", `type T = typeof value;`, []Kind{KindGlobal}, 0},
+		{"interface", `interface T { value: typeof value }`, []Kind{KindGlobal}, 0},
+		{"generic alias", `type T<U> = typeof value;`, []Kind{KindGlobal, KindType}, 1},
+		{"generic interface", `interface T<U> { value: typeof value }`, []Kind{KindGlobal, KindType}, 1},
+		{"function type", `type T = () => typeof value;`, []Kind{KindGlobal, KindFunctionType}, 1},
+		{"mapped type", `type T = { [K in keyof typeof value]: K };`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional check", `type T = typeof value extends unknown ? 1 : 2;`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional extends", `type T = unknown extends typeof value ? 1 : 2;`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional true", `type T = unknown extends unknown ? typeof value : 2;`, []Kind{KindGlobal, KindType}, 1},
+		{"conditional false", `type T = unknown extends unknown ? 1 : typeof value;`, []Kind{KindGlobal, KindType}, 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			m := buildWithReferences(t, `declare const value: unknown; `+testCase.declaration)
+			assertKinds(t, m, testCase.kinds)
+			assertDeclares(t, m.Global, "T", DefType)
+			reference := findReference(t, m, "value")
+			if reference.From != m.Scopes[testCase.owner] {
+				t.Errorf("value reference belongs to kind %d, want kind %d", reference.From.Kind, m.Scopes[testCase.owner].Kind)
+			}
+			if reference.Resolved() != m.Global.Declarations("value")[0] {
+				t.Error("value reference should resolve to the outer declaration")
+			}
+		})
+	}
 }
 
 func TestBuildKeepsTheFirstFunctionOverloadAsTheBindingAnchor(t *testing.T) {
