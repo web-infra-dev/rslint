@@ -251,10 +251,12 @@ func isExplicitReactType(node *ast.Node) bool {
 		(name.AsIdentifier().Text == "Component" || name.AsIdentifier().Text == "PureComponent")
 }
 
+// parentReactClass mirrors componentUtil.getParentES6Component: walk out to the
+// nearest enclosing class and treat it as the component only when that class is
+// itself a React class. The lookup is deliberately ES6-class-only, so a helper
+// class nested inside a createReactClass component is not attributed to that
+// surrounding ES5 component.
 func parentReactClass(node *ast.Node, pragma string) *ast.Node {
-	if component := reactutil.GetParentReactComponentScopeBased(node, pragma, ""); component != nil {
-		return component
-	}
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
 		if parent.Kind != ast.KindClassDeclaration && parent.Kind != ast.KindClassExpression {
 			continue
