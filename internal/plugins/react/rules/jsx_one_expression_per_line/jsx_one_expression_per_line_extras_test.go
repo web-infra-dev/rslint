@@ -94,5 +94,68 @@ func TestJsxOneExpressionPerLineExtras(t *testing.T) {
 		{Code: "<App>\n  <Foo>\n    text\n  </Foo><Bar />\n</App>", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "moveToNewLine", Line: 4, Column: 9, EndLine: 4, EndColumn: 16},
 		}, Output: []string{"<App>\n  <Foo>\n    text\n  </Foo>\n<Bar />\n</App>"}},
+		// ---- Adjacent-fix parity: eslint-plugin-react only lands every other
+		// ---- report per pass when children abut, which decides whether a raw
+		// ---- trailing space is trimmed or kept alongside a `{' '}` marker. ----
+		{Code: `<A><B />{x}a {y}</A>`, Tsx: true, Output: []string{"<A>\n<B />\n{x}\na\n{y}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A><B /><C />a {y}</A>`, Tsx: true, Output: []string{"<A>\n<B />\n<C />\na\n{y}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A><B />{x}a {y}b {z}</A>`, Tsx: true, Output: []string{"<A>\n<B />\n{x}\na\n{y}\nb\n{z}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A>{x}a {y} b {z}</A>`, Tsx: true, Output: []string{"<A>\n{x}\na \n{' '}\n{y}\n{' '}\nb \n{' '}\n{z}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A><B />{x} a {y}</A>`, Tsx: true, Output: []string{"<A>\n<B />\n{x}\n{' '}\na\n{y}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A><B />foo <C /> bar <D /></A>`, Tsx: true, Output: []string{"<A>\n<B />\nfoo \n{' '}\n<C />\n{' '}\nbar \n{' '}\n<D />\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A><B /> a {x}</A>`, Tsx: true, Output: []string{"<A>\n<B />\n{' '}\na \n{' '}\n{x}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A>{x}<B /> {y}</A>`, Tsx: true, Output: []string{"<A>\n{x}\n<B /> \n{' '}\n{y}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A><B />{x}a </A>`, Tsx: true, Output: []string{"<A>\n<B />\n{x}\na\n{' '}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
+		{Code: `<A>a {x}b </A>`, Tsx: true, Output: []string{"<A>\na\n{x}\nb\n{' '}\n</A>"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+			{MessageId: "moveToNewLine"},
+		}},
 	})
 }

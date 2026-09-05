@@ -178,50 +178,79 @@ func isSpaceBetween(previous, current *ast.Node) bool {
 }
 
 type fixDetails struct {
-	child            *ast.Node
-	descriptor       string
-	firstChild       bool
-	leadingSpace     bool
-	leadingSpaceFrom []*ast.Node
-	leadingNewline   bool
-	trailingSpace    bool
-	trailingNewline  bool
+	child *ast.Node
+
+	descriptor      string
+	firstChild      bool
+	leadingSpace    bool
+	leadingNewline  bool
+	trailingSpace   bool
+	trailingNewline bool
+
+	// leadingSpaceOwn and leadingSpaceGap record the two sources of a leading
+	// space that survive the fix: a space the child's own text starts with, and
+	// a gap between the child and its predecessor. leadingSpaceFromText records
+	// the third source, a preceding text sibling whose raw source ends with a
+	// space; that one only survives when the sibling keeps that space.
+	leadingSpaceOwn      bool
+	leadingSpaceGap      bool
+	leadingSpaceFromText []*ast.Node
 }
 
-func hasSuppressedJSXPredecessor(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
-	for _, previous := range details.leadingSpaceFrom {
-		previousDetails := detailsByChild[previous]
-		if reactutil.IsJsxLike(previous) && previousDetails != nil &&
-			!previousDetails.firstChild && !shouldKeepLeadingSpace(previousDetails, detailsByChild) {
-			return true
+// acceptedFixes mirrors which reports ESLint's fixer applies in its first pass.
+// SourceCodeFixer walks the reports in source order and skips any whose range
+// starts where the previously applied range ended, so among children that abut
+// each other only every other fix lands per pass. eslint-plugin-react relies on
+// that: the skipped reports are re-created against the already rewritten source
+// in a later pass, which is what decides whether a raw trailing space is
+// trimmed away or left in place. Rslint applies abutting fixes in a single
+// pass, so the rule has to resolve those decisions up front.
+func acceptedFixes(detailsList []*fixDetails) map[*ast.Node]bool {
+	accepted := make(map[*ast.Node]bool, len(detailsList))
+	lastEnd := -1
+	for _, details := range detailsList {
+		if details == nil || details.child == nil {
+			continue
 		}
-		if isJSXText(previous) && previousDetails != nil &&
-			hasSuppressedJSXPredecessor(previousDetails, detailsByChild) {
-			return true
+		if details.child.Pos() > lastEnd {
+			accepted[details.child] = true
+			lastEnd = details.child.End()
 		}
 	}
-	return false
+	return accepted
 }
 
-func shouldKeepLeadingSpace(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
-	for _, previous := range details.leadingSpaceFrom {
-		previousDetails := detailsByChild[previous]
-		if isJSXText(previous) && previousDetails != nil &&
-			hasSuppressedJSXPredecessor(previousDetails, detailsByChild) {
-			return false
-		}
-		if !isJSXText(previous) || previousDetails == nil || !previousDetails.firstChild {
-			return true
-		}
+// shouldKeepTrailingTextSpace reports whether a text child's raw trailing space
+// survives. When the child's own fix lands in the first pass the space is
+// trimmed with the rest of the source. When it is skipped, the following
+// sibling's fix inserts a line break behind the space first, so the space is no
+// longer at the end of the node and every later pass preserves it.
+func shouldKeepTrailingTextSpace(details *fixDetails, accepted map[*ast.Node]bool) bool {
+	if details == nil {
+		// A child the rule never reports keeps its source verbatim.
+		return true
 	}
-	return false
-}
-
-func shouldKeepTrailingTextSpace(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails) bool {
 	if details.firstChild || details.trailingSpace {
 		return false
 	}
-	return !hasSuppressedJSXPredecessor(details, detailsByChild)
+	return !accepted[details.child]
+}
+
+// shouldKeepLeadingSpace reports whether the `{' '}` marker for a leading space
+// is still warranted once the surrounding fixes have been applied. A space the
+// child's own text starts with, or a gap between the two children, is always
+// still there. A space that only comes from a preceding text sibling is there
+// only while that sibling keeps it.
+func shouldKeepLeadingSpace(details *fixDetails, detailsByChild map[*ast.Node]*fixDetails, accepted map[*ast.Node]bool) bool {
+	if details.leadingSpaceOwn || details.leadingSpaceGap {
+		return true
+	}
+	for _, previous := range details.leadingSpaceFromText {
+		if shouldKeepTrailingTextSpace(detailsByChild[previous], accepted) {
+			return true
+		}
+	}
+	return false
 }
 
 func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
@@ -321,11 +350,17 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 				}
 				previousRaw := nodeSource(source, previous)
 				childRaw := nodeSource(source, child)
-				if (isJSXText(previous) && strings.HasSuffix(previousRaw, " ")) ||
-					(isJSXText(child) && strings.HasPrefix(childRaw, " ")) ||
-					isSpaceBetween(previous, child) {
+				if isJSXText(previous) && strings.HasSuffix(previousRaw, " ") {
 					details.leadingSpace = true
-					details.leadingSpaceFrom = append(details.leadingSpaceFrom, previous)
+					details.leadingSpaceFromText = append(details.leadingSpaceFromText, previous)
+				}
+				if isJSXText(child) && strings.HasPrefix(childRaw, " ") {
+					details.leadingSpace = true
+					details.leadingSpaceOwn = true
+				}
+				if isSpaceBetween(previous, child) {
+					details.leadingSpace = true
+					details.leadingSpaceGap = true
 				}
 				details.leadingNewline = true
 			}
@@ -348,6 +383,7 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 	sort.Slice(detailsList, func(i, j int) bool {
 		return detailsList[i].child.Pos() < detailsList[j].child.Pos()
 	})
+	accepted := acceptedFixes(detailsList)
 	for _, details := range detailsList {
 		if details == nil || details.child == nil {
 			continue
@@ -362,11 +398,11 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node, options ruleOptions) {
 		ctx.ReportRangeWithDeferredFixes(core.NewTextRange(child.Pos(), child.End()), message, func() []rule.RuleFix {
 			rawSource := nodeSource(source, child)
 			fixedSource := fixSource(rawSource)
-			if isJSXText(child) && hasTrailingTextSpace(rawSource) && shouldKeepTrailingTextSpace(&currentDetails, detailsByChild) {
+			if isJSXText(child) && hasTrailingTextSpace(rawSource) && shouldKeepTrailingTextSpace(&currentDetails, accepted) {
 				fixedSource += " "
 			}
 			leadingSpace := ""
-			if currentDetails.leadingSpace && shouldKeepLeadingSpace(&currentDetails, detailsByChild) {
+			if currentDetails.leadingSpace && shouldKeepLeadingSpace(&currentDetails, detailsByChild, accepted) {
 				leadingSpace = "\n{' '}"
 			}
 			trailingSpace := ""
