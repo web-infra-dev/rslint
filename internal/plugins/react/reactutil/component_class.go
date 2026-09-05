@@ -1,8 +1,15 @@
 package reactutil
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // IsCreateClassCall reports whether the given CallExpression's callee is
@@ -100,58 +107,150 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 	return false
 }
 
-// IsExplicitReactComponent reports whether a class has a JSDoc @extends or
-// @augments tag naming React.Component or React.PureComponent. This is kept
-// separate from ExtendsReactComponent because eslint-plugin-react treats the
-// JSDoc marker as an additional detection path, while other callers may need
-// to preserve the distinction between an actual extends clause and a JSDoc
-// annotation.
-func IsExplicitReactComponent(classNode *ast.Node) bool {
-	if classNode == nil {
+// IsExplicitReactComponent recognizes the JSDoc component marker accepted by
+// eslint-plugin-react. The host follows SourceCode.getJSDocComment, including
+// declarations that own the comment for a class or function expression.
+func IsExplicitReactComponent(node *ast.Node) bool {
+	if node == nil {
 		return false
 	}
-	for _, doc := range classNode.JSDoc(nil) {
-		jsDoc := doc.AsJSDoc()
-		if jsDoc == nil || jsDoc.Tags == nil {
+	sourceFile := ast.GetSourceFileOfNode(node)
+	if sourceFile == nil {
+		return false
+	}
+	host, pos := componentJSDocHost(node, sourceFile)
+	if host == nil {
+		return false
+	}
+	doc, sourceFile := componentJSDoc(host, pos, sourceFile)
+	if doc == nil || doc.AsJSDoc().Tags == nil {
+		return false
+	}
+	text := sourceFile.Text()
+	for _, tag := range doc.AsJSDoc().Tags.Nodes {
+		if !ast.IsJSDocAugmentsTag(tag) {
 			continue
 		}
-		for _, tag := range jsDoc.Tags.Nodes {
-			if !ast.IsJSDocAugmentsTag(tag) {
-				continue
-			}
-			augments := tag.AsJSDocAugmentsTag()
-			if augments == nil || augments.ClassName == nil {
-				continue
-			}
-			if sourceFile := ast.GetSourceFileOfNode(classNode); sourceFile != nil {
-				text := sourceFile.Text()
-				start, end := tag.Pos(), augments.ClassName.Pos()
-				if start < 0 || end < start || end > len(text) || containsJSDocTypeBraces(text[start:end]) {
-					continue
-				}
-			}
-			name := ast.SkipParentheses(augments.ClassName.AsExpressionWithTypeArguments().Expression)
-			if name == nil || name.Kind != ast.KindPropertyAccessExpression {
-				continue
-			}
-			access := name.AsPropertyAccessExpression()
-			object := ast.SkipParentheses(access.Expression)
-			property := access.Name()
-			if object != nil && object.Kind == ast.KindIdentifier && object.AsIdentifier().Text == "React" && property != nil && property.Kind == ast.KindIdentifier && isComponentName(property.AsIdentifier().Text) {
-				return true
-			}
+		augments := tag.AsJSDocAugmentsTag()
+		if augments.ClassName == nil || augments.TagName == nil {
+			continue
+		}
+		// tsgo accepts type braces and generic arguments too. Doctrine's name
+		// must be bare; the gap may contain multiline JSDoc decoration.
+		if strings.ContainsRune(text[augments.TagName.End():augments.ClassName.Pos()], '{') {
+			continue
+		}
+		// Doctrine stops reading tags at an invalid extends description.
+		if augments.Comment != nil {
+			return false
+		}
+		name := utils.TrimmedNodeText(sourceFile, augments.ClassName)
+		if name == "React.Component" || name == "React.PureComponent" {
+			return true
 		}
 	}
 	return false
 }
 
-func containsJSDocTypeBraces(text string) bool {
-	for index := range len(text) {
-		if text[index] == '{' || text[index] == '}' {
-			return true
+func componentJSDoc(host *ast.Node, pos int, sourceFile *ast.SourceFile) (*ast.Node, *ast.SourceFile) {
+	text := sourceFile.Text()
+	start := scanner.SkipTrivia(text, pos)
+	if !strings.Contains(text[pos:start], "/**") {
+		return nil, sourceFile
+	}
+	// Prefer tsgo's cached parse. An intervening comment or blank line breaks
+	// ESLint's attachment, even when TypeScript still attaches the JSDoc.
+	for _, doc := range slices.Backward(host.JSDoc(sourceFile)) {
+		if doc.Pos() >= pos && doc.End() <= start && ecmascript.IsBlank(text[doc.End():start]) &&
+			scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), start)-scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), doc.End()) <= 1 {
+			return doc, sourceFile
 		}
 	}
-	return false
+	// tsgo omits some same-line comments (e.g. an object property after `{`).
+	// Use its comment scanner and parser for that case too, without changing
+	// the source AST or implementing a second JSDoc parser.
+	var last ast.CommentRange
+	for comment := range utils.GetCommentsInRange(sourceFile, core.NewTextRange(pos, start)) {
+		if comment.End() > last.End() {
+			last = comment
+		}
+	}
+	if last.End() == 0 || !strings.HasPrefix(text[last.Pos():last.End()], "/**") ||
+		scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), start)-scanner.ComputeLineOfPosition(sourceFile.ECMALineMap(), last.End()) > 1 {
+		return nil, sourceFile
+	}
+	fragment := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/component.ts", Path: "/component.ts"}, text[last.Pos():last.End()]+"\nconst component = 0;", core.ScriptKindTS)
+	docs := fragment.Statements.Nodes[0].JSDoc(fragment)
+	if len(docs) == 0 {
+		return nil, sourceFile
+	}
+	return docs[0], fragment
+}
+
+func componentJSDocHost(node *ast.Node, sourceFile *ast.SourceFile) (*ast.Node, int) {
+	parentOf := func(node *ast.Node) *ast.Node {
+		parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+		// ESTree has no VariableDeclarationList wrapper.
+		if parent != nil && parent.Kind == ast.KindVariableDeclarationList {
+			parent = parent.Parent
+		}
+		return parent
+	}
+	parent := parentOf(node)
+	host := node
+	switch node.Kind {
+	case ast.KindClassDeclaration, ast.KindFunctionDeclaration:
+		// Export wrappers are part of this node in tsgo.
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		// ESTree gives an object method a FunctionExpression value whose
+		// JSDoc host is the containing Property.
+		if parent == nil || parent.Kind != ast.KindObjectLiteralExpression {
+			return nil, 0
+		}
+	case ast.KindClassExpression:
+		if parent == nil || parent.Kind == ast.KindPropertyDeclaration {
+			// The latter's ESTree grandparent is ClassBody, not the outer class.
+			return nil, 0
+		}
+		if parent.Kind == ast.KindExportAssignment {
+			// `export default (class {})` is a ClassDeclaration in ESTree.
+			host = parent
+		} else {
+			host = parentOf(parent)
+		}
+		if host != nil && host.Kind == ast.KindVariableStatement && host.Modifiers() != nil {
+			// A class expression asks for the inner VariableDeclaration; a
+			// comment before `export` belongs to ExportNamedDeclaration.
+			return host, host.Modifiers().Nodes[len(host.Modifiers().Nodes)-1].End()
+		}
+	case ast.KindFunctionExpression, ast.KindArrowFunction:
+		if parent == nil || parent.Kind == ast.KindCallExpression || parent.Kind == ast.KindNewExpression {
+			break
+		}
+		for parent != nil {
+			pos := parent.Pos()
+			if parent.Kind == ast.KindVariableStatement && parent.Modifiers() != nil {
+				inner := parent.Modifiers().Nodes[len(parent.Modifiers().Nodes)-1].End()
+				if utils.HasCommentsInRange(sourceFile, core.NewTextRange(inner, scanner.SkipTrivia(sourceFile.Text(), inner))) {
+					return parent, inner
+				}
+			}
+			if ast.IsFunctionLike(parent) || parent.Kind == ast.KindPropertyAssignment ||
+				utils.HasCommentsInRange(sourceFile, core.NewTextRange(pos, scanner.SkipTrivia(sourceFile.Text(), pos))) {
+				break
+			}
+			parent = parentOf(parent)
+		}
+		if parent != nil && parent.Kind != ast.KindFunctionDeclaration && parent.Kind != ast.KindSourceFile {
+			host = parent
+		}
+	default:
+		return nil, 0
+	}
+	if host == nil {
+		return nil, 0
+	}
+	return host, host.Pos()
 }
 
 func isComponentName(name string) bool {

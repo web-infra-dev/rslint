@@ -127,13 +127,14 @@ func TestNoRestrictedSyntax_ProbeDeepEdges(t *testing.T) {
 				},
 			},
 			// Probe: `[type!='Identifier']` — matches every non-Identifier
-			// node. For `var x = 1;` that is: VariableStatement,
+			// node. For `var x = 1;` that is: Program, VariableStatement,
 			// VariableDeclaration (the declarator), NumericLiteral.
 			// Identifier `x` is excluded.
 			{
 				Code:    `var x = 1;`,
 				Options: []interface{}{`[type!='Identifier']`},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Using '[type!='Identifier']' is not allowed."},
 					{MessageId: "restrictedSyntax", Message: "Using '[type!='Identifier']' is not allowed."},
 					{MessageId: "restrictedSyntax", Message: "Using '[type!='Identifier']' is not allowed."},
 					{MessageId: "restrictedSyntax", Message: "Using '[type!='Identifier']' is not allowed."},

@@ -2,10 +2,10 @@ package no_restricted_syntax
 
 import (
 	"math"
+	"math/big"
+	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf16"
-	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -116,15 +116,14 @@ func matches(sel selector, node *ast.Node, mc *matchContext) bool {
 	return matchesInScope(sel, node, mc, nil)
 }
 
-func matchesInScope(sel selector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
-	return matchesInScopeTarget(sel, node, mc, scopeRoot, "")
+func matchesInScope(sel selector, node *ast.Node, mc *matchContext, scopeRoot *virtualNodeFacade) bool {
+	return matchesInScopeTarget(sel, node, mc, scopeRoot, "physical")
 }
 
 // matchesInScopeTarget evaluates the selector against either the physical
-// tsgo node (target == "physical") or one of the ESTree wrapper nodes that
-// tsgo folds into that node. An empty target retains the historical behavior
-// used when walking ancestors and children.
-func matchesInScopeTarget(sel selector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node, target string) bool {
+// tsgo node (target == "physical") or an ESTree facade on that same node.
+// Structural matching carries both the node and its identity through each edge.
+func matchesInScopeTarget(sel selector, node *ast.Node, mc *matchContext, scopeRoot *virtualNodeFacade, target string) bool {
 	switch v := sel.(type) {
 	case subjectSelector:
 		return matchesInScopeTarget(v.Inner, node, mc, scopeRoot, target)
@@ -143,7 +142,7 @@ func matchesInScopeTarget(sel selector, node *ast.Node, mc *matchContext, scopeR
 		if !matchesInScopeTarget(v.Inner, node, mc, scopeRoot, target) {
 			return false
 		}
-		return matchesClassTarget(node, v.Path, scopeRoot, target)
+		return matchesClassTarget(node, v.Path, mc, scopeRoot, target)
 	case attrSelector:
 		if !matchesInScopeTarget(v.Inner, node, mc, scopeRoot, target) {
 			return false
@@ -153,7 +152,7 @@ func matchesInScopeTarget(sel selector, node *ast.Node, mc *matchContext, scopeR
 		}
 		return matchesAttr(node, v.Path, v.Op, v.Value, mc)
 	case combinatorSelector:
-		if !matchesInScopeTarget(v.Right, node, mc, scopeRoot, target) {
+		if v.Kind != combAdjacent && v.Kind != combSibling && !matchesInScopeTarget(v.Right, node, mc, scopeRoot, target) {
 			return false
 		}
 		return matchesCombinatorTarget(v, node, mc, scopeRoot, target)
@@ -210,7 +209,7 @@ func matchesIdentifier(sel identifierSelector, node *ast.Node) bool {
 func refineEstreeMatch(name string, node *ast.Node) bool {
 	switch name {
 	case "Identifier":
-		return !isJSXIdentifier(node)
+		return node.Kind != ast.KindConstructor && !isJSXIdentifier(node)
 	case "JSXIdentifier":
 		return isJSXIdentifier(node)
 	case "MemberExpression":
@@ -222,13 +221,15 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 	case "JSXEmptyExpression":
 		return node.Kind == ast.KindJsxExpression && node.AsJsxExpression().DotDotDotToken == nil && node.AsJsxExpression().Expression == nil
 	case "JSXElement":
-		return node.Kind == ast.KindJsxElement
+		return node.Kind == ast.KindJsxElement || node.Kind == ast.KindJsxSelfClosingElement
 	case "JSXOpeningElement":
 		return node.Kind == ast.KindJsxOpeningElement
+	case "Literal":
+		return node.Kind != ast.KindConstructor
 	case "FunctionExpression":
 		// Methods expose a synthetic FunctionExpression through ESTree's
 		// MethodDefinition.value / Property.value fields.
-		return !isFunctionValueNode(node)
+		return node.Kind == ast.KindFunctionExpression
 	case "TSEnumBody":
 		return false
 	case "JSXSpreadChild":
@@ -253,14 +254,7 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 	case "SequenceExpression":
 		return node.Kind == ast.KindBinaryExpression && isCommaOperator(node)
 	case "ChainExpression":
-		// ESTree wraps the entire optional chain in a single
-		// ChainExpression node. tsgo has no analogue, so we match the
-		// outermost link in the chain — the highest node that is itself
-		// part of the chain but whose parent is not.
-		// `ast.IsOutermostOptionalChain` is too permissive for this
-		// purpose (it's true for the link directly under any `?.`-token
-		// wrapper, which still emits an inner Match in `a?.b?.()`).
-		return ast.IsOptionalChain(node) && (node.Parent == nil || !ast.IsOptionalChain(node.Parent))
+		return isChainRoot(node)
 	case "UnaryExpression":
 		// ESTree's UnaryExpression wraps `+`, `-`, `!`, `~`, `typeof`, `void`,
 		// `delete`. ESTree's UpdateExpression wraps `++`/`--`. tsgo splits
@@ -304,6 +298,8 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 			return node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression
 		}
 		return true
+	case "TSAbstractMethodDefinition":
+		return isClassLikeNode(node.Parent) && ast.HasSyntacticModifier(node, ast.ModifierFlagsAbstract)
 	case "MethodDefinition":
 		// Mirror of "Property": MethodDefinition only fires for methods
 		// / accessors inside a class body. KindConstructor is class-only
@@ -314,7 +310,7 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 				return false
 			}
 			pk := node.Parent.Kind
-			return pk == ast.KindClassDeclaration || pk == ast.KindClassExpression
+			return (pk == ast.KindClassDeclaration || pk == ast.KindClassExpression) && !ast.HasSyntacticModifier(node, ast.ModifierFlagsAbstract)
 		case ast.KindConstructor:
 			return true
 		}
@@ -430,48 +426,25 @@ func isAssignmentOperatorKind(k ast.Kind) bool {
 
 // matchesClassTarget evaluates `Foo.bar` — Foo already matched by the inner
 // selector, here we check that the node sits at the named field of its parent.
-func matchesClassTarget(node *ast.Node, path []string, scopeRoot *ast.Node, target string) bool {
+func matchesClassTarget(node *ast.Node, path []string, mc *matchContext, scopeRoot *virtualNodeFacade, target string) bool {
 	if len(path) == 0 {
 		return false
 	}
-	if target != "" && target != "physical" {
-		if matchesVirtualField(node, target, path) {
-			return true
-		}
-	}
-	// esquery selects exactly the Nth ESTree ancestor for an N-segment field
-	// path. Walk logical parents so tsgo-only wrappers do not shift that index.
-	ancestor := node
+	ancestor, ancestorTarget := node, target
 	for range path {
-		ancestor = matchingParent(ancestor, scopeRoot)
-		if ancestor == nil {
+		var ok bool
+		ancestor, ancestorTarget, ok = logicalParentTarget(ancestor, ancestorTarget, scopeRoot)
+		if !ok {
 			return false
 		}
 	}
-	return nodeIsAtFieldPath(node, ancestor, path)
+	return nodeIsAtFieldPath(node, target, targetValue(ancestor, ancestorTarget), path, mc)
 }
 
 func isVirtualOnlyIdentity(name string) bool {
 	switch name {
-	case "ClassBody", "TSEnumBody", "JSXEmptyExpression":
+	case "ClassBody", "TSEnumBody", "JSXEmptyExpression", "TSEmptyBodyFunctionExpression", "ChainExpression":
 		return true
-	}
-	return false
-}
-
-func matchesVirtualField(node *ast.Node, target string, path []string) bool {
-	if len(path) != 1 {
-		return false
-	}
-	switch target {
-	case "ClassBody", "TSEnumBody":
-		return path[0] == "body"
-	case "FunctionExpression":
-		return path[0] == "value"
-	case "JSXElement":
-		return path[0] == "body" || path[0] == "children"
-	case "JSXOpeningElement":
-		return path[0] == "openingElement"
 	}
 	return false
 }
@@ -562,6 +535,7 @@ func lookupStringAttrPath(node *ast.Node, path []string, mc *matchContext) (text
 
 		switch value := current.(type) {
 		case *ast.Node:
+			value = unwrapEstreeNode(value)
 			if value == nil {
 				// A present ESTree property whose value is null remains null when
 				// a deeper path is requested; use the generic resolver to retain
@@ -574,7 +548,7 @@ func lookupStringAttrPath(node *ast.Node, path []string, mc *matchContext) (text
 				case ast.KindIdentifier:
 					return value.AsIdentifier().Text, true, true
 				case ast.KindPrivateIdentifier:
-					return value.AsPrivateIdentifier().Text, true, true
+					return strings.TrimPrefix(value.AsPrivateIdentifier().Text, "#"), true, true
 				}
 				// JSX name attributes resolve to nodes rather than strings, so
 				// let the generic resolver preserve that facade's semantics.
@@ -600,122 +574,56 @@ func lookupStringAttrPath(node *ast.Node, path []string, mc *matchContext) (text
 	return "", false, false
 }
 
-// matchesCombinator handles `>` (parent), descendant, `+` (prev sibling),
-// `~` (any prior sibling). The right-hand side has already been verified
-// against the current node before this function is called.
-func matchesCombinatorTarget(c combinatorSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node, target string) bool {
-	if target != "" && target != "physical" {
-		parent, parentTarget, ok := virtualParent(node, target)
-		if !ok {
-			return false
-		}
-		if c.Kind == combChild {
-			return matchesInScopeTarget(c.Left, parent, mc, scopeRoot, parentTarget)
-		}
-		if c.Kind == combDescendant {
-			if matchesInScopeTarget(c.Left, parent, mc, scopeRoot, parentTarget) {
-				return true
-			}
-			for current, currentTarget, ok := logicalParent(parent, scopeRoot); ok; current, currentTarget, ok = logicalParent(current, scopeRoot) {
-				if matchesInScopeTarget(c.Left, current, mc, scopeRoot, currentTarget) {
-					return true
-				}
-			}
-			return false
-		}
-	}
+// matchesCombinatorTarget handles parents, ancestors, and array siblings.
+// Sibling subjects also permit esquery's reverse matching direction.
+func matchesCombinatorTarget(c combinatorSelector, node *ast.Node, mc *matchContext, scopeRoot *virtualNodeFacade, target string) bool {
 	switch c.Kind {
-	case combChild:
-		parent, parentTarget, ok := logicalParent(node, scopeRoot)
+	case combChild, combDescendant:
+		parent, parentTarget, ok := logicalParentTarget(node, target, scopeRoot)
 		if !ok {
 			return false
 		}
-		// ESTree wraps `export default <decl>` in an
-		// ExportDefaultDeclaration node. tsgo flattens this — a default-
-		// exported FunctionDeclaration / ClassDeclaration sits directly
-		// under SourceFile with `export default` modifiers. To honour
-		// `ExportDefaultDeclaration > FunctionDeclaration`-style
-		// selectors, treat such a declaration as if it had a virtual
-		// ExportDefaultDeclaration parent.
-		if isDefaultExportedDeclaration(node) {
-			if selectorMatchesVirtualExportDefault(c.Left) {
-				return true
-			}
-		}
-		return matchesInScopeTarget(c.Left, parent, mc, scopeRoot, parentTarget)
-	case combDescendant:
-		current, currentTarget, ok := logicalParent(node, scopeRoot)
-		if !ok {
-			return false
-		}
-		if isDefaultExportedDeclaration(node) && selectorMatchesVirtualExportDefault(c.Left) {
+		if target == "physical" && isDefaultExportedDeclaration(node) && selectorMatchesVirtualExportDefault(c.Left) {
 			return true
 		}
 		for ok {
-			if matchesInScopeTarget(c.Left, current, mc, scopeRoot, currentTarget) {
+			if matchesInScopeTarget(c.Left, parent, mc, scopeRoot, parentTarget) {
 				return true
 			}
-			current, currentTarget, ok = logicalParent(current, scopeRoot)
+			if c.Kind == combChild {
+				break
+			}
+			parent, parentTarget, ok = logicalParentTarget(parent, parentTarget, scopeRoot)
 		}
-		return false
 	case combAdjacent, combSibling:
-		parent, _, ok := logicalParent(node, scopeRoot)
-		if !ok {
+		siblings, idx := siblingsOf(node, target, scopeRoot)
+		if idx < 0 {
 			return false
 		}
-		// esquery's sibling combinators only consider list-position
-		// siblings — nodes sharing the same NodeList field on the
-		// parent. Two scalar children of the same parent (e.g.
-		// VariableDeclaration's `id` and `init`) are NOT siblings.
-		var siblings []*ast.Node
-		for _, list := range listChildrenOf(parent) {
-			for _, child := range list {
-				if unwrapEstreeNode(child) == node {
-					siblings = list
-					break
-				}
-			}
-			if siblings != nil {
-				break
-			}
-		}
-		if siblings == nil {
-			return false
-		}
-		idx := -1
-		for i, sib := range siblings {
-			if unwrapEstreeNode(sib) == node {
-				idx = i
-				break
-			}
-		}
-		if idx > 0 {
-			if c.Kind == combAdjacent && matchesNodeVariants(c.Left, unwrapEstreeNode(siblings[idx-1]), mc, scopeRoot) {
+		if idx > 0 && matchesInScopeTarget(c.Right, node, mc, scopeRoot, target) {
+			if c.Kind == combAdjacent && matchesInScopeTarget(c.Left, unwrapEstreeNode(siblings[idx-1]), mc, scopeRoot, childTarget(siblings[idx-1])) {
 				return true
 			}
 			if c.Kind == combSibling {
 				for i := idx - 1; i >= 0; i-- {
-					if matchesNodeVariants(c.Left, unwrapEstreeNode(siblings[i]), mc, scopeRoot) {
+					if matchesInScopeTarget(c.Left, unwrapEstreeNode(siblings[i]), mc, scopeRoot, childTarget(siblings[i])) {
 						return true
 					}
 				}
 			}
 		}
-
-		// These reverse-direction branches intentionally mirror esquery 1.7.0:
-		// sibling looks at a subject on the left, while adjacent looks at a
-		// subject on the right.
-		if c.Kind == combSibling && isSubjectSelector(c.Left) && matchesInScope(c.Left, node, mc, scopeRoot) {
+		// These reverse-direction branches mirror esquery 1.7.0's subject
+		// handling. Only nodes in the same ESTree array can be siblings.
+		if c.Kind == combSibling && isSubjectSelector(c.Left) && matchesInScopeTarget(c.Left, node, mc, scopeRoot, target) {
 			for i := idx + 1; i < len(siblings); i++ {
-				if matchesInScope(c.Right, unwrapEstreeNode(siblings[i]), mc, scopeRoot) {
+				if matchesInScopeTarget(c.Right, unwrapEstreeNode(siblings[i]), mc, scopeRoot, childTarget(siblings[i])) {
 					return true
 				}
 			}
 		}
-		if c.Kind == combAdjacent && isSubjectSelector(c.Right) && matchesInScope(c.Left, node, mc, scopeRoot) && idx+1 < len(siblings) {
-			return matchesInScope(c.Right, unwrapEstreeNode(siblings[idx+1]), mc, scopeRoot)
+		if c.Kind == combAdjacent && isSubjectSelector(c.Right) && matchesInScopeTarget(c.Left, node, mc, scopeRoot, target) && idx+1 < len(siblings) {
+			return matchesInScopeTarget(c.Right, unwrapEstreeNode(siblings[idx+1]), mc, scopeRoot, childTarget(siblings[idx+1]))
 		}
-		return false
 	}
 	return false
 }
@@ -735,7 +643,7 @@ func isFunctionValueNode(node *ast.Node) bool {
 	}
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-		return true
+		return node.Parent != nil && (isClassLikeNode(node.Parent) || node.Parent.Kind == ast.KindObjectLiteralExpression)
 	}
 	return false
 }
@@ -744,39 +652,57 @@ func isEnumDeclarationNode(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindEnumDeclaration
 }
 
-func virtualTargets(node *ast.Node) []string {
-	if node == nil {
-		return nil
-	}
-	var targets []string
-	if isClassLikeNode(node) {
-		targets = append(targets, "ClassBody")
-	}
-	if isEnumDeclarationNode(node) {
-		targets = append(targets, "TSEnumBody")
-	}
-	if node.Kind == ast.KindJsxSelfClosingElement {
-		targets = append(targets, "JSXElement", "JSXOpeningElement")
-	}
-	if isEmptyJSXExpression(node) {
-		targets = append(targets, "JSXEmptyExpression")
-	}
-	if isFunctionValueNode(node) {
-		targets = append(targets, "FunctionExpression")
-	}
-	return targets
+func isChainRoot(node *ast.Node) bool {
+	// Only the receiver continues a chain. An optional chain in an argument
+	// or a computed key belongs to its own ChainExpression.
+	return node != nil && ast.IsOptionalChain(node) &&
+		(node.Parent == nil || !ast.IsOptionalChain(node.Parent) || node.Parent.Expression() != node)
 }
 
-func matchesNodeVariants(sel selector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node) bool {
-	if matchesInScope(sel, node, mc, scopeRoot) {
-		return true
+func childTarget(node *ast.Node) string {
+	if isChainRoot(unwrapEstreeNode(node)) {
+		return "ChainExpression"
 	}
-	for _, target := range virtualTargets(node) {
-		if matchesInScopeTarget(sel, node, mc, scopeRoot, target) {
-			return true
+	return "physical"
+}
+
+func estreeChildValue(node *ast.Node) interface{} {
+	if isChainRoot(node) {
+		return virtualNodeFacade{node, "ChainExpression"}
+	}
+	return node
+}
+
+func constructorKey(node *ast.Node, mc *matchContext) virtualNodeFacade {
+	if mc != nil && mc.sf != nil {
+		if token, ok := utils.TokenBeforePosition(mc.sf, node.ParameterList().Pos()-1); ok && token.Kind == ast.KindStringLiteral {
+			return virtualNodeFacade{node, "Literal"}
 		}
 	}
-	return false
+	return virtualNodeFacade{node, "Identifier"}
+}
+
+// virtualTarget identifies a folded wrapper. Constructor keys are separate
+// scalar facades; self-closing JSX uses the physical node for JSXElement.
+func virtualTarget(node *ast.Node) string {
+	switch {
+	case isChainRoot(node):
+		return "ChainExpression"
+	case isClassLikeNode(node):
+		return "ClassBody"
+	case isEnumDeclarationNode(node):
+		return "TSEnumBody"
+	case node.Kind == ast.KindJsxSelfClosingElement:
+		return "JSXOpeningElement"
+	case isEmptyJSXExpression(node):
+		return "JSXEmptyExpression"
+	case isFunctionValueNode(node):
+		if node.Body() == nil {
+			return "TSEmptyBodyFunctionExpression"
+		}
+		return "FunctionExpression"
+	}
+	return ""
 }
 
 // virtualParent returns the physical node and wrapper identity that is the
@@ -785,6 +711,12 @@ func matchesNodeVariants(sel selector, node *ast.Node, mc *matchContext, scopeRo
 // allocating synthetic AST nodes.
 func virtualParent(node *ast.Node, target string) (*ast.Node, string, bool) {
 	switch target {
+	case "ChainExpression":
+		return structuralParent(node)
+	case "Identifier", "Literal":
+		if node.Kind == ast.KindConstructor {
+			return node, "physical", true
+		}
 	case "ClassBody":
 		if isClassLikeNode(node) {
 			return node, "physical", true
@@ -797,17 +729,13 @@ func virtualParent(node *ast.Node, target string) (*ast.Node, string, bool) {
 		if isEmptyJSXExpression(node) {
 			return node, "physical", true
 		}
-	case "FunctionExpression":
+	case "FunctionExpression", "TSEmptyBodyFunctionExpression":
 		if isFunctionValueNode(node) {
 			return node, "physical", true
 		}
-	case "JSXElement":
-		if node.Kind == ast.KindJsxSelfClosingElement {
-			return estreeParent(node), "physical", true
-		}
 	case "JSXOpeningElement":
 		if node.Kind == ast.KindJsxSelfClosingElement {
-			return node, "JSXElement", true
+			return node, "physical", true
 		}
 	}
 	return nil, "", false
@@ -816,10 +744,20 @@ func virtualParent(node *ast.Node, target string) (*ast.Node, string, bool) {
 // logicalParent returns the parent edge in the ESTree graph. Most tsgo nodes
 // have a direct physical equivalent, but class members, enum members, and
 // method bodies pass through ESTree wrapper nodes that tsgo folds away.
-func logicalParent(node *ast.Node, scopeRoot *ast.Node) (*ast.Node, string, bool) {
-	if node == nil || node == scopeRoot {
+func logicalParentTarget(node *ast.Node, target string, scopeRoot *virtualNodeFacade) (*ast.Node, string, bool) {
+	if node == nil || scopeRoot != nil && node == scopeRoot.node && target == scopeRoot.typeName {
 		return nil, "", false
 	}
+	if target != "physical" && target != "" {
+		return virtualParent(node, target)
+	}
+	if isChainRoot(node) {
+		return node, "ChainExpression", true
+	}
+	return structuralParent(node)
+}
+
+func structuralParent(node *ast.Node) (*ast.Node, string, bool) {
 	parent := estreeParent(node)
 	if parent == nil {
 		return nil, "", false
@@ -831,7 +769,7 @@ func logicalParent(node *ast.Node, scopeRoot *ast.Node) (*ast.Node, string, bool
 		return parent, "TSEnumBody", true
 	}
 	if isFunctionValueNode(parent) && isFunctionValueChild(node, parent) {
-		return parent, "FunctionExpression", true
+		return parent, virtualTarget(parent), true
 	}
 	if parent.Kind == ast.KindJsxSelfClosingElement {
 		return parent, "JSXOpeningElement", true
@@ -846,11 +784,11 @@ func classMembers(node *ast.Node) []*ast.Node {
 	switch node.Kind {
 	case ast.KindClassDeclaration:
 		if members := node.AsClassDeclaration().Members; members != nil {
-			return members.Nodes
+			return utils.ESTreeMembers(members.Nodes)
 		}
 	case ast.KindClassExpression:
 		if members := node.AsClassExpression().Members; members != nil {
-			return members.Nodes
+			return utils.ESTreeMembers(members.Nodes)
 		}
 	}
 	return nil
@@ -879,11 +817,14 @@ func isFunctionValueChild(node, parent *ast.Node) bool {
 	if node == nil || parent == nil {
 		return false
 	}
+	if node == utils.ESTreeType(parent) || nodeInList(node, statements(parent.TypeParameterList())) {
+		return true
+	}
 	if body := parent.Body(); body != nil && node == body {
 		return true
 	}
-	for _, param := range utils.ESTreeParameters(parent) {
-		if unwrapEstreeNode(param) == node {
+	for _, param := range parent.Parameters() {
+		if param == node || unwrapEstreeNode(param) == node || isPlainParameter(param) && node == utils.ESTreeType(param) {
 			return true
 		}
 	}
@@ -971,7 +912,7 @@ func isEmptyJSXExpression(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindJsxExpression && node.AsJsxExpression().DotDotDotToken == nil && node.AsJsxExpression().Expression == nil
 }
 
-func matchesPseudoTarget(p pseudoSelector, node *ast.Node, mc *matchContext, scopeRoot *ast.Node, target string) bool {
+func matchesPseudoTarget(p pseudoSelector, node *ast.Node, mc *matchContext, scopeRoot *virtualNodeFacade, target string) bool {
 	switch p.Name {
 	case "is", "matches":
 		for _, a := range p.Args {
@@ -1009,7 +950,7 @@ func matchesPseudoTarget(p pseudoSelector, node *ast.Node, mc *matchContext, sco
 	return false
 }
 
-func matchesNodeClassTarget(node *ast.Node, class string, scopeRoot *ast.Node, target string) bool {
+func matchesNodeClassTarget(node *ast.Node, class string, scopeRoot *virtualNodeFacade, target string) bool {
 	nodeType := estreeNameForKind(node)
 	if target != "" && target != "physical" {
 		nodeType = target
@@ -1022,7 +963,7 @@ func matchesNodeClassTarget(node *ast.Node, class string, scopeRoot *ast.Node, t
 	case "function":
 		return nodeType == "FunctionDeclaration" || nodeType == "FunctionExpression" || nodeType == "ArrowFunctionExpression"
 	case "expression", "pattern":
-		parent := matchingParent(node, scopeRoot)
+		parent, _, _ := logicalParentTarget(node, target, scopeRoot)
 		isExpression := strings.HasSuffix(nodeType, "Expression") ||
 			strings.HasSuffix(nodeType, "Literal") ||
 			nodeType == "MetaProperty" ||
@@ -1043,6 +984,7 @@ func hasMatching(node *ast.Node, sel selector, mc *matchContext, target string) 
 		matched := false
 		var visitDirect func(child *ast.Node, childTarget string) bool
 		visitDirect = func(child *ast.Node, childTarget string) bool {
+			child = unwrapEstreeNode(child)
 			if expression := utils.JSDocTypeCastExpression(child); expression != nil {
 				return visitDirect(expression, childTarget)
 			}
@@ -1050,16 +992,16 @@ func hasMatching(node *ast.Node, sel selector, mc *matchContext, target string) 
 				return false
 			}
 			if isTransparentEstreeContainer(child) {
-				forEachLogicalChild(child, childTarget, visitDirect)
+				forEachLogicalChild(child, childTarget, mc, visitDirect)
 				return matched
 			}
-			if matchesInScopeTarget(relative.Inner, child, mc, node, childTarget) {
+			if matchesInScopeTarget(relative.Inner, child, mc, &virtualNodeFacade{node, target}, childTarget) {
 				matched = true
 				return true
 			}
 			return false
 		}
-		forEachLogicalChild(node, target, visitDirect)
+		forEachLogicalChild(node, target, mc, visitDirect)
 		return matched
 	}
 	return hasDescendantMatching(node, sel, mc, target)
@@ -1069,6 +1011,7 @@ func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext, targe
 	found := false
 	var visit func(n *ast.Node, currentTarget string) bool
 	visit = func(n *ast.Node, currentTarget string) bool {
+		n = unwrapEstreeNode(n)
 		if found {
 			return true
 		}
@@ -1079,28 +1022,33 @@ func hasDescendantMatching(node *ast.Node, sel selector, mc *matchContext, targe
 			return false
 		}
 		if !isTransparentEstreeContainer(n) {
-			if matchesInScopeTarget(sel, n, mc, node, currentTarget) {
+			if matchesInScopeTarget(sel, n, mc, &virtualNodeFacade{node, target}, currentTarget) {
 				found = true
 				return true
 			}
 		}
-		forEachLogicalChild(n, currentTarget, visit)
+		forEachLogicalChild(n, currentTarget, mc, visit)
 		return found
 	}
 	visit(node, target)
 	return found
 }
 
-func forEachLogicalChild(node *ast.Node, target string, visit func(*ast.Node, string) bool) {
+func forEachLogicalChild(node *ast.Node, target string, mc *matchContext, visit func(*ast.Node, string) bool) {
 	if node == nil {
 		return
 	}
-	visitPhysicalChildren := func(skip func(*ast.Node) bool) {
-		node.ForEachChild(func(child *ast.Node) bool {
+	visitPhysicalChildren := func(skip func(*ast.Node) bool) bool {
+		return node.ForEachChild(func(child *ast.Node) bool {
+			// ForEachChild includes operator/modifier tokens and EOF. Only
+			// token kinds already exposed by the rule have an ESTree identity.
+			if ast.IsToken(child) && !slices.Contains(allInterestingKinds, child.Kind) {
+				return false
+			}
 			if skip != nil && skip(child) {
 				return false
 			}
-			return visit(child, "physical")
+			return visit(child, childTarget(child))
 		})
 	}
 	switch target {
@@ -1118,7 +1066,15 @@ func forEachLogicalChild(node *ast.Node, target string, visit func(*ast.Node, st
 			}
 		}
 		return
-	case "FunctionExpression":
+	case "FunctionExpression", "TSEmptyBodyFunctionExpression":
+		for _, child := range utils.ESTreeTypeParameters(node) {
+			if visit(child, "physical") {
+				return
+			}
+		}
+		if t := utils.ESTreeType(node); t != nil && visit(t, "physical") {
+			return
+		}
 		for _, child := range utils.ESTreeParameters(node) {
 			if visit(child, "physical") {
 				return
@@ -1128,36 +1084,47 @@ func forEachLogicalChild(node *ast.Node, target string, visit func(*ast.Node, st
 			visit(body, "physical")
 		}
 		return
-	case "JSXElement":
-		if node.Kind == ast.KindJsxSelfClosingElement {
-			visit(node, "JSXOpeningElement")
-			return
-		}
 	case "JSXOpeningElement":
 		if node.Kind == ast.KindJsxSelfClosingElement {
 			visitPhysicalChildren(nil)
 		}
 		return
-	case "JSXEmptyExpression":
+	case "ChainExpression":
+		visit(node, "physical")
+		return
+	case "JSXEmptyExpression", "Identifier", "Literal":
 		return
 	}
 
 	switch {
 	case isClassLikeNode(node):
-		visitPhysicalChildren(func(child *ast.Node) bool {
+		if visitPhysicalChildren(func(child *ast.Node) bool {
 			return nodeInList(child, classMembers(node))
-		})
+		}) {
+			return
+		}
 		visit(node, "ClassBody")
 	case isEnumDeclarationNode(node):
-		visitPhysicalChildren(func(child *ast.Node) bool {
+		if visitPhysicalChildren(func(child *ast.Node) bool {
 			return nodeInList(child, enumMembers(node))
-		})
+		}) {
+			return
+		}
 		visit(node, "TSEnumBody")
 	case isFunctionValueNode(node):
-		visitPhysicalChildren(func(child *ast.Node) bool {
+		if node.Kind == ast.KindConstructor && visit(node, constructorKey(node, mc).typeName) {
+			return
+		}
+		if visitPhysicalChildren(func(child *ast.Node) bool {
 			return isFunctionValueChild(child, node)
-		})
-		visit(node, "FunctionExpression")
+		}) {
+			return
+		}
+		visit(node, virtualTarget(node))
+	case node.Kind == ast.KindIdentifier && isPlainParameter(node.Parent) && node.Parent.Name() == node:
+		if t := utils.ESTreeType(node.Parent); t != nil {
+			visit(t, "physical")
+		}
 	case node.Kind == ast.KindJsxSelfClosingElement:
 		visit(node, "JSXOpeningElement")
 	case isEmptyJSXExpression(node):
@@ -1167,17 +1134,41 @@ func forEachLogicalChild(node *ast.Node, target string, visit func(*ast.Node, st
 	}
 }
 
-func nodeIsAtFieldPath(node, ancestor *ast.Node, path []string) bool {
-	ancestor = unwrapEstreeNode(ancestor)
-	if len(path) == 0 {
-		return unwrapEstreeNode(node) == ancestor
+// targetValue shares the attribute facade with structural field matching.
+func targetValue(node *ast.Node, target string) interface{} {
+	if target == "physical" || target == "" {
+		return node
 	}
-	for _, child := range nodesAtField(ancestor, path[0]) {
-		if nodeIsAtFieldPath(node, unwrapEstreeNode(child), path[1:]) {
-			return true
+	return virtualNodeFacade{node, target}
+}
+
+func nodeIsAtFieldPath(node *ast.Node, target string, current interface{}, path []string, mc *matchContext) bool {
+	if nodes, ok := current.([]*ast.Node); ok {
+		for _, child := range nodes {
+			if nodeIsAtFieldPath(node, target, estreeChildValue(unwrapEstreeNode(child)), path, mc) {
+				return true
+			}
+		}
+		return false
+	}
+	if len(path) == 0 {
+		switch value := current.(type) {
+		case *ast.Node:
+			return target == "physical" && node == unwrapEstreeNode(value)
+		case virtualNodeFacade:
+			return node == value.node && target == value.typeName
+		}
+		return false
+	}
+	next, ok := stepAttrPath(current, path[0], mc)
+	if !ok {
+		if physical, isNode := current.(*ast.Node); isNode && physical != nil {
+			next = nodesAtField(physical, path[0])
+		} else {
+			return false
 		}
 	}
-	return false
+	return nodeIsAtFieldPath(node, target, next, path[1:], mc)
 }
 
 // lookupAttrPath walks `path` against `node` to fetch a comparable value.
@@ -1202,10 +1193,15 @@ func stepAttrPath(current interface{}, segment string, mc *matchContext) (interf
 		return nil, true
 	}
 	if n, ok := current.(*ast.Node); ok {
+		n = unwrapEstreeNode(n)
 		if n == nil {
 			return nil, true
 		}
-		return readNodeAttr(n, segment, mc)
+		value, found := readNodeAttr(n, segment, mc)
+		if child, ok := value.(*ast.Node); ok && child != n && segment != "parent" {
+			return estreeChildValue(child), found
+		}
+		return value, found
 	}
 	if rf, ok := current.(regexFacade); ok {
 		switch segment {
@@ -1232,66 +1228,38 @@ func stepAttrPath(current interface{}, segment string, mc *matchContext) (interf
 		case "type":
 			return vn.typeName, true
 		case "parent":
-			switch vn.typeName {
-			case "ClassBody", "TSEnumBody", "FunctionExpression":
-				return vn.node, true
-			case "JSXEmptyExpression":
-				return virtualNodeFacade{node: vn.node, typeName: "JSXExpressionContainer"}, true
-			case "JSXOpeningElement":
-				return virtualNodeFacade{node: vn.node, typeName: "JSXElement"}, true
-			case "JSXExpressionContainer", "JSXElement", "JSXMemberExpression", "JSXIdentifier":
-				return estreeParentValue(vn.node), true
-			default:
-				return estreeParent(vn.node), true
+			parent, target, ok := logicalParentTarget(vn.node, vn.typeName, nil)
+			if !ok {
+				return nil, true
 			}
-		case "expression":
-			if vn.typeName == "JSXExpressionContainer" {
-				return unwrapExpression(vn.node.AsJsxExpression().Expression), true
-			}
+			return targetValue(parent, target), true
 		}
 		return readVirtualNodeAttr(vn, segment, mc)
-	}
-	if fv, ok := current.(functionValueFacade); ok {
-		switch segment {
-		case "type":
-			return "FunctionExpression", true
-		case "id":
-			return nil, true
-		case "parent":
-			return fv.node, true
-		case "body":
-			return fv.node.Body(), true
-		case "params":
-			return utils.ESTreeParameters(fv.node), true
-		case "async":
-			return ast.IsAsyncFunction(fv.node), true
-		case "generator":
-			return methodValueIsGenerator(fv.node), true
-		case "expression":
-			return false, true
-		}
-		return nil, false
 	}
 	// Primitive interpretations: support `.length` on strings / slices.
 	if segment == "length" {
 		switch v := current.(type) {
 		case string:
-			return float64(len([]rune(v))), true
+			return float64(ecmascript.StringCodeUnitCount(v)), true
 		case []*ast.Node:
 			return float64(len(v)), true
 		}
 	}
 	if nodes, ok := current.([]*ast.Node); ok {
 		index, err := strconv.Atoi(segment)
-		if err != nil || index < 0 || index >= len(nodes) {
+		if err != nil || index < 0 || index >= len(nodes) || strconv.Itoa(index) != segment {
 			return nil, false
 		}
-		return nodes[index], true
+		return estreeChildValue(unwrapEstreeNode(nodes[index])), true
 	}
 	return nil, false
 }
 
 type undefinedAttr struct{}
+
+// Keep BigInt distinct from string for typeof and regexp selectors. Its
+// canonical decimal text is also the value esquery uses for string equality.
+type bigintAttr string
 
 func compareStringAttr(left string, op attrOp, right attrValue) bool {
 	equal := attrStringEquals(left, right)
@@ -1334,19 +1302,42 @@ func compareAttr(left interface{}, op attrOp, right attrValue) bool {
 }
 
 func compareRelationalAttr(left interface{}, right attrValue) (int, bool) {
+	if value, ok := left.(bigintAttr); ok {
+		leftInt, valid := ecmascript.StringToBigInt(string(value))
+		if !valid {
+			return 0, false
+		}
+		if right.Kind == attrValueString || right.Kind == attrValueIdent {
+			text := right.Str
+			if right.Kind == attrValueIdent {
+				text = right.Ident
+			}
+			rightInt, valid := ecmascript.StringToBigInt(text)
+			if !valid {
+				return 0, false
+			}
+			return leftInt.Cmp(rightInt), true
+		}
+		if right.Kind != attrValueNumber || math.IsNaN(right.Num) {
+			return 0, false
+		}
+		// SetInt chooses enough precision to preserve every BigInt bit; the
+		// other operand is already an IEEE 754 number in esquery's AST.
+		return new(big.Float).SetInt(leftInt).Cmp(new(big.Float).SetFloat64(right.Num)), true
+	}
 	leftText, leftIsString, leftNumber, leftOK := leftRelationalPrimitive(left)
 	rightText, rightIsString, rightNumber, rightOK := rightRelationalPrimitive(right)
 	if !leftOK || !rightOK {
 		return 0, false
 	}
 	if leftIsString && rightIsString {
-		return compareJSStrings(leftText, rightText), true
+		return ecmascript.CompareStrings(leftText, rightText), true
 	}
 	if leftIsString {
-		leftNumber, leftOK = jsStringToNumber(leftText)
+		leftNumber, leftOK = ecmascript.StringToNumber(leftText)
 	}
 	if rightIsString {
-		rightNumber, rightOK = jsStringToNumber(rightText)
+		rightNumber, rightOK = ecmascript.StringToNumber(rightText)
 	}
 	if !leftOK || !rightOK || math.IsNaN(leftNumber) || math.IsNaN(rightNumber) {
 		return 0, false
@@ -1383,7 +1374,7 @@ func leftRelationalPrimitive(value interface{}) (text string, isString bool, num
 			return "", false, 0, true
 		}
 		return attrAsString(typed), true, 0, true
-	case []*ast.Node, regexFacade, metaIdentifier, functionValueFacade:
+	case []*ast.Node, regexFacade, metaIdentifier, virtualNodeFacade:
 		return attrAsString(typed), true, 0, true
 	default:
 		return "", false, 0, false
@@ -1401,70 +1392,6 @@ func rightRelationalPrimitive(value attrValue) (text string, isString bool, numb
 	default:
 		return "", false, 0, false
 	}
-}
-
-func jsStringToNumber(value string) (float64, bool) {
-	value = ecmascript.StringTrim(value)
-	if value == "" {
-		return 0, true
-	}
-	switch value {
-	case "Infinity", "+Infinity":
-		return math.Inf(1), true
-	case "-Infinity":
-		return math.Inf(-1), true
-	}
-	if len(value) > 2 && value[0] == '0' {
-		base := 0
-		switch value[1] {
-		case 'x', 'X':
-			base = 16
-		case 'b', 'B':
-			base = 2
-		case 'o', 'O':
-			base = 8
-		}
-		if base != 0 {
-			parsed, err := strconv.ParseUint(value[2:], base, 64)
-			return float64(parsed), err == nil
-		}
-	}
-	parsed, err := strconv.ParseFloat(value, 64)
-	return parsed, err == nil && !math.IsNaN(parsed)
-}
-
-func compareJSStrings(left, right string) int {
-	if isASCII(left) && isASCII(right) {
-		return strings.Compare(left, right)
-	}
-	leftUnits := utf16.Encode([]rune(left))
-	rightUnits := utf16.Encode([]rune(right))
-	limit := min(len(leftUnits), len(rightUnits))
-	for index := range limit {
-		if leftUnits[index] < rightUnits[index] {
-			return -1
-		}
-		if leftUnits[index] > rightUnits[index] {
-			return 1
-		}
-	}
-	switch {
-	case len(leftUnits) < len(rightUnits):
-		return -1
-	case len(leftUnits) > len(rightUnits):
-		return 1
-	default:
-		return 0
-	}
-}
-
-func isASCII(value string) bool {
-	for index := range len(value) {
-		if value[index] >= utf8.RuneSelf {
-			return false
-		}
-	}
-	return true
 }
 
 func attrEquals(left interface{}, right attrValue) bool {
@@ -1510,17 +1437,15 @@ func attrAsString(v interface{}) string {
 	switch x := v.(type) {
 	case string:
 		return x
+	case bigintAttr:
+		return string(x)
 	case bool:
 		if x {
 			return "true"
 		}
 		return "false"
 	case float64:
-		// Match JavaScript's "1" not "1.0" formatting.
-		if x == float64(int64(x)) {
-			return strconv.FormatInt(int64(x), 10)
-		}
-		return strconv.FormatFloat(x, 'g', -1, 64)
+		return ecmascript.NumberToString(x)
 	case int:
 		return strconv.Itoa(x)
 	case nil:
@@ -1547,7 +1472,7 @@ func attrAsString(v interface{}) string {
 			}
 		}
 		return text.String()
-	case regexFacade, metaIdentifier, functionValueFacade:
+	case regexFacade, metaIdentifier, virtualNodeFacade:
 		return "[object Object]"
 	}
 	return ""
@@ -1557,6 +1482,8 @@ func attrTypeOf(v interface{}) string {
 	switch v.(type) {
 	case undefinedAttr:
 		return "undefined"
+	case bigintAttr:
+		return "bigint"
 	case string:
 		return "string"
 	case bool:
@@ -1568,31 +1495,39 @@ func attrTypeOf(v interface{}) string {
 	}
 }
 
-func nodeIndexInListFieldTarget(node *ast.Node, scopeRoot *ast.Node, target string) (int, int) {
-	parent, parentTarget, ok := logicalParent(node, scopeRoot)
-	if target != "" && target != "physical" {
-		parent, parentTarget, ok = virtualParent(node, target)
+func nodeIndexInListFieldTarget(node *ast.Node, scopeRoot *virtualNodeFacade, target string) (int, int) {
+	siblings, index := siblingsOf(node, target, scopeRoot)
+	return index, len(siblings)
+}
+
+func siblingsOf(node *ast.Node, target string, scopeRoot *virtualNodeFacade) ([]*ast.Node, int) {
+	// All folded children occupy scalar fields, never a sibling array.
+	if target != "physical" && target != "ChainExpression" || target == "physical" && isChainRoot(node) {
+		return nil, -1
 	}
-	if !ok || parent == nil {
-		return -1, 0
+	parent, parentTarget, ok := logicalParentTarget(node, target, scopeRoot)
+	if !ok {
+		return nil, -1
 	}
-	if parentTarget == "ClassBody" {
-		return indexInNodeList(node, classMembers(parent))
+	var lists [][]*ast.Node
+	switch parentTarget {
+	case "ClassBody":
+		lists = [][]*ast.Node{classMembers(parent)}
+	case "TSEnumBody":
+		lists = [][]*ast.Node{enumMembers(parent)}
+	case "FunctionExpression", "TSEmptyBodyFunctionExpression":
+		lists = [][]*ast.Node{utils.ESTreeParameters(parent)}
+	case "JSXOpeningElement":
+		lists = listChildrenOf(parent)
+	case "physical":
+		lists = listChildrenOf(parent)
 	}
-	if parentTarget == "TSEnumBody" {
-		return indexInNodeList(node, enumMembers(parent))
-	}
-	if parentTarget != "physical" {
-		return -1, 0
-	}
-	for _, list := range listChildrenOf(parent) {
-		for i, child := range list {
-			if unwrapEstreeNode(child) == node {
-				return i, len(list)
-			}
+	for _, list := range lists {
+		if index, _ := indexInNodeList(node, list); index >= 0 {
+			return list, index
 		}
 	}
-	return -1, 0
+	return nil, -1
 }
 
 func indexInNodeList(node *ast.Node, list []*ast.Node) (int, int) {
@@ -1664,42 +1599,33 @@ func selectorMatchesVirtualExportDefault(sel selector) bool {
 // like `MemberExpression[object.name='console']` would silently miss
 // `(console).log`, `(console as any).log`, `console!.log`.
 func unwrapExpression(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	for {
-		switch node.Kind {
-		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
-		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		default:
-			return node
-		}
-		if node == nil {
-			return nil
-		}
-	}
+	return utils.SkipAssertionsAndParens(node)
 }
 
 func unwrapEstreeNode(node *ast.Node) *ast.Node {
 	for node != nil {
-		if expression := utils.JSDocTypeCastExpression(node); expression != nil {
-			node = expression
+		node = utils.ESTreeRuntimeExpression(node)
+		if node == nil {
+			return nil
+		}
+		if isPlainParameter(node) {
+			node = node.Name()
 			continue
 		}
-		if node.Kind != ast.KindParenthesizedExpression {
-			break
+		if node.Kind == ast.KindComputedPropertyName {
+			node = node.AsComputedPropertyName().Expression
+			continue
 		}
-		node = node.AsParenthesizedExpression().Expression
+		return node
 	}
-	return node
+	return nil
+}
+
+func isPlainParameter(node *ast.Node) bool {
+	return node != nil && node.Kind == ast.KindParameter &&
+		node.AsParameterDeclaration().Initializer == nil &&
+		node.AsParameterDeclaration().DotDotDotToken == nil &&
+		!ast.HasSyntacticModifier(node, ast.ModifierFlagsParameterPropertyModifier)
 }
 
 func isTransparentEstreeContainer(node *ast.Node) bool {
@@ -1707,8 +1633,11 @@ func isTransparentEstreeContainer(node *ast.Node) bool {
 		return false
 	}
 	switch node.Kind {
-	case ast.KindParenthesizedExpression, ast.KindImportAttributes:
+	case ast.KindParenthesizedExpression, ast.KindComputedPropertyName, ast.KindSemicolonClassElement,
+		ast.KindImportAttributes, ast.KindJsxAttributes, ast.KindHeritageClause, ast.KindExpressionWithTypeArguments:
 		return true
+	case ast.KindBlock:
+		return node.Parent != nil && node.Parent.Kind == ast.KindClassStaticBlockDeclaration
 	case ast.KindVariableDeclarationList:
 		return node.Parent != nil && node.Parent.Kind == ast.KindVariableStatement
 	}
@@ -1716,63 +1645,19 @@ func isTransparentEstreeContainer(node *ast.Node) bool {
 }
 
 func estreeParent(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	parent := node.Parent
-	for parent != nil {
-		if utils.IsJSDocTypeCastWrapper(parent) {
-			parent = parent.Parent
-			continue
-		}
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression, ast.KindImportAttributes:
-			// These are tsgo parser nodes without corresponding ESTree nodes.
-			parent = parent.Parent
-		case ast.KindVariableDeclarationList:
-			// A list under VariableStatement is a tsgo-only container. In a
-			// for-loop initializer, the list itself is ESTree's
-			// VariableDeclaration and must remain in the ancestry.
-			if parent.Parent != nil && parent.Parent.Kind == ast.KindVariableStatement {
-				parent = parent.Parent
-				continue
-			}
-			return parent
-		default:
-			return parent
-		}
+	parent := utils.ESTreeParent(node)
+	for parent != nil && (isTransparentEstreeContainer(parent) || isPlainParameter(parent)) {
+		parent = utils.ESTreeParent(parent)
 	}
 	return parent
 }
 
 func estreeParentValue(node *ast.Node) interface{} {
-	parent := estreeParent(node)
-	if parent == nil {
+	parent, target, ok := logicalParentTarget(node, "physical", nil)
+	if !ok {
 		return nil
 	}
-	if isClassLikeNode(parent) && nodeInList(node, classMembers(parent)) {
-		return virtualNodeFacade{node: parent, typeName: "ClassBody"}
-	}
-	if isEnumDeclarationNode(parent) && nodeInList(node, enumMembers(parent)) {
-		return virtualNodeFacade{node: parent, typeName: "TSEnumBody"}
-	}
-	if isFunctionValueNode(parent) && isFunctionValueChild(node, parent) {
-		return functionValueFacade{node: parent}
-	}
-	if parent.Kind == ast.KindJsxSelfClosingElement {
-		return virtualNodeFacade{node: parent, typeName: "JSXOpeningElement"}
-	}
-	if isJSXMemberExpression(parent) {
-		return jsxFacade(parent)
-	}
-	return parent
-}
-
-func matchingParent(node *ast.Node, scopeRoot *ast.Node) *ast.Node {
-	if node == nil || scopeRoot == node {
-		return nil
-	}
-	return estreeParent(node)
+	return targetValue(parent, target)
 }
 
 // readNodeAttr extracts the named ESTree-style attribute from a tsgo node.
@@ -1852,7 +1737,7 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 	case "id":
 		return readIdAttr(node)
 	case "key":
-		return readKeyAttr(node)
+		return readKeyAttr(node, mc)
 	case "left":
 		return readLeftAttr(node)
 	case "right":
@@ -1879,6 +1764,11 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 		return readGeneratorAttr(node)
 	case "specifiers":
 		return readSpecifiersAttr(node)
+	case "selfClosing":
+		if node.Kind == ast.KindJsxOpeningElement {
+			return false, true
+		}
+		return nil, false
 	case "openingElement":
 		return readOpeningElementAttr(node)
 	case "closingElement":
@@ -1908,6 +1798,9 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 }
 
 func readOpeningElementAttr(node *ast.Node) (interface{}, bool) {
+	if node.Kind == ast.KindJsxSelfClosingElement {
+		return virtualNodeFacade{node, "JSXOpeningElement"}, true
+	}
 	if node.Kind == ast.KindJsxElement {
 		return node.AsJsxElement().OpeningElement, true
 	}
@@ -1915,6 +1808,9 @@ func readOpeningElementAttr(node *ast.Node) (interface{}, bool) {
 }
 
 func readClosingElementAttr(node *ast.Node) (interface{}, bool) {
+	if node.Kind == ast.KindJsxSelfClosingElement {
+		return nil, true
+	}
 	if node.Kind == ast.KindJsxElement {
 		return node.AsJsxElement().ClosingElement, true
 	}
@@ -1924,9 +1820,7 @@ func readClosingElementAttr(node *ast.Node) (interface{}, bool) {
 func readAttributesAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
 	case ast.KindJsxOpeningElement:
-		return node.AsJsxOpeningElement().Attributes, true
-	case ast.KindJsxSelfClosingElement:
-		return node.AsJsxSelfClosingElement().Attributes, true
+		return statements(node.AsJsxOpeningElement().Attributes.AsJsxAttributes().Properties), true
 	case ast.KindImportDeclaration:
 		return importAttributes(node.AsImportDeclaration().Attributes), true
 	case ast.KindExportDeclaration:
@@ -1943,6 +1837,9 @@ func importAttributes(node *ast.Node) []*ast.Node {
 }
 
 func readChildrenAttr(node *ast.Node) (interface{}, bool) {
+	if node.Kind == ast.KindJsxSelfClosingElement {
+		return []*ast.Node{}, true
+	}
 	if node.Kind == ast.KindJsxElement {
 		c := node.AsJsxElement().Children
 		if c == nil {
@@ -1953,9 +1850,7 @@ func readChildrenAttr(node *ast.Node) (interface{}, bool) {
 	return nil, false
 }
 
-// readTagNameAttr returns the JSX tag-name node — esquery exposes this as
-// `name` on JSXOpeningElement / JSXSelfClosingElement, but ESLint also
-// understands `tagName` for direct compatibility with TSGo-style ASTs.
+// readTagNameAttr retains rslint's tsgo-style alias for JSX tag names.
 func readTagNameAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
 	case ast.KindJsxOpeningElement:
@@ -2066,6 +1961,12 @@ func readQuasiAttr(node *ast.Node) (interface{}, bool) {
 // can be unambiguously chosen. If multiple ESTree names map to the same
 // kind, the canonical one is returned.
 func estreeNameForKind(node *ast.Node) string {
+	if isJSXIdentifier(node) {
+		return "JSXIdentifier"
+	}
+	if isJSXMemberExpression(node) {
+		return "JSXMemberExpression"
+	}
 	switch node.Kind {
 	case ast.KindIdentifier:
 		return "Identifier"
@@ -2139,12 +2040,15 @@ func estreeNameForKind(node *ast.Node) string {
 		if node.Parent != nil {
 			switch node.Parent.Kind {
 			case ast.KindClassDeclaration, ast.KindClassExpression:
+				if ast.HasSyntacticModifier(node, ast.ModifierFlagsAbstract) {
+					return "TSAbstractMethodDefinition"
+				}
 				return "MethodDefinition"
 			case ast.KindObjectLiteralExpression:
 				return "Property"
 			}
 		}
-		return "Property"
+		return "TSMethodSignature"
 	case ast.KindImportDeclaration:
 		return "ImportDeclaration"
 	case ast.KindClassDeclaration:
@@ -2173,8 +2077,16 @@ func estreeNameForKind(node *ast.Node) string {
 		// ESTree drops parens, so a node walking via `type` ought to see
 		// the inner expression's type instead.
 		return estreeNameForKind(unwrapExpression(node))
-	case ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression:
-		return estreeNameForKind(unwrapExpression(node))
+	case ast.KindAsExpression:
+		return "TSAsExpression"
+	case ast.KindSatisfiesExpression:
+		return "TSSatisfiesExpression"
+	case ast.KindNonNullExpression:
+		return "TSNonNullExpression"
+	case ast.KindTypeAssertionExpression:
+		return "TSTypeAssertion"
+	case ast.KindDecorator:
+		return "Decorator"
 	case ast.KindThisKeyword:
 		return "ThisExpression"
 	case ast.KindSuperKeyword:
@@ -2224,6 +2136,9 @@ func estreeNameForKind(node *ast.Node) string {
 	case ast.KindJsxClosingElement:
 		return "JSXClosingElement"
 	case ast.KindJsxExpression:
+		if node.AsJsxExpression().DotDotDotToken != nil {
+			return "JSXSpreadChild"
+		}
 		return "JSXExpressionContainer"
 	case ast.KindMetaProperty:
 		return "MetaProperty"
@@ -2252,13 +2167,11 @@ func readNameAttr(node *ast.Node) (interface{}, bool) {
 	case ast.KindIdentifier:
 		return node.AsIdentifier().Text, true
 	case ast.KindPrivateIdentifier:
-		return node.AsPrivateIdentifier().Text, true
+		return strings.TrimPrefix(node.AsPrivateIdentifier().Text, "#"), true
 	// JSX: ESTree calls the tag identifier `name`; tsgo stores it as
 	// TagName. Also expose it through this attribute path.
 	case ast.KindJsxOpeningElement:
 		return node.AsJsxOpeningElement().TagName, true
-	case ast.KindJsxSelfClosingElement:
-		return node.AsJsxSelfClosingElement().TagName, true
 	case ast.KindJsxClosingElement:
 		return node.AsJsxClosingElement().TagName, true
 	case ast.KindJsxAttribute:
@@ -2281,7 +2194,7 @@ func readValueAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 		}
 		return text, true
 	case ast.KindBigIntLiteral:
-		return utils.NormalizeBigIntLiteral(node.AsBigIntLiteral().Text), true
+		return bigintAttr(utils.NormalizeBigIntLiteral(node.AsBigIntLiteral().Text)), true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindTrueKeyword:
@@ -2301,7 +2214,12 @@ func readValueAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 	// ESTree stores a class method's function fields under
 	// MethodDefinition.value, while tsgo puts them directly on the method.
 	case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-		return functionValueFacade{node: node}, true
+		if !isFunctionValueNode(node) {
+			return nil, false
+		}
+		return virtualNodeFacade{node: node, typeName: virtualTarget(node)}, true
+	case ast.KindJsxAttribute:
+		return node.AsJsxAttribute().Initializer, true
 	case ast.KindImportAttribute:
 		return unwrapExpression(node.AsImportAttribute().Value), true
 	}
@@ -2799,7 +2717,7 @@ func regexLiteralText(node *ast.Node, mc *matchContext) string {
 }
 
 func readParamsAttr(node *ast.Node) (interface{}, bool) {
-	if !isFunctionLikeForParams(node) {
+	if !isFunctionLikeForParams(node) || isFunctionValueNode(node) {
 		return nil, false
 	}
 	params := utils.ESTreeParameters(node)
@@ -2868,25 +2786,26 @@ func readArgumentsAttr(node *ast.Node) (interface{}, bool) {
 func readExpressionAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
 	case ast.KindDecorator:
-		return unwrapExpression(node.AsDecorator().Expression), true
+		return unwrapEstreeNode(node.AsDecorator().Expression), true
 	case ast.KindExpressionStatement:
-		return unwrapExpression(node.AsExpressionStatement().Expression), true
-	case ast.KindParenthesizedExpression:
-		return unwrapExpression(node.AsParenthesizedExpression().Expression), true
-	case ast.KindAwaitExpression:
-		return unwrapExpression(node.AsAwaitExpression().Expression), true
-	case ast.KindYieldExpression:
-		return unwrapExpression(node.AsYieldExpression().Expression), true
-	case ast.KindReturnStatement:
-		return unwrapExpression(node.AsReturnStatement().Expression), true
-	case ast.KindThrowStatement:
-		return unwrapExpression(node.AsThrowStatement().Expression), true
-	case ast.KindCallExpression:
-		return unwrapExpression(node.AsCallExpression().Expression), true
-	case ast.KindNewExpression:
-		return unwrapExpression(node.AsNewExpression().Expression), true
+		return unwrapEstreeNode(node.AsExpressionStatement().Expression), true
+	case ast.KindAsExpression:
+		return unwrapEstreeNode(node.AsAsExpression().Expression), true
+	case ast.KindSatisfiesExpression:
+		return unwrapEstreeNode(node.AsSatisfiesExpression().Expression), true
+	case ast.KindNonNullExpression:
+		return unwrapEstreeNode(node.AsNonNullExpression().Expression), true
+	case ast.KindTypeAssertionExpression:
+		return unwrapEstreeNode(node.AsTypeAssertion().Expression), true
+	case ast.KindArrowFunction:
+		return node.Body() != nil && node.Body().Kind != ast.KindBlock, true
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
+		return false, true
 	case ast.KindJsxExpression:
-		return unwrapExpression(node.AsJsxExpression().Expression), true
+		if isEmptyJSXExpression(node) {
+			return virtualNodeFacade{node, "JSXEmptyExpression"}, true
+		}
+		return unwrapEstreeNode(node.AsJsxExpression().Expression), true
 	}
 	return nil, false
 }
@@ -2899,28 +2818,32 @@ type virtualNodeFacade struct {
 	typeName string
 }
 
-func jsxFacade(node *ast.Node) interface{} {
-	if node == nil {
-		return nil
-	}
-	if isJSXMemberExpression(node) {
-		return virtualNodeFacade{node: node, typeName: "JSXMemberExpression"}
-	}
-	if isJSXIdentifier(node) {
-		return virtualNodeFacade{node: node, typeName: "JSXIdentifier"}
-	}
-	return node
-}
-
 func readVirtualNodeAttr(facade virtualNodeFacade, name string, mc *matchContext) (interface{}, bool) {
 	node := facade.node
 	if node == nil {
 		return nil, false
 	}
 	switch facade.typeName {
+	case "ChainExpression":
+		if name == "expression" {
+			return node, true
+		}
+	case "Literal":
+		if node.Kind == ast.KindConstructor && name == "value" {
+			return "constructor", true
+		}
+		if node.Kind == ast.KindConstructor && name == "raw" && mc != nil && mc.sf != nil {
+			if token, ok := utils.TokenBeforePosition(mc.sf, node.ParameterList().Pos()-1); ok {
+				return token.Text, true
+			}
+		}
+	case "Identifier":
+		if node.Kind == ast.KindConstructor && name == "name" {
+			return "constructor", true
+		}
 	case "ClassBody":
 		if name == "body" {
-			return readBodyAttr(node)
+			return classMembers(node), true
 		}
 		if name == "type" || name == "parent" {
 			return nil, false
@@ -2940,43 +2863,12 @@ func readVirtualNodeAttr(facade virtualNodeFacade, name string, mc *matchContext
 		if name == "type" || name == "parent" {
 			return nil, false
 		}
-	case "JSXExpressionContainer":
-		if name == "expression" {
-			return unwrapExpression(node.AsJsxExpression().Expression), true
-		}
-		if name == "type" || name == "parent" {
-			return nil, false
-		}
-	case "JSXMemberExpression":
-		if name == "object" {
-			return readObjectAttr(node)
-		}
-		if name == "property" {
-			return readPropertyAttr(node)
-		}
-		if name == "type" || name == "parent" {
-			return nil, false
-		}
-	case "JSXIdentifier":
-		if name == "name" {
-			return readNameAttr(node)
-		}
-		if name == "type" || name == "parent" {
-			return nil, false
-		}
-	case "JSXElement":
-		if name == "openingElement" {
-			return virtualNodeFacade{node: node, typeName: "JSXOpeningElement"}, true
-		}
-		if name == "children" {
-			return []*ast.Node{}, true
-		}
-		if name == "closingElement" || name == "type" || name == "parent" {
-			return nil, true
-		}
 	case "JSXOpeningElement":
+		if name == "selfClosing" {
+			return true, true
+		}
 		if name == "name" || name == "tagName" {
-			return jsxFacade(node.AsJsxSelfClosingElement().TagName), true
+			return node.AsJsxSelfClosingElement().TagName, true
 		}
 		if name == "attributes" {
 			attributes := node.AsJsxSelfClosingElement().Attributes
@@ -2992,7 +2884,7 @@ func readVirtualNodeAttr(facade virtualNodeFacade, name string, mc *matchContext
 		if name == "type" || name == "parent" {
 			return nil, false
 		}
-	case "FunctionExpression":
+	case "FunctionExpression", "TSEmptyBodyFunctionExpression":
 		switch name {
 		case "body":
 			return node.Body(), true
@@ -3011,13 +2903,6 @@ func readVirtualNodeAttr(facade virtualNodeFacade, name string, mc *matchContext
 		}
 	}
 	return nil, false
-}
-
-// functionValueFacade models the synthetic FunctionExpression stored at
-// ESTree MethodDefinition.value. tsgo stores the same function fields directly
-// on the class member node, so attribute paths need this intermediate object.
-type functionValueFacade struct {
-	node *ast.Node
 }
 
 func methodValueIsGenerator(node *ast.Node) bool {
@@ -3058,8 +2943,10 @@ func readIdAttr(node *ast.Node) (interface{}, bool) {
 	return nil, false
 }
 
-func readKeyAttr(node *ast.Node) (interface{}, bool) {
+func readKeyAttr(node *ast.Node, mc *matchContext) (interface{}, bool) {
 	switch node.Kind {
+	case ast.KindConstructor:
+		return constructorKey(node, mc), true
 	case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindPropertyDeclaration:
 		return node.Name(), true
 	case ast.KindImportAttribute:
@@ -3093,7 +2980,7 @@ func readObjectAttr(node *ast.Node) (interface{}, bool) {
 	case ast.KindPropertyAccessExpression:
 		object := unwrapExpression(node.AsPropertyAccessExpression().Expression)
 		if isJSXMemberExpression(node) {
-			return jsxFacade(object), true
+			return object, true
 		}
 		return object, true
 	case ast.KindElementAccessExpression:
@@ -3107,7 +2994,7 @@ func readPropertyAttr(node *ast.Node) (interface{}, bool) {
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression().Name()
 		if isJSXMemberExpression(node) {
-			return jsxFacade(property), true
+			return property, true
 		}
 		return property, true
 	case ast.KindElementAccessExpression:
@@ -3174,14 +3061,14 @@ func readAlternateAttr(node *ast.Node) (interface{}, bool) {
 
 func readBodyAttr(node *ast.Node) (interface{}, bool) {
 	switch node.Kind {
+	case ast.KindClassStaticBlockDeclaration:
+		return statements(node.AsClassStaticBlockDeclaration().Body.AsBlock().Statements), true
 	case ast.KindFunctionDeclaration:
 		return node.AsFunctionDeclaration().Body, true
 	case ast.KindFunctionExpression:
 		return node.AsFunctionExpression().Body, true
 	case ast.KindArrowFunction:
 		return node.AsArrowFunction().Body, true
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().Body, true
 	case ast.KindIfStatement:
 		return node.AsIfStatement().ThenStatement, true
 	case ast.KindWhileStatement:
@@ -3202,18 +3089,8 @@ func readBodyAttr(node *ast.Node) (interface{}, bool) {
 			return []*ast.Node{}, true
 		}
 		return stmts.Nodes, true
-	case ast.KindClassDeclaration:
-		members := node.AsClassDeclaration().Members
-		if members == nil {
-			return []*ast.Node{}, true
-		}
-		return members.Nodes, true
-	case ast.KindClassExpression:
-		members := node.AsClassExpression().Members
-		if members == nil {
-			return []*ast.Node{}, true
-		}
-		return members.Nodes, true
+	case ast.KindClassDeclaration, ast.KindClassExpression:
+		return virtualNodeFacade{node, "ClassBody"}, true
 	case ast.KindEnumDeclaration:
 		return virtualNodeFacade{node: node, typeName: "TSEnumBody"}, true
 	}

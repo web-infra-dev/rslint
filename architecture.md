@@ -1713,6 +1713,8 @@ Playground inspection is a separate read-only path through `internal/inspector`.
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+Playground JavaScript configs are imported as modules in a Blob worker created inside an iframe with an opaque origin and `sandbox="allow-scripts"`. The iframe only relays messages; the worker inherits a Content Security Policy that limits scripts and connections to package CDNs and has no DOM or navigation APIs. The page validates the serialized config before linting and removes the iframe on completion or timeout.
+
 ## 16. Glossary
 
 - **AST**: Abstract Syntax Tree produced directly by ts-go

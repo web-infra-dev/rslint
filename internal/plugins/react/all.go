@@ -31,6 +31,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_duplicate_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_target_blank"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_undef"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_one_expression_per_line"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_pascal_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_multi_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_spread_multi"
@@ -78,6 +79,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/sort_prop_types"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/static_property_placement"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -124,6 +126,7 @@ func GetAllRules() []rule.Rule {
 		jsx_no_duplicate_props.JsxNoDuplicatePropsRule,
 		jsx_no_target_blank.JsxNoTargetBlankRule,
 		jsx_no_undef.JsxNoUndefRule,
+		jsx_one_expression_per_line.JsxOneExpressionPerLineRule,
 		jsx_pascal_case.JsxPascalCaseRule,
 		jsx_props_no_multi_spaces.JsxPropsNoMultiSpacesRule,
 		jsx_props_no_spreading.JsxPropsNoSpreadingRule,
@@ -171,6 +174,7 @@ func GetAllRules() []rule.Rule {
 		self_closing_comp.SelfClosingCompRule,
 		sort_comp.SortCompRule,
 		sort_prop_types.SortPropTypesRule,
+		static_property_placement.StaticPropertyPlacementRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
 		jsx_child_element_spacing.JsxChildElementSpacingRule,

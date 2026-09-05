@@ -39,6 +39,12 @@ func IsRstestCoreImportModule(specifier string) bool {
 	return specifier == RstestImportModule || specifier == RstackTestImportModule
 }
 
+// IsImportMetaRstest reports whether node is the Rstest module namespace
+// exposed through import.meta. Parentheses around either link are transparent.
+func IsImportMetaRstest(node *ast.Node) bool {
+	return isImportMetaRstest(node)
+}
+
 type RstestFnType = testFramework.FnKind
 
 type RstestImportMode = testFramework.ReferenceMode

@@ -1678,12 +1678,32 @@ func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
 // Augmentation declarations are skipped as well, for the reason
 // IsSymbolDeclaredInFile gives.
 func IsValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
+	return valueSymbolDeclaredInFile(symbol, sf, false)
+}
+
+// IsRuntimeValueSymbolDeclaredInFile is IsValueSymbolDeclaredInFile with
+// type-only imports excluded as well. Use it where a local declaration only
+// counts when the binding survives to runtime: `import type { x } from "m"`
+// and `import { type x } from "m"` name x in the type world only, so such a
+// file neither obtains the module's value nor shadows a global of that name.
+//
+// IsValueSymbolDeclaredInFile keeps counting them, because a caller asking
+// whether a name is locally declared at all is usually guarding against a
+// redeclaration the checker would flag, not against a runtime shadow.
+func IsRuntimeValueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
+	return valueSymbolDeclaredInFile(symbol, sf, true)
+}
+
+func valueSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile, skipTypeOnlyImports bool) bool {
 	if symbol == nil {
 		return false
 	}
 	for _, decl := range symbol.Declarations {
 		switch decl.Kind {
 		case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
+			continue
+		}
+		if skipTypeOnlyImports && ast.IsTypeOnlyImportDeclaration(decl) {
 			continue
 		}
 		if ast.GetSourceFileOfNode(decl) == sf && !isInAmbientAugmentation(decl) {

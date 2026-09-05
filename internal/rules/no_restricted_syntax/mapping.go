@@ -48,14 +48,16 @@ var estreeKindMap = map[string][]ast.Kind{
 	// ESTree's VariableDeclaration is the statement-level node (`var a = 1;`).
 	// tsgo represents that with VariableStatement; the inner declarators
 	// become VariableDeclaration nodes (mapped as VariableDeclarator below).
-	"VariableDeclaration":     {ast.KindVariableStatement, ast.KindVariableDeclarationList},
-	"VariableDeclarator":      {ast.KindVariableDeclaration},
-	"FunctionDeclaration":     {ast.KindFunctionDeclaration},
-	"FunctionExpression":      {ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
-	"ArrowFunctionExpression": {ast.KindArrowFunction},
-	"TSEnumDeclaration":       {ast.KindEnumDeclaration},
-	"TSEnumBody":              {ast.KindEnumDeclaration},
-	"TSEnumMember":            {ast.KindEnumMember},
+	"VariableDeclaration":           {ast.KindVariableStatement, ast.KindVariableDeclarationList},
+	"VariableDeclarator":            {ast.KindVariableDeclaration},
+	"FunctionDeclaration":           {ast.KindFunctionDeclaration},
+	"FunctionExpression":            {ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
+	"TSEmptyBodyFunctionExpression": {ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
+	"TSAbstractMethodDefinition":    {ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor},
+	"ArrowFunctionExpression":       {ast.KindArrowFunction},
+	"TSEnumDeclaration":             {ast.KindEnumDeclaration},
+	"TSEnumBody":                    {ast.KindEnumDeclaration},
+	"TSEnumMember":                  {ast.KindEnumMember},
 
 	// Classes
 	"ClassDeclaration": {ast.KindClassDeclaration},
@@ -96,6 +98,7 @@ var estreeKindMap = map[string][]ast.Kind{
 
 	// Literals
 	"Literal": {
+		ast.KindConstructor,
 		ast.KindStringLiteral,
 		ast.KindNumericLiteral,
 		ast.KindBigIntLiteral,
@@ -107,7 +110,7 @@ var estreeKindMap = map[string][]ast.Kind{
 	"RegExpLiteral": {ast.KindRegularExpressionLiteral},
 
 	// Identifiers
-	"Identifier":        {ast.KindIdentifier},
+	"Identifier":        {ast.KindIdentifier, ast.KindConstructor},
 	"PrivateIdentifier": {ast.KindPrivateIdentifier},
 
 	// Object literal members

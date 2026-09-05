@@ -162,6 +162,8 @@ type Semantic struct {
 	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
 	// (node -> value_symbol_id)
 	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
+	// ShorthandBindingSymbols maps local shorthand object binding symbols to the property symbols they read.
+	ShorthandBindingSymbols map[ast.SymbolId]ast.SymbolId `json:"shorthand_binding_symbols"`
 	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
 	// The primary symbol remains recorded in Node2sym.
 	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
@@ -179,6 +181,7 @@ func NewSemantic() Semantic {
 		Node2type:                make(map[NodeReference]checker.TypeId),
 		NodeFlags:                make(map[NodeReference]uint32),
 		ShorthandSymbols:         make(map[NodeReference]ast.SymbolId),
+		ShorthandBindingSymbols:  make(map[ast.SymbolId]ast.SymbolId),
 		ParameterPropertySymbols: make(map[NodeReference]ast.SymbolId),
 		ExternalSymbols:          []ExternalSymbol{},
 		Primtypes:                PrimTypes{},
@@ -378,6 +381,26 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				value_sym_id := ast.GetSymbolId(valueSymbol)
 				semantic.ShorthandSymbols[key] = value_sym_id
 				recordSymbol(valueSymbol)
+			}
+
+			// In an object binding shorthand such as `const { y } = x`, the identifier's
+			// primary symbol is the new local binding. Record the source property symbol
+			// separately, matching the symbol returned for `y` in `x.y`.
+			if ast.IsIdentifier(node) && node.Parent != nil && ast.IsBindingElement(node.Parent) {
+				binding := node.Parent.AsBindingElement()
+				pattern := node.Parent.Parent
+				if binding.PropertyName == nil && binding.DotDotDotToken == nil &&
+					node.Parent.Name() == node && ast.IsObjectBindingPattern(pattern) {
+					if patternType := tc.GetTypeAtLocation(pattern); patternType != nil {
+						if propertySymbol := tc.GetPropertyOfType(patternType, node.Text()); propertySymbol != nil {
+							propertySymbolID := ast.GetSymbolId(propertySymbol)
+							if localSymbolID, ok := semantic.Node2sym[key]; ok {
+								semantic.ShorthandBindingSymbols[localSymbolID] = propertySymbolID
+							}
+							recordSymbol(propertySymbol)
+						}
+					}
+				}
 			}
 
 			if ast.IsParameterPropertyDeclaration(node, node.Parent) {

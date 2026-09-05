@@ -1,8 +1,51 @@
 package rule
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
+
+func TestDisableManagerSameLineBoundaries(t *testing.T) {
+	for _, prefix := range []string{"eslint", "rslint"} {
+		for _, testCase := range []struct {
+			name          string
+			disable       string
+			enable        string
+			otherDisabled bool
+		}{
+			{"specific", " react/no-namespace", " react/no-namespace", false},
+			{"wildcard then specific", "", " react/no-namespace", true},
+			{"specific then wildcard", " react/no-namespace", "", false},
+		} {
+			t.Run(prefix+"/"+testCase.name, func(t *testing.T) {
+				code := "/* 😀 */ before(); /* " + prefix + "-disable" + testCase.disable + " */ inside(); /* " + prefix + "-enable" + testCase.enable + " */ after();"
+				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/directives.js", Path: "/directives.js"}, code, core.ScriptKindJS)
+				dm := NewDisableManager(sf, NewCommentStore(sf))
+				for _, query := range []struct {
+					marker string
+					want   bool
+				}{
+					{"before()", false}, {"inside()", true}, {"after()", false},
+				} {
+					pos := strings.Index(code, query.marker)
+					if pos < 0 {
+						t.Fatalf("missing marker %q", query.marker)
+					}
+					if got := dm.IsRuleDisabled("react/no-namespace", pos); got != query.want {
+						t.Errorf("%s: disabled = %v, want %v", query.marker, got, query.want)
+					}
+				}
+				if got := dm.IsRuleDisabled("no-console", strings.Index(code, "after()")); got != testCase.otherDisabled {
+					t.Errorf("unrelated rule disabled = %v, want %v", got, testCase.otherDisabled)
+				}
+			})
+		}
+	}
+}
 
 // ---------------------------------------------------------------------------
 // parseRuleNames
@@ -457,7 +500,7 @@ func TestIsBlockDisabled(t *testing.T) {
 			want:     false,
 		},
 		{
-			name: "query line 0 with no directives",
+			name:       "query line 0 with no directives",
 			directives: nil,
 			ruleName:   "no-console",
 			line:       0,
@@ -496,7 +539,7 @@ func TestIsBlockDisabled(t *testing.T) {
 				lineDisabledRules:     make(map[int][]string),
 				nextLineDisabledRules: make(map[int][]string),
 			}
-			got := dm.isBlockDisabled(tt.ruleName, tt.line)
+			got := dm.isBlockDisabled(tt.ruleName, tt.line, 0)
 			if got != tt.want {
 				t.Errorf("isBlockDisabled(%q, %d) = %v, want %v", tt.ruleName, tt.line, got, tt.want)
 			}
@@ -601,7 +644,7 @@ func TestDisableManagerBlockAndLineCombined(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := dm.isBlockDisabled(tt.ruleName, tt.line)
+			got := dm.isBlockDisabled(tt.ruleName, tt.line, 0)
 			// For line-level checks we call the helper directly
 			if !got {
 				got = dm.isLineDisabled(tt.ruleName, tt.line)

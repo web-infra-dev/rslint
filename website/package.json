@@ -17,6 +17,7 @@
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "dagre": "catalog:",
+    "fflate": "catalog:",
     "input-otp": "catalog:",
     "lucide-react": "catalog:",
     "swr": "catalog:",

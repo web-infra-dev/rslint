@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_restricted_syntax.schema.json
@@ -76,30 +77,50 @@ var NoRestrictedSyntaxRule = rule.Rule{
 				}
 			}
 
-			if node.Kind == ast.KindJsxSelfClosingElement {
-				// tsgo folds JSXElement and JSXOpeningElement into one physical node.
-				// Visit the two ESTree identities in their logical order so reports
-				// from selectors on the physical JSXElement remain ahead of the
-				// synthetic opening element.
-				for _, target := range []string{"JSXElement", "JSXOpeningElement"} {
-					visitCandidates(func(index int, indexed bool) {
-						bucket.matchAndReportSelfClosing(index, node, mc, &ctx, indexed, target)
-					})
+			// A dispatch key read from the physical node cannot prune its
+			// folded ESTree child: type, parent and fields can all differ.
+			target := virtualTarget(node)
+			visitVirtual := func() {
+				if !bucket.hasVirtual {
+					return
 				}
-				return
+				if node.Kind == ast.KindConstructor {
+					keyTarget := constructorKey(node, mc).typeName
+					for index := range bucket.entries {
+						bucket.matchVirtual(index, node, keyTarget, mc, &ctx)
+					}
+				}
+				if target != "" {
+					for index := range bucket.entries {
+						bucket.matchVirtual(index, node, target, mc, &ctx)
+					}
+				}
+			}
+			// ChainExpression surrounds the physical node; the other facades
+			// are its children. Exit events reverse that order.
+			virtualBeforePhysical := bucket.entries[0].exit != (target == "ChainExpression")
+			if virtualBeforePhysical {
+				visitVirtual()
 			}
 			visitCandidates(func(index int, indexed bool) {
 				bucket.matchPhysical(index, node, mc, &ctx, indexed)
 			})
-			visitCandidates(func(index int, indexed bool) {
-				bucket.matchVirtual(index, node, mc, &ctx)
-			})
+			if !virtualBeforePhysical {
+				visitVirtual()
+			}
 		}
 
 		listeners := make(rule.RuleListeners, len(plan.buckets))
 		for k, bucket := range plan.buckets {
-			listeners[k] = func(node *ast.Node) {
-				visit(node, bucket)
+			switch k {
+			case ast.KindSourceFile:
+				// The engine starts at SourceFile's children. Program enter runs
+				// eagerly, and EOF provides the matching Program exit event.
+				visit(ctx.SourceFile.AsNode(), bucket)
+			case rule.ListenerOnExit(ast.KindSourceFile):
+				listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) { visit(ctx.SourceFile.AsNode(), bucket) }
+			default:
+				listeners[k] = func(node *ast.Node) { visit(node, bucket) }
 			}
 		}
 		return listeners
@@ -218,8 +239,9 @@ func buildRulePlan(options []any) *rulePlan {
 }
 
 type ruleBucket struct {
-	entries  []ruleEntry
-	dispatch *stringAttrDispatch
+	entries    []ruleEntry
+	dispatch   *stringAttrDispatch
+	hasVirtual bool
 }
 
 type stringAttrDispatch struct {
@@ -246,6 +268,7 @@ func buildRuleBucket(entries []ruleEntry) ruleBucket {
 
 	stats := make(map[string]*dispatchStat)
 	for _, entry := range entries {
+		bucket.hasVirtual = bucket.hasVirtual || !isBareWildcardSelector(entry.compiled)
 		attrs := collectDispatchAttrs(entry.compiled, nil)
 		for index, attr := range attrs {
 			duplicate := false
@@ -428,74 +451,45 @@ func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchCont
 	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
 		compiled = bucket.dispatch.matched[index]
 	}
+	if node.Kind == ast.KindSourceFile && isBareWildcardSelector(entry.compiled) {
+		return
+	}
+	if isPlainParameter(node) && !isBareWildcardSelector(entry.compiled) {
+		return
+	}
 	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
-		ctx.ReportNode(node, rule.RuleMessage{
+		ctx.ReportRange(utils.GetESTreeBindingIdentifierRange(mc.sf, node), rule.RuleMessage{
 			Id:          "restrictedSyntax",
 			Description: entry.formatMessage(),
 		})
 	}
 }
 
-func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext) {
+func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, target string, mc *matchContext, ctx *rule.RuleContext) {
 	entry := &bucket.entries[index]
-	message := rule.RuleMessage{
-		Id:          "restrictedSyntax",
-		Description: entry.formatMessage(),
-	}
-	for _, target := range virtualTargets(node) {
-		// A bare universe selector intentionally walks only the physical tsgo
-		// tree. Other broad selectors, including regex attributes and negative
-		// pseudos, still need to be evaluated against virtual ESTree targets.
-		if isBareWildcardSelector(entry.compiled) {
-			continue
-		}
-		// Dispatch predicates are stripped only for the physical path.
-		// Virtual ESTree identities must be checked against the original
-		// selector, otherwise the stripped wildcard reports them again.
-		if !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
-			continue
-		}
-		switch target {
-		case "ClassBody":
-			ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
-		case "TSEnumBody":
-			ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
-		case "JSXEmptyExpression":
-			nodeRange := utils.TrimNodeTextRange(mc.sf, node)
-			ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
-		case "FunctionExpression":
-			ctx.ReportRange(functionValueTextRange(mc.sf, node), message)
-		default:
-			ctx.ReportNode(node, message)
-		}
-	}
-}
-
-func (bucket *ruleBucket) matchAndReportSelfClosing(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool, target string) {
-	entry := &bucket.entries[index]
-	compiled := entry.compiled
-	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
-		compiled = bucket.dispatch.matched[index]
-	}
-
-	physicalMatch := matchesInScopeTarget(compiled, node, mc, nil, "physical")
-	if target == "JSXElement" && physicalMatch {
-		ctx.ReportNode(node, rule.RuleMessage{
-			Id:          "restrictedSyntax",
-			Description: entry.formatMessage(),
-		})
+	// Preserve the documented bare-wildcard traversal. Other broad selectors
+	// must see the folded child, including regex and negative selectors.
+	if isBareWildcardSelector(entry.compiled) || !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
 		return
 	}
-	if !selectorTargetsEstreeType(entry.compiled, target) {
-		return
+	message := rule.RuleMessage{Id: "restrictedSyntax", Description: entry.formatMessage()}
+	switch target {
+	case "Identifier", "Literal":
+		if token, ok := utils.TokenBeforePosition(mc.sf, node.ParameterList().Pos()-1); ok {
+			ctx.ReportRange(core.NewTextRange(token.Start, token.End), message)
+		}
+	case "ClassBody":
+		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
+	case "TSEnumBody":
+		ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
+	case "JSXEmptyExpression":
+		nodeRange := utils.TrimNodeTextRange(mc.sf, node)
+		ctx.ReportRange(core.NewTextRange(nodeRange.Pos()+1, max(nodeRange.Pos()+1, nodeRange.End()-1)), message)
+	case "FunctionExpression", "TSEmptyBodyFunctionExpression":
+		ctx.ReportRange(functionValueTextRange(mc.sf, node), message)
+	default:
+		ctx.ReportNode(node, message)
 	}
-	if !matchesInScopeTarget(entry.compiled, node, mc, nil, target) {
-		return
-	}
-	ctx.ReportNode(node, rule.RuleMessage{
-		Id:          "restrictedSyntax",
-		Description: entry.formatMessage(),
-	})
 }
 
 func (e ruleEntry) formatMessage() string {
@@ -503,43 +497,15 @@ func (e ruleEntry) formatMessage() string {
 }
 
 func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
-	if sf == nil || node == nil || node.Body() == nil {
-		if node == nil {
-			return core.TextRange{}
-		}
-		return core.NewTextRange(node.Pos(), node.End())
+	// tsgo records the position immediately after '(' (or '<' for generic
+	// methods). Reuse that parser boundary, including for bodyless overloads.
+	if parameters := node.TypeParameterList(); parameters != nil && len(parameters.Nodes) > 0 {
+		return core.NewTextRange(parameters.Pos()-1, node.End())
 	}
-	tokens := utils.TokensOfNode(sf, node)
-	bodyStart := node.Body().Pos()
-	openIndex := -1
-	for index, token := range tokens {
-		if token.Start >= bodyStart {
-			break
-		}
-		if token.Kind == ast.KindOpenParenToken {
-			openIndex = index
-		}
+	if parameters := node.ParameterList(); parameters != nil {
+		return core.NewTextRange(parameters.Pos()-1, node.End())
 	}
-	if openIndex < 0 {
-		return core.NewTextRange(node.Pos(), node.End())
-	}
-	start := tokens[openIndex].Start
-	if openIndex > 0 && tokens[openIndex-1].Kind == ast.KindGreaterThanToken {
-		depth := 0
-		for index := openIndex - 1; index >= 0; index-- {
-			switch tokens[index].Kind {
-			case ast.KindGreaterThanToken:
-				depth++
-			case ast.KindLessThanToken:
-				depth--
-				if depth == 0 {
-					start = tokens[index].Start
-					index = -1
-				}
-			}
-		}
-	}
-	return core.NewTextRange(start, node.Body().End())
+	return utils.TrimNodeTextRange(sf, node)
 }
 
 func classBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
@@ -565,23 +531,10 @@ func enumBodyTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
 }
 
 func listBodyTextRange(sf *ast.SourceFile, node *ast.Node, members *ast.NodeList) core.TextRange {
-	if sf == nil || node == nil || members == nil {
-		return core.NewTextRange(node.Pos(), node.End())
+	if members != nil {
+		return core.NewTextRange(members.Pos()-1, node.End())
 	}
-	open, closeEnd := -1, -1
-	for _, token := range utils.TokensOfNode(sf, node) {
-		if token.Kind == ast.KindOpenBraceToken && token.Start <= members.Pos() {
-			open = token.Start
-		}
-		if open >= 0 && token.Kind == ast.KindCloseBraceToken && token.Start >= members.End() {
-			closeEnd = token.End
-			break
-		}
-	}
-	if open < 0 || closeEnd < 0 {
-		return core.NewTextRange(node.Pos(), node.End())
-	}
-	return core.NewTextRange(open, closeEnd)
+	return utils.TrimNodeTextRange(sf, node)
 }
 
 func deduplicateRuleEntries(entries []ruleEntry) []ruleEntry {
@@ -623,7 +576,7 @@ func sortRuleEntries(entries []ruleEntry) {
 		if a.identifiers != b.identifiers {
 			return a.identifiers < b.identifiers
 		}
-		return compareJSStrings(entries[left].selector, entries[right].selector) < 0
+		return ecmascript.CompareStrings(entries[left].selector, entries[right].selector) < 0
 	})
 }
 

@@ -12,7 +12,11 @@ import (
 
 const messageID = "prefer-string-trim-start-end"
 
-var trimMethods = []string{"trimLeft", "trimRight"}
+var (
+	trimMethods      = []string{"trimLeft", "trimRight"}
+	trimStartMessage = preferTrimStartEndMessage("trimLeft", "trimStart")
+	trimEndMessage   = preferTrimStartEndMessage("trimRight", "trimEnd")
+)
 
 func preferTrimStartEndMessage(method, replacement string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -48,13 +52,15 @@ var PreferStringTrimStartEndRule = rule.Rule{
 
 				method := call.Property.AsIdentifier().Text
 				replacement := "trimStart"
+				message := trimStartMessage
 				if method == "trimRight" {
 					replacement = "trimEnd"
+					message = trimEndMessage
 				}
 
 				ctx.ReportNodeWithDeferredFixes(
 					call.Property,
-					preferTrimStartEndMessage(method, replacement),
+					message,
 					func() []rule.RuleFix {
 						return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, call.Property, replacement)}
 					},

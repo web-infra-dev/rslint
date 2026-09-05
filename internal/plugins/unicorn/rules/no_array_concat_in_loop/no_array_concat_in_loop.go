@@ -105,22 +105,11 @@ func (variable scopeVariable) sameBinding(other scopeVariable) bool {
 }
 
 type scopeVariableFinder struct {
-	manager      *scope.Manager
-	scopeByBlock map[*ast.Node]*scope.Scope
+	manager *scope.Manager
 }
 
 func newScopeVariableFinder(sourceFile *ast.SourceFile) *scopeVariableFinder {
-	manager := scope.Build(sourceFile, scope.Options{})
-	scopeByBlock := make(map[*ast.Node]*scope.Scope, len(manager.Scopes))
-	for _, current := range manager.Scopes {
-		if current.Block != nil {
-			// A named function expression owns an outer name scope and an inner
-			// function scope with the same block. Build creates them in that
-			// order, so the later entry is the scope getScope() acquires first.
-			scopeByBlock[current.Block] = current
-		}
-	}
-	return &scopeVariableFinder{manager: manager, scopeByBlock: scopeByBlock}
+	return &scopeVariableFinder{manager: scope.Build(sourceFile, scope.Options{})}
 }
 
 func (finder *scopeVariableFinder) find(identifier *ast.Node) scopeVariable {
@@ -128,7 +117,7 @@ func (finder *scopeVariableFinder) find(identifier *ast.Node) scopeVariable {
 		return scopeVariable{}
 	}
 	name := identifier.Text()
-	for current := finder.acquire(identifier); current != nil; current = current.Parent {
+	for current := finder.manager.Acquire(identifier); current != nil; current = current.Parent {
 		definitions := current.Declarations(name)
 		if hasAuthoredDefinition(definitions) {
 			return scopeVariable{scope: current, name: name, definitions: definitions, found: true}
@@ -142,37 +131,6 @@ func (finder *scopeVariableFinder) find(identifier *ast.Node) scopeVariable {
 		}
 	}
 	return scopeVariable{}
-}
-
-func (finder *scopeVariableFinder) acquire(identifier *ast.Node) *scope.Scope {
-	var child *ast.Node
-	for current := identifier; current != nil; current = current.Parent {
-		if acquired := finder.scopeByBlock[current]; acquired != nil &&
-			!outsideRuntimeMethodScope(current, child) {
-			return acquired
-		}
-		child = current
-	}
-	return finder.manager.Global
-}
-
-// TSESTree represents a runtime method as a MethodDefinition wrapping a
-// FunctionExpression. Its computed key and member-level decorators sit
-// outside that function, while parameters (including their decorators), type
-// parameters, return type, and body sit inside it. ts-go combines both parts
-// into one method node, so acquisition must skip that node only for the two
-// outer positions. TypeScript method signatures are not combined runtime
-// methods and deliberately keep their function-type scope here.
-func outsideRuntimeMethodScope(method *ast.Node, child *ast.Node) bool {
-	if method == nil || child == nil {
-		return false
-	}
-	switch method.Kind {
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return child == method.Name() || child.Kind == ast.KindDecorator
-	default:
-		return false
-	}
 }
 
 func hasImplicitArguments(block *ast.Node) bool {

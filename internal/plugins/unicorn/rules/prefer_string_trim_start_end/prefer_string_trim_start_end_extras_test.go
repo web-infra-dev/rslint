@@ -29,6 +29,12 @@ func TestPreferStringTrimStartEndExtras(t *testing.T) {
 		t,
 		&prefer_string_trim_start_end.PreferStringTrimStartEndRule,
 		[]rule_tester.ValidTestCase{
+			// With a checker, both direct and recursive class expressions are
+			// known non-strings, including merged type/value declarations.
+			{Code: `class Base extends class { trimLeft() {} } {} function f(value: Base) { value.trimLeft(); }`, FileName: "file.ts"},
+			{Code: `class Base extends class { trimLeft() {} } {} class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`, FileName: "file.ts"},
+			{Code: `type Base = string; const Base = class { trimRight() {} }; class Derived extends Base {} function f(value: Derived) { value.trimRight(); }`, FileName: "file.ts"},
+
 			// ---- Real-user: upstream PR #1768 optional-call direction ----
 			// Optional calls are deliberately allowed.
 			{Code: `foo.trimRight?.()`, FileName: "file.js"},
@@ -189,6 +195,32 @@ func TestPreferStringTrimStartEndEditDemand(t *testing.T) {
 	}
 }
 
+func TestPreferStringTrimStartEndMessages(t *testing.T) {
+	t.Parallel()
+
+	diagnostics := lintPreferStringTrimStartEndSourceOnly(t, "file.js", `value.trimLeft(); value.trimRight();`)
+	want := []rule.RuleMessage{
+		{
+			Id:          messageID,
+			Description: expectedMessage("trimLeft", "trimStart"),
+			Data:        map[string]string{"method": "trimLeft", "replacement": "trimStart"},
+		},
+		{
+			Id:          messageID,
+			Description: expectedMessage("trimRight", "trimEnd"),
+			Data:        map[string]string{"method": "trimRight", "replacement": "trimEnd"},
+		},
+	}
+	if len(diagnostics) != len(want) {
+		t.Fatalf("diagnostics = %d, want %d", len(diagnostics), len(want))
+	}
+	for i, message := range want {
+		if !reflect.DeepEqual(diagnostics[i].Message, message) {
+			t.Errorf("diagnostic %d: message = %+v, want %+v", i, diagnostics[i].Message, message)
+		}
+	}
+}
+
 func TestPreferStringTrimStartEndSourceOnly(t *testing.T) {
 	t.Parallel()
 
@@ -247,6 +279,66 @@ func TestPreferStringTrimStartEndSourceOnly(t *testing.T) {
 			name: "direct class expression heritage remains unknown",
 			code: `class Collection extends class {} {} function f(foo: Collection) { foo.trimLeft(); }`,
 			want: 1,
+		},
+		{
+			name: "recursive class expression heritage",
+			code: `class Base extends class { trimLeft() {} } {} class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`,
+			want: 0,
+		},
+		{
+			name: "nested class expressions through const aliases",
+			code: `const Origin = class extends class extends class { trimRight() {} } {} {}; const Base = Origin; class Derived extends Base {} function f(value: Derived) { value.trimRight(); }`,
+			want: 0,
+		},
+		{
+			name: "recursive heritage through a constrained type parameter",
+			code: `class Base extends class { trimLeft() {} } {} class Derived extends Base {} function f<T extends Derived>(value: T) { value?.trimLeft(); }`,
+			want: 0,
+		},
+		{
+			name: "recursive heritage with a string union remains unknown",
+			code: `class Base extends class { trimRight() {} } {} class Derived extends Base {} function f(value: Derived | string) { value.trimRight(); }`,
+			want: 1,
+		},
+		{
+			name: "recursive factory superclass remains unknown",
+			code: `function factory() { return class { trimLeft() {} }; } class Base extends factory() {} class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`,
+			want: 1,
+		},
+		{
+			name: "recursive asserted alias remains unknown",
+			code: `const Base = (class { trimLeft() {} }) as any; class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`,
+			want: 1,
+		},
+		{
+			name: "cyclic class aliases remain unknown",
+			code: `const Base = Alias; const Alias = Base; class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`,
+			want: 1,
+		},
+		{
+			name: "cyclic class heritage remains unknown",
+			code: `class Base extends Derived {} class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`,
+			want: 1,
+		},
+		{
+			name: "type declaration before const remains unknown",
+			code: `type Base = string; const Base = class { trimLeft() {} }; class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`,
+			want: 1,
+		},
+		{
+			name: "const declaration before type is resolved",
+			code: `const Base = class { trimLeft() {} }; type Base = string; class Derived extends Base {} function f(value: Derived) { value.trimLeft(); }`,
+			want: 0,
+		},
+		{
+			name: "interface declaration before class remains unknown",
+			code: `interface Base {} class Base { trimRight() {} } class Derived extends Base {} function f(value: Derived) { value.trimRight(); }`,
+			want: 1,
+		},
+		{
+			name: "class declaration before interface is resolved",
+			code: `class Base { trimRight() {} } interface Base {} class Derived extends Base {} function f(value: Derived) { value.trimRight(); }`,
+			want: 0,
 		},
 		{
 			name: "using binding is not a const alias",

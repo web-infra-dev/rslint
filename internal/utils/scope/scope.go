@@ -95,6 +95,7 @@ const (
 	KindType                       // TS type alias / interface: type parameters
 	KindClassStaticBlock           // `static { ... }`
 	KindClassFieldInitializer      // the initializer expression of a class field
+	KindWith                       // the body environment of a with statement
 )
 
 // Scope is one node of the scope tree.
@@ -237,6 +238,8 @@ type Manager struct {
 	// References lists every reference in the file, in the order the builder
 	// discovered them. Populated only when [Options.CollectReferences] is set.
 	References []*Reference
+	// byBlock is the lazy index used by Acquire.
+	byBlock map[*ast.Node]*Scope
 }
 
 // Build analyzes `sf` and returns its scope tree.

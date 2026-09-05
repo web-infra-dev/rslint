@@ -527,9 +527,9 @@ func (p *parser) parseNumber() (float64, error) {
 			return 0, fmt.Errorf("expected digit at position %d", p.pos)
 		}
 	}
-	val, err := strconv.ParseFloat(p.src[start:p.pos], 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid number at position %d: %w", start, err)
+	val, ok := ecmascript.StringToNumber(p.src[start:p.pos])
+	if !ok {
+		return 0, fmt.Errorf("invalid number at position %d", start)
 	}
 	return val, nil
 }
