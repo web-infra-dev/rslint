@@ -3,13 +3,10 @@ package consistent_rstest_namespace
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -311,7 +308,7 @@ func (file *fileNamespaces) importFixes(elements []*ast.Node, index int) []rule.
 	if len(elements) < 2 {
 		return nil
 	}
-	return []rule.RuleFix{rule.RuleFixRemoveRange(specifierRemovalRange(file.ctx.SourceFile, elements, index))}
+	return []rule.RuleFix{rule.RuleFixRemoveRange(rstestUtils.SpecifierRemovalRange(file.ctx.SourceFile, elements, index))}
 }
 
 func (file *fileNamespaces) scan() {
@@ -476,103 +473,4 @@ func exportSpecifierLocalName(node *ast.Node) string {
 		return ""
 	}
 	return local.AsIdentifier().Text
-}
-
-// specifierRemovalRange spans the specifier at index together with the comma
-// that separates it from its neighbour. A comment written for the specifier
-// that stays is kept; one written for the specifier that goes is removed with
-// it. Which comment is whose is read from the separating comma: the comments
-// on the removed specifier's side of it go with the specifier.
-func specifierRemovalRange(sourceFile *ast.SourceFile, elements []*ast.Node, index int) core.TextRange {
-	elementRange := utils.TrimNodeTextRange(sourceFile, elements[index])
-	if index > 0 {
-		// The comma this range starts at is the one before the specifier, so the
-		// comments that follow it run up to the next comma, or to the end of the
-		// list when the removed specifier is the last one.
-		previousEnd := utils.TrimNodeTextRange(sourceFile, elements[index-1]).End()
-		limit := specifierListEnd(sourceFile, elements, index)
-		return core.NewTextRange(previousEnd, commentsEnd(sourceFile.Text(), elementRange.End(), limit))
-	}
-	nextStart := utils.TrimNodeTextRange(sourceFile, elements[index+1]).Pos()
-	return core.NewTextRange(elementRange.Pos(), firstSpecifierRemovalEnd(sourceFile.Text(), elementRange.End(), nextStart))
-}
-
-// specifierListEnd is how far after the specifier at index its own comments can
-// reach: the next specifier for a specifier in the middle of the list, and the
-// closing brace of the list for the last one.
-func specifierListEnd(sourceFile *ast.SourceFile, elements []*ast.Node, index int) int {
-	if index+1 < len(elements) {
-		return utils.TrimNodeTextRange(sourceFile, elements[index+1]).Pos()
-	}
-	if parent := elements[index].Parent; parent != nil {
-		return utils.TrimNodeTextRange(sourceFile, parent).End()
-	}
-	return len(sourceFile.Text())
-}
-
-// commentsEnd walks the whitespace and comments that begin at start and returns
-// the end of the last comment it consumed, or start when it meets anything else
-// first — the separating comma or the closing brace of the list.
-func commentsEnd(text string, start int, limit int) int {
-	if start < 0 || limit > len(text) || start >= limit {
-		return start
-	}
-	end := start
-	for position := start; position < limit; {
-		rest := text[position:limit]
-		switch {
-		case rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\r' || rest[0] == '\n':
-			position++
-		case strings.HasPrefix(rest, "//"):
-			length := strings.IndexByte(rest, '\n')
-			if length < 0 {
-				length = len(rest)
-			}
-			position += length
-			end = position
-		case strings.HasPrefix(rest, "/*"):
-			length := strings.Index(rest, "*/")
-			if length < 0 {
-				return end
-			}
-			position += length + 2
-			end = position
-		default:
-			return end
-		}
-	}
-	return end
-}
-
-func firstSpecifierRemovalEnd(text string, start int, end int) int {
-	if start < 0 || end > len(text) || start >= end {
-		return end
-	}
-	between := text[start:end]
-	comma := strings.IndexByte(between, ',')
-	if comma < 0 {
-		return end
-	}
-	comment := firstCommentOffset(between)
-	if comment < 0 {
-		return end
-	}
-	if comment > comma {
-		return start + comment
-	}
-	if afterComma := firstCommentOffset(between[comma+1:]); afterComma >= 0 {
-		return start + comma + 1 + afterComma
-	}
-	return end
-}
-
-func firstCommentOffset(text string) int {
-	offset := -1
-	if line := strings.Index(text, "//"); line >= 0 {
-		offset = line
-	}
-	if block := strings.Index(text, "/*"); block >= 0 && (offset < 0 || block < offset) {
-		offset = block
-	}
-	return offset
 }

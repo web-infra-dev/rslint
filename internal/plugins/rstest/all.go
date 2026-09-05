@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
 	no_import_node "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_import_node_test"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_rstest_methods"
@@ -28,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_falsy"
@@ -62,6 +64,7 @@ func GetAllRules() []rule.Rule {
 		no_hooks.NoHooksRule,
 		no_identical_title.NoIdenticalTitleRule,
 		no_import_node.NoImportNodeTestRule,
+		no_importing_rstest_globals.NoImportingRstestGlobalsRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
 		no_mocks_import.NoMocksImportRule,
 		no_restricted_rstest_methods.NoRestrictedRstestMethodsRule,
@@ -73,6 +76,7 @@ func GetAllRules() []rule.Rule {
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_import_in_mock.PreferImportInMockRule,
+		prefer_importing_rstest_globals.PreferImportingRstestGlobalsRule,
 		prefer_rs_mocked.PreferRsMockedRule,
 		prefer_strict_boolean_matchers.PreferStrictBooleanMatchersRule,
 		prefer_to_be_falsy.PreferToBeFalsyRule,
