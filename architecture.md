@@ -1557,12 +1557,11 @@ Txtar fixtures are ordinary committed test inputs: they require no generator,
 golden-update mode, or separate build step, and run through the owning package's
 normal `go test` invocation.
 
-### Continuous Integration
+### Local Verification and Continuous Integration
 
-- **Go Tests**: `pnpm run test:go`
-- **TypeScript / JS Tests**: `pnpm run test`
-- **Linting**: `pnpm run lint` and `pnpm run lint:go`
-- **Build Verification**: `pnpm run build`
+Local verification uses existing Go, pnpm/Rstack and Cargo commands with explicit package or test-file arguments. See [CONTRIBUTING.md](./CONTRIBUTING.md#verify-a-change) for examples and [AGENTS.md](./AGENTS.md#local-verification) for scope and result-reuse rules. Test layout and semantic coverage remain part of reviewing the change.
+
+`.github/workflows/ci.yml` owns the full Go, JS, Rust, WASM and integration checks. Its command list does not expand local test scope.
 
 ### Release Lines
 
@@ -1575,7 +1574,7 @@ The maintained rule-porting workflow now lives under [`.agents/skills/port-rule`
 
 Use these entry points instead of duplicating a separate checklist here:
 
-- [`.agents/skills/port-rule/SKILL.md`](./.agents/skills/port-rule/SKILL.md): primary skill entry and workflow
+- [`.agents/skills/port-rule/SKILL.md`](./.agents/skills/port-rule/SKILL.md): new-rule workflow and reference routing
 - [`.agents/skills/port-rule/references/PORT_RULE.md`](./.agents/skills/port-rule/references/PORT_RULE.md): detailed end-to-end porting guide
 - [`.agents/skills/port-rule/references/QUICK_REFERENCE.md`](./.agents/skills/port-rule/references/QUICK_REFERENCE.md): commands, naming conventions, and condensed checklist
 
