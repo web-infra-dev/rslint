@@ -361,6 +361,9 @@ for the first consumer; later consumers share that list. A source without `//`
 or `/*` takes a cheap byte-scan fast path. Inline-global parsing first checks
 for an exact raw-text directive candidate, so ordinary files do not force
 comment collection.
+Comment traversal uses parser-owned token ranges and scans the gaps between
+AST children with a scanner local to the walk. It does not populate the
+SourceFile token cache; token APIs still return canonical cached nodes.
 The linter also creates one shared `RefStore` handle per file. Its candidate
 identifier walk is deferred until the first reference query, and binder name
 resolution is then performed once per queried symbol name. Rules query it with
