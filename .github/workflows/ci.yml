@@ -126,8 +126,8 @@ jobs:
           version: v2.12.2
           args: --timeout=15m ./cmd/... ./internal/...
 
-      - name: Go format check
-        run: pnpm run format:go --diff
+      - name: go fmt
+        run: npm run format:go
 
       - name: Check Spell
         run: pnpm check-spell

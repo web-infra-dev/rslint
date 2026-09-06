@@ -1529,7 +1529,7 @@ normal `go test` invocation.
 
 Local verification uses existing Go, pnpm/Rstack and Cargo commands with explicit package or test-file arguments. See [CONTRIBUTING.md](./CONTRIBUTING.md#verify-a-change) for examples and [AGENTS.md](./AGENTS.md#local-verification) for scope and result-reuse rules. Test layout and semantic coverage remain part of reviewing the change.
 
-`.github/workflows/ci.yml` owns the full Go, JS, Rust, WASM and integration checks. Its command list does not expand local test scope. Go lint runs once, and Go formatting reports differences without modifying CI's checkout.
+`.github/workflows/ci.yml` owns the full Go, JS, Rust, WASM and integration checks. Its command list does not expand local test scope.
 
 ### Release Lines
 

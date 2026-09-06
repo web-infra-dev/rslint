@@ -95,12 +95,12 @@ The following are scoped examples, not a checklist. Replace the package or file 
 | Rstest integration file     | `pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
 | VS Code extension workspace | `xvfb-run -a pnpm --filter rslint test`                                                        |
 | Go lint                     | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`              |
-| Go formatting check         | `golangci-lint fmt --diff ./internal/rules/max_params`                                         |
+| Go formatting check         | `golangci-lint fmt --diff ./internal/rules/max_params/max_params.go`                           |
 | JS/TS/docs formatting check | `pnpm exec rs fmt --check <changed-files>`                                                     |
 
 The VS Code package uses its own `__tests__/runTest.ts` and Mocha runner, not Rstest. Its existing `test` script compiles and runs all extension suites and currently exposes no test-file or suite selector. The workspace command above is the smallest supported entry point; report that scope rather than inventing a filter or sending extension tests to `rs test`.
 
-Run Go lint once with the branch-diff filter and selected package directories; do not follow it with the root `lint:go` script. Substitute the actual base ref when it is not `origin/main`. Preserve the formatter's existing behavior: the scoped `golangci-lint fmt --diff` command corresponds to root `pnpm run format:go --diff` without adding formatter options such as `--enable gofmt`.
+Run Go lint once with the branch-diff filter and selected package directories; do not follow it with the root `lint:go` script. Substitute the actual base ref when it is not `origin/main`. For Go formatting, pass the changed Go file paths directly and use the repository's formatter configuration. `--diff` reports formatting differences without writing files; it does not select files from Git.
 
 ## Record the result
 
