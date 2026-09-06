@@ -90,6 +90,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 				FS:             fsys,
 				AllowFiles:     []string{targetPath},
 				Format:         format,
+				NoColor:        true,
 				SingleThreaded: true,
 				TypeCheck:      test.typeCheckOnly,
 				TypeCheckOnly:  test.typeCheckOnly,
