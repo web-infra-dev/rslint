@@ -39,6 +39,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -52,6 +53,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/output"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // Application-level IPC message kinds for the CLI ⇆ Node engine protocol.
@@ -64,6 +66,7 @@ const (
 	kindPluginLint      ipc.MessageKind = "pluginLint"      // Go → Node: run ESLint-plugin rules in a worker
 	kindLoadConfigs     ipc.MessageKind = "loadConfigs"     // Go → Node: evaluate one config frontier
 	kindActivateConfigs ipc.MessageKind = "activateConfigs" // Go → Node: prepare the effective config/plugin set
+	kindPrepareConfigs  ipc.MessageKind = "prepareConfigs"  // Go → Node: start activation, return planning metadata
 )
 
 // initPayload mirrors the IPC `init` message sent by engine.ts. Field shape
@@ -91,7 +94,8 @@ type configDiscoveryPayload struct {
 }
 
 type ipcConfigModuleLoader struct {
-	channel *ipc.Channel
+	channel            *ipc.Channel
+	completeActivation func() error
 }
 
 func (loader *ipcConfigModuleLoader) LoadConfigs(ctx context.Context, request discovery.ConfigLoadBatchRequest) (discovery.ConfigLoadBatchResponse, error) {
@@ -107,13 +111,38 @@ func (loader *ipcConfigModuleLoader) LoadConfigs(ctx context.Context, request di
 }
 
 func (loader *ipcConfigModuleLoader) ActivateConfigs(ctx context.Context, request discovery.ConfigActivationRequest) (discovery.ConfigActivationResponse, error) {
-	msg, err := loader.channel.SendRequest(ctx, kindActivateConfigs, request)
+	response, err := loader.requestActivation(ctx, kindPrepareConfigs, request)
+	if err != nil {
+		return discovery.ConfigActivationResponse{}, err
+	}
+	if len(response.EslintPluginEntries) > 0 {
+		loader.completeActivation = func() error {
+			activated, err := loader.requestActivation(ctx, kindActivateConfigs, request)
+			if err != nil {
+				return err
+			}
+			if activated.TransactionID != response.TransactionID || !slices.EqualFunc(
+				activated.EslintPluginEntries, response.EslintPluginEntries,
+				func(a, b rule.ESLintPluginMetadata) bool {
+					return a.Prefix == b.Prefix && slices.Equal(a.RuleNames, b.RuleNames)
+				},
+			) {
+				return errors.New("config activation does not match prepared metadata")
+			}
+			return nil
+		}
+	}
+	return response, nil
+}
+
+func (loader *ipcConfigModuleLoader) requestActivation(ctx context.Context, kind ipc.MessageKind, request discovery.ConfigActivationRequest) (discovery.ConfigActivationResponse, error) {
+	msg, err := loader.channel.SendRequest(ctx, kind, request)
 	if err != nil {
 		return discovery.ConfigActivationResponse{}, err
 	}
 	var response discovery.ConfigActivationResponse
 	if err := msg.Decode(&response); err != nil {
-		return discovery.ConfigActivationResponse{}, fmt.Errorf("decode activateConfigs response: %w", err)
+		return discovery.ConfigActivationResponse{}, fmt.Errorf("decode %s response: %w", kind, err)
 	}
 	return response, nil
 }
@@ -553,6 +582,7 @@ func discoverCLIConfigCatalog(
 		return errors.New("no rslint config found; run `rslint --init` to create one")
 	}
 	args.ConfigCatalog = catalog
+	args.CompleteConfigActivation = loader.completeActivation
 	return nil
 }
 

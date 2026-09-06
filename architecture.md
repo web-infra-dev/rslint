@@ -838,8 +838,35 @@ Automatic discovery uses these rules:
 
 The transport and target phase differ by surface:
 
-- CLI sends `loadConfigs` / `activateConfigs` as reverse framed-IPC requests
-  during initialization. The resulting catalog and the later Go lint-target
+- CLI sends `loadConfigs` and the CLI-only `prepareConfigs` as reverse
+  framed-IPC requests during initialization. After final effective-ID selection
+  and the first fingerprint check, Node starts the existing plugin-host build
+  and returns provisional plugin metadata. Go may use that metadata for
+  read-only target planning and Program construction. Before `RunPipeline`,
+  `activateConfigs` joins the same activation, including its second fingerprint
+  check and host publication. The CLI adapter validates that the completed
+  metadata matches the prepared metadata. This barrier also runs with zero
+  targets, disabled plugin rules, or `--type-check-only`; earlier command
+  failures join the pending activation before returning. Initialization errors
+  remain fatal and can now appear through the ordinary aborted-run output
+  after the interactive start line, before any diagnostics or fixes execute.
+  The start line uses stdout; initialization and other aborted-run errors use
+  stderr in every format. If Go preparation and worker initialization both
+  fail, both errors are reported. Explicit `--cpuprof` and `--trace` outputs
+  record the Go preparation and execution reached by this invocation, including
+  failure paths. Recording starts before the activation barrier and replaces
+  the selected output file; an initialization failure still finalizes that
+  recording. Cancellation retains the engine's existing termination fallback:
+  a Go child blocked in I/O may require forced termination and report its
+  corresponding signal exit code while the engine drains owned workers.
+  Native-only configurations return fully verified metadata without a worker
+  or a second request. `--singleThreaded` still uses one JS worker and serial
+  Go work groups; that worker's initialization can overlap Go preparation.
+  The engine owns one activation per invocation: identical requests share its
+  completion, conflicting selections fail, and shutdown prevents late host
+  publication while draining owned builds with the existing initialization
+  timeout. API and LSP activation/commit behavior is unchanged.
+  The resulting catalog and the later Go lint-target
   walker are separate traversals, but the staged catalog already freezes the
   Git sources observed on its reachable frontier. There is no second per-owner
   directory sweep. Automatic literal scopes and explicit file-only invocations
@@ -1378,7 +1405,9 @@ Other invariants:
 | Program source identity index | Canonical source paths are resolved serially through `core.NewWorkGroup(true)`.                               |
 
 These workload stages run serially with `--singleThreaded`; infrastructure
-goroutines remain outside that guarantee.
+goroutines remain outside that guarantee. CLI plugin initialization uses one
+JS worker and can overlap the serial Go target planning and Program loading;
+lint and fix execution still await full config activation.
 
 ## 10. Performance & Memory Considerations
 

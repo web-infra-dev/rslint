@@ -18,6 +18,7 @@ import {
   CONFIG_DISCOVERY_PROTOCOL_VERSION,
   ConfigModuleHost,
   type ActivateConfigsRequest,
+  type ActivateConfigsResponse,
   type LoadConfigsRequest,
 } from '../config/config-loader.js';
 
@@ -322,6 +323,14 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   const configModuleHost = opts.configModuleHost ?? new ConfigModuleHost();
   const configTransactions = new Set<string>();
   let shuttingDown = false;
+  const configAbort = new AbortController();
+  let configActivation:
+    | {
+        request: ActivateConfigsRequest;
+        metadata: Promise<ActivateConfigsResponse>;
+        ready: Promise<ActivateConfigsResponse>;
+      }
+    | undefined;
   const pendingPluginHostBuilds = new Set<Promise<PluginLintHost | null>>();
   const stagedPluginHosts = new Set<PluginLintHost>();
   const pluginHostShutdowns = new WeakMap<PluginLintHost, Promise<void>>();
@@ -369,6 +378,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         }
         createPluginLintHost = mod.createPluginLintHost;
       }
+      if (shuttingDown) return null;
       const host = await createPluginLintHost(
         pluginConfigs,
         (rec) => stderr.write(`[rslint:plugin] ${rec.text}\n`),
@@ -390,6 +400,70 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     return host;
   };
 
+  const activateConfigs = (request: ActivateConfigsRequest) => {
+    if (shuttingDown)
+      throw new Error('engine: config activation after shutdown');
+    if (configActivation) {
+      const previous = configActivation.request;
+      if (
+        previous.transactionId !== request.transactionId ||
+        previous.effectiveConfigIds.length !==
+          request.effectiveConfigIds.length ||
+        previous.effectiveConfigIds.some(
+          (id, index) => id !== request.effectiveConfigIds[index],
+        )
+      ) {
+        throw new Error('engine: conflicting config activation');
+      }
+      return configActivation;
+    }
+    // One CLI invocation owns one selection. Snapshot it so both fingerprint
+    // checks and every waiter refer to the same effective sources.
+    const selected = {
+      ...request,
+      effectiveConfigIds: [...request.effectiveConfigIds],
+    };
+    let resolveMetadata!: (response: ActivateConfigsResponse) => void;
+    let rejectMetadata!: (error: unknown) => void;
+    const metadata = new Promise<ActivateConfigsResponse>((resolve, reject) => {
+      resolveMetadata = resolve;
+      rejectMetadata = reject;
+    });
+    void metadata.catch(() => undefined);
+    let stagedPluginHost: PluginLintHost | null = null;
+    const ready = (async () => {
+      try {
+        const response = await configModuleHost.activateConfigs(
+          selected,
+          configAbort.signal,
+          async (activation) => {
+            if (activation.pluginConfigs.length > 0) {
+              // This response permits read-only Go planning, never execution.
+              // The original activation still owns preparation and its second
+              // fingerprint check; activateConfigs below awaits that result.
+              resolveMetadata({
+                transactionId: activation.transactionId,
+                eslintPluginEntries: activation.eslintPluginEntries,
+              });
+            }
+            stagedPluginHost = await buildPluginHost(activation.pluginConfigs);
+          },
+        );
+        await publishPluginHost(stagedPluginHost);
+        stagedPluginHost = null;
+        return response;
+      } catch (error) {
+        await shutdownPluginHost(stagedPluginHost).catch(() => undefined);
+        throw error;
+      }
+    })();
+    // Observe failure immediately, even before Go reaches its final barrier.
+    // Native-only runs receive fully validated metadata.
+    void ready.then(resolveMetadata, rejectMetadata);
+    configActivation = { request: selected, metadata, ready };
+    return configActivation;
+  };
+
   // Without our own SIGINT handler Node's default action _exit(130)s
   // immediately, leaving the Go child to discover the disconnect via stdin EOF
   // — which a wedged child can't. Intercept and force it down first.
@@ -398,6 +472,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     // expected path, not an error — forward the kill to the Go child and tear
     // the worker pool down so its threads don't outlive us.
     shuttingDown = true;
+    configAbort.abort();
     safeKillGo(child);
     void Promise.allSettled([
       shutdownPluginHost(pluginHost),
@@ -427,46 +502,29 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     ipc.setInboundHandler(async (msg) => {
       switch (msg.kind) {
         case 'loadConfigs': {
+          if (shuttingDown || configActivation) {
+            throw new Error('engine: config load after activation or shutdown');
+          }
           if (!isLoadConfigsRequest(msg.data)) {
             throw new Error('engine: invalid loadConfigs request');
           }
           const request = msg.data;
-          const response = await configModuleHost.loadConfigs(request);
           configTransactions.add(request.transactionId);
+          const response = await configModuleHost.loadConfigs(
+            request,
+            configAbort.signal,
+          );
           return response;
         }
+        case 'prepareConfigs':
         case 'activateConfigs': {
           if (!isActivateConfigsRequest(msg.data)) {
             throw new Error('engine: invalid activateConfigs request');
           }
-          const request = msg.data;
-          let stagedPluginHost: PluginLintHost | null = null;
-          try {
-            const response = await configModuleHost.activateConfigs(
-              request,
-              undefined,
-              async (activation) => {
-                if (pluginHost) return;
-                const createdHost = await buildPluginHost(
-                  activation.pluginConfigs,
-                );
-                if (shuttingDown) {
-                  await shutdownPluginHost(createdHost).catch(() => undefined);
-                  return;
-                }
-                stagedPluginHost = createdHost;
-              },
-            );
-            // Do not expose a worker that re-imported the config until the
-            // post-prepare fingerprint check has accepted the activation.
-            const preparedHost = stagedPluginHost;
-            await publishPluginHost(preparedHost);
-            stagedPluginHost = null;
-            return response;
-          } catch (error) {
-            await shutdownPluginHost(stagedPluginHost).catch(() => undefined);
-            throw error;
-          }
+          const activation = activateConfigs(msg.data);
+          return msg.kind === 'prepareConfigs'
+            ? activation.metadata
+            : activation.ready;
         }
         case 'output': {
           if (!isOutputRequest(msg.data)) {
@@ -485,6 +543,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
           return { ok: true };
         }
         case 'pluginLint':
+          if (configActivation) await configActivation.ready;
           // Go dispatched a plugin-lint batch in parallel with native linting.
           // Go only dispatches after activation returned plugin metadata, so a
           // missing published host is a protocol/lifecycle failure. Surface it
@@ -567,6 +626,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     // even on the normal path and after the signal handler already fired.
     removeSignalHandlers();
     shuttingDown = true;
+    configAbort.abort();
     await Promise.allSettled([...pendingPluginHostBuilds]);
     await Promise.allSettled([
       shutdownPluginHost(pluginHost),

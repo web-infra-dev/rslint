@@ -279,9 +279,7 @@ describe('runEngine config activation', () => {
 
       expect(exitCode).toBe(0);
       expect(captured).toContain('plugin host was being prepared');
-      expect(captured).toContain(
-        'pluginLint requested without an activated plugin host',
-      );
+      expect(captured.match(/plugin host was being prepared/g)).toHaveLength(2);
       expect(lintCalls).toBe(0);
       expect(shutdownCalls).toBe(1);
     } finally {

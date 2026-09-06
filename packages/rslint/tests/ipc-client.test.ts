@@ -443,15 +443,21 @@ describe('IpcClient request/response', () => {
     }
   });
 
-  test('handler thrown error → peer receives error reply', async () => {
+  test.each([
+    ['boom', 'boom'],
+    ['', 'request failed'],
+    ['peer error: from config', 'peer error: from config'],
+  ])('handler error %j → peer receives %j', async (message, expected) => {
     const { a, b, cleanup } = pairClients();
     try {
       b.setInboundHandler(() => {
-        throw new Error('boom');
+        throw new Error(message);
       });
       a.start();
       b.start();
-      await expect(a.sendRequest('lint', {})).rejects.toThrow(/boom/);
+      await expect(a.sendRequest('lint', {})).rejects.toMatchObject({
+        message: expected,
+      });
     } finally {
       cleanup();
     }
