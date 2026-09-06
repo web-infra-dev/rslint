@@ -94,6 +94,10 @@ and new releases; versions through `0.9.1` retain only their existing rule histo
 `pnpm sync:version-info full` rebuilds rule history from stable tags while preserving
 recorded compiler bindings. Fetch all tags before running it.
 
+The scripts live in `scripts/sync-version-info/`: `index.js` is the entry point,
+`release.js` maintains rule release history, and `version.js` resolves the
+TypeScript commit and release version.
+
 ## Test the CLI
 
 After building, you can test the rslint CLI:

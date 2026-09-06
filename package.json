@@ -23,7 +23,7 @@
     "version": "zx scripts/version.mjs",
     "version:crates": "zx scripts/version-crates.mjs",
     "release": "pnpm --filter='!@rslint/tsgo-server' --filter='!@rslint/tsgo-server-*' -r publish --no-git-checks",
-    "sync:version-info": "node scripts/sync-version-info.js",
+    "sync:version-info": "node scripts/sync-version-info/index.js",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "rs fmt",
