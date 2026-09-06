@@ -218,6 +218,9 @@ async function main() {
       await updateWorkspaceDependencies(packagePath, versionMap);
     }
 
+    // Record rules and the exact compiler binding for this release together.
+    await $`node scripts/sync-releases.mjs --release`;
+
     // Summary
     console.log(chalk.green('\n✨ Version bump completed!'));
     console.log(chalk.gray('📋 Summary:'));

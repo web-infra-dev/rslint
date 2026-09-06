@@ -8,21 +8,22 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                  | Description                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
-| `-c, --config <path>` | Specify which JS/TS module config file to use                                                  |
-| `--fix`               | Automatically fix problems                                                                     |
-| `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
-| `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
-| `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
-| `--quiet`             | Report errors only, suppress warnings                                                          |
-| `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
-| `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
-| `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
-| `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
-| `--force-color`       | Force colored output ([details](/guide/environment-variables))                                 |
-| `--help`, `-h`        | Show help information                                                                          |
+| Flag                  | Description                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                                                    |
+| `-c, --config <path>` | Specify which JS/TS module config file to use                                                                                  |
+| `--fix`               | Automatically fix problems                                                                                                     |
+| `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                                                     |
+| `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))                                     |
+| `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats))                                 |
+| `--quiet`             | Report errors only, suppress warnings                                                                                          |
+| `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                                                      |
+| `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                                                           |
+| `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))                                             |
+| `--no-color`          | Disable colored output ([details](/guide/environment-variables))                                                               |
+| `--force-color`       | Force colored output ([details](/guide/environment-variables))                                                                 |
+| `--help`, `-h`        | Show help information                                                                                                          |
+| `--version`, `-v`     | Show the rslint version and embedded TypeScript binding; add `--json` for machine-readable output ([details](/guide/releases)) |
 
 ## File and Directory Arguments
 

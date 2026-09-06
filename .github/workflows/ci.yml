@@ -168,6 +168,20 @@ jobs:
       - name: Format
         run: pnpm format:check
 
+      - name: Verify release metadata
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            pnpm check:releases --verify-upstream --base "$BASE_SHA"
+          else
+            pnpm check:releases --verify-upstream
+          fi
+
+      - name: Test release metadata
+        run: pnpm test:releases
+
       # Rule options JSON Schema dump for the generate-rule-option-types
       # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
       # Without this, `pnpm run build` below still succeeds but the plugin
@@ -179,6 +193,9 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+      - name: Verify built compiler binding and rule catalog
+        run: node scripts/verify-build-info.mjs --binary npm/rslint/linux-x64-gnu/rslint --rule-schemas packages/rslint/rule-schemas.json
 
       - name: Dogfooding
         run: pnpm run lint --format github
@@ -353,6 +370,10 @@ jobs:
         run: |
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
+
+      - name: Build website and verify release page
+        run: pnpm run build:website
+
   test-rust:
     name: Test Rust
     runs-on: ${{ matrix.os }}

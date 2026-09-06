@@ -733,3 +733,6 @@ pingback
 prerender
 reparses
 batgo
+buildinfo
+gitlink
+gpgsign

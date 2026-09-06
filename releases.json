@@ -809,5 +809,13 @@
       "rstest:require-awaited-expect-poll",
       "rstest:require-mock-type-parameters"
     ]
+  },
+  {
+    "version": "unreleased",
+    "rules": [],
+    "typescript": {
+      "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
+      "releaseVersion": null
+    }
   }
 ]

@@ -68,7 +68,33 @@ git -C typescript-go checkout --detach FETCH_HEAD
 bash tools/update-typescript-go.sh
 ```
 
-The helper resolves the exact submodule commit to a Go pseudo-version, updates the root and shim module requirements, regenerates shims from the local checkout, tidies those modules, builds both Go entrypoints, and checks the unsafe checker mirror's field layout. Review the resulting changes and run the Go and JS tests before committing the new submodule revision. Compiler API changes may require adapting the shim declarations and their consumers.
+The helper resolves the exact submodule commit to a Go pseudo-version, updates the root and shim module requirements, regenerates shims from the local checkout, tidies those modules, refreshes the unreleased compiler binding, builds both Go entrypoints, and checks the unsafe checker mirror's field layout. Review the resulting changes and run the Go and JS tests before committing the new submodule revision. Compiler API changes may require adapting the shim declarations and their consumers.
+
+### Release metadata
+
+`releases.json` is the shared history for rule introduction versions and compiler
+bindings. Do not edit generated build metadata directly or add compiler bindings
+to old releases.
+
+- `pnpm sync:releases` refreshes the `unreleased` compiler binding and generated
+  Go/JavaScript metadata. It reads the checkout's full SHA and queries upstream
+  tags for an exact release match; a failed lookup fails the command.
+- `pnpm version patch` (or another supported bump) also runs
+  `pnpm sync:releases --release`, recording the new rules and compiler together.
+  Run that sync command again if the release candidate changes before publishing.
+  Published versions cannot be rewritten.
+- `pnpm check:releases` checks the generated data and the staged submodule gitlink
+  without network access. Stage a compiler update before running this check.
+  CI adds `--verify-upstream` and `--base <commit>` to verify the upstream release
+  match and prevent historical compiler bindings from being changed or backfilled.
+- `pnpm sync:releases --check --release` additionally requires the current package
+  version's record, checks workspace versions, and verifies the upstream tag.
+- `pnpm sync:releases --full` rebuilds rule history from local stable tags while
+  preserving compiler bindings. Fetch all tags first. The older
+  `pnpm sync:rule-releases` command remains an alias.
+
+Canary releases have their own exact bindings. Rule badges continue to show first
+stable support, so a canary does not consume a rule's introduction record.
 
 ## Test the CLI
 
