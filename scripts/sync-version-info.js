@@ -346,10 +346,10 @@ function syncCurrentVersion() {
 function printUsage() {
   console.log('\nUsage:');
   console.log(
-    '  pnpm sync:releases       Sync main and the current stable release',
+    '  pnpm sync:version-info       Sync main and the current stable release',
   );
   console.log(
-    '  pnpm sync:releases full  Rebuild rule history, preserving TypeScript bindings',
+    '  pnpm sync:version-info full  Rebuild rule history, preserving TypeScript bindings',
   );
 }
 

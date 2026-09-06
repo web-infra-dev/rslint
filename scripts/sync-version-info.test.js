@@ -97,8 +97,8 @@ function fixture(t) {
   write(root, 'website/releases.json', original);
   write(
     root,
-    'scripts/sync-releases.js',
-    fs.readFileSync(path.join(__dirname, 'sync-releases.js'), 'utf8'),
+    'scripts/sync-version-info.js',
+    fs.readFileSync(path.join(__dirname, 'sync-version-info.js'), 'utf8'),
   );
   commit(root);
   tag(root, 'v0.9.1');
@@ -112,12 +112,16 @@ function fixture(t) {
     read: () => JSON.parse(fs.readFileSync(file, 'utf8')),
     version: (version) => write(root, 'package.json', { version }),
     run: (...args) =>
-      execFileSync(process.execPath, ['scripts/sync-releases.js', ...args], {
-        cwd: root,
-        env,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }),
+      execFileSync(
+        process.execPath,
+        ['scripts/sync-version-info.js', ...args],
+        {
+          cwd: root,
+          env,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      ),
     pin: (revision) => {
       git(
         root,

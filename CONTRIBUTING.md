@@ -77,7 +77,7 @@ command separately:
 
 ```bash
 git fetch origin --tags
-pnpm sync:releases
+pnpm sync:version-info
 ```
 
 This replaces `pnpm sync:rule-releases`. It updates `website/releases.json` with
@@ -91,7 +91,7 @@ Commit the generated JSON with the release changes. The website uses it for rule
 version badges and the TypeScript compiler version table. The table shows `main`
 and new releases; versions through `0.9.1` retain only their existing rule history.
 
-`pnpm sync:releases full` rebuilds rule history from stable tags while preserving
+`pnpm sync:version-info full` rebuilds rule history from stable tags while preserving
 recorded compiler bindings. Fetch all tags before running it.
 
 ## Test the CLI
