@@ -137,6 +137,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	enableVirtualTerminalProcessing()
 	timeBefore := resolveStartTime(startTimeMs)
 
+	// Explicit profiles cover this Go invocation's preparation as well as linting.
+	// Start before joining plugin activation and finalize on failure too; the
+	// requested output replaces any previous recording at the same path.
 	if traceOut != "" {
 		f, err := os.Create(traceOut)
 		if err != nil {

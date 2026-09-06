@@ -851,7 +851,14 @@ The transport and target phase differ by surface:
   remain fatal and can now appear through the ordinary aborted-run output
   after the interactive start line, before any diagnostics or fixes execute.
   The start line uses stdout; initialization and other aborted-run errors use
-  stderr in every format.
+  stderr in every format. If Go preparation and worker initialization both
+  fail, both errors are reported. Explicit `--cpuprof` and `--trace` outputs
+  record the Go preparation and execution reached by this invocation, including
+  failure paths. Recording starts before the activation barrier and replaces
+  the selected output file; an initialization failure still finalizes that
+  recording. Cancellation retains the engine's existing termination fallback:
+  a Go child blocked in I/O may require forced termination and report its
+  corresponding signal exit code while the engine drains owned workers.
   Native-only configurations return fully verified metadata without a worker
   or a second request. `--singleThreaded` still uses one JS worker and serial
   Go work groups; that worker's initialization can overlap Go preparation.
