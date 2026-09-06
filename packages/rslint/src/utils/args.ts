@@ -27,8 +27,6 @@ export function parseArgs(argv: string[]) {
       config: { type: 'string', short: 'c' },
       init: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
-      version: { type: 'boolean', short: 'v' },
-      json: { type: 'boolean' },
       // Detected so the JS host can size the ESLint-plugin worker pool to a
       // single worker. NOT skipped below, so it still forwards to Go in
       // `rest` (Go's native pass honors the same flag independently).
@@ -101,8 +99,6 @@ export function parseArgs(argv: string[]) {
     : [...flags, ...positionalsBefore];
 
   return {
-    version: values.version === true,
-    json: values.json === true,
     // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     config: (values.config as string) ?? null,
     // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

@@ -25,7 +25,5 @@ while IFS= read -r -d '' module_file; do
 done < <(find ./shim -type f -name go.mod -print0)
 go mod tidy
 
-node scripts/sync-releases.mjs
-
 go build ./cmd/rslint ./cmd/tsgo
 go test "$compiler_module/shim/checker"

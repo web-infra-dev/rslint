@@ -811,8 +811,24 @@
     ]
   },
   {
-    "version": "unreleased",
-    "rules": [],
+    "version": "main",
+    "rules": [
+      "eslint-plugin-react:function-component-definition",
+      "eslint-plugin-react:jsx-one-expression-per-line",
+      "eslint-plugin-react:no-arrow-function-lifecycle",
+      "eslint-plugin-react:no-namespace",
+      "eslint-plugin-react:prefer-read-only-props",
+      "eslint-plugin-react:sort-comp",
+      "eslint-plugin-react:static-property-placement",
+      "eslint-plugin-unicorn:no-array-from-fill",
+      "eslint-plugin-unicorn:no-await-expression-member",
+      "eslint-plugin-unicorn:no-this-outside-of-class",
+      "eslint-plugin-unicorn:prefer-string-trim-start-end",
+      "rstest:no-importing-rstest-globals",
+      "rstest:no-restricted-rstest-methods",
+      "rstest:prefer-importing-rstest-globals",
+      "rstest:prefer-rs-mocked"
+    ],
     "typescript": {
       "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
       "releaseVersion": null

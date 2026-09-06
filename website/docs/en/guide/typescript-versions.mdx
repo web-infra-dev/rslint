@@ -1,0 +1,23 @@
+import TypeScriptVersions from '@/theme/components/TypeScriptVersions';
+
+# TypeScript Compiler Versions
+
+Rslint bundles a pinned TypeScript compiler. This table maps the `main` branch
+and each new npm release to the exact compiler source it uses.
+
+<TypeScriptVersions />
+
+A TypeScript release is shown only when its tag points to the exact recorded
+commit. Other revisions are identified by their commit hash.
+
+Tracking starts on **main**. Releases through **v0.9.1** are not included.
+
+## Why the TypeScript repository changed
+
+Rslint previously used [microsoft/typescript-go](https://github.com/microsoft/typescript-go),
+the staging repository for TypeScript's Go port. With that port complete, Microsoft
+archived the staging repository and moved development back to
+[microsoft/TypeScript](https://github.com/microsoft/TypeScript).
+
+Rslint now takes its compiler from that repository. It continues to use the Go
+compiler; the commit and release links above point to its current upstream home.

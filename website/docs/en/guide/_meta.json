@@ -43,11 +43,6 @@
   },
   {
     "type": "file",
-    "name": "releases",
-    "label": "Release Information"
-  },
-  {
-    "type": "file",
     "name": "js-api",
     "label": "JavaScript API"
   },
@@ -65,5 +60,10 @@
     "type": "file",
     "name": "environment-variables",
     "label": "Environment Variables"
+  },
+  {
+    "type": "file",
+    "name": "typescript-versions",
+    "label": "TypeScript Compiler Versions"
   }
 ]

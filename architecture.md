@@ -1538,7 +1538,6 @@ normal `go test` invocation.
 ### Release Lines
 
 - **rslint packages**: `scripts/version.mjs` and `.github/workflows/release.yml` own the unified rslint npm version. They explicitly exclude the tsgo server packages.
-- **Release metadata**: Root `releases.json` records first stable rule support and each new release's exact TypeScript commit, plus an upstream release version when its tag matches that commit. `scripts/sync-releases.mjs` generates the current binding for Go's `internal/buildinfo` and the `@rslint/core/build-info` export. CLI version queries read that embedded data before configuration or IPC startup. The website consumes the same history; old compiler bindings remain unrecorded and prereleases do not affect rule introduction badges. Development builds use an explicit `unreleased` entry. Release jobs validate the generated data and all check out one resolved rslint commit.
 - **tsgo distribution**: `pnpm version:crates` updates `tsgo-client`, `Cargo.lock`, `@rslint/tsgo-server`, and all six platform packages to one version. `.github/workflows/release-crates.yml` assembles the platform packages and publishes npm and crates.io artifacts together.
 
 ## 13. Adding a New Rule (Checklist)

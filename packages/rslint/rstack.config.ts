@@ -55,7 +55,6 @@ define.lib(() => {
       tsconfigPath: './tsconfig.lib.json',
       entry: {
         index: './src/index.ts',
-        'build-info': './src/build-info.ts',
         service: './src/service/service.ts',
         internal: './src/internal/node.ts',
         'config-loader': './src/config/config-loader.ts',

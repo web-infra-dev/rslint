@@ -7,7 +7,6 @@ import {
   isOutputFormat,
 } from '../utils/args.js';
 import { resolveRslintBinary } from '../internal/resolve-binary.js';
-import { buildInfo } from '../build-info.js';
 
 export type RunCLIOptions = {
   /**
@@ -17,23 +16,6 @@ export type RunCLIOptions = {
   argv?: string[];
 };
 
-function printVersion(args: {
-  readonly version: boolean;
-  readonly json: boolean;
-}): boolean {
-  if (!args.version) return false;
-  const { version, typescript } = buildInfo;
-  const release = typescript.releaseVersion
-    ? `${typescript.releaseVersion} `
-    : '';
-  process.stdout.write(
-    args.json
-      ? `${JSON.stringify(buildInfo)}\n`
-      : `rslint ${version}\nTypeScript ${release}(${typescript.commit})\n`,
-  );
-  return true;
-}
-
 export async function run(
   binPath: string,
   argv: string[],
@@ -41,7 +23,6 @@ export async function run(
 ): Promise<number> {
   const cwd = process.cwd();
   const args = parseArgs(argv);
-  if (printVersion(args)) return 0;
 
   // --init: pass through to Go (no config payload — Go writes the default
   // config to disk and prints the "Created …" line, forwarded via `output`).
@@ -109,11 +90,6 @@ export async function run(
 export async function runCLI({
   argv = process.argv,
 }: RunCLIOptions = {}): Promise<void> {
-  // Version queries work without a project, config, or native installation.
-  if (printVersion(parseArgs(argv.slice(2)))) {
-    process.exitCode = 0;
-    return;
-  }
   const startTime = Date.now();
   const exitCode = await run(resolveRslintBinary(), argv.slice(2), startTime);
   // Let stdout/stderr flush naturally instead of terminating the process.

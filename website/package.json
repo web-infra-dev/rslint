@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "rs doc build && node --test scripts/release-page.test.mjs",
+    "build": "rs doc build",
     "dev": "rs doc",
     "preview": "rs doc preview"
   },

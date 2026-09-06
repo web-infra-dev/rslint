@@ -68,33 +68,31 @@ git -C typescript-go checkout --detach FETCH_HEAD
 bash tools/update-typescript-go.sh
 ```
 
-The helper resolves the exact submodule commit to a Go pseudo-version, updates the root and shim module requirements, regenerates shims from the local checkout, tidies those modules, refreshes the unreleased compiler binding, builds both Go entrypoints, and checks the unsafe checker mirror's field layout. Review the resulting changes and run the Go and JS tests before committing the new submodule revision. Compiler API changes may require adapting the shim declarations and their consumers.
+The helper resolves the exact submodule commit to a Go pseudo-version, updates the root and shim module requirements, regenerates shims from the local checkout, tidies those modules, builds both Go entrypoints, and checks the unsafe checker mirror's field layout. Review the resulting changes and run the Go and JS tests before committing the new submodule revision. Compiler API changes may require adapting the shim declarations and their consumers.
 
-### Release metadata
+## Sync release information
 
-`releases.json` is the shared history for rule introduction versions and compiler
-bindings. Do not edit generated build metadata directly or add compiler bindings
-to old releases.
+After bumping to a new stable version and before publishing, run the release sync
+command separately:
 
-- `pnpm sync:releases` refreshes the `unreleased` compiler binding and generated
-  Go/JavaScript metadata. It reads the checkout's full SHA and queries upstream
-  tags for an exact release match; a failed lookup fails the command.
-- `pnpm version patch` (or another supported bump) also runs
-  `pnpm sync:releases --release`, recording the new rules and compiler together.
-  Run that sync command again if the release candidate changes before publishing.
-  Published versions cannot be rewritten.
-- `pnpm check:releases` checks the generated data and the staged submodule gitlink
-  without network access. Stage a compiler update before running this check.
-  CI adds `--verify-upstream` and `--base <commit>` to verify the upstream release
-  match and prevent historical compiler bindings from being changed or backfilled.
-- `pnpm sync:releases --check --release` additionally requires the current package
-  version's record, checks workspace versions, and verifies the upstream tag.
-- `pnpm sync:releases --full` rebuilds rule history from local stable tags while
-  preserving compiler bindings. Fetch all tags first. The older
-  `pnpm sync:rule-releases` command remains an alias.
+```bash
+git fetch origin --tags
+pnpm sync:releases
+```
 
-Canary releases have their own exact bindings. Rule badges continue to show first
-stable support, so a canary does not consume a rule's introduction record.
+This replaces `pnpm sync:rule-releases`. It updates `website/releases.json` with
+new rules and the pinned TypeScript commit. The `main` record is refreshed on each
+run; when the package version is a new stable release, that release is recorded
+as well. Stage any submodule revision change first. An exact upstream release tag supplies
+`typescript.releaseVersion`; otherwise the value is `null`. A failed upstream
+lookup stops the command without writing the file.
+
+Commit the generated JSON with the release changes. The website uses it for rule
+version badges and the TypeScript compiler version table. The table shows `main`
+and new releases; versions through `0.9.1` retain only their existing rule history.
+
+`pnpm sync:releases full` rebuilds rule history from stable tags while preserving
+recorded compiler bindings. Fetch all tags before running it.
 
 ## Test the CLI
 

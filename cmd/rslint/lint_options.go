@@ -87,7 +87,6 @@ Options:
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
-  -v, --version         Show rslint version and TypeScript binding (--json for JSON)
 `
 
 // validateTypeCheckOnlyFlags rejects --type-check-only combined with flags

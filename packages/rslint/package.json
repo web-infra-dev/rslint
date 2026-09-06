@@ -10,10 +10,6 @@
       "@typescript/source": "./src/service/service.ts",
       "default": "./dist/service.js"
     },
-    "./build-info": {
-      "@typescript/source": "./src/build-info.ts",
-      "default": "./dist/build-info.js"
-    },
     "./internal": {
       "@typescript/source": "./src/internal/node.ts",
       "default": "./dist/internal.js"
