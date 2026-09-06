@@ -72,27 +72,11 @@ func InsertMemberBeforeAccessorFix(
 	entry *ParsedJestFnMemberEntry,
 	name string,
 ) (rule.RuleFix, bool) {
-	receiver, accessor := GetAccessorReceiverAndParent(entry)
-	if receiver == nil || accessor == nil {
+	textRange, text, ok := testFramework.InsertMemberBeforeAccessor(entry, name)
+	if !ok {
 		return rule.RuleFix{}, false
 	}
-
-	questionDot := AccessorQuestionDotToken(accessor)
-	if questionDot == nil {
-		return rule.RuleFixReplaceRange(
-			core.NewTextRange(receiver.End(), receiver.End()),
-			"."+name,
-		), true
-	}
-
-	suffix := name
-	if accessor.Kind == ast.KindPropertyAccessExpression {
-		suffix += "."
-	}
-	return rule.RuleFixReplaceRange(
-		core.NewTextRange(questionDot.End(), questionDot.End()),
-		suffix,
-	), true
+	return rule.RuleFixReplaceRange(textRange, text), true
 }
 
 // ReplaceCallSuffixFix replaces a call's type arguments and arguments while

@@ -31,6 +31,7 @@ func TestPreferEqualityMatcherRule(t *testing.T) {
 			{Code: `expect.hasAssertions`},
 			{Code: `expect.hasAssertions()`},
 			{Code: `expect.assertions(1)`},
+			{Code: `expect(true).toBe(...true)`},
 			{Code: `expect(a == 1).toBe(true)`},
 			{Code: `expect(1 == a).toBe(true)`},
 			{Code: `expect(a == b).toBe(true)`},

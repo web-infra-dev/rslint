@@ -279,3 +279,24 @@ func AccessorReplacement(sourceFile *ast.SourceFile, node *ast.Node, name string
 		return core.TextRange{}, "", false
 	}
 }
+
+// InsertMemberBeforeAccessor returns the insertion edit for a dotted member
+// immediately before entry while keeping an optional boundary on the original
+// receiver. The caller decides whether the edit is an autofix or suggestion.
+func InsertMemberBeforeAccessor(entry *MemberEntry, name string) (core.TextRange, string, bool) {
+	receiver, accessor := AccessorReceiverAndParent(entry)
+	if receiver == nil || accessor == nil {
+		return core.TextRange{}, "", false
+	}
+
+	questionDot := AccessorQuestionDotToken(accessor)
+	if questionDot == nil {
+		return core.NewTextRange(receiver.End(), receiver.End()), "." + name, true
+	}
+
+	suffix := name
+	if accessor.Kind == ast.KindPropertyAccessExpression {
+		suffix += "."
+	}
+	return core.NewTextRange(questionDot.End(), questionDot.End()), suffix, true
+}
