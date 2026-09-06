@@ -641,6 +641,7 @@ define.test({
     './tests/rstest/rules/no-importing-rstest-globals.test.ts',
     './tests/rstest/rules/no-interpolation-in-snapshots.test.ts',
     './tests/rstest/rules/no-mocks-import.test.ts',
+    './tests/rstest/rules/no-restricted-matchers.test.ts',
     './tests/rstest/rules/no-restricted-rstest-methods.test.ts',
     './tests/rstest/rules/no-standalone-expect.test.ts',
     './tests/rstest/rules/prefer-called-exactly-once-with.test.ts',
