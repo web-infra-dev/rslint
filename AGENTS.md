@@ -11,7 +11,7 @@ Repository skills follow the branch, local verification, and test-layout rules b
 ## Local verification
 
 - Before running checks, identify affected packages from the branch diff plus staged, unstaged and untracked changes, trace changed APIs and their callers, and briefly state the selected scope. Include affected consumers for shared behavior and cross-language changes. Use the existing commands below; examples are in `CONTRIBUTING.md#verify-a-change`.
-- Go: `go test <affected-package-dirs>`. JS/TS: select the workspace and test files with pnpm filters; for Rstest verification use `CI=true pnpm --dir <workspace> exec rs test run <test-files>` so missing snapshots fail. Rust: `cargo test -p <affected-crate>`. Expand scope only on concrete dependency impact; appending paths to root scripts that already contain full-tree paths does not narrow them.
+- Go: `go test <affected-package-dirs>`; inspect aggregate test packages and use `-run` for the affected tests instead of executing unrelated rules through a shared runner. JS/TS: select the workspace and test files with pnpm filters; for Rstest verification use `CI=true pnpm --dir <workspace> exec rs test run <test-files>` so missing snapshots fail. Rust: `cargo test -p <affected-crate>`. Expand scope only on concrete dependency impact; appending paths to root scripts that already contain full-tree paths does not narrow them.
 - Full-repository or whole-plugin tests require an explicit user or reviewer request for that scope. This includes `go test ./...`, `go test ./internal/...`, `go test ./internal/plugins/<plugin>/...`, `pnpm run test:go`, root `pnpm test`, and `cargo test --workspace`. A CI command list is not a request to run it locally.
 - Shared code, many changed files, or uncertain impact do not authorize full suites: trace dependencies and test the affected packages. Passing results remain valid until relevant code/configuration changes; do not rerun merely because the commit step started.
 - For local Go lint, use `golangci-lint run --new-from-merge-base=<base-branch> <affected-package-dirs>`, normally against `origin/main`. Keep the branch-diff filter; unfiltered repository-wide lint requires an explicit request.
@@ -40,6 +40,7 @@ Repository skills follow the branch, local verification, and test-layout rules b
 
 ## Task-specific references
 
+- Start at the owning package and the paths below. For discovery, use filename searches or `rg -l`; read matching definitions and callers instead of dumping repository-wide matches. Expand when a path is missing or a dependency/behavior question remains. Keep tool output bounded; narrow a truncated query before retrying it.
 - Use pnpm for JS/TS tooling. Build/check scripts live in the relevant `package.json`; setup is in `CONTRIBUTING.md`. Initialize dependencies and submodules only when needed.
 - For module-boundary, entrypoint, or runtime-flow changes, read the relevant sections of `architecture.md`. Update those sections when their contracts or flows change.
 - For a new rule, use `.agents/skills/port-rule/SKILL.md`. Existing-rule fixes follow the branch, test-layout and verification rules above; a rule name alone does not request a new port. Load only reference sections needed by the current task, not the entire porting guide or architecture document.

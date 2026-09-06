@@ -1,995 +1,129 @@
-# Rslint Rule Porting Guide
+# Rule Porting Contracts
 
-## Role & Objective
+This reference supplements [SKILL.md](../SKILL.md). Read the section needed for the current work. Commands and repository locations have one home in [QUICK_REFERENCE.md](QUICK_REFERENCE.md); branch, local verification and test-layout rules remain in [AGENTS.md](../../../../AGENTS.md).
 
-You are an expert Software Engineer tasked with porting ESLint rules to `rslint`, a high-performance linter written in Go. Your goal is to implement the rule logic in Go, ensuring 1:1 parity with the original ESLint behavior, including all edge cases and error messages.
+## Upstream contract
 
----
+- Use the requested upstream version; otherwise select the latest released tag. Read source, tests and documentation at that tag. Discovery links on the default branch may describe unreleased behavior.
+- Determine whether the requested rule belongs to ESLint core, typescript-eslint or another plugin. Honor an explicitly requested legacy rule; otherwise resolve deprecation/replacement before choosing its catalog key. Do not register both a core and TypeScript alias for one port.
+- Preserve public behavior: accepted options, defaults, diagnostics, ranges, fixes and suggestions. AST or Go implementation differences require adaptation, not automatic permission to change semantics.
+- A requested or already established public difference belongs in the implementation comment, rule documentation and a regression test. If an unsupported capability blocks parity, report that gap before claiming completion.
+- Check existing configuration and test-harness support before declaring an ESLint concept unsupported. For example, Go tests can pass `LanguageOptions` (including `sourceType`) and `Globals`. Preserve unsupported upstream cases as explained Go skips; a JS wrapper may not implement `skip`.
 
-## Scope: rule semantics, not framework parity
+## Coverage and assertions
 
-Port the **rule's semantics**: given equivalent input, produce equivalent diagnostics. Use existing configuration and test-harness features before treating an upstream case as unsupported. For example, upstream source-type cases can use `LanguageOptions.SourceType` in Go tests; legacy ESLint field names alone do not make the behavior unsupported. Do not recreate missing framework features inside a rule.
+Use the tests as the coverage record. Preserve upstream groups/source references and explain non-obvious regressions beside the cases; fixed header wording, category tags and case-count quotas are not required.
 
-Note: rslint combines the ECMAScript globals selected by `languageOptions.ecmaVersion` (default `"latest"`), config `languageOptions.globals`, and `/*global ...*/` comments in the immutable `ctx.Globals` view. When porting a rule that resolves global variables, do not skip these cases or keep a private language-global table: use `ctx.Globals.Access(name)` for the final access after language < config < inline precedence. Use `ctx.Globals.Override(name)` only when upstream distinguishes an explicitly authored setting from an implicit language global; the narrower `LanguageAccess`, `ConfigOverride`, and `ConfiguredAccess` methods are for rules whose upstream behavior genuinely depends on provenance. `InlineDeclarations()` provides ordered comment ranges. Test cases author config globals as `Globals: map[string]any{"foo": "readonly"}` and select a version with `LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}`. Access values support `IsDeclared()` and `IsWritable()`; an explicit `off` is not declared.
+| Suite                     | Required coverage                                                                                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<rule>_upstream_test.go` | Every valid/invalid case from the pinned upstream tests and documentation, including fixture-driven cases; explained skips for unsupported framework behavior.                             |
+| `<rule>_extras_test.go`   | Reachable semantic decisions missing upstream, relevant tsgo/ESTree shape differences, supplied regressions and realistic inputs. Split large extras by area when it improves readability. |
+| One `<rule>.test.ts`      | The upstream semantic set through the selected JS wrapper and compiled binary. Do not duplicate Go extras here.                                                                            |
 
-Note: ESLint's scope manager (`sourceCode.getScope()`, `variable.references`) has no direct equivalent, but the common case — "every identifier that references this declared symbol" — is served by `ctx.Refs.References(sym)`, a lazily built per-file reference index keyed by binder symbols (`decl.Symbol()`). The reverse direction — "what symbol does this identifier resolve to" — is `ctx.Refs.Resolve(node)`: it tries the binder scope walk first and falls back to the checker for globals/ambient/cross-file symbols the binder can't place. Use `ctx.Refs.ResolveInFile(node)` instead when an ESLint scope rule must deliberately exclude TypeScript lib, ambient, and cross-file declarations (as core `no-undef` does). Never hand-roll a "try ctx.Refs, fall back to the checker" wrapper or walk the AST while calling `ctx.TypeChecker.GetSymbolAtLocation` per identifier. See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for semantics and the nil guard.
+Go and JS case counts may differ when one suite expands fixtures. Check semantic coverage, not numeric equality. Protocol/serialization regressions belong in their owning suites.
 
-Note: every comment in the file is exposed lazily through `ctx.Comments.All()` as a source-ordered, deduplicated `[]*ast.CommentRange`. If your rule needs to scan all comments (directive comments, "is this line comment-only", etc.), iterate that shared slice — do **not** call `utils.ForEachComment(ctx.SourceFile.AsNode(), ...)`, which re-walks the entire token tree from scratch. See [UTILS_REFERENCE.md](./UTILS_REFERENCE.md#token-and-comment-iteration) for the full comment-handling API and when each function is appropriate.
+### Diagnostic and option assertions
 
-Note: autofixes and suggestions are optional artifacts. New native rules must use the matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method so diagnostics-only consumers and suppressed diagnostics do not pay to construct replacement text, edit ranges/slices, or suggestions. Detection, message construction, and the diagnostic range remain eager and independent of edit demand; work used only to decide or materialize an edit belongs in the builder, which may return nil. See [AST_PATTERNS.md — Reporting Functions](./AST_PATTERNS.md#reporting-functions).
+- Use `rule_tester.RunRuleTester` with `fixtures.GetRootDir()`. Extend existing suites for fixes; keep small inputs inline and package fixtures under `testdata/`.
+- Every invalid case asserts the expected message ID and start position. Across the suite, assert each exact message variant and complete start/end range for every reporting shape, including multiline and non-ASCII input where positions can differ. Columns follow UTF-16, not byte offsets.
+- Those fields are checked only when provided: a passing Go test without `Message`, `EndLine` or `EndColumn` does not establish them.
+- Use JSON-shaped options, not typed Go structs. The tester normalizes a single object map or positional `[]any` and validates the schema before calling the rule. Do not duplicate an object case solely to test bare versus array-wrapped input.
+- Cover each option's accepted values and behavior-changing combinations, including omitted options versus explicit runtime defaults. `[{}]` is valid only for an object option allowing an empty object; a primitive option needs its actual default value.
+- A focused reproduction uses `go test <package> -run '<test-or-subtest>'`, followed by the affected package's verification. `RunRuleTester` rejects `Only: true`; `Skip: true` requires an explained upstream limitation.
 
-When an upstream test depends on a framework feature with no equivalent in the current configuration or test harness:
+### Fixes, suggestions and edit demand
 
-- **Don't** reimplement the concept inside your rule.
-- **Don't** list the gap under the rule's "Differences from ESLint" section — framework gaps apply to every rule, not yours.
-- **Do** mark the Go upstream case `Skip: true` (or JS `skip: true`) with an inline reason such as `// SKIP: rslint does not support ESLint's <concept>`.
+Assert fixed text in `InvalidTestCase.Output`, and suggestion message IDs plus applied text in `InvalidTestCaseError.Suggestions`. Cases that must not offer an edit also need assertions.
 
-The rule doc's "Differences from ESLint" section records requested or established public behavior differences for this rule (Phase 1 Step 6.A). Adapt AST or language representation differences in the implementation and cover them with regressions (Phase 1 Step 6.B).
+For a rule with fixes or suggestions, keep an edit-demand test in its extras suite. Run representative diagnostics with `EditDemandNone`, `EditDemandAutofix`, `EditDemandSuggestion` and `EditDemandAll`: count, message and range stay identical; artifacts appear only for the requested category and match the all-edits result. Ordinary `RunRuleTester` requests all edits, so output assertions alone do not check this boundary.
 
----
+See `internal/plugins/typescript/rules/no_restricted_types/no_restricted_types_extras_test.go` for a combined fix/suggestion example, and `internal/rule_tester/rule_tester.go` for the current case fields.
 
-## Testing Philosophy
+## AST and language semantics
 
-Porting is **re-implementation on a different substrate**, not translation. tsgo's AST diverges from ESTree in many small ways (parenthesized nodes are explicit, optional chain is a flag, literals split into multiple `Kind*Literal` kinds, numeric/string text is normalized at parse time, `AssignmentExpression` / `SequenceExpression` collapse into `BinaryExpression`); the type checker and scope manager are independent codebases with their own quirks. **Behavioral divergence between Go and ESLint is the default outcome; tests are the only mechanism that turns it into convergence.**
+Select edge cases from the upstream operations, not from a fixed checklist of unrelated syntax. Existing upstream cases can already cover a decision; extras fill the uncovered behavior and representation gaps.
 
-Three principles follow — internalize them before writing a single test case:
+| Operation the rule uses               | Adaptation to check                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inspects an expression receiver/child | Use `utils.ESTreeRuntimeExpression` for parentheses and JS JSDoc cast wrappers; preserve authored TS wrappers. For a direct call callee, use `utils.ESTreeCallCallee` on the raw callee to retain optional-chain boundaries. |
+| Matches member access                 | Distinguish identifier, computed, private and optional access. Dotted JSX tags and TypeScript heritage/type names can use similar tsgo nodes but have different ESTree roles.                                                |
+| Reads literal values or source text   | Literal kinds differ; `.Text()` may be normalized. Choose decoded value versus original token text according to upstream.                                                                                                    |
+| Handles assignment or sequence        | These share `BinaryExpression` in tsgo; branch on `OperatorToken.Kind`.                                                                                                                                                      |
+| Walks scopes or nested containers     | Test the boundaries the rule uses: shadowing, arrows, class/static bodies, body-absent declarations and same-kind nesting where relevant.                                                                                    |
+| Produces edits                        | Preserve comments and side effects, guard token fusion, and distinguish trimmed node text from raw positions.                                                                                                                |
 
-1. **Upstream's test suite is a floor, not a goal.** Migrating every `valid` / `invalid` case from the upstream test file proves only that you didn't miss a _documented_ behavior. It is **not** evidence the port is aligned. Upstream tests exercise the paths _upstream's authors_ found important on _their AST_; by construction they cannot cover the divergence your Go implementation introduces, because that divergence does not exist in their world.
+Use [member and call expressions](AST_PATTERNS.md#member-and-call-expressions) for those node shapes and helper contracts; a static-name helper can accept computed keys or reject private names differently from upstream. Other operations are indexed in [API and contract lookup](QUICK_REFERENCE.md#api-and-contract-lookup).
 
-2. **The augmentation IS the alignment work.** Every rule's tests are composed of three layers, all required, physically split across two files so the upstream-mirror and the rslint-added cases stay visually separated:
+Follow AGENTS.md's JavaScript helper requirements. Use `ecmascript` for JS string/number semantics, `unicode17` for Unicode categories and tsgo's `scanner` for identifiers. User-controlled regexps require `esregexp`. Match upstream's glob library/version; only `minimatch3` and `isglob` are available. Report unsupported libraries instead of substituting or adding a port outside the task.
 
-   | Layer                                      | What it covers                                                                                                                                                                                                       | Planned in     | Lives in                  |
-   | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------- |
-   | 1. **Upstream migration**                  | Every upstream `valid` / `invalid` case (or `Skip: true` with reason)                                                                                                                                                | Phase 1 Step 3 | `<rule>_upstream_test.go` |
-   | 2. **Edge-shape & real-user augmentation** | tsgo↔ESTree shape divergence on every child-node access (paren / optional-chain / literal-kind / type-wrapper / computed-key forms), plus real-user code shapes pulled from the upstream rule's GitHub issue tracker | Phase 1 Step 4 | `<rule>_extras_test.go`   |
-   | 3. **Branch lock-ins**                     | A minimum-input test for every reachable branch in the upstream source — including branches upstream itself never tests                                                                                              | Phase 1 Step 5 | `<rule>_extras_test.go`   |
+## Options and schema
 
-   The `_upstream_*` / `_extras_*` filename split is a contract — never mix migrated and rslint-added cases in the same file. See Phase 2 Step 4 for layout details and Phase 2 Step 1 for the split-when-too-large threshold.
+`Rule.Run` already receives normalized `options []any`. Guard each positional access and parse that representation directly; do not call `NormalizeOptions` again inside the rule.
 
-3. **Green tests are necessary, not sufficient.** Before claiming alignment, the rule must additionally pass the Contract Alignment Checklist (Phase 4 Step 6) and — for any rule with non-trivial branching — a differential validation against the reference implementation on a real codebase (Phase 4 Step 8). Any divergence the differential run surfaces feeds back into layer 2 or 3 as a new locked-in test. A green Go suite alone proves only that the rule handles the inputs _you thought of_.
+Every rule declares `Schema`:
 
-**Coverage bar.** The point of layers 2 + 3 is to prove the Go/tsgo port stays aligned where it structurally diverges from upstream's ESTree implementation — so the bar is _what they cover_, not how many cases they add up to. There is no case-count target. Concretely: every applicable Dimension 4 edge shape and ≥2 real-user shapes from the issue tracker (Phase 1 Step 4), plus every reachable branch locked in (Phase 1 Step 5). A near-empty `_extras_test.go` — or worse, none at all — is a reliable smell that Phase 1 Steps 4 and 5 were skipped: re-walk them before submitting. Phase 4 Step 6's per-layer checkboxes are what enforce this.
+- No options: reuse `rule.EmptyArraySchema`.
+- Options: place the pinned upstream schema in `<rule_name>.schema.json`, embed it and use `rule.NewSchema`.
+- For an upstream array of positional schemas, wrap it as `{"type":"array","items":<upstream array>,"minItems":0,"maxItems":<length>}`. A full schema object is copied as-is. The schema dialect is Draft 4.
 
-**JS rule mirrors stay in one file.** The three-layer model and the `_upstream_*` / `_extras_*` split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` runs upstream cases through the compiled binary to cover rule registration, IPC and diagnostic serialization. IPC framing and Unicode positions depend on input; regressions in those components belong in their existing owning integration suites, such as `packages/rslint/tests/ipc-client.test.ts`.
+CLI, API and LSP configuration paths validate options. Schema defaults populate existing option objects but do not create omitted outer objects or positional elements; keep runtime defaults in the parser. Verify defaults against the upstream implementation as well as its schema.
 
-- **JS mirrors Layer 1 only** (upstream `valid` / `invalid` cases). Layers 2 and 3 stay in Go.
-- A JS file far smaller than the Go suite — sometimes by 10× or more, depending on whether upstream uses fixture files — is the **expected** state, not "JS is under-tested." The semantic check is "every JS-asserted behavior also has a Go-upstream case"; literal case-count parity is **not** required (see Phase 4 Step 5).
-- See Phase 3 Step 2 for what goes in the JS file and Phase 4 Step 5 for the alignment-direction check (JS ⊆ Go upstream, semantic).
+## Framework boundaries
 
----
+Reuse the existing framework; extract a helper only for an actual second consumer with equivalent semantics.
 
-## Related Documents
+| Need                                               | Existing boundary                                                                                                                                                                                           |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resolve identifiers or enumerate symbol references | `ctx.Refs`, using binder symbols. Choose `ResolveInFile` when upstream excludes ambient/lib/cross-file declarations; `Resolve` has a checker fallback.                                                      |
+| Configured globals                                 | `ctx.Globals.Access` is the final effective value; `Override` is authored-only, and `ConfiguredAccess` excludes inline comments. Match upstream's configuration provenance; see `internal/rule/globals.go`. |
+| Type information                                   | Type-aware plugin rules declare `RequiresTypeInfo`. Core rules must still run on JS inputs; guard optional checker access and use the existing fallback semantics.                                          |
+| Whole-file comments                                | `ctx.Comments.All()`.                                                                                                                                                                                       |
+| Source/module services                             | `ctx.Program()`; cross-file infrastructure belongs in `internal/program`, without rule-side backend branching.                                                                                              |
+| Reusable plugin semantics                          | The owning `<plugin>util` package; general AST/type operations belong in `internal/utils`.                                                                                                                  |
+| Edit-only work                                     | A matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` builder. Diagnostic identity remains eager. The builder may return nil; do not pass a nil builder.                                       |
 
-| Document                                 | Description                                                        |
-| ---------------------------------------- | ------------------------------------------------------------------ |
-| [AST_PATTERNS.md](AST_PATTERNS.md)       | AST traversal, Program/module services, TypeChecker, and reporting |
-| [UTILS_REFERENCE.md](UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                             |
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands, file locations, naming conventions, checklist            |
+Do not add another per-identifier checker walk, scope index, comment scanner or module resolver where these APIs already provide the needed semantics. Read the relevant [AST_PATTERNS](AST_PATTERNS.md) or [UTILS_REFERENCE](UTILS_REFERENCE.md) section before using them. If caching is needed, keys must include the inputs/configuration that determine the result.
 
----
+## Integration and documentation
 
-## Source Code Reference
+Use the exact locations in [QUICK_REFERENCE](QUICK_REFERENCE.md#rule-files-and-registration).
 
-Use this map to locate the APIs needed by the current rule; read their relevant declarations rather than every file below:
+- Core rules use `rule.Rule{Name: "<rule-name>"}`. Only TypeScript plugin rules use `rule.CreateRule`, which adds `@typescript-eslint/`. Other plugins include their prefix in `rule.Rule.Name` directly.
+- Add a core rule to `coreRules()`; add an existing plugin rule to its `GetAllRules()`. The first native rule of a new plugin also needs its explicit aggregation in `internal/rules/all.go`; directories are not auto-discovered. Read the relevant architecture boundary for that case.
+- Register the single JS test file in `packages/rslint-test-tools/rstack.config.mts`'s `include`. For a new plugin suite, reuse its owning wrapper/configuration conventions; use JS/TS configuration, not a new legacy `rslint.json`.
+- Inspect the selected wrapper's types and assertions before copying cases. The core wrapper uses object-shaped options for object rules; other wrappers can accept positional arrays. Prefixing, skip support and snapshot support differ. In particular, the jsx-a11y wrapper does not provide the core wrapper's snapshots, message-ID or position assertions.
+- Unsupported cases cannot be silently discarded. Use a supported skip mechanism or retain an explained case/comment and report the coverage gap when the JS wrapper cannot express it.
+- Keep documentation focused on the rule's behavior, options and correct/incorrect examples. Include official docs when available and a source link pinned to the exact tag. Record requested/established public differences there; reusable AST/API discoveries belong in their reference, not product-facing rule explanations.
+- If the plugin is already enabled in repo-root `rslint.config.ts`, add the new rule at `warn` before verification. Otherwise do not enable a plugin or change the preset as a side effect of porting.
 
-### Core Infrastructure
+Build prerequisites are listed once in the command reference. A fresh binary does not imply fresh core JS, generated option types or wrapper output.
 
-| File/Directory                          | Description                                                                                        |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `internal/rule/rule.go`                 | **Core rule interface** - `Rule` and `RuleListeners`                                               |
-| `internal/rule/configured.go`           | Enabled `ConfiguredRule` descriptors, shared `RuleEnvironment`, and type-aware filtering           |
-| `internal/rule/context.go`              | `RuleContext`, edit demand, and diagnostic reporting APIs                                          |
-| `internal/rule/diagnostic.go`           | `RuleMessage`, `RuleFix`, `RuleSuggestion`, and fix helpers                                        |
-| `internal/rule/ref_store.go`            | Lazy per-file reference index exposed as `ctx.Refs`                                                |
-| `internal/rule/comment_store.go`        | Lazy canonical comment list exposed as `ctx.Comments`                                              |
-| `internal/rule/disable_manager.go`      | Logic for handling `// rslint-disable` and `// eslint-disable` comments                            |
-| `internal/program/program.go`           | Unified source-generation facade exposed through `ctx.Program()`                                   |
-| `internal/program/module_graph.go`      | Generic module-reference syntax and resolution index exposed by `Program.ModuleGraph()`            |
-| `internal/program/module_resolution.go` | Program-owned module resolution for one source/specifier pair                                      |
-| `internal/config/config.go`             | Configuration models and validation; concrete rule composition remains outside the config package. |
-| `internal/rules/all.go`                 | Final aggregation of core and plugin `all.go` sources into the shared immutable Go rule catalog.   |
-| `internal/rule_tester/rule_tester.go`   | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                            |
+## Differential validation
 
-### AST & Type System
+For non-trivial semantics, compare against the pinned upstream implementation on relevant real source files before claiming alignment. Reuse installed versions only after checking them; otherwise prepare exact versions in a scratch directory, without changing repository dependencies.
 
-| File/Directory                                                    | Description                                                          |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `typescript-go/packages/typescript/src/ast/ast.generated.ts`      | **AST node type definitions** - All JS/TS syntax nodes               |
-| `typescript-go/packages/typescript/src/enums/syntaxKind.enum.ts`  | **SyntaxKind enum** - Node type constants (maps to Go's `ast.Kind*`) |
-| `typescript-go/packages/typescript/src/enums/typeFlags.enum.ts`   | **TypeFlags enum** - Type checking flags                             |
-| `typescript-go/packages/typescript/src/enums/symbolFlags.enum.ts` | **SymbolFlags enum** - Symbol flags                                  |
-| `shim/ast/shim.go`                                                | Go-side AST shim implementation (auto-generated)                     |
+1. Resolve one explicit file set. Enable only the target rule, with matching options, parser settings and language mode. Type-aware rules require the same project/tsconfig context.
+2. Confirm both tools actually parsed/linted those files and enabled the target rule. Include a known match so two empty outputs cannot masquerade as alignment. Parser/configuration warnings, ignored files and missing coverage evidence are gaps; do not conditionally skip a coverage assertion when its required metadata is absent.
+3. Compare normalized file paths, rule names, message IDs/text, severity, complete ranges and applicable fixes/suggestions. Record the tool versions, file/diagnostic counts and fields actually compared.
+4. Classify differences: input/configuration mismatch, documented requested difference, or implementation bug. Fix unexplained rule differences, add a Go regression and rerun the affected comparison.
 
-### Example Rules (Recommended Reading)
+The CLI's `--format jsonline` includes paths, rule names, messages, severity and ranges, but omits message IDs and edits. Use `lint` from `@rslint/core/internal` to compare those fields, as the JS wrappers do. A CLI-only comparison does not establish fix/suggestion or message-ID parity.
 
-| Rule                    | Path                                                     | Highlights                              |
-| ----------------------- | -------------------------------------------------------- | --------------------------------------- |
-| `no-debugger`           | `internal/rules/no_debugger/`                            | Simplest rule example                   |
-| `constructor-super`     | `internal/rules/constructor_super/`                      | Complex control flow analysis           |
-| `array-callback-return` | `internal/rules/array_callback_return/`                  | Options parsing, function body analysis |
-| `no-var`                | `internal/rules/no_var/`                                 | `ctx.Refs`, deferred autofix            |
-| `no-restricted-types`   | `internal/plugins/typescript/rules/no_restricted_types/` | Deferred fixes and suggestions          |
+Snapshot generation is not verification. For wrappers using snapshots, review generated expectations against the pinned reference, then run the selected file with `CI=true`. A wrapper that checks only counts/messages does not verify diagnostic positions just because its test passes.
 
----
+## Delivery and troubleshooting
 
-## Workflow Overview
+Follow AGENTS.md's requested delivery scope and commit checks. For Go lint, preserve the branch-diff filter and select packages containing changed Go files; file arguments from different directories are not a substitute for package selection. Choose JS checks from the affected workspace's actual scripts rather than copying an unconditional root checklist.
 
-1. **Setup**: Select the task branch using Phase 0; reuse it when continuing the same task.
-2. **Preparation**: Gather requirements and test cases.
-3. **Implementation**: Write Go code and unit tests.
-4. **Integration**: Add JS tests and register the rule.
-5. **Verification**: Build and verify everything works.
-
----
-
-## Phase 0: Branch Setup
-
-Follow the repository's [branch rules](../../../../AGENTS.md#branches).
-
-1. Inspect `git status --short --branch`. When continuing the same rule or batch, keep its existing task branch; do not restart branch setup after a session resumes.
-2. For a new independent task, preserve unrelated work and start from current `origin/main` unless the user specified another base. Fetch the base without switching the user's checkout to main. Record this base for subsequent lint filtering and the PR target.
-3. Choose the name before creating the branch, following AGENTS.md's `<type>/<short-kebab-case-description>` convention:
-   - Single rule: `feat/port-rule-<rule-name-in-kebab-case>`.
-   - Batch: `feat/port-<plugin-name>-rules` or another short description of the batch.
-   - An explicit user branch name takes precedence.
-4. Create the branch with `git switch -c <chosen-name> <base-ref>`, then verify `git branch --show-current` against the chosen name before editing.
-
----
-
-## Phase 1: Preparation (CRITICAL)
-
-**Goal**: Understand _exactly_ what the rule does before writing code.
-
-1. **Locate Official Source**:
-   - **Priority**: If the user provides an official link, **FIRST** read and analyze that link's content.
-   - **Fallback**: If no link is provided, search for the rule documentation (ESLint website or Plugin repo) and source code (GitHub).
-   - Find the rule test file (usually `tests/lib/rules/<rule>.js`).
-   - **Source from the latest released tag, not the default branch.** Do not read the rule's behavior off `main`/`master`/HEAD — it may contain half-finished or unreleased changes. Find the upstream project's latest release tag and read the rule's doc/source/tests as they exist at that tag; note the tag, since Phase 2 Step 3 pins the rule doc's links to it — the only record of which upstream version the port targets.
-   - **If the rule (or the specific behavior/option being requested) doesn't exist yet at the latest released tag** — only on the default branch, or in an unpublished PR — stop and tell the user instead of porting it anyway. Don't silently port pre-release behavior just because the user's request didn't mention this.
+Format only changed, supported files. Explicit paths still obey formatter exclusions, including rule Markdown; skip empty selections. Inspect spell failures before adding intentional technical words to `scripts/dictionary.txt`. Do not add Markdown cspell directives or suppress lint simply to obtain a green result.
 
-2. **Determine Rule Origin & Deprecation Status**:
-
-   Some rules exist in both core ESLint and typescript-eslint. Before implementing, determine the canonical source:
-
-   | Scenario                                                                         | Catalog key                                 | Test Location                    | Rule Wrapper        |
-   | -------------------------------------------------------------------------------- | ------------------------------------------- | -------------------------------- | ------------------- |
-   | **Core ESLint only** (e.g., `no-debugger`)                                       | `"no-debugger"`                             | `tests/eslint/rules/`            | `rule.Rule{}`       |
-   | **typescript-eslint only** (e.g., `await-thenable`)                              | `"@typescript-eslint/await-thenable"`       | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
-   | **typescript-eslint extends core** (active, e.g., `no-array-constructor`)        | `"@typescript-eslint/no-array-constructor"` | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
-   | **typescript-eslint deprecated in favor of core** (e.g., `no-loss-of-precision`) | `"no-loss-of-precision"`                    | `tests/eslint/rules/`            | `rule.Rule{}`       |
+| Symptom                                           | Check before expanding scope                                                                   |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| JS cannot find a new rule or sees old Go behavior | Catalog entry, rebuilt binary, selected test registration and wrapper prefix.                  |
+| New options absent from generated JS types        | Schema dump before core JS build; the JS build does not refresh the dump itself.               |
+| Missing module/dist                               | The selected workspace's actual package path and required build output.                        |
+| Passing comparison with no diagnostics            | Intended files, parser/config warnings, rule enablement and a known positive input.            |
+| Position mismatch                                 | UTF-16 columns, source trivia and whether upstream reports the expression or its container.    |
+| TypeChecker is nil                                | Whether the rule declares type information and the test includes the required program/project. |
 
-   **How to check**: Visit the typescript-eslint rule page. If it shows a deprecation notice like _"use the base ESLint rule instead"_, treat it as a **core ESLint rule** — do NOT use the `@typescript-eslint/` prefix.
-
-3. **Collect Test Cases — Layer 1 (baseline migration)**:
-
-   This step is the planning input for `<rule>_upstream_test.go` (Layer 1) — the _floor_ of the rule's overall test coverage. The augmentation in Phase 1 Steps 4 and 5 (which is the planning input for `<rule>_extras_test.go`, Layers 2 + 3) is what actually verifies alignment. See the [Testing Philosophy](#testing-philosophy) for why migration alone is insufficient.
-
-   > **Phase 1 is planning, not writing.** Test files are physically created in Phase 2 Step 1 and populated in Phase 2 Step 4. In this phase you collect, organize, and annotate the cases — don't start a `_test.go` file yet.
-   - Extract **ALL** `valid` and `invalid` cases from the official documentation.
-   - Migrate **ALL** `valid` and `invalid` cases from the official unit test file (`tests/lib/rules/<rule>.js` for ESLint core; plugin equivalents otherwise) — not a representative subset.
-   - **Skip with explanation**: If a case exercises an option or syntax we intentionally don't support, keep it in the file as a `Skip: true` test with a `// SKIP: <reason>` comment — don't drop it silently.
-   - **Ensure Coverage**: Ensure Line and Column numbers are tested in invalid cases.
-
-   **Do NOT stop here.** The migrated suite is a baseline; proceed to Phase 1 Step 4 (edge-shape augmentation) and Phase 1 Step 5 (branch lock-ins) — without them the port can pass every upstream test and silently diverge on real-user inputs.
-
-4. **Identify Edge Cases — Layer 2 (edge-shape & real-user augmentation)**:
-
-   This layer covers the divergence Go-on-tsgo introduces that upstream's tests cannot see — see [Testing Philosophy](#testing-philosophy). Without it, the port can pass every upstream test and silently drift on inputs upstream's contributors didn't write but real users do.
-
-   Walk all four dimensions below. Dimension 4 (Universal Edge Shapes) is **non-skippable** — every applicable row needs ≥1 dedicated Go test (written in `<rule>_extras_test.go` during Phase 2 Step 4) marked `// ---- Dimension 4: <what> ----`, and rows that genuinely don't apply need an explicit `// N/A: <reason>` marker so future audits can verify the walk happened.
-
-   Systematically enumerate edge cases across four dimensions.
-
-   **Dimension 1: AST node types** — List every syntax construct the rule should handle:
-   - All access patterns (e.g., `.prop`, `['prop']`, ``[`prop`]``)
-   - Optional Chaining (`?.`)
-   - TypeScript-specific syntax (type annotations, generics, enums, etc.)
-   - Async functions, generators, arrow functions
-   - Empty bodies, malformed code
-
-   **Dimension 2: Scoping & nesting** — Enumerate nested combinations:
-   - Function / arrow / method / constructor / getter / setter crossed with each other
-   - Class bodies, computed property names, extends clauses, static blocks
-   - `this` / `super` binding semantics across scope boundaries
-   - Deeply nested patterns (3+ levels)
-
-   **Dimension 3: Autofix boundaries** (if the rule has autofix):
-   - Comments between tokens that must be preserved
-   - Arguments with side effects (should suppress autofix)
-   - Parenthesized expressions (multiple levels)
-   - Multi-line code with varying whitespace
-   - Diagnostic count, message, and range must be identical for every edit demand
-   - Identify every source-text read, token scan, range calculation, string build, and slice allocation used only by the edit; these belong in a deferred builder
-
-   **Dimension 4: Universal edge shapes** — walk this checklist for EVERY port, regardless of what the rule does. Mark rows as N/A when genuinely irrelevant (and briefly note why), and add ≥1 dedicated test for each applicable row. Upstream's own test suite rarely covers all of these; they are the most common source of "looks aligned but silently drifts" regressions:
-   - **Receiver / expression wrappers on inputs the rule inspects**:
-     - `(X).y`, `((X)).y` — single and multi-level parenthesized receiver (tsgo preserves; ESTree flattens)
-     - `X!.y` — TS non-null assertion
-     - `(X as any).y`, `X satisfies T` — TS type-expression wrappers
-     - `X?.y`, `X?.()` — optional chain (tsgo: flag on `PropertyAccessExpression`/`CallExpression`; no `ChainExpression` wrapper)
-   - **Access / key forms**:
-     - Identifier key vs string-literal key (`"x": ...`) vs numeric-literal key (`0: ...`) vs `PrivateIdentifier` (`#x`) vs `ComputedPropertyName` (`[expr]: ...`) — state explicitly which forms the rule accepts and lock every other form as an un-matched case
-     - Element access `X['y']`, `X[`y`]`, `X[0]`, `X[Symbol.iterator]` when the rule handles dotted member access
-   - **Declaration / container forms** (when the rule targets functions or classes):
-     - Class declaration vs class expression (`class X extends Y` vs `const X = class extends Y`)
-     - Function declaration vs function expression vs arrow vs method vs class-field arrow (`componentDidMount = () => {}`)
-     - `async` / `generator` / `async generator` variants
-   - **Nesting / traversal boundaries**:
-     - Same-kind nesting where only the outer (or only the inner) should match — e.g. class-in-class, function-in-function. Verify the listener doesn't "bleed" past the boundary
-     - Rule-specific ancestor walks (`getThisContainer`, `FindEnclosingScope`, etc.) crossed with arrow bodies, method bodies, and class-static-block bodies
-   - **Graceful degradation**:
-     - `SpreadAssignment` inside an object literal, `RestElement` inside a binding pattern — must not crash and must not mask sibling-property checks
-     - Empty class body, empty function body, empty destructuring pattern, empty arguments list
-     - Overload signatures / `abstract` / `declare` members — body-absent forms
-
-   **Real-user shapes** (after walking Dimensions 1–4) — scan the upstream rule's GitHub issue tracker for closed regressions, false-positive reports, and false-negative reports. Convert ≥2 representative real-user code shapes into Go tests, marked `// ---- Real-user: <issue# or scenario> ----`. These are inputs production codebases produce that upstream's contrived test suite typically misses — and they're the inputs your rule will most likely face in real use. Do not skip this step on the grounds that "upstream's tests pass"; that is precisely the failure mode this layer prevents.
-
-5. **Upstream Semantic Walk — Layer 3 (branch lock-ins)**:
-
-   Migrating upstream's `valid`/`invalid` tests covers the main path, but nearly every ESLint rule has branches / OR conditions that are reachable but not tested upstream. Missing these is the #1 source of "passes all upstream tests, silently drifts in semantics" regressions — exactly the failure mode the [Testing Philosophy](#testing-philosophy) calls out.
-
-   Do this walk BEFORE moving to Phase 2:
-   1. Read the upstream rule source file end-to-end.
-   2. For each listener / visitor, enumerate every branch — in particular:
-      - Every `||` / `&&` in a gating `if`, including the ones whose second arm is reachable only by a specific input shape.
-      - Every `.some()` / `.find()` / `entries().some()` predicate — each `return moduleName;`-style early-exit is a distinct branch.
-      - Every fallback value (`X || defaultY`, `X ?? Y`) where `X` can realistically be undefined.
-   3. For each branch, write down a MINIMAL input code snippet that exercises it.
-   4. Add a Go test for every snippet, even if upstream never tests it. Typical examples that slip past upstream tests:
-      - Destructuring from a non-`require` call whose first arg happens to match a watched module (e.g. `var {X} = myFunc('react')`).
-      - Fallback `reactModuleName || pragma` when `reactModuleName` is falsy.
-      - A condition that becomes true only for a TS-only syntax form (non-null, `as`, `satisfies`).
-
-   These tests protect against future refactors silently flipping semantics. They live in `<rule>_extras_test.go` (Phase 2 Step 4); each case carries an inline comment referencing the upstream branch it locks in: `// Locks in upstream <fn>() arm <N>: <what>`.
-
-6. **Document Divergence from ESLint**:
-
-   Preserve upstream behavior unless the task requests a difference or the repository already documents one for this rule. Implementation differences alone do not justify different diagnostics, fixes or suggestions.
-
-   **A. Requested or established divergence** — document the intended public behavior in all three places:
-   1. **Source code comment**: Add a `// NOTE: Unlike ESLint...` explaining the difference and rationale.
-   2. **Rule documentation**: Add a "Differences from ESLint" section in the rule's `.md` file.
-   3. **Test cases**: Ensure the differing behavior is covered by a dedicated test — a green-path `ValidTestCase` or a case with an exact `Message` / position assertion — so that future refactors can't silently flip it.
-
-   **B. AST or language representation differences** — adapt the implementation and add a regression for the upstream behavior. For example, numeric literal `.Text` is normalized, but `scanner.GetSourceTextOfNodeFromSourceFile` preserves `0x1` versus `1` when upstream compares raw tokens. Use the JavaScript-compatible helpers for semantic operations. If an unsupported capability prevents parity, report the gap before declaring the port complete; do not lock an accidental mismatch in as the expected behavior.
-
-7. **Identify How the Rule Reads Patterns**:
-
-   If the rule accepts a regexp or a glob — in a rule option, or read out of the source under lint — find the library upstream reads it with. Check the rule's own imports and the plugin's `package.json`, and note the **major version**. Go's standard library and general-purpose glob packages answer differently, so the port has a matching package for each:
-
-   | Upstream reads the pattern with       | Use in the port                                             |
-   | ------------------------------------- | ----------------------------------------------------------- |
-   | a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp`, imported as `esregexp`           |
-   | `minimatch` at `^3.x`                 | `utils/minimatch3`                                          |
-   | `is-glob`                             | `utils/isglob`                                              |
-   | any other glob package                | **not supported — stop and report to the user (see below)** |
-
-   `depguard` denies `regexp2`, `doublestar` and the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`, and `forbidigo` denies `strings.ToLower`, `strings.ToUpper` and `strings.TrimSpace` there, so a rule cannot reach past these by accident. Trimming, blankness, casing, character categories and number formatting have the same problem and the same answer — see [UTILS_REFERENCE.md § JavaScript Semantics](UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
-
-   The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks, because RE2 refuses syntax JavaScript accepts and the caller usually swallows the compile error.
-
-   **Only minimatch 3 and is-glob are ported. If the rule reads globs with anything else, stop and report that to the user before writing the port** — do not substitute `minimatch3` or `doublestar` and carry on, and do not port a new glob package on your own initiative. `minimatch@10` is the one to expect: ESLint moved to it for its own flat-config `files`/`ignores` and a plugin may follow, but only the 3.x reading is ported, because that is what the plugin ecosystem pins. `minimatch3` differs from 10 on POSIX character classes; `doublestar` differs on 13 of 37 sampled patterns, and not only on extended glob syntax — `src/**` matches `src` itself under doublestar but not under minimatch, and a leading `!` is a literal rather than a negation. Report which package and version the rule needs and which of its patterns would be misread; the user decides whether to port it, accept a documented divergence, or skip the rule.
-
----
-
-## Phase 2: Implementation (Go)
-
-> **AST note**: rslint is built on the tsgo AST, which is structurally different from ESLint's ESTree. Child-access patterns (`node.left`, `node.argument`, `node.callee`, …) do **not** correspond 1:1: parentheses are explicit nodes, optional chains are flag-based (no `ChainExpression` wrapper), `Literal` is split across several `Kind*Literal` kinds, and `AssignmentExpression` / `SequenceExpression` collapse into `BinaryExpression`. Review [AST_PATTERNS.md § AST Shape Essentials](AST_PATTERNS.md#ast-shape-essentials) before implementing, and run the Alignment Audit (end of Step 2) before tests.
->
-> **If you discover a new tsgo↔ESTree shape difference during porting** (e.g. a kind that has no ESTree analog, an `.Text` field that's normalized at parse time when ESLint sees raw source, an access pattern that requires an extra unwrap), **append it to [AST_PATTERNS.md § AST Shape Essentials](AST_PATTERNS.md#ast-shape-essentials) as part of your PR**. That file is the living knowledge base; every new rule is a chance to grow it.
-
-### Step 1: Directory Setup
-
-- **Core Rules**: `internal/rules/<rule_name_snake_case>/`
-- **Plugin Rules**: `internal/plugins/<plugin_name>/rules/<rule_name_snake_case>/`
-
-**Action**: Create the directory and the standard file set:
-
-1. `<rule_name>.go` — Implementation
-2. `<rule_name>.md` — Documentation
-3. `<rule_name>_upstream_test.go` — Layer 1 tests (upstream 1:1 migration; see [Testing Philosophy](#testing-philosophy))
-4. `<rule_name>_extras_test.go` — Layers 2 + 3 tests (edge-shape augmentation, real-user shapes, branch lock-ins)
-
-The `_upstream_*` / `_extras_*` split is a hard contract: a reviewer can `ls` the directory and immediately see (a) that the rule has rslint-added augmentation at all and (b) which side of the fence each case lives on. **Never** mix migrated and rslint-added cases in the same file, and **never** put augmentation cases in `_upstream_*`.
-
-**When to split further** — if `_extras_test.go` grows past roughly **80 cases or 600 lines**, partition by functional area and create one file per area:
-
-- `<rule_name>_extras_dim4_test.go` — Dimension 4 universal-edge-shape rows
-- `<rule_name>_extras_branches_test.go` — upstream-branch lock-ins
-- `<rule_name>_extras_realuser_test.go` — issue-tracker shapes
-- `<rule_name>_extras_<feature>_test.go` — option / mode / receiver type, etc.
-
-Same threshold for `_upstream_test.go` if upstream itself partitions cleanly into feature subsets (e.g. one file per option mode). When upstream is also split, each subfile's header comment should describe its own subset, not copy the whole-suite template (e.g. "TestRuleUpstreamCallbackArg migrates upstream's callback-arg test cases ...").
-
-**Test function naming for area splits** — each split file gets one Test function whose name mirrors the area suffix in PascalCase: `<rule>_extras_dim4_test.go` → `TestRuleExtrasDim4`, `<rule>_extras_branches_test.go` → `TestRuleExtrasBranches`, `<rule>_upstream_callback_arg_test.go` → `TestRuleUpstreamCallbackArg`. This keeps a 1:1 file ↔ function mapping that `grep` can exploit.
-
-For a worked example of large-rule splitting, see `internal/plugins/react_hooks/rules/exhaustive_deps/` (12 `upstream_*_test.go` + 5 extras files). **Important**: `exhaustive_deps` predates this convention and uses a hybrid naming pattern — some files keep the `<rule>_` prefix, others drop it; Test function names use `_`-separated snake (`TestExhaustiveDeps_Upstream_CallbackArg`) instead of the documented `Test<Rule><Suffix>` PascalCase. **New rules should follow the documented patterns above; reference `exhaustive_deps` only for _how_ to partition by feature, not for naming.**
-
-### Step 2: Write Rule Logic
-
-**File**: `<rule_name>.go`
-
-**Prerequisites**:
-
-- Read `internal/rule/rule.go` to understand core definitions
-- Reference existing rules for the standard implementation pattern
-- Review AST node types in `shim/ast/shim.go`
-- See [AST_PATTERNS.md](AST_PATTERNS.md) for traversal patterns and examples
-
-**Check plugin-local helpers FIRST** (before touching `internal/utils/`): grep the same plugin's neighbor rules for near-duplicates of the helper you're about to write:
-
-```bash
-# For plugin rules:
-rg -n "<operation-or-helper-name>" internal/plugins/<plugin>/
-# For core rules:
-rg -n "<operation-or-helper-name>" internal/rules/ internal/utils/
-```
-
-Reuse a helper with equivalent semantics. If the current rule and an existing consumer need the same operation, extract their common implementation to the appropriate shared package and verify both consumers. Similar names or code shapes alone do not establish equivalent semantics; do not refactor unrelated neighbors as a prerequisite.
-
-**Use Program capabilities for source-generation questions** (SECOND): before
-adding a helper for filesystem, package scope, source lookup, module resolution,
-or module references, inspect `internal/program/`. Rules receive the same
-backend-neutral facade through `ctx.Program()` in CLI, API, and LSP modes.
-
-- Resolve one specifier with `ctx.Program().ResolveModule(ctx.SourceFile, specifier)`.
-- Enumerate generic import/export/dynamic-import/require/AMD references with
-  `ctx.Program().ModuleGraph().References(file, kinds)`.
-- Cache a rule-specific, configuration-complete index with
-  `rule.CachedByProgram(ctx, key, build)`.
-- Keep rule semantics such as ignored paths, cycle depth, SCCs, and reporting
-  policy in the rule or its plugin helper. `Program.ModuleGraph` reports source
-  facts; it does not decide what a rule considers an edge.
-
-Never branch on how a Program was constructed, recover a raw compiler Program,
-add a parallel runtime/context field, or recreate module resolution under
-`internal/utils`.
-
-**Check for reusable `internal/utils/` helpers** (THIRD): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
-
-- `IsSpecific*`, `IsArgument*` — well-known API-call recognition (`Object.defineProperty`-style, member-access patterns, nth-argument-of)
-- `GetStatic*`, `Normalize*` — property-name / literal-value normalization (e.g. `GetStaticPropertyName`, `NormalizeNumericLiteral`, `NormalizeBigIntLiteral`)
-- `AreNodes*`, `IsSame*` — structural / reference AST comparison
-- `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
-- `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries. For "all references to this declared symbol" use `ctx.Refs.References(decl.Symbol())`, and for "what does this identifier resolve to" use `ctx.Refs.Resolve(node)`, which also resolves symbols declared outside this file (globals/ambient/cross-file) via its checker fallback — never a hand-rolled AST walk with `GetSymbolAtLocation` per identifier (see [AST_PATTERNS.md — Resolving Identifiers and Collecting References](AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs))
-- **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signatures and whether a type must be awaited; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
-
-See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
-
-**Check for reusable shim utilities** (FOURTH): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
-
-- `shim/scanner/` — `SkipTrivia` (skip whitespace/comments to find next token position), `GetScannerForSourceFile`, `GetSourceTextOfNodeFromSourceFile` (raw source text — useful when an AST node's `.Text` field has been normalized at parse time)
-- `shim/ast/` — `GetThisContainer`, `IsFunctionLike`, `IsFunctionLikeDeclaration`, `SkipParentheses`, `IsOptionalChain`, and other AST utilities
-- `shim/checker/` — native tsgo TypeChecker methods exposed as `Checker_*` functions (`GetReturnTypeOfSignature`, `GetApparentType`, `GetWidenedType`, `GetTypeArguments`, `GetPropertyOfType`, `GetIndexInfosOfType`, …). Reach here **only when** `internal/utils/` doesn't already wrap what you need; the wrappers encode invariants you'd otherwise have to re-derive. See `shim/checker/shim.go` for the full surface.
-- `shim/core/` — `NewTextRange` and other core utilities
-
-> **Warning**: Some shim functions have different semantics from ESLint's model. For example, `ast.GetThisContainer` treats `PropertyDeclaration`, `ClassStaticBlockDeclaration`, `ModuleDeclaration`, etc. as `this` containers, which does not match ESLint's scope model. Always compare the shim function's behavior against ESLint before reusing.
-
-**Rule Interface**:
-
-```go
-// For typescript-eslint rules that use TypeChecker (auto-prefixes with @typescript-eslint/):
-var MyRuleRule = rule.CreateRule(rule.Rule{
-    Name:             "my-rule",
-    RequiresTypeInfo: true,
-    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-        return rule.RuleListeners{
-            ast.KindSomeNode: func(node *ast.Node) {
-                // ctx.TypeChecker is guaranteed non-nil when RequiresTypeInfo is true
-            },
-        }
-    },
-})
-
-// For typescript-eslint rules that do NOT use TypeChecker:
-var MyOtherRule = rule.CreateRule(rule.Rule{
-    Name: "my-other-rule",
-    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-        // ...
-    },
-})
-
-// For ESLint Core rules:
-var MyCoreRule = rule.Rule{
-    Name: "my-core-rule",
-    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-        // ...
-    },
-}
-```
-
-**Key Points**:
-
-- `RuleListeners` is a map from `ast.Kind` to a callback function
-- Each callback receives a `*ast.Node` and reports diagnostics through `RuleContext`; reports with optional edits use the deferred methods
-- Options parsing happens inside the `Run` function before returning listeners
-- Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
-- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. The planner admits it only when the unified Program can provide a checker for that file, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
-- **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
-
-**AST Shim API Warning**: In `github.com/microsoft/TypeScript/tsc/shim/ast`:
-
-- **General Nodes** (`*ast.Node`): `node.Kind` is a field; `node.Text()` is a method
-- **Concrete Nodes** (e.g., `*ast.Identifier`): Use fields (e.g., `id.Text`)
-- Do not assume; check the shim source code to confirm.
-
-```go
-// Example: Checking if callee is "Array"
-if callee.Kind == ast.KindIdentifier {
-    identifier := callee.AsIdentifier()
-
-    // ✓ Correct - Text is a FIELD on concrete type
-    if identifier.Text == "Array" { ... }
-
-    // ✗ Wrong - Text is not a method!
-    if identifier.Text() == "Array" { ... }  // Compile error
-}
-```
-
-### Handling Options
-
-`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). The framework normalizes options before calling the rule, so write `parseOptions` to take that slice directly, guard its length, and read the first positional option from `options[0]`:
-
-```go
-Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-    opts := parseOptions(options)
-    // ...
-}
-
-func parseOptions(options []any) Options {
-    opts := Options{/* defaults */}
-    if len(options) == 0 {
-        return opts
-    }
-    optsMap, _ := options[0].(map[string]any)
-    if value, ok := optsMap["someOption"].(bool); ok {
-        opts.SomeOption = value
-    }
-    return opts
-}
-```
-
-Do not call `rule.NormalizeOptions` inside `Run` or make `parseOptions` accept a bare map. Configuration loading and `rule_tester.ResolveTestCaseOptions` already normalize inputs to `[]any`; the rule should consume that single representation.
-
-For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...), guarding each position with the corresponding length check before access.
-
-#### Options schema
-
-Every new rule declares a JSON Schema for its options on the `Schema` field. The linter validates each configured rule's options against it before linting starts (in the CLI, as a separate fail-fast step right after configuration is resolved), so a misconfigured rule fails with a clear error instead of being silently misread.
-
-- **No options**: set `Schema: rule.EmptyArraySchema`. Always reference the shared value — never author your own copy of the empty-array schema.
-- **With options**: copy ESLint's `meta.schema` into a `<rule_name>.schema.json` file (snake_case, matching `<rule_name>.go`) beside the rule source and embed it. When upstream's `meta.schema` is a plain **array** of item schemas, wrap it the way ESLint itself does: `{"type": "array", "items": <the upstream array, used directly as the tuple items>, "minItems": 0, "maxItems": <len>}`. When it's already a full schema **object** (e.g. eqeqeq's top-level `anyOf`), copy it as-is.
-
-```go
-import _ "embed"
-
-//go:embed my_rule.schema.json
-var schemaJSON []byte
-
-var MyRule = rule.Rule{
-    Name:   "my-rule",
-    Schema: rule.NewSchema(schemaJSON),
-    Run:    /* ... */,
-}
-```
-
-Schemas are JSON Schema Draft 4 (the draft ESLint itself uses) and compile lazily on first use; the CI sweep `TestAllRules_DeclaredSchemasCompile` (internal/config) catches a schema that fails to compile. Validation also fills schema `default` values into the options in place, matching ajv's `useDefaults` as ESLint configures it (cross-checked against ajv@6 by `TestValidateMatchesAjvFixtures`), so an option object a user partially fills in arrives at the rule with its schema defaults present. CLI, API and LSP configuration paths validate options. Keep `parseOptions` handling runtime defaults: a schema default inside an object only applies when the enclosing object exists; it does not supply omitted positional options.
-
-### Alignment Audit
-
-Before moving on, walk through each check. Each one targets a class of AST-shape bug that is not caught by compilation and may slip past narrowly-written unit tests. Skip a row when it doesn't apply to your rule.
-
-| If the rule …                                                                   | Audit                                                                                                                                                             | Reference                                                                            |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Reads a child node (every rule)                                                 | Any `.Kind ==` / `.Kind !=` / `.As<Type>()` / `.Text` access on a child must go through `ast.SkipParentheses` first (directly or via a helper).                   | [AST_PATTERNS.md § ParenthesizedExpression](AST_PATTERNS.md#parenthesizedexpression) |
-| Handles `foo?.bar` / `foo?.()`                                                  | Use `ast.IsOptionalChain(node)`; don't hand-check node flags.                                                                                                     | [AST_PATTERNS.md § Optional Chain](AST_PATTERNS.md#optional-chain)                   |
-| Compares literal values                                                         | Match the precise `Kind*Literal`; normalize numeric text via `utils.NormalizeNumericLiteral` before value comparison.                                             | [AST_PATTERNS.md § Literal Kinds](AST_PATTERNS.md#literal-kinds)                     |
-| Has separate ESLint listeners for `AssignmentExpression` / `SequenceExpression` | Collapse into one `BinaryExpression` listener and branch on `OperatorToken.Kind`.                                                                                 | [AST_PATTERNS.md § Binary Operator Kinds](AST_PATTERNS.md#binary-operator-kinds)     |
-| Emits autofixes or suggestions                                                  | Use the matching deferred report method. Keep diagnostic identity eager; put all edit-only work in the builder and return nil when no artifact applies.           | [AST_PATTERNS.md § Reporting Functions](AST_PATTERNS.md#reporting-functions)         |
-| Emits fix/suggestion text starting with an identifier                           | Guard against token fusion with the preceding character before emitting (otherwise e.g. `typeof` + `Number(foo)` becomes `typeofNumber(foo)`).                    | —                                                                                    |
-| Checks whether a name resolves to a global                                      | Use `utils.IsShadowed(node, name)`. Note: stricter than ESLint's scope manager on TS type-only bindings — document in the rule's `.md` if the difference matters. | —                                                                                    |
-| Reads source text for recommendation / fix                                      | Prefer `utils.TrimmedNodeText(sf, node)` (skips leading trivia) over raw `node.Pos()/End()`.                                                                      | [AST_PATTERNS.md § Node Text and Positions](AST_PATTERNS.md#node-text-and-positions) |
-
-### Helper Extraction
-
-After Step 2 is done, review each helper for extraction. Cross-file source and
-module infrastructure belongs to `internal/program`; plugin-specific shared
-semantics belong to `<plugin>util/`; only general AST/type helpers belong to
-`internal/utils/`.
-
-**Extract if all hold:**
-
-- Input/output is AST- or source-oriented (not encoding the rule's own semantics)
-- The name reads sensibly without context of the current rule
-- The current task has another concrete consumer with equivalent semantics
-
-**Keep local otherwise.** Predicates that encode a specific rule's definition (e.g. a `isDoubleLogicalNegating`-style helper that codifies "what counts as a double-negation coercion for THIS rule") stay with the rule — extracting would mislead future readers.
-
-Avoid a second implementation of an equivalent operation. Check the existing consumers before extracting it, preserve their contracts, and include their targeted tests. Keep superficially similar operations separate when their semantics differ.
-
-### Step 3: Write Documentation
-
-**File**: `<rule_name>.md`
-
-**Template**:
-
-````markdown
-# <rule-name>
-
-## Rule Details
-
-[Description of the rule]
-
-Examples of **incorrect** code for this rule:
-
-```javascript
-// Example
-var x = { a: 1, a: 2 };
-```
-
-Examples of **correct** code for this rule:
-
-```javascript
-// Example
-var x = { a: 1, b: 2 };
-```
-
-Examples of **incorrect** code for this rule with `{ "someOption": true }`:
-
-```json
-{ "<rule-name>": ["error", { "someOption": true }] }
-```
-
-```javascript
-// Example
-```
-
-## Original Documentation
-
-[Link to ESLint documentation]
-````
-
-**Pin the upstream version** — this is how rslint records which upstream release a rule's _behavior_ was ported/verified against, since nothing else in the repo does.
-
-- **Source code link**: always required, always a `github.com/.../blob/<tag>/...` link pinned to the exact released tag you read while porting — never `main`/`master`/`HEAD`.
-- **Doc link**: text is always `<Family/Plugin name>: <rule-name>` (e.g. `eslint-plugin-unicorn: no-thenable`, `ESLint: no-console`, `typescript-eslint: await-thenable`) — colon included, regardless of family. If the docs are plain markdown files in the project's GitHub repo (`eslint-plugin-unicorn`, `-react`, `-jsx-a11y`, `-jest`, `-promise`, `-import`, ...), pin the URL to the same tag as the source link. If the docs live on a custom website (`eslint.org`, `typescript-eslint.io`, `react.dev`, ...), the URL itself can't be pinned to a release — leave it as the plain rule-page URL.
-
-```markdown
-## Original Documentation
-
-- [eslint-plugin-unicorn: no-thenable](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/docs/rules/no-thenable.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v70.0.0/rules/no-thenable.js)
-```
-
-```markdown
-## Original Documentation
-
-- [ESLint: no-console](https://eslint.org/docs/latest/rules/no-console)
-- [Source code](https://github.com/eslint/eslint/blob/v10.8.0/lib/rules/no-console.js)
-```
-
-If a later change re-verifies a rule against a newer upstream release, bumping the pinned tag(s) is the entire re-alignment record — do it once the rule's behavior has actually been checked against the newer release, not preemptively.
-
-**Options in examples**: when a code block demonstrates a specific option combination, precede the `javascript` block with a standalone `json` block containing the rule's config entry — shape: `{ "<rule-name>": ["error", { ...options... }] }`. Let prettier format it (single-line when short, multi-line when the options list grows). Keep the `javascript` block pure source code (no annotations). Do **not** wrap the config entry in a `"rules": { ... }` object (redundant here) and do **not** copy upstream linter directives such as `/* eslint <rule>: [...] */` into the examples.
-
-**Writing a "Differences from ESLint" section** (when the rule has one):
-
-- The audience is the **rule user**, not the porter. Describe what they will observe, not why.
-- Each bullet states a concrete input pattern and the observable difference ("rslint reports X on this code; ESLint does not", "positions differ by N columns", "message text differs", etc.). Keep each bullet to ≤2 lines.
-- **Do NOT** mention implementation details: `getText`, `SkipParentheses`, `AST shape`, `ESTree vs tsgo`, "we chose to…" — those belong in source-code comments, not the rule doc.
-- If you can't explain the divergence in terms of observable input-vs-output behavior without reaching for mechanism, the divergence is probably a bug, not a documented difference. Reconsider.
-
-### Step 4: Write Go Tests
-
-**Files** (per Phase 2 Step 1): `<rule_name>_upstream_test.go` and `<rule_name>_extras_test.go`. The two-file split is the physical embodiment of the [Testing Philosophy](#testing-philosophy) — a reviewer should be able to `ls` the rule directory and immediately tell whether the augmentation work was done.
-
-**Layer-to-file mapping:**
-
-| Layer                                  | File                      | Test function                                                                    | In-file group markers (on the case directly)                                                                                                                                                                                                                                                                                                                                      |
-| -------------------------------------- | ------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Upstream migration                  | `<rule>_upstream_test.go` | `Test<Rule>Upstream`                                                             | `// ---- <upstream group name> ----` — preserve upstream's grouping verbatim so a top-to-bottom read matches the upstream test file                                                                                                                                                                                                                                               |
-| 2. Edge-shape & real-user augmentation | `<rule>_extras_test.go`   | `Test<Rule>Extras`                                                               | `// ---- <description> ----` on each case (free-form descriptive text, as used by existing jsx-a11y rules). For new rules, prefer the prefix-tagged forms `// ---- Dimension 4: <what> ----` and `// ---- Real-user: <issue# or scenario> ----` because they let `grep` find a category quickly; both styles are accepted. `// N/A: <reason>` for rows that genuinely don't apply |
-| 3. Branch lock-ins                     | `<rule>_extras_test.go`   | `Test<Rule>Extras` (or a separate `Test<Rule>ExtrasBranches` if extras is split) | `// Locks in upstream <fn>() arm <N>: <what>` on each case                                                                                                                                                                                                                                                                                                                        |
-
-Layers 2 + 3 — not case count — are the real alignment work; there is no numeric target. A near-empty `_extras` file is a smell that Phase 1 Steps 4 and 5 were skipped (Phase 4 Step 6's per-layer checkboxes enforce this).
-
-**File-header comment** — open each test file with a top-of-file comment that names what the file is for and points at its sibling:
-
-- `_upstream_test.go`: `// Test<Rule>Upstream migrates the full valid/invalid suite from upstream <upstream test path> 1:1. Position assertions cover line/column for every invalid case. rslint-specific lock-in cases live in the <rule>_extras_*_test.go file(s).`
-- `_extras_test.go`: `// Test<Rule>Extras locks in branches and edge shapes that the upstream test suite doesn't exercise. Each case carries an inline comment pointing at the specific branch / Dimension 4 row / tsgo AST quirk it covers, so future refactors can't silently regress them without breaking a named lock-in.`
-
-These comments are how a reader (or `grep`) confirms a file is doing its assigned job.
-
-**Reference examples** in `internal/plugins/jsx_a11y/rules/`:
-
-- Standard two-file rule: `anchor_ambiguous_text/`, `lang/`, `aria_role/`
-- Large-rule split (further partitioned by area): `internal/plugins/react_hooks/rules/exhaustive_deps/`
-
-**Conventions:**
-
-- Use `rule_tester.RunRuleTester` in each test file (one `Test<Name>` function per file is typical; multiple are fine when it improves grouping).
-- Shared fixtures (option-map literals, expected message strings) can live as package-level vars; both files share the same Go package so they compose freely.
-- Invalid cases **MUST** include `Line` and `Column` assertions.
-- Use `map[string]any` to pass object options in Go tests.
-- Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`.
-
-**Options coverage — MUST exercise JSON-decoded shapes.** `rule_tester.ResolveTestCaseOptions` normalizes each test case's options to `[]any` and validates them against the rule's schema before `Run` executes. Use JSON-shaped maps and slices in tests; a typed options struct does not model configuration input and will be rejected by an object schema.
-
-For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field uses JSON-shaped values. For a single object option, prefer `map[string]any{...}`; use `[]any{...}` when the rule genuinely has multiple positional options. Both forms reach `Run` as a normalized `[]any`, so do not duplicate a single-object case solely to test bare versus array-wrapped input. These cases catch missing `len(options)` / `options[0]` parsing, wrong key casing, and option-name typos.
-
-**Focused debugging**: use `go test <rule-package> -run '<test-or-subtest-pattern>'` for a reproduction, then verify the selected package before delivery. `RunRuleTester` rejects `Only: true`. Keep `Skip: true` only for upstream cases with an explicit limitation as described in Phase 1.
-
-**Optional Edit Testing**: If the rule provides autofix, use the `Output` field to verify the fixed code:
-
-```go
-// With autofix: provide Output field with the expected fixed code
-rule_tester.InvalidTestCase{
-    Code:   `var a = function() { return 1; }.bind(b)`,
-    Output: []string{`var a = function() { return 1; }`},
-    Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
-}
-
-// Without autofix (e.g., side-effect argument): omit Output field
-rule_tester.InvalidTestCase{
-    Code:   `var a = function() {}.bind(b++)`,
-    Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
-}
-```
-
-For suggestions, assert both their message IDs and applied output on the
-diagnostic:
-
-```go
-rule_tester.InvalidTestCase{
-    Code: `const value = source as Type`,
-    Errors: []rule_tester.InvalidTestCaseError{{
-        MessageId: "unexpectedAssertion",
-        Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
-            MessageId: "suggestAnnotation",
-            Output:    `const value: Type = source`,
-        }},
-    }},
-}
-```
-
-`RunRuleTester` requests all edit categories, so `Output` verifies final edit text but does not verify the demand boundary. For every rule with an autofix or suggestion, also add `Test<Rule>EditDemand` to the existing `<rule>_extras_test.go` file. Run the same representative diagnostic with:
-
-- `rule.EditDemandNone`
-- `rule.EditDemandAutofix`
-- `rule.EditDemandSuggestion`
-- `rule.EditDemandAll`
-
-Assert that diagnostic count, message, and range are identical in all four modes; fixes and suggestions appear only under their matching demand; and the requested artifacts equal the all-edits output. Do not create a standalone edit-demand test file. See `internal/plugins/typescript/rules/no_restricted_types/no_restricted_types_extras_test.go` for a combined fix/suggestion example. The framework's own `internal/rule/context_test.go` verifies that a builder is not invoked when its artifact category was not requested.
-
-**Test Case Structs**: See `internal/rule_tester/rule_tester.go` for `ValidTestCase`, `InvalidTestCase`, and `InvalidTestCaseError` definitions.
-
----
-
-## Phase 3: Integration (JS)
-
-### Step 1: Check & Setup Test Environment
-
-**Goal**: Ensure the test directory and necessary configuration files exist.
-
-1. **Check Directory**: Verify if `packages/rslint-test-tools/tests/<plugin-name>` exists.
-
-2. **Check Configuration**:
-   - **Reference**: Use `packages/rslint-test-tools/tests/eslint-plugin-jsx-a11y` as the template (ESM flat-config format).
-   - **Required Files**:
-     - `rslint.config.mjs` (Configuration for the linter — JSON `rslint.json` is legacy and `rslint --init` can migrate it to JS/TS; do NOT create new `rslint.json` files)
-     - `tsconfig.files.json` (TS Config for file-based tests)
-     - `tsconfig.virtual.json` (TS Config for virtual/code-based tests)
-   - **Plugin Configuration**: In `rslint.config.mjs`, set the `plugins` field (use the short plugin name, matching how rules are addressed in tests):
-     - **Core Rules**: `plugins: []`
-     - **Plugin Rules**: `plugins: ['<short-name>']` (e.g. `'jsx-a11y'`, `'jest'`, `'react'`, `'promise'`)
-   - **Warning**: When copying `rule-tester.ts`, remove any hardcoded rule prefixes (e.g., `ruleName = 'jsx-a11y/' + ruleName;`).
-
-### Step 2: Add JS Tests
-
-**Purpose & scope.** The JS rule file mirrors Layer 1 (upstream `valid` / `invalid` cases) through the compiled binary. Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) stay in Go extras. Keep protocol and serialization regressions in the suites that own those components; see [Testing Philosophy](#testing-philosophy).
-
-**Practical rule:** the JS file should assert exactly the upstream `valid` / `invalid` semantic set — nothing less, nothing more. Case **counts** between JS and `<rule>_upstream_test.go` may legitimately differ (one side may inline what the other folds into a fixture file); the contract is semantic-subset equivalence, not numeric parity. If you find yourself reaching for a tsgo-specific edge shape, a Dimension 4 row, a branch lock-in, or a GitHub-issue real-user shape while writing the JS file — stop. Those belong in Go extras.
-
-**File Locations** (determined by Phase 1 Step 2):
-
-- **Core ESLint Rules** (including deprecated typescript-eslint rules): `packages/rslint-test-tools/tests/eslint/rules/<rule-name>.test.ts`
-- **typescript-eslint Rules**: `packages/rslint-test-tools/tests/typescript-eslint/rules/<rule-name>.test.ts`
-- **Other Plugin Rules**: `packages/rslint-test-tools/tests/<plugin-name>/rules/<rule-name>.test.ts`
-
-**Setup RuleTester**:
-
-- **Core ESLint Rules**: Import `RuleTester` from `../rule-tester` (in `tests/eslint/rule-tester.ts`, no prefix)
-- **typescript-eslint Rules**: Import `RuleTester` from `@typescript-eslint/rule-tester` (auto-prefixes with `@typescript-eslint/`)
-- **Other Plugin Rules**: Refer to `packages/rslint-test-tools/tests/eslint-plugin-jsx-a11y/rule-tester.ts`
-
-**Options format** follows the selected RuleTester. The core wrapper declares object options as `options: { allow: ['warn'] }`; other wrappers may accept positional arrays. Read that wrapper's types and normalization before copying upstream cases, and preserve the upstream option positions and values.
-
-### Step 3: Register Test File
-
-**File**: `packages/rslint-test-tools/rstack.config.mts`
-
-Add the new test file path to the `include` array.
-
-### Step 4: Include Rule in the Catalog
-
-**Where to add depends on rule type** (determined by Phase 1 Step 2):
-
-| Rule type                                              | File to edit                         | What to add                                                              |
-| ------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------ |
-| Core ESLint (incl. deprecated typescript-eslint rules) | `internal/rules/all.go`              | Import the rule package; append `package.RuleNameRule` to `coreRules()`. |
-| typescript-eslint (active)                             | `internal/plugins/typescript/all.go` | Same — append to that plugin's `GetAllRules()`.                          |
-| Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                    |
-
-Each plugin `all.go` exports `GetAllRules() []rule.Rule`; core rules use `coreRules()` in `internal/rules/all.go`. `rules.All()` assembles those sources into the shared immutable catalog — **do not edit `internal/config` for a new rule**.
-
-For the first native rule in a new plugin, also add that plugin's `GetAllRules()` to the explicit aggregation in `internal/rules/all.go`; a new plugin directory is not discovered automatically. Inspect the plugin-enablement boundaries in `architecture.md` for this case.
-
-**Catalog key vs `rule.Name` must match** — catalog construction uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
-
-- **Core rule** — `rule.Rule{Name: "no-debugger", ...}` appears as `"no-debugger"`.
-- **typescript-eslint rule** — `rule.CreateRule(rule.Rule{Name: "no-shadow", ...})` appears as `"@typescript-eslint/no-shadow"`. The factory auto-prefixes; **only** use it for `@typescript-eslint/` rules — using it on a core or other-plugin rule will silently produce the wrong key.
-- **Other plugins** — `rule.Rule{Name: "react/jsx-key", ...}` — the prefix is part of the literal `Name`, no factory.
-
-**Do NOT include a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status.
-
----
-
-Before verification, finish conditional project configuration: if the plugin is already listed in the repo-root `rslint.config.ts` `plugins`, add the new rule with `'warn'` severity. Otherwise leave that configuration unchanged. Doing this before checks keeps the results valid through the commit step.
-
-## Phase 4: Verification & Build
-
-**Goal**: Ensure the compiled binary runs the rule correctly.
-
-Identify affected packages and consumers from the diff and callers, then state which of the existing commands below are needed. Reuse checks already passed for the same relevant inputs. Formatting and Go tests do not require a binary build; the binary build is required before JS integration tests exercise changed Go code.
-
-1. **Go formatting** (catches indentation issues early):
-
-   ```bash
-   gofmt -l internal/rules/<rule_name>/
-   ```
-
-   If files are listed, run `gofmt -w` on them to fix.
-
-2. **Go tests** (the package-level invocation runs every `*_test.go` in the rule directory — both `_upstream_test.go` and `_extras_test.go`, plus any further `_extras_<area>_test.go` splits):
-
-   ```bash
-   go test ./internal/rules/<rule_name>
-   # or, for plugin rules:
-   go test ./internal/plugins/<plugin>/rules/<rule_name>
-   ```
-
-   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also run tests for the changed package and the direct consumer packages that import or call the changed API. Identify and briefly state this package set before running tests. Follow [AGENTS.md's local verification scope](../../../../AGENTS.md#local-verification); the shared helper does not authorize whole-plugin or whole-tree tests.
-
-   ```bash
-   go test <changed-package-dir> <direct-consumer-package-dir>
-   ```
-
-   Extracting or renaming a shared helper can change existing consumers; tests for only the new rule package do not cover them. Identify direct consumers with `rg` / `git grep`, run their package tests, and do not fall back to `go test ./internal/...`, `go test ./internal/plugins/<plugin>/...`, or `pnpm run test:go`.
-
-3. **Build binary** (REQUIRED before JS tests — they spawn the binary via IPC):
-
-   ```bash
-   pnpm --filter @rslint/core build:bin
-   ```
-
-   This command builds only the Go binary. JS tests also import generated package outputs. After catalog or schema changes, refresh the schema dump before building core JS so the public option types include the new rule:
-
-   ```bash
-   go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
-   pnpm --filter @rslint/core build:js
-   ```
-
-   Also run `build:js` when core JS output is missing or stale. If the selected test imports `@typescript-eslint/rule-tester`, build that workspace when its `dist` is missing or stale with `pnpm --filter @typescript-eslint/rule-tester build`. Native Go-rule IPC tests do not by themselves require rebuilding the Rust parser. Reuse prepared outputs while their relevant inputs remain unchanged.
-
-4. **JS tests** (use the exact registered file; one-shot execution):
-
-   ```bash
-   # First run for new test cases: generate snapshots with -u flag
-   pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts -u
-
-   # Verify against reviewed snapshots; missing snapshots must fail, not be generated.
-   CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts
-   ```
-
-   Review generated snapshots against upstream expectations before treating them as evidence. The current Rstest local default adds missing snapshots even without `-u`; verification uses CI mode to prevent that write.
-
-5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
-
-   The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 2):
-   - **JS suite** = Layer 1 mirror through the compiled binary, catalog and wire protocol.
-   - **Go suite** = Layer 1 + Layer 2 + Layer 3 rule-semantic regression coverage. The pinned upstream behavior remains the reference for both suites.
-
-   Two checks:
-   - [ ] **JS ⊆ Go upstream (semantic)**: every behavior asserted by a JS case is also asserted somewhere in `<rule>_upstream_test.go`. The match is **semantic**, not literal — Go may legitimately split one fixture-driven upstream case into many inline cases, or the reverse. If JS asserts a behavior that has no corresponding Go-upstream case, the upstream migration is incomplete — fix Go.
-   - [ ] **JS contains no Layer 2 / 3 cases**: review the JS file's contents (not its case count) for tsgo-specific edge shapes (Dimension 4 rows), branch lock-ins, or GitHub-issue real-user shapes. If any are present they leaked from Go extras — move them out.
-
-   > **Do not use literal case-count equality as the alignment check.** It only happens to match when both sides are written from the same inline-case template (e.g. `lang` is 19=19, `anchor-ambiguous-text` 39=39, `aria-role` 38=38). For the majority of jsx-a11y rules the counts legitimately differ — `no_static_element_interactions` is 644 (Go upstream) vs 135 (JS), `aria_props` is 12 vs 99 — because upstream uses fixture files that one side expands and the other folds. Both are correct as long as the semantic-subset check above holds.
-
-   Layer 2 and Layer 3 cases stay in Go only. Do **not** add them to the JS file even if "for completeness" feels tempting — see Phase 3 Step 2 Purpose & scope for why.
-
-   **Go vs JS test differences**:
-
-   | Aspect           | Go tests                                | JS tests                                    |
-   | ---------------- | --------------------------------------- | ------------------------------------------- |
-   | Autofix          | `Output: []string{...}` field           | Not verified (snapshot filters out `fixes`) |
-   | Position         | `Line`/`Column` fields on each error    | Implicitly covered by snapshot              |
-   | Multiple errors  | `Errors: []...{{...}, {...}}`           | `errors: [{...}, {...}]`                    |
-   | MessageId format | camelCase (e.g., `"noLossOfPrecision"`) | camelCase (e.g., `"noLossOfPrecision"`)     |
-
-6. **Contract Alignment Checklist (Go ↔ ESLint)**:
-
-   Phase 4 Step 5 verifies our two test suites agree with each other. This step verifies the **public contract** of the rule agrees with ESLint. The oracle is ESLint's diagnostic output (`messageId` + message text + report position) and its options schema — **not** ESLint's internal implementation. Language-level implementation differences are acceptable (see Phase 1 Step 6.B); contract differences are not.
-
-   Before claiming the port is aligned, confirm every row. Missing any row means the claim is premature.
-
-   **File split** (each layer has a designated file — see [Testing Philosophy](#testing-philosophy) and Phase 2 Step 4):
-   - [ ] **Two files exist**: `<rule>_upstream_test.go` and `<rule>_extras_test.go` (or area-split variants `<rule>_extras_<area>_test.go` if the rule is large).
-   - [ ] **Header comments present**: each file's top-of-file comment names what the file is for and points at its sibling.
-   - [ ] **Split contract honored**: `_upstream_*` files contain only migrated upstream cases; `_extras_*` files contain only rslint-added cases. No mixing.
-
-   **Coverage layers**:
-   - [ ] **Layer 1 — Upstream migration complete** (in `_upstream_test.go`): every `valid` / `invalid` case from the upstream unit-test file has a corresponding Go case (or `Skip: true` + `// SKIP: <reason>`).
-   - [ ] **Layer 2 — Edge-shape augmentation present** (in `_extras_test.go`): Phase 1 Step 4 Dimension 4 walked row-by-row; every applicable row has ≥1 dedicated Go test marked `// ---- Dimension 4: <what> ----`; N/A rows carry an explicit `// N/A: <reason>` marker so the walk is auditable.
-   - [ ] **Layer 2 — Real-user shapes present** (in `_extras_test.go`): ≥2 cases pulled from the upstream rule's GitHub issue tracker (closed regressions / FP / FN reports), marked `// ---- Real-user: <issue# or scenario> ----`.
-   - [ ] **Layer 3 — Branch lock-ins present** (in `_extras_test.go`): every reachable branch in the upstream source has a minimum-input Go test marked `// Locks in upstream <fn>() arm <N>: <what>`, including branches upstream itself never tests.
-   - [ ] **Extras aren't a token gesture**: with the layers 2 + 3 boxes above checked, step back and confirm `_extras_*` substantively exercises the rule's divergence surface — not one perfunctory case per layer. There is no case-count target; a near-empty `_extras_*` is a smell to re-walk Phase 1 Steps 4 and 5, not a number to hit.
-
-   **Diagnostic contract** (each invalid output is exactly what ESLint emits):
-   - [ ] **Message text assertions**: each `messageId` has ≥1 test using the `InvalidTestCaseError.Message` field (exact string match), covering every modifier combination the rule can emit (`static`, `private`, `async`, computed-no-name, etc.).
-   - [ ] **Position assertions per container**: for each container the rule emits into (object literal / class / type / descriptor / …), ≥2 cases assert `Line` + `Column` + `EndLine` + `EndColumn`, including one multi-line case.
-   - [ ] **Edit-demand invariance**: rules with autofixes or suggestions have `Test<Rule>EditDemand` in `<rule>_extras_test.go`, covering none/autofix/suggestion/all without changing diagnostic identity.
-
-   **Options contract**:
-   - [ ] **Schema and defaults match**: option names and types match the upstream schema; runtime defaults match the upstream implementation. Compare omitted options with their explicit defaults in the schema's positional shape. Use `[{}]` only for a single object option that permits an empty object; primitive options need their default string, number or boolean value.
-   - [ ] **Combination matrix**: for every boolean option, include ≥1 test where it is `true` and ≥1 where it is `false`. Triggering combinations (rule behaves differently when two options are both on) get dedicated cases.
-
-   **Equivalence classes** (when applicable):
-   - [ ] **Three-way equivalence classes** (if the rule compares names / keys): static / private / dynamic keys form separate equivalence classes; test ≥1 cross-class negative (e.g. `'#a'` string vs `#a` private identifier should NOT pair up).
-
-7. **Pre-commit gate** (BLOCKING — must all pass before Phase 5):
-
-   ```bash
-   # Type check and lint (JS/TS side)
-   pnpm typecheck && pnpm lint
-
-   # Spell check (catches typos in comments and strings)
-   pnpm -w run check-spell <changed-text-files>
-
-   # Pre-commit format check (required by AGENTS.md; reuse a still-valid result)
-   pnpm run format:check
-
-   # Go lint: pass packages containing changed Go files, preserving the diff filter.
-   golangci-lint run --new-from-merge-base=<base-ref> <affected-package-dirs>
-   ```
-
-   These are BLOCKING. If any fails, fix before moving on — **do not** commit, push, or open a PR with any of them red. These checks do not authorize expanding the test suites beyond the scope defined in AGENTS.md.
-   - **Go lint scope**: lint only packages containing changed `.go` files under `cmd/` and `internal/` during port-rule pre-commit verification. Use the Phase 0 base ref (`origin/main` by default) with `--new-from-merge-base` so only issues introduced by the branch are reported. Do not run `pnpm lint:go` here; it lints the full `cmd/` and `internal/` trees and is reserved for explicit full-tree checks / CI. Do not pass changed files from multiple directories to one `golangci-lint run` invocation; named file arguments must all be in one directory and can also produce typecheck false positives when a file depends on sibling files.
-   - **Unknown-word failures from `check-spell`**: inspect each reported word in context before changing anything. Fix misspellings, invented words, or other accidental text in the source. Add a word to `scripts/dictionary.txt` only when it is intentional: a valid standard word, ESLint ecosystem identifier, Go module/package name, API name, or similar technical token. Use the original case. Do not add `cspell` ignore comments in Markdown files; they can cause documentation compilation failures.
-   - **Format failures**: fix the affected files with the repository formatter; preserve unrelated edits and never silence the failure.
-   - **Lint failures**: fix the code. Don't bypass with `//nolint`, `// eslint-disable`, or equivalent, unless the exception is already justified by an in-file comment pattern this repo uses.
-
-   **For formatting failures**, pass only affected files supported and not ignored by the repository formatter; skip a command when no files remain. `rs fmt` still applies `rstack.config.mts` exclusions to explicit paths, so rule Markdown excluded by that configuration is not a formatting target:
-
-   ```bash
-   pnpm exec rs fmt <changed-js-ts-md-files>
-   gofmt -w <changed-go-files>
-   ```
-
-8. **Differential Validation** (required for rules with non-trivial branching):
-
-   Unit tests verify cases you thought of; diffing against the reference implementation on a real codebase catches the rest. Skip when the rule has ≤ 2 branches and trivial messages, or when the rule is a new rslint invention with no reference.
-
-   **Procedure**: use the upstream version recorded in Phase 1 and compatible, explicitly pinned ESLint/parser versions. Record those versions with the comparison result. The example below is for a core rule; for a plugin rule, also install its recorded version and register it in the flat config.
-
-   ```bash
-   # 1. Scratch-install the reference tool at the recorded versions.
-   rslint_reference_dir=$(mktemp -d)
-   pnpm --dir "$rslint_reference_dir" init
-   pnpm --dir "$rslint_reference_dir" add --save-exact "eslint@<eslint-version>" "@typescript-eslint/parser@<parser-version>"
-   cat > "$rslint_reference_dir/eslint.config.mjs" <<'EOF'
-   import parser from '@typescript-eslint/parser';
-   export default [{
-     files: ['**/*.ts', '**/*.tsx'],
-     languageOptions: { parser },
-     rules: { '<rule-name>': 'warn' },
-   }];
-   EOF
-
-   # 2. Pick a target codebase and resolve the same explicit input files for both tools.
-   # 3. Enable only the target rule with matching options and parser/project settings.
-   # 4. Run both from the target project; compare normalized paths, rule names,
-   #    message text, severity, and start/end positions on the same file list.
-   ```
-
-   The rslint CLI's diagnostic output is `--format jsonline`; compare it with ESLint's JSON output. It includes `ruleName`, `filePath`, `message`, `severity` and `range`, but omits message IDs and edits. To compare those additional fields, collect diagnostics with `lint` from `@rslint/core/internal`, as the JS RuleTesters do. State which fields were actually compared; a CLI-only run does not verify message IDs, autofixes or suggestions.
-
-   **Prerequisite for type-info rules**: the reference tool must run with the same `parserOptions.project` / `tsconfig.json` as rslint, otherwise the comparison is meaningless. Pick a target codebase where the tsconfig loads cleanly under both tools.
-
-   **Interpreting a non-empty diff**:
-
-   | Diff kind                       | Likely cause                                           |
-   | ------------------------------- | ------------------------------------------------------ |
-   | rslint misses a report          | AST-shape mismatch (often a missing `SkipParentheses`) |
-   | rslint over-reports             | Same as above, inverted                                |
-   | Different message text          | paren / text-range handling in the recommendation      |
-   | Same count, different positions | column offset (0- vs 1-based, multibyte)               |
-
-   **Disposition standard**: classify each difference using evidence. A passing command or empty diff is meaningful only after confirming both tools linted the intended files with the target rule active. Parser/configuration failures and skipped files are coverage gaps, not matching rule results.
-
-   | Category                            | Evidence                                                                                        | Action                                                                                                                                          |
-   | ----------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-   | Requested or established divergence | The mismatch matches the specific documented behavior from Phase 1 Step 6.A.                    | Keep its regression and report the difference with the result.                                                                                  |
-   | Input or configuration mismatch     | File sets, ignore rules, parser/project settings or rule options differ.                        | Align the inputs and rerun; report any remaining exclusions as unverified coverage.                                                             |
-   | Rule mismatch                       | Diagnostics, fixes or suggestions differ on equivalent inputs without an established exception. | Fix the implementation, add a regression and rerun the affected comparison. AST or Go representation differences do not waive this requirement. |
-
----
-
-## Phase 5: Submission & PR
-
-Finish at the user's requested delivery scope. For local-only work, report the diff, branch and verification without publishing. When a commit, push or PR is part of the task:
-
-1. Ensure the selected checks and Phase 4 contract review passed after the final relevant edit. Reuse valid results; configuration changes belong before verification, not inside the commit step.
-2. When committing, stage only the files for the requested rule(s). Use `feat: port rule <rule-name>` for a per-rule commit. In a batch, keep per-rule commits when the changes are independently verifiable; shared prerequisite changes must be included before their consumers.
-3. Push only when the task includes a push or PR. Create a PR only when it is part of the task, using the base branch selected in Phase 0 (`main` by default). Use the repository PR template and include the upstream source/version plus the actual verification commands/results. Describe any user-approved omissions. Do not add AI-related attribution to the commit or PR.
-
-| Scope                         | PR title                                         |
-| ----------------------------- | ------------------------------------------------ |
-| One rule                      | `feat: port rule <rule-name>`                    |
-| Several rules from one plugin | `feat: port N <plugin-name> rules`               |
-| Several plugins               | `feat: port N rules from <plugin-1>, <plugin-2>` |
-
-For a requested PR, write the body to a temporary Markdown file and pass it with `--body-file`; avoid embedding multiline Markdown and backticks in a shell argument. Use the target branch name without a remote prefix (for example, `release/0.9` for base ref `origin/release/0.9`):
-
-```bash
-gh pr create --base <target-branch> --title "feat: port rule <rule-name>" --body-file <body-file>
-```
-
-The body should state what the rule reports, link the pinned upstream source, summarize the verification and follow the repository template's checklist. For a batch, use one rule table with descriptions and documentation links. Update the existing progress record and report the completed scope.
-
----
-
-## Post-Porting Validation (Optional)
-
-For complex rules (rules involving scope tracking, autofix, or many configuration options), consider running a deeper alignment check after the initial port:
-
-- Extend Phase 4's contract review and differential validation for the specific unresolved semantic risks
-- Run the rule on real-world projects and compare output with the original ESLint rule
-- This step is especially valuable for rules that track state across nested scopes (e.g., `this` binding, variable declarations)
-
----
-
-## Troubleshooting
-
-### "Expected diagnostics... but received false"
-
-If JS tests fail with 0 diagnostics found:
-
-1. **Did you rebuild the binary?** Run `pnpm --filter @rslint/core build:bin`
-2. **Is the rule catalogued?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `coreRules()` or the plugin's `GetAllRules()` are present.
-3. **Are test files included?** Check `rstack.config.mts`
-4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
-5. **Debug Mode**: Use `fmt.Fprintf(os.Stderr, "DEBUG: ...")` in Go code
-
-### Line/Column Mismatch
-
-1. Check 0-based vs 1-based column expectations
-2. Multi-byte characters may affect column calculation
-3. Use `github.com/microsoft/TypeScript/tsc/shim/scanner` for 0-based lines and UTF-16 columns, then add 1 for ESLint positions:
-   ```go
-   line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(ctx.SourceFile, node.Pos())
-   fmt.Fprintf(os.Stderr, "DEBUG: Line=%d, Column=%d\n", line+1, column+1)
-   ```
-
-### TypeChecker is nil
-
-1. Ensure test fixtures have correct `tsconfig.json`
-2. Use `fixtures.GetRootDir()` for correct path
-3. Check `parserOptions.project` is configured correctly
-
----
-
-## See Also
-
-- [AST_PATTERNS.md](AST_PATTERNS.md) - AST traversal, listeners, reporting functions, fix helpers
-- [UTILS_REFERENCE.md](UTILS_REFERENCE.md) - Utility functions in `internal/utils/`
-- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Commands, file locations, naming conventions, checklist
+Fix recoverable failures within the task and reuse checks whose inputs remain valid. Record each actual result; do not let a later successful command hide a failed prerequisite.

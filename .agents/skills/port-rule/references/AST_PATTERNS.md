@@ -2,7 +2,7 @@
 
 This document provides patterns and examples for working with the AST (Abstract Syntax Tree) when implementing lint rules.
 
-> **Note**: This is a reference document for [PORT_RULE.md](./PORT_RULE.md). See that document for the complete rule porting workflow.
+Read the section for the AST operation being implemented. Workflow and coverage requirements live in [SKILL.md](../SKILL.md) and [PORT_RULE.md](./PORT_RULE.md).
 
 ---
 
@@ -87,23 +87,40 @@ rule.RuleListeners{
 
 ## AST Shape Essentials
 
-The tsgo AST differs from ESTree (ESLint's AST) in a few systematic ways. Most porting bugs trace back to one of these shape differences. Work through each section before and after implementing a rule.
+The tsgo AST differs from ESTree (ESLint's AST). Select the shapes used by the upstream rule and test their relevant boundaries; unrelated sections are not prerequisites.
+
+### Member and Call Expressions
+
+Start with the named helpers in [ast_helpers.go](../../../../internal/utils/ast_helpers.go) and [jsx.go](../../../../internal/utils/jsx.go). Read their declarations and nearby comments for the operation in question; a full utility-file read is unnecessary.
+
+| Operation                           | Helper and boundary                                                                                                                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ESTree member object/property       | `utils.MemberExpressionParts(node)` handles property access, element access and heritage qualified names. It returns raw children and nil/nil for other shapes; it does not filter JSX tag names.                            |
+| Dotted JSX tags                     | Exclude `utils.IsInJsxTagName(node)` for an ordinary `MemberExpression` listener; property access inside JSX expressions remains relevant.                                                                                   |
+| TypeScript heritage                 | `utils.IsHeritageQualifiedName` identifies qualified names exposed as ESTree members in interface extends/class implements. Ordinary type references, type queries and heritage type arguments remain type names.            |
+| Runtime expression child            | `utils.ESTreeRuntimeExpression` removes parentheses and wrappers synthesized from JS JSDoc casts; authored TS assertions/non-null wrappers remain intact.                                                                    |
+| Direct call callee                  | Pass the raw `CallExpression.Expression` to `utils.ESTreeCallCallee`. It additionally returns nil for parentheses terminating an optional chain, whose ESTree callee is a `ChainExpression`. Do not strip parentheses first. |
+| Parent through transparent wrappers | `utils.ESTreeParent` skips parentheses and JS JSDoc cast wrappers. It does not synthesize ESTree-only parents such as `ChainExpression`.                                                                                     |
+
+These helpers normalize the stated wrappers; they do not construct ESTree-only nodes. If upstream tests a `ChainExpression` or its parent/child boundary, adapt that check using the [optional-chain representation](#optional-chain) instead of inferring it from the normalized node.
+
+Select property kinds exactly as upstream does: `.name` checks, static names, computed keys and private identifiers are different contracts. `PrivateIdentifier.Text` includes `#` in tsgo, whereas ESTree's private `name` does not. A static-name helper is not a substitute for checking the original node kind. Verify the relevant private/computed/optional cases against upstream.
 
 ### ParenthesizedExpression
 
 tsgo keeps parentheses as an explicit `KindParenthesizedExpression` node; ESTree drops them during parsing. Any time a rule reads a child expression, parentheses may be sitting in between.
 
-**Primary helpers** (from `shim/ast`, prefer these over hand-rolled loops):
+For ESTree expression/parent matching, use the helpers above. When the operation specifically needs only parenthesis navigation, `shim/ast` provides:
 
 - `ast.SkipParentheses(node)` — returns the innermost non-paren expression.
-- `ast.WalkUpParenthesizedExpressions(node)` — returns the first non-paren ancestor.
+- `ast.WalkUpParenthesizedExpressions(node)` — while the supplied node is a parenthesized expression, walks to its parent; a non-paren input is returned unchanged.
 
 ```go
-inner := ast.SkipParentheses(node.AsCallExpression().Expression)
-// `inner` is the callee without any `( … )` wrapping
+inner := ast.SkipParentheses(node.AsReturnStatement().Expression)
+// Only parentheses are removed; other wrappers remain intact.
 ```
 
-**Trap sites** — any expression-typed child can be parenthesised. The table below lists high-frequency offenders. The principle is universal: if you are about to read an expression-typed child and do anything with its kind/text/structure, unwrap it first.
+Expression-typed children can be parenthesised. Use the table to find relevant child fields, then choose the helper whose wrapper/chain semantics match upstream:
 
 | Kind                                                                                                                                                                 | Children to unwrap                        |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -120,7 +137,7 @@ inner := ast.SkipParentheses(node.AsCallExpression().Expression)
 | `ForStatement`                                                                                                                                                       | `Initializer`, `Condition`, `Incrementor` |
 | `ForInStatement` / `ForOfStatement`                                                                                                                                  | `Initializer`, `Expression`               |
 
-A helper that embeds the check (e.g. `isNumeric`, `isStringType`) should call `ast.SkipParentheses` at the top rather than require every call site to unwrap — otherwise one forgotten caller is a silent divergence.
+Keep the chosen unwrapping semantics in the helper that owns the predicate so callers agree. Do not erase TS assertions or optional-chain boundaries merely because parentheses are transparent.
 
 ### Optional Chain
 
@@ -263,10 +280,10 @@ Reporting the name node is the right call: the narrower range points at what the
 ### 1. ForEachChild - Iterate Direct Children
 
 ```go
+var identifiers []string
 node.ForEachChild(func(child *ast.Node) bool {
-    if child.Kind == ast.KindIdentifier {
-        id := child.AsIdentifier()
-        fmt.Println(id.Text())
+    if ast.IsIdentifier(child) {
+        identifiers = append(identifiers, child.AsIdentifier().Text)
     }
     return false // false = continue, true = stop
 })
@@ -942,4 +959,4 @@ text := ctx.SourceFile.Text()[openParenEnd:closeParenStart]
 
 - [PORT_RULE.md](./PORT_RULE.md) - Main rule porting workflow
 - [UTILS_REFERENCE.md](./UTILS_REFERENCE.md) - Utility functions reference
-- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Commands and checklist
+- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Commands and locations

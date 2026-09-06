@@ -1,45 +1,50 @@
 ---
 name: port-rule
-description: Port a new ESLint core or plugin rule to rslint, including explicitly requested batches of new rules. Use for adding or migrating a rule that is not implemented yet. Do not trigger merely because a rule is named, or for fixing, reviewing, or optimizing an existing rule.
+description: Port a new ESLint core or plugin rule to rslint, including explicitly requested batches. Use for rules not implemented yet, not for fixing, reviewing, or optimizing an existing rule.
 ---
 
 # Port Rule
 
-Implement a new rule with upstream diagnostic, option, fix, and suggestion parity. Follow [AGENTS.md](../../../AGENTS.md) for branch selection, verification scope, test layout, and JavaScript semantics. Existing-rule fixes follow those repository rules and load individual references only for the questions involved.
+Implement the requested rule with upstream diagnostic, option, fix and suggestion behavior. Follow [AGENTS.md](../../../AGENTS.md) for branches, verification scope, test organization and JavaScript semantics.
 
-## Start from the task
+## Start with the source
 
-1. Resolve the requested rule names and inspect whether they already exist. Reuse the current task branch when resuming.
-2. Use documentation/source URLs supplied by the user. Otherwise run `node .agents/skills/port-rule/scripts/search_rule.mjs <rule-name>` to discover them. Resolve the source and tests to the same released upstream tag before porting; discovery URLs pointing at `main` are not a version pin. Ask only when the upstream package/version is ambiguous or unavailable.
-3. Keep one brief progress record with the branch and base, upstream tag, current phase, completed checks, and remaining work. Use the available planning mechanism; this workflow does not require a particular task-tracking tool or a second printed checklist. After resuming, inspect the diff and existing progress before repeating work.
+1. Inspect the task branch and whether the rule already exists. Continue the same task on its branch. For a new task, fetch the intended base (normally `origin/main`), create a branch following AGENTS.md, and verify its name before editing.
+2. Use the supplied upstream version and URLs. Otherwise use `node .agents/skills/port-rule/scripts/search_rule.mjs <rule-name>` for discovery, then pin source, tests and docs to the latest released tag. A discovery URL on `main` is not a version pin. Resolve ambiguous origins or unsupported requirements before choosing a different rule or library.
+3. Read the pinned source and tests. Identify the rule's inputs, decisions and outputs, then implement and verify those behaviors in small increments. The tests can serve as the coverage record; a separate exhaustive plan and repeated checklists are unnecessary.
 
-## Read references as needed
+Keep one short progress record when work spans sessions or multiple rules: branch/base, upstream version, current work, valid check results and remaining gaps. Reuse it after resuming.
 
-Find section headings with `rg -n '^#{1,3} ' .agents/skills/port-rule/references/<file>`. Read the sections needed for the current phase; do not load every reference at task startup.
+## Preserve coverage
 
-| Work                                                             | Read                                                                                                                                                                               |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Establish upstream coverage and unsupported framework boundaries | [PORT_RULE: Scope and Testing Philosophy](references/PORT_RULE.md#scope-rule-semantics-not-framework-parity), then [Phase 1](references/PORT_RULE.md#phase-1-preparation-critical) |
-| Implement the rule, Go suites, schema and documentation          | [PORT_RULE: Phase 2](references/PORT_RULE.md#phase-2-implementation-go)                                                                                                            |
-| Register the rule and its single JS upstream mirror              | [PORT_RULE: Phase 3](references/PORT_RULE.md#phase-3-integration-js)                                                                                                               |
-| Verify semantic alignment and delivery checks                    | [PORT_RULE: Phase 4](references/PORT_RULE.md#phase-4-verification--build)                                                                                                          |
-| AST, symbol, module or reporting APIs                            | Relevant section of [AST_PATTERNS](references/AST_PATTERNS.md)                                                                                                                     |
-| Find a helper with the required JavaScript semantics             | Relevant section of [UTILS_REFERENCE](references/UTILS_REFERENCE.md)                                                                                                               |
-| Look up one command or catalog location                          | [QUICK_REFERENCE](references/QUICK_REFERENCE.md)                                                                                                                                   |
+- Migrate every upstream test and documentation example into Go upstream tests. Preserve grouping and origin so omissions can be reviewed. Keep unsupported framework cases as explained skips and report the gap.
+- Add Go extras for reachable decisions not covered upstream and for the AST shapes the rule actually inspects. Preserve JavaScript behavior across parentheses, optional access, computed/private keys, JSX and TypeScript forms where applicable. Combine cases when they exercise the same behavior; do not add duplicate tests to satisfy a count or comment-format quota.
+- Include supplied regressions and relevant real-code shapes. Search upstream issues when the source/tests leave a semantic question or missing realistic case; an issue-count quota is not a prerequisite for every port.
+- Assert message IDs, exact message variants, diagnostic ranges, options/defaults and any edits. Use the selected RuleTester's actual capabilities; passing a diagnostic-count check does not verify positions or fixes.
+- Keep the single JS file as the upstream mirror. Go extras stay in Go. For non-trivial rule semantics, also compare against the pinned reference on relevant real code and record actual file/rule coverage.
 
-## Implementation boundaries
+The detailed [coverage and assertions](references/PORT_RULE.md#coverage-and-assertions) contract explains options, diagnostic positions, skips and edit demand. Read it when writing or reviewing tests, not as a second planning checklist.
 
-- Keep all upstream cases in `<rule>_upstream_test.go`; keep rslint edge shapes, real-user regressions and branch coverage in `<rule>_extras_test.go` or its area splits. The coverage criteria and diagnostic assertions in PORT_RULE remain required.
-- Search existing helpers by the operation you need. Reuse an equivalent helper; extract shared code only when the current implementation needs it and its consumers have matching semantics. Avoid speculative refactoring of neighboring rules.
-- Use deferred report builders for edit-only work. Use `ctx.Refs` for symbols/references, `ctx.Comments.All()` for whole-file comments, and `ctx.Program()` for source/module services. Read the matching API section before introducing another implementation.
-- Keep rule documentation focused on user-visible behavior. Unsupported framework concepts are recorded as explained skips in upstream tests; do not recreate framework features inside a rule.
+## Find the next detail
+
+Use the following references for the current operation. Open a named path or symbol directly; use the location tables before searching whole trees. Read the relevant source definition to resolve a semantic question, not to rediscover every mapped build/catalog path. In an existing task, retain confirmed paths and check results in its progress record.
+
+| Need                                                    | Reference                                                                                                       |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Commands, build dependencies and exact repository paths | [QUICK_REFERENCE](references/QUICK_REFERENCE.md)                                                                |
+| Origin, deprecation or unsupported framework behavior   | [Upstream contract](references/PORT_RULE.md#upstream-contract)                                                  |
+| Options parsing and schema                              | [Options and schema](references/PORT_RULE.md#options-and-schema)                                                |
+| AST adaptation and JavaScript operations                | [AST and language semantics](references/PORT_RULE.md#ast-and-language-semantics), then the relevant API section |
+| Symbols, comments, modules or deferred edits            | [Framework boundaries](references/PORT_RULE.md#framework-boundaries)                                            |
+| Catalog, JS wrapper and rule documentation              | [Integration and documentation](references/PORT_RULE.md#integration-and-documentation)                          |
+| Compare real diagnostics with upstream                  | [Differential validation](references/PORT_RULE.md#differential-validation)                                      |
+
+For API lookup, start with [API and contract lookup](references/QUICK_REFERENCE.md#api-and-contract-lookup), then the linked section or named source symbol. If it does not cover the operation, search that reference or owning package before expanding. Do not enumerate all reference headings or load neighboring suites as a default preparation step. Batch independent reads, but bound their combined output to avoid truncation and repeated reads.
 
 ## Verify and deliver
 
-Use the existing scoped commands from [QUICK_REFERENCE](references/QUICK_REFERENCE.md#commands) and [PORT_RULE Phase 4](references/PORT_RULE.md#phase-4-verification--build). Inspect the branch diff plus staged, unstaged and untracked changes, trace affected consumers, and briefly state the package/test selection before running checks. For JS integration, select the exact registered test file and rebuild the binary after relevant Go changes.
+Select checks from the diff and actual consumers using the command reference. Complete required artifact builds before JS tests, review generated snapshots against upstream, and verify with `CI=true`. Do not treat a successful final shell command as evidence that earlier dependent steps passed; stop at a failed prerequisite and record each check's result.
 
-Complete Phase 4's semantic contract review and differential validation where applicable. Reuse passing checks until their relevant inputs change. Keep commands/results and remaining coverage gaps in the existing progress record.
+Before declaring alignment, account for upstream coverage, relevant branch/AST cases, options and diagnostic/edit behavior. Fix unexplained differences instead of recording implementation accidents as expected output.
 
-For a batch, keep one row per rule with its current phase and result. Repair ordinary implementation/test failures and continue independent work. Ask for a decision only when a missing requirement or unsupported capability changes the requested scope. Do not turn every recoverable failure into a skip/retry/abort question.
-
-Finish at the requested delivery scope. For requested commits or publication, follow [Phase 5](references/PORT_RULE.md#phase-5-submission--pr), use Conventional Commits, preserve unrelated edits, and run the required pre-commit checks after the final relevant edit. A local commit does not imply a push or PR. When a PR is part of the task, describe the implemented rules, actual verification and any user-approved omissions.
+Finish at the requested scope. For commits or publication, follow AGENTS.md and the repository PR template; local work does not imply a commit, push or PR. Report the branch, actual checks and unresolved coverage. Load [delivery and troubleshooting](references/PORT_RULE.md#delivery-and-troubleshooting) only for those steps.

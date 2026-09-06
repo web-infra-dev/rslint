@@ -1,193 +1,113 @@
-# Rslint Quick Reference Card
+# Rule Porting Quick Reference
 
-A quick reference for common commands, file locations, and checklists when porting ESLint rules.
-
-> **Note**: This is a reference document for [PORT_RULE.md](./PORT_RULE.md). Branch selection, local test scope, and test layout follow the repository's [AGENTS.md](../../../../AGENTS.md). Commands below are a menu, not an instruction to run every check for every task.
-
----
+Use this file to look up commands and locations. Read the relevant [porting contract](./PORT_RULE.md) for the behavior they verify. Branch selection, test layout and verification scope follow [AGENTS.md](../../../../AGENTS.md); formatting selections and the commit gate follow [CONTRIBUTING.md — Verify a change](../../../../CONTRIBUTING.md#verify-a-change).
 
 ## Commands
 
-Select the relevant commands from the diff and affected callers. Pass explicit package directories or test files, and reuse results while their relevant inputs remain unchanged. For Go lint, use the base ref selected in Phase 0 (`origin/main` by default).
+Run from the repository root unless the command selects a workspace with `--dir`. Replace placeholders with the affected paths, identified from the diff and callers. Reuse passing results while their relevant inputs remain unchanged.
 
-Before JS tests, prepare any missing or stale artifacts listed in [Phase 4](./PORT_RULE.md#phase-4-verification--build). Formatting selections follow [CONTRIBUTING.md](../../../../CONTRIBUTING.md#verify-a-change), including configured exclusions and skipping empty selections.
+| When needed                                                           | Command                                                                      |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Core rule implementation or tests changed                             | `go test ./internal/rules/<rule_name>`                                       |
+| Plugin rule implementation or tests changed                           | `go test ./internal/plugins/<go-plugin>/rules/<rule_name>`                   |
+| Shared behavior changed                                               | `go test <changed-package-dir> <affected-consumer-package-dirs>`             |
+| Focus a reproduction before package verification                      | `go test <rule-package-dir> -run '<test-or-subtest-pattern>'`                |
+| Catalog registration changed                                          | `go test ./internal/rules -run '^TestAllContainsEveryGoRuleExactlyOnce$'`    |
+| Lint affected Go packages                                             | `golangci-lint run --new-from-merge-base=<base-ref> <affected-package-dirs>` |
+| Fix formatting in changed Go files                                    | `gofmt -w <changed-go-files>`                                                |
+| Fix formatting in supported, non-ignored changed JS/TS/Markdown files | `pnpm exec rs fmt <changed-js-ts-md-files>`                                  |
 
-| Task                     | Command                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| Select branch            | Follow [Phase 0](./PORT_RULE.md#phase-0-branch-setup); reuse the branch when continuing the task         |
-| Go unit test             | `go test ./internal/rules/<rule_name>`                                                                   |
-| Go related tests         | `go test <changed package dirs and direct consumer package dirs>`                                        |
-| Build binary             | `pnpm --filter @rslint/core build:bin`                                                                   |
-| JS unit test             | `CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts` |
-| Type check               | `pnpm typecheck`                                                                                         |
-| Lint check               | `pnpm lint`                                                                                              |
-| Pre-commit format check  | `pnpm run format:check` (reuse a still-valid result)                                                     |
-| Format fix               | `pnpm exec rs fmt <changed-js-ts-md-files>`                                                              |
-| Spell check              | `pnpm -w run check-spell <changed-text-files>`                                                           |
-| Go lint changed packages | `golangci-lint run --new-from-merge-base=<base-ref> --timeout=10m <dirs containing changed .go files>`   |
-| Go format fix            | `gofmt -w <changed-go-files>`                                                                            |
+Keep the catalog test's `-run` selection for registration-only changes: unfiltered `go test ./internal/rules` also runs all-rule compiler compatibility and heritage suites. Shared code changes require the affected consumers, not an automatic whole-plugin run. The Go lint base is the task's selected base ref, normally `origin/main`.
 
----
+Formatting commands still obey repository exclusions, including explicitly passed rule Markdown paths. Skip empty or ignored-only selections. Required delivery and commit checks are defined in the linked repository instructions; this command table is not a checklist to run in full.
 
-## File Locations
+## Build and JS tests
 
-| File Type         | Core Rules                                                                | Plugin Rules                                                     |
-| ----------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Go implementation | `internal/rules/<name>/`                                                  | `internal/plugins/<plugin>/rules/<name>/`                        |
-| Go tests          | `<name>_upstream_test.go` + `<name>_extras_test.go` in the rule directory | Same two-file split in the plugin rule directory                 |
-| Documentation     | `internal/rules/<name>/<name>.md`                                         | `internal/plugins/<plugin>/rules/<name>/<name>.md`               |
-| JS tests          | `packages/rslint-test-tools/tests/eslint/rules/<name>.test.ts`            | `packages/rslint-test-tools/tests/<plugin>/rules/<name>.test.ts` |
+Prepare only missing or stale artifacts needed by the selected test. The build commands produce different outputs:
 
----
+| Artifact and invalidation condition                                                                                         | Command                                                                |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Native binary: relevant Go code changed, or the binary is missing/stale                                                     | `pnpm --filter @rslint/core build:bin`                                 |
+| Schema dump: catalog/schema changed, or the dump is missing/stale                                                           | `go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json` |
+| Core JS and public option types: core JS changed, required `dist` output is missing/stale, or the schema dump was refreshed | `pnpm --filter @rslint/core build:js`                                  |
+| TypeScript rule tester: the selected test imports `@typescript-eslint/rule-tester` and its `dist` is missing/stale          | `pnpm --filter @typescript-eslint/rule-tester build`                   |
 
-## Framework Performance Defaults
+`build:bin` builds the Go binary only. Refresh the schema dump **before** core `build:js` after catalog/schema changes: the JS build reads that dump to generate public option types and does not create it automatically. Native Go-rule IPC tests do not by themselves require a Rust parser rebuild.
 
-| Need                                           | Use                                                                     | Avoid                                                                        |
-| ---------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Autofixes or suggestions                       | Matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method | Constructing edit-only text, ranges, slices, or suggestions before reporting |
-| References to one declared symbol              | `ctx.Refs.References(decl.Symbol())`                                    | Full-file AST walk with one `GetSymbolAtLocation` call per identifier        |
-| Identifier → symbol, including globals/`.d.ts` | `ctx.Refs.Resolve(node)`                                                | A hand-rolled "try `ctx.Refs`, fall back to the checker" wrapper             |
-| Every comment in the file                      | `ctx.Comments.All()`                                                    | Calling `ForEachComment` on `ctx.SourceFile.AsNode()`                        |
-| Resolve a module/source target                 | `ctx.Program().ResolveModule(...)`                                      | A resolver helper in `internal/utils` or a raw compiler Program              |
-| Enumerate generic module references            | `ctx.Program().ModuleGraph().References(...)`                           | A second graph/runtime stored in `RuleContext`                               |
-
-Deferred edit builders may return nil and run synchronously only when their
-artifact category is requested and the diagnostic is not suppressed. Detection,
-message, and report range must remain independent of edit demand.
-
----
-
-## Rule Catalog Inclusion
-
-Core rules are listed in `internal/rules/all.go`'s `coreRules()`; each plugin's `all.go` exports `GetAllRules() []rule.Rule`. `rules.All()` combines those sources into the shared catalog — **do not edit `internal/config` for a new rule**.
-
-| Rule Type                                                                            | File to edit                         | Final catalog key                                    |
-| ------------------------------------------------------------------------------------ | ------------------------------------ | ---------------------------------------------------- |
-| ESLint Core                                                                          | `internal/rules/all.go`              | `"no-debugger"`                                      |
-| `@typescript-eslint`                                                                 | `internal/plugins/typescript/all.go` | `"@typescript-eslint/no-explicit-any"`               |
-| Other plugins (react, jest, import, jsx-a11y, promise, react-hooks, rstest, unicorn) | `internal/plugins/<plugin>/all.go`   | `"<plugin>/<rule>"` (e.g. `"import/no-self-import"`) |
-
-**How to add a rule**: add the import path, then append the rule var to `coreRules()` for a core rule or the plugin's `GetAllRules()` for a plugin rule:
-
-```go
-import "github.com/web-infra-dev/rslint/internal/.../my_rule"
-
-// Core rule: internal/rules/all.go
-func coreRules() []rule.Rule {
-    return []rule.Rule{
-        // …existing entries…
-        my_rule.MyRuleRule,
-    }
-}
-
-// Plugin rule: internal/plugins/<plugin>/all.go
-func GetAllRules() []rule.Rule {
-    return []rule.Rule{
-        // …existing entries…
-        my_rule.MyRuleRule,
-    }
-}
-```
-
-The catalog key comes from `rule.Name`. Core rules use `rule.Rule{Name: "…"}` (bare). `@typescript-eslint` rules use `rule.CreateRule(rule.Rule{Name: "…"})` which auto-prefixes `@typescript-eslint/`; **never** use `rule.CreateRule` outside `@typescript-eslint/` — it silently produces the wrong key.
-
----
-
-## Naming Conventions
-
-| Item                          | Convention                     | Example                                                                       |
-| ----------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
-| Go directory name             | snake_case                     | `no_empty_interface/`                                                         |
-| Go file name                  | snake_case                     | `no_empty_interface.go`                                                       |
-| Go variable name (Rule)       | PascalCase + Rule suffix       | `NoEmptyInterfaceRule`                                                        |
-| Rule name (ESLint Core)       | kebab-case                     | `"no-debugger"`                                                               |
-| Rule name (typescript-eslint) | kebab-case (auto-prefixed)     | `"no-explicit-any"` → `"@typescript-eslint/no-explicit-any"`                  |
-| Rule name (import)            | kebab-case (manually prefixed) | `"import/no-self-import"`                                                     |
-| JS test file name             | kebab-case                     | `no-empty-interface.test.ts`                                                  |
-| MessageId                     | camelCase                      | `"unexpectedAny"`, `"missingSuper"` (JS rule-tester auto-converts kebab-case) |
-
----
-
-## Go Module Imports
-
-```go
-import (
-    // Core rule interface
-    "github.com/web-infra-dev/rslint/internal/rule"
-
-    // Unified source/module facade (only when naming Program module types)
-    "github.com/web-infra-dev/rslint/internal/program"
-
-    // AST and type system (from typescript-go submodule)
-    "github.com/microsoft/TypeScript/tsc/shim/ast"
-    "github.com/microsoft/TypeScript/tsc/shim/checker"
-    "github.com/microsoft/TypeScript/tsc/shim/core"
-
-    // Utility functions
-    "github.com/web-infra-dev/rslint/internal/utils"
-
-    // JavaScript semantics — trim/blank/case/number, never strings.TrimSpace
-    // or strings.ToLower
-    "github.com/web-infra-dev/rslint/internal/utils/ecmascript"
-
-    // A general category (\p{Lu}, \p{L}, \p{M}) on the edition of Unicode Node
-    // reads — never the standard library's unicode package
-    "github.com/web-infra-dev/rslint/internal/utils/unicode17"
-
-    // A JavaScript RegExp — never the standard library's regexp, which is RE2
-    esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
-
-    // Globs the way a plugin reads them (minimatch 3.x); minimatch 10 is NOT ported
-    "github.com/web-infra-dev/rslint/internal/utils/minimatch3"
-
-    // "Is this a glob or a plain path?" (is-glob 4.0.3)
-    "github.com/web-infra-dev/rslint/internal/utils/isglob"
-
-    // Test framework
-    "github.com/web-infra-dev/rslint/internal/rule_tester"
-
-    // Fixtures (test files only)
-    "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
-)
-```
-
----
-
-## Checklist Before Submission
-
-- [ ] Go tests pass for the rule package and any changed-related Go package directories (see Phase 4 Step 2 in `PORT_RULE.md`)
-- [ ] Build binary (`pnpm --filter @rslint/core build:bin`)
-- [ ] JS snapshots generated when needed and reviewed against expected upstream behavior
-- [ ] The exact registered JS test file passes (use the scoped command above; reuse valid results)
-- [ ] Go/JS test coverage is semantically aligned (`JS ⊆ Go upstream`; extras remain Go-only)
-- [ ] Autofixes/suggestions use deferred report builders and have `Test<Rule>EditDemand` in the existing extras test file
-- [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
-- [ ] Whole-file comment scans use `ctx.Comments.All()`
-- [ ] Cross-file source/module queries use `ctx.Program()` without backend-kind branches
-- [ ] Regexps go through `esregexp`, globs through `minimatch3`/`isglob`, and JS string/number semantics through `ecmascript` — no `strings.TrimSpace`, `strings.ToLower`/`ToUpper`, stdlib `regexp`, or `doublestar` on a value that came from JavaScript
-- [ ] A character question goes to `ecmascript` (case, whitespace), `esregexp` (`/i` comparison), `unicode17` (a general category) or tsgo's `scanner` (identifier) — never to the standard library's `unicode`
-- [ ] Grep the change for `"regexp"` and account for every hit: a stdlib pattern is allowed only when it is written here, RE2 and JavaScript read it the same way, and no user input reaches it — otherwise it takes `esregexp`
-- [ ] If the upstream rule reads globs with anything but minimatch 3 or is-glob — `minimatch@10` included — it was reported to the user rather than silently ported onto `minimatch3`/`doublestar` or hand-rolled
-- [ ] Type check passes (`pnpm typecheck`)
-- [ ] Lint check passes (`pnpm lint`)
-- [ ] Spell check passes (`pnpm -w run check-spell <changed-text-files>`)
-- [ ] Pre-commit format check passes (`pnpm run format:check`; reuse a still-valid result)
-- [ ] Changed-package Go lint passes (packages containing changed `.go` files under `cmd/` and `internal/`; see Phase 4 Step 7 in `PORT_RULE.md`)
-- [ ] Rule included in the catalog (in `internal/rules/all.go` for core, or the plugin's `all.go` otherwise)
-- [ ] Test file registered (`packages/rslint-test-tools/rstack.config.mts`)
-- [ ] Documentation created (`<rule_name>.md`)
-
-**Formatting Fixes** (only for formatting failures; pass affected files and skip commands with no matching files):
+Verify the exact registered JS file after its required artifacts are ready:
 
 ```bash
-pnpm exec rs fmt <changed-js-ts-md-files>
-gofmt -w <changed-go-files>
+CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts
 ```
 
----
+Use `-u` only when adding or intentionally updating snapshots in a wrapper that actually uses snapshots:
 
-## See Also
+```bash
+pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts -u
+```
 
-- [PORT_RULE.md](./PORT_RULE.md) - Main rule porting workflow
-- [UTILS_REFERENCE.md](./UTILS_REFERENCE.md) - Utility functions reference
-- [AST_PATTERNS.md](./AST_PATTERNS.md) - AST traversal patterns and examples
+Review generated snapshots against upstream expectations, then verify with the CI command. Local Rstest runs may add missing snapshots without `-u`; CI verification must fail on missing snapshots. Wrapper capabilities differ: inspect the selected wrapper's assertions and skip handling rather than assuming all plugin suites use snapshots. See [Coverage and assertions](./PORT_RULE.md#coverage-and-assertions).
+
+## Workspace names and directories
+
+Use package names with `--filter` and directories with `--dir`; they are not interchangeable.
+
+| Package name                     | Source directory              | Relevant output or configuration                                  |
+| -------------------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| `@rslint/core`                   | `packages/rslint/`            | `dist/`, `rule-schemas.json`, `rstack.config.ts`                  |
+| `@rslint/test-tools`             | `packages/rslint-test-tools/` | `rstack.config.mts` selects integration files                     |
+| `@typescript-eslint/rule-tester` | `packages/rule-tester/`       | `src/index.ts` implements the wrapper; imports resolve to `dist/` |
+
+## Rule files and registration
+
+Go rule directories and filenames use snake_case (`<rule_name>`); exported rule variables use PascalCase with a `Rule` suffix. Rule keys and JS test filenames use kebab-case (`<rule-name>`); preserve upstream message IDs.
+
+| Item                                           | Location                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Core rule source, documentation and Go tests   | `internal/rules/<rule_name>/`                                                                    |
+| Plugin rule source, documentation and Go tests | `internal/plugins/<go-plugin>/rules/<rule_name>/`                                                |
+| Rule documentation                             | `<rule_name>.md` beside the Go implementation                                                    |
+| Options schema, when options exist             | `<rule_name>.schema.json` beside the Go implementation                                           |
+| Core catalog entry                             | Import and entry in `internal/rules/all.go` → `coreRules()`                                      |
+| Plugin catalog entry                           | Import and entry in `internal/plugins/<go-plugin>/all.go` → `GetAllRules()`                      |
+| JS rule mirror                                 | `packages/rslint-test-tools/tests/<suite>/rules/<rule-name>.test.ts`                             |
+| JS test registration                           | `packages/rslint-test-tools/rstack.config.mts` → `include`                                       |
+| Suite configuration and local wrapper          | `packages/rslint-test-tools/tests/<suite>/rslint.config.mjs` and `rule-tester.ts`, where present |
+
+Resolve `<go-plugin>` and `<suite>` from the actual family; directory names do not always match public prefixes:
+
+| Family            | Go plugin directory | JS suite directory          | Catalog key                      |
+| ----------------- | ------------------- | --------------------------- | -------------------------------- |
+| ESLint core       | Core path above     | `eslint`                    | `<rule-name>`                    |
+| typescript-eslint | `typescript`        | `typescript-eslint`         | `@typescript-eslint/<rule-name>` |
+| import            | `import`            | `eslint-plugin-import`      | `import/<rule-name>`             |
+| jest              | `jest`              | `eslint-plugin-jest`        | `jest/<rule-name>`               |
+| jsx-a11y          | `jsx_a11y`          | `eslint-plugin-jsx-a11y`    | `jsx-a11y/<rule-name>`           |
+| promise           | `promise`           | `eslint-plugin-promise`     | `promise/<rule-name>`            |
+| react             | `react`             | `eslint-plugin-react`       | `react/<rule-name>`              |
+| react-hooks       | `react_hooks`       | `eslint-plugin-react-hooks` | `react-hooks/<rule-name>`        |
+| rstest            | `rstest`            | `rstest`                    | `rstest/<rule-name>`             |
+| unicorn           | `unicorn`           | `eslint-plugin-unicorn`     | `unicorn/<rule-name>`            |
+
+The catalog key is `rule.Name`. `rule.CreateRule` automatically prefixes `@typescript-eslint/`, so use it only for that family. Core rules use a bare `rule.Rule` name; other plugins put their public prefix directly in `Name`. Resolve deprecated/extended rule origin using [Upstream contract](./PORT_RULE.md#upstream-contract), rather than registering both core and TypeScript keys.
+
+`rules.All()` combines explicit sources in `internal/rules/all.go`; a new plugin directory is not discovered automatically. Its first native rule also requires adding the plugin's `GetAllRules()` to that aggregation and checking the plugin-enablement boundaries in `architecture.md`. New rules do not belong in `internal/config`. See [Integration and documentation](./PORT_RULE.md#integration-and-documentation).
+
+## API and contract lookup
+
+Use the entry for the upstream operation, then locate the named declaration in its owning file with `rg -n`. Read that declaration and relevant callers when its contract is uncertain. These are lookup locations, not a prerequisite reading list.
+
+| Question                                                                        | Source or reference                                                                                                                       |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Rule declaration, listeners and prefix factory                                  | `internal/rule/rule.go`; [Listener Types](./AST_PATTERNS.md#listener-types)                                                               |
+| Options array, compilation and defaults                                         | `internal/rule/schema.go`; [Options and schema](./PORT_RULE.md#options-and-schema)                                                        |
+| Go case fields and diagnostic/edit assertions                                   | `internal/rule_tester/rule_tester.go`; [Coverage and assertions](./PORT_RULE.md#coverage-and-assertions)                                  |
+| Member/call expressions, private/computed keys, JSX/heritage, parentheses/JSDoc | [Member and Call Expressions](./AST_PATTERNS.md#member-and-call-expressions); `internal/utils/ast_helpers.go` and `internal/utils/jsx.go` |
+| Literal values and raw text                                                     | [Literal Kinds](./AST_PATTERNS.md#literal-kinds), [Node Text and Positions](./AST_PATTERNS.md#node-text-and-positions)                    |
+| Diagnostics, ranges and deferred edits                                          | `internal/rule/context.go`; [Reporting Functions](./AST_PATTERNS.md#reporting-functions)                                                  |
+| References, globals and source/module services                                  | `internal/rule/ref_store.go`, `internal/rule/globals.go`; [Framework boundaries](./PORT_RULE.md#framework-boundaries)                     |
+| Scope-sensitive upstream behavior                                               | `internal/utils/scope/`; [ESLint Scope Model](./UTILS_REFERENCE.md#internalutilsscope---eslint-scope-model)                               |
+| TypeChecker availability and access                                             | [Using TypeChecker](./AST_PATTERNS.md#using-typechecker)                                                                                  |
+| JS strings, numbers, Unicode, regexps and globs                                 | [JavaScript Semantics](./UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob)                                            |
+| Equivalent comparison inputs and output limitations                             | [Differential validation](./PORT_RULE.md#differential-validation)                                                                         |
+| Completion scope or a failing integration check                                 | [Delivery and troubleshooting](./PORT_RULE.md#delivery-and-troubleshooting)                                                               |

@@ -8,7 +8,7 @@ Install [Node.js](https://nodejs.org/) and [Go](https://go.dev/) first.
 
 ## Build locally
 
-Build the project:
+For a targeted change, start with [Verify a change](#verify-a-change) and prepare only the dependencies and artifacts it needs. For a complete local build:
 
 ```bash
 # Initialize the TypeScript repository (kept at the typescript-go/ path).
@@ -27,12 +27,15 @@ Inspect `git status --short --branch` and the branch diff, including staged, uns
 | ----------------------------- | ------------------------------------------------------------------------------------------------------ |
 | One Go rule package           | `go test ./internal/rules/max_params`                                                                  |
 | Related Go packages           | `go test <changed-package-dir> <affected-consumer-dirs>`                                               |
+| Catalog registration only     | `go test ./internal/rules -run '^TestAllContainsEveryGoRuleExactlyOnce$'`                              |
 | One JS integration file       | `CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
 | One Rust crate                | `cargo test -p tsgo-client`                                                                            |
 | Go lint for a changed package | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`                      |
 | Format changed JS/TS/docs     | `pnpm exec rs fmt <changed-files>`                                                                     |
 | Format changed Go files       | `gofmt -w <changed-go-files>`                                                                          |
 | Spell-check changed text      | `pnpm run check-spell <changed-text-files>`                                                            |
+
+An aggregate package can run more than its name suggests: unfiltered `go test ./internal/rules` also runs all-rule compiler compatibility and heritage suites. For registration-only changes, keep the named test selection above; select other tests only when their behavior is affected.
 
 Explicit `rs fmt` paths still obey `rstack.config.mts` exclusions, including rule Markdown under `internal/**/rules/**/*.md`. Select supported, non-ignored changed files and skip the command when none remain; an ignored-only selection fails instead of formatting those files.
 
