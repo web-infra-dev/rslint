@@ -1,55 +1,30 @@
 package prefer_called_with
 
 import (
-	"slices"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_called_with"
 )
 
-var preferCalledWithMatcherNames = map[string]bool{
-	"toBeCalled":       true,
-	"toHaveBeenCalled": true,
-}
-
-// Message builder
-
-func buildPreferCalledWithMessage(matcherName string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "preferCalledWith",
-		Description: "Prefer " + matcherName + "With(/* expected args */)",
-		Data: map[string]string{
-			"matcherName": matcherName,
-		},
-	}
-}
-
-var PreferCalledWithRule = rule.Rule{
-	Name:   "jest/prefer-called-with",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil ||
-					jestFnCall.Kind != jestUtils.JestFnTypeExpect ||
-					slices.Contains(jestFnCall.Modifiers, "not") {
-					return
-				}
-
-				matcherName := jestFnCall.Matcher
-				if !preferCalledWithMatcherNames[matcherName] {
-					return
-				}
-
-				reportNode := node
-				if jestFnCall.MatcherEntry != nil && jestFnCall.MatcherEntry.Node != nil {
-					reportNode = jestFnCall.MatcherEntry.Node
-				}
-
-				ctx.ReportNode(reportNode, buildPreferCalledWithMessage(matcherName))
-			},
-		}
+var PreferCalledWithRule = shared.NewRule(shared.Config{
+	Name: "jest/prefer-called-with",
+	Replacements: map[string]string{
+		"toBeCalled":       "toBeCalledWith",
+		"toHaveBeenCalled": "toHaveBeenCalledWith",
 	},
-}
+	Autofix: false,
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{Parse: func(node *ast.Node) *shared.ExpectCall {
+			parsed := jestUtils.ParseJestFnCall(node, ctx)
+			if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect {
+				return nil
+			}
+			call := &shared.ExpectCall{Matcher: parsed.Matcher, Modifiers: parsed.Modifiers}
+			if parsed.MatcherEntry != nil {
+				call.MatcherEntry = *parsed.MatcherEntry
+			}
+			return call
+		}}
+	},
+})
