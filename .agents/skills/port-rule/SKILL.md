@@ -1,332 +1,45 @@
 ---
 name: port-rule
-description: Port ESLint rules to rslint (a Go-based linter). Use when users want to port/migrate/implement an ESLint rule, add a new lint rule, or mention "port rule" or specific ESLint rule names like "no-unused-vars", "no-console", etc. Supports both single-rule and batch-rule porting. This skill guides through the complete workflow from setup to PR submission.
+description: Port a new ESLint core or plugin rule to rslint, including explicitly requested batches of new rules. Use for adding or migrating a rule that is not implemented yet. Do not trigger merely because a rule is named, or for fixing, reviewing, or optimizing an existing rule.
 ---
 
 # Port Rule
 
-Port ESLint rules to rslint with 1:1 behavior parity. Supports porting a single rule or multiple rules in batch.
+Implement a new rule with upstream diagnostic, option, fix, and suggestion parity. Follow [AGENTS.md](../../../AGENTS.md) for branch selection, verification scope, test layout, and JavaScript semantics. Existing-rule fixes follow those repository rules and load individual references only for the questions involved.
 
-## Prerequisites
+## Start from the task
 
-### Step 1: Get Rule Names
+1. Resolve the requested rule names and inspect whether they already exist. Reuse the current task branch when resuming.
+2. Use documentation/source URLs supplied by the user. Otherwise run `node .agents/skills/port-rule/scripts/search_rule.mjs <rule-name>` to discover them. Resolve the source and tests to the same released upstream tag before porting; discovery URLs pointing at `main` are not a version pin. Ask only when the upstream package/version is ambiguous or unavailable.
+3. Keep one brief progress record with the branch and base, upstream tag, current phase, completed checks, and remaining work. Use the available planning mechanism; this workflow does not require a particular task-tracking tool or a second printed checklist. After resuming, inspect the diff and existing progress before repeating work.
 
-Accept one or more rule names from the user. Supported formats:
+## Read references as needed
 
-- ESLint core: `no-console`, `no-unused-vars`
-- TypeScript-ESLint: `@typescript-eslint/no-explicit-any`
-- Other plugins: `import/no-duplicates`, `react/jsx-uses-react`
+Find section headings with `rg -n '^#{1,3} ' .agents/skills/port-rule/references/<file>`. Read the sections needed for the current phase; do not load every reference at task startup.
 
-Users may provide rules as:
+| Work                                                             | Read                                                                                                                                                                               |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Establish upstream coverage and unsupported framework boundaries | [PORT_RULE: Scope and Testing Philosophy](references/PORT_RULE.md#scope-rule-semantics-not-framework-parity), then [Phase 1](references/PORT_RULE.md#phase-1-preparation-critical) |
+| Implement the rule, Go suites, schema and documentation          | [PORT_RULE: Phase 2](references/PORT_RULE.md#phase-2-implementation-go)                                                                                                            |
+| Register the rule and its single JS upstream mirror              | [PORT_RULE: Phase 3](references/PORT_RULE.md#phase-3-integration-js)                                                                                                               |
+| Verify semantic alignment and delivery checks                    | [PORT_RULE: Phase 4](references/PORT_RULE.md#phase-4-verification--build)                                                                                                          |
+| AST, symbol, module or reporting APIs                            | Relevant section of [AST_PATTERNS](references/AST_PATTERNS.md)                                                                                                                     |
+| Find a helper with the required JavaScript semantics             | Relevant section of [UTILS_REFERENCE](references/UTILS_REFERENCE.md)                                                                                                               |
+| Look up one command or catalog location                          | [QUICK_REFERENCE](references/QUICK_REFERENCE.md)                                                                                                                                   |
 
-- A single rule name
-- Multiple names separated by commas, spaces, or newlines
-- A list provided one-by-one in conversation
+## Implementation boundaries
 
-### Step 2: Get Rule Documentation URLs
+- Keep all upstream cases in `<rule>_upstream_test.go`; keep rslint edge shapes, real-user regressions and branch coverage in `<rule>_extras_test.go` or its area splits. The coverage criteria and diagnostic assertions in PORT_RULE remain required.
+- Search existing helpers by the operation you need. Reuse an equivalent helper; extract shared code only when the current implementation needs it and its consumers have matching semantics. Avoid speculative refactoring of neighboring rules.
+- Use deferred report builders for edit-only work. Use `ctx.Refs` for symbols/references, `ctx.Comments.All()` for whole-file comments, and `ctx.Program()` for source/module services. Read the matching API section before introducing another implementation.
+- Keep rule documentation focused on user-visible behavior. Unsupported framework concepts are recorded as explained skips in upstream tests; do not recreate framework features inside a rule.
 
-For each rule, obtain the documentation URL.
+## Verify and deliver
 
-If user already provided documentation URLs, skip to the next rule.
+Use the existing scoped commands from [QUICK_REFERENCE](references/QUICK_REFERENCE.md#commands) and [PORT_RULE Phase 4](references/PORT_RULE.md#phase-4-verification--build). Inspect the branch diff plus staged, unstaged and untracked changes, trace affected consumers, and briefly state the package/test selection before running checks. For JS integration, select the exact registered test file and rebuild the binary after relevant Go changes.
 
-Otherwise, ask user to choose:
+Complete Phase 4's semantic contract review and differential validation where applicable. Reuse passing checks until their relevant inputs change. Keep commands/results and remaining coverage gaps in the existing progress record.
 
-1. **Auto search** (Recommended) - Run the search script to find documentation
-2. **Provide URL manually** - User provides the URL directly
+For a batch, keep one row per rule with its current phase and result. Repair ordinary implementation/test failures and continue independent work. Ask for a decision only when a missing requirement or unsupported capability changes the requested scope. Do not turn every recoverable failure into a skip/retry/abort question.
 
-**For auto search**, run for each rule:
-
-```bash
-node .agents/skills/port-rule/scripts/search_rule.mjs <rule-name>
-```
-
-Multiple rules can be searched in parallel.
-
-The script searches:
-
-- ESLint core rules → https://eslint.org/docs/latest/rules/
-- TypeScript-ESLint rules → https://typescript-eslint.io/rules/
-- Other plugins → GitHub repositories
-
-**After search**:
-
-- If found: Show results and ask user to confirm the URLs are correct
-- If not found: Ask user to provide the documentation URL manually
-
-## Planning
-
-**Before starting any implementation**, you MUST output a structured plan, then proceed to execute immediately without waiting for user confirmation.
-
-**IMPORTANT — Task Tracking**: After outputting the text plan, you MUST use the `TaskCreate` tool to create a persistent task for each phase/step. This ensures progress is tracked even if the conversation context is compressed. Specifically:
-
-- Create one task per phase (for single rule) or one task per phase per rule (for batch).
-- Use `TaskUpdate` to mark tasks as `in_progress` when starting and `completed` when done.
-- If you are unsure about current progress (e.g., after context compression or conversation resume), call `TaskList` first to check which tasks remain.
-
-### Single Rule
-
-For a single rule, output a brief checklist:
-
-```
-## Plan
-
-- [ ] Phase 0: Branch setup
-- [ ] Phase 1: Preparation — collect test cases for `<rule-name>`
-- [ ] Phase 2: Implementation — Go rule + tests + docs
-- [ ] Phase 3: Integration — JS tests + register
-- [ ] Phase 4: Verification — build + test
-- [ ] Phase 5: Commit & PR
-```
-
-Then create corresponding tasks via `TaskCreate`:
-
-- "Phase 0: Branch setup"
-- "Phase 1: Preparation — collect test cases for `<rule-name>`"
-- "Phase 2: Implementation — Go rule + tests + docs for `<rule-name>`"
-- "Phase 3: Integration — JS tests + register for `<rule-name>`"
-- "Phase 4: Verification — build + test for `<rule-name>`"
-- "Phase 5: Commit & PR for `<rule-name>`"
-
-### Batch Rules
-
-For multiple rules, output a structured plan with a summary table and per-rule breakdown:
-
-```
-## Plan
-
-### Rules to port (N rules)
-| # | Rule | Doc URL | Status |
-|---|------|---------|--------|
-| 1 | <rule-name-1> | <url> | pending |
-| 2 | <rule-name-2> | <url> | pending |
-| ... | ... | ... | ... |
-
-### Progress
-- [ ] Phase 0: Branch setup
-- Rule 1: `<rule-name-1>`
-  - [ ] Phase 1: Preparation
-  - [ ] Phase 2: Implementation
-  - [ ] Phase 3: Integration
-  - [ ] Phase 4: Verification
-  - [ ] Commit
-- Rule 2: `<rule-name-2>`
-  - [ ] Phase 1: Preparation
-  - [ ] Phase 2: Implementation
-  - [ ] Phase 3: Integration
-  - [ ] Phase 4: Verification
-  - [ ] Commit
-- ...
-- [ ] Phase 5: Create PR (summarize all rules)
-```
-
-Then create corresponding tasks via `TaskCreate` — one for Phase 0, then for each rule create tasks for Phase 1–4 + Commit, and finally one for Phase 5.
-
-Output the plan, then proceed to Phase 0 immediately.
-
-## Workflow
-
-Determine the mode based on the number of rules:
-
-- **1 rule** → Single Rule Mode
-- **2+ rules** → Batch Mode
-
-### Framework Performance Defaults
-
-Apply these defaults during every implementation phase. Do not rebuild work
-that the rule framework already shares or can skip:
-
-- **Autofixes and suggestions**: report them with the matching
-  `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method. Keep
-  diagnostic detection, message, and report range eager, but move all
-  edit-only source-text, range, string, slice, and suggestion construction into
-  the builder. A builder may return nil when the diagnostic is not fixable.
-- **Declared-symbol references**: translate ESLint `variable.references` to
-  `ctx.Refs.References(decl.Symbol())`. For the reverse direction (identifier →
-  symbol), use `ctx.Refs.Resolve(node)` — it resolves same-file symbols from
-  the binder alone, and falls back to the checker automatically for
-  global/`.d.ts`/cross-file symbols when a TypeChecker is available — never
-  walk the file and call `GetSymbolAtLocation` once per identifier, and never
-  hand-roll your own "try `ctx.Refs`, fall back to the checker" wrapper. To
-  check whether the resolved symbol is declared in this file (locally
-  shadowed), pair it with `utils.IsSymbolDeclaredInFile` — or
-  `utils.IsValueSymbolDeclaredInFile` when only a local _value_ declaration
-  counts (see AST_PATTERNS.md).
-- **Whole-file comments**: iterate `ctx.Comments.All()`. Never rescan
-  `ctx.SourceFile.AsNode()` once per rule.
-- **Cross-file source and module questions**: use the unified
-  `ctx.Program()` facade. Resolve one specifier with `Program.ResolveModule`;
-  enumerate generic module references with `Program.ModuleGraph().References`;
-  share configuration-complete rule indexes with `rule.CachedByProgram`.
-  Never add a backend-kind branch, raw compiler Program, parallel source
-  runtime, or module-resolution helper under `internal/utils`.
-
-See [AST_PATTERNS.md](references/AST_PATTERNS.md) for the APIs, boundaries, and
-worked examples.
-
-### Single Rule Mode
-
-Follow the phases in [PORT_RULE.md](references/PORT_RULE.md) sequentially:
-
-1. **Phase 0: Branch Setup** - Create feature branch from main
-2. **Phase 1: Preparation** - Collect test cases, walk Dimensions 1–4 edge cases (including the universal edge-shape checklist), and do an upstream semantic walk that enumerates each branch in the ESLint source
-3. **Phase 2: Implementation** - Before writing helpers, grep same-plugin neighbors and extract any near-duplicates to `<plugin>util/`. Then write Go rule, two-file test split (`<rule>_upstream_test.go` for Layer 1 + `<rule>_extras_test.go` for Layers 2 + 3 — see PORT_RULE.md Testing Philosophy), and documentation (see the "Differences from ESLint" writing rules in PORT_RULE.md Phase 2 Step 3 — user-facing only, no implementation talk)
-4. **Phase 3: Integration** - Add JS tests and register rule
-5. **Phase 4: Verification** - Build binary; run the rule's Go + JS tests; if a shared helper (`<plugin>util/`, `internal/utils/`) was added or modified, also run tests for the affected Go package(s) and direct consumer package(s); then run the BLOCKING pre-commit gate from Phase 4 Step 7, with Go lint restricted to packages containing changed Go files
-6. **Phase 5: Submission** - Commit and create PR
-
-For each phase: mark its task as `in_progress` (via `TaskUpdate`) before starting, and `completed` after finishing. Update the text checklist as well.
-
-### Batch Mode
-
-Follow the batch workflow in [PORT_RULE.md](references/PORT_RULE.md):
-
-1. **Phase 0: Branch Setup** - Create a single feature branch for the batch (once)
-2. **For each rule**, execute in order:
-   - **Phase 1: Preparation** - Collect test cases; walk Dimensions 1–4 edge cases; do an upstream semantic walk (enumerate branches in the ESLint source, add lock-in tests for branches upstream itself doesn't test)
-   - **Phase 2: Implementation** - grep same-plugin neighbors and extract near-duplicate helpers to `<plugin>util/` FIRST; then write Go rule, tests, and documentation (Differences section is user-facing only)
-   - **Phase 3: Integration** - Add JS tests and register rule
-   - **Phase 4: Verification** - Build binary; run Go + JS tests; if a shared helper was touched, run tests for the affected Go package(s) and direct consumer package(s); then the BLOCKING pre-commit gate
-   - **Commit** - Create an independent commit: `feat: port rule <rule-name>`
-   - **Report** - Briefly report the result before moving to the next rule
-3. **Phase 5: Create PR** - One PR summarizing all ported rules (once), see [Phase 5 Details](#phase-5-commit--pr-details) below
-
-**Progress tracking**: After completing each rule, update the checklist (mark as `[x]`) and the corresponding tasks (via `TaskUpdate` to `completed`), then report the status. After a failure, mark the checklist as `[!]` with a reason.
-
-**Failure handling**: If a rule fails at any phase, stop and ask the user:
-
-- **(a) Skip** this rule and continue with the next one
-- **(b) Attempt to fix** the issue
-- **(c) Abort** the entire batch
-
-Already-committed rules are not affected by later failures.
-
-### Phase 5: Commit & PR Details
-
-**Commit constraints**:
-
-- Commit message: `feat: port rule <rule-name>`
-- Do NOT include AI-related information in commit messages (no `Co-Authored-By: Claude` or similar)
-- Only stage files related to the current rule(s). `pnpm format:go` may reformat unrelated files — discard them with `git checkout -- <file>` before committing.
-- If the rule's plugin is already in the repo-root `rslint.config.ts` `plugins`, add the rule with `'warn'` severity. Otherwise, do NOT modify `rslint.config.ts`.
-
-**PR title format**:
-
-- Single rule: `feat: port rule <rule-name>`
-- Batch (single plugin): `feat: port N <plugin-name> rules`
-- Batch (multiple plugins): `feat: port N rules from <plugin-1>, <plugin-2>`
-
-**PR body template** (batch single plugin):
-
-```
-## Summary
-
-Port N <plugin-name> rules to rslint.
-
-### Rules ported
-| Rule | Description | Doc |
-|------|-------------|-----|
-| `<rule-1>` | [brief description] | [link](<url>) |
-| `<rule-2>` | [brief description] | [link](<url>) |
-
-## Checklist
-
-- [x] Tests updated (or not required).
-- [x] Documentation updated (or not required).
-```
-
-**PR body template** (single rule):
-
-```
-## Summary
-
-Port the `<rule-name>` rule from ESLint to rslint.
-
-[Brief description of what the rule does]
-
-## Related Links
-
-- ESLint rule: <link_to_eslint_doc>
-- Source code: <link_to_source_code>
-
-## Checklist
-
-- [x] Tests updated (or not required).
-- [x] Documentation updated (or not required).
-```
-
-Do NOT include AI-related information in PR title or body. If any rules were skipped during batch execution, note them in the PR body.
-
-### Completion Constraint
-
-The workflow is complete ONLY when all tasks created during Planning are marked as `completed` (or explicitly skipped due to failure). Do NOT stop or wait for user instructions while there are still pending tasks. If the conversation context was compressed or the session was resumed, call `TaskList` first to check remaining work before continuing.
-
-## Quick Reference
-
-**Framework defaults**:
-
-| Need                                        | Use                                                    |
-| ------------------------------------------- | ------------------------------------------------------ |
-| Autofixes or suggestions                    | `ReportNodeWithDeferred*` / `ReportRangeWithDeferred*` |
-| References to a declared symbol             | `ctx.Refs.References(decl.Symbol())`                   |
-| Identifier → symbol (incl. globals/`.d.ts`) | `ctx.Refs.Resolve(node)`                               |
-| Every comment in the file                   | `ctx.Comments.All()`                                   |
-
-**Values that came from JavaScript** — Go's standard library answers a nearby but different question about each, so never reach for `strings.TrimSpace`, `strings.ToLower`, the `unicode` package, the stdlib `regexp`, or `doublestar` on one:
-
-| Need                                                   | Use                                                     |
-| ------------------------------------------------------ | ------------------------------------------------------- |
-| Trim, blank, whitespace, upper/lower case, `String(n)` | `utils/ecmascript`                                      |
-| A regexp option, a `new RegExp(...)`, `/i` comparison  | `utils/ecmascript/regexp`, imported as `esregexp`       |
-| A general category — `\p{Lu}`, `\p{L}`, `\p{M}`        | `utils/unicode17`                                       |
-| "May this character start or continue an identifier?"  | tsgo's `scanner.IsIdentifierStart` / `IsIdentifierPart` |
-| A glob option (upstream on `minimatch@3`)              | `utils/minimatch3`                                      |
-| "Is this a glob or a plain path?"                      | `utils/isglob`                                          |
-| Any other glob package, **`minimatch@10`** too         | **Not ported — stop and report to the user**            |
-
-`depguard` denies the standard library's `unicode` and `forbidigo` denies `strings.ToLower` / `ToUpper` / `TrimSpace` under `internal/rules/**` and `internal/plugins/**`, so a rule cannot reach past these by accident. The ports agree with the standard library on ASCII, so there is nothing to weigh: the case a rule spells out is the JavaScript one.
-
-The stdlib `regexp` is not banned outright: a pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. A pattern out of a rule option, a config file or the source under lint takes `esregexp`, however plain it looks.
-
-Only minimatch 3 and is-glob are ported, and a third has no safe substitute: `minimatch3` differs from `minimatch@10` on POSIX classes, and `doublestar` differs on far more than extended glob syntax (`src/**` matches `src` under doublestar but not under minimatch). Report which package and version the rule needs and which patterns would be misread; do not quietly swap in either one, and do not port a new glob package without asking first. See [UTILS_REFERENCE.md § JavaScript Semantics](references/UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob).
-
-**Directory Structure**:
-
-- Core rules: `internal/rules/<rule_name_snake_case>/`
-- Plugin rules: `internal/plugins/<plugin_name>/rules/<rule_name_snake_case>/`
-
-**Per-rule files** (each rule directory contains):
-
-- `<rule>.go` — Implementation
-- `<rule>.md` — Documentation
-- `<rule>_upstream_test.go` — Layer 1: upstream 1:1 migration
-- `<rule>_extras_test.go` — Layers 2 + 3: edge-shape augmentation, real-user shapes, branch lock-ins
-- (optional, when extras grows past ~80 cases / ~600 lines) `<rule>_extras_<area>_test.go` — area-split extras
-
-The `_upstream_*` / `_extras_*` split is a hard contract — see [PORT_RULE.md Testing Philosophy](references/PORT_RULE.md#testing-philosophy) and Phase 2 Step 4 for the rationale and layout.
-
-**Key Commands**:
-
-```bash
-# Build binary (REQUIRED before JS tests)
-cd packages/rslint && pnpm run build:bin
-
-# Run Go tests
-go test -count=1 ./internal/rules/<rule_name>
-
-# Run JS tests (first run: append -u to generate snapshots)
-cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name>
-
-# Pre-commit gate (BLOCKING — all must pass before commit)
-pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check
-# Then run changed-package Go lint from PORT_RULE.md Phase 4 Step 7.
-
-# Auto-fix formatting issues
-pnpm format && pnpm format:go
-```
-
-## References
-
-- [PORT_RULE.md](references/PORT_RULE.md) - Complete porting guide with code templates
-- [AST_PATTERNS.md](references/AST_PATTERNS.md) - AST traversal patterns
-- [UTILS_REFERENCE.md](references/UTILS_REFERENCE.md) - Utility functions
-- [QUICK_REFERENCE.md](references/QUICK_REFERENCE.md) - Commands cheatsheet
+Finish at the requested delivery scope. For requested commits or publication, follow [Phase 5](references/PORT_RULE.md#phase-5-submission--pr), use Conventional Commits, preserve unrelated edits, and run the required pre-commit checks after the final relevant edit. A local commit does not imply a push or PR. When a PR is part of the task, describe the implemented rules, actual verification and any user-approved omissions.

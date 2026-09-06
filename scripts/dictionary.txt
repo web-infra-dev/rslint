@@ -151,6 +151,7 @@ disqualifiers
 dlclark
 Dmts
 dobedo
+Dogfooding
 dont
 dotless
 doublestar
@@ -220,6 +221,7 @@ forinstatement
 formedness
 forofstatement
 Foto
+Fprintf
 frameset
 fround
 fsys
@@ -258,6 +260,7 @@ gruber
 Gujr
 guoyu
 handl
+hardlinks
 hashtable
 haspopup
 Hebr
@@ -311,7 +314,11 @@ Laoo
 Larcher
 ldflags
 ldquo
+LASTEXITCODE
+libasound
 libc
+libgbm
+libnss
 libsyncrpc
 lifecycles
 Lingui
@@ -355,6 +362,7 @@ misalign
 miscategorise
 misparsed
 misrefactored
+mktemp
 Mlym
 mmap
 mobx
@@ -594,6 +602,7 @@ tablist
 Taml
 tanstack
 tarask
+TARGETARCH
 tarjan
 tascript
 tekuri
@@ -733,3 +742,4 @@ pingback
 prerender
 reparses
 batgo
+Swatinem

@@ -68,13 +68,13 @@ Three principles follow — internalize them before writing a single test case:
 | ---------------------------------------- | ------------------------------------------------------------------ |
 | [AST_PATTERNS.md](AST_PATTERNS.md)       | AST traversal, Program/module services, TypeChecker, and reporting |
 | [UTILS_REFERENCE.md](UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                             |
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands cheatsheet, file locations, naming conventions, checklist |
+| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands, file locations, naming conventions, checklist            |
 
 ---
 
 ## Source Code Reference
 
-Before starting, familiarize yourself with these key source locations:
+Use this map to locate the APIs needed by the current rule; read their relevant declarations rather than every file below:
 
 ### Core Infrastructure
 
@@ -118,7 +118,7 @@ Before starting, familiarize yourself with these key source locations:
 
 ## Workflow Overview
 
-1. **Setup**: Create and switch to a new branch from main.
+1. **Setup**: Select the task branch using Phase 0; reuse it when continuing the same task.
 2. **Preparation**: Gather requirements and test cases.
 3. **Implementation**: Write Go code and unit tests.
 4. **Integration**: Add JS tests and register the rule.
@@ -128,29 +128,15 @@ Before starting, familiarize yourself with these key source locations:
 
 ## Phase 0: Branch Setup
 
-**Goal**: Start from a clean state.
+Follow the repository's [branch rules](../../../../AGENTS.md#branches).
 
-1. **Checkout Main**: Ensure your workspace is on the latest `main` branch code.
-
-   ```bash
-   git checkout main && git pull origin main
-   ```
-
-2. **Create Branch**: Create a new feature branch.
-
-   **Single rule**:
-   - **Naming Convention**: `feat/port-rule-<rule_name_snake_case>-<YYYYMMDD>`
-
-   ```bash
-   git checkout -b feat/port-rule-<rule_name_snake_case>-$(date +%Y%m%d)
-   ```
-
-   **Batch mode**:
-   - **Naming Convention**: `feat/port-rules-batch-<YYYYMMDD>`
-
-   ```bash
-   git checkout -b feat/port-rules-batch-$(date +%Y%m%d)
-   ```
+1. Inspect `git status --short --branch`. When continuing the same rule or batch, keep its existing task branch; do not restart branch setup after a session resumes.
+2. For a new independent task, preserve unrelated work and start from current `origin/main` unless the user specified another base. Fetch the base without switching the user's checkout to main. Record this base for subsequent lint filtering and the PR target.
+3. Choose the name before creating the branch, following AGENTS.md's `<type>/<short-kebab-case-description>` convention:
+   - Single rule: `feat/port-rule-<rule-name-in-kebab-case>`.
+   - Batch: `feat/port-<plugin-name>-rules` or another short description of the batch.
+   - An explicit user branch name takes precedence.
+4. Create the branch with `git switch -c <chosen-name> <base-ref>`, then verify `git branch --show-current` against the chosen name before editing.
 
 ---
 
@@ -319,7 +305,7 @@ The `_upstream_*` / `_extras_*` split is a hard contract: a reviewer can `ls` th
 - `<rule_name>_extras_realuser_test.go` — issue-tracker shapes
 - `<rule_name>_extras_<feature>_test.go` — option / mode / receiver type, etc.
 
-Same threshold for `_upstream_test.go` if upstream itself partitions cleanly into feature subsets (e.g. one file per option mode). When upstream is also split, each subfile's header docstring should describe its own subset, not copy the whole-suite template (e.g. "TestRuleUpstreamCallbackArg migrates upstream's callback-arg test cases ...").
+Same threshold for `_upstream_test.go` if upstream itself partitions cleanly into feature subsets (e.g. one file per option mode). When upstream is also split, each subfile's header comment should describe its own subset, not copy the whole-suite template (e.g. "TestRuleUpstreamCallbackArg migrates upstream's callback-arg test cases ...").
 
 **Test function naming for area splits** — each split file gets one Test function whose name mirrors the area suffix in PascalCase: `<rule>_extras_dim4_test.go` → `TestRuleExtrasDim4`, `<rule>_extras_branches_test.go` → `TestRuleExtrasBranches`, `<rule>_upstream_callback_arg_test.go` → `TestRuleUpstreamCallbackArg`. This keeps a 1:1 file ↔ function mapping that `grep` can exploit.
 
@@ -340,12 +326,12 @@ For a worked example of large-rule splitting, see `internal/plugins/react_hooks/
 
 ```bash
 # For plugin rules:
-grep -rn "^func [a-z]" internal/plugins/<plugin>/rules/
+rg -n "<operation-or-helper-name>" internal/plugins/<plugin>/
 # For core rules:
-grep -rn "^func [a-z]" internal/rules/
+rg -n "<operation-or-helper-name>" internal/rules/ internal/utils/
 ```
 
-If ≥1 rule in the same plugin already defines a near-equivalent helper, you MUST extract the shared helper to `internal/plugins/<plugin>/<plugin>util/` (or an existing shared package) BEFORE adding your new rule. No second copy. This is a hard rule — see _Helper Extraction_ below for the override criterion.
+Reuse a helper with equivalent semantics. If the current rule and an existing consumer need the same operation, extract their common implementation to the appropriate shared package and verify both consumers. Similar names or code shapes alone do not establish equivalent semantics; do not refactor unrelated neighbors as a prerequisite.
 
 **Use Program capabilities for source-generation questions** (SECOND): before
 adding a helper for filesystem, package scope, source lookup, module resolution,
@@ -372,7 +358,7 @@ add a parallel runtime/context field, or recreate module resolution under
 - `AreNodes*`, `IsSame*` — structural / reference AST comparison
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
 - `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries. For "all references to this declared symbol" use `ctx.Refs.References(decl.Symbol())`, and for "what does this identifier resolve to" use `ctx.Refs.Resolve(node)`, which also resolves symbols declared outside this file (globals/ambient/cross-file) via its checker fallback — never a hand-rolled AST walk with `GetSymbolAtLocation` per identifier (see [AST_PATTERNS.md — Resolving Identifiers and Collecting References](AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs))
-- **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
+- **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signatures and whether a type must be awaited; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 
 See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
 
@@ -429,7 +415,7 @@ var MyCoreRule = rule.Rule{
 
 **AST Shim API Warning**: In `github.com/microsoft/TypeScript/tsc/shim/ast`:
 
-- **General Nodes** (`*ast.Node`): Use methods (e.g., `node.Kind()`, `node.Text()`)
+- **General Nodes** (`*ast.Node`): `node.Kind` is a field; `node.Text()` is a method
 - **Concrete Nodes** (e.g., `*ast.Identifier`): Use fields (e.g., `id.Text`)
 - Do not assume; check the shim source code to confirm.
 
@@ -521,11 +507,11 @@ semantics belong to `<plugin>util/`; only general AST/type helpers belong to
 
 - Input/output is AST- or source-oriented (not encoding the rule's own semantics)
 - The name reads sensibly without context of the current rule
-- Another rule would plausibly need the same thing
+- The current task has another concrete consumer with equivalent semantics
 
 **Keep local otherwise.** Predicates that encode a specific rule's definition (e.g. a `isDoubleLogicalNegating`-style helper that codifies "what counts as a double-negation coercion for THIS rule") stay with the rule — extracting would mislead future readers.
 
-**Hard override — duplicate-across-rules rule**: if the same helper (or a near-duplicate) already lives in ≥1 other rule within the same plugin, it MUST be extracted to `<plugin>util/`, even if the "plausibly needed by another rule" criterion above feels borderline. The fact that you're about to write the second copy is itself proof of reusability. Don't let the first duplicate bend your judgement.
+Avoid a second implementation of an equivalent operation. Check the existing consumers before extracting it, preserve their contracts, and include their targeted tests. Keep superficially similar operations separate when their semantics differ.
 
 ### Step 3: Write Documentation
 
@@ -613,12 +599,12 @@ If a later change re-verifies a rule against a newer upstream release, bumping t
 
 Layers 2 + 3 — not case count — are the real alignment work; there is no numeric target. A near-empty `_extras` file is a smell that Phase 1 Steps 4 and 5 were skipped (Phase 4 Step 6's per-layer checkboxes enforce this).
 
-**File-header docstring** — open each test file with a top-of-file comment that names what the file is for and points at its sibling:
+**File-header comment** — open each test file with a top-of-file comment that names what the file is for and points at its sibling:
 
 - `_upstream_test.go`: `// Test<Rule>Upstream migrates the full valid/invalid suite from upstream <upstream test path> 1:1. Position assertions cover line/column for every invalid case. rslint-specific lock-in cases live in the <rule>_extras_*_test.go file(s).`
 - `_extras_test.go`: `// Test<Rule>Extras locks in branches and edge shapes that the upstream test suite doesn't exercise. Each case carries an inline comment pointing at the specific branch / Dimension 4 row / tsgo AST quirk it covers, so future refactors can't silently regress them without breaking a named lock-in.`
 
-These docstrings are how a reader (or `grep`) confirms a file is doing its assigned job.
+These comments are how a reader (or `grep`) confirms a file is doing its assigned job.
 
 **Reference examples** in `internal/plugins/jsx_a11y/rules/`:
 
@@ -692,7 +678,7 @@ rule_tester.InvalidTestCase{
 - `rule.EditDemandSuggestion`
 - `rule.EditDemandAll`
 
-Assert that diagnostic count, message, and range are identical in all four modes; fixes and suggestions appear only under their matching demand; and the requested artifacts equal the all-edits output. Do not create a standalone edit-demand test file. See `internal/plugins/typescript/rules/no_restricted_types/no_restricted_types_extras_test.go` for a combined fix/suggestion example. The framework's own `internal/rule/context_test.go` covers the lower-level guarantee that an unrequested builder is not invoked.
+Assert that diagnostic count, message, and range are identical in all four modes; fixes and suggestions appear only under their matching demand; and the requested artifacts equal the all-edits output. Do not create a standalone edit-demand test file. See `internal/plugins/typescript/rules/no_restricted_types/no_restricted_types_extras_test.go` for a combined fix/suggestion example. The framework's own `internal/rule/context_test.go` verifies that a builder is not invoked when its artifact category was not requested.
 
 **Test Case Structs**: See `internal/rule_tester/rule_tester.go` for `ValidTestCase`, `InvalidTestCase`, and `InvalidTestCaseError` definitions.
 
@@ -765,11 +751,13 @@ Each plugin `all.go` exports `GetAllRules() []rule.Rule`; core rules use `coreRu
 
 ---
 
+Before verification, finish conditional project configuration: if the plugin is already listed in the repo-root `rslint.config.ts` `plugins`, add the new rule with `'warn'` severity. Otherwise leave that configuration unchanged. Doing this before checks keeps the results valid through the commit step.
+
 ## Phase 4: Verification & Build
 
 **Goal**: Ensure the compiled binary runs the rule correctly.
 
-Follow this **strict order** — each step depends on the previous one:
+Identify affected packages and consumers from the diff and callers, then state which of the existing commands below are needed. Reuse checks already passed for the same relevant inputs. Formatting and Go tests do not require a binary build; the binary build is required before JS integration tests exercise changed Go code.
 
 1. **Go formatting** (catches indentation issues early):
 
@@ -782,33 +770,33 @@ Follow this **strict order** — each step depends on the previous one:
 2. **Go tests** (the package-level invocation runs every `*_test.go` in the rule directory — both `_upstream_test.go` and `_extras_test.go`, plus any further `_extras_<area>_test.go` splits):
 
    ```bash
-   go test -count=1 ./internal/rules/<rule_name>
+   go test ./internal/rules/<rule_name>
    # or, for plugin rules:
-   go test -count=1 ./internal/plugins/<plugin>/rules/<rule_name>
+   go test ./internal/plugins/<plugin>/rules/<rule_name>
    ```
 
-   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also run tests for the changed package and the direct consumer packages that import or call the changed API. Keep the scope related to the changed Go code; do not run whole-plugin or whole-tree Go tests as part of the port-rule workflow.
+   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also run tests for the changed package and the direct consumer packages that import or call the changed API. Identify and briefly state this package set before running tests. Follow [AGENTS.md's local verification scope](../../../../AGENTS.md#local-verification); the shared helper does not authorize whole-plugin or whole-tree tests.
 
    ```bash
-   go test -count=1 <changed-package-dir> <direct-consumer-package-dir>
+   go test <changed-package-dir> <direct-consumer-package-dir>
    ```
 
-   Extracting / renaming a helper is a silent-regression hotspot; running only the new rule package is not enough when another package consumes the helper. Identify direct consumers with `rg` / `git grep`, run their package tests, and do not fall back to `go test ./internal/...`, `go test ./internal/plugins/<plugin>/...`, or `pnpm run test:go`.
+   Extracting or renaming a shared helper can change existing consumers; tests for only the new rule package do not cover them. Identify direct consumers with `rg` / `git grep`, run their package tests, and do not fall back to `go test ./internal/...`, `go test ./internal/plugins/<plugin>/...`, or `pnpm run test:go`.
 
 3. **Build binary** (REQUIRED before JS tests — they spawn the binary via IPC):
 
    ```bash
-   cd packages/rslint && pnpm run build:bin
+   pnpm --filter @rslint/core build:bin
    ```
 
-4. **JS tests** (note: this changes cwd, use absolute paths for subsequent commands):
+4. **JS tests** (use the exact registered file; one-shot execution):
 
    ```bash
    # First run for new test cases: generate snapshots with -u flag
-   cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name> -u
+   pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts -u
 
    # Subsequent runs: verify against existing snapshots
-   cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name>
+   pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts
    ```
 
 5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
@@ -842,7 +830,7 @@ Follow this **strict order** — each step depends on the previous one:
 
    **File split** (each layer has a designated file — see [Testing Philosophy](#testing-philosophy) and Phase 2 Step 4):
    - [ ] **Two files exist**: `<rule>_upstream_test.go` and `<rule>_extras_test.go` (or area-split variants `<rule>_extras_<area>_test.go` if the rule is large).
-   - [ ] **Header docstrings present**: each file's top-of-file comment names what the file is for and points at its sibling.
+   - [ ] **Header comments present**: each file's top-of-file comment names what the file is for and points at its sibling.
    - [ ] **Split contract honored**: `_upstream_*` files contain only migrated upstream cases; `_extras_*` files contain only rslint-added cases. No mixing.
 
    **Coverage layers**:
@@ -871,50 +859,40 @@ Follow this **strict order** — each step depends on the previous one:
    pnpm typecheck && pnpm lint
 
    # Spell check (catches typos in comments and strings)
-   pnpm -w run check-spell
+   pnpm -w run check-spell <changed-text-files>
 
-   # Format check
-   pnpm format:check
+   # Pre-commit format check (required by AGENTS.md; reuse a still-valid result)
+   pnpm run format:check
 
-   # Go lint (packages containing changed Go files only)
-   changed_go_dirs="$(
-     {
-       git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.go'
-       git diff --name-only --diff-filter=ACMR --cached -- '*.go'
-       git diff --name-only --diff-filter=ACMR -- '*.go'
-       git ls-files --others --exclude-standard -- '*.go'
-     } | sort -u | grep -E '^(cmd|internal)/' | while IFS= read -r file; do dirname "$file"; done | sort -u
-   )"
-   if [ -n "$changed_go_dirs" ]; then
-     printf '%s\n' "$changed_go_dirs" | xargs golangci-lint run --new-from-rev=origin/main --timeout=10m
-   fi
+   # Go lint: pass packages containing changed Go files, preserving the diff filter.
+   golangci-lint run --new-from-merge-base=<base-ref> <affected-package-dirs>
    ```
 
-   These are BLOCKING. If any fails, fix before moving on — **do not** commit, push, or open a PR with any of them red.
-   - **Go lint scope**: lint only packages containing changed `.go` files under `cmd/` and `internal/` during port-rule pre-commit verification, with `--new-from-rev=origin/main` so only issues introduced by the branch are reported. Do not run `pnpm lint:go` here; it lints the full `cmd/` and `internal/` trees and is reserved for explicit full-tree checks / CI. Do not pass changed files from multiple directories to one `golangci-lint run` invocation; named file arguments must all be in one directory and can also produce typecheck false positives when a file depends on sibling files.
+   These are BLOCKING. If any fails, fix before moving on — **do not** commit, push, or open a PR with any of them red. These checks do not authorize expanding the test suites beyond the scope defined in AGENTS.md.
+   - **Go lint scope**: lint only packages containing changed `.go` files under `cmd/` and `internal/` during port-rule pre-commit verification. Use the Phase 0 base ref (`origin/main` by default) with `--new-from-merge-base` so only issues introduced by the branch are reported. Do not run `pnpm lint:go` here; it lints the full `cmd/` and `internal/` trees and is reserved for explicit full-tree checks / CI. Do not pass changed files from multiple directories to one `golangci-lint run` invocation; named file arguments must all be in one directory and can also produce typecheck false positives when a file depends on sibling files.
    - **Unknown-word failures from `check-spell`**: inspect each reported word in context before changing anything. Fix misspellings, invented words, or other accidental text in the source. Add a word to `scripts/dictionary.txt` only when it is intentional: a valid standard word, ESLint ecosystem identifier, Go module/package name, API name, or similar technical token. Use the original case. Do not add `cspell` ignore comments in Markdown files; they can cause documentation compilation failures.
-   - **Format failures**: auto-fix (`pnpm format && pnpm format:go`); never silence.
+   - **Format failures**: fix the affected files with the repository formatter; preserve unrelated edits and never silence the failure.
    - **Lint failures**: fix the code. Don't bypass with `//nolint`, `// eslint-disable`, or equivalent, unless the exception is already justified by an in-file comment pattern this repo uses.
 
-   **If checks fail**, run these to auto-fix:
+   **For formatting failures**, pass only the affected files (and skip a command when it has no matching files):
 
    ```bash
-   pnpm format      # Fix JS/TS formatting
-   pnpm format:go   # Fix Go formatting (e.g., import order)
+   pnpm exec rs fmt <changed-js-ts-md-files>
+   gofmt -w <changed-go-files>
    ```
 
 8. **Differential Validation** (recommended for rules with non-trivial branching):
 
    Unit tests verify cases you thought of; diffing against the reference implementation on a real codebase catches the rest. Skip when the rule has ≤ 2 branches and trivial messages, or when the rule is a new rslint invention with no reference.
 
-   **Procedure**:
+   **Procedure**: use the upstream version recorded in Phase 1 and compatible, explicitly pinned ESLint/parser versions. Record those versions with the comparison result. The example below is for a core rule; for a plugin rule, also install its recorded version and register it in the flat config.
 
    ```bash
-   # 1. Scratch-install the reference tool.
-   mkdir -p /tmp/ref-cmp && cd /tmp/ref-cmp
-   npm init -y >/dev/null
-   npm i --silent eslint @typescript-eslint/parser  # + plugin if non-core
-   cat > eslint.config.mjs <<'EOF'
+   # 1. Scratch-install the reference tool at the recorded versions.
+   rslint_reference_dir=$(mktemp -d)
+   pnpm --dir "$rslint_reference_dir" init
+   pnpm --dir "$rslint_reference_dir" add --save-exact "eslint@<eslint-version>" "@typescript-eslint/parser@<parser-version>"
+   cat > "$rslint_reference_dir/eslint.config.mjs" <<'EOF'
    import parser from '@typescript-eslint/parser';
    export default [{
      files: ['**/*.ts', '**/*.tsx'],
@@ -950,120 +928,25 @@ Follow this **strict order** — each step depends on the previous one:
 
 ## Phase 5: Submission & PR
 
-### Phase 5A: Per-Rule Commit
+Finish at the user's requested delivery scope. For local-only work, report the diff, branch and verification without publishing. When a commit, push or PR is part of the task:
 
-**Goal**: Commit each rule independently after it passes verification (Phase 4).
+1. Ensure the selected checks and Phase 4 contract review passed after the final relevant edit. Reuse valid results; configuration changes belong before verification, not inside the commit step.
+2. When committing, stage only the files for the requested rule(s). Use `feat: port rule <rule-name>` for a per-rule commit. In a batch, keep per-rule commits when the changes are independently verifiable; shared prerequisite changes must be included before their consumers.
+3. Push only when the task includes a push or PR. Create a PR only when it is part of the task, using the base branch selected in Phase 0 (`main` by default). Use the repository PR template and include the upstream source/version plus the actual verification commands/results. Describe any user-approved omissions. Do not add AI-related attribution to the commit or PR.
 
-This step is executed **after each rule's Phase 4 completes** (both in single-rule and batch mode).
+| Scope                         | PR title                                         |
+| ----------------------------- | ------------------------------------------------ |
+| One rule                      | `feat: port rule <rule-name>`                    |
+| Several rules from one plugin | `feat: port N <plugin-name> rules`               |
+| Several plugins               | `feat: port N rules from <plugin-1>, <plugin-2>` |
 
-1. **Configure Project Settings (Conditional)**:
-   - If the rule's plugin is already in the repo-root `rslint.config.ts` `plugins`, add the rule with `'warn'` severity
-   - Otherwise, do NOT modify `rslint.config.ts`
+For a requested PR, write the body to a temporary Markdown file and pass it with `--body-file`; avoid embedding multiline Markdown and backticks in a shell argument. Use the target branch name without a remote prefix (for example, `release/0.9` for base ref `origin/release/0.9`):
 
-2. **Commit Changes**:
+```bash
+gh pr create --base <target-branch> --title "feat: port rule <rule-name>" --body-file <body-file>
+```
 
-   ```bash
-   git add <specific_files_related_to_this_rule>
-   git commit -m "feat: port rule <rule-name>"
-   ```
-
-   - Use specific file paths with `git add` (NOT `git add .`)
-   - Only include files related to **this specific rule** in the commit
-   - Ensure all tests pass before committing
-   - **Do NOT include AI-related information** in commit messages (e.g., no `Co-Authored-By: Claude` or similar)
-
-**In batch mode**: After committing, briefly report the result, update the checklist, then proceed to the next rule.
-
-### Phase 5B: Push & Create PR
-
-**Goal**: Push all commits and create a PR.
-
-This step is executed **once**, after all rules are committed (or after the single rule is committed).
-
-1. **Push**:
-
-   ```bash
-   git push origin <branch-name>
-   ```
-
-2. **Create PR**:
-
-   **Note**: The `--body` templates below follow the repo's PR template (`.github/PULL_REQUEST_TEMPLATE.md`). `gh` only auto-fills that template when `--body` is omitted, so the explicit bodies here take its place.
-
-   **Single rule**:
-
-   ```bash
-   gh pr create --base main --title "feat: port rule <rule-name>" --body "## Summary
-
-   Port the \`<rule-name>\` rule from ESLint to rslint.
-
-   [Brief description of what the rule does]
-
-   ## Related Links
-
-   - ESLint rule: <link_to_eslint_doc>
-   - Source code: <link_to_source_code>
-
-   ## Checklist
-
-   - [x] Tests updated (or not required).
-   - [x] Documentation updated (or not required)."
-   ```
-
-   **Batch mode (single plugin)**:
-
-   PR title format: `feat: port N <plugin-name> rules`
-
-   ```bash
-   gh pr create --base main --title "feat: port N <plugin-name> rules" --body "## Summary
-
-   Port N <plugin-name> rules to rslint.
-
-   ### Rules ported
-   | Rule | Description | Doc |
-   |------|-------------|-----|
-   | \`<rule-1>\` | [brief description] | [link](<url>) |
-   | \`<rule-2>\` | [brief description] | [link](<url>) |
-   | ... | ... | ... |
-
-   ## Checklist
-
-   - [x] Tests updated (or not required).
-   - [x] Documentation updated (or not required)."
-   ```
-
-   Examples:
-   - `feat: port 4 @typescript-eslint non-null assertion rules`
-   - `feat: port 3 eslint-plugin-import rules`
-
-   **Batch mode (multiple plugins)**:
-
-   PR title format: `feat: port N rules from <plugin-1>, <plugin-2>`
-
-   ```bash
-   gh pr create --base main --title "feat: port N rules from <plugin-1>, <plugin-2>" --body "## Summary
-
-   Port N rules from <plugin-1> and <plugin-2> to rslint.
-
-   ### Rules ported
-   | Rule | Plugin | Description | Doc |
-   |------|--------|-------------|-----|
-   | \`<rule-1>\` | <plugin-1> | [brief description] | [link](<url>) |
-   | \`<rule-2>\` | <plugin-2> | [brief description] | [link](<url>) |
-   | ... | ... | ... | ... |
-
-   ## Checklist
-
-   - [x] Tests updated (or not required).
-   - [x] Documentation updated (or not required)."
-   ```
-
-   Examples:
-   - `feat: port 5 rules from @typescript-eslint, eslint-plugin-import`
-   - `feat: port 3 rules from ESLint core, @typescript-eslint`
-
-   - **Do NOT include AI-related information** in PR title or body
-   - If any rules were skipped during batch execution, note them in the PR body
+The body should state what the rule reports, link the pinned upstream source, summarize the verification and follow the repository template's checklist. For a batch, use one rule table with descriptions and documentation links. Update the existing progress record and report the completed scope.
 
 ---
 
@@ -1071,7 +954,7 @@ This step is executed **once**, after all rules are committed (or after the sing
 
 For complex rules (rules involving scope tracking, autofix, or many configuration options), consider running a deeper alignment check after the initial port:
 
-- Use the `validate-rule-alignment` skill to exhaustively verify edge cases
+- Extend Phase 4's contract review and differential validation for the specific unresolved semantic risks
 - Run the rule on real-world projects and compare output with the original ESLint rule
 - This step is especially valuable for rules that track state across nested scopes (e.g., `this` binding, variable declarations)
 
@@ -1083,7 +966,7 @@ For complex rules (rules involving scope tracking, autofix, or many configuratio
 
 If JS tests fail with 0 diagnostics found:
 
-1. **Did you rebuild the binary?** Run `cd packages/rslint && pnpm run build:bin`
+1. **Did you rebuild the binary?** Run `pnpm --filter @rslint/core build:bin`
 2. **Is the rule catalogued?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `coreRules()` or the plugin's `GetAllRules()` are present.
 3. **Are test files included?** Check `rstack.config.mts`
 4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
@@ -1093,10 +976,10 @@ If JS tests fail with 0 diagnostics found:
 
 1. Check 0-based vs 1-based column expectations
 2. Multi-byte characters may affect column calculation
-3. Debug with:
+3. Use `github.com/microsoft/TypeScript/tsc/shim/scanner` for 0-based lines and UTF-16 columns, then add 1 for ESLint positions:
    ```go
-   pos := ctx.SourceFile.LineMap().LineAndColumn(node.Pos())
-   fmt.Fprintf(os.Stderr, "DEBUG: Line=%d, Column=%d\n", pos.Line, pos.Column)
+   line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(ctx.SourceFile, node.Pos())
+   fmt.Fprintf(os.Stderr, "DEBUG: Line=%d, Column=%d\n", line+1, column+1)
    ```
 
 ### TypeChecker is nil

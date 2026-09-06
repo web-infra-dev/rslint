@@ -126,11 +126,8 @@ jobs:
           version: v2.12.2
           args: --timeout=15m ./cmd/... ./internal/...
 
-      - name: go vet
-        run: npm run lint:go
-
-      - name: go fmt
-        run: npm run format:go
+      - name: Go format check
+        run: pnpm run format:go --diff
 
       - name: Check Spell
         run: pnpm check-spell

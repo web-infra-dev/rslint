@@ -2,26 +2,28 @@
 
 A quick reference for common commands, file locations, and checklists when porting ESLint rules.
 
-> **Note**: This is a reference document for [PORT_RULE.md](./PORT_RULE.md). See that document for the complete rule porting workflow.
+> **Note**: This is a reference document for [PORT_RULE.md](./PORT_RULE.md). Branch selection, local test scope, and test layout follow the repository's [AGENTS.md](../../../../AGENTS.md). Commands below are a menu, not an instruction to run every check for every task.
 
 ---
 
-## Commands Cheatsheet
+## Commands
 
-| Task                     | Command                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| Create branch            | `git checkout -b feat/port-rule-<name>-$(date +%Y%m%d)`                                          |
-| Go unit test             | `go test -count=1 ./internal/rules/<rule_name>`                                                  |
-| Go related tests         | `go test -count=1 <changed package dirs and direct consumer package dirs>`                       |
-| Build binary             | `cd packages/rslint && pnpm run build:bin`                                                       |
-| JS unit test             | `cd packages/rslint-test-tools && pnpm exec rs test --testTimeout=10000 <rule-name>`             |
-| Type check               | `pnpm typecheck`                                                                                 |
-| Lint check               | `pnpm lint`                                                                                      |
-| Format check             | `pnpm format:check`                                                                              |
-| Format fix               | `pnpm format`                                                                                    |
-| Spell check              | `pnpm -w run check-spell`                                                                        |
-| Go lint changed packages | `golangci-lint run --new-from-rev=origin/main --timeout=10m <dirs containing changed .go files>` |
-| Go format fix            | `pnpm format:go`                                                                                 |
+Select the relevant commands from the diff and affected callers. Pass explicit package directories or test files, and reuse results while their relevant inputs remain unchanged. For Go lint, use the base ref selected in Phase 0 (`origin/main` by default).
+
+| Task                     | Command                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Select branch            | Follow [Phase 0](./PORT_RULE.md#phase-0-branch-setup); reuse the branch when continuing the task       |
+| Go unit test             | `go test ./internal/rules/<rule_name>`                                                                 |
+| Go related tests         | `go test <changed package dirs and direct consumer package dirs>`                                      |
+| Build binary             | `pnpm --filter @rslint/core build:bin`                                                                 |
+| JS unit test             | `pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts`       |
+| Type check               | `pnpm typecheck`                                                                                       |
+| Lint check               | `pnpm lint`                                                                                            |
+| Pre-commit format check  | `pnpm run format:check` (reuse a still-valid result)                                                   |
+| Format fix               | `pnpm exec rs fmt <changed-js-ts-md-files>`                                                            |
+| Spell check              | `pnpm -w run check-spell <changed-text-files>`                                                         |
+| Go lint changed packages | `golangci-lint run --new-from-merge-base=<base-ref> --timeout=10m <dirs containing changed .go files>` |
+| Go format fix            | `gofmt -w <changed-go-files>`                                                                          |
 
 ---
 
@@ -152,9 +154,9 @@ import (
 ## Checklist Before Submission
 
 - [ ] Go tests pass for the rule package and any changed-related Go package directories (see Phase 4 Step 2 in `PORT_RULE.md`)
-- [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
-- [ ] JS snapshots generated (`pnpm exec rs test <name> -u`)
-- [ ] JS tests pass (`cd packages/rslint-test-tools && pnpm exec rs test <name>`)
+- [ ] Build binary (`pnpm --filter @rslint/core build:bin`)
+- [ ] JS snapshots generated when needed and reviewed against expected upstream behavior
+- [ ] The exact registered JS test file passes (use the scoped command above; reuse valid results)
 - [ ] Go/JS test coverage is semantically aligned (`JS ⊆ Go upstream`; extras remain Go-only)
 - [ ] Autofixes/suggestions use deferred report builders and have `Test<Rule>EditDemand` in the existing extras test file
 - [ ] ESLint `variable.references` usage maps to `ctx.Refs` with a binder symbol
@@ -166,18 +168,18 @@ import (
 - [ ] If the upstream rule reads globs with anything but minimatch 3 or is-glob — `minimatch@10` included — it was reported to the user rather than silently ported onto `minimatch3`/`doublestar` or hand-rolled
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
-- [ ] Spell check passes (`pnpm -w run check-spell`)
-- [ ] Format check passes (`pnpm format:check`)
+- [ ] Spell check passes (`pnpm -w run check-spell <changed-text-files>`)
+- [ ] Pre-commit format check passes (`pnpm run format:check`; reuse a still-valid result)
 - [ ] Changed-package Go lint passes (packages containing changed `.go` files under `cmd/` and `internal/`; see Phase 4 Step 7 in `PORT_RULE.md`)
 - [ ] Rule included in the catalog (in `internal/rules/all.go` for core, or the plugin's `all.go` otherwise)
 - [ ] Test file registered (`packages/rslint-test-tools/rstack.config.mts`)
 - [ ] Documentation created (`<rule_name>.md`)
 
-**Quick Fix Commands** (run before committing if checks fail):
+**Formatting Fixes** (only for formatting failures; pass affected files and skip commands with no matching files):
 
 ```bash
-pnpm format      # Fix JS/TS formatting
-pnpm format:go   # Fix Go formatting
+pnpm exec rs fmt <changed-js-ts-md-files>
+gofmt -w <changed-go-files>
 ```
 
 ---

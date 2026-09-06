@@ -19,24 +19,30 @@ go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
 pnpm build
 ```
 
-Test the setup:
+## Verify a change
 
-```bash
-# Run all tests
-pnpm test
+Inspect `git status --short --branch` and the branch diff, including staged, unstaged and untracked work. Identify the changed packages and the callers affected by shared API changes, then select the relevant existing commands. The examples below are a menu; run only those needed for the change.
 
-# Run Go tests only
-pnpm run test:go
+| Check                         | Existing command with explicit scope                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| One Go rule package           | `go test ./internal/rules/max_params`                                                          |
+| Related Go packages           | `go test <changed-package-dir> <affected-consumer-dirs>`                                       |
+| One JS integration file       | `pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
+| One Rust crate                | `cargo test -p tsgo-client`                                                                    |
+| Go lint for a changed package | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`              |
+| Format changed JS/TS/docs     | `pnpm exec rs fmt <changed-files>`                                                             |
+| Format changed Go files       | `gofmt -w <changed-go-files>`                                                                  |
+| Spell-check changed text      | `pnpm run check-spell <changed-text-files>`                                                    |
 
-# Run linting
-pnpm run lint
+Before JS integration tests exercise changed Go code, run `pnpm --filter @rslint/core build:bin`. Build affected JS artifacts with the workspace's existing build command when its source changed or the required output is missing. Go test-only changes need the owning package's tests. Shared helpers need their affected consumers; package imports are a starting point for tracing the changed API, not a reason to run every rule in a plugin.
 
-# Run type checking
-pnpm run typecheck
+Root `test:go` and `lint:go` already include `./cmd/... ./internal/...`; appending another directory adds to that scope. Use `go test` and `golangci-lint run` directly for selected packages. Root `pnpm test` also runs multiple workspaces. Full-suite verification follows an explicit user/reviewer request; CI's command list is not a local checklist.
 
-# Check code formatting
-pnpm run format:check
-```
+Keep the passing commands/results in the task's existing progress record. Reuse them while their relevant inputs remain unchanged. Report platform, generated-content or cross-language gaps with the additional targeted checks they need. Documentation-only changes require no language tests unless executable examples, generated content, builds or runtime behavior are affected.
+
+Branch naming and test organization follow [AGENTS.md](./AGENTS.md). Before delivery, check the current branch with `git branch --show-current`, review the upstream/extras split and verify new JS integration files are included in `packages/rslint-test-tools/rstack.config.mts`. Before committing, ensure `pnpm run check-spell <changed-text-files>` and `pnpm run format:check` have passed after the final relevant edit, reusing valid results. Spell-check file arguments also cover changed hidden paths such as `.agents/`; the default globs omit hidden directories.
+
+The existing pre-commit hook runs `rs staged`. Install it through `pnpm run prepare`; `git config --get core.hooksPath` should point to `.rstack/hooks/_`. If a checkout still points to old Husky hooks, inspect them before migrating once with `pnpm exec rs hooks --force`. Keep ordinary `prepare` non-forcing.
 
 ## TypeScript compiler dependency
 
