@@ -850,6 +850,8 @@ The transport and target phase differ by surface:
   failures join the pending activation before returning. Initialization errors
   remain fatal and can now appear through the ordinary aborted-run output
   after the interactive start line, before any diagnostics or fixes execute.
+  The start line uses stdout; initialization and other aborted-run errors use
+  stderr in every format.
   Native-only configurations return fully verified metadata without a worker
   or a second request. `--singleThreaded` still uses one JS worker and serial
   Go work groups; that worker's initialization can overlap Go preparation.

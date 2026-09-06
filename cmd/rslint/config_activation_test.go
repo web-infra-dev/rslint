@@ -41,6 +41,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 		{name: "fix failure", fix: true},
 		{name: "successful activation", succeed: true},
 		{name: "default format abort", defaultFormat: true},
+		{name: "default format Program failure", defaultFormat: true, badProject: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -125,8 +126,12 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 					t.Fatalf("execution after activation: dispatches=%d stdout=%q stderr=%q", dispatches, stdout, stderr)
 				}
 			} else if test.defaultFormat {
-				if code != 1 || dispatches != 0 || !strings.Contains(stdout, activationError.Error()) || strings.Contains(stdout, "no-debugger") || stderr != "" {
+				if code != 1 || dispatches != 0 || stdout != "start   Linting...\n" ||
+					!strings.HasPrefix(stderr, "error   Linting failed in ") || strings.Count(stderr, activationError.Error()) != 1 {
 					t.Fatalf("default activation failure: code=%d dispatches=%d stdout=%q stderr=%q", code, dispatches, stdout, stderr)
+				}
+				if test.badProject && !strings.Contains(stderr, "missing.json") {
+					t.Fatalf("Program failure missing from stderr: %q", stderr)
 				}
 			} else if code != 1 || dispatches != 0 || stdout != "" || strings.Count(stderr, activationError.Error()) != 1 {
 				t.Fatalf("activation failure: code=%d dispatches=%d stdout=%q stderr=%q", code, dispatches, stdout, stderr)

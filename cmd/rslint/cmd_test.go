@@ -1844,7 +1844,7 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 		SingleThreaded: true,
 		TypeCheck:      true,
 	})
-	if code == 0 || !strings.Contains(stdout, "missing.json") {
+	if code != 1 || !strings.Contains(stderr, "missing.json") || strings.Contains(stdout, "missing.json") {
 		t.Fatalf("type-check must resolve every configured project: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 }

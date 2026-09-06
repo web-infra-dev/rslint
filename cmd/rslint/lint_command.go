@@ -297,7 +297,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			return 1
 		}
 		if format == output.FormatDefault {
-			if err := output.RenderAbort(os.Stdout, mode, timeBefore, reason, outputOptions); err != nil {
+			if err := output.RenderAbort(os.Stderr, mode, timeBefore, reason, outputOptions); err != nil {
 				fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
 			}
 		} else {
