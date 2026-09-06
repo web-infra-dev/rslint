@@ -12,10 +12,11 @@ import (
 )
 
 var names = padding.StatementNames{
-	"beforeAll": padding.StatementBeforeAll,
-	"describe":  padding.StatementDescribe,
-	"expect":    padding.StatementExpect,
-	"test":      padding.StatementTest,
+	"beforeAll":  padding.StatementBeforeAll,
+	"beforeEach": padding.StatementBeforeEach,
+	"describe":   padding.StatementDescribe,
+	"expect":     padding.StatementExpect,
+	"test":       padding.StatementTest,
 }
 
 func around(statementType padding.StatementType) []padding.Config {
@@ -612,4 +613,131 @@ func TestPaddingCopiesInputs(t *testing.T) {
 	if len(diagnostics) != 1 {
 		t.Fatalf("diagnostics after mutating inputs = %d, want 1", len(diagnostics))
 	}
+}
+
+// configuredRule is one enabled rule in a multi-rule arbitration test: the
+// severity and priority it was configured with decide which rule owns a
+// boundary that several rules match.
+type configuredRule struct {
+	name     string
+	severity rule.DiagnosticSeverity
+	priority int
+	configs  []padding.Config
+}
+
+func runConfiguredRules(t *testing.T, code string, rules []configuredRule) []rule.RuleDiagnostic {
+	t.Helper()
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/padding.ts",
+		Path:     "/padding.ts",
+	}, code, core.ScriptKindTS)
+	comments := rule.NewCommentStore(sourceFile)
+	disableManager := rule.NewDisableManager(sourceFile, comments)
+	cache := rule.NewFileCache()
+	var diagnostics []rule.RuleDiagnostic
+	var eof func(*ast.Node)
+	var listenersForTraversal []rule.RuleListeners
+	for _, configured := range rules {
+		ctx := rule.RuleContext{
+			SourceFile:     sourceFile,
+			Comments:       comments,
+			DisableManager: disableManager,
+		}.WithFileCache(cache).WithDiagnosticConsumer(
+			configured.name,
+			configured.severity,
+			rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			}},
+		)
+		listeners := padding.NewRule(padding.Definition{
+			Name: configured.name, Family: "test", Priority: configured.priority,
+			Names: names, Configs: configured.configs,
+		}).Run(ctx, nil)
+		listenersForTraversal = append(listenersForTraversal, listeners)
+		if listener := listeners[rule.ListenerOnExit(ast.KindEndOfFile)]; listener != nil {
+			eof = listener
+		}
+	}
+	var visit ast.Visitor
+	visit = func(node *ast.Node) bool {
+		for _, listeners := range listenersForTraversal {
+			if listener := listeners[node.Kind]; listener != nil {
+				listener(node)
+			}
+		}
+		return node.ForEachChild(visit)
+	}
+	visit(sourceFile.AsNode())
+	if eof != nil {
+		eof(nil)
+	}
+	return diagnostics
+}
+
+func assertSingleDiagnostic(t *testing.T, diagnostics []rule.RuleDiagnostic, name string, severity rule.DiagnosticSeverity) {
+	t.Helper()
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics = %d, want 1: %#v", len(diagnostics), diagnostics)
+	}
+	if diagnostics[0].RuleName != name || diagnostics[0].Severity != severity {
+		t.Fatalf("diagnostic = (%s, %s), want (%s, %s)",
+			diagnostics[0].RuleName, diagnostics[0].Severity, name, severity)
+	}
+}
+
+// A boundary that two rules both match is reported once, and the surviving
+// report must keep the strictest configured severity. Otherwise enabling an
+// extra warning-level rule would suppress an error and flip a failing lint run
+// to a passing one.
+func TestPaddingErrorRuleOwnsBoundaryMatchedByWarningRule(t *testing.T) {
+	const code = "beforeAll(connect);\nbeforeEach(reset);"
+	warning := configuredRule{
+		name:     "test/padding-around-before-all-blocks",
+		severity: rule.SeverityWarning,
+		configs:  around(padding.StatementBeforeAll),
+	}
+	failing := configuredRule{
+		name:     "test/padding-around-before-each-blocks",
+		severity: rule.SeverityError,
+		configs:  around(padding.StatementBeforeEach),
+	}
+	// The warning rule sorts first by name, so registration order must not
+	// decide the winner in either direction.
+	for _, rules := range [][]configuredRule{{warning, failing}, {failing, warning}} {
+		diagnostics := runConfiguredRules(t, code, rules)
+		assertSingleDiagnostic(t, diagnostics, failing.name, rule.SeverityError)
+	}
+}
+
+// Severity outranks priority: an error-level aggregate rule keeps the boundary
+// even though an atomic rule would otherwise own it.
+func TestPaddingErrorAggregateOwnsBoundaryOverWarningAtomicRule(t *testing.T) {
+	const code = "setup();\nbeforeAll(connect);"
+	diagnostics := runConfiguredRules(t, code, []configuredRule{
+		{
+			name: "test/padding-around-before-all-blocks", severity: rule.SeverityWarning,
+			configs: around(padding.StatementBeforeAll),
+		},
+		{
+			name: "test/padding-around-all", severity: rule.SeverityError, priority: 100,
+			configs: around(padding.StatementBeforeAll),
+		},
+	})
+	assertSingleDiagnostic(t, diagnostics, "test/padding-around-all", rule.SeverityError)
+}
+
+// Priority still decides between rules configured at the same severity.
+func TestPaddingAtomicRuleWinsOverAggregateAtEqualSeverity(t *testing.T) {
+	const code = "setup();\nbeforeAll(connect);"
+	diagnostics := runConfiguredRules(t, code, []configuredRule{
+		{
+			name: "test/padding-around-all", severity: rule.SeverityWarning, priority: 100,
+			configs: around(padding.StatementBeforeAll),
+		},
+		{
+			name: "test/padding-around-before-all-blocks", severity: rule.SeverityWarning,
+			configs: around(padding.StatementBeforeAll),
+		},
+	})
+	assertSingleDiagnostic(t, diagnostics, "test/padding-around-before-all-blocks", rule.SeverityWarning)
 }

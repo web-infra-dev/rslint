@@ -76,9 +76,11 @@ type Definition struct {
 	// Family groups rules that must not report the same statement boundary
 	// twice. The lowest-priority matching rule owns the boundary.
 	Family string
-	// Priority orders rules within a family. Atomic rules should keep the zero
-	// value; aggregate rules should use a larger value so a specific enabled
-	// rule owns an overlapping diagnostic.
+	// Priority orders rules within a family that share a configured severity.
+	// Atomic rules should keep the zero value; aggregate rules should use a
+	// larger value so a specific enabled rule owns an overlapping diagnostic.
+	// The configured severity outranks Priority, so an error-level rule always
+	// owns a boundary a warning-level rule also matches.
 	Priority int
 	Message  rule.RuleMessage
 	Names    StatementNames
@@ -200,6 +202,14 @@ func (state *engine) run() {
 		left, right := state.requests[i], state.requests[j]
 		if left.family != right.family {
 			return strings.Compare(left.family, right.family) < 0
+		}
+		// Severity outranks priority: whichever rule owns a boundary decides
+		// the severity the boundary is reported at, so a warning-level rule
+		// must never displace an error-level one. Otherwise merely enabling an
+		// extra warning rule would turn a failing lint run into a passing one.
+		// SeverityError sorts before SeverityWarning by constant order.
+		if leftSeverity, rightSeverity := left.ctx.Severity(), right.ctx.Severity(); leftSeverity != rightSeverity {
+			return leftSeverity < rightSeverity
 		}
 		if left.priority != right.priority {
 			return left.priority < right.priority
