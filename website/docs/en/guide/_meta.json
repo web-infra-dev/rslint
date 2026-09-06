@@ -64,6 +64,6 @@
   {
     "type": "file",
     "name": "typescript-versions",
-    "label": "TypeScript Versions Used by Rslint"
+    "label": "Bundled TypeScript Versions"
   }
 ]
