@@ -35,16 +35,14 @@ export default function TypeScriptVersions() {
                       </Badge>
                     </a>
                   ) : (
-                    <a
-                      href={`https://www.npmjs.com/package/@rslint/core/v/${version}`}
-                    >
-                      <img
-                        src={`https://img.shields.io/badge/npm-v${version}-CB3837?logo=npm&logoColor=white`}
-                        alt={`npm v${version}`}
-                        height={20}
-                        className="!my-0 h-5"
-                      />
-                    </a>
+                    <Badge className="overflow-hidden p-0">
+                      <span className="bg-gray-700 px-2 py-0.5 text-white">
+                        npm
+                      </span>
+                      <span className="bg-[#CB3837] px-2 py-0.5 text-white">
+                        v{version}
+                      </span>
+                    </Badge>
                   )}
                 </TableCell>
                 <TableCell>
