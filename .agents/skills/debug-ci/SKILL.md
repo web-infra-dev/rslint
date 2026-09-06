@@ -38,7 +38,9 @@ Read-only reproduction may stay detached. Before applying a patch or editing in 
 
 When validating an uncommitted fix, apply the intended staged and unstaged changes and copy any required untracked inputs into this clone before testing. A clone of `HEAD` alone does not contain the fix. Review the isolated diff against the intended input; exclude unrelated edits, host `node_modules`, generated binaries and caches.
 
-After applying the selected patch, initialize the compiler submodule when the selected checks need it. Verify its revision and include any intended changes inside the submodule as well:
+If the patch changes a submodule gitlink, update the isolated clone's index too: for an initial combined patch against a clean checkout, use `git apply --index <patch>`. Plain `git apply` leaves the index unchanged, and `git submodule update` selects the indexed commit. Check that indexed gitlink against the intended revision and fetch the commit from the source submodule if it is not available remotely.
+
+Initialize the compiler submodule when the selected checks need it, verify its `HEAD` matches the intended gitlink, then apply any intended changes inside that submodule:
 
 ```bash
 git -C <repro-dir> submodule sync -- typescript-go
@@ -61,6 +63,7 @@ Reuse a matching image if available. Otherwise prepare a temporary Docker build 
 | golangci-lint version                              | `golangci-lint-action` version input in the selected workflow                                                                   |
 | Rust toolchain, when the native parser is required | `.github/actions/setup-rust/action.yml` and the selected job's build prerequisites                                              |
 | xvfb and GUI packages                              | Selected workflow's install step; add missing Electron runtime libraries when the bare image lacks runner-provided dependencies |
+| Check environment                                  | Effective workflow, job and step variables, including values established by setup actions                                       |
 
 Pass the versions read from those sources as Docker build arguments, with no fallback version constants in the Dockerfile. For example, declare `ARG GO_VERSION`, `ARG NODE_VERSION` and `ARG GOLANGCI_LINT_VERSION`, use those arguments in the corresponding installations, and pass their resolved values when building. Keep the base image and installation architecture consistent with `--platform`; for Go downloads, Docker's `TARGETARCH` can select the archive architecture.
 
@@ -76,10 +79,11 @@ Omit unneeded tools and arguments, or add the selected Rust toolchain when the e
 
 ## Prepare and run the selected checks
 
-Mount only the isolated clone. Keep the container alive during the diagnosis so its tool caches can be reused:
+Mount only the isolated clone. Pass the selected check's necessary environment values, including GitHub Actions' implicit `CI=true` and applicable step values such as `GOMAXPROCS`. Without CI mode, Rstest can create missing snapshots and pass where CI would fail. Keep the container alive during the diagnosis so its tool caches can be reused:
 
 ```bash
 docker run --rm -it --platform <ci-linux-platform> \
+  --env CI=true \
   --mount "type=bind,src=<absolute-repro-dir>,dst=/workspace" \
   --workdir /workspace \
   rslint-ci-test bash
@@ -101,6 +105,8 @@ The following are scoped examples, not a checklist. Replace the package or file 
 The VS Code package uses its own `__tests__/runTest.ts` and Mocha runner, not Rstest. Its existing `test` script compiles and runs all extension suites and currently exposes no test-file or suite selector. The workspace command above is the smallest supported entry point; report that scope rather than inventing a filter or sending extension tests to `rs test`.
 
 Run Go lint once with the branch-diff filter and selected package directories; do not follow it with the root `lint:go` script. Substitute the actual base ref when it is not `origin/main`. For Go formatting, pass the changed Go file paths directly and use the repository's formatter configuration. `--diff` reports formatting differences without writing files; it does not select files from Git.
+
+For `rs fmt`, select supported, non-ignored changed files and skip empty selections as described in [CONTRIBUTING.md](../../../CONTRIBUTING.md#verify-a-change).
 
 ## Record the result
 

@@ -8,11 +8,7 @@ You are an expert Software Engineer tasked with porting ESLint rules to `rslint`
 
 ## Scope: rule semantics, not framework parity
 
-Your job is porting the **rule's semantics** — given equivalent input, produce equivalent diagnostics. You are **not** responsible for re-implementing ESLint framework concepts that rslint deliberately does not expose. Examples:
-
-- `/*eslint ...*/` directive comments
-- `parserOptions.sourceType` override / `parserOptions.ecmaFeatures.*`
-- `env: 'browser' | 'node' | ...`
+Port the **rule's semantics**: given equivalent input, produce equivalent diagnostics. Use existing configuration and test-harness features before treating an upstream case as unsupported. For example, upstream source-type cases can use `LanguageOptions.SourceType` in Go tests; legacy ESLint field names alone do not make the behavior unsupported. Do not recreate missing framework features inside a rule.
 
 Note: rslint combines the ECMAScript globals selected by `languageOptions.ecmaVersion` (default `"latest"`), config `languageOptions.globals`, and `/*global ...*/` comments in the immutable `ctx.Globals` view. When porting a rule that resolves global variables, do not skip these cases or keep a private language-global table: use `ctx.Globals.Access(name)` for the final access after language < config < inline precedence. Use `ctx.Globals.Override(name)` only when upstream distinguishes an explicitly authored setting from an implicit language global; the narrower `LanguageAccess`, `ConfigOverride`, and `ConfiguredAccess` methods are for rules whose upstream behavior genuinely depends on provenance. `InlineDeclarations()` provides ordered comment ranges. Test cases author config globals as `Globals: map[string]any{"foo": "readonly"}` and select a version with `LanguageOptions: rule.LanguageOptions{ECMAVersion: 2020}`. Access values support `IsDeclared()` and `IsWritable()`; an explicit `off` is not declared.
 
@@ -22,13 +18,13 @@ Note: every comment in the file is exposed lazily through `ctx.Comments.All()` a
 
 Note: autofixes and suggestions are optional artifacts. New native rules must use the matching `ReportNodeWithDeferred*` or `ReportRangeWithDeferred*` method so diagnostics-only consumers and suppressed diagnostics do not pay to construct replacement text, edit ranges/slices, or suggestions. Detection, message construction, and the diagnostic range remain eager and independent of edit demand; work used only to decide or materialize an edit belongs in the builder, which may return nil. See [AST_PATTERNS.md — Reporting Functions](./AST_PATTERNS.md#reporting-functions).
 
-When an upstream test case depends on other unsupported concepts (like `env` or `/*eslint*/` configurations):
+When an upstream test depends on a framework feature with no equivalent in the current configuration or test harness:
 
 - **Don't** reimplement the concept inside your rule.
 - **Don't** list the gap under the rule's "Differences from ESLint" section — framework gaps apply to every rule, not yours.
-- **Do** mark the upstream case `skip: true` with an inline reason such as `// SKIP: rslint does not support ESLint's <concept>`.
+- **Do** mark the Go upstream case `Skip: true` (or JS `skip: true`) with an inline reason such as `// SKIP: rslint does not support ESLint's <concept>`.
 
-The rule doc's "Differences from ESLint" section is reserved for semantic differences of this specific rule — either intentional choices (Phase 1 Step 6.A) or tsgo/Go-semantic side effects (Phase 1 Step 6.B).
+The rule doc's "Differences from ESLint" section records requested or established public behavior differences for this rule (Phase 1 Step 6.A). Adapt AST or language representation differences in the implementation and cover them with regressions (Phase 1 Step 6.B).
 
 ---
 
@@ -54,7 +50,7 @@ Three principles follow — internalize them before writing a single test case:
 
 **Coverage bar.** The point of layers 2 + 3 is to prove the Go/tsgo port stays aligned where it structurally diverges from upstream's ESTree implementation — so the bar is _what they cover_, not how many cases they add up to. There is no case-count target. Concretely: every applicable Dimension 4 edge shape and ≥2 real-user shapes from the issue tracker (Phase 1 Step 4), plus every reachable branch locked in (Phase 1 Step 5). A near-empty `_extras_test.go` — or worse, none at all — is a reliable smell that Phase 1 Steps 4 and 5 were skipped: re-walk them before submitting. Phase 4 Step 6's per-layer checkboxes are what enforce this.
 
-**JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies catalog inclusion + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
+**JS rule mirrors stay in one file.** The three-layer model and the `_upstream_*` / `_extras_*` split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` runs upstream cases through the compiled binary to cover rule registration, IPC and diagnostic serialization. IPC framing and Unicode positions depend on input; regressions in those components belong in their existing owning integration suites, such as `packages/rslint/tests/ipc-client.test.ts`.
 
 - **JS mirrors Layer 1 only** (upstream `valid` / `invalid` cases). Layers 2 and 3 stay in Go.
 - A JS file far smaller than the Go suite — sometimes by 10× or more, depending on whether upstream uses fixture files — is the **expected** state, not "JS is under-tested." The semantic check is "every JS-asserted behavior also has a Go-upstream case"; literal case-count parity is **not** required (see Phase 4 Step 5).
@@ -248,16 +244,14 @@ Follow the repository's [branch rules](../../../../AGENTS.md#branches).
 
 6. **Document Divergence from ESLint**:
 
-   Two classes of divergence may arise when porting. Both must be documented; they differ in _how_ and _where_.
+   Preserve upstream behavior unless the task requests a difference or the repository already documents one for this rule. Implementation differences alone do not justify different diagnostics, fixes or suggestions.
 
-   **A. Intentional divergence** — a choice we make (e.g. more precise error locations, different reporting granularity). Do all three:
+   **A. Requested or established divergence** — document the intended public behavior in all three places:
    1. **Source code comment**: Add a `// NOTE: Unlike ESLint...` explaining the difference and rationale.
    2. **Rule documentation**: Add a "Differences from ESLint" section in the rule's `.md` file.
    3. **Test cases**: Ensure the differing behavior is covered by a dedicated test — a green-path `ValidTestCase` or a case with an exact `Message` / position assertion — so that future refactors can't silently flip it.
 
-   **B. Language-natural divergence** — a side effect of tsgo's AST or Go semantics that we don't actively choose (e.g. tsgo decimal-normalizes `NumericLiteral` at parse time, so a dynamic computed key `[0x1]` compares equal to `[1]` where ESLint's token-level comparison sees them as distinct). Usually more permissive than ESLint.
-   1. **Rule documentation** (or [AST_PATTERNS.md](AST_PATTERNS.md) if the quirk is general, not rule-specific): note the divergence under "Differences from ESLint" / the relevant AST-shape section.
-   2. **Test cases**: Lock the current behavior in with a test — typically the ESLint-fails-but-we-pass case stays on the `valid` side with a comment pointing at the underlying quirk, so the behavior can't flip silently.
+   **B. AST or language representation differences** — adapt the implementation and add a regression for the upstream behavior. For example, numeric literal `.Text` is normalized, but `scanner.GetSourceTextOfNodeFromSourceFile` preserves `0x1` versus `1` when upstream compares raw tokens. Use the JavaScript-compatible helpers for semantic operations. If an unsupported capability prevents parity, report the gap before declaring the port complete; do not lock an accidental mismatch in as the expected behavior.
 
 7. **Identify How the Rule Reads Patterns**:
 
@@ -479,7 +473,7 @@ var MyRule = rule.Rule{
 }
 ```
 
-Schemas are JSON Schema Draft 4 (the draft ESLint itself uses) and compile lazily on first use; the CI sweep `TestAllRules_DeclaredSchemasCompile` (internal/config) catches a schema that fails to compile. Validation also fills schema `default` values into the options in place, matching ajv's `useDefaults` as ESLint configures it (cross-checked against ajv@6 by `TestValidateMatchesAjvFixtures`), so an option object a user partially fills in arrives at the rule with its schema defaults present. Keep `parseOptions` handling defaults anyway: like in ESLint, a default only lands when the user supplied the enclosing options object at all (a grown tuple slot never reaches the rule), and API/LSP entry points don't run the validation step.
+Schemas are JSON Schema Draft 4 (the draft ESLint itself uses) and compile lazily on first use; the CI sweep `TestAllRules_DeclaredSchemasCompile` (internal/config) catches a schema that fails to compile. Validation also fills schema `default` values into the options in place, matching ajv's `useDefaults` as ESLint configures it (cross-checked against ajv@6 by `TestValidateMatchesAjvFixtures`), so an option object a user partially fills in arrives at the rule with its schema defaults present. CLI, API and LSP configuration paths validate options. Keep `parseOptions` handling runtime defaults: a schema default inside an object only applies when the enclosing object exists; it does not supply omitted positional options.
 
 ### Alignment Audit
 
@@ -623,20 +617,7 @@ These comments are how a reader (or `grep`) confirms a file is doing its assigne
 
 For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field uses JSON-shaped values. For a single object option, prefer `map[string]any{...}`; use `[]any{...}` when the rule genuinely has multiple positional options. Both forms reach `Run` as a normalized `[]any`, so do not duplicate a single-object case solely to test bare versus array-wrapped input. These cases catch missing `len(options)` / `options[0]` parsing, wrong key casing, and option-name typos.
 
-**Debug Flags**:
-
-```go
-rule_tester.ValidTestCase{
-    Code: `some code`,
-    Only: true,  // Run only this test
-}
-
-rule_tester.InvalidTestCase{
-    Code: `some code`,
-    Skip: true,  // Skip this test
-    Errors: []rule_tester.InvalidTestCaseError{...},
-}
-```
+**Focused debugging**: use `go test <rule-package> -run '<test-or-subtest-pattern>'` for a reproduction, then verify the selected package before delivery. `RunRuleTester` rejects `Only: true`. Keep `Skip: true` only for upstream cases with an explicit limitation as described in Phase 1.
 
 **Optional Edit Testing**: If the rule provides autofix, use the `Output` field to verify the fixed code:
 
@@ -705,7 +686,7 @@ Assert that diagnostic count, message, and range are identical in all four modes
 
 ### Step 2: Add JS Tests
 
-**Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies catalog inclusion + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
+**Purpose & scope.** The JS rule file mirrors Layer 1 (upstream `valid` / `invalid` cases) through the compiled binary. Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) stay in Go extras. Keep protocol and serialization regressions in the suites that own those components; see [Testing Philosophy](#testing-philosophy).
 
 **Practical rule:** the JS file should assert exactly the upstream `valid` / `invalid` semantic set — nothing less, nothing more. Case **counts** between JS and `<rule>_upstream_test.go` may legitimately differ (one side may inline what the other folds into a fixture file); the contract is semantic-subset equivalence, not numeric parity. If you find yourself reaching for a tsgo-specific edge shape, a Dimension 4 row, a branch lock-in, or a GitHub-issue real-user shape while writing the JS file — stop. Those belong in Go extras.
 
@@ -721,7 +702,7 @@ Assert that diagnostic count, message, and range are identical in all four modes
 - **typescript-eslint Rules**: Import `RuleTester` from `@typescript-eslint/rule-tester` (auto-prefixes with `@typescript-eslint/`)
 - **Other Plugin Rules**: Refer to `packages/rslint-test-tools/tests/eslint-plugin-jsx-a11y/rule-tester.ts`
 
-**Options Format**: JS tests use array format: `options: [{ allow: ['warn'] }]`
+**Options format** follows the selected RuleTester. The core wrapper declares object options as `options: { allow: ['warn'] }`; other wrappers may accept positional arrays. Read that wrapper's types and normalization before copying upstream cases, and preserve the upstream option positions and values.
 
 ### Step 3: Register Test File
 
@@ -740,6 +721,8 @@ Add the new test file path to the `include` array.
 | Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                    |
 
 Each plugin `all.go` exports `GetAllRules() []rule.Rule`; core rules use `coreRules()` in `internal/rules/all.go`. `rules.All()` assembles those sources into the shared immutable catalog — **do not edit `internal/config` for a new rule**.
+
+For the first native rule in a new plugin, also add that plugin's `GetAllRules()` to the explicit aggregation in `internal/rules/all.go`; a new plugin directory is not discovered automatically. Inspect the plugin-enablement boundaries in `architecture.md` for this case.
 
 **Catalog key vs `rule.Name` must match** — catalog construction uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
 
@@ -789,21 +772,32 @@ Identify affected packages and consumers from the diff and callers, then state w
    pnpm --filter @rslint/core build:bin
    ```
 
+   This command builds only the Go binary. JS tests also import generated package outputs. After catalog or schema changes, refresh the schema dump before building core JS so the public option types include the new rule:
+
+   ```bash
+   go run ./tools/dump_rule_schemas > packages/rslint/rule-schemas.json
+   pnpm --filter @rslint/core build:js
+   ```
+
+   Also run `build:js` when core JS output is missing or stale. If the selected test imports `@typescript-eslint/rule-tester`, build that workspace when its `dist` is missing or stale with `pnpm --filter @typescript-eslint/rule-tester build`. Native Go-rule IPC tests do not by themselves require rebuilding the Rust parser. Reuse prepared outputs while their relevant inputs remain unchanged.
+
 4. **JS tests** (use the exact registered file; one-shot execution):
 
    ```bash
    # First run for new test cases: generate snapshots with -u flag
    pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts -u
 
-   # Subsequent runs: verify against existing snapshots
-   pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts
+   # Verify against reviewed snapshots; missing snapshots must fail, not be generated.
+   CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts
    ```
+
+   Review generated snapshots against upstream expectations before treating them as evidence. The current Rstest local default adds missing snapshots even without `-u`; verification uses CI mode to prevent that write.
 
 5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
 
    The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 2):
-   - **JS suite** = Layer 1 mirror only. It exists to verify the binary, catalog inclusion, and wire protocol — not rule logic.
-   - **Go suite** = Layer 1 + Layer 2 + Layer 3 (full coverage). It is the source of truth for rule behavior.
+   - **JS suite** = Layer 1 mirror through the compiled binary, catalog and wire protocol.
+   - **Go suite** = Layer 1 + Layer 2 + Layer 3 rule-semantic regression coverage. The pinned upstream behavior remains the reference for both suites.
 
    Two checks:
    - [ ] **JS ⊆ Go upstream (semantic)**: every behavior asserted by a JS case is also asserted somewhere in `<rule>_upstream_test.go`. The match is **semantic**, not literal — Go may legitimately split one fixture-driven upstream case into many inline cases, or the reverse. If JS asserts a behavior that has no corresponding Go-upstream case, the upstream migration is incomplete — fix Go.
@@ -846,7 +840,7 @@ Identify affected packages and consumers from the diff and callers, then state w
    - [ ] **Edit-demand invariance**: rules with autofixes or suggestions have `Test<Rule>EditDemand` in `<rule>_extras_test.go`, covering none/autofix/suggestion/all without changing diagnostic identity.
 
    **Options contract**:
-   - [ ] **Schema match**: option names, types, and **defaults** match ESLint's schema exactly. Assert every default by running a case with no options vs. `[{}]` options and confirming identical output.
+   - [ ] **Schema and defaults match**: option names and types match the upstream schema; runtime defaults match the upstream implementation. Compare omitted options with their explicit defaults in the schema's positional shape. Use `[{}]` only for a single object option that permits an empty object; primitive options need their default string, number or boolean value.
    - [ ] **Combination matrix**: for every boolean option, include ≥1 test where it is `true` and ≥1 where it is `false`. Triggering combinations (rule behaves differently when two options are both on) get dedicated cases.
 
    **Equivalence classes** (when applicable):
@@ -874,14 +868,14 @@ Identify affected packages and consumers from the diff and callers, then state w
    - **Format failures**: fix the affected files with the repository formatter; preserve unrelated edits and never silence the failure.
    - **Lint failures**: fix the code. Don't bypass with `//nolint`, `// eslint-disable`, or equivalent, unless the exception is already justified by an in-file comment pattern this repo uses.
 
-   **For formatting failures**, pass only the affected files (and skip a command when it has no matching files):
+   **For formatting failures**, pass only affected files supported and not ignored by the repository formatter; skip a command when no files remain. `rs fmt` still applies `rstack.config.mts` exclusions to explicit paths, so rule Markdown excluded by that configuration is not a formatting target:
 
    ```bash
    pnpm exec rs fmt <changed-js-ts-md-files>
    gofmt -w <changed-go-files>
    ```
 
-8. **Differential Validation** (recommended for rules with non-trivial branching):
+8. **Differential Validation** (required for rules with non-trivial branching):
 
    Unit tests verify cases you thought of; diffing against the reference implementation on a real codebase catches the rest. Skip when the rule has ≤ 2 branches and trivial messages, or when the rule is a new rslint invention with no reference.
 
@@ -901,9 +895,13 @@ Identify affected packages and consumers from the diff and callers, then state w
    }];
    EOF
 
-   # 2. Pick a target codebase that exercises typical patterns.
-   # 3. Run both; normalize to sorted JSON of {file, line, col, messageId, message}; diff.
+   # 2. Pick a target codebase and resolve the same explicit input files for both tools.
+   # 3. Enable only the target rule with matching options and parser/project settings.
+   # 4. Run both from the target project; compare normalized paths, rule names,
+   #    message text, severity, and start/end positions on the same file list.
    ```
+
+   The rslint CLI's diagnostic output is `--format jsonline`; compare it with ESLint's JSON output. It includes `ruleName`, `filePath`, `message`, `severity` and `range`, but omits message IDs and edits. To compare those additional fields, collect diagnostics with `lint` from `@rslint/core/internal`, as the JS RuleTesters do. State which fields were actually compared; a CLI-only run does not verify message IDs, autofixes or suggestions.
 
    **Prerequisite for type-info rules**: the reference tool must run with the same `parserOptions.project` / `tsconfig.json` as rslint, otherwise the comparison is meaningless. Pick a target codebase where the tsconfig loads cleanly under both tools.
 
@@ -916,13 +914,13 @@ Identify affected packages and consumers from the diff and callers, then state w
    | Different message text          | paren / text-range handling in the recommendation      |
    | Same count, different positions | column offset (0- vs 1-based, multibyte)               |
 
-   **Disposition standard**: a non-empty diff is **not** automatically a failure. Every differing line must fall into exactly one of the three categories below — anything that cannot be confidently classified is treated as (c).
+   **Disposition standard**: classify each difference using evidence. A passing command or empty diff is meaningful only after confirming both tools linted the intended files with the target rule active. Parser/configuration failures and skipped files are coverage gaps, not matching rule results.
 
-   | Category                            | What it means                                                                                                                                                                                   | Action                                                                                                                  |
-   | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-   | **(a) Language-natural divergence** | tsgo AST or Go-semantic effect we don't actively choose (see Phase 1 Step 6.B — e.g. `NumericLiteral` parse-time normalization, normalized string cooked values).                               | Document under the rule's `.md` "Differences from ESLint" (or in [AST_PATTERNS.md](AST_PATTERNS.md) if general). Leave. |
-   | **(b) Scan-scope divergence**       | The two tools see different file sets (e.g., rslint respects `.gitignore` by default; ESLint does not; tsconfig `include` excludes a dir). Not a rule issue.                                    | No action. Optionally note in the PR description if a reviewer might be confused.                                       |
-   | **(c) Genuine bug**                 | Neither (a) nor (b). Rule logic, message text, or position is actually wrong on our side (or, rarely, ESLint's — but we align to ESLint unless we have a standing Phase 1 Step 6.A divergence). | **Must fix** before merging. Re-run the diff until it clears or reduces to (a)/(b) only.                                |
+   | Category                            | Evidence                                                                                        | Action                                                                                                                                          |
+   | ----------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+   | Requested or established divergence | The mismatch matches the specific documented behavior from Phase 1 Step 6.A.                    | Keep its regression and report the difference with the result.                                                                                  |
+   | Input or configuration mismatch     | File sets, ignore rules, parser/project settings or rule options differ.                        | Align the inputs and rerun; report any remaining exclusions as unverified coverage.                                                             |
+   | Rule mismatch                       | Diagnostics, fixes or suggestions differ on equivalent inputs without an established exception. | Fix the implementation, add a regression and rerun the affected comparison. AST or Go representation differences do not waive this requirement. |
 
 ---
 

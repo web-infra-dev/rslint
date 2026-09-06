@@ -10,20 +10,22 @@ A quick reference for common commands, file locations, and checklists when porti
 
 Select the relevant commands from the diff and affected callers. Pass explicit package directories or test files, and reuse results while their relevant inputs remain unchanged. For Go lint, use the base ref selected in Phase 0 (`origin/main` by default).
 
-| Task                     | Command                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------ |
-| Select branch            | Follow [Phase 0](./PORT_RULE.md#phase-0-branch-setup); reuse the branch when continuing the task       |
-| Go unit test             | `go test ./internal/rules/<rule_name>`                                                                 |
-| Go related tests         | `go test <changed package dirs and direct consumer package dirs>`                                      |
-| Build binary             | `pnpm --filter @rslint/core build:bin`                                                                 |
-| JS unit test             | `pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts`       |
-| Type check               | `pnpm typecheck`                                                                                       |
-| Lint check               | `pnpm lint`                                                                                            |
-| Pre-commit format check  | `pnpm run format:check` (reuse a still-valid result)                                                   |
-| Format fix               | `pnpm exec rs fmt <changed-js-ts-md-files>`                                                            |
-| Spell check              | `pnpm -w run check-spell <changed-text-files>`                                                         |
-| Go lint changed packages | `golangci-lint run --new-from-merge-base=<base-ref> --timeout=10m <dirs containing changed .go files>` |
-| Go format fix            | `gofmt -w <changed-go-files>`                                                                          |
+Before JS tests, prepare any missing or stale artifacts listed in [Phase 4](./PORT_RULE.md#phase-4-verification--build). Formatting selections follow [CONTRIBUTING.md](../../../../CONTRIBUTING.md#verify-a-change), including configured exclusions and skipping empty selections.
+
+| Task                     | Command                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Select branch            | Follow [Phase 0](./PORT_RULE.md#phase-0-branch-setup); reuse the branch when continuing the task         |
+| Go unit test             | `go test ./internal/rules/<rule_name>`                                                                   |
+| Go related tests         | `go test <changed package dirs and direct consumer package dirs>`                                        |
+| Build binary             | `pnpm --filter @rslint/core build:bin`                                                                   |
+| JS unit test             | `CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/<suite>/rules/<rule-name>.test.ts` |
+| Type check               | `pnpm typecheck`                                                                                         |
+| Lint check               | `pnpm lint`                                                                                              |
+| Pre-commit format check  | `pnpm run format:check` (reuse a still-valid result)                                                     |
+| Format fix               | `pnpm exec rs fmt <changed-js-ts-md-files>`                                                              |
+| Spell check              | `pnpm -w run check-spell <changed-text-files>`                                                           |
+| Go lint changed packages | `golangci-lint run --new-from-merge-base=<base-ref> --timeout=10m <dirs containing changed .go files>`   |
+| Go format fix            | `gofmt -w <changed-go-files>`                                                                            |
 
 ---
 

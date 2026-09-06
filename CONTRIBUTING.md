@@ -23,16 +23,20 @@ pnpm build
 
 Inspect `git status --short --branch` and the branch diff, including staged, unstaged and untracked work. Identify the changed packages and the callers affected by shared API changes, then select the relevant existing commands. The examples below are a menu; run only those needed for the change.
 
-| Check                         | Existing command with explicit scope                                                           |
-| ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| One Go rule package           | `go test ./internal/rules/max_params`                                                          |
-| Related Go packages           | `go test <changed-package-dir> <affected-consumer-dirs>`                                       |
-| One JS integration file       | `pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
-| One Rust crate                | `cargo test -p tsgo-client`                                                                    |
-| Go lint for a changed package | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`              |
-| Format changed JS/TS/docs     | `pnpm exec rs fmt <changed-files>`                                                             |
-| Format changed Go files       | `gofmt -w <changed-go-files>`                                                                  |
-| Spell-check changed text      | `pnpm run check-spell <changed-text-files>`                                                    |
+| Check                         | Existing command with explicit scope                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------ |
+| One Go rule package           | `go test ./internal/rules/max_params`                                                                  |
+| Related Go packages           | `go test <changed-package-dir> <affected-consumer-dirs>`                                               |
+| One JS integration file       | `CI=true pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
+| One Rust crate                | `cargo test -p tsgo-client`                                                                            |
+| Go lint for a changed package | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`                      |
+| Format changed JS/TS/docs     | `pnpm exec rs fmt <changed-files>`                                                                     |
+| Format changed Go files       | `gofmt -w <changed-go-files>`                                                                          |
+| Spell-check changed text      | `pnpm run check-spell <changed-text-files>`                                                            |
+
+Explicit `rs fmt` paths still obey `rstack.config.mts` exclusions, including rule Markdown under `internal/**/rules/**/*.md`. Select supported, non-ignored changed files and skip the command when none remain; an ignored-only selection fails instead of formatting those files.
+
+Run Rstest verification with `CI=true` so missing snapshots fail instead of being created automatically. The example uses POSIX shell syntax; set the equivalent environment variable in other shells. Use `-u` only for intentional snapshot generation and review the result against the expected behavior.
 
 Before JS integration tests exercise changed Go code, run `pnpm --filter @rslint/core build:bin`. Build affected JS artifacts with the workspace's existing build command when its source changed or the required output is missing. Go test-only changes need the owning package's tests. Shared helpers need their affected consumers; package imports are a starting point for tracing the changed API, not a reason to run every rule in a plugin.
 

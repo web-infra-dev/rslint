@@ -241,6 +241,7 @@ gimvy
 gimy
 gimyu
 github
+gitlink
 glossref
 gnored
 GOARCH
@@ -590,6 +591,7 @@ subclassing
 subpackages
 subtag
 subtags
+subtest
 subtests
 supa
 supersets
