@@ -3,11 +3,11 @@ package display_name
 // These regressions cover effective pragma resolution against eslint-plugin-react
 // v7.37.5. The existing rule suite lives in display_name_test.go.
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -110,7 +110,7 @@ func TestDisplayNameExtrasPragma(t *testing.T) {
 			})
 			t.Run("source", func(t *testing.T) {
 				root := fixtures.GetRootDir()
-				fileName := filepath.Join(root.Dir, "pragma.tsx")
+				fileName := tspath.ResolvePath(root.Dir, "pragma.tsx")
 				fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: test.code})
 				program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
 					RootFileNames: []string{fileName}, Host: utils.CreateCompilerHost(root.Dir, fs),
