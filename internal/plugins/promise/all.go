@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/param_names"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/prefer_await_to_then"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/prefer_catch"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/spec_only"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/valid_params"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -33,6 +34,7 @@ func GetAllRules() []rule.Rule {
 		param_names.ParamNamesRule,
 		prefer_await_to_then.PreferAwaitToThenRule,
 		prefer_catch.PreferCatchRule,
+		spec_only.SpecOnlyRule,
 		valid_params.ValidParamsRule,
 	}
 }

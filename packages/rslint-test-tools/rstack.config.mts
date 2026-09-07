@@ -696,6 +696,7 @@ define.test({
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
     './tests/eslint-plugin-promise/rules/prefer-await-to-then.test.ts',
     './tests/eslint-plugin-promise/rules/prefer-catch.test.ts',
+    './tests/eslint-plugin-promise/rules/spec-only.test.ts',
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',
 
     // eslint-plugin-unicorn
