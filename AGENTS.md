@@ -25,6 +25,7 @@ Repository skills follow the branch, local verification, and test-layout rules b
 - Go lint-rule tests keep upstream cases in `<rule>_upstream_test.go` and rslint-added regressions, edge cases, and branch coverage in `<rule>_extras_test.go`. Do not mix them. Large extras suites may split by area as `<rule>_extras_<area>_test.go`.
 - That split applies to Go rule tests. JS rule integration tests stay in one `<rule>.test.ts` and mirror upstream behavior; do not duplicate Go extras there. Detailed porting requirements live in `.agents/skills/port-rule/references/PORT_RULE.md`.
 - Keep small inputs inline. Put multi-file text fixtures under the owning package's `testdata/`; reuse `internal/testutil/txtarfs` for related portable text trees. Construct symlinks, permissions, concurrency, and other OS behavior directly in Go tests.
+- Normalize paths at the tsgo/VFS boundary: use `tspath.ResolvePath(root.Dir, name)` for fixture-relative paths and `tspath.NormalizePath(filepath.Join(...))` for host paths. Never use raw `filepath.Join` results as VFS keys or tsgo root filenames.
 - Keep package-specific helpers beside their tests; shared Go test infrastructure belongs in `internal/testutil`. Fixture helpers must fail on missing or empty selections.
 
 ## JavaScript compatibility
