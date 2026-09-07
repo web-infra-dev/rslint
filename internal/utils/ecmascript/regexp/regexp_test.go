@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -113,6 +114,16 @@ func TestTest(t *testing.T) {
 		{name: "i named group", source: "^(?<n>a)$", flags: "i", subject: "A", want: true},
 		{name: "i named backreference", source: `^(?<w>a)\k<w>$`, flags: "i", subject: "aA", want: true},
 		{name: "i numbered backreference", source: `^(a)\1$`, flags: "i", subject: "Aa", want: true},
+		{name: "mixed numeric first capture", source: `^(?<dir>src)/(.*)/\1$`, subject: "src/cli/src", want: true},
+		{name: "mixed numeric second capture", source: `^(?<dir>src)/(.*)/\2$`, subject: "src/cli/cli", want: true},
+		{name: "mixed numeric wrong order", source: `^(?<dir>src)/(.*)/\1$`, subject: "src/cli/cli"},
+		{name: "nested mixed captures", source: `^(?<a>a(b))(?<c>c)(d)\1\2\3\4$`, subject: "abcdabbcd", want: true}, // cspell:ignore abcdabbcd
+		{name: "mixed named backreference", source: `^(?<a>a)(b)\k<a>\2$`, subject: "abab", want: true},
+		{name: "mixed forward reference", source: `^\1(?<a>a)(b)$`, subject: "ab", want: true},
+		{name: "mixed optional reference", source: `^(?<a>a)?(b)\1$`, subject: "b", want: true},
+		{name: "mixed class numeric escape", source: `^(?<a>a)(b)[\1]$`, subject: "ab\x01", want: true},
+		{name: "mixed octal escape", source: `^(?<a>a)(b)\12$`, subject: "ab\n", want: true},
+		{name: "mixed lookaround capture", source: `^(?=(?<a>a))(a)\1\2$`, subject: "aaa", want: true},
 
 		// ---- `u` switches `i` to simple case folding, which has no rule
 		// about ASCII, so every pair the plain `i` cases above keep apart
@@ -314,6 +325,9 @@ func TestCompileRejects(t *testing.T) {
 		{name: "range running backwards", source: "[b-a]", is: ErrUnsupportedSyntax},
 		{name: "class that no bracket closes", source: "[abc", is: ErrUnsupportedSyntax},
 		{name: "backslash at the end", source: `a\`, is: ErrUnsupportedSyntax},
+		{name: "duplicate capture names", source: `(?<a>x)|(?<a>y)`, is: ErrUnsupportedSyntax},
+		{name: "backend numeric capture slot", source: `(?<3>a)(b)`, is: ErrUnsupportedSyntax},
+		{name: "backend balancing capture", source: `(?<a>a)(?<b-a>b)`, is: ErrUnsupportedSyntax},
 	}
 
 	for _, test := range tests {
@@ -380,5 +394,148 @@ func TestNilIsSafe(t *testing.T) {
 	}
 	if re.Unwrap() != nil {
 		t.Error("a nil RegExp unwrapped to something")
+	}
+	for _, re := range []*RegExp{nil, {}} {
+		if got, err := re.ReplaceFirst("input", "replacement"); got != "input" || err != nil {
+			t.Errorf("nil/zero RegExp.ReplaceFirst = %q, %v", got, err)
+		}
+	}
+}
+
+func TestReplaceFirst(t *testing.T) {
+	// Expectations are from JavaScript String#replace with a non-global RegExp.
+	for _, test := range []struct{ source, input, replacement, want string }{
+		{`^src/(.+)$`, "src/bin/test.js", "$1", "bin/test.js"},
+		{`a`, "aaa", "b", "baa"},
+		{`z`, "abc", "x", "abc"},
+		{`b`, "abc", "$$:$&:$`:$'", "a$:b:a:cc"},
+		{`(a)(b)?`, "a", "$2-$1-$3-$0-$_-$+-${1}", "-a-$3-$0-$_-$+-${1}"},
+		{`(a)`, "a", "$12:$01:$00:$99", "a2:a:$00:$99"},
+		{`(?<name>a)`, "a", "$<name>:$<missing>:$<name", "a::$<name"},
+		{`(?<name>a)(b)`, "ab", "$1:$2:$<name>", "a:b:a"},
+		{`(?<dir>src)/(.*)`, "src/cli.js", "$1/$2", "src/cli.js"},
+		{`(a)(?<name>b)(c)`, "abc", "$1:$2:$3:$<name>", "a:b:c:b"},
+		{`(?<a>a(b))(?<c>c)(d)`, "abcd", "$1:$2:$3:$4", "ab:b:c:d"},
+		{`(?<a>a)?(b)`, "b", "$1:$2:$<a>", ":b:"},
+		{`(?<a>a)|(b)`, "b", "$1:$2:$<a>", ":b:"},
+		{`(?<a>a)`, "a", "$<0>:$<1>:$<>:$<a>", ":::a"},
+		{`(?<__proto__>a)(b)`, "ab", "$<__proto__>:$1:$2", "a:a:b"},
+		{`(a)`, "a", "$<name>", "$<name>"},
+		{`b`, "😀b中文", "$&$", "😀b$中文"},
+		{`(中文)`, "😀中文尾", "$1:$`:$'", "😀中文:😀:尾尾"},
+		{`^`, "abc", "$", "$abc"},
+		{`$`, "中文", "$`", "中文中文"},
+		{`(?<=src/)(.+)`, "src/cli.js", "dist/$1", "src/dist/cli.js"},
+		{`(?<=(?<dir>src)/)(.*)`, "src/cli.js", "$1:$2", "src/src:cli.js"},
+		{`(?<a>a)(b)\1`, "aba", "$1:$2", "a:b"},
+		{``, "", "$&:$1", ":$1"},
+	} {
+		t.Run(test.source+"/"+test.replacement, func(t *testing.T) {
+			re := MustCompile(test.source, "")
+			got, err := re.ReplaceFirst(test.input, test.replacement)
+			if err != nil || got != test.want {
+				t.Errorf("ReplaceFirst(%q, %q) = %q, %v; want %q", test.input, test.replacement, got, err, test.want)
+			}
+		})
+	}
+	// The method always replaces once, even if the compiled pattern accepts g.
+	if got, err := MustCompile("a", "g").ReplaceFirst("aaa", "b"); err != nil || got != "baa" {
+		t.Errorf("global ReplaceFirst = %q, %v", got, err)
+	}
+	// Ten or more captures disambiguate $12 and retain $100's final zero.
+	if got, err := MustCompile(strings.Repeat("(a)", 12), "").ReplaceFirst(strings.Repeat("a", 12), "$12:$100"); err != nil || got != "a:a0" {
+		t.Errorf("two-digit ReplaceFirst = %q, %v", got, err)
+	}
+}
+
+func TestReplaceFirstTimeout(t *testing.T) {
+	re := MustCompile(`^(a+)+b$`, "")
+	re.Unwrap().MatchTimeout = time.Nanosecond
+	input := strings.Repeat("a", 200)
+	if got, err := re.ReplaceFirst(input, "changed"); err == nil || got != input {
+		t.Errorf("timed out ReplaceFirst = %q, %v; want unchanged input and error", got, err)
+	}
+}
+
+func TestReplaceFirstConcurrent(t *testing.T) {
+	re := MustCompile(`(?<dir>src)/(.*)`, "")
+	var workers sync.WaitGroup
+	for range 16 {
+		workers.Go(func() {
+			for range 50 {
+				got, err := re.ReplaceFirst("src/cli.js", "$2:$<dir>:$1")
+				if err != nil || got != "cli.js:src:src" || !re.Test("src/cli.js") {
+					t.Errorf("shared regexp returned %q, %v", got, err)
+				}
+			}
+		})
+	}
+	workers.Wait()
+}
+
+func FuzzCompileAndReplace(f *testing.F) {
+	for _, source := range []string{`(?<a>a)(b)\1`, `(?<3>a)(b)`, `(?<0>a)`, `(?<a>a)(?<b-a>b)`, `(?<x>a)|(?<x>b)`, `\((a)[()]`, `(?<=a)(b)`} {
+		f.Add(source, "ab", "$1:$2:$<a>:$<0>:$99")
+	}
+	f.Fuzz(func(t *testing.T, source, input, replacement string) {
+		if len(source) > 128 || len(input) > 128 || len(replacement) > 128 {
+			return
+		}
+		re, err := Compile(source, "")
+		if err != nil {
+			return
+		}
+		re.Unwrap().MatchTimeout = time.Millisecond
+		if got, err := re.ReplaceFirst(input, replacement); err != nil && got != input {
+			t.Fatalf("failed replacement changed input: %q -> %q", input, got)
+		}
+	})
+}
+
+func BenchmarkReplaceFirst(b *testing.B) {
+	for _, test := range []struct{ name, source, replacement string }{
+		{"plain", `^src/(.*)\.ts$`, "dist/$1.js"},
+		{"mixed", `(?<dir>src)/(.*)`, "$1/$2"},
+		{"named", `(?<dir>src)/(?<file>.*)`, "$<dir>/$<file>"},
+		{"no_match", `^lib/(.*)`, "dist/$1"},
+	} {
+		b.Run(test.name, func(b *testing.B) {
+			re := MustCompile(test.source, "")
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				if _, err := re.ReplaceFirst("src/cli.ts", test.replacement); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkRegExp(b *testing.B) {
+	for _, test := range []struct{ name, source, input string }{
+		{"plain", `^src/(.*)\.ts$`, "src/cli.ts"},
+		{"named", `^(?<dir>src)/(?<file>.*)\.ts$`, "src/cli.ts"},
+		{"mixed", `^(?<dir>src)/(.*)\.ts$`, "src/cli.ts"},
+		{"backreference", `^(?<dir>src)/(.*)/\1$`, "src/cli/src"},
+	} {
+		b.Run(test.name, func(b *testing.B) {
+			b.Run("compile", func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					if _, err := Compile(test.source, ""); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+			b.Run("test", func(b *testing.B) {
+				re := MustCompile(test.source, "")
+				b.ReportAllocs()
+				b.ResetTimer()
+				for b.Loop() {
+					re.Test(test.input)
+				}
+			})
+		})
 	}
 }

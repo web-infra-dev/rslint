@@ -276,6 +276,12 @@ func isDecimalDigit(source string, i int) bool {
 // countGroups reads how many capturing groups a pattern opens and whether any
 // of them is named, which is what a `\1` and a `\k` are read against.
 func countGroups(source string) (int, bool) {
+	return scanGroups(source, nil)
+}
+
+// scanGroups also lets compilation collect capture order using the same walk
+// that distinguishes backreferences from Annex B numeric escapes.
+func scanGroups(source string, visit func(name string)) (int, bool) {
 	count, named := 0, false
 	inClass := false
 	for i := 0; i < len(source); {
@@ -296,9 +302,19 @@ func countGroups(source string) (int, bool) {
 			switch {
 			case !strings.HasPrefix(rest, "?"):
 				count++
+				if visit != nil {
+					visit("")
+				}
 			case strings.HasPrefix(rest, "?<") && !strings.HasPrefix(rest, "?<=") && !strings.HasPrefix(rest, "?<!"):
 				count++
 				named = true
+				if visit != nil {
+					name := ""
+					if end := strings.IndexByte(rest, '>'); end >= 0 {
+						name = rest[2:end]
+					}
+					visit(name)
+				}
 			}
 		}
 		_, size := utf8.DecodeRuneInString(source[i:])

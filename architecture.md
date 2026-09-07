@@ -149,6 +149,15 @@ bundled standard libraries through the upstream `lib` build task.
 See [the compiler dependency guide](./CONTRIBUTING.md#typescript-compiler-dependency)
 for the pinned revision, migration rationale, and update workflow.
 
+Rule-facing string and matching helpers belong under `internal/utils/`:
+`ecmascript` owns JavaScript string values and UTF-16 conversion,
+`ecmascript/regexp` owns RegExp rewriting, capture numbering and replacement
+substitutions, and `minimatch3` owns the pinned glob grammar and path matching.
+The glob matcher uses code-unit input for regexp2; rule callers do not select a
+character encoding or translate backend capture numbers. These packages do not
+decide which files to lint or discover ignore files; those policies belong to
+configuration and target selection. Match timeouts remain at the engine boundary.
+
 ## 4. Parsing Pipeline
 
 The parsing and linting pipeline uses ts-go's native AST data model directly.

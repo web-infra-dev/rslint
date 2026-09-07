@@ -25,9 +25,14 @@
 // match may run: a backtracking engine on a pattern a user wrote is a way to
 // hang the linter, and a match that overruns is reported as no match.
 //
-// Three things are deliberately not covered:
+// The following are deliberately not covered:
 //
 //   - The `v` flag's set syntax, which Compile refuses outright.
+//   - Duplicate named groups across alternatives, which Compile refuses:
+//     regexp2 merges their capture slots instead of numbering them separately.
+//   - Non-Unicode matching of supplementary characters and lone surrogates.
+//     The RegExp matcher still reads Go code points; Test and ReplaceFirst
+//     share that behavior. Glob matching adapts its own input to UTF-16 units.
 //   - Comparing a backreference, or a `\p{…}` property escape, without regard
 //     to case. JavaScript compares a backreference by the same canonicalization
 //     it compares a literal by, and draws a property escape from Unicode's own
@@ -40,8 +45,7 @@
 //     carry `i` has none to make, and compares both exactly.
 //   - Exhaustive syntax validation under `u`. The `u` flag makes JavaScript
 //     reject constructs it otherwise tolerates — a bare `]` outside a class is
-//     the usual one — and those still compile here. Every pattern JavaScript
-//     accepts is read correctly; some it rejects are read rather than refused.
+//     the usual one — and those still compile here instead of being refused.
 package regexp
 
 import (
@@ -63,14 +67,15 @@ const MatchTimeout = time.Second
 // ErrUnsupportedFlag is returned for a flag this package does not implement.
 var ErrUnsupportedFlag = errors.New("unsupported regexp flag")
 
-// ErrUnsupportedSyntax is returned for syntax JavaScript itself rejects.
+// ErrUnsupportedSyntax is returned for invalid or unsupported JavaScript syntax.
 var ErrUnsupportedSyntax = errors.New("unsupported regexp syntax")
 
 // RegExp is a compiled JavaScript regexp.
 type RegExp struct {
-	source string
-	flags  string
-	re     *regexp2.Regexp
+	source   string
+	flags    string
+	re       *regexp2.Regexp
+	captures captureLayout
 	// exact is false when the pattern fell back to regexp2's own
 	// case-insensitivity, which is close to JavaScript's but not identical.
 	exact bool
@@ -124,12 +129,16 @@ func Compile(source string, flags string) (*RegExp, error) {
 		return nil, err
 	}
 
+	captures, err := parseCaptureLayout(source)
+	if err != nil {
+		return nil, err
+	}
 	rewritten, exact, err := rewrite(source, rewriteOptions{
 		multiline:  set.multiline,
 		dotAll:     set.dotAll,
 		ignoreCase: set.ignoreCase,
 		unicode:    set.unicode,
-	})
+	}, captures)
 	if err != nil {
 		return nil, err
 	}
@@ -159,8 +168,15 @@ func Compile(source string, flags string) (*RegExp, error) {
 		return nil, errors.New(strings.ReplaceAll(err.Error(), rewritten, source))
 	}
 	re.MatchTimeout = MatchTimeout
+	for name, index := range captures.names {
+		if re.GroupNumberFromName(name) != captures.number(index) {
+			// Reject backend-only capture syntax (numeric slot names or
+			// balancing groups) that would invalidate the lexical mapping.
+			return nil, fmt.Errorf("%w: capture name %q", ErrUnsupportedSyntax, name)
+		}
+	}
 
-	return &RegExp{source: source, flags: flags, re: re, exact: exact}, nil
+	return &RegExp{source: source, flags: flags, re: re, exact: exact, captures: captures}, nil
 }
 
 // MustCompile is Compile for a pattern written in this repository rather than
@@ -217,9 +233,9 @@ func (r *RegExp) Flags() string { return r.flags }
 // String renders the regexp the way JavaScript writes a regexp literal.
 func (r *RegExp) String() string { return "/" + r.source + "/" + r.flags }
 
-// Unwrap returns the compiled regexp2 pattern, for a caller that needs
-// capture groups or replacement. The pattern it holds is the rewritten one, so
-// its own String does not match Source.
+// Unwrap returns the compiled regexp2 pattern. Both its pattern and capture
+// numbering belong to the backend, not JavaScript. Use ReplaceFirst for string
+// substitution; it preserves JavaScript capture numbers and dollar syntax.
 func (r *RegExp) Unwrap() *regexp2.Regexp {
 	if r == nil {
 		return nil

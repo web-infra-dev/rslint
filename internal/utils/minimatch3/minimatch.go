@@ -24,9 +24,8 @@
 // them stays cheap. minimatch instead caps how deep it recurses, and answers
 // that a path does not match once it hits the cap.
 //
-// A `?` and a character class each match one whole character, where minimatch
-// counts the UTF-16 units JavaScript strings are made of and so needs `??` for
-// a character outside the basic multilingual plane.
+// A `?` and a character class each match one UTF-16 code unit, as minimatch
+// does. A character outside the basic multilingual plane therefore needs `??`.
 //
 // A `/` separates the parts of a path and a `\` escapes the character after
 // it, on every platform. minimatch 3 rewrote a `\` to a `/` when it ran on
@@ -39,8 +38,10 @@
 package minimatch3
 
 import (
+	"fmt"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/dlclark/regexp2"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -273,7 +274,7 @@ func (m *Matcher) parsePart(pattern string) (patternPart, bool) {
 	// Skip the regexp for non-magical patterns, unescaping the pattern so it
 	// compares exactly against a name.
 	if !hasMagic {
-		return patternPart{literal: globUnescape(pattern)}, true
+		return patternPart{literal: ecmascript.CombineSurrogatePairs(globUnescape(pattern))}, true
 	}
 
 	re, err := regexp2.Compile("^"+endAnchors(source)+`\z`, regexp2.None)
@@ -387,7 +388,9 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 	// The index a rune is reported at is its offset in bytes, which is what the
 	// character class slicing below wants: every character the parser gives a
 	// meaning to is ASCII, so an offset always lands on a rune boundary.
-	for i, c := range pattern {
+	for i, size := 0, 0; i < len(pattern); i += size {
+		var c rune
+		c, size = ecmascript.DecodeStringRune(pattern[i:])
 		// skip over any that are escaped.
 		if escaping && strings.ContainsRune(reSpecials, c) {
 			re += `\` + string(c)
@@ -538,6 +541,18 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 			// a literal standing on its own is widened here.
 			// minimatch builds `new RegExp(re, "i")`, with no `u`, so the
 			// comparison is the one that never crosses into ASCII.
+			if c > 0xFFFF {
+				// minimatch compiles without `u`: even inside a class these
+				// are two separate units, and neither participates in case
+				// folding. Emit escapes before closing or widening the class.
+				high, low := utf16.EncodeRune(c)
+				re += codeUnitEscape(high) + codeUnitEscape(low)
+				continue
+			}
+			if c >= 0xD800 && c <= 0xDFFF {
+				re += codeUnitEscape(c)
+				continue
+			}
 			if m.options.NoCase && !inClass {
 				if class, widened := esregexp.CaseClass(c, false); widened {
 					re += class
@@ -635,6 +650,10 @@ func (m *Matcher) parseSource(pattern string, isSub bool) (string, bool, bool) {
 	return re, hasMagic, true
 }
 
+func codeUnitEscape(unit rune) string {
+	return fmt.Sprintf(`\u%04x`, unit)
+}
+
 // isValidJSClass asks the ECMAScript scanner whether class is a complete
 // character class. minimatch uses the RegExp constructor for this check; the
 // scanner accepts a literal instead, so delimiters and raw line terminators
@@ -644,7 +663,18 @@ func isValidJSClass(class string) bool {
 	literal.Grow(len(class) + 2)
 	literal.WriteByte('/')
 	backslashes := 0
-	for _, r := range class {
+	for i := 0; i < len(class); {
+		r, size := ecmascript.DecodeStringRune(class[i:])
+		i += size
+		if r >= 0xD800 && r <= 0xDFFF {
+			escaped := codeUnitEscape(r)
+			if backslashes%2 != 0 {
+				escaped = escaped[1:]
+			}
+			literal.WriteString(escaped)
+			backslashes = 0
+			continue
+		}
 		switch r {
 		case '\\':
 			literal.WriteRune(r)
@@ -933,9 +963,9 @@ func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int,
 func (p patternPart) match(name string) bool {
 	if p.re == nil {
 		// A part without wildcards has to match exactly.
-		return name == p.literal
+		return name == p.literal || (strings.IndexByte(name, 0xED) >= 0 && ecmascript.CombineSurrogatePairs(name) == p.literal)
 	}
-	matched, err := p.re.MatchString(name)
+	matched, err := p.re.MatchRunes(ecmascript.StringCodeUnitRunes(name))
 	return err == nil && matched
 }
 

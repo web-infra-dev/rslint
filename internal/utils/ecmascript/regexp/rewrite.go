@@ -2,6 +2,7 @@ package regexp
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -103,7 +104,7 @@ type openGroup struct {
 // canonicalization it compares a literal by, and it draws `\p{…}` from
 // Unicode's own tables; a widened pattern can name neither, so the caller falls
 // back to regexp2's own case-insensitivity there, which is close but not exact.
-func rewrite(source string, options rewriteOptions) (string, bool, error) {
+func rewrite(source string, options rewriteOptions, captures captureLayout) (string, bool, error) {
 	var out strings.Builder
 	out.Grow(len(source))
 
@@ -114,9 +115,8 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 	groups := []openGroup{}
 	// How a `\1` and a `\k` read is settled by the pattern as a whole, so the
 	// groups are counted before the walk rather than as it goes.
-	groupCount, named := countGroups(source)
 	context := func() escapeContext {
-		return escapeContext{unicode: current.unicode, groups: groupCount, named: named}
+		return escapeContext{unicode: current.unicode, groups: captures.count, named: captures.named}
 	}
 
 	for i := 0; i < len(source); {
@@ -159,7 +159,15 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				if current.ignoreCase {
 					exact = false
 				}
-				out.WriteString(source[i:end])
+				if captures.numbers == nil {
+					out.WriteString(source[i:end])
+				} else {
+					index, _ := strconv.Atoi(source[i+size : end])
+					// Delimit the rewritten number so a following digit cannot
+					// become part of the reference. Escape decoding already
+					// distinguished this from an octal or identity escape.
+					out.WriteString(`\k<` + strconv.Itoa(captures.number(index)) + `>`)
+				}
 
 			case escapeAssertion:
 				// A pattern cannot repeat a position, and lowering the
