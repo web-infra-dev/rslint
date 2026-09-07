@@ -1,6 +1,6 @@
 import type { RslintConfigEntry } from '../define-config.js';
 
-// Aligned with official eslint-plugin-import recommended.
+// Based on official eslint-plugin-import recommended.
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
   plugins: ['eslint-plugin-import'],
@@ -14,7 +14,7 @@ const recommended: RslintConfigEntry = {
     // warnings
     // 'import/no-named-as-default': 'warn', // not implemented
     // 'import/no-named-as-default-member': 'warn', // not implemented
-    'import/no-duplicates': 'warn',
+    'import/no-duplicates': ['warn', { considerQueryString: true }],
   },
 };
 

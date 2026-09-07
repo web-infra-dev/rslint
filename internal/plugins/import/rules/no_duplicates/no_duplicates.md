@@ -38,12 +38,21 @@ import { y } from './bar';
 
 ### `considerQueryString`
 
-When set to `true`, imports with different query strings are treated as different modules.
+- **Default:** `true`
+
+When set to `false`, query strings are ignored when checking for duplicate imports.
 
 ```json
 {
-  "import/no-duplicates": ["error", { "considerQueryString": true }]
+  "import/no-duplicates": ["error", { "considerQueryString": false }]
 }
+```
+
+For example, these imports are reported as duplicates when `considerQueryString` is `false`, but are allowed when it is `true`:
+
+```javascript
+import iconUrl from './icon.svg?url';
+import iconSource from './icon.svg?raw';
 ```
 
 ### `prefer-inline`
