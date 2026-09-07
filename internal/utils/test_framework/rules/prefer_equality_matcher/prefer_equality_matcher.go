@@ -92,7 +92,7 @@ func parseStrictEqualityComparison(node *ast.Node) (left, right *ast.Node, negat
 // parentheses and type assertions, and returns the span a replacement operand
 // has to take over. The span stops at the outermost type assertion rather than
 // at the literal: `toBe(true as const)` asserts a type that only holds for the
-// literal, so leaving `as const` behind would produce uncompilable code.
+// literal, so code that leaves `as const` behind no longer compiles.
 func unwrapBooleanLiteral(node *ast.Node) (target *ast.Node, value bool, ok bool) {
 	for node != nil {
 		node = ast.SkipParentheses(node)
