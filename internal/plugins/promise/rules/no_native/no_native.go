@@ -2,6 +2,7 @@ package no_native
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
@@ -13,11 +14,8 @@ var NoNativeRule = rule.Rule{
 		// Upstream accepts any authored definition in the global scope, even
 		// one in a different TypeScript namespace. Module and CommonJS wrapper
 		// bindings instead have to resolve the individual reference.
-		sourceType := ctx.LanguageOptions.EffectiveSourceType()
-		globalScope := sourceType == "script" ||
-			(sourceType == "commonjs" && !ast.IsInJSFile(ctx.SourceFile.AsNode()))
-		if globalScope && ctx.Refs.IsNameDefinedInFileWithMeaning(ctx.SourceFile.AsNode(), "Promise",
-			ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) {
+		if !ctx.Refs.HasNonGlobalProgramScope() && ctx.Refs.IsNameDefinedInFileWithMeaning(
+			ctx.SourceFile.AsNode(), "Promise", scope.ReferenceDual.DeclarationMeaning()) {
 			return nil
 		}
 
@@ -32,7 +30,10 @@ var NoNativeRule = rule.Rule{
 				}
 				// Configured globals, inline globals and TypeScript's libraries
 				// do not supply the file-local definition required by this rule.
-				ctx.ReportNode(node, rule.RuleMessage{
+				// Identifiers already have their exact token end. Reuse tsgo's
+				// trivia handling without allocating a scanner per diagnostic.
+				start := scanner.GetTokenPosOfNode(node, ctx.SourceFile, false)
+				ctx.ReportRange(node.Loc.WithPos(start), rule.RuleMessage{
 					Id:          "name",
 					Description: `"Promise" is not defined.`,
 				})

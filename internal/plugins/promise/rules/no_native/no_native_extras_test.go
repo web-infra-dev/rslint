@@ -5,9 +5,13 @@ package no_native_test
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_native"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // N/A: no fixes, suggestions or options; literal values are never compared.
@@ -119,6 +123,32 @@ func TestNoNativeExtras(t *testing.T) {
 			// Default parameters preserve their outer binding
 			{
 				Code: `const Promise = polyfill; function f(value = Promise) { const Promise = local; }`,
+			},
+			// Type exports skip a value shadow and find the outer type
+			{
+				Code: "type Promise = {}; namespace N { const Promise = lib; export type { Promise }; }",
+			},
+			// Namespace re-exports preserve an outer lexical binding
+			{
+				Code: "const Promise = lib; namespace N { export { Promise } from \"x\"; Promise; }",
+			},
+			// ESTree erases parentheses around a bare type export
+			{
+				Code: "interface Promise {} export default (((Promise)));",
+			},
+			// A class expression decorator can use an outer binding
+			{
+				Code: "const Promise = lib; const C = @Promise class Promise {};",
+			},
+			// A synthesized JSDoc import cannot hide an authored import
+			{
+				Code:     "/** @import { Promise } from \"x\" */\nimport { Promise } from \"y\";\nPromise;",
+				FileName: "file.js",
+			},
+			// Espree treats a namespaced JSX tag as a label
+			{
+				Code:     "const v = <Promise:part />;",
+				FileName: "file.jsx",
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -353,6 +383,160 @@ Promise.resolve();`,
 				Code:   `for (const Promise of implementations) { Promise.resolve(); } Promise;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 63, EndLine: 1, EndColumn: 70}},
 			},
+			// A type export cannot resolve its own value-only alias
+			{
+				Code: "namespace N { const Promise = lib; export type { Promise }; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 50, EndLine: 1, EndColumn: 57},
+				},
+			},
+			// A namespace re-export does not bind a lexical reference
+			{
+				Code: "namespace N { export { Promise } from \"x\"; Promise; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 44, EndLine: 1, EndColumn: 51},
+				},
+			},
+			// Dotted namespace segments are not global scope definitions
+			{
+				Code:            "namespace Promise.Inner {} Promise;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 28, EndLine: 1, EndColumn: 35},
+				},
+			},
+			// Import type qualifiers are labels but type arguments are references
+			{
+				Code: "type P = import(\"x\").Promise; type Q = import(\"x\").Box<Promise<void>>;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 56, EndLine: 1, EndColumn: 63},
+				},
+			},
+			// A type predicate subject is a value reference
+			{
+				Code: "type Promise = {}; function test(value: unknown): Promise is string { return true; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 51, EndLine: 1, EndColumn: 58},
+				},
+			},
+			// An inferred type parameter is unavailable in the false branch
+			{
+				Code: "type P<T> = T extends infer Promise ? Promise : Promise;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 49, EndLine: 1, EndColumn: 56},
+				},
+			},
+			// A mapped type parameter stays inside its mapped type
+			{
+				Code: "type P = { [Promise in string as Promise]: Promise }; Promise;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 55, EndLine: 1, EndColumn: 62},
+				},
+			},
+			// A class expression name is unavailable in its own decorator
+			{
+				Code: "const C = @Promise class Promise { method() { return Promise; } };",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 12, EndLine: 1, EndColumn: 19},
+				},
+			},
+			// TypeScript treats a namespaced JSX tag as a reference
+			{
+				Code:     "const v = <Promise:part />;",
+				FileName: "file.tsx",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 12, EndLine: 1, EndColumn: 19},
+				},
+			},
+			// A closure in a parameter initializer cannot see body bindings
+			{
+				Code: "function f(value = () => Promise) { var Promise; return value(); }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 26, EndLine: 1, EndColumn: 33},
+				},
+			},
+			// Token ranges skip JavaScript Unicode trivia and preserve CRLF positions
+			{
+				Code: "/* 😀 */\u00a0\ufeffPromise; // trailing\r\n/* lead */\tPromise;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 1, Column: 11, EndLine: 1, EndColumn: 18},
+					{MessageId: "name", Message: noNativeMessage, Line: 2, Column: 12, EndLine: 2, EndColumn: 19},
+				},
+			},
+			// Token ranges exclude hashbang and leading JSDoc comments
+			{
+				Code:     "#!/usr/bin/env node\n/** leading */ Promise;",
+				FileName: "file.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "name", Message: noNativeMessage, Line: 2, Column: 16, EndLine: 2, EndColumn: 23},
+				},
+			},
 		},
 	)
+}
+
+func TestNoNativeCheckerInvariant(t *testing.T) {
+	root := noNativeTestRoot()
+	filePath := tspath.ResolvePath(root.Dir, "no-native-checker.ts")
+	crossFilePath := tspath.ResolvePath(root.Dir, "no-native-cross-file.ts")
+	ambientPath := tspath.ResolvePath(root.Dir, "no-native-ambient.d.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{
+		filePath:      "Promise.resolve();\nlet value: Promise<void>;",
+		crossFilePath: "var Promise = implementation;",
+		ambientPath:   "interface Promise<T> {}",
+	})
+	program, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.allowJs.json", utils.CreateCompilerHost(root.Dir, fs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := program.GetSourceFile(filePath)
+	if file == nil || program.GetSourceFile(crossFilePath) == nil || program.GetSourceFile(ambientPath) == nil {
+		t.Fatal("checker fixture must include the linted file and both external declarations")
+	}
+	checker, done := program.GetTypeChecker(t.Context())
+	t.Cleanup(done)
+	_, refsInit, language := rule.ResolveLanguageDefaults(filePath, rule.LanguageOptions{})
+	for _, withChecker := range []bool{false, true} {
+		name := "without checker"
+		if withChecker {
+			name = "with checker"
+		}
+		t.Run(name, func(t *testing.T) {
+			tc := checker
+			if !withChecker {
+				tc = nil
+			}
+			var diagnostics []rule.RuleDiagnostic
+			ctx := (rule.RuleContext{
+				SourceFile: file, TypeChecker: tc, LanguageOptions: language,
+				Refs: rule.NewRefStore(file, program.Options(), tc, refsInit),
+			}).WithReporter(no_native.NoNativeRule.Name, rule.SeverityError, func(d rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, d)
+			})
+			listeners := no_native.NoNativeRule.Run(ctx, nil)
+			var visit func(*ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if node.Kind == ast.KindIdentifier && node.Text() == "Promise" && checker.GetSymbolAtLocation(node) == nil {
+					t.Fatal("checker must resolve Promise from outside the linted file")
+				}
+				if callback := listeners[node.Kind]; callback != nil {
+					callback(node)
+				}
+				node.ForEachChild(visit)
+				return false
+			}
+			visit(file.AsNode())
+			want := []core.TextRange{core.NewTextRange(0, 7), core.NewTextRange(30, 37)}
+			if len(diagnostics) != len(want) {
+				t.Fatalf("got %d diagnostics, want %d", len(diagnostics), len(want))
+			}
+			for i, d := range diagnostics {
+				if d.Range != want[i] || d.Message.Id != "name" || d.Message.Description != noNativeMessage ||
+					d.RuleName != no_native.NoNativeRule.Name || d.Severity != rule.SeverityError ||
+					d.FixesPtr != nil || d.Suggestions != nil {
+					t.Errorf("diagnostic %d: got %+v, want no-native at %v without edits", i, d, want[i])
+				}
+			}
+		})
+	}
 }
