@@ -10,8 +10,8 @@ Implement the requested rule with upstream diagnostic, option, fix and suggestio
 ## Start with the source
 
 1. Inspect the task branch and whether the rule already exists. Continue the same task on its branch. For a new task, fetch the intended base (normally `origin/main`), create a branch following AGENTS.md, and verify its name before editing.
-2. Use the supplied upstream version and URLs. Otherwise use `node .agents/skills/port-rule/scripts/search_rule.mjs <rule-name>` for discovery, then pin source, tests and docs to the latest released tag. A discovery URL on `main` is not a version pin. Resolve ambiguous origins or unsupported requirements before choosing a different rule or library.
-3. Read the pinned source and tests. Identify the rule's inputs, decisions and outputs, then implement and verify those behaviors in small increments. The tests can serve as the coverage record; a separate exhaustive plan and repeated checklists are unnecessary.
+2. Use the supplied upstream version and URLs. Otherwise use `node .agents/skills/port-rule/scripts/search_rule.mjs <rule-name>` for discovery, then pin source, tests and docs to the latest released tag. A discovery URL on `main` is not a version pin. Resolve ambiguous origins before choosing a different rule. An upstream dependency without a matching Go port is a capability question, not an automatic blocker.
+3. Read the pinned source and tests. Identify the rule's inputs, decisions and outputs, then check existing rslint, tsgo and installed Go capabilities for the operations actually used. Prefer direct reuse or a small adaptation to copying helpers or porting whole dependencies; follow [reuse and compatibility](references/PORT_RULE.md#reuse-and-compatibility) when behavior differs. Implement and verify in small increments. The tests can serve as the coverage record; a separate exhaustive plan and repeated checklists are unnecessary.
 
 Keep one short progress record when work spans sessions or multiple rules: branch/base, upstream version, current work, valid check results and remaining gaps. Reuse it after resuming.
 
@@ -32,6 +32,7 @@ Use the following references for the current operation. Open a named path or sym
 | Need                                                    | Reference                                                                                                       |
 | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Commands, build dependencies and exact repository paths | [QUICK_REFERENCE](references/QUICK_REFERENCE.md)                                                                |
+| Existing tools, dependency reuse and narrow differences | [Reuse and compatibility](references/PORT_RULE.md#reuse-and-compatibility)                                      |
 | Origin, deprecation or unsupported framework behavior   | [Upstream contract](references/PORT_RULE.md#upstream-contract)                                                  |
 | Options parsing and schema                              | [Options and schema](references/PORT_RULE.md#options-and-schema)                                                |
 | AST adaptation and JavaScript operations                | [AST and language semantics](references/PORT_RULE.md#ast-and-language-semantics), then the relevant API section |

@@ -6,9 +6,19 @@ This reference supplements [SKILL.md](../SKILL.md). Read the section needed for 
 
 - Use the requested upstream version; otherwise select the latest released tag. Read source, tests and documentation at that tag. Discovery links on the default branch may describe unreleased behavior.
 - Determine whether the requested rule belongs to ESLint core, typescript-eslint or another plugin. Honor an explicitly requested legacy rule; otherwise resolve deprecation/replacement before choosing its catalog key. Do not register both a core and TypeScript alias for one port.
-- Preserve public behavior: accepted options, defaults, diagnostics, ranges, fixes and suggestions. AST or Go implementation differences require adaptation, not automatic permission to change semantics.
-- A requested or already established public difference belongs in the implementation comment, rule documentation and a regression test. If an unsupported capability blocks parity, report that gap before claiming completion.
+- Preserve the rule's purpose, accepted options, defaults, common diagnostics, ranges, fixes and suggestions. Use the reuse policy below for narrow edge differences; implementation mistakes are not intended differences.
+- A public difference belongs in an implementation comment, the rule documentation's `Differences from upstream` section and a regression test. State the actual compatibility scope when delivering; do not claim exact parity with known differences.
 - Check existing configuration and test-harness support before declaring an ESLint concept unsupported. For example, Go tests can pass `LanguageOptions` (including `sourceType`) and `Globals`. Preserve unsupported upstream cases as explained Go skips; a JS wrapper may not implement `skip`.
+
+## Reuse and compatibility
+
+Start from the rule's actual dependency calls and enabled options. Use the [capability lookup](QUICK_REFERENCE.md#api-and-contract-lookup) to inspect existing rslint helpers, Program services, tsgo shims and installed Go packages before implementing parsing, matching, traversal or resolution yourself. Read a definition and relevant caller to establish its contract; a different package name does not establish incompatibility.
+
+Prefer direct reuse, then a small adaptation or extension of an existing helper. If two consumers need the same operation, expose or extract the common capability at its owning boundary rather than copy it into the rule. Keep configuration policy and backend details out of rule code. Introduce a new utility only for a demonstrated gap; a complete upstream dependency port needs a benefit beyond the existence of that import.
+
+Compare behavior that can affect this rule, using pinned upstream cases and a few discriminating inputs. Do not turn this into a survey of every API or a full library-conformance project. Default and realistic configurations must retain their diagnostics and safe edits. Bounded, uncommon differences in an existing tool may be accepted under the repository's reuse policy without a new permission round: record the triggering input, upstream result, rslint result and practical scope in `Differences from upstream`, and cover the chosen behavior in a regression. Retain affected upstream cases and explain their differing expectation instead of silently omitting them.
+
+A difference is not narrow merely because it occurs in an optional setting. Missing whole options, common false positives or negatives, unsafe fixes, or a change to the rule's purpose need resolution or explicit user direction. Existing user authorization for a specific tradeoff remains valid; do not ask again. Report a concrete unresolved capability and its effect when clarification is actually needed.
 
 ## Coverage and assertions
 
@@ -54,7 +64,7 @@ Select edge cases from the upstream operations, not from a fixed checklist of un
 
 Use [member and call expressions](AST_PATTERNS.md#member-and-call-expressions) for those node shapes and helper contracts; a static-name helper can accept computed keys or reject private names differently from upstream. Other operations are indexed in [API and contract lookup](QUICK_REFERENCE.md#api-and-contract-lookup).
 
-Follow AGENTS.md's JavaScript helper requirements. Use `ecmascript` for JS string/number semantics, `unicode17` for Unicode categories and tsgo's `scanner` for identifiers. User-controlled regexps require `esregexp`. Match upstream's glob library/version; only `minimatch3` and `isglob` are available. Report unsupported libraries instead of substituting or adding a port outside the task.
+Follow AGENTS.md's JavaScript helper requirements. Use `ecmascript` for JS string/number semantics, `unicode17` for Unicode categories and tsgo's `scanner` for identifiers. User-controlled regexps require `esregexp`. For globs and ignore patterns, evaluate existing matching capabilities under [reuse and compatibility](#reuse-and-compatibility); upstream package/version identifies the comparison reference, not a mandatory implementation dependency.
 
 ## Options and schema
 
@@ -70,7 +80,7 @@ CLI, API and LSP configuration paths validate options. Schema defaults populate 
 
 ## Framework boundaries
 
-Reuse the existing framework; extract a helper only for an actual second consumer with equivalent semantics.
+Reuse the existing framework. An existing helper and the new rule are two consumers: expose or extract their common operation when needed, keeping rule-specific policy local.
 
 | Need                                               | Existing boundary                                                                                                                                                                                           |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
