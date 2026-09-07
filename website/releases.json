@@ -758,7 +758,6 @@
       "eslint-plugin-unicorn:no-magic-array-flat-depth",
       "eslint-plugin-unicorn:prefer-ternary",
       "eslint-plugin-unicorn:throw-new-error",
-      "eslint:accessorutil",
       "eslint:class-methods-use-this",
       "eslint:grouped-accessor-pairs",
       "eslint:id-denylist",
@@ -844,6 +843,10 @@
       "rstest:padding-around-test-blocks",
       "rstest:prefer-importing-rstest-globals",
       "rstest:prefer-rs-mocked"
-    ]
+    ],
+    "typescript": {
+      "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
+      "releaseVersion": null
+    }
   }
 ]

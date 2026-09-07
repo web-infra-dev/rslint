@@ -83,6 +83,34 @@ bash tools/update-typescript-go.sh
 
 The helper resolves the exact submodule commit to a Go pseudo-version, updates the root and shim module requirements, regenerates shims from the local checkout, tidies those modules, builds both Go entrypoints, and checks the unsafe checker mirror's field layout. Review the resulting changes and run the Go and JS tests before committing the new submodule revision. Compiler API changes may require adapting the shim declarations and their consumers.
 
+## Sync release information
+
+After bumping to a new stable version and before publishing, run the release sync
+command separately:
+
+```bash
+git fetch origin --tags
+pnpm sync:version-info
+```
+
+This replaces `pnpm sync:rule-releases`. It updates `website/releases.json` with
+new rules and the pinned TypeScript commit for the new stable release. If the
+package version matches the latest stable tag, the command skips it to preserve
+the published record. Stage any submodule revision change first. An exact upstream release tag supplies
+`typescript.releaseVersion`; otherwise the value is `null`. A failed upstream
+lookup stops the command without writing the file.
+
+Commit the generated JSON with the release changes. The website uses it for rule
+version badges and the TypeScript compiler version table. The table tracks releases
+from `0.9.2` onward; earlier versions retain only their existing rule history.
+
+`pnpm sync:version-info full` rebuilds rule history from stable tags while preserving
+recorded compiler bindings. Fetch all tags before running it.
+
+The scripts live in `scripts/sync-version-info/`: `index.js` is the entry point,
+`release.js` maintains rule release history, and `version.js` resolves the
+TypeScript commit and release version.
+
 ## Test the CLI
 
 After building, you can test the rslint CLI:

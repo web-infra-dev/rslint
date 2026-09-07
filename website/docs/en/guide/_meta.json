@@ -60,5 +60,10 @@
     "type": "file",
     "name": "environment-variables",
     "label": "Environment Variables"
+  },
+  {
+    "type": "file",
+    "name": "typescript-versions",
+    "label": "Bundled TypeScript Versions"
   }
 ]
