@@ -177,6 +177,25 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      # `Build` already compiled every package behind ./cmd/rslint, so this
+      # relink is link-only off the warm cache. It measures the stripped
+      # executable users download, not the unstripped one tested above.
+      - name: Measure rslint binary size
+        env:
+          BINARY_SIZE_GO_VERSION: ${{ matrix.go-version }}
+        run: |
+          go build -ldflags="-s -w" -o "${RUNNER_TEMP}/rslint-release" ./cmd/rslint
+          node scripts/binary-size.mjs record "${RUNNER_TEMP}/rslint-release" "${RUNNER_TEMP}/binary-size.json"
+
+      # Uploaded on every run, main included: a pull request's baseline is the
+      # artifact of the main run for its base commit.
+      - name: Upload rslint binary size
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rslint-binary-size
+          path: ${{ runner.temp }}/binary-size.json
+          if-no-files-found: error
+
       - name: Dogfooding
         run: pnpm run lint --format github
 
@@ -200,6 +219,71 @@ jobs:
 
       - name: Test
         run: xvfb-run -a pnpm run test
+
+  binary-size:
+    name: Binary Size
+    needs: test-node
+    # Reports only, deliberately kept out of `done` below: porting a rule
+    # legitimately grows the binary.
+    if: ${{ github.event_name == 'pull_request' && !cancelled() }}
+    runs-on: rspack-ubuntu-22.04-mini
+    permissions:
+      contents: read
+      # Reading the base commit's run and downloading its artifact.
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+
+      # Missing when `test-node` failed before the measurement.
+      - name: Download this run's measurement
+        id: head-size
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: rslint-binary-size
+          path: head-size
+
+      # On failure `run-id` stays empty and the report omits the comparison.
+      - name: Find the base measurement
+        id: base
+        if: steps.head-size.outcome == 'success'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/binary-size.mjs base-run
+
+      - name: Download the base measurement
+        if: steps.base.outputs.run-id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: rslint-binary-size
+          path: base-size
+          run-id: ${{ steps.base.outputs.run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Write report
+        if: steps.head-size.outcome == 'success'
+        run: |
+          node scripts/binary-size.mjs report head-size/binary-size.json base-size/binary-size.json > binary-size-report.md
+          cat binary-size-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # A fork's token is read-only, so this fails there and the job summary
+      # written above stays the report.
+      - name: Comment on the pull request
+        if: steps.head-size.outcome == 'success'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/binary-size.mjs comment binary-size-report.md
 
   test-node-windows:
     name: Test npm packages (rspack-windows-2022-large)
