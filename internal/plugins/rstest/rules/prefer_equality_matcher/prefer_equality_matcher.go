@@ -2,7 +2,6 @@ package prefer_equality_matcher
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -46,12 +45,10 @@ var PreferEqualityMatcherRule = shared.NewRule(shared.Config{
 })
 
 func buildSuggestionFixes(ctx rule.RuleContext, match shared.Match, equalityMatcher string) []rule.RuleFix {
-	comparisonRange := utils.TrimNodeTextRange(ctx.SourceFile, match.Comparison)
-	if ctx.Comments != nil && utils.HasCommentInSpan(
-		ctx.Comments.All(),
-		comparisonRange.Pos(),
-		comparisonRange.End(),
-	) {
+	// Both replaced spans are rewritten wholesale, so a comment inside either
+	// one would be dropped. The rule keeps the diagnostic and drops the
+	// suggestions instead.
+	if hasComment(ctx, match.Comparison) || hasComment(ctx, match.MatcherArgument) {
 		return nil
 	}
 
@@ -65,17 +62,9 @@ func buildSuggestionFixes(ctx rule.RuleContext, match shared.Match, equalityMatc
 	}
 
 	fixes := []rule.RuleFix{
-		rule.RuleFixReplace(
-			ctx.SourceFile,
-			match.Comparison,
-			scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(match.Left), false),
-		),
+		rule.RuleFixReplace(ctx.SourceFile, match.Comparison, match.LeftText),
 		rule.RuleFixReplaceRange(matcherRange, matcherText),
-		rule.RuleFixReplace(
-			ctx.SourceFile,
-			match.MatcherArgument,
-			scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(match.Right), false),
-		),
+		rule.RuleFixReplace(ctx.SourceFile, match.MatcherArgument, match.RightText),
 	}
 
 	var notModifier *testFramework.MemberEntry
@@ -111,4 +100,12 @@ func buildSuggestionFixes(ctx rule.RuleContext, match shared.Match, equalityMatc
 	}
 
 	return fixes
+}
+
+func hasComment(ctx rule.RuleContext, node *ast.Node) bool {
+	if ctx.Comments == nil || node == nil {
+		return false
+	}
+	textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+	return utils.HasCommentInSpan(ctx.Comments.All(), textRange.Pos(), textRange.End())
 }

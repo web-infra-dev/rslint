@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
@@ -33,10 +34,18 @@ type Runtime struct {
 // Match contains the source nodes and normalized modifier decision needed by
 // a framework-specific suggestion builder.
 type Match struct {
-	Expect          *ExpectCall
-	Comparison      *ast.Node
-	Left            *ast.Node
-	Right           *ast.Node
+	Expect     *ExpectCall
+	Comparison *ast.Node
+	Left       *ast.Node
+	Right      *ast.Node
+	// LeftText and RightText are the operands as they must be written at
+	// their new positions, which is not always their authored source text.
+	LeftText  string
+	RightText string
+	// MatcherArgument is the span the right operand replaces. It is the
+	// boolean literal, widened to the outermost type assertion around it so
+	// that an assertion written for the literal is not re-applied to an
+	// unrelated operand.
 	MatcherArgument *ast.Node
 	ShouldHaveNot   bool
 	ModifierText    string
@@ -79,23 +88,64 @@ func parseStrictEqualityComparison(node *ast.Node) (left, right *ast.Node, negat
 	}
 }
 
-func unwrapBooleanLiteral(node *ast.Node) (literal *ast.Node, value bool, ok bool) {
+// unwrapBooleanLiteral reads the boolean a matcher argument asserts through
+// parentheses and type assertions, and returns the span a replacement operand
+// has to take over. The span stops at the outermost type assertion rather than
+// at the literal: `toBe(true as const)` asserts a type that only holds for the
+// literal, so leaving `as const` behind would produce uncompilable code.
+func unwrapBooleanLiteral(node *ast.Node) (target *ast.Node, value bool, ok bool) {
 	for node != nil {
 		node = ast.SkipParentheses(node)
+		if node == nil {
+			break
+		}
 		switch node.Kind {
 		case ast.KindAsExpression:
+			if target == nil {
+				target = node
+			}
 			node = node.AsAsExpression().Expression
 		case ast.KindTypeAssertionExpression:
+			if target == nil {
+				target = node
+			}
 			node = node.AsTypeAssertion().Expression
 		case ast.KindTrueKeyword:
-			return node, true, true
+			if target == nil {
+				target = node
+			}
+			return target, true, true
 		case ast.KindFalseKeyword:
-			return node, false, true
+			if target == nil {
+				target = node
+			}
+			return target, false, true
 		default:
 			return nil, false, false
 		}
 	}
 	return nil, false, false
+}
+
+// operandText renders an operand for its new position. Redundant parentheses
+// are dropped, except around a comma expression: `expect((f(), a) === b)`
+// would otherwise become `expect(f(), a)`, which passes two arguments and
+// asserts on the wrong value.
+func operandText(sourceFile *ast.SourceFile, node *ast.Node) string {
+	inner := ast.SkipParentheses(node)
+	text := scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, inner, false)
+	if isCommaExpression(inner) {
+		return "(" + text + ")"
+	}
+	return text
+}
+
+func isCommaExpression(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return node.Kind == ast.KindBinaryExpression &&
+		node.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken
 }
 
 func modifierText(modifiers []testFramework.MemberEntry, addNot bool) string {
@@ -173,6 +223,8 @@ func NewRule(config Config) rule.Rule {
 						expectCall.MatcherEntry.Node,
 						buildUseEqualityMatcherMessage(),
 						func() []rule.RuleSuggestion {
+							match.LeftText = operandText(ctx.SourceFile, match.Left)
+							match.RightText = operandText(ctx.SourceFile, match.Right)
 							suggestions := make([]rule.RuleSuggestion, 0, len(equalityMatchers))
 							for _, equalityMatcher := range equalityMatchers {
 								fixes := config.BuildFixes(ctx, match, equalityMatcher)

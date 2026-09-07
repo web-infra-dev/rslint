@@ -3,7 +3,6 @@ package prefer_equality_matcher
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
@@ -43,15 +42,13 @@ var PreferEqualityMatcherRule = shared.NewRule(shared.Config{
 			return nil
 		}
 
-		leftText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(match.Left), false)
-		rightText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(match.Right), false)
 		return []rule.RuleFix{
-			rule.RuleFixReplace(ctx.SourceFile, match.Comparison, leftText),
+			rule.RuleFixReplace(ctx.SourceFile, match.Comparison, match.LeftText),
 			rule.RuleFixReplaceRange(
 				core.NewTextRange(match.Expect.HeadCall.End(), matcherAccessor.End()),
 				match.ModifierText+"."+equalityMatcher,
 			),
-			rule.RuleFixReplace(ctx.SourceFile, match.MatcherArgument, rightText),
+			rule.RuleFixReplace(ctx.SourceFile, match.MatcherArgument, match.RightText),
 		}
 	},
 })

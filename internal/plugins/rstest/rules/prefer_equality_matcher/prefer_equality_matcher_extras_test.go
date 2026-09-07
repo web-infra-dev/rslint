@@ -102,7 +102,15 @@ func TestPreferEqualityMatcherExtras(t *testing.T) {
 			// ---- Dimension 4: parentheses and type assertions ----
 			{Code: `expect(((a === b))).toBe(true);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(21, func(m string) string { return `expect(((a))).` + m + `(b);` })}},
 			{Code: `expect((a as number) === (b as number)).toBe(true);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(41, func(m string) string { return `expect(a as number).` + m + `(b as number);` })}},
-			{Code: `expect(a === b).toBe((true as boolean));`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(17, func(m string) string { return `expect(a).` + m + `((b as boolean));` })}},
+			{Code: `expect(a === b).toBe((true as boolean));`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(17, func(m string) string { return `expect(a).` + m + `((b));` })}},
+			// A type assertion written for the boolean literal cannot survive on
+			// the operand that replaces it: `b as const` does not compile.
+			{Code: `expect(a === b).toBe(true as const);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(17, func(m string) string { return `expect(a).` + m + `(b);` })}},
+			{Code: `expect(a === b).toBe(<const>true);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(17, func(m string) string { return `expect(a).` + m + `(b);` })}},
+			// Parentheses around a comma expression are load-bearing: dropping
+			// them would splice a second argument into the rewritten call.
+			{Code: `expect((f(), a) === b).toBe(true);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(24, func(m string) string { return `expect((f(), a)).` + m + `(b);` })}},
+			{Code: `expect(a === (f(), b)).toBe(true);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(24, func(m string) string { return `expect(a).` + m + `((f(), b));` })}},
 
 			// ---- Accessor syntax and modifier preservation ----
 			{Code: `expect(a === b)['toBe'](true);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(17, func(m string) string { return `expect(a)['` + m + `'](b);` })}},
@@ -165,6 +173,9 @@ api.expect(a).` + m + `(b);`
 			{Code: `expect(a === b).resolves /* keep */ .toBe(false,);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(38, func(m string) string { return `expect(a).resolves.not /* keep */ .` + m + `(b,);` })}},
 			{Code: `expect(a === b).not /* keep */ .toBe(false);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(33, func(m string) string { return `expect(a) /* keep */ .` + m + `(b);` })}},
 			{Code: `expect(a === b).toBe(/* expected */ true,);`, Errors: []rule_tester.InvalidTestCaseError{equalityExtrasError(17, func(m string) string { return `expect(a).` + m + `(/* expected */ b,);` })}},
+			// The whole type-asserted argument is replaced, so a comment inside
+			// it would be lost; the diagnostic is kept without suggestions.
+			{Code: `expect(a === b).toBe(true /* keep */ as const);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useEqualityMatcher", Line: 1, Column: 17}}},
 		},
 	)
 }
