@@ -62,17 +62,20 @@ Use package names with `--filter` and directories with `--dir`; they are not int
 
 Go rule directories and filenames use snake_case (`<rule_name>`); exported rule variables use PascalCase with a `Rule` suffix. Rule keys and JS test filenames use kebab-case (`<rule-name>`); preserve upstream message IDs.
 
-| Item                                           | Location                                                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Core rule source, documentation and Go tests   | `internal/rules/<rule_name>/`                                                                    |
-| Plugin rule source, documentation and Go tests | `internal/plugins/<go-plugin>/rules/<rule_name>/`                                                |
-| Rule documentation                             | `<rule_name>.md` beside the Go implementation                                                    |
-| Options schema, when options exist             | `<rule_name>.schema.json` beside the Go implementation                                           |
-| Core catalog entry                             | Import and entry in `internal/rules/all.go` → `coreRules()`                                      |
-| Plugin catalog entry                           | Import and entry in `internal/plugins/<go-plugin>/all.go` → `GetAllRules()`                      |
-| JS rule mirror                                 | `packages/rslint-test-tools/tests/<suite>/rules/<rule-name>.test.ts`                             |
-| JS test registration                           | `packages/rslint-test-tools/rstack.config.mts` → `include`                                       |
-| Suite configuration and local wrapper          | `packages/rslint-test-tools/tests/<suite>/rslint.config.mjs` and `rule-tester.ts`, where present |
+| Item                                           | Location                                                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Core rule source, documentation and Go tests   | `internal/rules/<rule_name>/`                                                                           |
+| Plugin rule source, documentation and Go tests | `internal/plugins/<go-plugin>/rules/<rule_name>/`                                                       |
+| Rule documentation                             | `<rule_name>.md` beside the Go implementation                                                           |
+| Options schema, when options exist             | `<rule_name>.schema.json` beside the Go implementation                                                  |
+| Core catalog entry                             | Import and entry in `internal/rules/all.go` → `coreRules()`                                             |
+| Plugin catalog entry                           | Import and entry in `internal/plugins/<go-plugin>/all.go` → `GetAllRules()`                             |
+| First-plugin display/group metadata            | `internal/plugins/<go-plugin>/plugin.go` → `PLUGIN_NAME`; consumed by `scripts/gen-rule-manifest.js`    |
+| First-plugin native declarations               | `internal/config/plugin_declarations.go` and `packages/rslint/src/config/define-config.ts`              |
+| First-plugin documentation prefix and presets  | `website/theme/plugin-registry.ts`; configuration snippets in `website/theme/components/RuleConfig.tsx` |
+| JS rule mirror                                 | `packages/rslint-test-tools/tests/<suite>/rules/<rule-name>.test.ts`                                    |
+| JS test registration                           | `packages/rslint-test-tools/rstack.config.mts` → `include`                                              |
+| Suite configuration and local wrapper          | `packages/rslint-test-tools/tests/<suite>/rslint.config.mjs` and `rule-tester.ts`, where present        |
 
 Resolve `<go-plugin>` and `<suite>` from the actual family; directory names do not always match public prefixes:
 
@@ -92,6 +95,8 @@ Resolve `<go-plugin>` and `<suite>` from the actual family; directory names do n
 The catalog key is `rule.Name`. `rule.CreateRule` automatically prefixes `@typescript-eslint/`, so use it only for that family. Core rules use a bare `rule.Rule` name; other plugins put their public prefix directly in `Name`. Resolve deprecated/extended rule origin using [Upstream contract](./PORT_RULE.md#upstream-contract), rather than registering both core and TypeScript keys.
 
 `rules.All()` combines explicit sources in `internal/rules/all.go`; a new plugin directory is not discovered automatically. Its first native rule also requires adding the plugin's `GetAllRules()` to that aggregation and checking the plugin-enablement boundaries in `architecture.md`. New rules do not belong in `internal/config`. See [Integration and documentation](./PORT_RULE.md#integration-and-documentation).
+
+For a first plugin, verify that `scripts/gen-rule-manifest.js` associates its group with the actual JS suite and rule documentation, and that generated documentation uses the correct route and enables the plugin. A plugin without a preset needs an explicit `plugins` declaration in its generated example; preserve the requested preset scope.
 
 ## API and contract lookup
 
