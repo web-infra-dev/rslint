@@ -809,5 +809,41 @@
       "rstest:require-awaited-expect-poll",
       "rstest:require-mock-type-parameters"
     ]
+  },
+  {
+    "version": "0.9.2",
+    "rules": [
+      "eslint-plugin-jest:padding-around-after-all-blocks",
+      "eslint-plugin-jest:padding-around-after-each-blocks",
+      "eslint-plugin-jest:padding-around-all",
+      "eslint-plugin-jest:padding-around-before-all-blocks",
+      "eslint-plugin-jest:padding-around-before-each-blocks",
+      "eslint-plugin-jest:padding-around-describe-blocks",
+      "eslint-plugin-jest:padding-around-expect-groups",
+      "eslint-plugin-jest:padding-around-test-blocks",
+      "eslint-plugin-react:function-component-definition",
+      "eslint-plugin-react:jsx-one-expression-per-line",
+      "eslint-plugin-react:no-arrow-function-lifecycle",
+      "eslint-plugin-react:no-namespace",
+      "eslint-plugin-react:prefer-read-only-props",
+      "eslint-plugin-react:sort-comp",
+      "eslint-plugin-react:static-property-placement",
+      "eslint-plugin-unicorn:no-array-from-fill",
+      "eslint-plugin-unicorn:no-await-expression-member",
+      "eslint-plugin-unicorn:no-this-outside-of-class",
+      "eslint-plugin-unicorn:prefer-string-trim-start-end",
+      "rstest:no-importing-rstest-globals",
+      "rstest:no-restricted-rstest-methods",
+      "rstest:padding-around-after-all-blocks",
+      "rstest:padding-around-after-each-blocks",
+      "rstest:padding-around-all",
+      "rstest:padding-around-before-all-blocks",
+      "rstest:padding-around-before-each-blocks",
+      "rstest:padding-around-describe-blocks",
+      "rstest:padding-around-expect-groups",
+      "rstest:padding-around-test-blocks",
+      "rstest:prefer-importing-rstest-globals",
+      "rstest:prefer-rs-mocked"
+    ]
   }
 ]
