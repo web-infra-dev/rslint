@@ -1748,9 +1748,6 @@ func TestDisplayNameRule(t *testing.T) {
 			Settings: map[string]interface{}{
 				"react": map[string]interface{}{"createClass": "createClass"},
 			},
-			// SKIP: rslint does not support ESLint's `/** @jsx ... */` directive
-			// comments. The pragma is read solely from settings.react.pragma.
-			Skip:   true,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: noDisplayName}},
 		},
 

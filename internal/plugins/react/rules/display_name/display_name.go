@@ -1471,7 +1471,7 @@ var DisplayNameRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		pragma := reactutil.GetReactPragma(ctx.Settings)
+		pragma := reactutil.GetReactPragmaFromContext(ctx)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
 
