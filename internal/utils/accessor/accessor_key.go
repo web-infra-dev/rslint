@@ -1,4 +1,4 @@
-package accessorutil
+package accessor
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"

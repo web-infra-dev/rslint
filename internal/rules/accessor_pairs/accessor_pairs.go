@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/rules/accessorutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/accessor"
 )
 
 //go:embed accessor_pairs.schema.json
@@ -57,7 +57,7 @@ const (
 // accessorGroup keeps the accessors belonging to one shared key. The key
 // helper preserves ESLint's distinct static, private, and dynamic classes.
 type accessorGroup struct {
-	key      accessorutil.Key
+	key      accessor.Key
 	isStatic bool
 	getters  []*ast.Node
 	setters  []*ast.Node
@@ -76,11 +76,11 @@ func checkList(ctx rule.RuleContext, members []*ast.Node, opts Options, kind con
 		if !isGetter && !isSetter {
 			continue
 		}
-		key := accessorutil.MakeKey(m)
+		key := accessor.MakeKey(m)
 		isStatic := distinguishStatic && ast.IsStatic(m)
 		var group *accessorGroup
 		for _, g := range groups {
-			if g.isStatic == isStatic && accessorutil.KeysEqual(ctx.SourceFile, g.key, key) {
+			if g.isStatic == isStatic && accessor.KeysEqual(ctx.SourceFile, g.key, key) {
 				group = g
 				break
 			}
