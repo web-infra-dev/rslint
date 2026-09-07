@@ -14,9 +14,7 @@ const releases: Release[] = data;
 export default releases;
 
 export const ruleVersionById = new Map(
-  releases
-    .filter(({ version }) => version !== 'main')
-    .flatMap(({ version, rules }) =>
-      rules.map((rule) => [rule, version] as const),
-    ),
+  releases.flatMap(({ version, rules }) =>
+    rules.map((rule) => [rule, version] as const),
+  ),
 );

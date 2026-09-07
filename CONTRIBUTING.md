@@ -94,15 +94,15 @@ pnpm sync:version-info
 ```
 
 This replaces `pnpm sync:rule-releases`. It updates `website/releases.json` with
-new rules and the pinned TypeScript commit. The `main` record is refreshed on each
-run; when the package version is a new stable release, that release is recorded
-as well. Stage any submodule revision change first. An exact upstream release tag supplies
+new rules and the pinned TypeScript commit for the new stable release. If the
+package version matches the latest stable tag, the command skips it to preserve
+the published record. Stage any submodule revision change first. An exact upstream release tag supplies
 `typescript.releaseVersion`; otherwise the value is `null`. A failed upstream
 lookup stops the command without writing the file.
 
 Commit the generated JSON with the release changes. The website uses it for rule
-version badges and the TypeScript compiler version table. The table shows `main`
-and new releases; versions through `0.9.1` retain only their existing rule history.
+version badges and the TypeScript compiler version table. The table tracks releases
+from `0.9.2` onward; earlier versions retain only their existing rule history.
 
 `pnpm sync:version-info full` rebuilds rule history from stable tags while preserving
 recorded compiler bindings. Fetch all tags before running it.

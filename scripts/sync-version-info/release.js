@@ -188,11 +188,7 @@ function syncFullHistory() {
     readReleases().map((entry) => [entry.version, entry]),
   );
   const versions = new Set(stableTags.map(({ version }) => version));
-  if (
-    [...recorded.keys()].some(
-      (version) => version !== 'main' && !versions.has(version),
-    )
-  ) {
+  if ([...recorded.keys()].some((version) => !versions.has(version))) {
     throw new Error(
       'Fetch all recorded stable release tags before a full sync',
     );
@@ -207,8 +203,6 @@ function syncFullHistory() {
     // Rebuild rule history without adding or changing compiler bindings.
     return { ...recorded.get(version), version, rules };
   });
-  if (recorded.has('main')) releases.push(recorded.get('main'));
-
   writeReleases(releases);
 }
 
@@ -228,13 +222,18 @@ function syncCurrentVersion(getTypeScriptBinding) {
       `Package version v${version} is older than ${latestTag.tag}`,
     );
   }
-  const published = latestTag?.version === version;
+  if (latestTag?.version === version) {
+    console.log(
+      `Skipped: package version v${version} matches the latest stable tag.`,
+    );
+    return false;
+  }
   const previousTag = latestTag;
   if (!previousTag) {
     throw new Error(`No stable tag exists before v${version}`);
   }
 
-  const releases = readReleases().filter((entry) => entry.version !== 'main');
+  const releases = readReleases();
   const latestRelease = releases.at(-1);
   const targetIndex = releases.findIndex(
     (release) => release.version === version,
@@ -251,7 +250,7 @@ function syncCurrentVersion(getTypeScriptBinding) {
   if (targetIndex !== -1 && targetIndex !== releases.length - 1) {
     throw new Error(`Refusing to rewrite historical version v${version}`);
   }
-  if (!published && targetIndex !== -1 && !releases[targetIndex].typescript) {
+  if (targetIndex !== -1 && !releases[targetIndex].typescript) {
     throw new Error(
       `Refusing to add a compiler binding to historical version v${version}; fetch release tags first`,
     );
@@ -269,13 +268,11 @@ function syncCurrentVersion(getTypeScriptBinding) {
     (rule) => !previousRules.has(rule) && !assignedRules.has(rule),
   );
   const typescript = getTypeScriptBinding(getGitOutput);
-  if (!published) {
-    const release = { version, rules, typescript };
-    if (targetIndex === -1) releases.push(release);
-    else releases[targetIndex] = release;
-  }
-  releases.push({ version: 'main', rules: published ? rules : [], typescript });
+  const release = { version, rules, typescript };
+  if (targetIndex === -1) releases.push(release);
+  else releases[targetIndex] = release;
   writeReleases(releases);
+  return true;
 }
 
 module.exports = { syncFullHistory, syncCurrentVersion };

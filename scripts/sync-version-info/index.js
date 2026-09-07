@@ -5,9 +5,7 @@ const { getTypeScriptBinding } = require('./version');
 
 function printUsage() {
   console.log('\nUsage:');
-  console.log(
-    '  pnpm sync:version-info       Sync main and the current stable release',
-  );
+  console.log('  pnpm sync:version-info       Sync the current stable release');
   console.log(
     '  pnpm sync:version-info full  Rebuild rule history, preserving TypeScript bindings',
   );
@@ -21,8 +19,8 @@ function main() {
 
   if (args[0] === 'full') {
     syncFullHistory();
-  } else {
-    syncCurrentVersion(getTypeScriptBinding);
+  } else if (!syncCurrentVersion(getTypeScriptBinding)) {
+    return;
   }
   console.log('Generated website/releases.json.');
 }

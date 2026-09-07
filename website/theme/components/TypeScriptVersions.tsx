@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitBranchIcon, GitCommitHorizontalIcon } from 'lucide-react';
+import { GitCommitHorizontalIcon } from 'lucide-react';
 import releases from '@/releases';
 import { Badge } from '@components/ui/badge';
 import {
@@ -27,23 +27,14 @@ export default function TypeScriptVersions() {
             typescript ? (
               <TableRow key={version}>
                 <TableCell>
-                  {version === 'main' ? (
-                    <a href="https://github.com/web-infra-dev/rslint/tree/main">
-                      <Badge variant="unreleased" className="gap-1.5 py-0.5">
-                        <GitBranchIcon className="size-3.5" aria-hidden />
-                        main
-                      </Badge>
-                    </a>
-                  ) : (
-                    <Badge className="overflow-hidden p-0">
-                      <span className="bg-gray-700 px-2 py-0.5 text-white">
-                        npm
-                      </span>
-                      <span className="bg-[#CB3837] px-2 py-0.5 text-white">
-                        v{version}
-                      </span>
-                    </Badge>
-                  )}
+                  <Badge className="overflow-hidden p-0">
+                    <span className="bg-gray-700 px-2 py-0.5 text-white">
+                      npm
+                    </span>
+                    <span className="bg-[#CB3837] px-2 py-0.5 text-white">
+                      v{version}
+                    </span>
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   {typescript.releaseVersion ? (
