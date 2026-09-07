@@ -15,7 +15,6 @@
  * base commit. That keeps the whole system on the built-in GITHUB_TOKEN: no
  * data branch, no personal access token, no repository writes.
  */
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -24,6 +23,10 @@ const SCHEMA_VERSION = 1;
 // Ties an update to the comment this workflow posted last time, instead of
 // opening a new thread on every push.
 const COMMENT_MARKER = '<!-- rslint-binary-size -->';
+
+// Written by `base-run`, read by `report`, so the base commit can be named
+// whether or not a measurement for it turned up.
+const BASE_COMMIT_FILE = 'base-commit.json';
 
 const apiBase = process.env.GITHUB_API_URL || 'https://api.github.com';
 const repository = process.env.GITHUB_REPOSITORY || '';
@@ -38,6 +41,37 @@ async function api(endpoint) {
     );
   }
   return response.json();
+}
+
+/** The `rel="next"` target of an API `Link` header, if there is another page. */
+function nextPageUrl(link) {
+  if (!link) return '';
+  for (const part of link.split(',')) {
+    const match = /<([^>]+)>;\s*rel="next"/.exec(part);
+    if (match) return match[1];
+  }
+  return '';
+}
+
+/**
+ * Walk a list endpoint page by page.
+ *
+ * Reading only the first page would miss the marker comment once a pull
+ * request has more than a page of comments, and every later push would then
+ * post a fresh report instead of editing the existing one.
+ */
+async function* apiPages(endpoint) {
+  let url = `${apiBase}${endpoint}`;
+  while (url) {
+    const response = await fetch(url, { headers: githubHeaders() });
+    if (!response.ok) {
+      throw new Error(
+        `GET ${url} failed: ${response.status} ${response.statusText}`,
+      );
+    }
+    yield await response.json();
+    url = nextPageUrl(response.headers.get('link'));
+  }
 }
 
 function githubHeaders() {
@@ -66,23 +100,6 @@ function readEvent() {
  * comment has to name the head commit it measured so a stale report is
  * obvious.
  */
-/**
- * Subject line of the commit that was checked out.
- *
- * Recorded here rather than looked up when the report is rendered, so a
- * baseline read back from an artifact carries its own description. Best
- * effort: a shallow or absent checkout just leaves it blank.
- */
-function commitSubject() {
-  try {
-    return execFileSync('git', ['log', '-1', '--format=%s'], {
-      encoding: 'utf8',
-    }).trim();
-  } catch {
-    return '';
-  }
-}
-
 function headCommitSha() {
   try {
     return readEvent().pull_request?.head?.sha || process.env.GITHUB_SHA || '';
@@ -98,7 +115,6 @@ function record(binary, out) {
     schemaVersion: SCHEMA_VERSION,
     sha: process.env.GITHUB_SHA || '',
     headSha: headCommitSha(),
-    subject: commitSubject(),
     ref: process.env.GITHUB_REF_NAME || '',
     event: process.env.GITHUB_EVENT_NAME || '',
     runId: process.env.GITHUB_RUN_ID || '',
@@ -116,7 +132,7 @@ function record(binary, out) {
 /**
  * Locate the workflow run that measured the pull request's base commit.
  *
- * The base commit is on main, so its own CI run holds the baseline artifact.
+ * The base commit is on main, so its own CI run holds its measurement.
  * A miss is not an error: the base may predate this workflow, its run may
  * still be going, or its artifact may have expired. The report then just
  * states the current size.
@@ -124,6 +140,8 @@ function record(binary, out) {
 async function findBaseRun() {
   const baseSha = readEvent().pull_request?.base?.sha;
   if (!baseSha) return { baseSha: '', runId: '' };
+
+  await writeBaseCommit(baseSha);
 
   const runs = await api(
     `/repos/${repository}/actions/runs?head_sha=${baseSha}&per_page=100`,
@@ -143,6 +161,26 @@ async function findBaseRun() {
   }
 
   return { baseSha, runId: '' };
+}
+
+/**
+ * Record the base commit's identity next to its measurement.
+ *
+ * Looked up rather than read off the base measurement so the report can name
+ * the base commit even when no measurement for it exists.
+ */
+async function writeBaseCommit(sha) {
+  let subject;
+  try {
+    const commit = await api(`/repos/${repository}/commits/${sha}`);
+    subject = (commit.commit?.message || '').split('\n')[0];
+  } catch {
+    subject = '';
+  }
+  fs.writeFileSync(
+    BASE_COMMIT_FILE,
+    `${JSON.stringify({ sha, subject }, null, 2)}\n`,
+  );
 }
 
 function formatBytes(bytes) {
@@ -193,6 +231,15 @@ function formatTimestamp(iso) {
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
 }
 
+/** The base commit this pull request is measured against. */
+function baseCommit() {
+  try {
+    return JSON.parse(fs.readFileSync(BASE_COMMIT_FILE, 'utf8'));
+  } catch {
+    return { sha: readEvent().pull_request?.base?.sha || '', subject: '' };
+  }
+}
+
 /** Render the Markdown shared by the job summary and the pull request comment. */
 function report(headPath, basePath) {
   const head = JSON.parse(fs.readFileSync(headPath, 'utf8'));
@@ -200,41 +247,41 @@ function report(headPath, basePath) {
     basePath && fs.existsSync(basePath)
       ? JSON.parse(fs.readFileSync(basePath, 'utf8'))
       : undefined;
+  const baseOn = baseCommit();
 
-  const lines = [COMMENT_MARKER, '', '## 🦀📦 Binary size', ''];
-
-  if (base) {
-    const delta = head.size - base.size;
-    lines.push(
-      `Commit ${commitLink(head.headSha)} merged into base ${commitLink(base.headSha || base.sha)}${formatSubject(base.subject)}.`,
-      '',
-      '| Binary | Base | This PR | Change |',
-      '| --- | ---: | ---: | ---: |',
-      `| \`rslint\` (${head.target}) | ${formatBytes(base.size)} | ${formatBytes(head.size)} | ${formatDelta(delta)} (${formatPercent(delta, base.size)}) |`,
-    );
-  } else {
-    lines.push(
-      `Commit ${commitLink(head.headSha)}. No baseline measurement was available for the base commit — it may predate this workflow, still be running, or have expired — so only the current size is reported.`,
-      '',
-      '| Binary | This PR |',
-      '| --- | ---: |',
-      `| \`rslint\` (${head.target}) | ${formatBytes(head.size)} |`,
-    );
-  }
+  // One table either way: an em dash where a missing measurement would go says
+  // everything a sentence about it would.
+  const delta = base ? head.size - base.size : undefined;
+  const row = [
+    `\`rslint\` (${head.target})`,
+    base ? formatBytes(base.size) : '—',
+    formatBytes(head.size),
+    delta === undefined
+      ? '—'
+      : `${formatDelta(delta)} (${formatPercent(delta, base.size)})`,
+  ];
 
   const goVersion = head.goVersion ? `Go ${head.goVersion}, ` : '';
   const server = process.env.GITHUB_SERVER_URL;
-  const measured =
+  const run =
     head.runId && server && repository
-      ? `[Measured](${server}/${repository}/actions/runs/${head.runId})`
-      : 'Measured';
-  lines.push(
-    '',
-    `<sub>Stripped release build: \`go build -ldflags="-s -w" ./cmd/rslint\` (${goVersion}linux/amd64) — the executable alone, not the full npm install. ${measured} ${formatTimestamp(head.measuredAt)}.</sub>`,
-    '',
-  );
+      ? `[run](${server}/${repository}/actions/runs/${head.runId})`
+      : 'run';
 
-  return lines.join('\n');
+  return [
+    COMMENT_MARKER,
+    '',
+    '## 🦀📦 Binary size',
+    '',
+    `Commit ${commitLink(head.headSha)} merged into base ${commitLink(baseOn.sha)}${formatSubject(baseOn.subject)}.`,
+    '',
+    '| Binary | Base | This PR | Change |',
+    '| --- | ---: | ---: | ---: |',
+    `| ${row.join(' | ')} |`,
+    '',
+    `<sub>Stripped \`go build -ldflags="-s -w" ./cmd/rslint\`, ${goVersion}linux/amd64 · ${run} · ${formatTimestamp(head.measuredAt)}</sub>`,
+    '',
+  ].join('\n');
 }
 
 /**
@@ -249,12 +296,13 @@ async function comment(reportPath) {
   const issueNumber = readEvent().pull_request?.number;
   if (!issueNumber) throw new Error('no pull request number in the event');
 
-  const existing = await api(
+  let previous;
+  for await (const page of apiPages(
     `/repos/${repository}/issues/${issueNumber}/comments?per_page=100`,
-  );
-  const previous = (existing || []).find((item) =>
-    item.body?.includes(COMMENT_MARKER),
-  );
+  )) {
+    previous = page.find((item) => item.body?.includes(COMMENT_MARKER));
+    if (previous) break;
+  }
 
   const endpoint = previous
     ? `/repos/${repository}/issues/comments/${previous.id}`
@@ -295,8 +343,8 @@ async function main() {
       appendOutput('run-id', runId);
       process.stdout.write(
         runId
-          ? `baseline run for ${baseSha}: ${runId}\n`
-          : `no baseline measurement found for ${baseSha || 'the base commit'}\n`,
+          ? `run measuring ${baseSha}: ${runId}\n`
+          : `no measurement found for ${baseSha || 'the base commit'}\n`,
       );
       break;
     }
