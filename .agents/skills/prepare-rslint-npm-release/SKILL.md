@@ -63,8 +63,8 @@ compiler already pinned for this release; preparing a release does not imply a
 compiler upgrade. Stage any separately authorized submodule revision change
 before syncing. The sync can read the pin without initializing the submodule.
 
-An existing release tag makes the default sync skip that published version. An
-unexpected skip during new release preparation is not successful generation:
+The default sync skips when the package version equals the latest stable tag.
+An unexpected skip during new release preparation is not successful generation:
 check the package version and fetched tags. Use incremental sync for normal
 preparation; `full` rebuilds historical rule records and belongs to a separate
 history repair request.
@@ -79,11 +79,11 @@ Check these invariants before committing:
 - The new release appears once in `website/releases.json`. Earlier records and
   compiler bindings are unchanged, and no `main` entry or compiler backfill is
   introduced.
-- New rule IDs are unique and sorted, refer to registered rules, and were absent
-  from the previous stable release and earlier recorded releases. Cross-check
-  their implementations and the relevant core/plugin `all.go` aggregators;
-  a helper or fixture directory is not a rule. A release with no new rules is
-  valid.
+- New rule IDs are unique and sorted. The list equals the registered rules added
+  since the previous stable release, excluding IDs recorded in earlier releases.
+  Cross-check implementations and the relevant core/plugin `all.go` aggregators
+  for both missing and spurious entries; a helper or fixture directory is not a
+  rule. A release with no new rules is valid.
 - `typescript.commit` equals the indexed gitlink. `typescript.releaseVersion` is
   an exact upstream tag match, including peeled annotated tags, or `null` when
   no tag matches. Do not substitute the latest TypeScript release or a version
