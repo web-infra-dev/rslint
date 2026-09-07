@@ -1,11 +1,10 @@
-#!/usr/bin/env node
-
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { normalizeVersion, compareVersions } = require('./version');
 
-const REPO_ROOT = path.resolve(__dirname, '..');
-const RULE_RELEASES_PATH = path.join(REPO_ROOT, 'website/rule-releases.json');
+const REPO_ROOT = path.resolve(__dirname, '../..');
+const RELEASES_PATH = path.join(REPO_ROOT, 'website/releases.json');
 const CORE_RULES_DIR = path.join(REPO_ROOT, 'internal/rules');
 const PLUGINS_DIR = path.join(REPO_ROOT, 'internal/plugins');
 const STABLE_VERSION_RE = /^\d+\.\d+\.\d+$/;
@@ -20,19 +19,6 @@ const PLUGIN_GROUP_FALLBACKS = new Map([
   ['unicorn', 'eslint-plugin-unicorn'],
 ]);
 const pluginGroupByBlob = new Map();
-
-function normalizeVersion(version) {
-  return String(version).replace(/^v/, '');
-}
-
-function compareVersions(a, b) {
-  const aParts = normalizeVersion(a).split('.').map(Number);
-  const bParts = normalizeVersion(b).split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if (aParts[i] !== bParts[i]) return aParts[i] - bParts[i];
-  }
-  return 0;
-}
 
 function canonicalRuleId(group, rule) {
   return `${group}:${rule.replace(/_/g, '-')}`;
@@ -66,13 +52,14 @@ function getPluginGroup(content, plugin) {
 
 function getPluginGroupAtBlob(blob, plugin) {
   if (!blob) return getPluginGroup(undefined, plugin);
-  if (!pluginGroupByBlob.has(blob)) {
+  const key = `${plugin}:${blob}`;
+  if (!pluginGroupByBlob.has(key)) {
     pluginGroupByBlob.set(
-      blob,
+      key,
       getPluginGroup(getGitOutput(['cat-file', 'blob', blob]), plugin),
     );
   }
-  return pluginGroupByBlob.get(blob);
+  return pluginGroupByBlob.get(key);
 }
 
 function getRuleIdsAtRef(ref) {
@@ -98,16 +85,24 @@ function getRuleIdsAtRef(ref) {
     const pluginFile = /^internal\/plugins\/([^/]+)\/plugin\.go$/.exec(file);
     if (pluginFile) pluginBlobs.set(pluginFile[1], blob);
 
-    const coreRule = /^internal\/rules\/([^/]+)\//.exec(file);
-    if (coreRule && coreRule[1] !== 'fixtures') {
+    const coreRule = /^internal\/rules\/([^/]+)\/([^/]+)\.go$/.exec(file);
+    if (
+      coreRule &&
+      !['fixtures', 'testdata'].includes(coreRule[1]) &&
+      (coreRule[1] === coreRule[2] || coreRule[2] === 'rule')
+    ) {
       coreRules.add(coreRule[1]);
       continue;
     }
 
-    const pluginRule = /^internal\/plugins\/([^/]+)\/rules\/([^/]+)\//.exec(
-      file,
-    );
-    if (!pluginRule || pluginRule[2] === 'fixtures') continue;
+    const pluginRule =
+      /^internal\/plugins\/([^/]+)\/rules\/([^/]+)\/([^/]+)\.go$/.exec(file);
+    if (
+      !pluginRule ||
+      ['fixtures', 'testdata'].includes(pluginRule[2]) ||
+      (pluginRule[2] !== pluginRule[3] && pluginRule[3] !== 'rule')
+    )
+      continue;
     const [, plugin, rule] = pluginRule;
     if (!pluginRules.has(plugin)) pluginRules.set(plugin, new Set());
     pluginRules.get(plugin).add(rule);
@@ -131,17 +126,25 @@ function getRuleIdsAtRef(ref) {
   return uniqueSorted(ruleIds);
 }
 
-function getRuleDirectories(directory) {
+function getDirectories(directory) {
   if (!fs.existsSync(directory)) return [];
   return fs
     .readdirSync(directory, { withFileTypes: true })
     .filter(
       (entry) =>
         entry.isDirectory() &&
-        entry.name !== 'fixtures' &&
+        !['fixtures', 'testdata'].includes(entry.name) &&
         !entry.name.startsWith('.'),
     )
     .map((entry) => entry.name);
+}
+
+function getRuleDirectories(directory) {
+  return getDirectories(directory).filter((name) =>
+    [name, 'rule'].some((file) =>
+      fs.existsSync(path.join(directory, name, `${file}.go`)),
+    ),
+  );
 }
 
 function getCurrentRuleIds() {
@@ -149,7 +152,7 @@ function getCurrentRuleIds() {
     canonicalRuleId('eslint', rule),
   );
 
-  for (const plugin of getRuleDirectories(PLUGINS_DIR)) {
+  for (const plugin of getDirectories(PLUGINS_DIR)) {
     const rulesDirectory = path.join(PLUGINS_DIR, plugin, 'rules');
     const rules = getRuleDirectories(rulesDirectory);
     if (rules.length === 0) continue;
@@ -167,19 +170,28 @@ function getCurrentRuleIds() {
   return uniqueSorted(ruleIds);
 }
 
-function readRuleReleases() {
-  return JSON.parse(fs.readFileSync(RULE_RELEASES_PATH, 'utf8'));
+function readReleases() {
+  return JSON.parse(fs.readFileSync(RELEASES_PATH, 'utf8'));
 }
 
-function writeRuleReleases(data) {
-  fs.mkdirSync(path.dirname(RULE_RELEASES_PATH), { recursive: true });
-  fs.writeFileSync(RULE_RELEASES_PATH, `${JSON.stringify(data, null, 2)}\n`);
+function writeReleases(data) {
+  fs.mkdirSync(path.dirname(RELEASES_PATH), { recursive: true });
+  fs.writeFileSync(RELEASES_PATH, `${JSON.stringify(data, null, 2)}\n`);
 }
 
 function syncFullHistory() {
   const stableTags = getStableTags();
   if (stableTags.length === 0) {
     throw new Error('No stable release tags were found');
+  }
+  const recorded = new Map(
+    readReleases().map((entry) => [entry.version, entry]),
+  );
+  const versions = new Set(stableTags.map(({ version }) => version));
+  if ([...recorded.keys()].some((version) => !versions.has(version))) {
+    throw new Error(
+      'Fetch all recorded stable release tags before a full sync',
+    );
   }
 
   const assignedRules = new Set();
@@ -188,13 +200,13 @@ function syncFullHistory() {
       (rule) => !assignedRules.has(rule),
     );
     for (const rule of rules) assignedRules.add(rule);
-    return { version, rules };
+    // Rebuild rule history without adding or changing compiler bindings.
+    return { ...recorded.get(version), version, rules };
   });
-
-  writeRuleReleases(releases);
+  writeReleases(releases);
 }
 
-function syncCurrentVersion() {
+function syncCurrentVersion(getTypeScriptBinding) {
   const version = normalizeVersion(
     JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'))
       .version,
@@ -205,21 +217,23 @@ function syncCurrentVersion() {
 
   const stableTags = getStableTags();
   const latestTag = stableTags.at(-1);
+  if (latestTag && compareVersions(version, latestTag.version) < 0) {
+    throw new Error(
+      `Package version v${version} is older than ${latestTag.tag}`,
+    );
+  }
   if (latestTag?.version === version) {
     console.log(
       `Skipped: package version v${version} matches the latest stable tag.`,
     );
     return false;
   }
-
-  const previousTag = stableTags
-    .filter((entry) => compareVersions(entry.version, version) < 0)
-    .at(-1);
+  const previousTag = latestTag;
   if (!previousTag) {
     throw new Error(`No stable tag exists before v${version}`);
   }
 
-  const releases = readRuleReleases();
+  const releases = readReleases();
   const latestRelease = releases.at(-1);
   const targetIndex = releases.findIndex(
     (release) => release.version === version,
@@ -230,11 +244,16 @@ function syncCurrentVersion() {
       latestRelease.version !== version)
   ) {
     throw new Error(
-      `Rule release JSON must end at v${previousTag.version} before syncing v${version}`,
+      `Release JSON must end at v${previousTag.version} before syncing v${version}`,
     );
   }
   if (targetIndex !== -1 && targetIndex !== releases.length - 1) {
     throw new Error(`Refusing to rewrite historical version v${version}`);
+  }
+  if (targetIndex !== -1 && !releases[targetIndex].typescript) {
+    throw new Error(
+      `Refusing to add a compiler binding to historical version v${version}; fetch release tags first`,
+    );
   }
 
   const previousRules = new Set(getRuleIdsAtRef(previousTag.tag));
@@ -243,48 +262,17 @@ function syncCurrentVersion() {
       .filter((release) => compareVersions(release.version, version) < 0)
       .flatMap((release) => release.rules),
   );
-  const rules = getCurrentRuleIds().filter(
+  const currentRules = getCurrentRuleIds();
+  if (!currentRules.length) throw new Error('No current rules were found');
+  const rules = currentRules.filter(
     (rule) => !previousRules.has(rule) && !assignedRules.has(rule),
   );
-  const release = { version, rules };
-
-  if (targetIndex === -1) {
-    releases.push(release);
-  } else {
-    releases[targetIndex] = release;
-  }
-  writeRuleReleases(releases);
+  const typescript = getTypeScriptBinding(getGitOutput);
+  const release = { version, rules, typescript };
+  if (targetIndex === -1) releases.push(release);
+  else releases[targetIndex] = release;
+  writeReleases(releases);
   return true;
 }
 
-function printUsage() {
-  console.log('\nUsage:');
-  console.log('  pnpm sync:rule-releases       Incremental sync (default)');
-  console.log('  pnpm sync:rule-releases full  Full historical sync');
-}
-
-function main() {
-  const args = process.argv.slice(2);
-  if (args.length > 1 || (args[0] && args[0] !== 'full')) {
-    throw new Error('The only supported argument is "full"');
-  }
-
-  if (args[0] === 'full') {
-    syncFullHistory();
-    console.log(`Generated ${path.relative(REPO_ROOT, RULE_RELEASES_PATH)}.`);
-  } else {
-    const generated = syncCurrentVersion();
-    if (generated) {
-      console.log(`Generated ${path.relative(REPO_ROOT, RULE_RELEASES_PATH)}.`);
-    }
-  }
-}
-
-try {
-  main();
-} catch (error) {
-  console.error(`Rule release sync failed: ${error.message}`);
-  process.exitCode = 1;
-} finally {
-  printUsage();
-}
+module.exports = { syncFullHistory, syncCurrentVersion };

@@ -5,7 +5,7 @@ import path from 'node:path';
 import * as rslintCore from '@rslint/core';
 import type { RslintConfigEntry } from '@rslint/core';
 import { PLUGIN_REGISTRY, groupToRouteSlug } from './theme/plugin-registry.ts';
-import ruleReleases from './rule-releases.json' with { type: 'json' };
+import { ruleVersionById } from './releases.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const MANIFEST_PATH = path.resolve(
@@ -14,11 +14,7 @@ const MANIFEST_PATH = path.resolve(
 );
 const SCRIPT_PATH = path.resolve(REPO_ROOT, 'scripts/gen-rule-manifest.js');
 const RULES_DOCS_DIR = path.resolve(import.meta.dirname, 'docs/en/rules');
-const RULE_VERSION_BY_ID = new Map(
-  ruleReleases.flatMap(({ version, rules }) =>
-    rules.map((rule) => [rule, version] as const),
-  ),
-);
+const RULE_VERSION_BY_ID = ruleVersionById;
 
 /** Shape of each rule entry in rule-manifest.json. */
 interface RuleEntry {

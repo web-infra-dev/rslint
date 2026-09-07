@@ -10,7 +10,7 @@ define.fmt({
     'packages/rslint-test-tools/tests/typescript-eslint/rules',
     'binaries/',
     'internal/**/rules/**/*.md',
-    'website/rule-releases.json',
+    'website/releases.json',
     'packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/',
   ],
 });

@@ -394,10 +394,7 @@ func rstestExpectRootMatch(
 	}
 	localName := root.AsIdentifier().Text
 	ctx := analysis.ctx
-	if ctx.TypeChecker == nil {
-		return rstestExpectMatch{ok: localName == "expect"}
-	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(root)
+	symbol := resolveRstestRootSymbol(ctx, root)
 	if symbol == nil {
 		return rstestExpectMatch{ok: localName == "expect"}
 	}

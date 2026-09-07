@@ -38,15 +38,28 @@ import { y } from './bar';
 
 ### `considerQueryString`
 
+- **Default:**
+  - `false` by default
+  - `true` if using the `importPlugin.configs.recommended` preset
+
 When set to `true`, imports with different query strings are treated as different modules.
 
 ```json
 {
-  "import/no-duplicates": ["error", { "considerQueryString": true }]
+  "import/no-duplicates": ["error", { "considerQueryString": false }]
 }
 ```
 
+For example, these imports are reported as duplicates when `considerQueryString` is `false`, but are allowed when it is `true`:
+
+```javascript
+import iconUrl from './icon.svg?url';
+import iconSource from './icon.svg?raw';
+```
+
 ### `prefer-inline`
+
+- **Default:** `false`
 
 When set to `true`, supports TypeScript inline type imports, allowing `import type { X }` to be merged into `import { type X }`.
 

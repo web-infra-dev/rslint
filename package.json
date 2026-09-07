@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -23,7 +23,7 @@
     "version": "zx scripts/version.mjs",
     "version:crates": "zx scripts/version-crates.mjs",
     "release": "pnpm --filter='!@rslint/tsgo-server' --filter='!@rslint/tsgo-server-*' -r publish --no-git-checks",
-    "sync:rule-releases": "node scripts/sync-rule-releases.js",
+    "sync:version-info": "node scripts/sync-version-info/index.js",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "rs fmt",

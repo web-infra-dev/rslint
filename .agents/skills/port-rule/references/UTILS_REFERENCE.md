@@ -2,7 +2,7 @@
 
 This document provides a comprehensive reference for utility functions available in `internal/utils/`. These utilities are commonly used when implementing lint rules.
 
-> **Note**: This is a reference document for [PORT_RULE.md](./PORT_RULE.md). See that document for the complete rule porting workflow.
+Look up the operation or named function needed by the current rule. Workflow and coverage requirements live in [SKILL.md](../SKILL.md) and [PORT_RULE.md](./PORT_RULE.md).
 
 ---
 
@@ -74,6 +74,8 @@ utils.TypeRecurser(t, func(subType *checker.Type) bool {
 
 ### AST Helpers
 
+For member access, JSX/heritage, runtime-expression wrappers and call callee boundaries, see [Member and Call Expressions](./AST_PATTERNS.md#member-and-call-expressions), which maps the helpers in `internal/utils/ast_helpers.go` and `internal/utils/jsx.go`.
+
 ```go
 // Get heritage clauses of a class/interface
 heritageClauses := utils.GetHeritageClauses(classNode) // *ast.NodeList
@@ -82,11 +84,11 @@ heritageClauses := utils.GetHeritageClauses(classNode) // *ast.NodeList
 isAsync := utils.IncludesModifier(funcNode, ast.KindAsyncKeyword)
 
 // Whether a node could plausibly evaluate to an Error object — mirrors
-// ESLint's astUtils.couldBeError. Unwraps parens + TS assertions internally.
+// ESLint's astUtils.couldBeError. Unwraps only parens, not TS assertions.
 // Used by no-throw-literal, prefer-promise-reject-errors, etc.
 mayBeError := utils.CouldBeError(node)
 
-// Whether a node, after unwrapping parens + TS assertions, is the literal
+// Whether a node, after unwrapping only parens, is the literal
 // identifier `undefined`. Lexical check only — does not detect `void 0`.
 isUndef := utils.IsUndefinedIdentifier(node)
 ```
@@ -566,7 +568,7 @@ Reach for these **before** writing a helper of your own — the shim already cov
 Use these instead of hand-rolled loops. See [AST_PATTERNS.md § ParenthesizedExpression](./AST_PATTERNS.md#parenthesizedexpression).
 
 - `ast.SkipParentheses(node)` — innermost non-paren expression
-- `ast.WalkUpParenthesizedExpressions(node)` — first non-paren ancestor
+- `ast.WalkUpParenthesizedExpressions(node)` — walks upward while the supplied node is parenthesized; returns a non-paren input unchanged
 
 ### Optional chain
 
@@ -726,7 +728,7 @@ lower := ecmascript.StringToLowerCase(name)
 ecmascript.StringToLocaleUpperCase(s)
 ecmascript.StringToLocaleLowerCase(s)
 
-// String(n) / string concatenation. strconv picks the same digits but leaves
+// String(n) / string concatenation. Go's formatter picks the same digits but leaves
 // fixed notation at a different point and spells the infinities differently.
 text := ecmascript.NumberToString(42) // "42", not "4.2e+01"
 
@@ -875,4 +877,4 @@ Report which upstream package and version the rule depends on, and which of its 
 
 - [PORT_RULE.md](./PORT_RULE.md) - Main rule porting workflow
 - [AST_PATTERNS.md](./AST_PATTERNS.md) - AST traversal patterns and examples
-- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Commands and checklist
+- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Commands and locations

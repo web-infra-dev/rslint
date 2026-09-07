@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/rules/accessorutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/accessor"
 )
 
 //go:embed grouped_accessor_pairs.schema.json
@@ -36,7 +36,7 @@ func parseOptions(options []any) Options {
 }
 
 type accessorGroup struct {
-	key         accessorutil.Key
+	key         accessor.Key
 	getterIndex int
 	setterIndex int
 	getterCount int
@@ -78,10 +78,10 @@ func checkList(ctx rule.RuleContext, headLocator *utils.FunctionHeadRangeLocator
 		if !include(member) || (member.Kind != ast.KindGetAccessor && member.Kind != ast.KindSetAccessor) {
 			continue
 		}
-		key := accessorutil.MakeKey(member)
+		key := accessor.MakeKey(member)
 		groupIndex := -1
 		for index := range groups {
-			if accessorutil.KeysEqual(ctx.SourceFile, groups[index].key, key) {
+			if accessor.KeysEqual(ctx.SourceFile, groups[index].key, key) {
 				groupIndex = index
 				break
 			}

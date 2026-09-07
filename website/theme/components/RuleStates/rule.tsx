@@ -12,7 +12,7 @@ import { CancelSymbol, TableSelector } from './table-selector';
 import { Badge, Heading, PresetBadge, Text } from './ui-utils';
 import { Button } from '@components/ui/button';
 import manifest from '@/generated/rule-manifest.json';
-import ruleReleases from '@/rule-releases.json';
+import { ruleVersionById } from '@/releases';
 import { groupToRouteSlug } from '@/theme/plugin-registry';
 import RuleVersionBadge from '@/theme/components/RuleVersionBadge';
 
@@ -31,11 +31,7 @@ type Rule = {
   presets: { name: string; value: unknown }[];
 };
 
-const introducedInByRule = new Map(
-  ruleReleases.flatMap(({ version, rules }) =>
-    rules.map((rule) => [rule, version] as const),
-  ),
-);
+const introducedInByRule = ruleVersionById;
 
 type RuleStateDescribe = {
   name: string;

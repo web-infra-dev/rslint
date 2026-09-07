@@ -1,97 +1,48 @@
-# Repository Guidelines
+# Working on rslint
 
-This document summarizes how to work on rslint effectively and consistently.
+Repository skills follow the branch, local verification, and test-layout rules below. Explicit user instructions take precedence.
 
-## Project Structure & Module Organization
+## Branches
 
-- `architecture.md`: Current high-level architecture, major runtime flows, and subsystem relationships.
-- `cmd/rslint/`: CLI entry (default), IPC API (`--api`), LSP (`--lsp`).
-- `internal/config/`: Config types, authored path-space matching, merging, project-path resolution, and configured-rule resolution.
-- `internal/config/target/`: Lint-target planning, explicit file outcomes, directory walking, and config-owner routing.
-- `internal/program/`: Unified source Program, module resolution/graph, and generation-scoped derived caches.
-- `internal/linter/`: Linter engine, traversal, and fix application.
-- `internal/rule/`: Rule descriptors/environment, immutable catalogs, context, diagnostics, disable manager, listeners.
-- `internal/rules/`: Core rules and the final `all.go` aggregation of every Go-implemented rule.
-- `internal/plugins/typescript/`: `@typescript-eslint` rules under `rules/<rule>/`.
-- `internal/plugins/import/`: `eslint-plugin-import` rule implementations.
-- `internal/testutil/`: Cross-package test infrastructure, including safe txtar fixture materialization.
-- `internal/utils/`: JSONC, overlay VFS, compiler construction, AST/type helpers.
-- `internal/utils/ecmascript/`: JavaScript's own semantics (trim, blank, upper/lower case, number-to-string) plus `ecmascript/regexp` for a JavaScript RegExp and its `/i` comparison. `internal/utils/unicode17/` carries the general categories on the edition of Unicode Node reads. `internal/utils/minimatch3/` and `internal/utils/isglob/` port the glob packages ESLint plugins depend on.
-- `internal/lsp/`: Language Server integration. Also see `website/` and `packages/` for UI/tooling.
+- Before editing code or documentation, inspect `git status --short --branch`. Use a dedicated task branch; create it before editing if currently on the default branch. Read-only investigation needs no new branch.
+- Name new branches `<type>/<short-kebab-case-description>`, using `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, or `perf` according to the request. Honor an explicit user branch name. After creating or switching, verify `git branch --show-current` against the intended name before editing.
+- Continue the same task on its existing branch, including after a session resumes. Preserve unrelated work when starting a separate task; do not restart from main merely because a workflow lists branch setup.
 
-## Build, Test, and Development Commands
+## Local verification
 
-These commands are reference entry points, not a checklist to run in full for every change. Use the scoped validation rules below to select the relevant commands.
+- Before running checks, identify affected packages from the branch diff plus staged, unstaged and untracked changes, trace changed APIs and their callers, and briefly state the selected scope. Include affected consumers for shared behavior and cross-language changes. Use the existing commands below; examples are in `CONTRIBUTING.md#verify-a-change`.
+- Go: `go test <affected-package-dirs>`; inspect aggregate test packages and use `-run` for the affected tests instead of executing unrelated rules through a shared runner. JS/TS: select the workspace and test files with pnpm filters; for Rstest verification use `CI=true pnpm --dir <workspace> exec rs test run <test-files>` so missing snapshots fail. Rust: `cargo test -p <affected-crate>`. Expand scope only on concrete dependency impact; appending paths to root scripts that already contain full-tree paths does not narrow them.
+- Full-repository or whole-plugin tests require an explicit user or reviewer request for that scope. This includes `go test ./...`, `go test ./internal/...`, `go test ./internal/plugins/<plugin>/...`, `pnpm run test:go`, root `pnpm test`, and `cargo test --workspace`. A CI command list is not a request to run it locally.
+- Shared code, many changed files, or uncertain impact do not authorize full suites: trace dependencies and test the affected packages. Passing results remain valid until relevant code/configuration changes; do not rerun merely because the commit step started.
+- For local Go lint, use `golangci-lint run --new-from-merge-base=<base-branch> <affected-package-dirs>`, normally against `origin/main`. Keep the branch-diff filter; unfiltered repository-wide lint requires an explicit request.
+- Documentation/configuration-only edits need no language tests unless they change executable examples, generated content, builds, or runtime behavior. Format/fix only changed files with the repository tooling.
+- Before JS integration tests exercise changed Go code, rebuild with `pnpm --filter @rslint/core build:bin`.
+- When delivering changes, report the branch and actual verification commands/results, including any relevant coverage gap.
 
-- Setup submodule: `git submodule update --init --depth 1`
-- Install Deps: `pnpm install`
-- Build JS/TS: `pnpm build`
-- Run Go tests: `pnpm run test:go`
-- Run JS tests: `pnpm run test`
-- Run Check Spell: `pnpm run check-spell`
-- Lint Go: `pnpm run lint:go`
-- Lint JS: `pnpm run lint`
-- Format JS/TS/MD: `pnpm run format`
-- CLI help: `go run ./cmd/rslint --help`
-  - Built-package examples: `pnpm exec rslint --config rslint.config.ts`, `--fix`, `--format default|jsonline|github|gitlab`, `--quiet`, `--max-warnings 0`
-- LSP: `go run ./cmd/rslint --lsp` | IPC API: `go run ./cmd/rslint --api`
+## Test organization
 
-## Coding Style & Naming Conventions
+- Extend the appropriate existing suite for a regression; do not create a separate test file for each fix.
+- Go lint-rule tests keep upstream cases in `<rule>_upstream_test.go` and rslint-added regressions, edge cases, and branch coverage in `<rule>_extras_test.go`. Do not mix them. Large extras suites may split by area as `<rule>_extras_<area>_test.go`.
+- That split applies to Go rule tests. JS rule integration tests stay in one `<rule>.test.ts` and mirror upstream behavior; do not duplicate Go extras there. Detailed porting requirements live in `.agents/skills/port-rule/references/PORT_RULE.md`.
+- Keep small inputs inline. Put multi-file text fixtures under the owning package's `testdata/`; reuse `internal/testutil/txtarfs` for related portable text trees. Construct symlinks, permissions, concurrency, and other OS behavior directly in Go tests.
+- Normalize paths at the tsgo/VFS boundary: use `tspath.ResolvePath(root.Dir, name)` for fixture-relative paths and `tspath.NormalizePath(filepath.Join(...))` for host paths. Never use raw `filepath.Join` results as VFS keys or tsgo root filenames.
+- Keep package-specific helpers beside their tests; shared Go test infrastructure belongs in `internal/testutil`. Fixture helpers must fail on missing or empty selections.
 
-- Go uses gofmt/goimports; keep functions focused and small.
-- For Go changes, run `pnpm run lint:go -- --new-from-merge-base=<base-branch>` (normally `origin/main`) so diagnostics are limited to code introduced by the current branch. Run an unfiltered repository-wide Go lint only for broad or cross-cutting changes, changes whose impact cannot be scoped reliably, or when explicitly requested by the user, CI, or a reviewer.
-- TS/JS/MD/CSS use Rstack CLI's formatter via `pnpm run format`.
-- Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
-- Prefer table-driven tests. Keep package-specific helpers beside their tests; put reusable test infrastructure in `internal/testutil`, not production utility packages.
-- A value that came from JavaScript — a string to trim or case, a character to classify, a number to print, a regexp or glob out of a rule option — is read through `internal/utils/ecmascript`, `ecmascript/regexp`, `unicode17`, `minimatch3`, or `isglob`, never through `strings.TrimSpace`, `strings.ToLower`, the `unicode` package, the stdlib `regexp`, or `doublestar`. An identifier question goes to tsgo's `scanner`, so a rule and the parser never disagree. `depguard` and `forbidigo` enforce this under `internal/rules/**` and `internal/plugins/**`.
-- The stdlib `regexp` is for a pattern written in this repository that RE2 and JavaScript read the same way and that no user input reaches. A pattern out of a rule option, a config file or the source under lint takes `esregexp`, however plain it looks.
-- **Only minimatch 3 and is-glob are ported.** A rule that needs another glob package — minimatch 10 included — is reported to the user, naming the package and version, rather than being pointed at `minimatch3` or `doublestar` or given a fresh port.
+## JavaScript compatibility
 
-## Testing Guidelines
+- Rules and their supporting helpers preserve JavaScript/upstream semantics. Use `internal/utils/ecmascript` for JS string/number operations, `internal/utils/unicode17` for Unicode categories, and tsgo's `scanner` for identifiers. Go's case, whitespace, and Unicode helpers are not equivalent substitutes.
+- Use `internal/utils/ecmascript/regexp` (`esregexp`) for patterns from rule options, config, or linted source. Go's `regexp` is allowed only for repository-authored patterns with equivalent RE2/JS behavior and no user-controlled pattern construction.
+- Match the upstream glob package and version. Only `minimatch3` and `isglob` are ported; report other requirements instead of substituting a matcher or introducing a new port.
 
-- Co-locate Go tests with implementation; name files `*_test.go` and functions `TestXxx`.
-- Keep small inputs inline. Put multi-file textual filesystem fixtures under the nearest package's `testdata/` directory, and group related layouts in `.txtar` when that makes the scenario easier to review.
-- Use `.txtar` only for portable regular text files. Construct symlinks, permissions, concurrency, and other OS behavior directly in Go tests.
-- Fixture helpers must reject missing or empty selections instead of allowing a test to pass without exercising a case.
-- Keep tests minimal and behavior-focused; avoid unrelated scenarios.
-- Run tests only for affected modules. Include direct consumers when shared behavior or exported APIs change; for cross-language boundaries, test both the changed producer and its directly affected consumers.
+## Commits
 
-| Changed area                        | Scoped test requirement                                                                                                            |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Go                                  | Run `go test` for changed packages.                                                                                                |
-| JavaScript/TypeScript               | Run affected pnpm workspace tests or specific test files.                                                                          |
-| Rust                                | Run `cargo test -p <crate>` for affected crates.                                                                                   |
-| Documentation or configuration only | No language test suite is required unless executable examples, generated content, build behavior, or runtime configuration change. |
+- Use Conventional Commits. Before committing, ensure `pnpm run check-spell <changed-text-files>` and `pnpm run format:check` have passed after the final relevant edit; reuse valid results. Pass spell-check paths explicitly so changes under hidden directories such as `.agents/` are covered. These checks do not authorize broader tests or repository-wide automatic fixes.
+- Preserve existing public CLI behavior unless the requested change requires otherwise; update affected user documentation when behavior changes.
 
-- Run repository-wide test suites only for broad or cross-cutting changes, shared test or build infrastructure changes, changes whose impact cannot be scoped reliably, or when explicitly requested by the user, CI, or a reviewer.
-- A passing test result remains valid until relevant code or configuration changes. Do not rerun tests solely because the commit step has started.
+## Task-specific references
 
-## Pre-commit Checks
-
-- Before committing, ensure `pnpm run check-spell` and `pnpm run format:check` have passed after the final relevant edit.
-- Reuse results from the current task when no applicable files have changed since those checks passed; do not rerun them solely because the commit step has started.
-
-## Commit & Pull Request Guidelines
-
-- For each user-requested code or documentation change, work on a dedicated branch whose name reflects the request. If currently on the default branch, create it before editing; reuse an appropriate existing task branch when already on one. Name new branches `<type>/<short-kebab-case-description>`, selecting the type from the requested work using Conventional Commit-style categories such as `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, or `perf`. Honor an explicit branch name from the user.
-- Do not create a branch for read-only investigation or status requests unless the user explicitly asks for one.
-- Use Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `ci:`, etc.
-- PRs should be small, with clear description, repro steps, and linked issues.
-- Include examples (commands or code) and update docs when behavior changes.
-- Preserve existing CLI behavior unless a change is explicitly requested.
-
-## Architecture & Configuration Tips
-
-- Read `architecture.md` before making broad changes that touch module boundaries, entrypoints, or cross-package flows.
-- If a change affects the high-level architecture, runtime data flow, or major integration paths, update `architecture.md` in the same change.
-- rslint loads JS/TS module configs; `--init` can migrate legacy `rslint.json`/`rslint.jsonc` files.
-- The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
-- Use `--format github` in CI to emit GitHub workflow annotations, or `--format gitlab` to emit a Code Quality report (`codequality` artifact) for GitLab CI merge requests.
-
-## Website UI Guidelines (shadcn/ui)
-
-- Prefer shadcn/ui components from `@components/ui/*` (e.g., `button`, `toggle-group`, `alert`, `card`, `table`) over custom elements.
-- Minimize custom CSS. Use component variants, utility classes, and existing styles instead of adding new selectors when possible.
-- Icons: use `lucide-react` for consistent iconography (e.g., import `{ Share2Icon, CheckIcon } from 'lucide-react'`).
-- Keep layout simple: compose shadcn primitives and flex utilities for alignment instead of bespoke CSS blocks.
-- Only add custom CSS for domain‑specific visuals that primitives can’t express (e.g., AST tree expanders), and keep it scoped.
+- Start at the owning package and the paths below. For discovery, use filename searches or `rg -l`; read matching definitions and callers instead of dumping repository-wide matches. Expand when a path is missing or a dependency/behavior question remains. Keep tool output bounded; narrow a truncated query before retrying it.
+- Use pnpm for JS/TS tooling. Build/check scripts live in the relevant `package.json`; setup is in `CONTRIBUTING.md`. Initialize dependencies and submodules only when needed.
+- For module-boundary, entrypoint, or runtime-flow changes, read the relevant sections of `architecture.md`. Update those sections when their contracts or flows change.
+- For a new rule, use `.agents/skills/port-rule/SKILL.md`. Existing-rule fixes follow the branch, test-layout and verification rules above; a rule name alone does not request a new port. Load only reference sections needed by the current task, not the entire porting guide or architecture document.
+- For website UI, reuse shadcn/ui components from `@components/ui/*`, `lucide-react` icons, and existing layout utilities. Add scoped CSS only where those cannot express the required visual.

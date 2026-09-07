@@ -4,8 +4,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
-	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/require_to_throw_message"
 )
 
@@ -24,10 +22,6 @@ var RequireToThrowMessageRule = shared.NewRule(shared.Config{
 					parsed.Matchers[0].Kind != rstestUtils.RstestExpectMatcherCall {
 					return nil
 				}
-				if isSourceOnlyLocalExpect(node, parsed, ctx, analysis) {
-					return nil
-				}
-
 				matcherCall := rstestUtils.MatcherCall(parsed.MatcherEntry)
 				if matcherCall == nil {
 					return nil
@@ -43,67 +37,3 @@ var RequireToThrowMessageRule = shared.NewRule(shared.Config{
 		}
 	},
 })
-
-// isSourceOnlyLocalExpect closes the one provenance gap in the shared Rstest
-// parser that matters to this rule. Without a checker the parser deliberately
-// treats a bare `expect` as the global, but the binder can still prove that a
-// call resolves to a local value. Rstest imports and import.meta destructuring
-// remain accepted; this only rejects an actual local shadow.
-func isSourceOnlyLocalExpect(
-	node *ast.Node,
-	parsed *rstestUtils.ParsedRstestExpectCall,
-	ctx rule.RuleContext,
-	analysis *rstestUtils.RstestCallAnalysis,
-) bool {
-	if ctx.TypeChecker != nil || ctx.Refs == nil || parsed.FromTestContext {
-		return false
-	}
-	root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
-	if root == nil || root.Kind != ast.KindIdentifier {
-		return false
-	}
-	symbol := ctx.Refs.Resolve(root)
-	if symbol == nil {
-		return false
-	}
-	name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
-		root.AsIdentifier().Text,
-		root,
-		symbol,
-		ctx.SourceFile,
-		rstestUtils.RstestAllImportModules,
-	)
-	if name == "expect" {
-		return false
-	}
-	if testFramework.IsModuleNamespaceSymbolModules(symbol, rstestUtils.RstestAllImportModules) {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil {
-			continue
-		}
-		variable := declaration
-		if declaration.Kind == ast.KindBindingElement {
-			variable = internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
-		}
-		if variable != nil &&
-			variable.Kind == ast.KindVariableDeclaration &&
-			rstestUtils.IsImportMetaRstest(variable.AsVariableDeclaration().Initializer) {
-			return false
-		}
-	}
-	if !internalUtils.IsRuntimeValueSymbolDeclaredInFile(symbol, ctx.SourceFile) {
-		return false
-	}
-	// A TestContext `expect` is declared in this file too, but it is Rstest's
-	// own assertion function. Only a TypeChecker can put it in
-	// ContextExpectNames, so the syntactic declaration index answers instead.
-	contextExpects := analysis.Callbacks().ContextExpectDeclarations
-	for _, declaration := range symbol.Declarations {
-		if contextExpects[declaration] {
-			return false
-		}
-	}
-	return true
-}

@@ -20,11 +20,21 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_rstest_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_all_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_each_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_all"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_before_all_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_before_each_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_describe_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_expect_groups"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_test_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_exactly_once_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_once"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_times"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
@@ -32,6 +42,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_falsy"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_truthy"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
@@ -68,11 +79,21 @@ func GetAllRules() []rule.Rule {
 		no_importing_rstest_globals.NoImportingRstestGlobalsRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
 		no_mocks_import.NoMocksImportRule,
+		no_restricted_matchers.NoRestrictedMatchersRule,
 		no_restricted_rstest_methods.NoRestrictedRstestMethodsRule,
 		no_standalone_expect.NoStandaloneExpectRule,
+		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,
+		padding_around_after_each_blocks.PaddingAroundAfterEachBlocksRule,
+		padding_around_all.PaddingAroundAllRule,
+		padding_around_before_all_blocks.PaddingAroundBeforeAllBlocksRule,
+		padding_around_before_each_blocks.PaddingAroundBeforeEachBlocksRule,
+		padding_around_describe_blocks.PaddingAroundDescribeBlocksRule,
+		padding_around_expect_groups.PaddingAroundExpectGroupsRule,
+		padding_around_test_blocks.PaddingAroundTestBlocksRule,
 		prefer_called_exactly_once_with.PreferCalledExactlyOnceWithRule,
 		prefer_called_once.PreferCalledOnceRule,
 		prefer_called_times.PreferCalledTimesRule,
+		prefer_called_with.PreferCalledWithRule,
 		prefer_each.PreferEachRule,
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
@@ -80,6 +101,7 @@ func GetAllRules() []rule.Rule {
 		prefer_importing_rstest_globals.PreferImportingRstestGlobalsRule,
 		prefer_rs_mocked.PreferRsMockedRule,
 		prefer_strict_boolean_matchers.PreferStrictBooleanMatchersRule,
+		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be_falsy.PreferToBeFalsyRule,
 		prefer_to_be_truthy.PreferToBeTruthyRule,
 		prefer_todo.PreferTodoRule,

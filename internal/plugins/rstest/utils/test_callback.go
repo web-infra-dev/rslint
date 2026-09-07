@@ -10,12 +10,6 @@ type RstestTestCallbacks struct {
 	Functions          map[*ast.Node]bool
 	ContextReceivers   map[*ast.Symbol]bool
 	ContextExpectNames map[*ast.Symbol]bool
-	// ContextExpectDeclarations holds the declaration node of every
-	// destructured TestContext `expect` binding. The symbol-keyed sets above
-	// need a TypeChecker to be filled; this one is recorded from syntax alone,
-	// so a rule can still tell Rstest's own callback `expect` apart from an
-	// unrelated local binding of that name in a source-only program.
-	ContextExpectDeclarations map[*ast.Node]bool
 }
 
 // rstestCallbackRegistration ties a callback function back to one of the
@@ -41,10 +35,9 @@ type rstestFunctionEntry struct {
 
 func newRstestTestCallbacks() RstestTestCallbacks {
 	return RstestTestCallbacks{
-		Functions:                 map[*ast.Node]bool{},
-		ContextReceivers:          map[*ast.Symbol]bool{},
-		ContextExpectNames:        map[*ast.Symbol]bool{},
-		ContextExpectDeclarations: map[*ast.Node]bool{},
+		Functions:          map[*ast.Node]bool{},
+		ContextReceivers:   map[*ast.Symbol]bool{},
+		ContextExpectNames: map[*ast.Symbol]bool{},
 	}
 }
 
@@ -250,10 +243,13 @@ func recordRstestTestCallback(
 	switch name.Kind {
 	case ast.KindIdentifier:
 		analysis.addExpectRootName(name.AsIdentifier().Text)
-		if ctx.TypeChecker == nil {
-			return
+		var symbol *ast.Symbol
+		if ctx.TypeChecker != nil {
+			symbol = ctx.TypeChecker.GetSymbolAtLocation(name)
+		} else {
+			symbol = parameter.Symbol
 		}
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
+		if symbol != nil {
 			result.ContextReceivers[symbol] = true
 		}
 	case ast.KindObjectBindingPattern:
@@ -281,11 +277,13 @@ func recordRstestTestCallback(
 				continue
 			}
 			analysis.addExpectRootName(binding.Name().AsIdentifier().Text)
-			result.ContextExpectDeclarations[element] = true
-			if ctx.TypeChecker == nil {
-				continue
+			var symbol *ast.Symbol
+			if ctx.TypeChecker != nil {
+				symbol = ctx.TypeChecker.GetSymbolAtLocation(binding.Name())
+			} else {
+				symbol = element.Symbol()
 			}
-			if symbol := ctx.TypeChecker.GetSymbolAtLocation(binding.Name()); symbol != nil {
+			if symbol != nil {
 				result.ContextExpectNames[symbol] = true
 			}
 		}

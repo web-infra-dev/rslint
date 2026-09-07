@@ -25,6 +25,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_unneeded_async_expect_function"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_after_all_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_after_each_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_all"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_before_all_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_before_each_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_describe_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_expect_groups"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/padding_around_test_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_called_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_comparison_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_each"
@@ -79,6 +87,14 @@ func GetAllRules() []rule.Rule {
 		no_standalone_expect.NoStandaloneExpectRule,
 		no_test_prefixes.NoTestPrefixesRule,
 		no_unneeded_async_expect_function.NoUnneededAsyncExpectFunctionRule,
+		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,
+		padding_around_after_each_blocks.PaddingAroundAfterEachBlocksRule,
+		padding_around_all.PaddingAroundAllRule,
+		padding_around_before_all_blocks.PaddingAroundBeforeAllBlocksRule,
+		padding_around_before_each_blocks.PaddingAroundBeforeEachBlocksRule,
+		padding_around_describe_blocks.PaddingAroundDescribeBlocksRule,
+		padding_around_expect_groups.PaddingAroundExpectGroupsRule,
+		padding_around_test_blocks.PaddingAroundTestBlocksRule,
 		prefer_called_with.PreferCalledWithRule,
 		prefer_comparison_matcher.PreferComparisonMatcherRule,
 		prefer_each.PreferEachRule,

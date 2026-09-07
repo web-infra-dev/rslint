@@ -1,5 +1,6 @@
-// TestRequireToThrowMessageResolvesLocalShadowInSourceOnlyProgram verifies the
-// rule's provenance decision when no tsconfig supplies a TypeChecker. The main
+// TestRequireToThrowMessageResolvesLocalShadowInSourceOnlyProgram verifies that
+// every expect source the rule accepts, and every local binding it rejects, is
+// decided the same way when no tsconfig supplies a TypeChecker. The main
 // upstream and edge-shape matrices live in the sibling upstream/extras files.
 package require_to_throw_message
 
@@ -63,6 +64,52 @@ expect(run).toThrowError();`,
   const expect = createAssertionLibrary();
   expect(run).toThrow();
 });`,
+			want: nil,
+		},
+		{
+			name: "namespace import",
+			code: `import * as rstest from '@rstest/core';
+rstest.expect(run).toThrow();`,
+			want: []string{"toThrow"},
+		},
+		{
+			name: "renamed import",
+			code: `import { expect as assertThat } from '@rstest/core';
+assertThat(run).toThrow();`,
+			want: []string{"toThrow"},
+		},
+		{
+			name: "test context receiver",
+			code: `test('throws', (context) => {
+  context.expect(run).toThrow();
+});`,
+			want: []string{"toThrow"},
+		},
+		{
+			name: "whole-module require",
+			code: `const rstest = require('@rstest/core');
+rstest.expect(run).toThrow();`,
+			want: []string{"toThrow"},
+		},
+		{
+			name: "playwright import",
+			code: `import { expect } from '@rstest/playwright';
+expect(run).toThrow();`,
+			want: []string{"toThrow"},
+		},
+		{
+			name: "parameter shadow",
+			code: `function helper(expect) {
+  expect(run).toThrow();
+}`,
+			want: nil,
+		},
+		{
+			name: "function declaration shadow",
+			code: `function expect(value) {
+  return { toThrow() {} };
+}
+expect(run).toThrow();`,
 			want: nil,
 		},
 		{
