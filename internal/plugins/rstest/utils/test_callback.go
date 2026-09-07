@@ -10,6 +10,12 @@ type RstestTestCallbacks struct {
 	Functions          map[*ast.Node]bool
 	ContextReceivers   map[*ast.Symbol]bool
 	ContextExpectNames map[*ast.Symbol]bool
+	// ContextExpectDeclarations holds the declaration node of every
+	// destructured TestContext `expect` binding. The symbol-keyed sets above
+	// need a TypeChecker to be filled; this one is recorded from syntax alone,
+	// so a rule can still tell Rstest's own callback `expect` apart from an
+	// unrelated local binding of that name in a source-only program.
+	ContextExpectDeclarations map[*ast.Node]bool
 }
 
 // rstestCallbackRegistration ties a callback function back to one of the
@@ -35,9 +41,10 @@ type rstestFunctionEntry struct {
 
 func newRstestTestCallbacks() RstestTestCallbacks {
 	return RstestTestCallbacks{
-		Functions:          map[*ast.Node]bool{},
-		ContextReceivers:   map[*ast.Symbol]bool{},
-		ContextExpectNames: map[*ast.Symbol]bool{},
+		Functions:                 map[*ast.Node]bool{},
+		ContextReceivers:          map[*ast.Symbol]bool{},
+		ContextExpectNames:        map[*ast.Symbol]bool{},
+		ContextExpectDeclarations: map[*ast.Node]bool{},
 	}
 }
 
@@ -274,6 +281,7 @@ func recordRstestTestCallback(
 				continue
 			}
 			analysis.addExpectRootName(binding.Name().AsIdentifier().Text)
+			result.ContextExpectDeclarations[element] = true
 			if ctx.TypeChecker == nil {
 				continue
 			}

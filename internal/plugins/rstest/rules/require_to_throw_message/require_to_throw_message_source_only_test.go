@@ -49,6 +49,23 @@ expect(run).toThrowError();`,
 			want: []string{"toThrowError"},
 		},
 		{
+			name: "test context expect",
+			code: `test('throws', ({ expect }) => {
+  expect(() => {
+    throw new Error('boom');
+  }).toThrow();
+});`,
+			want: []string{"toThrow"},
+		},
+		{
+			name: "local shadow inside a test callback",
+			code: `test('throws', () => {
+  const expect = createAssertionLibrary();
+  expect(run).toThrow();
+});`,
+			want: nil,
+		},
+		{
 			name: "import meta destructuring",
 			code: `const { expect } = import.meta.rstest;
 expect(run).toThrow();`,

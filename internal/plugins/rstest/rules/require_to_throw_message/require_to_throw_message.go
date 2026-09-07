@@ -24,7 +24,7 @@ var RequireToThrowMessageRule = shared.NewRule(shared.Config{
 					parsed.Matchers[0].Kind != rstestUtils.RstestExpectMatcherCall {
 					return nil
 				}
-				if isSourceOnlyLocalExpect(node, parsed, ctx) {
+				if isSourceOnlyLocalExpect(node, parsed, ctx, analysis) {
 					return nil
 				}
 
@@ -53,6 +53,7 @@ func isSourceOnlyLocalExpect(
 	node *ast.Node,
 	parsed *rstestUtils.ParsedRstestExpectCall,
 	ctx rule.RuleContext,
+	analysis *rstestUtils.RstestCallAnalysis,
 ) bool {
 	if ctx.TypeChecker != nil || ctx.Refs == nil || parsed.FromTestContext {
 		return false
@@ -92,5 +93,17 @@ func isSourceOnlyLocalExpect(
 			return false
 		}
 	}
-	return internalUtils.IsRuntimeValueSymbolDeclaredInFile(symbol, ctx.SourceFile)
+	if !internalUtils.IsRuntimeValueSymbolDeclaredInFile(symbol, ctx.SourceFile) {
+		return false
+	}
+	// A TestContext `expect` is declared in this file too, but it is Rstest's
+	// own assertion function. Only a TypeChecker can put it in
+	// ContextExpectNames, so the syntactic declaration index answers instead.
+	contextExpects := analysis.Callbacks().ContextExpectDeclarations
+	for _, declaration := range symbol.Declarations {
+		if contextExpects[declaration] {
+			return false
+		}
+	}
+	return true
 }
