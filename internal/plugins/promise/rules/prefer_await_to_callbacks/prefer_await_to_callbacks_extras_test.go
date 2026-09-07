@@ -1,9 +1,9 @@
 package prefer_await_to_callbacks_test
 
 import (
-	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/prefer_await_to_callbacks"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -14,7 +14,8 @@ import (
 func TestPreferAwaitToCallbacksExtras(t *testing.T) {
 	root := fixtures.GetRootDir()
 	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
-		filepath.Join(root.Dir, "tsconfig.callbacks.json"): `{"extends":"./tsconfig.json","compilerOptions":{"allowJs":true}}`,
+		// The fixture VFS uses forward-slash paths on every platform.
+		tspath.ResolvePath(root.Dir, "tsconfig.callbacks.json"): `{"extends":"./tsconfig.json","compilerOptions":{"allowJs":true}}`,
 	})
 	rule_tester.RunRuleTester(root, "tsconfig.callbacks.json", t, &prefer_await_to_callbacks.PreferAwaitToCallbacksRule,
 		[]rule_tester.ValidTestCase{
