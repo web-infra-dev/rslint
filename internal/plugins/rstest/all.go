@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/hoisted_apis_on_top"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/max_expects"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_alias_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_async_mock_factory"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_expect"
 	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
@@ -64,6 +65,7 @@ func GetAllRules() []rule.Rule {
 		hoisted_apis_on_top.HoistedApisOnTopRule,
 		max_expects.MaxExpectsRule,
 		no_alias_methods.NoAliasMethodsRule,
+		no_async_mock_factory.NoAsyncMockFactoryRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_conditional_expect.NoConditionalExpectRule,
 		no_conditional_in.NoConditionalInTestRule,
