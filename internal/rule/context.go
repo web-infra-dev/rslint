@@ -115,6 +115,18 @@ func (ctx *RuleContext) ProcessCurrentDirectory() string {
 	return ctx.fileCache.processCurrentDirectory
 }
 
+// Severity returns the configured severity of the rule bound to this context.
+// Rules that arbitrate between several enabled rules over the same source
+// position need it so a warning-level rule cannot displace an error-level one.
+// It returns SeverityError on an unbound context, matching the default of
+// ParseSeverity.
+func (ctx *RuleContext) Severity() DiagnosticSeverity {
+	if ctx == nil {
+		return SeverityError
+	}
+	return ctx.reporter.severity
+}
+
 // ruleContextReporter is immutable after Rule.Run starts. Keeping only the
 // rule-specific metadata here avoids allocating a family of bound reporting
 // closures for every rule context.

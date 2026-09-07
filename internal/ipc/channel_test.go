@@ -74,22 +74,34 @@ func TestChannel_RequestResponse(t *testing.T) {
 }
 
 func TestChannel_InboundError(t *testing.T) {
-	a, b := newChannelPair(t)
-	b.SetInboundHandler(func(_ context.Context, _ *Message) (any, error) {
-		return nil, io.ErrUnexpectedEOF // arbitrary handler failure
-	})
-	a.Start()
-	b.Start()
+	for _, test := range []struct {
+		name    string
+		message string
+		want    string
+	}{
+		{name: "message", message: "invalid config: boom", want: "invalid config: boom"},
+		{name: "empty", want: "request failed"},
+		{name: "user prefix", message: "ipc: peer error: from config", want: "ipc: peer error: from config"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			a, b := newChannelPair(t)
+			b.SetInboundHandler(func(_ context.Context, _ *Message) (any, error) {
+				return nil, errors.New(test.message)
+			})
+			a.Start()
+			b.Start()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	_, err := a.SendRequest(ctx, "boom", nil)
-	if err == nil {
-		t.Fatal("expected error from peer handler")
-		return
-	}
-	if got := err.Error(); got == "" || !strings.Contains(got, "peer error") {
-		t.Fatalf("expected peer error, got %q", got)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_, err := a.SendRequest(ctx, "boom", nil)
+			if err == nil {
+				t.Fatal("expected error from peer handler")
+				return
+			}
+			if got := err.Error(); got != test.want {
+				t.Fatalf("handler error = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 
@@ -721,8 +733,8 @@ func TestChannel_HandlerPanicRecovered(t *testing.T) {
 		t.Fatal("expected error from panicking handler")
 		return
 	}
-	if !strings.Contains(err.Error(), "peer error") {
-		t.Fatalf("expected peer error frame, got %v", err)
+	if got, want := err.Error(), "inbound handler panicked: handler boom"; got != want {
+		t.Fatalf("handler error = %q, want %q", got, want)
 	}
 }
 

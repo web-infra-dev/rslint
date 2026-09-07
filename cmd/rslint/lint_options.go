@@ -60,6 +60,10 @@ type lintArgs struct {
 	// Every lint invocation requires a non-empty automatic catalog or one
 	// explicit config entry.
 	ConfigCatalog *discovery.ConfigCatalog
+	// CompleteConfigActivation validates the CLI's provisional plugin metadata
+	// after read-only target/Program preparation and before any lint or fixes.
+	// The command also joins it on early failure. Nil means already activated.
+	CompleteConfigActivation func() error
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).

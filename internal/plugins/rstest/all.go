@@ -22,6 +22,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_rstest_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_all_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_each_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_all"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_before_all_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_before_each_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_describe_blocks"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_expect_groups"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_test_blocks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_exactly_once_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_once"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_times"
@@ -69,6 +77,14 @@ func GetAllRules() []rule.Rule {
 		no_mocks_import.NoMocksImportRule,
 		no_restricted_rstest_methods.NoRestrictedRstestMethodsRule,
 		no_standalone_expect.NoStandaloneExpectRule,
+		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,
+		padding_around_after_each_blocks.PaddingAroundAfterEachBlocksRule,
+		padding_around_all.PaddingAroundAllRule,
+		padding_around_before_all_blocks.PaddingAroundBeforeAllBlocksRule,
+		padding_around_before_each_blocks.PaddingAroundBeforeEachBlocksRule,
+		padding_around_describe_blocks.PaddingAroundDescribeBlocksRule,
+		padding_around_expect_groups.PaddingAroundExpectGroupsRule,
+		padding_around_test_blocks.PaddingAroundTestBlocksRule,
 		prefer_called_exactly_once_with.PreferCalledExactlyOnceWithRule,
 		prefer_called_once.PreferCalledOnceRule,
 		prefer_called_times.PreferCalledTimesRule,

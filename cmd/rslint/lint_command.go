@@ -64,7 +64,20 @@ func resolveStartTime(startTimeMs int64) time.Time {
 // handleLintCommand handles one CLI invocation: it prepares command-owned
 // config/targets/Programs, delegates lint execution to linter.RunPipeline, and
 // projects the result to the selected output format.
-func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) int {
+func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) (exitCode int) {
+	completeActivation := args.CompleteConfigActivation
+	// Even a preflight/Program error must observe preparation failure and join
+	// the pending transaction. Cancellation is still owned by the IPC adapter.
+	defer func() {
+		if completeActivation != nil {
+			if err := completeActivation(); err != nil {
+				if ctx.Err() == nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				}
+				exitCode = 1
+			}
+		}
+	}()
 	// Unpack into locals so the command body below stays focused — only the
 	// flag-parse front matter lives in parseLintFlags.
 	init := args.Init
@@ -124,6 +137,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	enableVirtualTerminalProcessing()
 	timeBefore := resolveStartTime(startTimeMs)
 
+	// Explicit profiles cover this Go invocation's preparation as well as linting.
+	// Start before joining plugin activation and finalize on failure too; the
+	// requested output replaces any previous recording at the same path.
 	if traceOut != "" {
 		f, err := os.Create(traceOut)
 		if err != nil {
@@ -284,7 +300,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			return 1
 		}
 		if format == output.FormatDefault {
-			if err := output.RenderAbort(os.Stdout, mode, timeBefore, reason, outputOptions); err != nil {
+			if err := output.RenderAbort(os.Stderr, mode, timeBefore, reason, outputOptions); err != nil {
 				fmt.Fprintf(os.Stderr, "error writing lint report: %v\n", err)
 			}
 		} else {
@@ -379,6 +395,17 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		programs = loadedPrograms.Programs
+	}
+
+	// Metadata was sufficient for planning, but execution requires the exact
+	// host validated by Node's post-prepare fingerprint check. Join even when
+	// there are no targets, no enabled plugin rules, or only type checking.
+	if completeActivation != nil {
+		complete := completeActivation
+		completeActivation = nil
+		if err := complete(); err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		}
 	}
 
 	// Only the default formatter consumes the completed-run summary. Freeze

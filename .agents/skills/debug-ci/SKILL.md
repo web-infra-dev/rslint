@@ -1,208 +1,115 @@
 ---
 name: debug-ci
-description: Reproduce and debug CI failures locally using Docker. Use when a CI job fails but tests pass locally, especially for Linux-specific issues (VSCode extension tests with xvfb, Go tests on Linux). Builds a container matching the CI environment defined in .github/workflows/ci.yml.
+description: Reproduce Linux CI failures locally using Docker when the same tests pass on the host, especially Go platform differences and VS Code extension tests requiring xvfb. Read the workflow and setup actions for the revision being tested; Docker does not reproduce Windows or macOS runners.
 ---
 
 # Debug CI
 
-Reproduce CI test failures locally using a Docker container that mirrors the CI environment.
+Reproduce the selected failing Linux checks in an isolated checkout with the relevant CI toolchain. Follow [AGENTS.md](../../../AGENTS.md) for the task branch, verification scope, test organization and result reuse. Keep the existing task branch and progress record when continuing a diagnosis.
 
-## When to Use
-
-- CI job fails but the same tests pass locally on macOS/Windows
-- VSCode extension tests fail (require xvfb + Linux GUI libraries)
-- Platform-specific issues (Linux vs macOS vs Windows)
-
-## CI Jobs Overview
-
-Reference: `.github/workflows/ci.yml`
-
-| CI Job                | Runner                   | Key Tools               | Docker Reproducible? |
-| --------------------- | ------------------------ | ----------------------- | -------------------- |
-| **Test Go**           | Ubuntu / Windows / macOS | Go, Node                | Yes (Linux)          |
-| **Lint&Check**        | Ubuntu                   | Go, Node, golangci-lint | Yes                  |
-| **Test npm packages** | Ubuntu / Windows         | Go, Node, xvfb          | Yes (Linux)          |
-| **Test WASM**         | Ubuntu                   | Go, Node                | Yes                  |
-| **Test Rust**         | macOS                    | Rust, Go, Node          | No (macOS only)      |
-| **Build Website**     | Ubuntu                   | Node                    | Yes                  |
-
-## Workflow
-
-### Step 1: Identify the Failing Job
+## Identify the failure and select the scope
 
 ```bash
 gh pr checks <PR_NUMBER>
-```
-
-Fetch detailed failure logs:
-
-```bash
-# Find failed job IDs
 gh api repos/web-infra-dev/rslint/actions/runs/<RUN_ID>/jobs \
   --jq '.jobs[] | select(.conclusion == "failure") | {name, id}'
-
-# Get logs for a specific job
 gh api repos/web-infra-dev/rslint/actions/jobs/<JOB_ID>/logs
 ```
 
-### Step 2: Build Docker Image
+Record the failing commit, job, runner architecture and failed test or check. Read `.github/workflows/ci.yml` and its referenced setup actions at the failing revision to reproduce the original failure. To validate the current fix, use the intended task revision plus its current changes and the CI configuration applicable to that target; record any environment differences from the failed run.
 
-Check current tool versions from CI config before building:
+Trace the affected packages and consumers, then state the selected commands before running them. A failed CI job does not authorize all of that job's tests locally. If the user or reviewer explicitly requests a whole job or full suite, read its commands from the workflow at the selected revision rather than maintaining a second full-job script here. Windows and macOS failures need the corresponding platform; report that gap instead of claiming Docker parity.
 
-| Tool            | Version Source                                                                                  |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| Go              | `.github/workflows/ci.yml` → `go-version` matrix (currently `1.25.0`)                           |
-| Node            | `.github/actions/setup-node/action.yml` → `node-version` (currently `24`)                       |
-| xvfb + GUI deps | `.github/workflows/ci.yml` → `test-node` job → "Install xvfb and dependencies" step             |
-| golangci-lint   | `.github/workflows/ci.yml` → `lint` job → `golangci-lint-action` `version` (currently `v2.4.0`) |
+## Isolate the reproduction
 
-Write a Dockerfile. The apt packages for xvfb **must match** the CI step in `test-node`:
-
-```
-# From CI: sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
-```
-
-Additional GUI dependencies (libxss1, libatk-bridge2.0-0, etc.) are needed for VSCode Electron to run headlessly — they are implicit in the CI runner image but not in bare ubuntu:22.04.
-
-Complete Dockerfile:
-
-```dockerfile
-FROM ubuntu:22.04
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV GOMAXPROCS=8
-
-# Base tools
-RUN apt-get update && apt-get install -y \
-    curl wget git build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# xvfb and GUI deps (from ci.yml test-node job + Electron implicit deps)
-RUN apt-get update && apt-get install -y \
-    libasound2 libgbm1 libgtk-3-0 libnss3 xvfb \
-    libxss1 libatk-bridge2.0-0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 \
-    libpango-1.0-0 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 \
-    libgcc1 libglib2.0-0 libnspr4 libpangocairo-1.0-0 libstdc++6 libx11-6 \
-    libx11-xcb1 libxcb1 libxcursor1 libxfixes3 libxi6 libxrender1 libxtst6 \
-    ca-certificates fonts-liberation lsb-release xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Go (version from ci.yml go-version matrix)
-RUN curl -fsSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | tar -C /usr/local -xz
-ENV PATH="/usr/local/go/bin:${PATH}"
-ENV GOPATH="/root/go"
-ENV PATH="${GOPATH}/bin:${PATH}"
-
-# Node (version from .github/actions/setup-node/action.yml)
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-# pnpm (from .github/actions/setup-node/action.yml: corepack enable)
-RUN corepack enable
-
-# golangci-lint (version from ci.yml lint job → golangci-lint-action)
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
-    | sh -s -- -b /usr/local/bin v2.4.0
-
-WORKDIR /workspace
-```
-
-Build:
+Use a disposable independent clone outside the working checkout. This keeps its `.git` directory usable inside Docker and keeps Linux dependencies, Go binaries and VS Code downloads out of the user's current workspace.
 
 ```bash
-docker build -t rslint-ci-test <dockerfile-dir>
+git clone --no-hardlinks --no-checkout <repository-url-or-local-path> <repro-dir>
 ```
 
-### Step 3: Write Test Script
-
-Choose the test script based on which CI job failed:
-
-**Test npm packages (Linux)** — the most common scenario requiring Docker reproduction:
+Before checkout, ensure the exact tested commit is present. A normal clone may omit PR merge/fork refs or unpublished local commits; fetch the corresponding CI/PR ref, or fetch from a local checkout that holds the commit. Verify the resolved SHA matches the recorded target: a current PR ref may have advanced since the failed run.
 
 ```bash
-#!/bin/bash
-set -e
-cd /workspace
-
-rm -rf node_modules packages/*/node_modules
-find . -name '.vscode-test' -type d -exec rm -rf {} + 2>/dev/null || true
-
-pnpm install --frozen-lockfile    # .github/actions/setup-node
-pnpm format:check                 # ci.yml test-node "Format" (Linux only)
-pnpm run build                    # ci.yml test-node "Build" step
-pnpm run lint --format github     # ci.yml test-node "Dogfooding" (Linux only)
-pnpm typecheck                    # ci.yml test-node "TypeCheck" (Linux only)
-xvfb-run -a pnpm run test         # ci.yml test-node "Test on Linux" step
+git -C <repro-dir> checkout --detach <tested-commit>
 ```
 
-**Lint&Check**:
+Read-only reproduction may stay detached. Before applying a patch or editing in the clone, select a task branch at the tested commit and verify `git branch --show-current` there, following AGENTS.md.
+
+When validating an uncommitted fix, apply the intended staged and unstaged changes and copy any required untracked inputs into this clone before testing. A clone of `HEAD` alone does not contain the fix. Review the isolated diff against the intended input; exclude unrelated edits, host `node_modules`, generated binaries and caches.
+
+If the patch changes a submodule gitlink, update the isolated clone's index too: for an initial combined patch against a clean checkout, use `git apply --index <patch>`. Plain `git apply` leaves the index unchanged, and `git submodule update` selects the indexed commit. Check that indexed gitlink against the intended revision and fetch the commit from the source submodule if it is not available remotely.
+
+Initialize the compiler submodule when the selected checks need it, verify its `HEAD` matches the intended gitlink, then apply any intended changes inside that submodule:
 
 ```bash
-#!/bin/bash
-set -e
-cd /workspace
-rm -rf node_modules packages/*/node_modules
-pnpm install --frozen-lockfile
-golangci-lint run --timeout=5m ./cmd/... ./internal/...   # ci.yml lint "golangci-lint"
-npm run lint:go                                           # ci.yml lint "go vet"
-npm run format:go                                         # ci.yml lint "go fmt"
-pnpm check-spell                                         # ci.yml lint "Check Spell"
+git -C <repro-dir> submodule sync -- typescript-go
+git -C <repro-dir> submodule update --init --depth 1
 ```
 
-**Test Go (Linux)**:
+Ensure the chosen base ref and enough history for the lint merge-base exist in the isolated clone. A local clone's `origin` points to the source checkout, so verify the base commit rather than assuming its `origin/main` matches the source checkout's remote-tracking ref.
+
+Reuse the same isolated clone, image and container while their relevant inputs remain unchanged. Install dependencies or rebuild outputs only when the selected execution path needs them and they are missing or stale. Do not delete the current workspace's `node_modules` or `.vscode-test` directories to obtain a clean Linux environment.
+
+## Match the Linux environment
+
+Reuse a matching image if available. Otherwise prepare a temporary Docker build context outside the repository, using the selected revision's sources below. Install only the tools needed by the selected checks.
+
+| Input                                              | Source                                                                                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Linux base and architecture                        | Failing job's runner and setup logs; select the matching Docker platform                                                        |
+| Go version                                         | Selected job's `go-version` or matrix in `.github/workflows/ci.yml`                                                             |
+| Node version and pnpm setup                        | Selected job and `.github/actions/setup-node/action.yml`; pnpm version also follows root `package.json`                         |
+| golangci-lint version                              | `golangci-lint-action` version input in the selected workflow                                                                   |
+| Rust toolchain, when the native parser is required | `.github/actions/setup-rust/action.yml` and the selected job's build prerequisites                                              |
+| xvfb and GUI packages                              | Selected workflow's install step; add missing Electron runtime libraries when the bare image lacks runner-provided dependencies |
+| Check environment                                  | Effective workflow, job and step variables, including values established by setup actions                                       |
+
+Pass the versions read from those sources as Docker build arguments, with no fallback version constants in the Dockerfile. For example, declare `ARG GO_VERSION`, `ARG NODE_VERSION` and `ARG GOLANGCI_LINT_VERSION`, use those arguments in the corresponding installations, and pass their resolved values when building. Keep the base image and installation architecture consistent with `--platform`; for Go downloads, Docker's `TARGETARCH` can select the archive architecture.
 
 ```bash
-#!/bin/bash
-set -e
-cd /workspace
-go test -parallel 8 ./internal/...   # ci.yml test-go "Unit Test"
+docker build --platform <ci-linux-platform> \
+  --build-arg GO_VERSION=<selected-go-version> \
+  --build-arg NODE_VERSION=<selected-node-version> \
+  --build-arg GOLANGCI_LINT_VERSION=<selected-lint-version> \
+  -t rslint-ci-test <temporary-build-context>
 ```
 
-**Test WASM**:
+Omit unneeded tools and arguments, or add the selected Rust toolchain when the execution path builds the native parser. Do not copy fixed versions or the entire CI job into this skill. Record any runner services, image packages or architecture details that cannot be matched. On Apple Silicon, matching an x64 Linux runner may require emulation and increase runtime; do not treat an ARM run as equivalent evidence.
+
+## Prepare and run the selected checks
+
+Mount only the isolated clone. Pass the selected check's necessary environment values, including GitHub Actions' implicit `CI=true` and applicable step values such as `GOMAXPROCS`. Without CI mode, Rstest can create missing snapshots and pass where CI would fail. Keep the container alive during the diagnosis so its tool caches can be reused:
 
 ```bash
-#!/bin/bash
-set -e
-cd /workspace
-rm -rf node_modules packages/*/node_modules
-pnpm install --frozen-lockfile
-pnpm --filter '@rslint/core' build:js
-pnpm --filter '@rslint/wasm' build   # ci.yml test-wasm "Build"
+docker run --rm -it --platform <ci-linux-platform> \
+  --env CI=true \
+  --mount "type=bind,src=<absolute-repro-dir>,dst=/workspace" \
+  --workdir /workspace \
+  rslint-ci-test bash
 ```
 
-**Build Website**:
+Run commands inside `/workspace`. For JS-based checks, use `pnpm install --frozen-lockfile` when dependencies need preparation. Read the selected workspace's scripts and the applicable CI build prerequisites before building: compiled JS artifacts, the native parser and generated rule schemas may be required by the selected integration chain. Build those dependencies with their existing workspace commands; do not default to a root build for every diagnosis. Before JS integration tests exercise changed Go code, run `pnpm --filter @rslint/core build:bin`.
 
-```bash
-#!/bin/bash
-set -e
-cd /workspace
-rm -rf node_modules packages/*/node_modules
-pnpm install --frozen-lockfile
-pnpm run build:website               # ci.yml website "Build"
-```
+The following are scoped examples, not a checklist. Replace the package or file with the selected target and include affected consumers when needed.
 
-### Step 4: Run in Docker
+| Check                       | Existing scoped command                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| Go rule package             | `go test -count=1 ./internal/rules/max_params`                                                 |
+| Rstest integration file     | `pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
+| VS Code extension workspace | `xvfb-run -a pnpm --filter rslint test`                                                        |
+| Go lint                     | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`              |
+| Go formatting check         | `golangci-lint fmt --diff ./internal/rules/max_params/max_params.go`                           |
+| JS/TS/docs formatting check | `pnpm exec rs fmt --check <changed-files>`                                                     |
 
-```bash
-docker run --rm \
-  -v <project-root>:/workspace \
-  -v <test-script>:/run-test.sh:ro \
-  rslint-ci-test bash /run-test.sh
-```
+The VS Code package uses its own `__tests__/runTest.ts` and Mocha runner, not Rstest. Its existing `test` script compiles and runs all extension suites and currently exposes no test-file or suite selector. The workspace command above is the smallest supported entry point; report that scope rather than inventing a filter or sending extension tests to `rs test`.
 
-### Step 5: Restore Host Environment
+Run Go lint once with the branch-diff filter and selected package directories; do not follow it with the root `lint:go` script. Substitute the actual base ref when it is not `origin/main`. For Go formatting, pass the changed Go file paths directly and use the repository's formatter configuration. `--diff` reports formatting differences without writing files; it does not select files from Git.
 
-Docker overwrites host node_modules and Go binaries with Linux versions. Always restore after testing:
+For `rs fmt`, select supported, non-ignored changed files and skip empty selections as described in [CONTRIBUTING.md](../../../CONTRIBUTING.md#verify-a-change).
 
-```bash
-pnpm install
-```
+## Record the result
 
-## Caveats
+Keep the tested revision and patch, container tool versions and architecture, selected commands, outcomes and remaining platform gaps in the task's existing progress record. Reuse passing results while their relevant inputs remain unchanged; rebuilding an image or reaching the commit step is not itself a reason to repeat unrelated checks.
 
-- **typescript-go submodule ~1.2GB**: Do not `cp` / `rsync` the project inside the container — use a bind mount directly
-- **Apple Silicon**: Docker runs via x86_64 emulation, Go compilation will be 5-10x slower
-- **node_modules conflict**: The container installs Linux-native dependencies, overwriting macOS/Windows host dependencies. Always run `pnpm install` after testing to restore
-- **Windows CI**: Docker cannot simulate a Windows runner. Windows-specific failures require a Windows machine to debug
-- **Test Rust**: CI runs on macOS, not suitable for Linux Docker reproduction
+Bring only intentional fixes back from the isolated clone and review them on the existing task branch. Dispose of task-owned reproduction resources when they are no longer needed. No host dependency restoration should be necessary because all Linux writes stayed in the isolated clone; `pnpm install` is not a way to restore a Go binary overwritten by a Linux build.
