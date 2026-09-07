@@ -32,7 +32,7 @@ Repository skills follow the branch, local verification, and test-layout rules b
 
 - Rules and their supporting helpers preserve JavaScript/upstream semantics. Use `internal/utils/ecmascript` for JS string/number operations, `internal/utils/unicode17` for Unicode categories, and tsgo's `scanner` for identifiers. Go's case, whitespace, and Unicode helpers are not equivalent substitutes.
 - Use `internal/utils/ecmascript/regexp` (`esregexp`) for patterns from rule options, config, or linted source. Go's `regexp` is allowed only for repository-authored patterns with equivalent RE2/JS behavior and no user-controlled pattern construction.
-- Match the upstream glob package and version. Only `minimatch3` and `isglob` are ported; report other requirements instead of substituting a matcher or introducing a new port.
+- Prefer existing rslint, tsgo and Go dependency capabilities before adding low-level helpers or porting an upstream dependency. Compare the operations and options the rule actually uses, not just library names. Preserve common behavior; a narrow edge difference may be documented in the rule's `Differences from upstream` section with a concrete example and regression test. Do not silently drop options or upstream cases. Escalate differences that change the rule's purpose, common diagnostics or fix safety; a different dependency name alone is not a blocker.
 
 ## Commits
 

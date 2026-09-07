@@ -62,17 +62,20 @@ Use package names with `--filter` and directories with `--dir`; they are not int
 
 Go rule directories and filenames use snake_case (`<rule_name>`); exported rule variables use PascalCase with a `Rule` suffix. Rule keys and JS test filenames use kebab-case (`<rule-name>`); preserve upstream message IDs.
 
-| Item                                           | Location                                                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Core rule source, documentation and Go tests   | `internal/rules/<rule_name>/`                                                                    |
-| Plugin rule source, documentation and Go tests | `internal/plugins/<go-plugin>/rules/<rule_name>/`                                                |
-| Rule documentation                             | `<rule_name>.md` beside the Go implementation                                                    |
-| Options schema, when options exist             | `<rule_name>.schema.json` beside the Go implementation                                           |
-| Core catalog entry                             | Import and entry in `internal/rules/all.go` → `coreRules()`                                      |
-| Plugin catalog entry                           | Import and entry in `internal/plugins/<go-plugin>/all.go` → `GetAllRules()`                      |
-| JS rule mirror                                 | `packages/rslint-test-tools/tests/<suite>/rules/<rule-name>.test.ts`                             |
-| JS test registration                           | `packages/rslint-test-tools/rstack.config.mts` → `include`                                       |
-| Suite configuration and local wrapper          | `packages/rslint-test-tools/tests/<suite>/rslint.config.mjs` and `rule-tester.ts`, where present |
+| Item                                           | Location                                                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Core rule source, documentation and Go tests   | `internal/rules/<rule_name>/`                                                                           |
+| Plugin rule source, documentation and Go tests | `internal/plugins/<go-plugin>/rules/<rule_name>/`                                                       |
+| Rule documentation                             | `<rule_name>.md` beside the Go implementation                                                           |
+| Options schema, when options exist             | `<rule_name>.schema.json` beside the Go implementation                                                  |
+| Core catalog entry                             | Import and entry in `internal/rules/all.go` → `coreRules()`                                             |
+| Plugin catalog entry                           | Import and entry in `internal/plugins/<go-plugin>/all.go` → `GetAllRules()`                             |
+| First-plugin display/group metadata            | `internal/plugins/<go-plugin>/plugin.go` → `PLUGIN_NAME`; consumed by `scripts/gen-rule-manifest.js`    |
+| First-plugin native declarations               | `internal/config/plugin_declarations.go` and `packages/rslint/src/config/define-config.ts`              |
+| First-plugin documentation prefix and presets  | `website/theme/plugin-registry.ts`; configuration snippets in `website/theme/components/RuleConfig.tsx` |
+| JS rule mirror                                 | `packages/rslint-test-tools/tests/<suite>/rules/<rule-name>.test.ts`                                    |
+| JS test registration                           | `packages/rslint-test-tools/rstack.config.mts` → `include`                                              |
+| Suite configuration and local wrapper          | `packages/rslint-test-tools/tests/<suite>/rslint.config.mjs` and `rule-tester.ts`, where present        |
 
 Resolve `<go-plugin>` and `<suite>` from the actual family; directory names do not always match public prefixes:
 
@@ -93,21 +96,25 @@ The catalog key is `rule.Name`. `rule.CreateRule` automatically prefixes `@types
 
 `rules.All()` combines explicit sources in `internal/rules/all.go`; a new plugin directory is not discovered automatically. Its first native rule also requires adding the plugin's `GetAllRules()` to that aggregation and checking the plugin-enablement boundaries in `architecture.md`. New rules do not belong in `internal/config`. See [Integration and documentation](./PORT_RULE.md#integration-and-documentation).
 
+For a first plugin, verify that `scripts/gen-rule-manifest.js` associates its group with the actual JS suite and rule documentation, and that generated documentation uses the correct route and enables the plugin. A plugin without a preset needs an explicit `plugins` declaration in its generated example; preserve the requested preset scope.
+
 ## API and contract lookup
 
 Use the entry for the upstream operation, then locate the named declaration in its owning file with `rg -n`. Read that declaration and relevant callers when its contract is uncertain. These are lookup locations, not a prerequisite reading list.
 
-| Question                                                                        | Source or reference                                                                                                                       |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Rule declaration, listeners and prefix factory                                  | `internal/rule/rule.go`; [Listener Types](./AST_PATTERNS.md#listener-types)                                                               |
-| Options array, compilation and defaults                                         | `internal/rule/schema.go`; [Options and schema](./PORT_RULE.md#options-and-schema)                                                        |
-| Go case fields and diagnostic/edit assertions                                   | `internal/rule_tester/rule_tester.go`; [Coverage and assertions](./PORT_RULE.md#coverage-and-assertions)                                  |
-| Member/call expressions, private/computed keys, JSX/heritage, parentheses/JSDoc | [Member and Call Expressions](./AST_PATTERNS.md#member-and-call-expressions); `internal/utils/ast_helpers.go` and `internal/utils/jsx.go` |
-| Literal values and raw text                                                     | [Literal Kinds](./AST_PATTERNS.md#literal-kinds), [Node Text and Positions](./AST_PATTERNS.md#node-text-and-positions)                    |
-| Diagnostics, ranges and deferred edits                                          | `internal/rule/context.go`; [Reporting Functions](./AST_PATTERNS.md#reporting-functions)                                                  |
-| References, globals and source/module services                                  | `internal/rule/ref_store.go`, `internal/rule/globals.go`; [Framework boundaries](./PORT_RULE.md#framework-boundaries)                     |
-| Scope-sensitive upstream behavior                                               | `internal/utils/scope/`; [ESLint Scope Model](./UTILS_REFERENCE.md#internalutilsscope---eslint-scope-model)                               |
-| TypeChecker availability and access                                             | [Using TypeChecker](./AST_PATTERNS.md#using-typechecker)                                                                                  |
-| JS strings, numbers, Unicode, regexps and globs                                 | [JavaScript Semantics](./UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob)                                            |
-| Equivalent comparison inputs and output limitations                             | [Differential validation](./PORT_RULE.md#differential-validation)                                                                         |
-| Completion scope or a failing integration check                                 | [Delivery and troubleshooting](./PORT_RULE.md#delivery-and-troubleshooting)                                                               |
+| Question                                                                        | Source or reference                                                                                                                                                                        |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rule declaration, listeners and prefix factory                                  | `internal/rule/rule.go`; [Listener Types](./AST_PATTERNS.md#listener-types)                                                                                                                |
+| Options array, compilation and defaults                                         | `internal/rule/schema.go`; [Options and schema](./PORT_RULE.md#options-and-schema)                                                                                                         |
+| Go case fields and diagnostic/edit assertions                                   | `internal/rule_tester/rule_tester.go`; [Coverage and assertions](./PORT_RULE.md#coverage-and-assertions)                                                                                   |
+| Member/call expressions, private/computed keys, JSX/heritage, parentheses/JSDoc | [Member and Call Expressions](./AST_PATTERNS.md#member-and-call-expressions); `internal/utils/ast_helpers.go` and `internal/utils/jsx.go`                                                  |
+| Literal values and raw text                                                     | [Literal Kinds](./AST_PATTERNS.md#literal-kinds), [Node Text and Positions](./AST_PATTERNS.md#node-text-and-positions)                                                                     |
+| Diagnostics, ranges and deferred edits                                          | `internal/rule/context.go`; [Reporting Functions](./AST_PATTERNS.md#reporting-functions)                                                                                                   |
+| References, globals and source/module services                                  | `internal/rule/ref_store.go`, `internal/rule/globals.go`; [Framework boundaries](./PORT_RULE.md#framework-boundaries)                                                                      |
+| Scope-sensitive upstream behavior                                               | `internal/utils/scope/`; [ESLint Scope Model](./UTILS_REFERENCE.md#internalutilsscope---eslint-scope-model)                                                                                |
+| TypeChecker availability and access                                             | [Using TypeChecker](./AST_PATTERNS.md#using-typechecker)                                                                                                                                   |
+| Filesystem, package lookup and paths                                            | `ctx.Program().FS()`, `NearestPackageJSONDirectory()` and `CurrentDirectory()` in `internal/program/program.go`; `shim/tspath/shim.go`. Preserve the Program's source authority.           |
+| Glob and ignore matching                                                        | [Existing matching capabilities](./UTILS_REFERENCE.md#existing-matching-capabilities); apply [reuse and compatibility](./PORT_RULE.md#reuse-and-compatibility) to the rule's actual calls. |
+| JS strings, numbers, Unicode, regexps and globs                                 | [JavaScript Semantics](./UTILS_REFERENCE.md#javascript-semantics-ecmascript-minimatch3-isglob)                                                                                             |
+| Equivalent comparison inputs and output limitations                             | [Differential validation](./PORT_RULE.md#differential-validation)                                                                                                                          |
+| Completion scope or a failing integration check                                 | [Delivery and troubleshooting](./PORT_RULE.md#delivery-and-troubleshooting)                                                                                                                |
