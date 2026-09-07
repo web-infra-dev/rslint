@@ -8,6 +8,7 @@ This reference supplements [SKILL.md](../SKILL.md). Read the section needed for 
 - Determine whether the requested rule belongs to ESLint core, typescript-eslint or another plugin. Honor an explicitly requested legacy rule; otherwise resolve deprecation/replacement before choosing its catalog key. Do not register both a core and TypeScript alias for one port.
 - Preserve the rule's purpose, accepted options, defaults, common diagnostics, ranges, fixes and suggestions. Use the reuse policy below for narrow edge differences; implementation mistakes are not intended differences.
 - A public difference belongs in an implementation comment, the rule documentation's `Differences from upstream` section and a regression test. State the actual compatibility scope when delivering; do not claim exact parity with known differences.
+- Write `Differences from upstream` for rule users: identify the triggering configuration or file, explain the resulting diagnostic/fix behavior, and give a practical workaround when available. Use distinguishable examples for similar-looking characters, including escaped spellings or code points. Keep library internals and implementation costs in code comments or contributor references.
 - Check existing configuration and test-harness support before declaring an ESLint concept unsupported. For example, Go tests can pass `LanguageOptions` (including `sourceType`) and `Globals`. Preserve unsupported upstream cases as explained Go skips; a JS wrapper may not implement `skip`.
 
 ## Reuse and compatibility
