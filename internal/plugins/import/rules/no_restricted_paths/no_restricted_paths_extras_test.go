@@ -27,6 +27,15 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 		t,
 		&no_restricted_paths.NoRestrictedPathsRule,
 		[]rule_tester.ValidTestCase{
+			// One wildcard does not select a filename containing two code units.
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/😀.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/client/?.ts",
+					"from":   "./restricted-paths/server",
+				}),
+			},
 			// ---- Options: no options, empty options array and empty option object all disable the rule ----
 			{Code: `import b from "../server/b"`, FileName: "restricted-paths/client/a.ts"},
 			{Code: `import b from "../server/b"`, FileName: "restricted-paths/client/a.ts", Options: []interface{}{}},
@@ -172,6 +181,15 @@ func TestNoRestrictedPathsExtras(t *testing.T) {
 			// inspects a module specifier string literal and the linted file's path.
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:     `import b from "../server/b"`,
+				FileName: "restricted-paths/client/😀.ts",
+				Options: zones(map[string]interface{}{
+					"target": "./restricted-paths/client/@(??).ts",
+					"from":   "./restricted-paths/server",
+				}),
+				Errors: []rule_tester.InvalidTestCaseError{unexpectedPath("../server/b", 1, 15)},
+			},
 			// ---- An extended glob list in a `target` selects the zone the way
 			// upstream's Minimatch does: `!(server)` names every directory but
 			// that one, so `client` is inside the zone ----

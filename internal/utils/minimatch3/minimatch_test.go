@@ -5,7 +5,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
+	"unicode/utf8"
 
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
@@ -205,6 +208,77 @@ func TestMatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMatchUTF16(t *testing.T) {
+	descending := ecmascript.StringFromCodeUnits([]uint16{'[', 0xDFFF, '-', 0xD800, ']'})
+	// JavaScript minimatch 3.1.5 compiles globs without the Unicode regexp flag.
+	for _, test := range []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"?", "😀", false},
+		{"??", "😀", true},
+		{"@(??)", "😀", true},
+		{"src/@(??).js", "src/😀.js", true},
+		{"[😀]", "😀", false},
+		{"[😀][😀]", "😀", true},
+		{"[!a]", "😀", false},
+		{"[!a][!a]", "😀", true},
+		{"😀?", "😀a", true},
+		{"😀?", "😀😀", false},
+		{"[😀-😁]", "[😀-😁]", true},
+		{"[😀-😁]", "😀", false},
+		{"[😀", "[😀", true},
+		{`\😀?`, "😀a", true},
+		{"[中]", "中", true},
+		{"[中]?", "中😀", false},
+		{"{😀,中}?", "😀a", true},
+		{"**/@(😀|??).js", "src/😀.js", true},
+		{"!(??)", "😀", false},
+		{"[!]", "😀", false},
+		{"[!][!]", "😀", true},
+		{descending, descending, true},
+	} {
+		for _, noCase := range []bool{false, true} {
+			if got := minimatch3.New(test.pattern, minimatch3.Options{NoCase: noCase, NoNegate: true}).Match(test.path); got != test.want {
+				t.Errorf("Match(%q, %q, NoCase=%v) = %v, want %v", test.pattern, test.path, noCase, got, test.want)
+			}
+		}
+	}
+	// Compiler strings may spell a surrogate pair as adjacent WTF-8 pieces.
+	pair := string([]byte{0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80})
+	for _, pattern := range []string{"😀", pair, "[😀][😀]", "??"} {
+		for _, input := range []string{"😀", pair} {
+			if !minimatch3.New(pattern, minimatch3.Options{}).Match(input) {
+				t.Errorf("Match(%q, %q) lost a surrogate pair", pattern, input)
+			}
+		}
+	}
+	lone := ecmascript.StringFromCodeUnits([]uint16{0xD83D})
+	for _, pattern := range []string{"?", "[😀]", lone} {
+		if !minimatch3.New(pattern, minimatch3.Options{}).Match(lone) {
+			t.Errorf("Match(%q, lone surrogate) = false", pattern)
+		}
+	}
+}
+
+func FuzzMatchUTF16(f *testing.F) {
+	for _, input := range []string{"a", "中文", "😀", "a😀中", "𐐀", "a\n"} {
+		f.Add(input)
+	}
+	f.Fuzz(func(t *testing.T, input string) {
+		if len(input) == 0 || len(input) > 64 || !utf8.ValidString(input) || strings.Contains(input, "/") || input == "." || input == ".." || strings.ContainsRune("\n\r\u2028\u2029", []rune(input)[0]) {
+			return
+		}
+		count := len(utf16.Encode([]rune(input)))
+		for _, size := range []int{count, count + 1} {
+			pattern := "@(" + strings.Repeat("?", size) + ")"
+			if got := minimatch3.New(pattern, minimatch3.Options{Dot: true}).Match(input); got != (size == count) {
+				t.Errorf("Match(%q, %q) = %v", pattern, input, got)
+			}
+		}
+	})
 }
 
 // TestMatchOptions covers the options this port carries over from minimatch.
@@ -598,6 +672,25 @@ func TestBraceExpand(t *testing.T) {
 				if got[i] != test.want[i] {
 					t.Fatalf("BraceExpand(%q) = %q, want %q", test.pattern, got, test.want)
 				}
+			}
+		})
+	}
+}
+func BenchmarkMatch(b *testing.B) {
+	for _, test := range []struct{ name, pattern, path string }{
+		{"literal", "src/components/Button.tsx", "src/components/Button.tsx"},
+		{"ascii", "src/**/*.ts", "src/components/button.ts"},
+		{"long_ascii", "**/*.ts", "src/" + strings.Repeat("component", 24) + ".ts"},
+		{"bmp", "src/**/*.ts", "src/组件/按钮.ts"},
+		{"astral", "src/**/*.ts", "src/😀/button.ts"},
+		{"extglob", "src/@(??|cli).ts", "src/😀.ts"},
+	} {
+		b.Run(test.name, func(b *testing.B) {
+			matcher := minimatch3.New(test.pattern, minimatch3.Options{})
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				matcher.Match(test.path)
 			}
 		})
 	}

@@ -557,6 +557,10 @@ func TestOrderMinimatchCompatibility(t *testing.T) {
 		&order.OrderRule,
 		[]rule_tester.ValidTestCase{
 			{
+				Code:    "import react from 'react';\nimport emoji from 'pkg/😀';",
+				Options: minimatchPathGroupOptions("pkg/?", nil),
+			},
+			{
 				Code:    "import react from 'react';\nimport scope from 'scope';",
 				Options: minimatchPathGroupOptions("scope/package", map[string]any{}),
 			},
@@ -568,6 +572,13 @@ func TestOrderMinimatchCompatibility(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// A supplementary character occupies two UTF-16 wildcard positions.
+			{
+				Code:    "import react from 'react';\nimport emoji from 'pkg/😀';",
+				Options: minimatchPathGroupOptions("pkg/@(??)", nil),
+				Output:  []string{"import emoji from 'pkg/😀';\nimport react from 'react';\n"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "order", Line: 2, Column: 1}},
+			},
 			// With patternOptions omitted, import/order disables leading comments
 			// and treats a leading # as an ordinary package-import pattern.
 			{
