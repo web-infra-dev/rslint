@@ -361,9 +361,13 @@ func bindingContainsName(binding *ast.Node, target string) bool {
 // It names the UMD module in the global namespace but does not read the local
 // value at runtime, so it cannot make a var-to-let replacement unsafe.
 func filterSafeNamespaceExportReferences(refs []*ast.Node) []*ast.Node {
-	return slices.DeleteFunc(slices.Clone(refs), func(ref *ast.Node) bool {
+	isNamespaceExport := func(ref *ast.Node) bool {
 		return ref != nil && ref.Parent != nil && ref.Parent.Kind == ast.KindNamespaceExportDeclaration
-	})
+	}
+	if !slices.ContainsFunc(refs, isNamespaceExport) {
+		return refs
+	}
+	return slices.DeleteFunc(slices.Clone(refs), isNamespaceExport)
 }
 
 // filterSafeAmbientNamespaceReferences removes type-only reads contributed by
@@ -454,18 +458,21 @@ func hasUnsafeHoistedFunctionReference(nameNode *ast.Node, refs []*ast.Node, ctx
 	}
 	declarationScope := findEnclosingExecutionScope(nameNode)
 	declarationStart := nameNode.Pos()
+	var checkedFunction *ast.Node
 	for _, ref := range refs {
 		if ref.Pos() < declarationStart || isTypeOnlyReferenceLocation(ref) {
 			continue
 		}
 		for currentScope := findEnclosingExecutionScope(ref); currentScope != nil && currentScope != declarationScope; currentScope = findEnclosingExecutionScope(currentScope) {
-			if currentScope.Kind != ast.KindFunctionDeclaration || currentScope.Name() == nil {
+			if currentScope.Kind != ast.KindFunctionDeclaration || currentScope.Name() == nil || currentScope == checkedFunction {
 				continue
 			}
+			// Consecutive reads in one function have the same invocation sites.
+			checkedFunction = currentScope
 			functionSymbol := utils.BindingNameSymbol(currentScope.Name())
 			for _, functionRef := range ctx.Refs.References(functionSymbol) {
-				if isImmediateInvocation(functionRef) &&
-					(functionRef.Pos() < declarationStart || isInvocationInOwnInitializer(nameNode, functionRef)) {
+				if (functionRef.Pos() < declarationStart || isInvocationInOwnInitializer(nameNode, functionRef, ctx)) &&
+					isImmediateInvocation(functionRef) {
 					return true
 				}
 			}
@@ -475,21 +482,104 @@ func hasUnsafeHoistedFunctionReference(nameNode *ast.Node, refs []*ast.Node, ctx
 }
 
 // isInvocationInOwnInitializer catches calls such as
-// `var value = readValue(); function readValue() { return value; }`. The call
-// is textually after the binding name but still runs before let initializes
-// it. A function/arrow used directly as the initializer stays deferred.
-func isInvocationInOwnInitializer(nameNode *ast.Node, invocation *ast.Node) bool {
+// `var value = readValue(); function readValue() { return value; }`. A call
+// inside a stored callback or method runs later, even when its source range
+// is inside the initializer. Immediately invoked functions still run in TDZ.
+func isInvocationInOwnInitializer(nameNode *ast.Node, invocation *ast.Node, ctx *rule.RuleContext) bool {
 	if !scope.IsInsideOwnInitializer(nameNode, invocation.End()) {
 		return false
 	}
-	root := ast.GetRootDeclaration(nameNode.Parent)
-	return root == nil || !isInDirectFunctionInitializer(root.AsVariableDeclaration(), invocation)
+	return isExecutedInInitializer(nameNode, invocation, ctx, nil)
+}
+
+func isExecutedInInitializer(nameNode, reference *ast.Node, ctx *rule.RuleContext, active map[*ast.Node]bool) bool {
+	boundary := findEnclosingExecutionScope(nameNode)
+	for current := findEnclosingExecutionScope(reference); current != nil && current != boundary; current = findEnclosingExecutionScope(current) {
+		if isImmediateInvocation(current) {
+			continue
+		}
+		expression := invocationResultExpression(current)
+		if expression.Parent != nil && (expression.Parent.Kind == ast.KindCallExpression ||
+			expression.Parent.Kind == ast.KindNewExpression) {
+			// A callback passed to a call may be invoked synchronously.
+			continue
+		}
+
+		// Named local functions, including arrows stored in a local variable,
+		// may be called by another part of the initializer. Follow their calls
+		// without recursing forever on mutually recursive functions.
+		var binding *ast.Node
+		if current.Kind == ast.KindFunctionDeclaration {
+			binding = current.Name()
+		} else if expression.Parent != nil &&
+			expression.Parent.Kind == ast.KindVariableDeclaration && expression.Parent.Initializer() == expression {
+			binding = expression.Parent.Name()
+		}
+		if binding != nil && binding.Kind == ast.KindIdentifier {
+			return hasInitializerCall(nameNode, current, binding, false, ctx, active)
+		}
+
+		// Accessing a freshly created object can invoke its getter/method;
+		// constructing a class can execute its constructor and instance fields.
+		// Ordinary stored objects and classes leave those bodies deferred.
+		owner := expression.Parent
+		if owner != nil && owner.Kind == ast.KindPropertyAssignment {
+			owner = owner.Parent
+		}
+		if owner != nil && (owner.Kind == ast.KindObjectLiteralExpression || ast.IsClassLike(owner)) {
+			if ast.IsClassLike(owner) && owner.Name() != nil &&
+				hasInitializerCall(nameNode, current, owner.Name(), true, ctx, active) {
+				return true
+			}
+			value := invocationResultExpression(owner)
+			if value.Parent != nil && value.Parent.Kind == ast.KindVariableDeclaration &&
+				value.Parent.Name() != nil && value.Parent.Name().Kind == ast.KindIdentifier {
+				return hasInitializerCall(nameNode, current, value.Parent.Name(), true, ctx, active)
+			}
+			if isImmediateInvocation(value) || (value.Parent != nil && ast.IsAccessExpression(value.Parent) &&
+				utils.AccessExpressionObject(value.Parent) == value) ||
+				(value.Parent != nil && value.Parent.Kind == ast.KindSpreadAssignment) {
+				current = owner
+				continue
+			}
+		}
+		return false
+	}
+	return true
+}
+
+func hasInitializerCall(nameNode, functionNode, binding *ast.Node, memberAccess bool, ctx *rule.RuleContext, active map[*ast.Node]bool) bool {
+	if active[functionNode] {
+		return false
+	}
+	if active == nil {
+		active = make(map[*ast.Node]bool)
+	}
+	active[functionNode] = true
+	defer delete(active, functionNode)
+	for _, reference := range ctx.Refs.References(utils.BindingNameSymbol(binding)) {
+		if !scope.IsInsideOwnInitializer(nameNode, reference.End()) {
+			continue
+		}
+		expression := invocationResultExpression(reference)
+		canInvoke := isImmediateInvocation(reference) ||
+			(expression.Parent != nil && (expression.Parent.Kind == ast.KindCallExpression || expression.Parent.Kind == ast.KindNewExpression)) ||
+			(memberAccess && expression.Parent != nil && ast.IsAccessExpression(expression.Parent) && utils.AccessExpressionObject(expression.Parent) == expression)
+		if canInvoke && isExecutedInInitializer(nameNode, reference, ctx, active) {
+			return true
+		}
+	}
+	return false
 }
 
 func isImmediateInvocation(reference *ast.Node) bool {
+	return immediateInvocationResult(reference) != nil
+}
+
+func immediateInvocationResult(reference *ast.Node) *ast.Node {
 	current := invocationResultExpression(reference)
 	if utils.IsCallee(current) || isTaggedTemplateTag(current) {
-		return true
+		return current.Parent
 	}
 
 	// Function.prototype.call/apply invoke their receiver immediately. Reuse
@@ -498,10 +588,19 @@ func isImmediateInvocation(reference *ast.Node) bool {
 	parent := current.Parent
 	if parent == nil || !ast.IsAccessExpression(parent) ||
 		utils.AccessExpressionObject(parent) != current {
-		return false
+		return nil
 	}
 	name, ok := utils.AccessExpressionStaticName(parent)
-	return ok && (name == "call" || name == "apply") && utils.IsCallee(parent)
+	if !ok || !utils.IsCallee(parent) {
+		return nil
+	}
+	if name == "call" || name == "apply" {
+		return parent.Parent
+	}
+	if name == "bind" {
+		return immediateInvocationResult(parent.Parent)
+	}
+	return nil
 }
 
 // invocationResultExpression walks only expressions whose result can be the
@@ -530,6 +629,21 @@ func invocationResultExpression(reference *ast.Node) *ast.Node {
 			if conditional != nil && (conditional.WhenTrue == current || conditional.WhenFalse == current) {
 				current = parent
 				continue
+			}
+		}
+		// An immediately invoked function can return a callable that is used
+		// again in the same initializer, as in (() => () => read())()().
+		if parent.Kind == ast.KindReturnStatement ||
+			(parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == current) {
+			owner := parent
+			if parent.Kind == ast.KindReturnStatement {
+				owner = findEnclosingExecutionScope(parent)
+			}
+			if owner != nil {
+				if result := immediateInvocationResult(owner); result != nil {
+					current = result
+					continue
+				}
 			}
 		}
 		break
