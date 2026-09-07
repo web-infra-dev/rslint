@@ -20,6 +20,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_interpolation_in_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_mocks_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_restricted_rstest_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/padding_around_after_all_blocks"
@@ -76,6 +77,7 @@ func GetAllRules() []rule.Rule {
 		no_importing_rstest_globals.NoImportingRstestGlobalsRule,
 		no_interpolation_in_snapshots.NoInterpolationInSnapshotsRule,
 		no_mocks_import.NoMocksImportRule,
+		no_restricted_matchers.NoRestrictedMatchersRule,
 		no_restricted_rstest_methods.NoRestrictedRstestMethodsRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		padding_around_after_all_blocks.PaddingAroundAfterAllBlocksRule,

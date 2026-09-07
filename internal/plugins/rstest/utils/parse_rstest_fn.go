@@ -332,19 +332,12 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 // `test` imported from Vitest is taken for an Rstest global, while a renamed
 // or namespace import from an Rstest module stops resolving at all.
 //
-// The TypeChecker is therefore not the only source consulted. A source-only
-// Program — the generation rslint builds for files no tsconfig project owns —
-// carries no checker, so the file's reference store answers instead. Its
-// binder scope walk resolves imports and declarations authored in this file,
-// which is everything the discriminations above need; only bindings declared
-// outside the file are beyond it, and those were never Rstest registrations.
+// RefStore resolves through the binder first and falls back to the checker for
+// declarations outside this file. A source-only Program has no checker, but
+// its binder scope walk still resolves every local import and declaration
+// needed to distinguish Rstest APIs from foreign and shadowing bindings.
 func resolveRstestRootSymbol(ctx rule.RuleContext, root *ast.Node) *ast.Symbol {
-	if ctx.TypeChecker != nil {
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(root); symbol != nil {
-			return symbol
-		}
-	}
-	return ctx.Refs.ResolveInFile(root)
+	return ctx.Refs.Resolve(root)
 }
 
 func resolveRstestRoot(

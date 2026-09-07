@@ -243,10 +243,13 @@ func recordRstestTestCallback(
 	switch name.Kind {
 	case ast.KindIdentifier:
 		analysis.addExpectRootName(name.AsIdentifier().Text)
-		if ctx.TypeChecker == nil {
-			return
+		var symbol *ast.Symbol
+		if ctx.TypeChecker != nil {
+			symbol = ctx.TypeChecker.GetSymbolAtLocation(name)
+		} else {
+			symbol = parameter.Symbol
 		}
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
+		if symbol != nil {
 			result.ContextReceivers[symbol] = true
 		}
 	case ast.KindObjectBindingPattern:
@@ -274,10 +277,13 @@ func recordRstestTestCallback(
 				continue
 			}
 			analysis.addExpectRootName(binding.Name().AsIdentifier().Text)
-			if ctx.TypeChecker == nil {
-				continue
+			var symbol *ast.Symbol
+			if ctx.TypeChecker != nil {
+				symbol = ctx.TypeChecker.GetSymbolAtLocation(binding.Name())
+			} else {
+				symbol = element.Symbol()
 			}
-			if symbol := ctx.TypeChecker.GetSymbolAtLocation(binding.Name()); symbol != nil {
+			if symbol != nil {
 				result.ContextExpectNames[symbol] = true
 			}
 		}
