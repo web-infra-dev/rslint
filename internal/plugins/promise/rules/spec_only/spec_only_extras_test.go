@@ -1,9 +1,9 @@
 package spec_only_test
 
 import (
-	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/spec_only"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -15,8 +15,9 @@ import (
 // Go assertions include complete diagnostic ranges.
 func TestSpecOnlyExtras(t *testing.T) {
 	root := fixtures.GetRootDir()
+	// Use tsgo paths for the in-memory filesystem on every platform.
 	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
-		filepath.Join(root.Dir, "tsconfig.allowJs.json"): `{"extends":"./tsconfig.json","compilerOptions":{"allowJs":true}}`,
+		tspath.ResolvePath(root.Dir, "tsconfig.allowJs.json"): `{"extends":"./tsconfig.json","compilerOptions":{"allowJs":true}}`,
 	})
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &spec_only.SpecOnlyRule,
 		[]rule_tester.ValidTestCase{
