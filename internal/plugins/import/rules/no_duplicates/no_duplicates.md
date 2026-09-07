@@ -38,9 +38,11 @@ import { y } from './bar';
 
 ### `considerQueryString`
 
-- **Default:** `true`
+- **Default:**
+  - `false` by default
+  - `true` if using the `importPlugin.configs.recommended` preset
 
-When set to `false`, query strings are ignored when checking for duplicate imports.
+When set to `true`, imports with different query strings are treated as different modules.
 
 ```json
 {
@@ -56,6 +58,8 @@ import iconSource from './icon.svg?raw';
 ```
 
 ### `prefer-inline`
+
+- **Default:** `false`
 
 When set to `true`, supports TypeScript inline type imports, allowing `import type { X }` to be merged into `import { type X }`.
 
