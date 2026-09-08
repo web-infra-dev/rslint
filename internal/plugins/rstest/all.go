@@ -50,6 +50,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_mock_type_parameters"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_test_timeout"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_to_throw_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_title"
@@ -108,6 +109,7 @@ func GetAllRules() []rule.Rule {
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
 		require_mock_type_parameters.RequireMockTypeParametersRule,
 		require_test_timeout.RequireTestTimeoutRule,
+		require_to_throw_message.RequireToThrowMessageRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
 		valid_title.ValidTitleRule,
