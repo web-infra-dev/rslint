@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -312,6 +313,63 @@ func writeProgramBuildFixture(t *testing.T, root string, files map[string]string
 	}
 }
 
+func TestBuildContextMetadataDiscoveryPreservesParallelSourceReuse(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	const config = `{"compilerOptions":{"noLib":true,"noResolve":true},"files":["shared.ts"]}`
+	writeProgramBuildFixture(t, root, map[string]string{
+		"first.json":  config,
+		"second.json": config,
+		"shared.ts":   "export const shared = 1;\n",
+	})
+	baseFS := &programReadCountingFS{
+		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		reads: make(map[string]int),
+	}
+	context := newBuildContext(baseFS)
+	var configs []*tsoptions.ParsedCommandLine
+	for _, name := range []string{"first.json", "second.json"} {
+		parsed, err := context.parseConfig(root, tspath.ResolvePath(root, name))
+		if err != nil {
+			t.Fatalf("parse config %s: %v", name, err)
+		}
+		if parsed == nil || len(parsed.Errors) != 0 {
+			t.Fatalf("metadata discovery did not parse valid config %s", name)
+		}
+		configs = append(configs, parsed)
+	}
+	fileName := tspath.ResolvePath(root, "shared.ts")
+	if got := baseFS.readCount(fileName); got != 0 {
+		t.Fatalf("metadata discovery read source %d times, want 0", got)
+	}
+
+	context.enableConcurrentProgramQueries()
+	type buildResult struct {
+		program *compiler.Program
+		err     error
+	}
+	results := make(chan buildResult, len(configs))
+	for _, parsed := range configs {
+		go func() {
+			program, err := utils.CreateProgramFromParsedConfigLenient(true, parsed, context.newCompilerHostWithCache(root))
+			results <- buildResult{program: program, err: err}
+		}()
+	}
+	first, second := <-results, <-results
+	if first.err != nil || second.err != nil {
+		t.Fatalf("build programs: first=%v second=%v", first.err, second.err)
+	}
+	firstSource, secondSource := first.program.GetSourceFile(fileName), second.program.GetSourceFile(fileName)
+	if firstSource == nil || secondSource == nil {
+		t.Fatal("shared source must be present in both Programs")
+	}
+	if firstSource != secondSource {
+		t.Fatal("identical sources and parse options must reuse the AST across Programs")
+	}
+	if got := baseFS.readCount(fileName); got != 1 {
+		t.Fatalf("source reads after metadata discovery and parallel construction = %d, want 1", got)
+	}
+}
+
 func TestBuildContextSharesExtendedConfigWithoutFreezingConfigDir(t *testing.T) {
 	root := t.TempDir()
 	writeProgramBuildFixture(t, root, map[string]string{
@@ -330,11 +388,11 @@ func TestBuildContextSharesExtendedConfigWithoutFreezingConfigDir(t *testing.T) 
 		reads: make(map[string]int),
 	}
 	context := newBuildContext(baseFS)
-	_, configA, err := context.parseConfig(root, filepath.Join(root, "packages/a/tsconfig.json"))
+	configA, err := context.parseConfig(root, filepath.Join(root, "packages/a/tsconfig.json"))
 	if err != nil {
 		t.Fatalf("parse config A: %v", err)
 	}
-	_, configB, err := context.parseConfig(root, filepath.Join(root, "packages/b/tsconfig.json"))
+	configB, err := context.parseConfig(root, filepath.Join(root, "packages/b/tsconfig.json"))
 	if err != nil {
 		t.Fatalf("parse config B: %v", err)
 	}
@@ -435,7 +493,7 @@ func TestBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.T) {
 	})
 
 	context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
-	_, before, err := context.parseConfig(root, filepath.Join(root, "a.json"))
+	before, err := context.parseConfig(root, filepath.Join(root, "a.json"))
 	if err != nil {
 		t.Fatalf("parse config before write: %v", err)
 	}
@@ -447,7 +505,7 @@ func TestBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.T) {
 	if err := context.FS().WriteFile(basePath, `{"compilerOptions":{"strict":false}}`); err != nil {
 		t.Fatalf("write extended config: %v", err)
 	}
-	_, after, err := context.parseConfig(root, filepath.Join(root, "b.json"))
+	after, err := context.parseConfig(root, filepath.Join(root, "b.json"))
 	if err != nil {
 		t.Fatalf("parse config after write: %v", err)
 	}

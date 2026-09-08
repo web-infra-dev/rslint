@@ -140,7 +140,7 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 	slot.parseOnce.Do(func() {
 		slot.config = spec.parsed
 		if slot.config == nil {
-			_, slot.config, slot.parseErr = execution.session.context.parseConfig(
+			slot.config, slot.parseErr = execution.session.context.parseConfig(
 				spec.programCwd,
 				spec.tsconfigPath,
 			)

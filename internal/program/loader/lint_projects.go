@@ -28,8 +28,7 @@ func (s *Session) discoverServiceProjects(
 		}
 		if discovery == nil {
 			discovery = utils.NewTypeScriptProjectDiscovery(s.FS(), func(path string) (*tsoptions.ParsedCommandLine, error) {
-				_, parsed, err := s.context.parseConfig(tspath.GetDirectoryPath(path), path)
-				return parsed, err
+				return s.context.parseConfig(tspath.GetDirectoryPath(path), path)
 			})
 			projects = make(map[string][]int)
 		}

@@ -118,21 +118,23 @@ func (c *buildContext) newCompilerHost(cwd string) compiler.CompilerHost {
 // createProjectProgram creates a tsconfig-backed Program and preserves the
 // lenient syntactic-error behavior used by the CLI and API.
 func (c *buildContext) createProjectProgram(singleThreaded bool, cwd string, tsconfigPath string) (*compiler.Program, error) {
-	host, config, err := c.parseConfig(cwd, tsconfigPath)
+	config, err := c.parseConfig(cwd, tsconfigPath)
 	if err != nil {
 		return nil, err
 	}
-	return utils.CreateProgramFromParsedConfigLenient(singleThreaded, config, host)
+	return utils.CreateProgramFromParsedConfigLenient(singleThreaded, config, c.newCompilerHostWithCache(cwd))
 }
 
-func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (compiler.CompilerHost, *tsoptions.ParsedCommandLine, error) {
+// parseConfig reads metadata without binding the source cache to a filesystem.
+// Program construction chooses its serial or parallel view before doing that.
+func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (*tsoptions.ParsedCommandLine, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !c.compilerFS().FileExists(resolvedConfigPath) {
-		return nil, nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
+		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
 	c.registerTSConfig(resolvedConfigPath)
 
-	host := c.newCompilerHostWithCache(cwd)
+	host := c.newCompilerHost(cwd)
 	config, _ := tsoptions.GetParsedCommandLineOfConfigFile(
 		tsconfigPath,
 		&core.CompilerOptions{},
@@ -140,7 +142,7 @@ func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (compiler.Co
 		host,
 		c.extendedConfigCacheInterface(),
 	)
-	return host, config, nil
+	return config, nil
 }
 
 // createCompatibilityProgram creates a source-only compiler Program using the
