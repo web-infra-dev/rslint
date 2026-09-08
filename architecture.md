@@ -1536,6 +1536,16 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 
+`cmd/tsgo` dispatches two one-shot subcommands, each parsing its own options.
+`project --api --config <path>` returns the existing binary project information;
+the Rust client selects this command, and flag-only invocations remain compatible.
+`config --config <path>` resolves tsconfig inheritance and prints
+`FinalCompilerOptions` directly as JSON for JavaScript consumers to `JSON.parse`.
+This command includes defaults and implied values for the exported option subset,
+without creating a Program or checking source code. Parsing errors go to stderr
+with a nonzero exit code. Both commands default to `tsconfig.json` in the working
+directory and use the same pinned compiler without its JavaScript API.
+
 ### Future Enhancements
 
 The current architecture already leaves room for:
