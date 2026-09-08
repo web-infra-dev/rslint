@@ -608,106 +608,38 @@ describe('collectPluginMeta', () => {
   });
 });
 
-describe('preset tsconfigRootDir provenance', () => {
-  function evaluate(
-    expression: string,
-    directory: string,
-    filename = 'rslint.config.mjs',
-  ): Record<string, unknown>[] {
-    return vm.runInNewContext(
-      expression,
-      { ts },
-      { filename: path.join(directory, filename) },
-    );
-  }
-  function roots(entries: Record<string, unknown>[]): unknown[] {
-    return [
-      ...new Set(
-        normalizeConfig(entries).flatMap(
-          (entry) => entry.inferredTSConfigRootDirs ?? [],
-        ),
-      ),
-    ];
-  }
-  test.each([
-    '[ts.configs.recommended]',
-    '[...ts.configs.recommended]',
-    '[{...ts.configs.base}]',
-    '[{rules: {...ts.configs.recommended.find(entry => entry.rules).rules}}]',
-    '[(() => ts.configs.base)()]',
-  ])('retains the config origin through %s', (expression) => {
-    const directory = createTempDir();
-    try {
-      const entries = evaluate(expression, directory);
-      expect(roots(entries)).toEqual([directory]);
-      expect(JSON.stringify(entries)).not.toContain('tsconfigRootDir');
-      expect(
-        normalizeConfig(entries).every(
-          (entry) => entry.languageOptions === undefined,
-        ),
-      ).toBe(true);
-    } finally {
-      cleanup(directory);
-    }
-  });
-  test('does not infer from helper modules or unused accesses', () => {
-    const directory = createTempDir();
-    try {
-      evaluate('[ts.configs.base]', directory);
-      expect(
-        roots(evaluate('[ts.configs.base]', directory, 'helper.mjs')),
-      ).toEqual([]);
-      expect(roots([{ rules: {} }])).toEqual([]);
-    } finally {
-      cleanup(directory);
-    }
-  });
-  test('rules spread retains both candidate directories and deduplicates repeated origins', () => {
-    const directory = createTempDir();
-    try {
-      const expression =
-        '[{rules: {...ts.configs.recommended.find(entry => entry.rules).rules}}]';
-      const a = evaluate(expression, directory);
-      const b = evaluate(expression, path.join(directory, 'nested'));
-      const again = evaluate(expression, directory);
-      const merged = [
-        {
-          rules: {
-            ...(a[0].rules as object),
-            ...(b[0].rules as object),
-            ...(again[0].rules as object),
+describe('TypeScript preset values', () => {
+  test.each(Object.keys(ts.configs) as (keyof typeof ts.configs)[])(
+    '%s keeps its identity across config and helper reads',
+    (name) => {
+      const preset = ts.configs[name];
+      for (const filename of ['rslint.config.mjs', 'helper.mjs']) {
+        const reread = vm.runInNewContext(
+          'ts.configs[name]',
+          { ts, name },
+          {
+            filename: path.join(os.tmpdir(), filename),
           },
-        },
-      ];
-      expect(roots(merged)).toEqual([
-        directory,
-        path.join(directory, 'nested'),
-      ]);
-      expect(roots(a)).toEqual([directory]);
-    } finally {
-      cleanup(directory);
-    }
-  });
-  test('restores V8 stack hooks and ignores URL reload queries', () => {
-    const directory = createTempDir();
-    const limit = Error.stackTraceLimit;
-    const prepare = Error.prepareStackTrace;
+        );
+        expect(reread).toBe(preset);
+      }
+    },
+  );
+
+  test('configuring a preset before exporting it preserves the modification', () => {
+    const base = ts.configs.base;
+    const previousFiles = base.files;
     try {
       const entries = vm.runInNewContext(
-        '[ts.configs.base]',
+        "ts.configs.base.files = ['src/**/*.ts']; [ts.configs.base]",
         { ts },
-        {
-          filename: new URL(
-            'rslint.config.mjs?rslint=1',
-            `file://${directory}/`,
-          ).href,
-        },
+        { filename: path.join(os.tmpdir(), 'rslint.config.mjs') },
       );
-      expect(roots(entries)).toEqual([directory]);
-      expect(Error.stackTraceLimit).toBe(limit);
-      expect(Error.prepareStackTrace).toBe(prepare);
+      expect(normalizeConfig(entries)[0].files).toEqual(['src/**/*.ts']);
+      expect(entries[0]).toBe(base);
     } finally {
-      cleanup(directory);
+      if (previousFiles === undefined) delete base.files;
+      else base.files = previousFiles;
     }
   });
 });

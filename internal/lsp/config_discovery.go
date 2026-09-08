@@ -629,15 +629,14 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			)
 		}
 		seenConfigDirs[configID] = configDir
-		var paths []string
-		if !config.NeedsProjectPolicy(entries) {
-			paths, err = resolveTsConfigPathsWithFS(entries, configDir, fsys)
+		if !config.HasProjectOptions(entries) {
+			paths, err := resolveTsConfigPathsWithFS(entries, configDir, fsys)
 			if err != nil {
 				return nil, fmt.Errorf("resolve tsconfig paths for %q: %w", configDir, err)
 			}
+			snapshot.tsConfigPaths[configDir] = paths
 		}
 		snapshot.configs[configDir] = append(config.RslintConfig(nil), entries...)
-		snapshot.tsConfigPaths[configDir] = paths
 	}
 
 	// A failed candidate still blocks the workspace fallback when no usable

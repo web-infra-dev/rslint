@@ -152,9 +152,9 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	if snapshot.projectPolicy.ProjectService {
 		var selected selectedLintProject
 		if serviceRequest != nil {
-			selected, err = serviceRequest.service(snapshot.projectPolicy.TsconfigRootDir)
+			selected, err = serviceRequest.service(snapshot.projectServiceRootDirectory())
 		} else {
-			selected, err = request.service(snapshot.projectPolicy.TsconfigRootDir)
+			selected, err = request.service(snapshot.projectServiceRootDirectory())
 		}
 		program, sourceFile, hasTypeInfo = selected.program, selected.sourceFile, selected.program != nil
 		if err == nil && !hasTypeInfo {

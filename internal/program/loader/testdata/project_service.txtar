@@ -40,3 +40,33 @@ exports.outside = 1;
 {"files":["file.ts"]}
 -- service/file.ts --
 export const service = 1;
+-- legacy-policy/pkg[1]/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- legacy-policy/pkg[1]/tsconfig.unsafe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- legacy-policy/pkg[1]/tsconfig.safe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","safe.d.ts"]}
+-- legacy-policy/pkg[1]/tsconfig.other.json --
+{"compilerOptions":{"noLib":true},"files":["other.ts"]}
+-- legacy-policy/pkg[1]/target.ts --
+export const result: string = value.member;
+-- legacy-policy/pkg[1]/other.ts --
+export const other = 1;
+-- legacy-policy/pkg[1]/unsafe.d.ts --
+declare const value: any;
+-- legacy-policy/pkg[1]/safe.d.ts --
+declare const value: { member: number };
+-- root-contexts/owner/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["x.ts","y.ts"]}
+-- root-contexts/owner/x.ts --
+export const x = 1;
+-- root-contexts/owner/y.ts --
+export const result: string = value.member;
+-- root-contexts/a[1]/config.json --
+{"compilerOptions":{"noLib":true},"files":["../owner/x.ts","../owner/y.ts","unsafe.d.ts"]}
+-- root-contexts/a[1]/unsafe.d.ts --
+declare const value: any;
+-- root-contexts/b/config.json --
+{"compilerOptions":{"noLib":true},"files":["../owner/y.ts","safe.d.ts"]}
+-- root-contexts/b/safe.d.ts --
+declare const value: { member: number };

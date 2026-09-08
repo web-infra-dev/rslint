@@ -567,7 +567,7 @@ func TestSessionRejectsNilFilesystemBeforeLoading(t *testing.T) {
 			if session.FS() != nil {
 				t.Fatal("invalid session unexpectedly exposed a filesystem")
 			}
-			if _, err := session.BuildProjects(nil, true); err == nil {
+			if _, err := session.BuildProjects(ProjectBuildRequest{Configs: nil, Scope: AllDeclared, SingleThreaded: true}); err == nil {
 				t.Fatal("BuildProjects accepted an invalid session")
 			}
 			if _, err := session.LoadCLI(ProjectSet{}, target.Plan{}, "/repo", true); err == nil {

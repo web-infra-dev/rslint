@@ -2617,8 +2617,14 @@ module.exports = config;`
   );
 
   test.each([
-    ['no preset', 'none', 'omitted', false],
-    ['direct preset', 'direct', 'omitted', true],
+    ...['none', 'direct', 'helper', 'function', 'rules'].flatMap((preset) =>
+      ['omitted', 'root', 'cwd', 'null', 'undefined'].map((boundary) => [
+        `${preset} / ${boundary}`,
+        preset,
+        boundary,
+        !['cwd', 'undefined'].includes(boundary),
+      ]),
+    ),
     ...['js', 'ts', 'mts', 'cjs', 'cts'].map((extension) => [
       `direct ${extension}`,
       'direct',
@@ -2626,16 +2632,14 @@ module.exports = config;`
       true,
       extension,
     ]),
-    ['helper module', 'helper', 'omitted', false],
-    ['helper function', 'function', 'omitted', true],
-    ['rules spread', 'rules', 'omitted', true],
-    ['explicit root', 'none', 'root', true],
-    ['explicit cwd', 'direct', 'cwd', false],
-    ['null reset', 'direct', 'null', true],
-    ['undefined override', 'direct', 'undefined', false],
+    ['object spread', 'object', 'omitted', true],
+    ['JSON copy', 'json', 'omitted', true],
+    ['imported config', 'shared', 'omitted', true],
+    ['imported config plus direct preset', 'shared-direct', 'omitted', true],
+    ['custom config filename', 'none', 'omitted', true, 'mjs', 'custom.mjs'],
   ])(
-    'projectService root inference: %s',
-    async (_name, preset, boundary, typed, extension = 'mjs') => {
+    'projectService config directory default: %s',
+    async (_name, preset, boundary, typed, extension = 'mjs', customName) => {
       const tmp = await mkdtemp(
         path.join(os.tmpdir(), 'rslint-root-inference-'),
       );
@@ -2655,12 +2659,22 @@ module.exports = config;`
         path.join(tmp, 'helper.mjs'),
         `import {ts} from ${JSON.stringify(coreURL)}; export const base = ts.configs.base; export const get = () => ts.configs.base;`,
       );
-      const prefix = `import {ts} from ${JSON.stringify(coreURL)}; import {base, get} from './helper.mjs';`;
+      await mkdir(path.join(tmp, 'shared'));
+      await writeFile(
+        path.join(tmp, 'shared/rslint.config.mjs'),
+        `import {ts} from ${JSON.stringify(coreURL)}; export default [ts.configs.base];`,
+      );
+      const prefix = `import {ts} from ${JSON.stringify(coreURL)}; import {base, get} from './helper.mjs'; ${preset.startsWith('shared') ? "import shared from './shared/rslint.config.mjs';" : ''}`;
+      const configName = customName ?? `rslint.config.${extension}`;
       const entry = {
         none: '{}',
         direct: 'ts.configs.base',
         helper: 'base',
         function: 'get()',
+        object: '{...ts.configs.base}',
+        json: 'JSON.parse(JSON.stringify(ts.configs.base))',
+        shared: '...shared',
+        'shared-direct': '...shared,ts.configs.base',
         rules:
           '{rules: {...ts.configs.recommended.find(entry => entry.rules).rules}}',
       }[preset];
@@ -2675,7 +2689,7 @@ module.exports = config;`
         : '';
       const configExpression = `[${entry},{plugins:['@typescript-eslint'], languageOptions:{parserOptions:{projectService:true${options}}},rules:{'no-debugger':'error','@typescript-eslint/no-for-in-array':'error'}}${reset}]`;
       await writeFile(
-        path.join(tmp, `rslint.config.${extension}`),
+        path.join(tmp, configName),
         ['cjs', 'cts'].includes(extension)
           ? `module.exports = import(${JSON.stringify(coreURL)}).then(({ts}) => ${configExpression});`
           : `${prefix} export default ${configExpression};`,
@@ -2683,8 +2697,8 @@ module.exports = config;`
       const instance = new Rslint({
         cwd,
         // CJS/CTS are supported through explicit config selection.
-        ...(['cjs', 'cts'].includes(extension)
-          ? { overrideConfigFile: path.join(tmp, `rslint.config.${extension}`) }
+        ...(customName || ['cjs', 'cts'].includes(extension)
+          ? { overrideConfigFile: path.join(tmp, configName) }
           : {}),
       });
       try {
@@ -2705,7 +2719,195 @@ module.exports = config;`
     },
   );
 
-  test('projectService root inference isolates concurrent API instances and fresh reloads', async () => {
+  test.each([
+    ['automatic parent config', false, 'auto', true],
+    ['automatic nested config', true, 'auto', false],
+    ['explicit parent config', true, 'parent', true],
+    ['explicit nested config', true, 'nested', false],
+    ['explicit external config', true, 'external', true],
+    ['inline only', true, 'inline', undefined],
+    ['parent config with inline basePath suffix', false, 'suffix', true],
+  ])(
+    'projectService config owner and cwd: %s',
+    async (_name, nestedConfig, mode, ownerTyped) => {
+      const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-owner-root-'));
+      const pkg = path.join(tmp, 'pkg');
+      const source =
+        'const values = [1]; for (const key in values) {} debugger;';
+      const entries = [
+        {
+          plugins: ['@typescript-eslint'],
+          languageOptions: { parserOptions: { projectService: true } },
+          rules: {
+            'no-debugger': 'error',
+            '@typescript-eslint/no-for-in-array': 'error',
+          },
+        },
+      ];
+      try {
+        await mkdir(pkg);
+        await writeFile(
+          path.join(tmp, 'tsconfig.json'),
+          JSON.stringify({ files: ['pkg/tool.ts'] }),
+        );
+        await writeFile(
+          path.join(pkg, 'tsconfig.json'),
+          JSON.stringify({ files: ['other.ts'] }),
+        );
+        await writeFile(path.join(pkg, 'other.ts'), 'export {};');
+        await writeFile(path.join(pkg, 'tool.ts'), source);
+        await writeFile(
+          path.join(tmp, 'rslint.config.mjs'),
+          `export default ${JSON.stringify(entries)};`,
+        );
+        if (nestedConfig) {
+          await writeFile(
+            path.join(pkg, 'rslint.config.mjs'),
+            `export default ${JSON.stringify(entries)};`,
+          );
+        }
+        const external = path.join(tmp, 'tooling/custom.mjs');
+        if (mode === 'external') {
+          await mkdir(path.dirname(external));
+          await writeFile(
+            external,
+            `export default ${JSON.stringify(entries)};`,
+          );
+        }
+        for (const cwd of [tmp, pkg]) {
+          const instance = new Rslint({
+            cwd,
+            ...(mode === 'parent' || mode === 'nested'
+              ? {
+                  overrideConfigFile: path.join(
+                    mode === 'parent' ? tmp : pkg,
+                    'rslint.config.mjs',
+                  ),
+                }
+              : {}),
+            ...(mode === 'external' ? { overrideConfigFile: external } : {}),
+            ...(mode === 'inline'
+              ? { overrideConfigFile: true, overrideConfig: entries }
+              : {}),
+            ...(mode === 'suffix'
+              ? {
+                  overrideConfig: [
+                    {
+                      basePath: pkg,
+                      files: [['**/*', '**/*.ts']],
+                      languageOptions: {
+                        parserOptions: { projectService: true },
+                      },
+                    },
+                  ],
+                }
+              : {}),
+          });
+          try {
+            const filePath = path.relative(cwd, path.join(pkg, 'tool.ts'));
+            for (const results of [
+              await instance.lintFiles([filePath]),
+              await instance.lintText(source, { filePath }),
+            ]) {
+              const ids = results[0].messages.map(({ ruleId }) => ruleId);
+              expect(ids).toContain('no-debugger');
+              expect(ids.includes('@typescript-eslint/no-for-in-array')).toBe(
+                ownerTyped ?? cwd === tmp,
+              );
+            }
+          } finally {
+            await instance.close();
+          }
+        }
+      } finally {
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test.each(['default', 'narrow', 'null reset', 'disabled'])(
+    'projectService AND files, basePath and ignores with %s root policy',
+    async (mode) => {
+      const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-policy-match-'));
+      const source =
+        'const values = [1]; for (const key in values) {} debugger;';
+      const files = [
+        'pkg/src/match.ts',
+        'pkg/src/ignored.ts',
+        'pkg/src/global.ts',
+        'pkg/other.ts',
+        'pkg/src/match.js',
+      ];
+      const rootOptions =
+        mode === 'default' ? {} : { tsconfigRootDir: path.join(tmp, 'pkg') };
+      const instance = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          { ignores: ['**/global.ts'] },
+          {
+            plugins: ['@typescript-eslint'],
+            languageOptions: { parserOptions: { project: false } },
+            rules: {
+              'no-debugger': 'error',
+              '@typescript-eslint/no-for-in-array': 'error',
+            },
+          },
+          {
+            basePath: 'pkg',
+            files: [['src/**', '**/*.ts']],
+            ignores: ['**/ignored.ts'],
+            languageOptions: {
+              parserOptions: { projectService: true, ...rootOptions },
+            },
+          },
+          ...(mode === 'null reset'
+            ? [
+                {
+                  languageOptions: { parserOptions: { tsconfigRootDir: null } },
+                },
+              ]
+            : []),
+          ...(mode === 'disabled'
+            ? [
+                {
+                  languageOptions: { parserOptions: { projectService: false } },
+                },
+              ]
+            : []),
+        ],
+        virtualFiles: {
+          'tsconfig.json': JSON.stringify({
+            compilerOptions: { allowJs: true },
+            files,
+          }),
+        },
+      });
+      try {
+        await mkdir(path.join(tmp, 'pkg/src'), { recursive: true });
+        for (const file of files) await writeFile(path.join(tmp, file), source);
+        const results = await instance.lintFiles(files);
+        expect(results).toHaveLength(files.length - 1);
+        for (const result of results) {
+          const name = path
+            .relative(tmp, result.filePath)
+            .replaceAll(path.sep, '/');
+          expect(name).not.toBe('pkg/src/global.ts');
+          const ids = result.messages.map(({ ruleId }) => ruleId);
+          expect(ids).toContain('no-debugger');
+          expect(ids.includes('@typescript-eslint/no-for-in-array')).toBe(
+            name === 'pkg/src/match.ts' &&
+              ['default', 'null reset'].includes(mode),
+          );
+        }
+      } finally {
+        await instance.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test('projectService root policies isolate concurrent API instances and fresh reloads', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-root-isolation-'));
     const coreURL = pathToFileURL(
       path.resolve(import.meta.dirname, '../dist/index.js'),
@@ -2737,10 +2939,10 @@ module.exports = config;`
         expect(result[0].messages.map((message) => message.ruleId)).toEqual([
           '@typescript-eslint/no-for-in-array',
         ]);
-      // Reload A with no candidate; B's cached/transitive preset cannot supply it.
+      // A now narrows its root explicitly; B retains its own config default.
       await writeFile(
         path.join(tmp, 'a/rslint.config.mjs'),
-        `export default [{plugins:['@typescript-eslint'],languageOptions:{parserOptions:{projectService:true}},rules:{'@typescript-eslint/no-for-in-array':'error'}}];`,
+        `export default [{plugins:['@typescript-eslint'],languageOptions:{parserOptions:{projectService:true,tsconfigRootDir:${JSON.stringify(path.join(tmp, 'a/pkg'))}}},rules:{'@typescript-eslint/no-for-in-array':'error'}}];`,
       );
       const [a, b] = await run();
       expect(a[0].messages).toEqual([]);
@@ -2752,6 +2954,195 @@ module.exports = config;`
       await rm(tmp, { recursive: true, force: true });
     }
   });
+
+  test.each(
+    [true, false].flatMap((declared) =>
+      [
+        'none',
+        'service',
+        'root',
+        'project paths',
+        'project false',
+        'project null',
+      ].map((option) => ({
+        declared,
+        option,
+      })),
+    ),
+  )(
+    'unmatched $option preserves owner project declarations (declared=$declared)',
+    async ({ declared, option }) => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-matched-policy-'),
+      );
+      const cwd = path.join(tmp, 'literal[owner]');
+      await mkdir(cwd);
+      const source =
+        'export const result = value.member;\nfor (const key in [1]) {}';
+      const unusedOptions = {
+        none: {},
+        service: { projectService: true },
+        root: { tsconfigRootDir: cwd },
+        'project paths': { project: './missing.json' },
+        'project false': { project: false },
+        'project null': { project: null },
+      }[option];
+      const instance = new Rslint({
+        cwd,
+        overrideConfigFile: true,
+        overrideConfig: [
+          {
+            plugins: ['@typescript-eslint'],
+            rules: {
+              '@typescript-eslint/no-unsafe-member-access': 'error',
+              '@typescript-eslint/no-for-in-array': 'error',
+            },
+          },
+          ...(declared
+            ? [
+                {
+                  languageOptions: {
+                    parserOptions: { project: './unsafe.json' },
+                  },
+                },
+                {
+                  languageOptions: {
+                    parserOptions: { project: './safe.json' },
+                  },
+                },
+              ]
+            : []),
+          {
+            files: ['unused.ts'],
+            languageOptions: { parserOptions: unusedOptions },
+          },
+        ],
+        virtualFiles: {
+          'tsconfig.json': JSON.stringify({
+            files: ['target.ts', 'unsafe.d.ts'],
+          }),
+          'unsafe.json': JSON.stringify({
+            files: ['target.ts', 'unsafe.d.ts'],
+          }),
+          'safe.json': JSON.stringify({ files: ['target.ts', 'safe.d.ts'] }),
+          'unsafe.d.ts': 'declare const value: any;',
+          'safe.d.ts': 'declare const value: { member: number };',
+        },
+      });
+      try {
+        await writeFile(path.join(cwd, 'target.ts'), source);
+        if (option === 'project paths') {
+          await expect(instance.lintFiles(['target.ts'])).rejects.toThrow(
+            /missing\.json/,
+          );
+          await expect(
+            instance.lintText(source, { filePath: 'target.ts' }),
+          ).rejects.toThrow(/missing\.json/);
+          return;
+        }
+        for (const results of [
+          await instance.lintFiles(['target.ts']),
+          await instance.lintText(source, { filePath: 'target.ts' }),
+        ]) {
+          expect(results[0].messages.map(({ ruleId }) => ruleId)).toEqual([
+            '@typescript-eslint/no-unsafe-member-access',
+            '@typescript-eslint/no-for-in-array',
+          ]);
+        }
+      } finally {
+        await instance.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test.each([true, false])(
+    'projectService false preserves scoped owner declarations but disables the implicit default (declared=%s)',
+    async (declared) => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-service-disabled-'),
+      );
+      const instance = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          {
+            plugins: ['@typescript-eslint'],
+            languageOptions: { parserOptions: { projectService: false } },
+            rules: {
+              '@typescript-eslint/no-for-in-array': 'error',
+              'no-debugger': 'error',
+            },
+          },
+          ...(declared
+            ? [
+                {
+                  files: ['unused.ts'],
+                  languageOptions: {
+                    parserOptions: { project: './custom.json' },
+                  },
+                },
+              ]
+            : []),
+        ],
+        virtualFiles: {
+          'tsconfig.json': JSON.stringify({ files: ['target.ts'] }),
+          'custom.json': JSON.stringify({ files: ['target.ts'] }),
+        },
+      });
+      try {
+        const [result] = await instance.lintText(
+          'const values = [1];\nfor (const key in values) {}\ndebugger;\n',
+          { filePath: 'target.ts' },
+        );
+        expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
+          ...(declared ? ['@typescript-eslint/no-for-in-array'] : []),
+          'no-debugger',
+        ]);
+      } finally {
+        await instance.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test.each(['./custom.json', './custom*.json'])(
+    'explicit project policy keeps the config directory literal for %s',
+    async (project) => {
+      const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-literal-base-'));
+      const cwd = path.join(tmp, 'literal[owner]');
+      await mkdir(cwd);
+      const instance = new Rslint({
+        cwd,
+        overrideConfigFile: true,
+        overrideConfig: [
+          {
+            plugins: ['@typescript-eslint'],
+            languageOptions: {
+              parserOptions: { projectService: false, project },
+            },
+            rules: { '@typescript-eslint/no-unsafe-member-access': 'error' },
+          },
+        ],
+        virtualFiles: {
+          'custom.json': JSON.stringify({ files: ['target.ts', 'types.d.ts'] }),
+          'types.d.ts': 'declare const value: any;',
+        },
+      });
+      try {
+        const [result] = await instance.lintText(
+          'export const result = value.member;',
+          { filePath: 'target.ts' },
+        );
+        expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
+          '@typescript-eslint/no-unsafe-member-access',
+        ]);
+      } finally {
+        await instance.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
 
   test('projectService lintText lets a null root boundary restore ancestor discovery', async () => {
     const tmp = await mkdtemp(
@@ -2865,52 +3256,90 @@ module.exports = config;`
     },
   );
 
-  test('project policy lintText replaces an inherited project array instead of combining its type contexts', async () => {
-    const tmp = await mkdtemp(
-      path.join(os.tmpdir(), 'rslint-project-array-override-'),
-    );
-    const rslint = new Rslint({
-      cwd: tmp,
-      overrideConfigFile: true,
-      overrideConfig: [
-        {
-          plugins: ['@typescript-eslint'],
-          languageOptions: {
-            parserOptions: { projectService: false, project: ['./first.json'] },
-          },
-        },
-        {
-          files: ['**/*.ts'],
-          languageOptions: { parserOptions: { project: ['./second.json'] } },
-          rules: { '@typescript-eslint/no-for-in-array': 'error' },
-        },
-      ],
-      virtualFiles: {
-        'first.json': JSON.stringify({
-          compilerOptions: { paths: { values: ['./scalar.ts'] } },
-          files: ['probe.ts'],
-        }),
-        'second.json': JSON.stringify({
-          compilerOptions: { paths: { values: ['./array.ts'] } },
-          files: ['probe.ts'],
-        }),
-        'scalar.ts': 'export const values = 1;\n',
-        'array.ts': 'export const values = [1];\n',
-      },
-    });
-    try {
-      const [result] = await rslint.lintText(
-        "import { values } from 'values';\nfor (const key in values) {}\n",
-        { filePath: 'probe.ts' },
+  test.each([
+    {
+      name: 'later paths',
+      overrides: [{ project: ['./second.json'] }],
+      typed: true,
+    },
+    { name: 'later empty array', overrides: [{ project: [] }], typed: true },
+    {
+      name: 'empty array without paths',
+      overrides: [{ project: [] }],
+      declared: false,
+      typed: false,
+    },
+    { name: 'false', overrides: [{ project: false }], typed: false },
+    { name: 'null', overrides: [{ project: null }], typed: false },
+    {
+      name: 'paths after false',
+      overrides: [{ project: false }, { project: ['./second.json'] }],
+      typed: true,
+    },
+    {
+      name: 'service disabled with later paths',
+      overrides: [{ projectService: false, project: ['./second.json'] }],
+      typed: true,
+    },
+  ])(
+    'explicit lintText preserves declaration order with $name',
+    async ({ overrides, typed, declared = true }) => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-project-array-override-'),
       );
-      expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
-        '@typescript-eslint/no-for-in-array',
-      ]);
-    } finally {
-      await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
-    }
-  });
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          {
+            plugins: ['@typescript-eslint'],
+            languageOptions: {
+              parserOptions: declared ? { project: ['./first.json'] } : {},
+            },
+          },
+          {
+            files: ['**/*.ts'],
+            rules: {
+              '@typescript-eslint/no-for-in-array': 'error',
+              'no-debugger': 'error',
+            },
+          },
+          ...overrides.map((parserOptions) => ({
+            languageOptions: { parserOptions },
+          })),
+        ],
+        virtualFiles: {
+          'tsconfig.json': JSON.stringify({
+            compilerOptions: { paths: { values: ['./array.ts'] } },
+            files: ['probe.ts'],
+          }),
+          'first.json': JSON.stringify({
+            compilerOptions: { paths: { values: ['./array.ts'] } },
+            files: ['probe.ts'],
+          }),
+          'second.json': JSON.stringify({
+            compilerOptions: { paths: { values: ['./scalar.ts'] } },
+            files: ['probe.ts'],
+          }),
+          'scalar.ts': 'export const values = 1;\n',
+          'array.ts': 'export const values = [1];\n',
+        },
+      });
+      try {
+        const [result] = await rslint.lintText(
+          "import { values } from 'values';\nfor (const key in values) {}\ndebugger;\n",
+          { filePath: 'probe.ts' },
+        );
+        expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
+          ...(typed ? ['@typescript-eslint/no-for-in-array'] : []),
+          'no-debugger',
+        ]);
+      } finally {
+        await rslint.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
 
   test.each(['missing', 'excluded'])(
     'projectService lintText keeps gap syntax rules with a %s project',
@@ -2962,25 +3391,34 @@ module.exports = config;`
     },
   );
 
-  test.each(['project', 'service'])(
-    'TypeScript preset preserves the caller’s %s selection',
-    async (mode) => {
+  test.each(
+    Object.keys(ts.configs).flatMap((preset) =>
+      ['project', 'service'].flatMap((mode) =>
+        ['before', 'after'].map((order) => ({ preset, mode, order })),
+      ),
+    ),
+  )(
+    'TypeScript $preset preset $order caller $mode selection',
+    async ({ preset, mode, order }) => {
       const tmp = await mkdtemp(
         path.join(os.tmpdir(), 'rslint-preset-policy-'),
       );
+      const caller = {
+        languageOptions: {
+          parserOptions:
+            mode === 'service'
+              ? { projectService: true }
+              : { project: './custom.json' },
+        },
+      };
+      const presetEntries = [ts.configs[preset]].flat();
       const rslint = new Rslint({
         cwd: tmp,
         overrideConfigFile: true,
         overrideConfig: [
-          {
-            languageOptions: {
-              parserOptions:
-                mode === 'service'
-                  ? { projectService: true }
-                  : { project: './custom.json' },
-            },
-          },
-          ...ts.configs.recommendedTypeChecked,
+          ...(order === 'before'
+            ? [...presetEntries, caller]
+            : [caller, ...presetEntries]),
           {
             rules: {
               '@typescript-eslint/no-for-in-array': 'error',

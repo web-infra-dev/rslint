@@ -19,9 +19,6 @@ import (
 type projectTargetBinding struct {
 	targets []target.File
 	owners  []int
-	// complete includes import fallback and intentionally unbound targets.
-	// Such targets must not borrow another parser policy's Programs.
-	complete bool
 }
 
 type targetedProjectSlot struct {
@@ -43,7 +40,7 @@ type targetedProjectExecution struct {
 	session        *Session
 	plan           projectPlan
 	singleThreaded bool
-	slots          []*targetedProjectSlot
+	slots          []targetedProjectSlot
 }
 
 type targetedProjectBuildQueue struct {
@@ -111,24 +108,12 @@ func newTargetedProjectExecution(
 	plan projectPlan,
 	singleThreaded bool,
 ) *targetedProjectExecution {
-	execution := &targetedProjectExecution{
+	return &targetedProjectExecution{
 		session:        session,
 		plan:           plan,
 		singleThreaded: singleThreaded,
-		slots:          make([]*targetedProjectSlot, len(plan.specs)),
+		slots:          make([]targetedProjectSlot, len(plan.specs)),
 	}
-	for index, spec := range plan.specs {
-		key := exactPathID(spec.tsconfigPath)
-		slot := session.projectSlots[key]
-		if slot == nil {
-			slot = &targetedProjectSlot{}
-			if session.projectSlots != nil {
-				session.projectSlots[key] = slot
-			}
-		}
-		execution.slots[index] = slot
-	}
-	return execution
 }
 
 func (c *buildContext) createProjectProgramFromParsedConfig(
@@ -144,7 +129,7 @@ func (c *buildContext) createProjectProgramFromParsedConfig(
 }
 
 func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlot, error) {
-	slot := execution.slots[index]
+	slot := &execution.slots[index]
 	spec := execution.plan.specs[index]
 	slot.parseOnce.Do(func() {
 		_, slot.config, slot.parseErr = execution.session.context.parseConfig(
@@ -168,7 +153,7 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 }
 
 func (execution *targetedProjectExecution) build(index int) error {
-	slot := execution.slots[index]
+	slot := &execution.slots[index]
 	spec := execution.plan.specs[index]
 	slot.buildOnce.Do(func() {
 		parsed, err := execution.parse(index)
@@ -192,7 +177,7 @@ func (execution *targetedProjectExecution) containsTarget(
 	index int,
 	target target.File,
 ) bool {
-	slot := execution.slots[index]
+	slot := &execution.slots[index]
 	if slot.program == nil {
 		return false
 	}
@@ -276,25 +261,25 @@ func (execution *targetedProjectExecution) predictedProjectPosition(
 	return bestPosition
 }
 
-func runTargetConfigTasks(
-	configDirs []string,
+func runTargetProjectTasks(
+	groups []projectTargetGroup,
 	singleThreaded bool,
-	task func(configDir string) error,
+	task func(group projectTargetGroup) error,
 ) error {
-	if len(configDirs) == 0 {
+	if len(groups) == 0 {
 		return nil
 	}
-	workerCount := min(runtime.GOMAXPROCS(0), len(configDirs))
+	workerCount := min(runtime.GOMAXPROCS(0), len(groups))
 	if singleThreaded || workerCount <= 1 {
-		for _, configDir := range configDirs {
-			if err := task(configDir); err != nil {
+		for _, group := range groups {
+			if err := task(group); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 
-	errs := make([]error, len(configDirs))
+	errs := make([]error, len(groups))
 	jobs := make(chan int, workerCount)
 	var workers sync.WaitGroup
 	workers.Add(workerCount)
@@ -302,11 +287,11 @@ func runTargetConfigTasks(
 		go func() {
 			defer workers.Done()
 			for index := range jobs {
-				errs[index] = task(configDirs[index])
+				errs[index] = task(groups[index])
 			}
 		}()
 	}
-	for index := range configDirs {
+	for index := range groups {
 		jobs <- index
 	}
 	close(jobs)
@@ -342,7 +327,7 @@ func (execution *targetedProjectExecution) projectSet(
 		if index >= len(keep) || !keep[index] {
 			continue
 		}
-		slot := execution.slots[index]
+		slot := &execution.slots[index]
 		if slot.program == nil {
 			continue
 		}
@@ -360,6 +345,23 @@ func (execution *targetedProjectExecution) projectSet(
 			continue
 		}
 		binding.owners[targetIndex] = setIndex
+	}
+	if execution.plan.targetProjects != nil {
+		set.targetProjects = make(map[target.File][]int, len(execution.plan.targetProjects))
+		remapped := make(map[projectIndexListID][]int)
+		for file, candidates := range execution.plan.targetProjects {
+			key := projectIndexListIdentity(candidates)
+			indexes, exists := remapped[key]
+			if !exists {
+				for _, index := range candidates {
+					if retained := projectSetIndexByPlanIndex[index]; retained >= 0 {
+						indexes = append(indexes, retained)
+					}
+				}
+				remapped[key] = indexes
+			}
+			set.targetProjects[file] = indexes
+		}
 	}
 	return set
 }
@@ -400,40 +402,19 @@ func configsForActiveOwners(
 	return active
 }
 
-// BuildProjectsForTargetOwners constructs every project declared by the
-// configs that govern at least one selected target. Unlike BuildTargetProjects,
-// it does not narrow each active owner's project declarations by root or import
-// membership.
-func (s *Session) BuildProjectsForTargetOwners(
-	configs map[string]rslintconfig.RslintConfig,
+// executeTargetProjectPlan retains the existing direct-root and import
+// selection tiers over each target's ordered candidates. All contexts share
+// one execution and one slot per declared tsconfig.
+func (s *Session) executeTargetProjectPlan(
+	plan projectPlan,
 	targetPlan target.Plan,
 	singleThreaded bool,
 ) (ProjectSet, error) {
-	return s.BuildProjects(configsForActiveOwners(configs, targetPlan), singleThreaded)
-}
-
-// BuildTargetProjects materializes only configured projects needed to decide
-// ownership for the supplied lint targets. TypeScript config roots have first
-// priority; targets outside every root retain the historical declaration-order
-// fallback to projects that contain them through module resolution.
-func (s *Session) BuildTargetProjects(
-	configs map[string]rslintconfig.RslintConfig,
-	targetPlan target.Plan,
-	singleThreaded bool,
-) (ProjectSet, error) {
-	if err := s.validate(); err != nil {
-		return ProjectSet{}, err
-	}
-	configs = configsForActiveOwners(configs, targetPlan)
-	if len(configs) == 0 || len(targetPlan.Files) == 0 {
-		return ProjectSet{}, nil
-	}
-	plan := buildProjectPlan(configs, s.FS())
 	if plan.terminalErr != nil {
 		return ProjectSet{}, plan.terminalErr
 	}
 	if len(plan.specs) == 0 {
-		return ProjectSet{}, nil
+		return ProjectSet{targetProjects: plan.targetProjects}, nil
 	}
 
 	execution := newTargetedProjectExecution(s, plan, singleThreaded)
@@ -442,23 +423,14 @@ func (s *Session) BuildTargetProjects(
 	for index := range directProjectByTarget {
 		directProjectByTarget[index] = -1
 	}
-	targetIndexesByConfig := make(map[string][]int)
-	for targetIndex, target := range targetPlan.Files {
-		targetIndexesByConfig[target.ConfigDirectory] = append(
-			targetIndexesByConfig[target.ConfigDirectory],
-			targetIndex,
-		)
-	}
-	configDirs := make([]string, 0, len(targetIndexesByConfig))
-	for configDir := range targetIndexesByConfig {
-		configDirs = append(configDirs, configDir)
-	}
-	sort.Strings(configDirs)
+	groups := groupTargetsByProjects(targetPlan.Files, plan.targetProjects, func(owner string) []int {
+		return orderedProjectIndexesForConfig(plan, owner)
+	})
 
-	err := runTargetConfigTasks(configDirs, singleThreaded, func(configDir string) error {
-		targetIndexes := targetIndexesByConfig[configDir]
+	err := runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
+		targetIndexes := group.targetIndexes
 		unresolved := len(targetIndexes)
-		orderedProjectIndexes := orderedProjectIndexesForConfig(plan, configDir)
+		orderedProjectIndexes := group.projectIndexes
 		scanProject := func(projectIndex int) error {
 			parsed, err := execution.parse(projectIndex)
 			if err != nil {
@@ -587,18 +559,18 @@ func (s *Session) BuildTargetProjects(
 	// Direct ownership has been decided for every target before this fallback
 	// starts. A project built for another target cannot steal a direct target
 	// merely because it imports that file.
-	if !singleThreaded && len(configDirs) > 1 {
+	if !singleThreaded && len(groups) > 1 {
 		s.context.enableConcurrentProgramQueries()
 	}
 	var keepMu sync.Mutex
-	err = runTargetConfigTasks(configDirs, singleThreaded, func(configDir string) error {
+	err = runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
 		pending := make(map[int]struct{})
-		for _, targetIndex := range targetIndexesByConfig[configDir] {
+		for _, targetIndex := range group.targetIndexes {
 			if directProjectByTarget[targetIndex] < 0 {
 				pending[targetIndex] = struct{}{}
 			}
 		}
-		orderedProjectIndexes := orderedProjectIndexesForConfig(plan, configDir)
+		orderedProjectIndexes := group.projectIndexes
 		fallbackProjectIndexes := make([]int, 0, len(orderedProjectIndexes))
 		for _, projectIndex := range orderedProjectIndexes {
 			for targetIndex := range pending {
@@ -642,17 +614,4 @@ func (s *Session) BuildTargetProjects(
 	}
 
 	return execution.projectSet(keep, directProjectByTarget, targetPlan.Files), nil
-}
-
-func (s *Session) BuildTargetProject(
-	configDirectory string,
-	config rslintconfig.RslintConfig,
-	targetPlan target.Plan,
-	singleThreaded bool,
-) (ProjectSet, error) {
-	return s.BuildTargetProjects(
-		map[string]rslintconfig.RslintConfig{configDirectory: config},
-		targetPlan,
-		singleThreaded,
-	)
 }

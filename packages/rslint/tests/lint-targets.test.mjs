@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'rstack/test';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -523,8 +530,8 @@ describe('CLI lint target contracts', () => {
   );
 
   test.each([
-    ['cwd fallback', false, false, false],
-    ['inferred config directory', true, false, true],
+    ['config directory without presets', false, false, true],
+    ['config directory with presets', true, false, true],
     ['explicit config directory', false, true, true],
   ])(
     'projectService CLI root uses %s',
@@ -554,6 +561,114 @@ describe('CLI lint target contracts', () => {
           expect(rules.includes('@typescript-eslint/no-for-in-array')).toBe(
             typed,
           );
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test.each(['directory', 'trailing separator', 'dot segments'])(
+    'projectService normalizes the CLI root boundary with %s',
+    async (spelling) => {
+      const root = await realpath(
+        await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-root-spelling-')),
+      );
+      const boundary = path.join(root, 'pkg');
+      const tsconfigRootDir =
+        spelling === 'trailing separator'
+          ? boundary + path.sep
+          : spelling === 'dot segments'
+            ? boundary + path.sep + '..' + path.sep + 'pkg' + path.sep + '.'
+            : boundary;
+      try {
+        await writeFixture(root, {
+          'rslint.config.mjs': `export default ${JSON.stringify([
+            {
+              files: ['**/*.ts'],
+              plugins: ['@typescript-eslint'],
+              languageOptions: {
+                parserOptions: { projectService: true, tsconfigRootDir },
+              },
+              rules: {
+                '@typescript-eslint/no-for-in-array': 'error',
+                'no-debugger': 'error',
+              },
+            },
+          ])};`,
+          'tsconfig.json': JSON.stringify({ files: ['pkg/tool.ts'] }),
+          'pkg/tool.ts':
+            'const values = [1];\nfor (const key in values) {}\ndebugger;\n',
+        });
+        const result = await runCLI(root, ['pkg/tool.ts']);
+        expect(result.code).toBe(1);
+        expect(result.stderr).toBe('');
+        expect(
+          parseDiagnostics(result.stdout).map(({ ruleName }) => ruleName),
+        ).toEqual(['no-debugger']);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test.each(
+    [
+      '.',
+      '',
+      ...(process.platform === 'win32' ? [] : ['C:/foreign-root']),
+    ].flatMap((value) =>
+      ['matched', 'unmatched', 'overridden', 'null reset'].map((mode) => ({
+        value,
+        mode,
+      })),
+    ),
+  )(
+    'projectService validates final root $value after $mode configuration',
+    async ({ value, mode }) => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-root-validation-'),
+      );
+      try {
+        const invalid = {
+          ...(mode === 'unmatched' ? { files: ['other/**'] } : {}),
+          languageOptions: { parserOptions: { tsconfigRootDir: value } },
+        };
+        const config = [
+          {
+            languageOptions: { parserOptions: { projectService: true } },
+            rules: { 'no-debugger': 'error' },
+          },
+          invalid,
+          ...(mode === 'overridden' || mode === 'null reset'
+            ? [
+                {
+                  languageOptions: {
+                    parserOptions: {
+                      tsconfigRootDir: mode === 'null reset' ? null : root,
+                    },
+                  },
+                },
+              ]
+            : []),
+        ];
+        await writeFixture(root, {
+          'rslint.config.mjs': `export default ${JSON.stringify(config)};`,
+          'tsconfig.json': JSON.stringify({ files: ['src.ts'] }),
+          'src.ts': 'debugger;',
+        });
+        const result = await runCLI(root, ['src.ts']);
+        expect(result.code).toBe(1);
+        if (mode === 'matched') {
+          expect(result.stderr).toContain(
+            'tsconfigRootDir must be an absolute path',
+          );
+          expect(result.stdout).not.toContain('no-debugger');
+        } else {
+          expect(result.stderr).not.toContain('tsconfigRootDir');
+          expect(
+            parseDiagnostics(result.stdout).map(({ ruleName }) => ruleName),
+          ).toEqual(['no-debugger']);
         }
       } finally {
         await rm(root, { recursive: true, force: true });
@@ -612,6 +727,324 @@ describe('CLI lint target contracts', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  test.each(
+    ['ordinary', 'false', 'null', 'service'].flatMap((selection) =>
+      ['--type-check', '--type-check-only'].map((mode) => ({
+        selection,
+        mode,
+      })),
+    ),
+  )(
+    'program-wide explicit projects use actual root contexts from $selection targets in $mode',
+    async ({ selection, mode }) => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-cli-declared-roots-'),
+      );
+      try {
+        const parserOptions = {
+          tsconfigRootDir: path.join(root, 'actual'),
+          ...(selection === 'ordinary'
+            ? {}
+            : { project: selection === 'null' ? null : false }),
+          ...(selection === 'service' ? { projectService: true } : {}),
+        };
+        await writeFixture(root, {
+          'rslint.config.mjs': `export default ${JSON.stringify([
+            {
+              files: ['actual/*.ts'],
+              plugins: ['@typescript-eslint'],
+              languageOptions: {
+                parserOptions: { project: './declared.json' },
+              },
+              rules: {
+                '@typescript-eslint/no-for-in-array': 'error',
+                'no-debugger': 'error',
+              },
+            },
+            {
+              basePath: 'unused-origin',
+              files: ['never.ts'],
+              languageOptions: {
+                parserOptions: { project: './additional.json' },
+              },
+            },
+            { files: ['actual/probe.ts'], languageOptions: { parserOptions } },
+          ])};`,
+          // No declared.json exists at the owner: every mode must retain the
+          // selected target's root even when service or clear owns its binding.
+          'actual/declared.json': JSON.stringify({
+            files: ['probe.ts', 'peer.ts'],
+          }),
+          'actual/additional.json': JSON.stringify({
+            files: ['unselected.ts'],
+          }),
+          'actual/tsconfig.json': JSON.stringify({
+            files: ['probe.ts', 'service-peer.ts'],
+          }),
+          'actual/probe.ts':
+            'const values = [1];\nfor (const key in values) {}\ndebugger;\nexport {};\n',
+          'actual/peer.ts': 'export const broken: number = "explicit";\n',
+          'actual/unselected.ts':
+            'export const broken: number = "additional";\n',
+          'actual/service-peer.ts':
+            'export const broken: number = "service";\n',
+        });
+        const result = await runCLI(root, [mode, 'actual/probe.ts']);
+        expect(result.code).toBe(1);
+        expect(result.stderr).toBe('');
+        const expected = [
+          { filePath: 'actual/peer.ts', ruleName: 'TypeScript(TS2322)' },
+          { filePath: 'actual/unselected.ts', ruleName: 'TypeScript(TS2322)' },
+        ];
+        if (selection === 'service') {
+          expected.push({
+            filePath: 'actual/service-peer.ts',
+            ruleName: 'TypeScript(TS2322)',
+          });
+        }
+        if (mode === '--type-check') {
+          expected.push({
+            filePath: 'actual/probe.ts',
+            ruleName: 'no-debugger',
+          });
+          if (selection === 'ordinary' || selection === 'service') {
+            expected.push({
+              filePath: 'actual/probe.ts',
+              ruleName: '@typescript-eslint/no-for-in-array',
+            });
+          }
+        }
+        expect(
+          normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
+        ).toEqual(normalizedDiagnostics(root, expected));
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test.each([
+    {
+      name: 'broad lint',
+      args: ['.'],
+      lintFiles: ['x.ts', 'y.ts'],
+      typeFiles: [],
+    },
+    {
+      name: 'focused lint',
+      args: ['src/y.ts'],
+      lintFiles: ['y.ts'],
+      typeFiles: [],
+    },
+    {
+      name: 'program-wide check',
+      args: ['--type-check-only', '.'],
+      lintFiles: [],
+      typeFiles: ['a/peer.ts', 'b/peer.ts'],
+    },
+  ])(
+    'scoped root contexts keep overlapping projects separate in $name',
+    async ({ args, lintFiles, typeFiles }) => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-cli-root-contexts-'),
+      );
+      try {
+        await writeFixture(root, {
+          'rslint.config.mjs': `export default ${JSON.stringify([
+            { ignores: ['a/**', 'b/**', 'rslint.config.mjs'] },
+            {
+              files: ['src/*.ts'],
+              plugins: ['@typescript-eslint'],
+              languageOptions: {
+                parserOptions: { project: './declared.json' },
+              },
+              rules: {
+                '@typescript-eslint/no-for-in-array': 'error',
+                'no-debugger': 'error',
+              },
+            },
+            ...['x', 'y'].map((name, index) => ({
+              files: [`src/${name}.ts`],
+              languageOptions: {
+                parserOptions: {
+                  tsconfigRootDir: path.join(root, index === 0 ? 'a' : 'b'),
+                },
+              },
+            })),
+          ])};`,
+          ...Object.fromEntries(
+            ['a', 'b'].map((name) => [
+              `${name}/declared.json`,
+              JSON.stringify({
+                compilerOptions: { paths: { values: ['./values.ts'] } },
+                files: ['../src/x.ts', '../src/y.ts', 'peer.ts'],
+              }),
+            ]),
+          ),
+          'a/values.ts': 'export const values = [1];\n',
+          'b/values.ts': 'export const values = { item: 1 };\n',
+          'a/peer.ts': 'export const broken: number = "a";\n',
+          'b/peer.ts': 'export const broken: number = "b";\n',
+          'src/x.ts':
+            "import { values } from 'values';\nfor (const key in values) {}\ndebugger;\n",
+          'src/y.ts':
+            "import { values } from 'values';\nfor (const key in values) {}\ndebugger;\n",
+        });
+        const result = await runCLI(root, args);
+        expect(result.code).toBe(1);
+        expect(result.stderr).toBe('');
+        const expected = [
+          ...lintFiles.map((name) => ({
+            filePath: `src/${name}`,
+            ruleName: 'no-debugger',
+          })),
+          ...(lintFiles.includes('x.ts')
+            ? [
+                {
+                  filePath: 'src/x.ts',
+                  ruleName: '@typescript-eslint/no-for-in-array',
+                },
+              ]
+            : []),
+          ...typeFiles.map((filePath) => ({
+            filePath,
+            ruleName: 'TypeScript(TS2322)',
+          })),
+        ];
+        expect(
+          normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
+        ).toEqual(normalizedDiagnostics(root, expected));
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test.each([
+    {
+      name: 'false target',
+      parserOptions: { project: false },
+      selected: true,
+      declared: false,
+      mode: '--type-check-only',
+      expected: [],
+    },
+    {
+      name: 'null target',
+      parserOptions: { project: null },
+      selected: true,
+      declared: false,
+      mode: '--type-check-only',
+      expected: [],
+    },
+    {
+      name: 'disabled service target',
+      parserOptions: { projectService: false },
+      selected: true,
+      declared: false,
+      mode: '--type-check-only',
+      expected: [],
+    },
+    {
+      name: 'clear target with explicit declarations',
+      parserOptions: { project: false },
+      selected: true,
+      declared: true,
+      mode: '--type-check-only',
+      expected: ['explicit-error.ts'],
+    },
+    {
+      name: 'no service targets in lint',
+      parserOptions: { projectService: true },
+      selected: false,
+      declared: false,
+      mode: null,
+      expected: [],
+    },
+    {
+      name: 'no service targets in type-check',
+      parserOptions: { projectService: true },
+      selected: false,
+      declared: false,
+      mode: '--type-check-only',
+      expected: ['default-error.ts'],
+    },
+    {
+      name: 'no targets with explicit declarations in lint',
+      parserOptions: {},
+      selected: false,
+      declared: true,
+      mode: null,
+      expected: [],
+    },
+    {
+      name: 'no targets with explicit declarations in type-check',
+      parserOptions: {},
+      selected: false,
+      declared: true,
+      mode: '--type-check-only',
+      expected: ['explicit-error.ts'],
+    },
+  ])(
+    'project scope preserves $name',
+    async ({ parserOptions, selected, declared, mode, expected }) => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-cli-project-scope-'),
+      );
+      try {
+        await writeFixture(root, {
+          'rslint.config.mjs': `export default ${JSON.stringify([
+            {
+              ignores: selected
+                ? ['default-error.ts', 'explicit-error.ts', 'rslint.config.mjs']
+                : ['**'],
+            },
+            ...(declared
+              ? [
+                  {
+                    files: ['unused.ts'],
+                    languageOptions: {
+                      parserOptions: { project: './declared.json' },
+                    },
+                  },
+                ]
+              : []),
+            {
+              files: selected ? ['target.ts'] : ['absent/**'],
+              languageOptions: { parserOptions },
+              rules: { 'no-debugger': 'error' },
+            },
+          ])};`,
+          'tsconfig.json': JSON.stringify({
+            files: ['target.ts', 'default-error.ts'],
+          }),
+          'declared.json': JSON.stringify({
+            files: ['target.ts', 'explicit-error.ts'],
+          }),
+          'target.ts': 'debugger;\nexport {};\n',
+          'default-error.ts': 'export const broken: number = "default";\n',
+          'explicit-error.ts': 'export const broken: number = "explicit";\n',
+        });
+        const result = await runCLI(root, [...(mode ? [mode] : []), '.']);
+        expect(result.code).toBe(expected.length === 0 ? 0 : 1);
+        expect(result.stderr).toBe('');
+        expect(
+          normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
+        ).toEqual(
+          normalizedDiagnostics(
+            root,
+            expected.map((filePath) => ({
+              filePath,
+              ruleName: 'TypeScript(TS2322)',
+            })),
+          ),
+        );
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   test('external config keeps authored paths and invocation target scope', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-external-'));

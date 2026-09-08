@@ -77,3 +77,19 @@ export const target = 1;
 export const unowned = 1;
 -- transient-service-project/app/second.ts --
 export const second = 2;
+-- flat-policy/pkg[1]/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- flat-policy/pkg[1]/tsconfig.unsafe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- flat-policy/pkg[1]/tsconfig.safe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","safe.d.ts"]}
+-- flat-policy/pkg[1]/tsconfig.other.json --
+{"compilerOptions":{"noLib":true},"files":["other.ts"]}
+-- flat-policy/pkg[1]/target.ts --
+export const result: string = value.member;
+-- flat-policy/pkg[1]/other.ts --
+export const other = 1;
+-- flat-policy/pkg[1]/unsafe.d.ts --
+declare const value: any;
+-- flat-policy/pkg[1]/safe.d.ts --
+declare const value: { member: number };

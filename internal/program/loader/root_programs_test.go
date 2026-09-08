@@ -480,7 +480,7 @@ func buildProjectsForConfigs(
 	singleThreaded bool,
 	context *buildContext,
 ) (ProjectSet, error) {
-	return sessionForTest(context).BuildProjects(configs, singleThreaded)
+	return sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: configs, Scope: AllDeclared, SingleThreaded: singleThreaded})
 }
 
 func buildProjectsForConfig(
@@ -489,7 +489,7 @@ func buildProjectsForConfig(
 	singleThreaded bool,
 	context *buildContext,
 ) (ProjectSet, error) {
-	return sessionForTest(context).BuildProject(configDirectory, config, singleThreaded)
+	return sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{configDirectory: config}, Scope: AllDeclared, SingleThreaded: singleThreaded})
 }
 
 func executeProjectPlanForTest(

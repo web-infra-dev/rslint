@@ -215,10 +215,8 @@ type Server struct {
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}
 	fallbackConfig       config.RslintConfig
-	// Configured project paths are keyed per owner so a nested config with no
-	// tsconfig does not disable filtering for files under other configs. The
-	// empty workspace fallback never supplies type information.
-	// A nil map value means the corresponding config has no type information.
+	// Ordinary project declarations are expanded once per owner generation.
+	// Service/root/reset options instead use the document's effective config.
 	tsConfigPathsByConfig map[string][]string
 	documents             map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics           map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics

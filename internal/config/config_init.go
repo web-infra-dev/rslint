@@ -242,8 +242,7 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 	// Build the output file
 	var buf strings.Builder
 	buf.WriteString(imports.buildImportLine())
-	buf.WriteByte('\n')
-	buf.WriteString("export default defineConfig([\n")
+	buf.WriteString("\nexport default defineConfig([\n")
 	for i, entry := range configEntries {
 		buf.WriteString(entry)
 		if i < len(configEntries)-1 {
@@ -261,7 +260,7 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 			continue
 		}
 		options := entry.LanguageOptions.ParserOptions
-		if options.rootDirSet && options.TsconfigRootDir == "" {
+		if options.rootDirSet && options.TsconfigRootDir == nil {
 			// Preserve runtime-only null resets without widening the public TS type.
 			useTypeScript = false
 			break
@@ -679,8 +678,8 @@ func formatLanguageOptions(lo *LanguageOptions) string {
 		poFields = append(poFields, "        project: true")
 	}
 
-	if po.TsconfigRootDir != "" {
-		poFields = append(poFields, "        tsconfigRootDir: '"+escapeJSString(po.TsconfigRootDir)+"'")
+	if po.TsconfigRootDir != nil {
+		poFields = append(poFields, "        tsconfigRootDir: '"+escapeJSString(*po.TsconfigRootDir)+"'")
 	} else if po.rootDirSet {
 		poFields = append(poFields, "        tsconfigRootDir: null")
 	}

@@ -215,12 +215,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	var configTargetScopes map[string]target.OwnerScope
 
-	// Program-wide type checking builds every configured project. Plain linting
-	// waits for target discovery and builds only the projects owned by configs
-	// that govern at least one selected target.
-	var projectSet loader.ProjectSet
-	buildAllPrograms := typeCheck || typeCheckOnly
-
 	configDirectories := configCatalog.ConfigDirectories()
 	if configCatalog.Explicit {
 		if len(configDirectories) != 1 {
@@ -309,29 +303,19 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return 1
 	}
 
-	// Program-wide type checking builds every configured project. Delay that
-	// expensive work until preflight has succeeded and the interactive start
-	// line is visible. The pre-override snapshots preserve the prior project
-	// selection semantics: --rule changes rules, not project discovery.
+	// Project declarations and target discovery use the pre-override config.
+	// The shared file resolver below includes --rule for lint execution.
 	projectConfigs := targetConfigMap
 	if projectConfigs == nil {
 		projectConfigs = map[string]rslintconfig.RslintConfig{currentDirectory: targetRslintConfig}
 	}
-	usesProjectPolicy := false
-	for _, config := range projectConfigs {
-		usesProjectPolicy = usesProjectPolicy || rslintconfig.NeedsProjectPolicy(config)
-	}
-	if buildAllPrograms && !usesProjectPolicy {
-		if targetConfigMap != nil {
-			projectSet, err = programSession.BuildProjects(targetConfigMap, singleThreaded)
-		} else {
-			projectSet, err = programSession.BuildProject(currentDirectory, targetRslintConfig, singleThreaded)
-		}
-		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+	hasProjectOptions := false
+	for _, entries := range projectConfigs {
+		if rslintconfig.HasProjectOptions(entries) {
+			hasProjectOptions = true
+			break
 		}
 	}
-
 	// Use CWD for display paths (not any config directory).
 	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
 	// so it already holds the normalized CWD.
@@ -341,19 +325,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	}
-	broadProjectLoad := isBroadProjectLoadScope(
-		allowFiles,
-		allowDirs,
-		cwd,
-		fs.UseCaseSensitiveFileNames(),
-	)
-	projectScope := loader.ProjectScopeTarget
-	if buildAllPrograms {
-		projectScope = loader.ProjectScopeAll
-	} else if broadProjectLoad {
-		projectScope = loader.ProjectScopeOwner
+	projectScope := loader.Targeted
+	if typeCheck || typeCheckOnly {
+		projectScope = loader.AllDeclared
+	} else if isBroadProjectLoadScope(allowFiles, allowDirs, cwd, fs.UseCaseSensitiveFileNames()) {
+		projectScope = loader.ActiveOwners
 	}
-
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
 	// This keeps an explicit --config outside the current directory from
 	// widening the scanned root to the config file's directory.
@@ -361,17 +338,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		allowDirs = []string{cwd}
 	}
 
-	// --- Lint target discovery and Program loading ---
-	programs := projectSet.Programs()
-	buildSingleConfigPrograms := buildAllPrograms
-	var (
-		targetPlan     target.Plan
-		loadedPrograms loader.LoadResult
-	)
-	// Legacy --type-check-only remains program-wide. Automatic discovery
-	// needs the selected paths to find their projects, then checks each whole
-	// selected Program without resolving or executing lint rules.
-	if !typeCheckOnly || usesProjectPolicy {
+	// Plain explicit-project type-check-only remains program-wide and skips
+	// target discovery. Per-file service/root options require selected targets
+	// before their effective values can contribute project candidates.
+	var targetPlan target.Plan
+	var configResolver *configLint.Resolver
+	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
+	if !typeCheckOnly || hasProjectOptions {
 		targetPlan, err = target.Resolve(target.Request{
 			ConfigMap:       targetConfigMap,
 			Config:          targetRslintConfig,
@@ -386,38 +359,40 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
-		if usesProjectPolicy {
-			projectSet, err = programSession.BuildLintProjects(projectConfigs, targetPlan, workingDirectory, singleThreaded, projectScope)
-			if err != nil {
-				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-			}
-		} else if !buildAllPrograms {
-			if configMap != nil {
-				if broadProjectLoad {
-					projectSet, err = programSession.BuildProjectsForTargetOwners(configMap, targetPlan, singleThreaded)
-				} else {
-					projectSet, err = programSession.BuildTargetProjects(configMap, targetPlan, singleThreaded)
-				}
-			} else if len(targetPlan.Files) > 0 {
-				buildSingleConfigPrograms = true
-				if broadProjectLoad {
-					projectSet, err = programSession.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-				} else {
-					projectSet, err = programSession.BuildTargetProject(currentDirectory, rslintConfig, targetPlan, singleThreaded)
-				}
-			}
+		configResolver = configLint.NewResolver(configLint.ResolverOptions{
+			ConfigsByOwner:  configMap,
+			Config:          rslintConfig,
+			ConfigDirectory: currentDirectory,
+			Catalog:         ruleCatalog,
+			PathSpaces:      targetPlan.PathSpaces(),
+			FS:              fs,
+		})
+		if hasProjectOptions {
+			projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files)
 			if err != nil {
 				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 			}
 		}
-		programs = projectSet.Programs()
-		if !typeCheckOnly {
-			loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
-			if err != nil {
-				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-			}
-			programs = loadedPrograms.Programs
+	}
+	projectRequest := loader.ProjectBuildRequest{
+		Configs:        projectConfigs,
+		Targets:        targetPlan,
+		Policies:       projectPolicies,
+		Scope:          projectScope,
+		SingleThreaded: singleThreaded,
+	}
+	projectSet, err := programSession.BuildProjects(projectRequest)
+	if err != nil {
+		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+	}
+	programs := projectSet.Programs()
+	var loadedPrograms loader.LoadResult
+	if !typeCheckOnly {
+		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
+		if err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
+		programs = loadedPrograms.Programs
 	}
 
 	// Metadata was sufficient for planning, but execution requires the exact
@@ -455,25 +430,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
 	createPrograms := func(session *loader.Session) (loader.LoadResult, error) {
-		var rebuilt loader.ProjectSet
-		var err error
-		if usesProjectPolicy {
-			rebuilt, err = session.BuildLintProjects(projectConfigs, targetPlan, workingDirectory, singleThreaded, projectScope)
-		} else if configMap != nil {
-			if buildAllPrograms {
-				rebuilt, err = session.BuildProjects(configMap, singleThreaded)
-			} else if broadProjectLoad {
-				rebuilt, err = session.BuildProjectsForTargetOwners(configMap, targetPlan, singleThreaded)
-			} else {
-				rebuilt, err = session.BuildTargetProjects(configMap, targetPlan, singleThreaded)
-			}
-		} else if buildSingleConfigPrograms {
-			if buildAllPrograms || broadProjectLoad {
-				rebuilt, err = session.BuildProject(currentDirectory, rslintConfig, singleThreaded)
-			} else {
-				rebuilt, err = session.BuildTargetProject(currentDirectory, rslintConfig, targetPlan, singleThreaded)
-			}
-		}
+		rebuilt, err := session.BuildProjects(projectRequest)
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
@@ -491,16 +448,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		var fileConfigResolver *configLint.Resolver
 		var rulesForFile linter.RuleHandler
 		if !typeCheckOnly {
-			fileConfigResolver = configLint.NewResolver(configLint.ResolverOptions{
-				ConfigsByOwner:                      configMap,
-				Config:                              rslintConfig,
-				ConfigDirectory:                     currentDirectory,
-				Catalog:                             ruleCatalog,
-				TargetsBySourcePath:                 binding.LintTargetBySourcePath,
-				SourceMappingsIncludeCanonicalPaths: true,
-				PathSpaces:                          targetPlan.PathSpaces(),
-				FS:                                  generationFS,
-			})
+			fileConfigResolver = configResolver.WithSourceMappings(binding.LintTargetBySourcePath, generationFS, true)
 			rulesForFile = func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 				return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 			}

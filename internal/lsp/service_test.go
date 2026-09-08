@@ -64,6 +64,7 @@ func TestNewServerInitializesRuleCatalog(t *testing.T) {
 }
 
 func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) {
+	clear(s.tsConfigPathsByConfig)
 	s.jsConfigs = configs
 	s.jsConfigOwnerIndex = target.NewOwnerIndex(configs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
@@ -144,22 +145,27 @@ func documentLintSnapshotForTest(
 	usesConfigCatalog bool,
 	typeScriptConfigPaths []string,
 ) documentLintSnapshot {
+	if typeScriptConfigPaths != nil {
+		entries = append(append(config.RslintConfig(nil), entries...), config.ConfigEntry{
+			LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+				Project: config.ProjectPaths(typeScriptConfigPaths),
+			}},
+		})
+	}
 	ruleCatalog := rules.All()
 	if usesConfigCatalog {
 		ruleCatalog = s.currentRuleCatalog()
 	}
 	target := lspConfigTarget(uriToPath(uri), configDirectory, s.fs)
 	snapshot := documentLintSnapshot{
-		cwd:    s.cwd,
 		target: target,
 		config: entries,
 		pathSpaces: config.NewPathSpaceSnapshot(
 			map[string]config.RslintConfig{target.ConfigDirectory: entries},
 			s.fs,
 		),
-		ruleCatalog:           ruleCatalog,
-		typeScriptConfigPaths: typeScriptConfigPaths,
-		pluginGeneration:      s.eslintPluginConfigGeneration,
+		ruleCatalog:      ruleCatalog,
+		pluginGeneration: s.eslintPluginConfigGeneration,
 	}
 	if usesConfigCatalog {
 		snapshot.configKey = target.ConfigDirectory
@@ -1436,9 +1442,9 @@ func TestCloseAndReopen(t *testing.T) {
 	}
 }
 
-// ======== tsConfigPaths lifecycle tests ========
+// ======== per-document project paths ========
 
-func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
+func TestDocumentProjectPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{"/project-a/tsconfig.json": true}}
 
@@ -1462,18 +1468,16 @@ func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 		},
 	})
 
-	s.rebuildTsConfigPaths()
-
-	entryA := s.tsConfigPathsByConfig["/project-a"]
+	entryA := s.documentLintSnapshot("file:///project-a/target.ts").typeScriptConfigPaths
 	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
 		t.Errorf("expected project-a to resolve to its tsconfig, got %v", entryA)
 	}
-	if entry, ok := s.tsConfigPathsByConfig["/project-b"]; !ok || entry != nil {
-		t.Errorf("expected project-b entry present and nil (no tsconfig), got present=%v value=%v", ok, entry)
+	if entry := s.documentLintSnapshot("file:///project-b/target.ts").typeScriptConfigPaths; entry != nil {
+		t.Errorf("expected project-b to have no tsconfig, got %v", entry)
 	}
 }
 
-func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
+func TestDocumentProjectPaths_AllConfigsHaveProject(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{
 		"/project-a/tsconfig.json": true,
@@ -1501,13 +1505,11 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 		},
 	})
 
-	s.rebuildTsConfigPaths()
-
-	entryA := s.tsConfigPathsByConfig["/project-a"]
+	entryA := s.documentLintSnapshot("file:///project-a/target.ts").typeScriptConfigPaths
 	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
 		t.Errorf("expected project-a → /project-a/tsconfig.json, got %v", entryA)
 	}
-	entryB := s.tsConfigPathsByConfig["/project-b"]
+	entryB := s.documentLintSnapshot("file:///project-b/target.ts").typeScriptConfigPaths
 	if len(entryB) != 1 || entryB[0] != "/project-b/tsconfig.json" {
 		t.Errorf("expected project-b → /project-b/tsconfig.json, got %v", entryB)
 	}
@@ -1520,7 +1522,7 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 // rslint.config.ts but no tsconfig.json, which used to flip the whole
 // workspace's type-aware rules without checking the governing config's
 // resolved tsconfigs.
-func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
+func TestDocumentProjectPaths_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{"/project/tsconfig.json": true}}
 
@@ -1541,31 +1543,27 @@ func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T
 		},
 	})
 
-	s.rebuildTsConfigPaths()
-
 	// File under root config → root's resolved tsconfig.
-	rootPaths := s.tsConfigPathsForURI("file:///project/test/skills.test.ts")
+	rootPaths := s.documentLintSnapshot("file:///project/test/skills.test.ts").typeScriptConfigPaths
 	if len(rootPaths) != 1 || rootPaths[0] != "/project/tsconfig.json" {
 		t.Errorf("expected root-config file to see [/project/tsconfig.json], got %v", rootPaths)
 	}
 
 	// File under nested template config -> nil (no type info), scoped to this
 	// config only; the root config's list above must remain unaffected.
-	nestedPaths := s.tsConfigPathsForURI("file:///project/template-rslint/foo.ts")
+	nestedPaths := s.documentLintSnapshot("file:///project/template-rslint/foo.ts").typeScriptConfigPaths
 	if nestedPaths != nil {
 		t.Errorf("expected nested-config file to see nil tsconfig paths (no type info), got %v", nestedPaths)
 	}
 }
 
-func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
+func TestDocumentProjectPaths_NoConfig(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 
-	// No discovered configs.
-	s.rebuildTsConfigPaths()
-
-	if s.tsConfigPathsByConfig != nil {
-		t.Errorf("expected no project map when no config, got %v", s.tsConfigPathsByConfig)
+	s.cwd = "/project"
+	if paths := s.documentLintSnapshot("file:///project/target.ts").typeScriptConfigPaths; paths != nil {
+		t.Errorf("expected no project paths when no config or tsconfig exists, got %v", paths)
 	}
 }
 

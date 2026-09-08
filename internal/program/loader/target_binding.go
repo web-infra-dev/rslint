@@ -1,12 +1,87 @@
 package loader
 
 import (
+	"sort"
+
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 )
+
+type projectTargetGroup struct {
+	owner          string
+	targetIndexes  []int
+	projectIndexes []int
+}
+
+type projectIndexListID struct {
+	first  *int
+	length int
+}
+
+func projectIndexListIdentity(indexes []int) projectIndexListID {
+	if len(indexes) == 0 {
+		return projectIndexListID{}
+	}
+	return projectIndexListID{first: &indexes[0], length: len(indexes)}
+}
+
+func projectIndexesForTarget(
+	file target.File,
+	overrides map[target.File][]int,
+	indexesByOwner map[string][]int,
+	forOwner func(string) []int,
+) []int {
+	if indexes, overridden := overrides[file]; overridden {
+		return indexes
+	}
+	indexes, cached := indexesByOwner[file.ConfigDirectory]
+	if !cached {
+		indexes = forOwner(file.ConfigDirectory)
+		indexesByOwner[file.ConfigDirectory] = indexes
+	}
+	return indexes
+}
+
+func groupTargetsByProjects(
+	targets []target.File,
+	overrides map[target.File][]int,
+	forOwner func(string) []int,
+) []projectTargetGroup {
+	type groupKey struct {
+		owner string
+		list  projectIndexListID
+	}
+	groups := make([]projectTargetGroup, 0)
+	groupIndexes := make(map[groupKey]int)
+	indexesByOwner := make(map[string][]int)
+	for targetIndex, file := range targets {
+		indexes := projectIndexesForTarget(file, overrides, indexesByOwner, forOwner)
+		if len(indexes) == 0 {
+			continue
+		}
+		// A path context shares one immutable candidate slice. Its storage
+		// identity only batches equal requests; separately allocated lists can
+		// safely remain separate groups even when their contents are equal.
+		key := groupKey{owner: file.ConfigDirectory, list: projectIndexListIdentity(indexes)}
+		groupIndex, found := groupIndexes[key]
+		if !found {
+			groupIndex = len(groups)
+			groupIndexes[key] = groupIndex
+			groups = append(groups, projectTargetGroup{owner: file.ConfigDirectory, projectIndexes: indexes})
+		}
+		groups[groupIndex].targetIndexes = append(groups[groupIndex].targetIndexes, targetIndex)
+	}
+	sort.Slice(groups, func(left, right int) bool {
+		if groups[left].owner != groups[right].owner {
+			return groups[left].owner < groups[right].owner
+		}
+		return groups[left].targetIndexes[0] < groups[right].targetIndexes[0]
+	})
+	return groups
+}
 
 type projectRootMembership struct {
 	exactID   string
@@ -42,10 +117,41 @@ func directRootProgramOwners(
 		}
 	}
 
+	groups := groupTargetsByProjects(targets, set.targetProjects, func(owner string) []int {
+		return orderedProgramIndexesForConfig(set, owner)
+	})
+	var rankedPrograms []bool
+	if len(set.targetProjects) > 0 {
+		rankedPrograms = make([]bool, len(set.compilerPrograms))
+		rankedGroups := groups[:0]
+		for _, group := range groups {
+			_, overridden := set.targetProjects[targets[group.targetIndexes[0]]]
+			if overridden && len(group.projectIndexes) == 1 {
+				// A single candidate has no root/import ranking to
+				// decide. Binding still checks its actual source and identity.
+				for _, targetIndex := range group.targetIndexes {
+					owners[targetIndex] = group.projectIndexes[0]
+				}
+				continue
+			}
+			rankedGroups = append(rankedGroups, group)
+			for _, index := range group.projectIndexes {
+				rankedPrograms[index] = true
+			}
+		}
+		groups = rankedGroups
+		if len(groups) == 0 {
+			return owners
+		}
+	}
+
 	rootPaths := make([]string, 0)
 	rootPathIndexByID := make(map[string]int)
 	membershipsByProgram := make([][]projectRootMembership, len(set.compilerPrograms))
 	for programIndex, program := range set.compilerPrograms {
+		if rankedPrograms != nil && !rankedPrograms[programIndex] {
+			continue
+		}
 		if program == nil || program.CommandLine() == nil {
 			continue
 		}
@@ -65,21 +171,13 @@ func directRootProgramOwners(
 		}
 	}
 
-	targetIndexesByConfig := make(map[string][]int)
-	for targetIndex, target := range targets {
-		targetIndexesByConfig[target.ConfigDirectory] = append(
-			targetIndexesByConfig[target.ConfigDirectory],
-			targetIndex,
-		)
-	}
-	orderedProgramsByConfig := make(map[string][]int, len(targetIndexesByConfig))
 	exactOwnerPositionByTarget := make([]int, len(targets))
 	for index := range exactOwnerPositionByTarget {
 		exactOwnerPositionByTarget[index] = -1
 	}
-	for configDirectory, targetIndexes := range targetIndexesByConfig {
-		orderedPrograms := orderedProgramIndexesForConfig(set, configDirectory)
-		orderedProgramsByConfig[configDirectory] = orderedPrograms
+	for _, group := range groups {
+		targetIndexes := group.targetIndexes
+		orderedPrograms := group.projectIndexes
 		targetsByExactID := make(map[string][]int, len(targetIndexes))
 		for _, targetIndex := range targetIndexes {
 			exactID := exactPathID(targets[targetIndex].Path)
@@ -108,9 +206,9 @@ func directRootProgramOwners(
 	// Resolve those root identities once per path, in directory batches.
 	canonicalLimitByTarget := make([]int, len(targets))
 	needsCanonicalRoots := make([]bool, len(set.compilerPrograms))
-	for configDirectory, targetIndexes := range targetIndexesByConfig {
-		orderedPrograms := orderedProgramsByConfig[configDirectory]
-		for _, targetIndex := range targetIndexes {
+	for _, group := range groups {
+		orderedPrograms := group.projectIndexes
+		for _, targetIndex := range group.targetIndexes {
 			limit := exactOwnerPositionByTarget[targetIndex]
 			if limit < 0 {
 				limit = len(orderedPrograms)
@@ -157,7 +255,8 @@ func directRootProgramOwners(
 	}
 
 	canonicalOwnerFound := make([]bool, len(targets))
-	for configDirectory, targetIndexes := range targetIndexesByConfig {
+	for _, group := range groups {
+		targetIndexes := group.targetIndexes
 		targetsByCanonicalID := make(map[string][]int, len(targetIndexes))
 		for _, targetIndex := range targetIndexes {
 			target := targets[targetIndex]
@@ -172,7 +271,7 @@ func directRootProgramOwners(
 			)
 		}
 
-		for position, programIndex := range orderedProgramsByConfig[configDirectory] {
+		for position, programIndex := range group.projectIndexes {
 			if !needsCanonicalRoots[programIndex] {
 				continue
 			}
@@ -234,11 +333,9 @@ func (s *Session) bindTargetsToProjects(
 	programFiles := newProgramFileIndex(set.compilerPrograms, plan.Files, fsys, singleThreaded)
 	directOwners := directRootProgramOwners(set, plan.Files, fsys, singleThreaded)
 	for targetIndex, target := range plan.Files {
-		programIndexes, cached := programIndexesByConfig[target.ConfigDirectory]
-		if !cached {
-			programIndexes = orderedProgramIndexesForConfig(set, target.ConfigDirectory)
-			programIndexesByConfig[target.ConfigDirectory] = programIndexes
-		}
+		programIndexes := projectIndexesForTarget(target, set.targetProjects, programIndexesByConfig, func(owner string) []int {
+			return orderedProgramIndexesForConfig(set, owner)
+		})
 		if bindTargetToProgram(
 			&binding,
 			set,
@@ -252,9 +349,6 @@ func (s *Session) bindTargetsToProjects(
 
 		bound := false
 		for _, programIndex := range programIndexes {
-			if set.targetBinding != nil && set.targetBinding.complete {
-				break
-			}
 			if bindTargetToProgram(
 				&binding,
 				set,

@@ -10,10 +10,28 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 )
 
 type configOrders map[string]int
+
+// ProjectScope preserves the construction choices made by CLI/API callers.
+type ProjectScope uint8
+
+const (
+	AllDeclared ProjectScope = iota
+	ActiveOwners
+	Targeted
+)
+
+type ProjectBuildRequest struct {
+	Configs        map[string]rslintconfig.RslintConfig
+	Targets        target.Plan
+	Policies       map[target.File]rslintconfig.ProjectPolicy
+	Scope          ProjectScope
+	SingleThreaded bool
+}
 
 // ProjectSet is the stable, deduplicated set of configured project generations
 // built for one load pass. Its compiler backing and config associations are
@@ -23,9 +41,12 @@ type ProjectSet struct {
 	programs         []*lintprogram.Program
 	configOrders     []configOrders
 	targetBinding    *projectTargetBinding
+	// Missing entries use ordinary owner declarations. Present entries are an
+	// ordered candidate list; an empty list explicitly leaves a target unbound.
+	targetProjects map[target.File][]int
 }
 
-// Programs returns the configured rslint Programs in stable declaration order.
+// Programs returns the configured rslint Programs in stable project-plan order.
 // The slice is read-only and remains owned by the ProjectSet.
 func (projects ProjectSet) Programs() []*lintprogram.Program {
 	return projects.programs
@@ -44,13 +65,19 @@ type projectSpec struct {
 type projectPlan struct {
 	specs       []projectSpec
 	terminalErr error
+	// These indexes refer to specs until execution compacts the retained set.
+	targetProjects map[target.File][]int
 }
 
 func exactPathID(filePath string) string {
 	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
 }
 
-func buildProjectPlan(configMap map[string]rslintconfig.RslintConfig, fsys vfs.FS) projectPlan {
+func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
+	configMap := request.Configs
+	if request.Scope != AllDeclared {
+		configMap = configsForActiveOwners(configMap, request.Targets)
+	}
 	if len(configMap) == 0 {
 		return projectPlan{}
 	}
@@ -63,32 +90,105 @@ func buildProjectPlan(configMap map[string]rslintconfig.RslintConfig, fsys vfs.F
 
 	plan := projectPlan{}
 	programByTsconfig := make(map[string]int)
-	for _, configDir := range configDirs {
-		entries := configMap[configDir]
-		normalizedConfigDir := tspath.NormalizePath(configDir)
-		configDirID := exactPathID(normalizedConfigDir)
-		tsconfigs, err := rslintconfig.ResolveTsConfigPaths(entries, normalizedConfigDir, fsys)
-		if err != nil {
-			plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
-			return plan
+	addPaths := func(owner string, paths []string, ordinary bool) []int {
+		var indexes []int
+		if !ordinary {
+			indexes = make([]int, 0, len(paths))
 		}
+		ownerID := exactPathID(owner)
+		for order, path := range paths {
+			path = tspath.NormalizePath(path)
+			pathID := exactPathID(path)
+			index, exists := programByTsconfig[pathID]
+			if !exists {
+				index = len(plan.specs)
+				programByTsconfig[pathID] = index
+				plan.specs = append(plan.specs, projectSpec{
+					tsconfigPath: path, programCwd: tspath.GetDirectoryPath(path), configOrders: configOrders{},
+				})
+			}
+			if ordinary {
+				if _, associated := plan.specs[index].configOrders[ownerID]; !associated {
+					plan.specs[index].configOrders[ownerID] = order
+				}
+			}
+			if !ordinary {
+				indexes = append(indexes, index)
+			}
+		}
+		return indexes
+	}
+	// No new project options need no per-target preparation. In particular,
+	// AllDeclared keeps its original path when no target discovery was needed.
+	if len(request.Policies) == 0 {
+		for _, owner := range configDirs {
+			paths, err := rslintconfig.ResolveTsConfigPaths(configMap[owner], owner, fsys)
+			if err != nil {
+				plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", owner, err)
+				return plan
+			}
+			addPaths(owner, paths, true)
+		}
+		return plan
+	}
 
-		for order, tsconfigPath := range tsconfigs {
-			tsconfigPath = tspath.NormalizePath(tsconfigPath)
-			tsconfigID := exactPathID(tsconfigPath)
-			if programIndex, ok := programByTsconfig[tsconfigID]; ok {
-				if _, associated := plan.specs[programIndex].configOrders[configDirID]; !associated {
-					plan.specs[programIndex].configOrders[configDirID] = order
+	type pathContext struct {
+		root            string
+		defaultDisabled bool
+	}
+	targetsByOwner := make(map[string][]target.File)
+	for _, file := range request.Targets.Files {
+		targetsByOwner[file.ConfigDirectory] = append(targetsByOwner[file.ConfigDirectory], file)
+	}
+	plan.targetProjects = make(map[target.File][]int, len(request.Policies))
+	for _, configDir := range configDirs {
+		contexts := make(map[pathContext][]target.File)
+		for _, file := range targetsByOwner[configDir] {
+			policy := request.Policies[file]
+			key := pathContext{root: policy.TsconfigRootDir, defaultDisabled: policy.DefaultProjectDisabled}
+			if policy.ProjectService || policy.ProjectDisabled {
+				plan.targetProjects[file] = nil
+				if request.Scope != AllDeclared {
+					continue
+				}
+				// Type checking retains raw explicit declarations at this target's
+				// root, but a service/clear target never requests an implicit project.
+				key.defaultDisabled = true
+				if _, exists := contexts[key]; !exists {
+					contexts[key] = nil
 				}
 				continue
 			}
-
-			programByTsconfig[tsconfigID] = len(plan.specs)
-			plan.specs = append(plan.specs, projectSpec{
-				tsconfigPath: tsconfigPath,
-				programCwd:   tspath.GetDirectoryPath(tsconfigPath),
-				configOrders: configOrders{configDirID: order},
+			contexts[key] = append(contexts[key], file)
+		}
+		if len(targetsByOwner[configDir]) == 0 && request.Scope == AllDeclared {
+			contexts[pathContext{}] = nil
+		}
+		keys := make([]pathContext, 0, len(contexts))
+		for key := range contexts {
+			keys = append(keys, key)
+		}
+		sort.Slice(keys, func(left, right int) bool {
+			if keys[left].root != keys[right].root {
+				return keys[left].root < keys[right].root
+			}
+			return !keys[left].defaultDisabled && keys[right].defaultDisabled
+		})
+		for _, key := range keys {
+			paths, err := rslintconfig.ResolveTsConfigPathsWithPolicy(configMap[configDir], configDir, fsys, rslintconfig.ProjectPolicy{
+				TsconfigRootDir: key.root, DefaultProjectDisabled: key.defaultDisabled,
 			})
+			if err != nil {
+				plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
+				return plan
+			}
+			ordinary := key == (pathContext{})
+			indexes := addPaths(configDir, paths, ordinary)
+			if !ordinary {
+				for _, file := range contexts[key] {
+					plan.targetProjects[file] = indexes
+				}
+			}
 		}
 	}
 	return plan
@@ -102,7 +202,7 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 		if plan.terminalErr != nil {
 			return ProjectSet{}, plan.terminalErr
 		}
-		return ProjectSet{}, nil
+		return ProjectSet{targetProjects: plan.targetProjects}, nil
 	}
 	compilerPrograms := make([]*compiler.Program, len(plan.specs))
 	errs := make([]error, len(plan.specs))
@@ -111,16 +211,7 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 	if parallel {
 		s.context.enableConcurrentProgramQueries()
 	}
-	var execution *targetedProjectExecution
-	if s.projectSlots != nil {
-		execution = newTargetedProjectExecution(s, plan, singleThreaded)
-	}
 	build := func(index int) {
-		if execution != nil {
-			errs[index] = execution.build(index)
-			compilerPrograms[index] = execution.slots[index].program
-			return
-		}
 		spec := plan.specs[index]
 		compilerPrograms[index], errs[index] = s.context.createProjectProgram(
 			singleThreaded,
@@ -176,29 +267,30 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 		compilerPrograms: compilerPrograms,
 		programs:         lintprogram.NewFromCompilers(compilerPrograms),
 		configOrders:     orders,
+		targetProjects:   plan.targetProjects,
 	}, nil
 }
 
-// BuildProjects constructs every unique tsconfig declared by configs in
-// stable config/project order.
-func (s *Session) BuildProjects(
-	configs map[string]rslintconfig.RslintConfig,
-	singleThreaded bool,
-) (ProjectSet, error) {
+// BuildProjects applies the caller's construction scope once, then adds the
+// configured projects selected by service targets. Source binding is deferred
+// to LoadCLI/LoadAPI, which consume the resulting candidate lists once.
+func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error) {
 	if err := s.validate(); err != nil {
 		return ProjectSet{}, err
 	}
-	plan := buildProjectPlan(configs, s.FS())
-	return s.executeProjectPlan(plan, singleThreaded)
-}
-
-func (s *Session) BuildProject(
-	configDirectory string,
-	config rslintconfig.RslintConfig,
-	singleThreaded bool,
-) (ProjectSet, error) {
-	return s.BuildProjects(
-		map[string]rslintconfig.RslintConfig{configDirectory: config},
-		singleThreaded,
-	)
+	plan := buildProjectPlan(request, s.FS())
+	var set ProjectSet
+	var err error
+	if request.Scope == Targeted {
+		set, err = s.executeTargetProjectPlan(plan, request.Targets, request.SingleThreaded)
+	} else {
+		set, err = s.executeProjectPlan(plan, request.SingleThreaded)
+	}
+	if err != nil {
+		return ProjectSet{}, err
+	}
+	if err := s.appendServiceProjects(&set, request.Targets, request.Policies, request.SingleThreaded); err != nil {
+		return ProjectSet{}, err
+	}
+	return set, nil
 }

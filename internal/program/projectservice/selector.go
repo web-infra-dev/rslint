@@ -228,7 +228,7 @@ func (s *Selector) Select(fileName, rootDirectory string) (Selection, error) {
 		filePath:       s.path(fileName),
 		seenReferences: make(map[tspath.Path]bool),
 	}
-	rootPath := s.path(tspath.NormalizePath(rootDirectory))
+	rootPath := s.path(tspath.GetNormalizedAbsolutePath(rootDirectory, ""))
 	for directory := tspath.GetDirectoryPath(fileName); ; directory = tspath.GetDirectoryPath(directory) {
 		for _, name := range []string{"tsconfig.json", "jsconfig.json"} {
 			entry, err := s.candidate(tspath.ResolvePath(directory, name), true)

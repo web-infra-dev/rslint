@@ -90,6 +90,7 @@ func fileURIFromPath(filePath string) lsproto.URI {
 }
 
 func (s *Server) invalidateLintProjectCaches() {
+	clear(s.tsConfigPathsByConfig)
 	if s.lintPrograms != nil {
 		s.lintPrograms.Invalidate()
 	}
@@ -119,9 +120,18 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	if params == nil {
 		return nil
 	}
+	for _, change := range params.Changes {
+		if s.lintPrograms == nil || !s.lintPrograms.isOpenSourceOverlayWatchChange(change) {
+			// Project globs can change even with no open documents or resident
+			// Program. Reuse the owner cache only until the next disk generation.
+			clear(s.tsConfigPathsByConfig)
+			break
+		}
+	}
 
 	if s.lintPrograms != nil &&
 		s.lintPrograms.DidChangeWatchedFiles(params.Changes) {
+		clear(s.tsConfigPathsByConfig)
 		s.invalidateOpenDocumentDiagnostics()
 		_ = s.RefreshDiagnostics(ctx)
 	}
@@ -174,12 +184,11 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		return nil
 	}
 	if needsTypeInfoRebuild {
-		// tsconfig changed — rebuild tsConfigPaths so type-aware rule filtering
-		// stays in sync. Session already handles the project state update and
-		// triggers RefreshDiagnostics for relinting.
-		if err := s.rebuildTsConfigPaths(); err != nil {
-			log.Printf("[rslint] Failed to rebuild tsconfig paths: %v", err)
-		}
+		// Re-expand ordinary project paths on the next document snapshot and
+		// discard project contents, including projects outside the Session.
+		s.invalidateLintProjectCaches()
+		s.invalidateOpenDocumentDiagnostics()
+		return s.RefreshDiagnostics(ctx)
 	}
 	if needsIgnoreRefresh {
 		s.invalidateOpenDocumentDiagnostics()
@@ -231,44 +240,4 @@ func isTsConfigURI(uri string) bool {
 	name := uri[idx+1:]
 	return (strings.HasPrefix(name, "tsconfig") || strings.HasPrefix(name, "jsconfig")) &&
 		strings.HasSuffix(name, ".json")
-}
-
-// resolveTsConfigPaths resolves parserOptions.project from a config while
-// preserving each declared path. TypeScript resolves relative includes from
-// that lexical location, so a symlinked tsconfig is not interchangeable with
-// its physical target.
-func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) ([]string, error) {
-	return resolveTsConfigPathsWithFS(cfg, cwd, s.fs)
-}
-
-// rebuildTsConfigPaths resolves parserOptions.project from the current config.
-// Called when a tsconfig changes so that type-aware rule filtering stays in
-// sync. Config transactions resolve the same declarations while preparing
-// their snapshot.
-//
-// We resolve per-config directory into tsConfigPathsByConfig.
-// A config whose parserOptions.project is empty and has no auto-detected
-// tsconfig resolves to nil. Files governed by that config have no type info,
-// without affecting files governed by other configs. A nested template or
-// fixture config without a tsconfig must not change sibling config behavior.
-func (s *Server) rebuildTsConfigPaths() error {
-	var byConfig map[string][]string
-	if len(s.jsConfigs) > 0 {
-		byConfig = make(map[string][]string, len(s.jsConfigs))
-		for dir, entries := range s.jsConfigs {
-			if config.NeedsProjectPolicy(entries) {
-				// Effective projects are resolved in each document's frozen policy.
-				continue
-			}
-			paths, err := s.resolveTsConfigPaths(entries, dir)
-			if err != nil {
-				return fmt.Errorf("resolve tsconfig paths for %q: %w", dir, err)
-			}
-			byConfig[dir] = paths
-		}
-	}
-
-	s.tsConfigPathsByConfig = byConfig
-	s.invalidateLintProjectCaches()
-	return nil
 }

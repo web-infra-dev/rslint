@@ -21,7 +21,6 @@ import (
 // and fixes must all consume this same target/config pair; none may rediscover
 // the target identity from the filesystem mid-operation.
 type documentLintSnapshot struct {
-	cwd                   string
 	target                target.File
 	config                config.RslintConfig
 	resolvedConfig        config.ResolvedFileConfig
@@ -72,35 +71,29 @@ func resolveDocumentLintSnapshotProjects(
 	snapshot documentLintSnapshot,
 	fs vfs.FS,
 ) documentLintSnapshot {
-	if !config.NeedsProjectPolicy(snapshot.config) {
-		return snapshot
+	if config.HasProjectOptions(snapshot.config) {
+		snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig)
 	}
-	resolver, err := config.NewProjectPolicyResolverWithPathSpaces(
-		snapshot.config,
-		snapshot.target.ConfigDirectory,
-		snapshot.cwd,
-		fs,
-		snapshot.pathSpaces,
-	)
-	if err != nil {
-		snapshot.projectPolicyError = err
-		return snapshot
-	}
-	snapshot.projectPolicy, snapshot.projectPolicyError = resolver.Resolve(snapshot.target.Identity())
 	snapshot.typeScriptConfigPaths = nil
 	if snapshot.projectPolicyError != nil || snapshot.projectPolicy.ProjectService || snapshot.projectPolicy.ProjectDisabled {
 		return snapshot
 	}
-	// Policy paths already use their authored base. Resolve only this file's
-	// effective declaration, never the union of other flat-config entries.
-	snapshot.typeScriptConfigPaths, snapshot.projectPolicyError = resolveTsConfigPathsWithFS(
-		config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
-			ParserOptions: &config.ParserOptions{Project: snapshot.projectPolicy.Project},
-		}}},
+	// Preserve the owner's declaration order and authored bases. Matched root
+	// options can rebase those declarations without another config matcher.
+	snapshot.typeScriptConfigPaths, snapshot.projectPolicyError = config.ResolveTsConfigPathsWithPolicy(
+		snapshot.config,
 		snapshot.target.ConfigDirectory,
 		fs,
+		snapshot.projectPolicy,
 	)
 	return snapshot
+}
+
+func (snapshot documentLintSnapshot) projectServiceRootDirectory() string {
+	if snapshot.projectPolicy.TsconfigRootDir != "" {
+		return snapshot.projectPolicy.TsconfigRootDir
+	}
+	return snapshot.target.ConfigDirectory
 }
 
 func isLintableScriptFile(uri lsproto.DocumentUri) bool {
@@ -309,26 +302,34 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
 	selection := s.selectDocumentConfig(target)
 	target.ConfigDirectory = selection.directory
-	var typeScriptConfigPaths []string
-	if selection.configKey != "" {
-		typeScriptConfigPaths = s.tsConfigPathsByConfig[selection.configKey]
-	}
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
 	snapshot := documentLintSnapshot{
-		cwd:                   s.cwd,
-		target:                target,
-		config:                selection.entries,
-		resolvedConfig:        selection.resolved,
-		pathSpaces:            selection.pathSpaces,
-		ruleCatalog:           selection.ruleCatalog,
-		configResolved:        !selection.configMissing,
-		typeScriptConfigPaths: typeScriptConfigPaths,
-		configKey:             selection.configKey,
-		pluginGeneration:      s.eslintPluginConfigGeneration,
-		unavailable:           selection.configKey != "" && unavailable,
+		target:           target,
+		config:           selection.entries,
+		resolvedConfig:   selection.resolved,
+		pathSpaces:       selection.pathSpaces,
+		ruleCatalog:      selection.ruleCatalog,
+		configResolved:   !selection.configMissing,
+		configKey:        selection.configKey,
+		pluginGeneration: s.eslintPluginConfigGeneration,
+		unavailable:      selection.configKey != "" && unavailable,
 	}
 	if snapshot.configResolved {
-		snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
+		if config.HasProjectOptions(snapshot.config) {
+			snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
+		} else if snapshot.configKey != "" {
+			paths, cached := s.tsConfigPathsByConfig[snapshot.configKey]
+			if !cached {
+				paths, snapshot.projectPolicyError = resolveTsConfigPathsWithFS(snapshot.config, snapshot.target.ConfigDirectory, s.fs)
+				if snapshot.projectPolicyError == nil {
+					if s.tsConfigPathsByConfig == nil {
+						s.tsConfigPathsByConfig = make(map[string][]string)
+					}
+					s.tsConfigPathsByConfig[snapshot.configKey] = paths
+				}
+			}
+			snapshot.typeScriptConfigPaths = paths
+		}
 	}
 	return snapshot
 }
@@ -385,18 +386,4 @@ func (s *Server) jsConfigKeyForTarget(target target.File) (string, bool) {
 	}
 	_, active := s.jsConfigs[configDir]
 	return configDir, active
-}
-
-// tsConfigPathsForURI returns parserOptions.project paths from the config owner
-// selected by getConfigForURI. A nested config with no tsconfig therefore does
-// not affect type-info decisions for sibling configs.
-//
-// A nil return means the governing config has no resolved tsconfig, so callers
-// must disable type-aware rules for this file.
-func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
-	target := lspTargetIdentity(uriToPath(uri), s.fs)
-	if configKey, ok := s.jsConfigKeyForTarget(target); ok {
-		return s.tsConfigPathsByConfig[configKey]
-	}
-	return nil
 }

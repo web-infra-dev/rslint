@@ -17,3 +17,5 @@ import { value } from './lib/value';
 export const expected: number = value;
 -- c.ts --
 export const contextOnly = 1;
+-- outside.ts --
+export const outside = 1;

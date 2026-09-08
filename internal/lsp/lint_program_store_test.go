@@ -885,29 +885,31 @@ func TestLintProgramStoreWatchedSymlinkSourceChangeRebuilds(t *testing.T) {
 }
 
 func TestLintProgramStoreWatchedChangeRefreshesCustomProjectDiagnostics(t *testing.T) {
-	const content = "export const value = 1;\n"
-	fixture := newLintProgramStoreFixture(t, content)
-	fixture.load(t)
-	fixture.server.lintPrograms = fixture.store
-
-	dependencyURI := documentURIFromPath(
-		filepath.Join(filepath.Dir(fixture.sourcePath), "dependency.ts"),
-	)
-	if err := fixture.server.handleDidChangeWatchedFiles(
-		context.Background(),
-		&lsproto.DidChangeWatchedFilesParams{
-			Changes: []*lsproto.FileEvent{{
-				Uri:  dependencyURI,
-				Type: lsproto.FileChangeTypeChanged,
-			}},
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-fixture.server.refreshCh:
-	default:
-		t.Fatal("custom-project watcher invalidation did not schedule diagnostics")
+	for _, loaded := range []bool{false, true} {
+		t.Run(strconv.FormatBool(loaded), func(t *testing.T) {
+			fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+			if loaded {
+				fixture.load(t)
+			}
+			fixture.server.lintPrograms = fixture.store
+			// A missing explicit path/glob can fail policy resolution before a
+			// Program is loaded. A delivered creation event must still relint.
+			customURI := documentURIFromPath(tspath.ResolvePath(fixture.server.cwd, "custom.json"))
+			if err := fixture.server.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+				Changes: []*lsproto.FileEvent{{Uri: customURI, Type: lsproto.FileChangeTypeCreated}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case <-fixture.server.refreshCh:
+			default:
+				t.Fatal("custom-project watcher event did not schedule diagnostics")
+			}
+			delete(fixture.server.documents, fixture.sourceURI)
+			if fixture.store.DidChangeWatchedFiles([]*lsproto.FileEvent{{Uri: customURI, Type: lsproto.FileChangeTypeChanged}}) {
+				t.Fatal("empty store without open documents requested diagnostics")
+			}
+		})
 	}
 }
 

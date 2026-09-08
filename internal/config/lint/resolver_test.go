@@ -1,6 +1,8 @@
 package lint
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -183,6 +185,145 @@ func TestResolverSingleConfigAcceptsUnboundSource(t *testing.T) {
 	owner, resolved, ok := resolver.ResolveSourcePath("/repo/a.ts")
 	if !ok || owner != "/repo" || len(resolved.EnabledRules) != 1 {
 		t.Fatalf("single config did not accept an unbound source: owner=%q resolved=%+v ok=%v", owner, resolved, ok)
+	}
+}
+
+func TestResolverTargetConfigSurvivesSourceBinding(t *testing.T) {
+	for _, single := range []bool{true, false} {
+		t.Run(map[bool]string{true: "single", false: "multiple"}[single], func(t *testing.T) {
+			entries := config.RslintConfig{{Files: []string{"src/**/*.ts"}, Rules: config.Rules{"no-debugger": "error"}}}
+			options := ResolverOptions{Config: entries, ConfigDirectory: "/repo"}
+			if !single {
+				options.ConfigsByOwner = map[string]config.RslintConfig{"/repo": entries}
+			}
+			resolver := newBaseResolver(options)
+			file := target.File{PathIdentity: config.PathIdentity{
+				Path: "/repo/src/file.ts", CanonicalPath: "/physical/file.ts", CanonicalParentPath: "/physical",
+			}, ConfigDirectory: "/repo"}
+			before, ok := resolver.ResolveTarget(file)
+			if !ok || len(before.EnabledRules) != 1 {
+				t.Fatalf("unbound target lost its config: %+v, %v", before, ok)
+			}
+			mapping := map[string]target.File{"/physical/file.ts": file}
+			bound := resolver.WithSourceMappings(mapping, &caseInsensitiveResolverFS{FS: osvfs.FS()}, true)
+			mapping["/physical/file.ts"] = target.File{}
+			if bound.singleResolver != resolver.singleResolver ||
+				bound.resolversByOwnerPath["/repo"] != resolver.resolversByOwnerPath["/repo"] {
+				t.Fatal("source binding replaced the already-used file config resolver")
+			}
+			if _, ok := resolver.TargetForSourcePath("/physical/file.ts"); ok {
+				t.Fatal("source binding mutated the unbound resolver")
+			}
+			gotTarget, ok := bound.TargetForSourcePath("/physical/file.ts")
+			if !ok || gotTarget != file {
+				t.Fatalf("binding lost the frozen target identity: %+v, %v", gotTarget, ok)
+			}
+			owner, after, ok := bound.ResolveSourcePath("/physical/file.ts")
+			if !ok || owner != "/repo" || after.MergedConfig != before.MergedConfig {
+				t.Fatalf("binding did not reuse the effective config: owner=%q before=%p after=%p", owner, before.MergedConfig, after.MergedConfig)
+			}
+		})
+	}
+}
+
+type ownerAliasResolverFS struct{ vfs.FS }
+
+func (*ownerAliasResolverFS) Realpath(path string) string {
+	if path == "/symlink" || strings.HasPrefix(path, "/symlink/") {
+		return "/real" + strings.TrimPrefix(path, "/symlink")
+	}
+	return path
+}
+
+func TestResolverLiteralOwnerWinsCanonicalAlias(t *testing.T) {
+	service := true
+	resolver := newBaseResolver(ResolverOptions{
+		ConfigsByOwner: map[string]config.RslintConfig{
+			"/real": {{Rules: config.Rules{"no-debugger": "error"}}},
+			"/symlink": {{Rules: config.Rules{"no-console": "error"}, LanguageOptions: &config.LanguageOptions{
+				ParserOptions: &config.ParserOptions{ProjectService: &service},
+			}}},
+		},
+		FS: &ownerAliasResolverFS{FS: osvfs.FS()},
+	})
+	realTarget := targetForTest("/real/file.ts", "/real")
+	aliasTarget := targetForTest("/symlink/file.ts", "/symlink")
+	realResolved, _ := resolver.ResolveTarget(realTarget)
+	alias, _ := resolver.ResolveTarget(aliasTarget)
+	if len(realResolved.EnabledRules) != 1 || realResolved.EnabledRules[0].Name != "no-debugger" ||
+		len(alias.EnabledRules) != 1 || alias.EnabledRules[0].Name != "no-console" {
+		t.Fatalf("canonical alias changed literal owner: real=%v alias=%v", configuredRuleNameSet(realResolved.EnabledRules), configuredRuleNameSet(alias.EnabledRules))
+	}
+	policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget})
+	if err != nil || len(policies) != 1 || !policies[aliasTarget].ProjectService {
+		t.Fatalf("policy gate used an alias instead of its literal owner: %v, %v", policies, err)
+	}
+}
+
+func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
+	for _, test := range []struct {
+		name, input string
+		want        config.ProjectPolicy
+		error       string
+	}{
+		{name: "ordinary project declarations do not project", input: `[{"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"project":["second.json"]}}}]`},
+		{name: "unmatched options are neutral", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":"relative","project":true}}}]`},
+		{name: "empty match remains zero", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":false}}}]`},
+		{name: "matched service", input: `[{"languageOptions":{"parserOptions":{"projectService":true}}}]`, want: config.ProjectPolicy{ProjectService: true}},
+		{name: "service false retains explicit declarations", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"projectService":false}}}]`, want: config.ProjectPolicy{DefaultProjectDisabled: true}},
+		{name: "matched reset", input: `[{"languageOptions":{"parserOptions":{"project":null}}}]`, want: config.ProjectPolicy{ProjectDisabled: true}},
+		{name: "root error includes target", input: `[{"languageOptions":{"parserOptions":{"tsconfigRootDir":"relative"}}}]`, error: "absolute path"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var entries config.RslintConfig
+			if err := json.Unmarshal([]byte(test.input), &entries); err != nil {
+				t.Fatal(err)
+			}
+			file := targetForTest("/repo/target.ts", "/repo")
+			resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: map[string]config.RslintConfig{"/repo": entries}})
+			policies, err := resolver.ProjectPolicies([]target.File{file})
+			if test.error != "" {
+				if err == nil || !strings.Contains(err.Error(), file.Path) || !strings.Contains(err.Error(), test.error) {
+					t.Fatalf("target policy error=%v", err)
+				}
+				return
+			}
+			if err != nil || policies[file] != test.want || (test.want == (config.ProjectPolicy{}) && len(policies) != 0) {
+				t.Fatalf("policies=%v error=%v, want %+v", policies, err, test.want)
+			}
+		})
+	}
+}
+
+func TestResolverRuleOverridePreservesProjectOptions(t *testing.T) {
+	service, root := true, tspath.NormalizePath(t.TempDir())
+	entries := config.RslintConfig{{
+		Files: []string{"src/*.ts"}, Rules: config.Rules{"no-debugger": "warn"},
+		LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: &service, TsconfigRootDir: &root}},
+	}, {Files: []string{"unused/*.ts"}, LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"unused.json"}}}}}
+	file := targetForTest("/repo/src/file.ts", "/repo")
+	before := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: "/repo"})
+	want, err := before.ProjectPolicies([]target.File{file})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := config.BuildCLIRuleEntry([]string{"no-debugger: error"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries = append(entries, *entry)
+	entries, optionsErrors := config.ValidateRuleOptions(entries, rules.All())
+	if len(optionsErrors) != 0 {
+		t.Fatal(optionsErrors)
+	}
+	after := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: "/repo"})
+	got, err := after.ProjectPolicies([]target.File{file})
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("rule override changed parser policy or entry matching: %v, %v; want %v", got, err, want)
+	}
+	resolved, _ := after.ResolveTarget(file)
+	if len(resolved.EnabledRules) != 1 || resolved.EnabledRules[0].Severity != rule.SeverityError {
+		t.Fatalf("rule override was not applied: %v", resolved.EnabledRules)
 	}
 }
 

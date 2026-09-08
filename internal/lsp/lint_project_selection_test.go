@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -379,7 +380,8 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			server.documents[uri] = editorText
 			options := &config.ParserOptions{ProjectService: config.BoolPtr(true), Project: test.project}
 			if test.rootDir != "" {
-				options.TsconfigRootDir = tspath.ResolvePath(directory, test.rootDir)
+				rootDir := tspath.ResolvePath(directory, test.rootDir)
+				options.TsconfigRootDir = &rootDir
 			}
 			entries := config.RslintConfig{{
 				Plugins:         []string{"@typescript-eslint"},
@@ -462,94 +464,114 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	for _, test := range []struct {
 		name         string
+		owner        string
 		explicitRoot string
-		inferredRoot bool
+		resetRoot    bool
 		wantTyped    bool
 	}{
-		{name: "invocation cwd leaves ancestor unowned"},
-		{name: "explicit root admits ancestor", explicitRoot: ".", wantTyped: true},
-		{name: "inferred root admits ancestor", inferredRoot: true, wantTyped: true},
-		{name: "explicit root overrides inferred root", explicitRoot: "pkg", inferredRoot: true},
+		{name: "parent owner admits ancestor", owner: ".", wantTyped: true},
+		{name: "explicit root narrows parent owner", owner: ".", explicitRoot: "pkg"},
+		{name: "null restores parent owner", owner: ".", explicitRoot: "pkg", resetRoot: true, wantTyped: true},
+		{name: "nested owner excludes ancestor", owner: "pkg"},
+		{name: "explicit root expands nested owner", owner: "pkg", explicitRoot: ".", wantTyped: true},
+		{name: "null restores nested owner", owner: "pkg", explicitRoot: ".", resetRoot: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			directory := tspath.NormalizePath(archive.Materialize(t, "ancestor"))
 			workspace := tspath.ResolvePath(directory, "pkg")
 			fileName := tspath.ResolvePath(workspace, "target.ts")
-			server := newTestServer()
-			server.cwd = workspace
-			server.fs = bundled.WrapFS(osvfs.FS())
-			server.lintPrograms = newLintProgramStore(server)
-			server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
-			uri := documentURIFromPath(fileName)
-			const editorText = "debugger;\ndeclare const value: any;\nexport const result = value.member;\n"
-			server.documents[uri] = editorText
-			options := &config.ParserOptions{ProjectService: config.BoolPtr(true)}
-			if test.explicitRoot != "" {
-				options.TsconfigRootDir = tspath.ResolvePath(directory, test.explicitRoot)
-			}
-			entries := config.RslintConfig{{
-				Plugins:         []string{"@typescript-eslint"},
-				LanguageOptions: &config.LanguageOptions{ParserOptions: options},
-				Rules: config.Rules{
-					"no-debugger": "error", "@typescript-eslint/no-unsafe-member-access": "error",
-				},
-			}}
-			if test.inferredRoot {
-				entries[0].InferredTSConfigRootDirs = []string{directory}
-			}
-			installJSConfigsForTest(server, map[string]config.RslintConfig{directory: entries})
-			snapshot := server.documentLintSnapshot(uri)
-			if snapshot.cwd != workspace || snapshot.target.ConfigDirectory != directory {
-				t.Fatalf("snapshot cwd=%q owner=%q, want nested workspace %q and parent owner %q", snapshot.cwd, snapshot.target.ConfigDirectory, workspace, directory)
-			}
-			if snapshot.projectPolicyError != nil {
-				t.Fatal(snapshot.projectPolicyError)
-			}
-			environment := server.freezeSpeculativeLintEnvironment(uri, snapshot.target)
-			// A later invocation directory would admit the ancestor project. Both
-			// adapters must continue using the policy frozen for this operation.
-			server.cwd = directory
-			for _, speculative := range []bool{false, true} {
-				var generation linter.Generation
-				var release linter.ReleaseFunc
-				var err error
-				wantText := editorText
-				if speculative {
-					wantText = "// speculative text\n" + editorText
-					generation, release, err = acquireSpeculativeGeneration(context.Background(), wantText, snapshot, environment)
-				} else {
-					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
-					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
-				}
-				if release != nil {
-					defer release()
-				}
-				if err != nil || len(generation.Native.Programs) != 1 {
-					t.Fatalf("speculative=%v: programs=%d error=%v", speculative, len(generation.Native.Programs), err)
-				}
-				program := generation.Native.Programs[0]
-				wantConfig := ""
-				if test.wantTyped {
-					wantConfig = tspath.ResolvePath(directory, "tsconfig.json")
-				}
-				if program.Options().ConfigFilePath != wantConfig {
-					t.Fatalf("speculative=%v: config=%q, want %q", speculative, program.Options().ConfigFilePath, wantConfig)
-				}
-				source := program.GetSourceFile(fileName)
-				if source == nil || source.Text() != wantText {
-					t.Fatalf("speculative=%v: generation did not use its editor text", speculative)
-				}
-				foundSyntax, foundTyped := false, false
-				for _, configured := range generation.Native.RulesForFile(source) {
-					foundSyntax = foundSyntax || configured.Name == "no-debugger"
-					foundTyped = foundTyped || configured.RequiresTypeInfo
-				}
-				if !foundSyntax || foundTyped != test.wantTyped {
-					t.Fatalf("speculative=%v: syntax=%v typed=%v, want typed=%v", speculative, foundSyntax, foundTyped, test.wantTyped)
-				}
-			}
-			if server.documents[uri] != editorText {
-				t.Fatal("speculative generation changed resident editor content")
+			owner := tspath.ResolvePath(directory, test.owner)
+			for _, cwdName := range []string{".", "pkg"} {
+				t.Run("cwd="+cwdName, func(t *testing.T) {
+					server := newTestServer()
+					server.cwd = tspath.ResolvePath(directory, cwdName)
+					server.fs = bundled.WrapFS(osvfs.FS())
+					server.lintPrograms = newLintProgramStore(server)
+					server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+					uri := documentURIFromPath(fileName)
+					const editorText = "debugger;\ndeclare const value: any;\nexport const result = value.member;\n"
+					server.documents[uri] = editorText
+					options := &config.ParserOptions{ProjectService: config.BoolPtr(true)}
+					if test.explicitRoot != "" {
+						rootDir := tspath.ResolvePath(directory, test.explicitRoot)
+						options.TsconfigRootDir = &rootDir
+					}
+					entries := config.RslintConfig{{
+						Plugins:         []string{"@typescript-eslint"},
+						LanguageOptions: &config.LanguageOptions{ParserOptions: options},
+						Rules: config.Rules{
+							"no-debugger": "error", "@typescript-eslint/no-unsafe-member-access": "error",
+						},
+					}}
+					if test.resetRoot {
+						var reset config.RslintConfig
+						if err := json.Unmarshal([]byte(`[{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}]`), &reset); err != nil {
+							t.Fatal(err)
+						}
+						entries = append(entries, reset...)
+					}
+					installJSConfigsForTest(server, map[string]config.RslintConfig{owner: entries})
+					snapshot := server.documentLintSnapshot(uri)
+					if snapshot.target.ConfigDirectory != owner || snapshot.projectPolicyError != nil {
+						t.Fatalf("snapshot owner=%q error=%v, want %q", snapshot.target.ConfigDirectory, snapshot.projectPolicyError, owner)
+					}
+					environment := server.freezeSpeculativeLintEnvironment(uri, snapshot.target)
+
+					// The same owner is independent of workspace cwd. A later owner
+					// refresh must also leave this operation's target/policy frozen.
+					changedOwner := directory
+					if owner == directory {
+						changedOwner = workspace
+					}
+					server.cwd = changedOwner
+					installJSConfigsForTest(server, map[string]config.RslintConfig{changedOwner: entries})
+					server.invalidateLintProjectCaches()
+					if next := server.documentLintSnapshot(uri); next.target.ConfigDirectory != changedOwner {
+						t.Fatalf("new snapshot owner=%q, want changed owner %q", next.target.ConfigDirectory, changedOwner)
+					}
+					for _, speculative := range []bool{false, true} {
+						var generation linter.Generation
+						var release linter.ReleaseFunc
+						var err error
+						wantText := editorText
+						if speculative {
+							wantText = "// speculative text\n" + editorText
+							generation, release, err = acquireSpeculativeGeneration(context.Background(), wantText, snapshot, environment)
+						} else {
+							provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+							generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+						}
+						if release != nil {
+							defer release()
+						}
+						if err != nil || len(generation.Native.Programs) != 1 {
+							t.Fatalf("speculative=%v: programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+						}
+						program := generation.Native.Programs[0]
+						wantConfig := ""
+						if test.wantTyped {
+							wantConfig = tspath.ResolvePath(directory, "tsconfig.json")
+						}
+						if program.Options().ConfigFilePath != wantConfig {
+							t.Fatalf("speculative=%v: config=%q, want %q", speculative, program.Options().ConfigFilePath, wantConfig)
+						}
+						source := program.GetSourceFile(fileName)
+						if source == nil || source.Text() != wantText {
+							t.Fatalf("speculative=%v: generation did not use its editor text", speculative)
+						}
+						foundSyntax, foundTyped := false, false
+						for _, configured := range generation.Native.RulesForFile(source) {
+							foundSyntax = foundSyntax || configured.Name == "no-debugger"
+							foundTyped = foundTyped || configured.RequiresTypeInfo
+						}
+						if !foundSyntax || foundTyped != test.wantTyped {
+							t.Fatalf("speculative=%v: syntax=%v typed=%v, want typed=%v", speculative, foundSyntax, foundTyped, test.wantTyped)
+						}
+					}
+					if server.documents[uri] != editorText {
+						t.Fatal("speculative generation changed resident editor content")
+					}
+				})
 			}
 		})
 	}
@@ -797,9 +819,6 @@ func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
 		}}},
 	}
 	server.jsConfigs = map[string]config.RslintConfig{directory: entries}
-	if err := server.rebuildTsConfigPaths(); err != nil {
-		t.Fatalf("eagerly expanded an unrelated flat-config project: %v", err)
-	}
 	uri := documentURIFromPath(tspath.ResolvePath(directory, "pkg/src/target.ts"))
 	snapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshotForTest(server, uri, entries, directory, false, nil), server.fs)
 	if snapshot.projectPolicyError != nil || !snapshot.projectPolicy.ProjectService || len(snapshot.typeScriptConfigPaths) != 0 {
@@ -809,6 +828,135 @@ func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
 	jsSnapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshotForTest(server, jsURI, entries, directory, false, nil), server.fs)
 	if jsSnapshot.projectPolicyError == nil || !strings.Contains(jsSnapshot.projectPolicyError.Error(), "missing.json") {
 		t.Fatalf("matching explicit project error=%v", jsSnapshot.projectPolicyError)
+	}
+}
+
+func TestDocumentProjectPolicyUsesFlatConfigAndRawBases(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		name         string
+		options      string
+		matched      bool
+		restore      bool
+		firstProject string
+		omitSecond   bool
+		wantConfig   string
+		gap          bool
+		wantError    string
+		rootOverride bool
+	}{
+		{name: "ordinary declarations keep original order", options: `{}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched service true", options: `{"projectService":true}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched service false", options: `{"projectService":false}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched service null", options: `{"projectService":null}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched root", options: `{"tsconfigRootDir":"."}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched root null", options: `{"tsconfigRootDir":null}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched project false", options: `{"project":false}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched project null", options: `{"project":null}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched project", options: `{"project":"./tsconfig.safe.json"}`, omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched project and service", options: `{"projectService":false,"project":"./tsconfig.safe.json"}`, omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched project still validates declaration", options: `{"project":"./missing.json"}`, wantError: "doesn't exist"},
+		{name: "matched service false retains declarations", options: `{"projectService":false}`, matched: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "matched root retains declaration order", options: `{}`, matched: true, rootOverride: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "matched false", options: `{"project":false}`, matched: true, gap: true},
+		{name: "matched null", options: `{"project":null}`, matched: true, gap: true},
+		{name: "matched empty array keeps earlier declarations", options: `{"project":[]}`, matched: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "matched false then restore", options: `{"project":false}`, matched: true, restore: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "matched null then restore", options: `{"project":null}`, matched: true, restore: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "literal project in literal directory", options: `{}`, omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "glob project in literal directory", options: `{}`, firstProject: "./tsconfig.u*.json", omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := tspath.ResolvePath(archive.Materialize(t, "flat-policy"), "pkg[1]")
+			fileName := tspath.ResolvePath(directory, "target.ts")
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = bundled.WrapFS(osvfs.FS())
+			server.backgroundCtx = context.Background()
+			server.defaultLibraryPath = bundled.LibPath()
+			server.initializeParams = &lsproto.InitializeParams{}
+			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer server.session.Close()
+			server.lintPrograms = newLintProgramStore(server)
+			server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			uri := documentURIFromPath(fileName)
+			const content = "export const result = (() => { var output = value.member; return output; })();\n"
+			server.documents[uri] = content
+			server.session.DidOpenFile(context.Background(), uri, 1, content, "typescript")
+			first := test.firstProject
+			if first == "" {
+				first = "./tsconfig.unsafe.json"
+			}
+			entries := config.RslintConfig{{
+				Plugins: []string{"@typescript-eslint"}, Rules: config.Rules{"no-var": "error", "@typescript-eslint/no-unsafe-member-access": "error"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{first}}},
+			}}
+			if !test.omitSecond {
+				entries = append(entries, config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.safe.json"}}}})
+			}
+			var options config.ParserOptions
+			if err := json.Unmarshal([]byte(test.options), &options); err != nil {
+				t.Fatal(err)
+			}
+			if test.rootOverride {
+				options.TsconfigRootDir = &directory
+			}
+			selector := "unused.ts"
+			if test.matched {
+				selector = "target.ts"
+			}
+			entries = append(entries, config.ConfigEntry{Files: []string{selector}, LanguageOptions: &config.LanguageOptions{ParserOptions: &options}})
+			if test.restore {
+				entries = append(entries, config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.safe.json"}}}})
+			}
+			installJSConfigsForTest(server, map[string]config.RslintConfig{directory: entries})
+			snapshot := server.documentLintSnapshot(uri)
+			if test.wantError != "" {
+				if snapshot.projectPolicyError == nil || !strings.Contains(snapshot.projectPolicyError.Error(), test.wantError) {
+					t.Fatalf("expected raw declaration error %q, got %v", test.wantError, snapshot.projectPolicyError)
+				}
+				return
+			}
+			if snapshot.projectPolicyError != nil || (len(snapshot.typeScriptConfigPaths) == 0) != test.gap {
+				t.Fatalf("target paths=%v error=%v, gap=%v", snapshot.typeScriptConfigPaths, snapshot.projectPolicyError, test.gap)
+			}
+			for _, speculative := range []bool{false, true} {
+				var generation linter.Generation
+				var release linter.ReleaseFunc
+				var err error
+				if speculative {
+					generation, release, err = acquireSpeculativeGeneration(context.Background(), content, snapshot,
+						server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+				} else {
+					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				}
+				if err != nil || len(generation.Native.Programs) != 1 {
+					t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+				}
+				program := generation.Native.Programs[0]
+				if !test.gap && program.Options().ConfigFilePath != tspath.ResolvePath(directory, test.wantConfig) {
+					t.Fatalf("speculative=%v: selected %q, want %s", speculative, program.Options().ConfigFilePath, test.wantConfig)
+				}
+				result, err := runLSPGenerationForTest(context.Background(), generation, release, linter.ArtifactDemand{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				counts := make(map[string]int)
+				for _, diagnostic := range result.Observation.Native.Diagnostics {
+					counts[diagnostic.RuleName]++
+				}
+				wantUnsafe := 0
+				if test.wantConfig == "tsconfig.unsafe.json" {
+					wantUnsafe = 1
+				}
+				if counts["@typescript-eslint/no-unsafe-member-access"] != wantUnsafe || counts["no-var"] != 1 {
+					t.Fatalf("speculative=%v: diagnostics=%v, want unsafe=%d and no-var=1", speculative, counts, wantUnsafe)
+				}
+			}
+		})
 	}
 }
 

@@ -1,176 +1,73 @@
 package config
 
 import (
+	"errors"
 	"fmt"
-	"slices"
-	"strings"
+	"path/filepath"
+	"runtime"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
-// ProjectPolicy is the effective project configuration for one lint target.
-// Project paths are absolute (and may contain globs); discovery keeps the
-// target's lexical path. Resolving this policy never resolves lint rules.
+// ProjectPolicy projects project-service options from an already resolved
+// target config. Ordinary project declarations remain owned by the raw config.
+// The zero value preserves ordinary project loading and its default fallback.
 type ProjectPolicy struct {
-	ProjectService  bool
+	ProjectService         bool
+	DefaultProjectDisabled bool
+	ProjectDisabled        bool
+	// TsconfigRootDir is an explicit absolute override. An empty value leaves
+	// service discovery at the config owner and project paths at their authored bases.
 	TsconfigRootDir string
-	Project         ProjectPaths
-	ProjectDisabled bool
 }
 
-// NeedsProjectPolicy distinguishes per-file project settings from the legacy
-// config-wide explicit-project path. The latter retains its declaration order.
-func NeedsProjectPolicy(config RslintConfig) bool {
-	for _, entry := range config {
+// HasProjectOptions identifies configs that need per-target project policy.
+// Ordinary project strings and arrays continue through the existing loader.
+func HasProjectOptions(entries RslintConfig) bool {
+	for _, entry := range entries {
 		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
 			continue
 		}
 		options := entry.LanguageOptions.ParserOptions
-		if options.ProjectService != nil || options.TsconfigRootDir != "" || options.rootDirSet || options.ProjectDisabled || options.projectAutomatic {
+		if options.ProjectService != nil || options.TsconfigRootDir != nil || options.rootDirSet ||
+			options.ProjectDisabled || options.projectAutomatic {
 			return true
 		}
 	}
 	return false
 }
 
-type ProjectPolicyResolver struct {
-	config          RslintConfig
-	configDirectory string
-	cwd             string
-	inferredRoots   []string
-	matcher         *configTargetResolver
-}
-
-func NewProjectPolicyResolver(config RslintConfig, configDirectory string, cwd string, fsys vfs.FS) *ProjectPolicyResolver {
-	return &ProjectPolicyResolver{config, configDirectory, cwd, inferredProjectRoots(config), newConfigTargetResolver(config, configDirectory, fsys)}
-}
-
-// NewProjectPolicyResolverWithPathSpaces shares the exact config-match
-// generation already frozen by target discovery or an editor snapshot.
-func NewProjectPolicyResolverWithPathSpaces(
-	config RslintConfig,
-	configDirectory string,
-	cwd string,
-	fsys vfs.FS,
-	pathSpaces *PathSpaceSnapshot,
-) (*ProjectPolicyResolver, error) {
-	matcher, err := NewTargetMatcherWithPathSpaces(config, configDirectory, fsys, pathSpaces)
-	if err != nil {
-		return nil, err
+// ResolveProjectPolicy is a pure projection of the same effective config used
+// for rules and plugins. Matching and option merging have already happened.
+func ResolveProjectPolicy(resolved ResolvedFileConfig) (ProjectPolicy, error) {
+	merged := resolved.MergedConfig
+	if merged == nil || merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
+		return ProjectPolicy{}, nil
 	}
-	return &ProjectPolicyResolver{config, configDirectory, cwd, inferredProjectRoots(config), matcher.resolver}, nil
-}
-
-// Preset origins belong to the composed config, independent of entry matching.
-// A resolver is reused for every target of that owner in this generation.
-func inferredProjectRoots(config RslintConfig) []string {
-	var roots []string
-	for _, entry := range config {
-		for _, root := range entry.InferredTSConfigRootDirs {
-			root = tspath.NormalizePath(root)
-			if !slices.Contains(roots, root) {
-				roots = append(roots, root)
-			}
-		}
+	options := merged.LanguageOptions.ParserOptions
+	policy := ProjectPolicy{}
+	if options.ProjectService != nil {
+		policy.ProjectService = *options.ProjectService
+		policy.DefaultProjectDisabled = !policy.ProjectService
 	}
-	return roots
-}
-
-// CanLoadDeclaredProjectsWithoutTargets preserves program-wide checking for
-// legacy explicit projects, including earlier entries whose service setting is later
-// disabled for every target. Scoped overrides still require target matching.
-func (resolver *ProjectPolicyResolver) CanLoadDeclaredProjectsWithoutTargets() bool {
-	if !NeedsProjectPolicy(resolver.config) {
-		return true
-	}
-	hasProjects := false
-	mayEnableService := false
-	for index, entry := range resolver.config {
-		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
-			continue
+	if options.TsconfigRootDir != nil {
+		root := *options.TsconfigRootDir
+		absolute := filepath.IsAbs(root)
+		if runtime.GOOS == "windows" {
+			absolute = absolute && len(root) >= 2 && root[1] == ':' &&
+				((root[0] >= 'a' && root[0] <= 'z') || (root[0] >= 'A' && root[0] <= 'Z'))
 		}
-		options := entry.LanguageOptions.ParserOptions
-		// Do not fold project declarations: their legacy union cannot restore
-		// projects removed by an explicit clear, even after a later override.
-		if options.TsconfigRootDir != "" || options.rootDirSet || options.ProjectDisabled || options.projectAutomatic || options.Project != nil && len(options.Project) == 0 {
-			return false
+		if !absolute {
+			return ProjectPolicy{}, fmt.Errorf("parserOptions.tsconfigRootDir must be an absolute path: %q", *options.TsconfigRootDir)
 		}
-		hasProjects = hasProjects || options.Project != nil
-		if options.ProjectService == nil {
-			continue
-		}
-		if *options.ProjectService {
-			mayEnableService = true
-			continue
-		}
-		prepared := resolver.matcher.entries[index]
-		// These are precisely the entry predicates used by resolveTarget.
-		// With none present, false applies in every authored path space. The
-		// original entries remain intact for project-path origin resolution.
-		if !hasFileSelectors(entry) && len(prepared.ignorePatterns) == 0 && prepared.configArrayBaseIndex < 0 {
-			mayEnableService = false
-		}
-	}
-	return hasProjects && !mayEnableService
-}
-
-func (resolver *ProjectPolicyResolver) Resolve(target PathIdentity) (ProjectPolicy, error) {
-	decision := resolver.matcher.resolveTarget(target)
-	if !decision.selected || decision.globallyIgnored {
-		return ProjectPolicy{ProjectDisabled: true}, nil
-	}
-	var merged *LanguageOptions
-	projectBase := resolver.configDirectory
-	for index, entry := range resolver.config {
-		if !decision.key.contains(index) || entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
-			continue
-		}
-		options := entry.LanguageOptions.ParserOptions
-		origin := configEntryPathOrigin(entry, resolver.configDirectory)
-		if options.Project != nil {
-			projectBase = origin.directory
-		}
-		// Only parser options belong to this phase. Raw plugin language options
-		// and rules are merged later by the file-config resolver.
-		merged = mergeLanguageOptions(merged, &LanguageOptions{ParserOptions: options})
-	}
-	policy := ProjectPolicy{TsconfigRootDir: tspath.NormalizePath(resolver.cwd)}
-	if merged == nil || merged.ParserOptions == nil {
-		return policy, nil
-	}
-	options := merged.ParserOptions
-	policy.ProjectService = options.ProjectService != nil && *options.ProjectService
-	policy.ProjectDisabled = options.ProjectDisabled
-	if options.TsconfigRootDir != "" {
-		if !tspath.IsRootedDiskPath(options.TsconfigRootDir) {
-			return ProjectPolicy{}, fmt.Errorf("parserOptions.tsconfigRootDir must be an absolute path: %q", options.TsconfigRootDir)
-		}
-		policy.TsconfigRootDir = tspath.NormalizePath(options.TsconfigRootDir)
-		projectBase = policy.TsconfigRootDir
-	} else {
-		switch len(resolver.inferredRoots) {
-		case 1:
-			policy.TsconfigRootDir = resolver.inferredRoots[0]
-		default:
-			if len(resolver.inferredRoots) > 1 {
-				return ProjectPolicy{}, fmt.Errorf("no tsconfigRootDir was set, and multiple candidate directories are present:\n - %s\nset parserOptions.tsconfigRootDir explicitly", strings.Join(resolver.inferredRoots, "\n - "))
-			}
-		}
+		policy.TsconfigRootDir = tspath.NormalizePath(filepath.Clean(root))
 	}
 	if policy.ProjectService && (options.Project != nil || options.projectAutomatic) {
-		return ProjectPolicy{}, fmt.Errorf("%s: enabling parserOptions.project does nothing when projectService is enabled; remove project or set projectService to false", target.Path)
+		return ProjectPolicy{}, errors.New("enabling parserOptions.project does nothing when projectService is enabled; remove project or set projectService to false")
 	}
 	if options.projectAutomatic {
-		return ProjectPolicy{}, fmt.Errorf("%s: parserOptions.project: true is not supported; use projectService: true for automatic discovery", target.Path)
+		return ProjectPolicy{}, errors.New("parserOptions.project: true is not supported; use projectService: true for automatic discovery")
 	}
-	if options.Project != nil {
-		policy.Project = make(ProjectPaths, len(options.Project))
-		for index, path := range options.Project {
-			policy.Project[index] = tspath.ResolvePath(projectBase, path)
-		}
-	} else if options.ProjectService != nil && !policy.ProjectService {
-		policy.ProjectDisabled = true
-	}
+	policy.ProjectDisabled = options.ProjectDisabled && !policy.ProjectService
 	return policy, nil
 }

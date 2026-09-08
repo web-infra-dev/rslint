@@ -413,9 +413,6 @@ func newPushDiagnosticsPluginFixture(
 	s.configSnapshotIncludesGitignore = true
 	configDirectory := filepath.Dir(fixture.configPath)
 	installJSConfigsForTest(s, map[string]config.RslintConfig{configDirectory: entries})
-	s.tsConfigPathsByConfig = map[string][]string{
-		configDirectory: {fixture.configPath},
-	}
 	s.eslintPluginConfigGeneration = "push-generation"
 	return s, fixture.sourceURI, queue
 }
@@ -1175,6 +1172,7 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 	uri := lsproto.DocumentUri("file:///alias/source.ts")
 	filePath := tspath.NormalizePath(uriToPath(uri))
 	fsys := &retargetingDocumentFS{
+		mockFS:     mockFS{files: map[string]bool{"/owner-a/tsconfig.json": true, "/owner-b/tsconfig.json": true}},
 		targetPath: filePath,
 		targets:    []string{"/owner-a/source.ts", "/owner-b/source.ts"},
 	}
@@ -1194,10 +1192,6 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 			Rules:   config.Rules{"tpfrozentarget/owner-b": "error"},
 		}},
 	})
-	s.tsConfigPathsByConfig = map[string][]string{
-		"/owner-a": {"/owner-a/tsconfig.json"},
-		"/owner-b": {"/owner-b/tsconfig.json"},
-	}
 	const source = "const value = 1;"
 	s.documents[uri] = source
 	s.eslintPluginConfigGeneration = "frozen-plugin-generation"

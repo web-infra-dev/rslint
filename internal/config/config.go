@@ -18,9 +18,6 @@ type RslintConfig []ConfigEntry
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
 	Name string `json:"name,omitempty"`
-	// InferredTSConfigRootDirs is Node-produced preset provenance, separate from
-	// authored parser options so explicit values and null resets retain meaning.
-	InferredTSConfigRootDirs []string `json:"inferredTSConfigRootDirs,omitempty"`
 	// BasePath is ESLint flat config's entry-local matching base. A pointer
 	// preserves the distinction between omission and an explicitly authored
 	// empty string; both are valid, but only the latter scopes the entry.
@@ -298,7 +295,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		// neutral but remains non-nil for isGlobalIgnoreEntry.
 		hasNonGlobalKey := false
 		for key := range raw {
-			if key != "ignores" && key != "name" && key != "basePath" && key != "inferredTSConfigRootDirs" {
+			if key != "ignores" && key != "name" && key != "basePath" {
 				hasNonGlobalKey = true
 				break
 			}
@@ -547,11 +544,12 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 }
 
 // ParserOptions contains parser-specific configuration.
-// ProjectService uses *bool to distinguish "not set" (nil) from "explicitly false".
+// ProjectService distinguishes omission from false; TsconfigRootDir retains an
+// empty string so final policy validation cannot confuse it with a null reset.
 type ParserOptions struct {
 	ProjectService  *bool        `json:"projectService,omitempty"`
 	Project         ProjectPaths `json:"project,omitempty"`
-	TsconfigRootDir string       `json:"tsconfigRootDir,omitempty"`
+	TsconfigRootDir *string      `json:"tsconfigRootDir,omitempty"`
 	ProjectDisabled bool         `json:"-"`
 
 	projectAutomatic bool
@@ -590,9 +588,6 @@ func (options *ParserOptions) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(value, &options.TsconfigRootDir); err != nil {
 			return errors.New("parserOptions.tsconfigRootDir must be an absolute path string")
 		}
-		if string(value) != "null" && !tspath.IsRootedDiskPath(options.TsconfigRootDir) {
-			return errors.New("parserOptions.tsconfigRootDir must be an absolute path")
-		}
 	}
 	return nil
 }
@@ -613,8 +608,8 @@ func (options ParserOptions) MarshalJSON() ([]byte, error) {
 	} else if options.projectAutomatic {
 		encoded["project"] = true
 	}
-	if options.TsconfigRootDir != "" {
-		encoded["tsconfigRootDir"] = options.TsconfigRootDir
+	if options.TsconfigRootDir != nil {
+		encoded["tsconfigRootDir"] = *options.TsconfigRootDir
 	} else if options.rootDirSet {
 		encoded["tsconfigRootDir"] = nil
 	}
@@ -1158,7 +1153,7 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 				po.ProjectDisabled = override.ParserOptions.ProjectDisabled
 				po.projectAutomatic = override.ParserOptions.projectAutomatic
 			}
-			if override.ParserOptions.TsconfigRootDir != "" || override.ParserOptions.rootDirSet {
+			if override.ParserOptions.TsconfigRootDir != nil || override.ParserOptions.rootDirSet {
 				po.TsconfigRootDir = override.ParserOptions.TsconfigRootDir
 				po.rootDirSet = override.ParserOptions.rootDirSet
 			}

@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { collectTSConfigRootDirs } from './tsconfig-root-dir.js';
 import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
 
@@ -324,11 +323,7 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     const needsNonGlobalShapeMarker =
       authoredNonGlobalKey && !serializesNonGlobalKey;
 
-    const inferredTSConfigRootDirs = collectTSConfigRootDirs(entry);
     return {
-      ...(inferredTSConfigRootDirs.length > 0
-        ? { inferredTSConfigRootDirs }
-        : {}),
       ...(entry.name !== undefined ? { name: entry.name } : {}),
       ...(hasBasePath ? { basePath: entry.basePath } : {}),
       ...(hasFiles ? { files: entry.files } : {}),

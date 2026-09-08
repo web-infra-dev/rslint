@@ -503,9 +503,9 @@ func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) {
 	s.markContent(uriToPath(uri), content, false)
 }
 
-// DidChangeWatchedFiles returns whether resident state was discarded. The
-// caller uses that signal to refresh diagnostics even when Session does not
-// own the custom project that registered the watcher.
+// DidChangeWatchedFiles returns whether diagnostics need to be refreshed. A
+// custom project path may previously have failed to resolve, leaving no
+// resident Program even though a filesystem change alters its lint policy.
 func (s *lintProgramStore) DidChangeWatchedFiles(
 	changes []*lsproto.FileEvent,
 ) bool {
@@ -520,7 +520,8 @@ func (s *lintProgramStore) DidChangeWatchedFiles(
 			) || discarded
 			continue
 		}
-		return s.Invalidate() || discarded
+		invalidated := s.Invalidate()
+		return invalidated || discarded || len(s.server.documents) > 0
 	}
 	return discarded
 }

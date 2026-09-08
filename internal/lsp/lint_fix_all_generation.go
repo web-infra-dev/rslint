@@ -75,7 +75,7 @@ func acquireSpeculativeGeneration(
 	var found bool
 	var err error
 	if snapshot.projectPolicy.ProjectService {
-		selected, err = request.service(snapshot.projectPolicy.TsconfigRootDir)
+		selected, err = request.service(snapshot.projectServiceRootDirectory())
 		found = selected.program != nil
 	} else {
 		selected, found, err = selectConfiguredLintProject(

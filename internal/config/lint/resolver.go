@@ -1,9 +1,10 @@
 // Package lint resolves already-selected lint targets against their governing
-// configuration. Target discovery and Program binding happen before this
-// package; it only joins their immutable results to config.FileConfigResolver.
+// configuration. It resolves frozen targets before Program construction and
+// joins the same configuration to source paths after Program binding.
 package lint
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -17,6 +18,7 @@ import (
 // resolves the effective configuration owned by those targets.
 type Resolver struct {
 	configsByOwner       map[string]config.RslintConfig
+	config               config.RslintConfig
 	configDirectory      string
 	targetsBySourcePath  map[string]target.File
 	fsys                 vfs.FS
@@ -50,6 +52,7 @@ func NewResolver(options ResolverOptions) *Resolver {
 	}
 	resolver := &Resolver{
 		configsByOwner:  options.ConfigsByOwner,
+		config:          options.Config,
 		configDirectory: options.ConfigDirectory,
 		targetsBySourcePath: normalizeSourceTargetMappings(
 			options.TargetsBySourcePath,
@@ -84,9 +87,75 @@ func NewResolver(options ResolverOptions) *Resolver {
 	for _, ownerDirectory := range ownerDirectories {
 		fileResolver := newFileResolver(options.ConfigsByOwner[ownerDirectory], ownerDirectory)
 		resolver.resolversByOwnerPath[ownerDirectory] = fileResolver
-		resolver.resolversByOwnerPath[canonicalPathID(ownerDirectory, options.FS)] = fileResolver
+		physicalDirectory, _ := options.PathSpaces.PhysicalDirectory(ownerDirectory)
+		canonicalOwner := config.ExactPathID(physicalDirectory)
+		if _, isLiteralOwner := options.ConfigsByOwner[canonicalOwner]; !isLiteralOwner {
+			resolver.resolversByOwnerPath[canonicalOwner] = fileResolver
+		}
 	}
 	return resolver
+}
+
+// WithSourceMappings adds one Program generation's source binding without
+// rebuilding configuration resolvers or changing their frozen path spaces.
+func (resolver *Resolver) WithSourceMappings(
+	mapping map[string]target.File,
+	fsys vfs.FS,
+	canonicalKeysPresent bool,
+) *Resolver {
+	bound := *resolver
+	bound.targetsBySourcePath = normalizeSourceTargetMappings(mapping, fsys, canonicalKeysPresent)
+	bound.fsys = fsys
+	return &bound
+}
+
+// ResolveTarget evaluates an already-selected target under its frozen owner.
+// The boolean reports owner availability; a nil merged config is a valid miss.
+func (resolver *Resolver) ResolveTarget(file target.File) (config.ResolvedFileConfig, bool) {
+	if resolver.singleResolver != nil {
+		return resolver.singleResolver.ResolveTarget(file.Identity()), true
+	}
+	fileResolver := resolver.resolversByOwnerPath[file.ConfigDirectory]
+	if fileResolver == nil {
+		return config.ResolvedFileConfig{}, false
+	}
+	return fileResolver.ResolveTarget(file.Identity()), true
+}
+
+// ProjectPolicies resolves only owners with service/root/reset options. The
+// returned values carry no project lists, and zero policies need no override.
+func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]config.ProjectPolicy, error) {
+	ownersWithOptions := make(map[*config.FileConfigResolver]bool, len(resolver.configsByOwner))
+	for owner, entries := range resolver.configsByOwner {
+		ownersWithOptions[resolver.resolversByOwnerPath[owner]] = config.HasProjectOptions(entries)
+	}
+	singleHasOptions := config.HasProjectOptions(resolver.config)
+	var policies map[target.File]config.ProjectPolicy
+	for _, file := range files {
+		hasOptions := singleHasOptions
+		if resolver.configsByOwner != nil {
+			hasOptions = ownersWithOptions[resolver.resolversByOwnerPath[file.ConfigDirectory]]
+		}
+		if !hasOptions {
+			continue
+		}
+		resolved, ok := resolver.ResolveTarget(file)
+		if !ok {
+			continue
+		}
+		policy, err := config.ResolveProjectPolicy(resolved)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", file.Path, err)
+		}
+		if policy == (config.ProjectPolicy{}) {
+			continue
+		}
+		if policies == nil {
+			policies = make(map[target.File]config.ProjectPolicy)
+		}
+		policies[file] = policy
+	}
+	return policies, nil
 }
 
 func normalizeSourceTargetMappings(
@@ -126,13 +195,6 @@ func canonicalPathID(filePath string, fsys vfs.FS) string {
 	return config.ExactPathID(authoritativePath(filePath, fsys))
 }
 
-func (resolver *Resolver) resolverForOwner(ownerDirectory string) *config.FileConfigResolver {
-	if fileResolver := resolver.resolversByOwnerPath[ownerDirectory]; fileResolver != nil {
-		return fileResolver
-	}
-	return resolver.resolversByOwnerPath[canonicalPathID(ownerDirectory, resolver.fsys)]
-}
-
 // TargetForSourcePath returns the selected lint target represented by a
 // Program source path. It never infers a new owner from the source path.
 func (resolver *Resolver) TargetForSourcePath(sourcePath string) (target.File, bool) {
@@ -154,11 +216,8 @@ func (resolver *Resolver) ResolveSourcePath(
 	}
 	if resolver.configsByOwner != nil {
 		if bound {
-			fileResolver := resolver.resolverForOwner(lintTarget.ConfigDirectory)
-			if fileResolver == nil {
-				return "", config.ResolvedFileConfig{}, false
-			}
-			return lintTarget.ConfigDirectory, fileResolver.ResolveTarget(lintTarget.Identity()), true
+			resolved, ok := resolver.ResolveTarget(lintTarget)
+			return lintTarget.ConfigDirectory, resolved, ok
 		}
 		return "", config.ResolvedFileConfig{}, false
 	}

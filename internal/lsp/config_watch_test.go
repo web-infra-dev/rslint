@@ -3,10 +3,15 @@ package lsp
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+
+	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
 func TestIsTsConfigURI(t *testing.T) {
@@ -62,7 +67,7 @@ func TestHandleDidChangeWatchedFilesIgnoresLegacyJSONConfig(t *testing.T) {
 	}
 }
 
-func TestHandleDidChangeWatchedFilesRebuildsTypeInfoForTSConfigVariants(t *testing.T) {
+func TestHandleDidChangeWatchedFilesInvalidatesTypeInfoForTSConfigVariants(t *testing.T) {
 	for _, uri := range []lsproto.DocumentUri{
 		"file:///project/tsconfig.json",
 		"file:///project/tsconfig.build.json",
@@ -72,17 +77,150 @@ func TestHandleDidChangeWatchedFilesRebuildsTypeInfoForTSConfigVariants(t *testi
 			s := newTestServer()
 			s.fs = &mockFS{files: map[string]bool{}}
 			s.cwd = "/project"
-			s.tsConfigPathsByConfig = map[string][]string{
-				"/project": {"/project/old-tsconfig.json"},
-			}
+			s.lintSessionRoots = newLintSessionProjectRootCache()
+			s.lintSessionRoots.entries["/project/old-tsconfig.json"] = lintSessionProjectRootEntry{}
 
 			if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
 				Changes: []*lsproto.FileEvent{{Uri: uri, Type: lsproto.FileChangeTypeChanged}},
 			}); err != nil {
 				t.Fatalf("tsconfig event: %v", err)
 			}
-			if s.tsConfigPathsByConfig != nil {
-				t.Fatalf("stale type-info paths survived rebuild: %+v", s.tsConfigPathsByConfig)
+			if len(s.lintSessionRoots.entries) != 0 {
+				t.Fatalf("stale project metadata survived invalidation: %+v", s.lintSessionRoots.entries)
+			}
+			select {
+			case <-s.refreshCh:
+			default:
+				t.Fatal("tsconfig change did not request new document snapshots")
+			}
+		})
+	}
+}
+
+func TestHandleDidChangeWatchedFilesInvalidatesOrdinaryProjectPathsWithoutOpenDocuments(t *testing.T) {
+	s := newTestServer()
+	fsys := &mockFS{files: map[string]bool{"/project/custom.json": true}}
+	s.fs = fsys
+	s.cwd = "/project"
+	installJSConfigsForTest(s, map[string]config.RslintConfig{s.cwd: {{
+		LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./custom.json"}}},
+	}}})
+	uri := lsproto.DocumentUri("file:///project/file.ts")
+	initial := s.documentLintSnapshot(uri)
+	if initial.projectPolicyError != nil || len(initial.typeScriptConfigPaths) != 1 {
+		t.Fatalf("initial paths=%v error=%v", initial.typeScriptConfigPaths, initial.projectPolicyError)
+	}
+	delete(fsys.files, "/project/custom.json")
+	if cached := s.documentLintSnapshot(uri); cached.projectPolicyError != nil || len(cached.typeScriptConfigPaths) != 1 {
+		t.Fatalf("ordinary owner paths were expanded again before invalidation: %+v", cached)
+	}
+	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+		Changes: []*lsproto.FileEvent{{Uri: "file:///project/custom.json", Type: lsproto.FileChangeTypeDeleted}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if missing := s.documentLintSnapshot(uri); missing.projectPolicyError == nil {
+		t.Fatal("closed-document config deletion retained cached project paths")
+	}
+	if _, cached := s.tsConfigPathsByConfig[s.cwd]; cached {
+		t.Fatal("failed path resolution was cached")
+	}
+	fsys.files["/project/custom.json"] = true
+	if restored := s.documentLintSnapshot(uri); restored.projectPolicyError != nil || len(restored.typeScriptConfigPaths) != 1 {
+		t.Fatalf("recreated config did not recover: %+v", restored)
+	}
+}
+
+func TestHandleDidChangeWatchedFilesReevaluatesCustomProject(t *testing.T) {
+	for _, pattern := range []string{"./custom.json", "./custom*.json"} {
+		t.Run(pattern, func(t *testing.T) {
+			fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+			s := fixture.server
+			customPath := tspath.ResolvePath(s.cwd, "custom.json")
+			if err := os.Rename(fixture.configPath, customPath); err != nil {
+				t.Fatal(err)
+			}
+			s.backgroundCtx = context.Background()
+			if err := s.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer s.session.Close()
+			s.lintPrograms = fixture.store
+			s.session.DidOpenFile(context.Background(), fixture.sourceURI, 1, s.documents[fixture.sourceURI], "typescript")
+			installJSConfigsForTest(s, map[string]config.RslintConfig{s.cwd: {{
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{pattern}}},
+			}}})
+			select {
+			case <-s.refreshCh:
+			default:
+			}
+			for _, step := range []struct {
+				name   string
+				kind   lsproto.FileChangeType
+				strict bool
+			}{
+				{name: "initial"},
+				{name: "changed", kind: lsproto.FileChangeTypeChanged, strict: true},
+				{name: "deleted", kind: lsproto.FileChangeTypeDeleted},
+				{name: "recreated", kind: lsproto.FileChangeTypeCreated},
+			} {
+				if step.kind == lsproto.FileChangeTypeDeleted {
+					if err := os.Remove(customPath); err != nil {
+						t.Fatal(err)
+					}
+				} else if step.kind != 0 {
+					strict := "false"
+					if step.strict {
+						strict = "true"
+					}
+					if err := os.WriteFile(customPath, []byte(`{"compilerOptions":{"noLib":true,"strict":`+strict+`},"files":["src/index.ts"]}`), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if step.kind != 0 {
+					if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+						Changes: []*lsproto.FileEvent{{Uri: documentURIFromPath(customPath), Type: step.kind}},
+					}); err != nil {
+						t.Fatal(err)
+					}
+					select {
+					case <-s.refreshCh:
+					default:
+						t.Fatalf("%s custom project did not schedule diagnostics", step.name)
+					}
+				}
+				snapshot := s.documentLintSnapshot(fixture.sourceURI)
+				if step.kind == lsproto.FileChangeTypeDeleted {
+					if snapshot.projectPolicyError == nil {
+						t.Fatal("deleted explicit project retained resolved paths")
+					}
+					continue
+				}
+				if snapshot.projectPolicyError != nil || len(snapshot.typeScriptConfigPaths) != 1 || snapshot.typeScriptConfigPaths[0] != customPath {
+					t.Fatalf("%s paths=%v error=%v", step.name, snapshot.typeScriptConfigPaths, snapshot.projectPolicyError)
+				}
+				for _, speculative := range []bool{false, true} {
+					var generation linter.Generation
+					var release linter.ReleaseFunc
+					var err error
+					if speculative {
+						generation, release, err = acquireSpeculativeGeneration(context.Background(), s.documents[fixture.sourceURI], snapshot,
+							s.freezeSpeculativeLintEnvironment(fixture.sourceURI, snapshot.target))
+					} else {
+						provider := &documentGenerationProvider{server: s, uri: fixture.sourceURI, snapshot: snapshot}
+						generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+					}
+					if err != nil || len(generation.Native.Programs) != 1 {
+						t.Fatalf("%s speculative=%v generation=%+v error=%v", step.name, speculative, generation, err)
+					}
+					options := generation.Native.Programs[0].Options()
+					if options.ConfigFilePath != customPath || options.Strict.IsTrue() != step.strict {
+						t.Fatalf("%s speculative=%v selected stale project: %+v", step.name, speculative, options)
+					}
+					if release != nil {
+						release()
+					}
+				}
 			}
 		})
 	}

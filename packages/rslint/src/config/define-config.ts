@@ -101,9 +101,9 @@ export interface ParserOptions {
    */
   projectService?: boolean;
   /**
-   * Absolute boundary for upward project discovery. Defaults to the config
-   * directory inferred from TS preset access, or the invocation cwd when no
-   * directory can be inferred. References may point outside this boundary;
+   * Absolute boundary for upward project discovery. Defaults to the governing
+   * Rslint config's directory, or API cwd for inline-only configuration.
+   * References may point outside this boundary;
    * it does not force the target to use that directory's tsconfig.
    */
   tsconfigRootDir?: string;

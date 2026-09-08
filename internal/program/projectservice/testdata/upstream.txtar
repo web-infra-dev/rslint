@@ -1310,6 +1310,16 @@ export const result: string = nullable;
     {
       "file": "pkg/src/file.ts",
       "unowned": true
+    },
+    {
+      "file": "pkg/src/file.ts",
+      "rootDirectory": "pkg/",
+      "unowned": true
+    },
+    {
+      "file": "pkg/src/file.ts",
+      "rootDirectory": "pkg/../pkg/",
+      "unowned": true
     }
   ]
 }

@@ -378,26 +378,43 @@ func TestHandleLint_SelectedTargetResolvesGoverningProject(t *testing.T) {
 
 func TestHandleLint_ProjectServiceUsesTargetConfigAndOverlay(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
-	for _, useService := range []bool{true, false} {
-		options := `"projectService":true`
-		if !useService {
-			options = `"projectService":false,"project":"tsconfig.json"`
-		}
-		config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{` + options + `}},"rules":{"@typescript-eslint/no-unnecessary-condition":"error","no-debugger":"error"}}]`)
-		response, err := (&Handler{}).HandleLint(api.LintRequest{
-			Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
-			Files:        []string{tspath.ResolvePath(dir, "pkg/file.ts")},
-			FileContents: map[string]string{tspath.ResolvePath(dir, "pkg/file.ts"): `export function keep(x: string | undefined) { return x != null; }`},
+	for _, test := range []struct {
+		name            string
+		projectEntries  string
+		wantDiagnostics int
+		wantError       string
+	}{
+		{name: "nearest service", projectEntries: `{"languageOptions":{"parserOptions":{"projectService":true}}}`},
+		{name: "explicit root", projectEntries: `{"languageOptions":{"parserOptions":{"projectService":false,"project":"tsconfig.json"}}}`, wantDiagnostics: 1},
+		{name: "first declared project is root", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}}`, wantDiagnostics: 1},
+		{name: "first declared project is nested", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}}`},
+		{name: "unmatched project remains declared", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":"missing.json"}}}`, wantError: "missing.json"},
+		{name: "unmatched service is neutral", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"files":["unused.ts"],"languageOptions":{"parserOptions":{"projectService":true}}}`},
+		{name: "matched project false is gap", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":false}}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"rules":{"@typescript-eslint/no-unnecessary-condition":"error","no-debugger":"error"}},` + test.projectEntries + `]`)
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+				Files:        []string{tspath.ResolvePath(dir, "pkg/file.ts")},
+				FileContents: map[string]string{tspath.ResolvePath(dir, "pkg/file.ts"): `export function keep(x: string | undefined) { return x != null; }`},
+			})
+			if test.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantError) {
+					t.Fatalf("error=%v, want %q", err, test.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.FileCount != 1 {
+				t.Fatalf("wrong API target scope: %+v", response)
+			}
+			if len(response.Diagnostics) != test.wantDiagnostics {
+				t.Fatalf("wrong effective TypeScript options: %+v", response)
+			}
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if response.FileCount != 1 {
-			t.Fatalf("wrong API target scope: %+v", response)
-		}
-		if useService && len(response.Diagnostics) != 0 || !useService && len(response.Diagnostics) == 0 {
-			t.Fatalf("wrong effective TypeScript options (service=%v): %+v", useService, response)
-		}
 	}
 }
 
