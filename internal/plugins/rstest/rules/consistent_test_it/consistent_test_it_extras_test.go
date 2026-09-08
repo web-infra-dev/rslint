@@ -151,6 +151,12 @@ func TestConsistentTestItExtras(t *testing.T) {
 			{Code: "const { it } = require('@rstest/core'); it('case');", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 41, EndLine: 1, EndColumn: 43}}},
 			// CommonJS can reuse the existing named base API.
 			{Code: "import { test } from '@rstest/core'; const { it } = require('@rstest/core'); it('case');", Output: []string{"import { test } from '@rstest/core'; const { it } = require('@rstest/core'); test('case');"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 78, EndLine: 1, EndColumn: 80}}},
+			// A reassignable CommonJS binding no longer holds what its pattern declares.
+			{Code: "import { test } from '@rstest/core'; let { it } = require('@rstest/core'); it = it.extend({ account: {} }); it('case', ({ account }) => {});", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 109, EndLine: 1, EndColumn: 111}}},
+			// A reassignable CommonJS binding no longer holds what its pattern declares.
+			{Code: "import { test } from '@rstest/core'; let { it } = require('@rstest/core'); it('case');", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 76, EndLine: 1, EndColumn: 78}}},
+			// A class static block is a variable environment of its own.
+			{Code: "import { it, test } from '@rstest/core'; class C { static { if (true) { var test = () => {}; } it('case', () => {}); } }", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 96, EndLine: 1, EndColumn: 98}}},
 			// Mutable CommonJS namespace is not rewritten.
 			{Code: "const core = require('@rstest/core'); core.it('case');", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 39, EndLine: 1, EndColumn: 46}}},
 			// Add import atomically.
