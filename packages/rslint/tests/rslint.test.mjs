@@ -2284,6 +2284,61 @@ module.exports = config;`
     EXIT_FIXTURE_OUTER_DEADLOCK_SENTINEL_MS,
   );
 
+  test.each(['explicit', 'mixed', 'service'])(
+    'projectService lintFiles keeps overlapping %s programs from duplicating targets',
+    async (mode) => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-service-modes-'),
+      );
+      const code =
+        'export const values = [1, 2];\nfor (const key in values) {}\n';
+      await writeFile(
+        path.join(tmp, 'tsconfig.json'),
+        JSON.stringify({ files: ['a.ts', 'b.ts', 'c.ts'] }),
+      );
+      for (const file of ['a.ts', 'b.ts', 'c.ts']) {
+        await writeFile(path.join(tmp, file), code);
+      }
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          ts.configs.base,
+          {
+            files: ['**/*.ts'],
+            rules: { '@typescript-eslint/no-for-in-array': 'error' },
+          },
+          ...['a.ts', 'b.ts'].map((file) => {
+            const service =
+              mode === 'service' || (mode === 'mixed' && file === 'b.ts');
+            return {
+              files: [file],
+              languageOptions: {
+                parserOptions: service
+                  ? { projectService: true }
+                  : { projectService: false, project: './tsconfig.json' },
+              },
+            };
+          }),
+        ],
+      });
+      try {
+        const results = await rslint.lintFiles(['a.ts', 'b.ts']);
+        expect(
+          results.map((result) => path.basename(result.filePath)).sort(),
+        ).toEqual(['a.ts', 'b.ts']);
+        for (const result of results) {
+          expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
+            '@typescript-eslint/no-for-in-array',
+          ]);
+        }
+      } finally {
+        await rslint.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
   test('projectService lintText selects the nearest overlay project over a different config-directory project', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-service-overlay-'),

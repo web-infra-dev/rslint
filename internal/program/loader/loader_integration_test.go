@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -92,6 +93,100 @@ func TestBuildLintProjectsRejectsUnownedServiceTarget(t *testing.T) {
 	_, err = NewSession(fsys).BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, ProjectScopeTarget)
 	if err == nil || !strings.Contains(err.Error(), "project service") {
 		t.Fatalf("unowned service target must fail: %v", err)
+	}
+}
+
+func TestBuildLintProjectsKeepsProgramModesSeparate(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service_modes.txtar")
+	for _, output := range []string{"stale", "missing"} {
+		for _, mode := range []string{"explicit", "mixed", "service"} {
+			for _, scope := range []ProjectLoadScope{ProjectScopeTarget, ProjectScopeOwner, ProjectScopeAll} {
+				t.Run(output+"/"+mode+"/scope-"+strconv.Itoa(int(scope)), func(t *testing.T) {
+					dir := tspath.NormalizePath(archive.Materialize(t, ""))
+					if output == "missing" {
+						if err := os.Remove(tspath.ResolvePath(dir, "dist/value.d.ts")); err != nil {
+							t.Fatal(err)
+						}
+					}
+					var config rslintconfig.RslintConfig
+					files := []string{tspath.ResolvePath(dir, "a.ts"), tspath.ResolvePath(dir, "b.ts")}
+					serviceForFile := []bool{mode == "service", mode != "explicit"}
+					for index, name := range []string{"a.ts", "b.ts"} {
+						options := &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(serviceForFile[index])}
+						if !serviceForFile[index] {
+							options.Project = rslintconfig.ProjectPaths{"tsconfig.json"}
+						}
+						config = append(config, rslintconfig.ConfigEntry{
+							Files: []string{name}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: options},
+						})
+					}
+					fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+					plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+					if err != nil {
+						t.Fatal(err)
+					}
+					session := NewSession(fsys)
+					projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, scope)
+					if err != nil {
+						t.Fatal(err)
+					}
+					wantPrograms := 1
+					if mode == "mixed" {
+						wantPrograms = 2
+					}
+					if projects.Len() != wantPrograms {
+						t.Fatalf("got %d Programs for one tsconfig, want %d", projects.Len(), wantPrograms)
+					}
+					binding, err := session.LoadAPI(projects, plan, dir, true)
+					if err != nil {
+						t.Fatal(err)
+					}
+					programForFile := make(map[string]*compiler.Program)
+					for index, sources := range binding.TargetsByProgram {
+						program := projects.compilerPrograms[index]
+						if program.Options().ConfigFilePath != tspath.ResolvePath(dir, "tsconfig.json") || len(program.CommandLine().FileNames()) != 3 {
+							t.Fatal("selected project lost its config identity or complete roots")
+						}
+						for _, file := range sources {
+							if programForFile[file] != nil {
+								t.Fatalf("target %s was bound twice", file)
+							}
+							programForFile[file] = program
+						}
+						if program.GetSourceFile(tspath.ResolvePath(dir, "c.ts")) == nil {
+							t.Fatal("sibling outside lint targets must remain in the type context")
+						}
+					}
+					if len(programForFile) != 2 {
+						t.Fatalf("expected only the two requested lint targets, got %v", programForFile)
+					}
+					for index, file := range files {
+						program := programForFile[file]
+						if program == nil {
+							t.Fatalf("target %s has no Program", file)
+						}
+						usesSource := program.GetSourceFile(tspath.ResolvePath(dir, "lib/value.ts")) != nil
+						usesDeclaration := program.GetSourceFile(tspath.ResolvePath(dir, "dist/value.d.ts")) != nil
+						if usesSource != serviceForFile[index] || usesDeclaration != (!serviceForFile[index] && output == "stale") {
+							t.Fatalf("target %s borrowed the wrong reference context: source=%v, declaration=%v", file, usesSource, usesDeclaration)
+						}
+						var codes []int
+						for _, diagnostic := range program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(file)) {
+							codes = append(codes, int(diagnostic.Code()))
+						}
+						var wantCodes []int
+						if serviceForFile[index] {
+							wantCodes = []int{2322}
+						} else if output == "missing" {
+							wantCodes = []int{6305}
+						}
+						if !slices.Equal(codes, wantCodes) {
+							t.Fatalf("target %s: semantic codes = %v, want %v", file, codes, wantCodes)
+						}
+					}
+				})
+			}
+		}
 	}
 }
 
