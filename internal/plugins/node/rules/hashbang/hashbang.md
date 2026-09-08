@@ -70,65 +70,66 @@ export default [
 
 ## Differences from upstream
 
-Where upstream mishandles valid patterns or produces an unsafe fix, rslint
-preserves the intended pattern meaning and valid JavaScript output.
+Compared with `eslint-plugin-n`, the following cases can change which files need
+a hashbang, whether a file is checked, or the result of an automatic fix.
 
-- **Overlapping path conversions.** If several object-form `convertPath`
-  patterns match a source file, rslint selects the first pattern in alphabetical
-  order; upstream uses the order of the JavaScript object properties. For
-  example, `**` wins over `src/**` in rslint even when you wrote `src/**` first.
-  This can change whether the converted path matches a `bin` entry and needs a
-  hashbang. Use the array form of `convertPath` to specify the priority.
-- **Package-relative publication checks.** Root metadata such as `README.js`
-  remains published when linting from another directory. Paths such as
-  `..hidden.js` stay inside their package; only `../` walks to a parent. If
-  `convertPath` enters a nested package, its `files` patterns use that package's
-  relative paths. Upstream can skip the hashbang check in these situations
-  because it mixes working-directory, package-directory and path-prefix tests.
-- **Negated character classes.** `additionalExecutables: ["[!b]oo.js"]` selects
-  `foo.js` and excludes `boo.js` in rslint, following Git glob syntax. Upstream
-  treats `!` as a literal character inside the class and does not select
-  `foo.js`. The same applies to `[^b]` and plain `files` and ignore-file patterns.
-- **Pattern arrays and whitespace.** Each `files` or `additionalExecutables`
-  element is one pattern. With `"files": ["lib/foo.js\nbar.js"]`, rslint does
-  not treat `lib/foo.js` as published; upstream splits that `files` element at
-  the newline and does. Only ignore-file text is split into lines. Tabs and
-  non-breaking spaces inside array entries remain filename characters in
-  rslint, while upstream can trim or turn them into ordinary spaces.
-- **Backslash escapes in Git ignore patterns.** rslint treats a backslash as
-  quoting the next character. Upstream sometimes interprets it as regexp syntax
-  or loses the escape. For example, `additionalExecutables: ["cli\\*"]` selects
-  the literal name `cli*` in rslint, but upstream also selects `cli.js`.
-  `"cli\\?"` selects `cli?` in rslint, while upstream does not; `"a\\b.js"`
-  selects `ab.js` in rslint but `a.js` upstream. These differences also apply to
-  plain `files` patterns and ignore files. Use unescaped wildcards or spell out
-  ordinary executable names when possible.
-- **Malformed character classes.** With `additionalExecutables: ["[cli.js"]`,
-  rslint selects a file literally named `[cli.js`; upstream selects no file.
-  rslint also treats reversed ranges such as `[z-a]` literally, while upstream
-  removes the invalid range, retaining any valid part of the class. Close every
-  class and write ranges in ascending order, such as `[a-z]`.
-- **Line breaks inside directory names.** With
-  `additionalExecutables: ["**/cli.js"]`, rslint selects `cli.js` below a directory
-  whose name contains a line break; upstream's leading `**/` does not cross that
-  name. Similar differences affect plain `files` patterns and ignore files.
-  Avoid line breaks in directory names or list the path explicitly.
-- **Zero-step brace ranges.** With `"files": ["lib/cli{1..3..0}.js"]` in
-  `package.json`, rslint treats `lib/cli1.js` as published; upstream does not.
-  This can change whether `ignoreUnpublished` skips its hashbang check. Use a
-  positive step, such as `lib/cli{1..3..1}.js`, or list the file names explicitly.
-- **Fixing an empty hashbang or one without LF.** For an executable containing
-  only `#!/usr/bin/env node` without a final newline, both tools report a
-  missing hashbang. rslint replaces that header and adds LF; upstream inserts
-  another hashbang before it, producing invalid JavaScript. rslint also replaces
-  an empty `#!` header and headers ending in CR, U+2028 or U+2029 this way.
-- **Invalid conversion expressions.** If a `convertPath` regular expression
-  fails to compile, for example `[`, rslint skips this rule for the file and
-  produces no hashbang diagnostic or fix. Upstream fails while loading the rule
-  with a `SyntaxError`. Correct the expression to ensure the file is checked.
-- **Non-string executable entries.** If `package.json` contains
-  `"bin": { "cli": false }`, rslint ignores that entry; upstream throws a
-  `TypeError`. Use a string path for each executable entry.
+### Conversion priority
+
+If several object-form `convertPath` patterns match, rslint uses alphabetical
+pattern order; upstream uses object property order. For example, `**` wins over
+`src/**` in rslint even if you wrote `src/**` first. The resulting path may match
+a different `bin` entry or publication pattern. **Use the array form of
+`convertPath` when priority matters.**
+
+### Corrections to file selection and fixes
+
+- **Checking published files.** With `ignoreUnpublished: true`, rslint keeps
+  checking package-root files such as `README.js` when you lint from another
+  directory. A name such as `..hidden.js` does not put a file outside its
+  package. When `convertPath` points into a nested package, that package's
+  `files` entries determine publication. Upstream can incorrectly skip the
+  hashbang check in these cases.
+- **Excluding or escaping filename characters.** With
+  `additionalExecutables: ["[!b]oo.js"]` or `["[^b]oo.js"]`, rslint selects
+  `foo.js` as an executable and excludes `boo.js`; upstream misses `foo.js`.
+  With `["cli\\*"]`, rslint selects the literal filename `cli*`, while upstream
+  also selects `cli.js`. Similarly, `["cli\\?"]` selects `cli?`, which upstream
+  misses, and `["a\\b.js"]` selects `ab.js`, where upstream selects `a.js`.
+  The same matching differences affect `files`, `.npmignore` and `.gitignore`.
+- **Filenames containing whitespace.** Each `files` or `additionalExecutables`
+  entry is one pattern, including any newline, tab or non-breaking space in it.
+  For example, with `"files": ["lib/foo.js\nbar.js"]` and
+  `ignoreUnpublished: true`, rslint skips `lib/foo.js`; upstream checks it.
+  Put separate filenames in separate entries. Upstream can also ignore tabs
+  and non-breaking spaces or match ordinary spaces instead. With
+  `additionalExecutables: ["**/cli.js"]`, rslint selects `cli.js` inside a
+  directory whose name contains a newline; upstream misses it. The directory
+  name difference also affects `files`, `.npmignore` and `.gitignore`.
+- **Fixing an incomplete first line.** If an executable contains only
+  `#!/usr/bin/env node` without a final newline, both tools report a missing
+  hashbang. rslint fixes it to a single header ending in LF; upstream duplicates
+  the header and produces invalid JavaScript. rslint also replaces an empty
+  `#!` or a header ending in CR, U+2028 or U+2029 with a valid header ending in LF.
+
+### Invalid patterns and package metadata
+
+- **Unclosed brackets or reversed ranges.** With
+  `additionalExecutables: ["[cli.js"]`, rslint treats the literal filename
+  `[cli.js` as executable; upstream selects nothing. A reversed range such as
+  `[z-a]` also matches its literal text in rslint; upstream drops the invalid
+  range and can still match the remaining characters. Close brackets and use
+  ascending ranges such as `[a-z]` to select the intended files.
+- **A brace range with step zero.** With
+  `"files": ["lib/cli{1..3..0}.js"]` and `ignoreUnpublished: true`, rslint checks
+  `lib/cli1.js`; upstream skips it. Use a positive step such as `{1..3..1}` or
+  list the filenames separately.
+- **An invalid `convertPath` regular expression.** An expression such as `[`
+  causes rslint to skip this rule for the file without reporting or fixing a
+  hashbang. Upstream stops with a `SyntaxError`. Correct the expression so the
+  file is checked.
+- **A non-string `bin` entry.** For `"bin": { "cli": false }`, rslint ignores
+  that entry; upstream stops with a `TypeError`. Use a string path so the entry
+  identifies an executable.
 
 ## Original Documentation
 
