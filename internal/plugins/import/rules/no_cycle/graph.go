@@ -16,9 +16,8 @@ import (
 
 // graphKey identifies one shape of the dependency graph. The references
 // themselves come from Program's generic module graph, so only what turns a
-// reference into a graph edge belongs here. maxDepth does not: it bounds the
-// search, not the graph, so configurations that differ only in maxDepth share
-// one graph.
+// reference into a graph edge belongs here. For searches using this graph,
+// maxDepth bounds the search rather than changing its edges.
 type graphKey struct {
 	settings           string
 	referenceKinds     program.ModuleReferenceKinds
@@ -59,6 +58,82 @@ type moduleGraph struct {
 	group []int32
 }
 
+type directTargetsKey struct {
+	file  *ast.SourceFile
+	kinds program.ModuleReferenceKinds
+}
+
+type directCyclesKey struct {
+	file           *ast.SourceFile
+	kinds          program.ModuleReferenceKinds
+	settings       string
+	ignoreExternal bool
+}
+
+type directCycle struct {
+	reference   program.ModuleReference
+	dynamicBack bool
+}
+
+// directCyclesFor answers maxDepth: 1 without constructing the whole graph.
+// At that depth the search only visits the initial target, so a report needs
+// a direct edge back to self, which also proves the two share a component.
+// Cache both positive and empty answers to avoid rescanning a high-degree
+// file on later lint passes. Keep source order and duplicates for reporting.
+func directCyclesFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, settings *import_utils.ModuleSettings, opts ruleOptions, refs []program.ModuleReference) []directCycle {
+	self := ctx.SourceFile
+	key := directCyclesKey{file: self, kinds: opts.referenceKinds, settings: settings.Key(), ignoreExternal: opts.ignoreExternal}
+	return rule.CachedByProgram(ctx, key, func() []directCycle {
+		if fileIsExcluded(settings, opts, self) {
+			return nil
+		}
+		var cycles []directCycle
+		type backEdge struct{ dynamic, found bool }
+		checked := make(map[*ast.SourceFile]backEdge)
+		for _, ref := range refs {
+			if ref.TypeOnly || ref.Target == nil || ref.Target == self {
+				continue
+			}
+			back, known := checked[ref.Target]
+			if !known {
+				// An excluded target cannot close a cycle. Avoid collecting its
+				// references, especially for large external export files.
+				if !fileIsExcluded(settings, opts, ref.Target) {
+					targets := directTargetsFor(ctx, sourceGraph, ref.Target, opts.referenceKinds)
+					back.dynamic, back.found = targets[self]
+				}
+				checked[ref.Target] = back
+			}
+			if back.found {
+				cycles = append(cycles, directCycle{reference: ref, dynamicBack: back.dynamic})
+			}
+		}
+		return cycles
+	})
+}
+
+// directTargetsFor indexes a file only when a depth-one search reaches it.
+// Sharing this set avoids repeatedly scanning a high-degree target for each
+// of its importers. The value records whether any runtime reference to a
+// target is dynamic: the unsafe option withholds that target's static edges
+// too. This set does not apply settings or unsafe, so its key only needs the
+// selected syntax kinds. Neither cache retains a Program through its value.
+func directTargetsFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, file *ast.SourceFile, kinds program.ModuleReferenceKinds) map[*ast.SourceFile]bool {
+	return rule.CachedByProgram(ctx, directTargetsKey{file: file, kinds: kinds}, func() map[*ast.SourceFile]bool {
+		var targets map[*ast.SourceFile]bool
+		for _, ref := range sourceGraph.References(file, kinds) {
+			if ref.TypeOnly || ref.Target == nil {
+				continue
+			}
+			if targets == nil {
+				targets = make(map[*ast.SourceFile]bool)
+			}
+			targets[ref.Target] = targets[ref.Target] || ref.Dynamic()
+		}
+		return targets
+	})
+}
+
 // moduleGraphFor returns the Program generation's dependency graph for these
 // options, building it on the first file that asks for it.
 func moduleGraphFor(ctx rule.RuleContext, sourceGraph program.ModuleGraph, opts ruleOptions) *moduleGraph {
@@ -80,29 +155,27 @@ func buildModuleGraph(ctx rule.RuleContext, sourceGraph program.ModuleGraph, set
 		nodes: make([]moduleNode, len(files)),
 		index: make(map[*ast.SourceFile]int32, len(files)),
 	}
+	// Classify files once and collect only included references. The second
+	// pass converts their targets after the complete index is available,
+	// avoiding another index lookup for every source file.
 	for i, file := range files {
-		graph.index[file] = int32(i)
-	}
-
-	for i, file := range files {
-		// An edge into an excluded file is never traversable, so no search can
-		// enter it and no reference of its own can close a cycle back to it.
-		// Its outgoing references are therefore never needed, which keeps
-		// ignored — and, under ignoreExternal, node_modules — files out of the
-		// collection work entirely.
 		if fileIsExcluded(settings, opts, file) {
 			continue
 		}
-		refs := sourceGraph.References(file, opts.referenceKinds)
+		graph.index[file] = int32(i)
+		graph.nodes[i].refs = sourceGraph.References(file, opts.referenceKinds)
+	}
+
+	for i := range graph.nodes {
+		node := &graph.nodes[i]
+		refs := node.refs
 		if len(refs) == 0 {
 			continue
 		}
-		node := &graph.nodes[i]
-		node.refs = refs
 		node.edge = make([]int32, len(refs))
 		for r := range refs {
 			node.edge[r] = -1
-			if !referenceIsTraversable(settings, opts, refs[r]) {
+			if refs[r].TypeOnly || refs[r].Target == nil {
 				continue
 			}
 			if target, ok := graph.index[refs[r].Target]; ok {
@@ -114,42 +187,21 @@ func buildModuleGraph(ctx rule.RuleContext, sourceGraph program.ModuleGraph, set
 			node.expand = withheldDynamicEdges(node)
 		}
 	}
-
 	graph.computeGroups()
 	return graph
 }
 
-// fileIsExcluded reports whether referenceIsTraversable drops every edge into
-// file: its path is covered by `import/ignore`, or ignoreExternal is set and
-// the path is external. IsExternalPath only consults its specifier when the
-// resolved path is empty, so passing none matches what it answers for any
-// edge resolving to this file.
+// fileIsExcluded reports whether every edge into file is dropped: its path is
+// covered by `import/ignore`, or ignoreExternal is set and the path is external.
+// A resolved reference's Path is its target's FileName, which tsgo requires to
+// be absolute and nonempty. IsExternalPath only consults the specifier for an
+// empty path, so every reference resolving to this file has the same answer.
 func fileIsExcluded(settings *import_utils.ModuleSettings, opts ruleOptions, file *ast.SourceFile) bool {
 	fileName := file.FileName()
 	if settings.IsIgnoredPath(fileName) {
 		return true
 	}
 	return opts.ignoreExternal && settings.IsExternalPath("", fileName)
-}
-
-// referenceIsTraversable reports whether an edge is one the rule follows: it
-// has to survive into the emitted JavaScript, name a file the runtime loaded,
-// and be neither ignored by `import/ignore` nor set aside by ignoreExternal.
-func referenceIsTraversable(settings *import_utils.ModuleSettings, opts ruleOptions, reference program.ModuleReference) bool {
-	if reference.TypeOnly || reference.Target == nil {
-		return false
-	}
-	if settings.IsIgnoredPath(reference.Target.FileName()) {
-		return false
-	}
-	return !shouldIgnoreExternal(settings, opts, reference)
-}
-
-func shouldIgnoreExternal(settings *import_utils.ModuleSettings, opts ruleOptions, reference program.ModuleReference) bool {
-	if !opts.ignoreExternal {
-		return false
-	}
-	return settings.IsExternalPath(reference.Text(), reference.Path())
 }
 
 // withheldDynamicEdges applies allowUnsafeDynamicCyclicDependency: a file's
