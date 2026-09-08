@@ -1,3 +1,4 @@
+# cspell:ignore GOCACHE logicalcpu memsize
 name: CI
 
 on:
@@ -56,6 +57,28 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-test-go
 
+      - name: Configure Go build cache (macOS)
+        if: runner.os == 'macOS'
+        id: go-build-cache
+        run: |
+          echo "GOCACHE=$RUNNER_TEMP/rslint-go-build" >> "$GITHUB_ENV"
+          go version
+          sysctl hw.logicalcpu hw.memsize
+          echo "GOMAXPROCS=${GOMAXPROCS:-unset}"
+          df -h "$RUNNER_TEMP"
+
+      # Restore after setup-go has cleaned the runner's old build cache.
+      # Actions cache scopes PR writes to the PR; main supplies the fallback.
+      - name: Restore Go build cache (macOS)
+        if: runner.os == 'macOS'
+        id: restore-go-build-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/rslint-go-build
+          key: ci-test-go-build-v1-${{ matrix.runner }}-${{ runner.arch }}-${{ matrix.go-version }}-${{ github.sha }}
+          restore-keys: |
+            ci-test-go-build-v1-${{ matrix.runner }}-${{ runner.arch }}-${{ matrix.go-version }}-
+
       - name: Verify compiler shim layout
         run: go test github.com/microsoft/TypeScript/tsc/shim/checker
 
@@ -97,10 +120,31 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      - name: Unit Test (macOS)
+        if: runner.os == 'macOS'
+        run: /usr/bin/time -l go test -count=1 ./cmd/... ./internal/...
+
       # Fallback for any runner without a dedicated step above.
       - name: Unit Test
-        if: matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
+        if: runner.os != 'macOS' && matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
         run: go test -count=1 ./cmd/... ./internal/...
+
+      - name: Trim Go build cache (macOS)
+        if: runner.os == 'macOS' && steps.restore-go-build-cache.outputs.cache-hit != 'true'
+        id: trim-go-build-cache
+        continue-on-error: true
+        run: node .github/scripts/trim-go-cache.mjs "$GOCACHE" 4096
+
+      - name: Save Go build cache (macOS)
+        if: runner.os == 'macOS' && steps.trim-go-build-cache.outcome == 'success'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/rslint-go-build
+          key: ${{ steps.restore-go-build-cache.outputs.cache-primary-key }}
+
+      - name: Clean Go build cache (macOS)
+        if: always() && runner.os == 'macOS' && steps.go-build-cache.outcome == 'success'
+        run: go clean -cache
 
   lint:
     name: Lint&Check
