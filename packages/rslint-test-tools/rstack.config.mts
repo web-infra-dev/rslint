@@ -637,6 +637,7 @@ define.test({
     './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',
     './tests/rstest/rules/no-alias-methods.test.ts',
+    './tests/rstest/rules/no-async-mock-factory.test.ts',
     './tests/rstest/rules/no-commented-out-tests.test.ts',
     './tests/rstest/rules/no-conditional-expect.test.ts',
     './tests/rstest/rules/no-conditional-in-test.test.ts',

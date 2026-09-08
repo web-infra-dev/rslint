@@ -105,7 +105,7 @@ var PreferImportInMockRule = rule.Rule{
 // naming the module inside it. Both are nil when the call is anything else.
 func mockPathArgument(node *ast.Node) (*ast.Node, *ast.Node) {
 	utility := rstestUtils.ParseRstestPluginManagedCall(node)
-	if utility == nil || !mockMethods[utility.Member] || !isTransformablePosition(node) {
+	if utility == nil || !mockMethods[utility.Member] || !rstestUtils.IsTransformablePosition(node) {
 		return nil, nil
 	}
 	call := node.AsCallExpression()
@@ -150,27 +150,4 @@ func commentBetween(ctx rule.RuleContext, outer core.TextRange, inner core.TextR
 	comments := ctx.Comments.All()
 	return utils.HasCommentInSpan(comments, outer.Pos(), inner.Pos()) ||
 		utils.HasCommentInSpan(comments, inner.End(), outer.End())
-}
-
-// isTransformablePosition reports whether the call stands on its own as a
-// statement, which is the only place the mock transform can lift it out of.
-// Rstest moves the call above the module's imports, so a call whose value is
-// consumed — an argument to another call, a variable initializer, an operand
-// of a comma expression, an awaited expression — is either left untransformed,
-// and throws, or is lifted out of an expression that no longer parses without
-// it. The wrappers the transform cannot see do not change the position.
-func isTransformablePosition(node *ast.Node) bool {
-	// Climb while the parent is only a wrapper around what we came from, so
-	// `(rs.mock('./dep'));` is judged by the statement, not by the parentheses.
-	outermost := node
-	for {
-		parent := outermost.Parent
-		if parent == nil {
-			return false
-		}
-		if utils.SkipAssertionsAndParens(parent) != outermost {
-			return parent.Kind == ast.KindExpressionStatement
-		}
-		outermost = parent
-	}
 }
