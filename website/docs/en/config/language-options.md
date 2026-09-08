@@ -61,22 +61,24 @@ JavaScript files use the same ownership discovery when service is enabled. A JS 
 }
 ```
 
-`projectService: true` cannot be combined with explicit `project` paths or `project: []`, including values inherited from different matching entries. Remove `project`, or set `projectService: false` to use explicit projects. A later `project: false` or `project: null` clears inherited paths. A later `projectService: false` or `null` disables automatic discovery.
+`projectService: true` cannot be combined with explicit `project` paths or `project: []`, including values inherited from different matching entries. Remove `project`, or set `projectService: false` to use explicit projects. A later `project: false` or `project: null` clears inherited paths. A later `projectService: false` disables automatic discovery. JavaScript configurations and legacy JSON migration also accept `projectService: null` as a runtime reset, but it is not part of the public TypeScript type.
 
 A selected file that does not belong to a discovered project uses Rslint's existing [source-only gap fallback](/guide/type-checking#gap-files). Syntax diagnostics and rules that do not require types still run; type-aware rules are skipped. Other files in the same lint request keep their own project context. Config and Program failures are still errors.
 
 This differs from typescript-eslint, which rejects unowned files unless `allowDefaultProject` permits them. Rslint does not create a typed default project. To force source-only linting even when a file has an owning project, set both `projectService: false` and `project: false` for that file scope.
 
-Only the boolean form is supported. Object options such as `allowDefaultProject`, `defaultProject`, and `loadTypeScriptPlugins`, as well as `extraFileExtensions`, are not implemented. `project: true` is also unsupported; use `projectService: true` for automatic discovery.
+Object options such as `allowDefaultProject`, `defaultProject`, and `loadTypeScriptPlugins`, as well as `extraFileExtensions`, are not implemented. `project: true` is also unsupported; use `projectService: true` for automatic discovery.
 
 The editor reuses its existing Program store rather than hosting a second TypeScript project service. Normal source/config updates recheck ownership. One long-lived editor difference remains: after all seed documents close, deleting a config, querying a referenced target, and recreating the config may retain its previously loaded identity in Rslint. TypeScript can unload that project in this sequence, leaving it without a configured owner under `disableReferencedProjectLoad` until another document loads it. No stale Program is used while the config is missing.
 
 ## languageOptions.parserOptions.tsconfigRootDir
 
-- **Type:** `string | null`
+- **Type:** `string`
 - **Default:** the directory of the governing Rslint config
 
-An absolute directory that stops upward project discovery when the search reaches it. It does not select a tsconfig by itself. If the target is outside this directory's ancestor chain, it can still discover its own ancestors. Project references and `extends` may point outside the boundary. Relative paths are rejected; `null` resets an inherited boundary to the default.
+An absolute directory that stops upward project discovery when the search reaches it. It does not select a tsconfig by itself. If the target is outside this directory's ancestor chain, it can still discover its own ancestors. Project references and `extends` may point outside the boundary. Relative paths are rejected.
+
+JavaScript configurations and legacy JSON migration also accept `null` to reset an inherited boundary to the default. This is runtime compatibility, outside the public TypeScript type. JavaScript configurations checked with `checkJs` and `strictNullChecks` are still subject to that type.
 
 API override entries use their authored working-directory base for the default. A config entry's `basePath` scopes matching without moving this boundary. Unlike typescript-eslint's JavaScript call-stack inference, Rslint uses its resolved config origin, so external config modules have a deterministic base.
 

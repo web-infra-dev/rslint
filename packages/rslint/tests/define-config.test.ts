@@ -88,9 +88,9 @@ describe('defineConfig languageOptions typing', () => {
     const parserOptions: ParserOptions[] = [
       { projectService: true, tsconfigRootDir: '/workspace' },
       { projectService: false, project: './tsconfig.app.json' },
-      { projectService: null, project: [] },
+      { projectService: false, project: [] },
       { project: false },
-      { project: null, tsconfigRootDir: null },
+      { project: null },
     ];
     const config = defineConfig(
       parserOptions.map((options) => ({
@@ -102,6 +102,18 @@ describe('defineConfig languageOptions typing', () => {
     ).toEqual(parserOptions);
 
     defineConfig([
+      {
+        languageOptions: {
+          // @ts-expect-error null service is only a runtime compatibility value
+          parserOptions: { projectService: null },
+        },
+      },
+      {
+        languageOptions: {
+          // @ts-expect-error null root is only a runtime compatibility value
+          parserOptions: { tsconfigRootDir: null },
+        },
+      },
       {
         languageOptions: {
           // @ts-expect-error only boolean projectService is supported

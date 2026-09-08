@@ -255,8 +255,20 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 	output := buf.String()
 
 	// Determine output file name
+	useTypeScript := hasTSConfig
+	for _, entry := range entries {
+		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
+			continue
+		}
+		options := entry.LanguageOptions.ParserOptions
+		if options.rootDirSet && options.TsconfigRootDir == "" {
+			// Preserve runtime-only null resets without widening the public TS type.
+			useTypeScript = false
+			break
+		}
+	}
 	var configName string
-	if hasTSConfig {
+	if useTypeScript {
 		configName = "rslint.config.ts"
 	} else if isESMPackage(directory) {
 		configName = "rslint.config.js"

@@ -2654,6 +2654,127 @@ module.exports = config;`
     }
   });
 
+  test.each(['projectService', 'project', 'tsconfigRootDir'])(
+    'projectService lintText preserves inherited %s when a later value is undefined',
+    async (option) => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-service-undefined-'),
+      );
+      const parserOptions =
+        option === 'project'
+          ? { projectService: false, project: './custom.json' }
+          : {
+              projectService: true,
+              ...(option === 'tsconfigRootDir'
+                ? { tsconfigRootDir: path.join(tmp, 'nested') }
+                : {}),
+            };
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          serviceConfig,
+          { languageOptions: { parserOptions } },
+          {
+            files: ['**/*.ts'],
+            languageOptions: { parserOptions: { [option]: undefined } },
+            rules: {
+              '@typescript-eslint/no-for-in-array': 'error',
+              'no-debugger': 'error',
+            },
+          },
+        ],
+        virtualFiles: {
+          'tsconfig.json': JSON.stringify({
+            compilerOptions: {
+              paths: {
+                values: [
+                  option === 'tsconfigRootDir' ? './array.ts' : './scalar.ts',
+                ],
+              },
+            },
+            files: ['nested/probe.ts'],
+          }),
+          'custom.json': JSON.stringify({
+            compilerOptions: { paths: { values: ['./array.ts'] } },
+            files: ['nested/probe.ts'],
+          }),
+          'array.ts': 'export const values = [1];\n',
+          'scalar.ts': 'export const values = 1;\n',
+          ...(option === 'projectService'
+            ? {
+                'nested/tsconfig.json': JSON.stringify({
+                  compilerOptions: { paths: { values: ['../array.ts'] } },
+                  files: ['probe.ts'],
+                }),
+              }
+            : {}),
+        },
+      });
+      try {
+        const [result] = await rslint.lintText(
+          "import { values } from 'values';\nfor (const key in values) {}\ndebugger;\n",
+          { filePath: 'nested/probe.ts' },
+        );
+        expect(result.messages.map(({ ruleId }) => ruleId).sort()).toEqual(
+          option === 'tsconfigRootDir'
+            ? ['no-debugger']
+            : ['@typescript-eslint/no-for-in-array', 'no-debugger'],
+        );
+      } finally {
+        await rslint.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test('project policy lintText replaces an inherited project array instead of combining its type contexts', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-project-array-override-'),
+    );
+    const rslint = new Rslint({
+      cwd: tmp,
+      overrideConfigFile: true,
+      overrideConfig: [
+        {
+          plugins: ['@typescript-eslint'],
+          languageOptions: {
+            parserOptions: { projectService: false, project: ['./first.json'] },
+          },
+        },
+        {
+          files: ['**/*.ts'],
+          languageOptions: { parserOptions: { project: ['./second.json'] } },
+          rules: { '@typescript-eslint/no-for-in-array': 'error' },
+        },
+      ],
+      virtualFiles: {
+        'first.json': JSON.stringify({
+          compilerOptions: { paths: { values: ['./scalar.ts'] } },
+          files: ['probe.ts'],
+        }),
+        'second.json': JSON.stringify({
+          compilerOptions: { paths: { values: ['./array.ts'] } },
+          files: ['probe.ts'],
+        }),
+        'scalar.ts': 'export const values = 1;\n',
+        'array.ts': 'export const values = [1];\n',
+      },
+    });
+    try {
+      const [result] = await rslint.lintText(
+        "import { values } from 'values';\nfor (const key in values) {}\n",
+        { filePath: 'probe.ts' },
+      );
+      expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
+        '@typescript-eslint/no-for-in-array',
+      ]);
+    } finally {
+      await rslint.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   test.each(['missing', 'excluded'])(
     'projectService lintText keeps gap syntax rules with a %s project',
     async (mode) => {

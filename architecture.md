@@ -726,6 +726,11 @@ file, it parses that file, writes the recommended JS/TS module config, and
 removes the migrated source after the new file is safely created. No CLI, API,
 or LSP lint path reads those filenames.
 
+Migration preserves entry order and runtime parser-option resets. An explicit
+`tsconfigRootDir: null` reset selects JavaScript output (`.js` in ESM packages,
+otherwise `.mjs`), because the public TypeScript option accepts only a string.
+This output-format choice does not change the selected TypeScript presets.
+
 ### Config Entry Structure
 
 Each entry in the config array supports:

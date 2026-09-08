@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'rstack/test';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -400,6 +400,70 @@ describe('CLI lint target contracts', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  test.each([
+    { packageType: 'module', configName: 'rslint.config.js' },
+    { packageType: 'commonjs', configName: 'rslint.config.mjs' },
+  ])(
+    'projectService migration preserves a runtime null boundary in $configName',
+    async ({ packageType, configName }) => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-cli-service-migrate-root-'),
+      );
+      try {
+        await writeFixture(root, {
+          'package.json': JSON.stringify({ type: packageType }),
+          'rslint.json': JSON.stringify([
+            {
+              plugins: ['@typescript-eslint'],
+              languageOptions: {
+                parserOptions: {
+                  projectService: true,
+                  tsconfigRootDir: path.join(root, 'pkg'),
+                },
+              },
+              rules: {
+                '@typescript-eslint/no-for-in-array': 'error',
+                'no-console': 'error',
+              },
+            },
+            {
+              files: ['pkg/**/*.ts'],
+              plugins: ['@typescript-eslint'],
+              languageOptions: { parserOptions: { tsconfigRootDir: null } },
+            },
+          ]),
+          'tsconfig.json': JSON.stringify({ files: ['pkg/probe.ts'] }),
+          'pkg/probe.ts':
+            'export const values = [1]; for (const key in values) { console.log(key); }\n',
+          'node_modules/@rslint/core/package.json': JSON.stringify({
+            name: '@rslint/core',
+            type: 'module',
+            exports: './index.js',
+          }),
+          'node_modules/@rslint/core/index.js': `export * from ${JSON.stringify(
+            pathToFileURL(path.resolve(import.meta.dirname, '../dist/index.js'))
+              .href,
+          )};\n`,
+        });
+        const migration = await runCLI(root, ['--init']);
+        expect(migration.code, migration.stderr).toBe(0);
+        expect(await readFile(path.join(root, configName), 'utf8')).toContain(
+          'tsconfigRootDir: null',
+        );
+
+        const result = await runCLI(root, ['pkg/probe.ts']);
+        expect(result.code, result.stderr).toBe(1);
+        expect(
+          parseDiagnostics(result.stdout)
+            .map(({ ruleName }) => ruleName)
+            .sort(),
+        ).toEqual(['@typescript-eslint/no-for-in-array', 'no-console']);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   test.each([
     { mode: [], expectedRules: ['no-debugger'] },

@@ -99,13 +99,13 @@ export interface ParserOptions {
    * `project` paths or an empty project array. Object options are unsupported.
    * Files without an owning project use source-only linting and skip typed rules.
    */
-  projectService?: boolean | null;
+  projectService?: boolean;
   /**
    * Absolute boundary for upward project discovery. Defaults to the governing
    * config directory. References may point outside it; this does not force the
    * target to use that directory's tsconfig.
    */
-  tsconfigRootDir?: string | null;
+  tsconfigRootDir?: string;
   /**
    * tsconfig.json path(s) used for typed linting. Glob patterns are supported.
    * Omit both project and projectService to use the governing config's default

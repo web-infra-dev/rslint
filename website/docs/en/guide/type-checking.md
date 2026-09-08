@@ -40,7 +40,7 @@ For example, `rslint --type-check-only packages/app/src/file.ts` finds that file
 
 Configs mixing automatic and explicit policies, clearing inherited projects, or setting `tsconfigRootDir` also resolve their project policies from the selected scope. Unowned service targets use source-only gap linting. TypeScript presets do not enable service; if another matching entry enables it, set `projectService: false` to use explicit project paths. Leaving both enabled is a configuration error.
 
-An unconditional `projectService: false` or `null` overrides earlier matching entries. Ordinary explicit project declarations then retain program-wide checking even when no lint targets are selected. An override with `files`, entry-level `ignores`, or `basePath` still needs per-file matching and cannot disable service for every target.
+An unconditional `projectService: false` overrides earlier matching entries. JavaScript configurations also accept `null` for this runtime reset; the public TypeScript type uses a boolean. Ordinary explicit project declarations then retain program-wide checking even when no lint targets are selected. An override with `files`, entry-level `ignores`, or `basePath` still needs per-file matching and cannot disable service for every target.
 
 ## What gets type-checked
 
