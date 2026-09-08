@@ -87,8 +87,6 @@ extension substitution, using the same formats as upstream.
 
 ## Differences from upstream
 
-The public rule name is `node/no-extraneous-import`, using rslint's `node` plugin.
-
 Only `resolverConfig.modules`, the resolver override officially supported by
 upstream, is supported. Other enhanced-resolve overrides are not applied. For
 example, `resolverConfig: { alias: { virtual: './local.js' } }` does not make an
