@@ -3,7 +3,6 @@ package utils
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -25,23 +24,7 @@ import (
 // and stops at it. Parentheses around the callee are transparent, matching how
 // the chain was parsed in the first place.
 func MatcherCall(entry *ParsedRstestFnMemberEntry) *ast.Node {
-	_, accessor := testFramework.AccessorReceiverAndParent(entry)
-	if accessor == nil {
-		return nil
-	}
-
-	child := accessor
-	parent := accessor.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		child = parent
-		parent = parent.Parent
-	}
-	if parent == nil ||
-		parent.Kind != ast.KindCallExpression ||
-		parent.AsCallExpression().Expression != child {
-		return nil
-	}
-	return parent
+	return testFramework.InvokedAccessorCall(entry)
 }
 
 // FollowTypeAssertionChain unwraps `x as T` and `<T>x` wrappers, along with the
@@ -53,18 +36,7 @@ func MatcherCall(entry *ParsedRstestFnMemberEntry) *ast.Node {
 // so a value written `1 satisfies number` or `x!` keeps whatever wrapper it
 // was given.
 func FollowTypeAssertionChain(node *ast.Node) *ast.Node {
-	for node != nil {
-		node = ast.SkipParentheses(node)
-		switch node.Kind {
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		default:
-			return node
-		}
-	}
-	return nil
+	return testFramework.FollowTypeAssertionChain(node)
 }
 
 // MatcherArgumentListRange returns the span between the matcher call's
@@ -85,40 +57,5 @@ func FollowTypeAssertionChain(node *ast.Node) *ast.Node {
 // its own closing parenthesis, so the last token of the call is the other end
 // of the span.
 func MatcherArgumentListRange(sourceFile *ast.SourceFile, call *ast.Node) (core.TextRange, bool) {
-	if call == nil || call.Kind != ast.KindCallExpression {
-		return core.TextRange{}, false
-	}
-	callee := call.AsCallExpression().Expression
-	if callee == nil {
-		return core.TextRange{}, false
-	}
-
-	start := callee.End()
-	// A type argument list may hold parentheses of its own, as in
-	// `toBe<(a: string) => void>(value)`.
-	if typeArguments := call.AsCallExpression().TypeArguments; typeArguments != nil {
-		start = max(start, typeArguments.End())
-	}
-
-	tokens := utils.TokensOfNode(sourceFile, call)
-	if len(tokens) == 0 {
-		return core.TextRange{}, false
-	}
-	closeParen := tokens[len(tokens)-1]
-	if closeParen.Kind != ast.KindCloseParenToken {
-		return core.TextRange{}, false
-	}
-
-	for _, token := range tokens {
-		if token.Start < start {
-			continue
-		}
-		if token.Kind == ast.KindOpenParenToken {
-			if token.End > closeParen.Start {
-				return core.TextRange{}, false
-			}
-			return core.NewTextRange(token.End, closeParen.Start), true
-		}
-	}
-	return core.TextRange{}, false
+	return testFramework.CallArgumentListRange(sourceFile, call)
 }

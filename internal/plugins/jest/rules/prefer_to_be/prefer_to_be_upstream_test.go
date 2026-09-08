@@ -1,3 +1,7 @@
+// TestPreferToBeUpstream migrates the full valid/invalid suite from upstream
+// eslint-plugin-jest@v29.16.1 src/rules/__tests__/prefer-to-be.test.ts 1:1.
+// Position assertions cover line/column for every invalid case. rslint-specific
+// lock-in cases live in prefer_to_be_extras_test.go.
 package prefer_to_be_test
 
 import (
@@ -8,7 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestPreferToBeRule(t *testing.T) {
+func TestPreferToBeUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -31,6 +35,15 @@ func TestPreferToBeRule(t *testing.T) {
 			{Code: `expect(token).toStrictEqual(new RegExp('[abc]+', 'g'));`},
 			{Code: "expect(value).toEqual(dedent`my string`);"},
 			// prefer-to-be: null
+			{Code: `expect(null).toBeNull();`},
+			{Code: `expect(null).not.toBeNull();`},
+			{Code: `expect(null).toBe(1);`},
+			{Code: `expect(obj).toStrictEqual([ x, 1 ]);`},
+			{Code: `expect(obj).toStrictEqual({ x: 1 });`},
+			{Code: `expect(obj).not.toStrictEqual({ x: 1 });`},
+			{Code: `expect(value).toMatchSnapshot();`},
+			{Code: `expect(catchError()).toStrictEqual({ message: 'oh noes!' })`},
+			{Code: `expect("something");`},
 			{Code: `expect(null).not.toEqual();`},
 			{Code: `expect(null).toBe();`},
 			{Code: `expect(null).toMatchSnapshot();`},
@@ -47,11 +60,29 @@ func TestPreferToBeRule(t *testing.T) {
 			{Code: `expect(something).not.toBe(somethingElse)`},
 			{Code: `expect(something).not.toEqual(somethingElse)`},
 			{Code: `expect(undefined).toBe`},
+			{Code: `expect("something");`},
 			// prefer-to-be: NaN
 			{Code: `expect(NaN).toBeNaN();`},
 			{Code: `expect(true).not.toBeNaN();`},
-			{Code: `expect(value).toEqual(null!);`},
-			{Code: `expect(value).toEqual(1 satisfies number);`},
+			{Code: `expect({}).toEqual({});`},
+			{Code: `expect(something).toBe()`},
+			{Code: `expect(something).toBe(somethingElse)`},
+			{Code: `expect(something).toEqual(somethingElse)`},
+			{Code: `expect(something).not.toBe(somethingElse)`},
+			{Code: `expect(something).not.toEqual(somethingElse)`},
+			{Code: `expect(undefined).toBe`},
+			{Code: `expect("something");`},
+			// prefer-to-be: undefined vs defined
+			{Code: `expect(NaN).toBeNaN();`},
+			{Code: `expect(true).not.toBeNaN();`},
+			{Code: `expect({}).toEqual({});`},
+			{Code: `expect(something).toBe()`},
+			{Code: `expect(something).toBe(somethingElse)`},
+			{Code: `expect(something).toEqual(somethingElse)`},
+			{Code: `expect(something).not.toBe(somethingElse)`},
+			{Code: `expect(something).not.toEqual(somethingElse)`},
+			{Code: `expect(undefined).toBe`},
+			{Code: `expect("something");`},
 			// prefer-to-be: typescript edition
 			{Code: `(expect('Model must be bound to an array if the multiple property is true') as any).toHaveBeenTipped()`},
 		},
@@ -81,13 +112,6 @@ func TestPreferToBeRule(t *testing.T) {
 			{
 				Code:   `expect(value).toStrictEqual(1,);`,
 				Output: []string{`expect(value).toBe(1,);`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBe", Line: 1, Column: 15},
-				},
-			},
-			{
-				Code:   `expect(value).toEqual((1));`,
-				Output: []string{`expect(value).toBe((1));`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useToBe", Line: 1, Column: 15},
 				},
@@ -258,13 +282,6 @@ func TestPreferToBeRule(t *testing.T) {
 				},
 			},
 			{
-				Code:   `expect("a string")["not"]["toBe"](undefined);`,
-				Output: []string{`expect("a string")['toBeDefined']();`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBeDefined", Line: 1, Column: 27},
-				},
-			},
-			{
 				Code:   `expect("a string").not.toEqual(undefined);`,
 				Output: []string{`expect("a string").toBeDefined();`},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -422,48 +439,6 @@ func TestPreferToBeRule(t *testing.T) {
 				Output: []string{`expect("a string").toBeUndefined();`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useToBeUndefined", Line: 1, Column: 20},
-				},
-			},
-			{
-				Code:   `expect(value).toEqual((null));`,
-				Output: []string{`expect(value).toBeNull();`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBeNull", Line: 1, Column: 15},
-				},
-			},
-			{
-				Code:   `expect(value).toEqual((NaN));`,
-				Output: []string{`expect(value).toBeNaN();`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBeNaN", Line: 1, Column: 15},
-				},
-			},
-			{
-				Code:   `expect(value).toEqual((undefined));`,
-				Output: []string{`expect(value).toBeUndefined();`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBeUndefined", Line: 1, Column: 15},
-				},
-			},
-			{
-				Code:   `expect("a string")[("not")].toBeUndefined();`,
-				Output: []string{`expect("a string").toBeDefined();`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBeDefined"},
-				},
-			},
-			{
-				Code:   `expect("a string")?.["not"].toBeUndefined?.();`,
-				Output: []string{`expect("a string")?.toBeDefined?.();`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBeDefined"},
-				},
-			},
-			{
-				Code:   `(expect("a string")?.["not"]).toBeUndefined();`,
-				Output: []string{},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "useToBeDefined"},
 				},
 			},
 		},

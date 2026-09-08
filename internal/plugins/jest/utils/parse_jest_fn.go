@@ -300,19 +300,7 @@ func isValidJestCall(name string, members []string) bool {
 }
 
 func UnwrapBasicTypeAssertions(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
-		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		default:
-			return node
-		}
-	}
-	return node
+	return testFramework.FollowTypeAssertionChain(node)
 }
 
 func UnwrapTypeAssertions(node *ast.Node) *ast.Node {
