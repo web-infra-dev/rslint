@@ -62,6 +62,7 @@ jobs:
         id: go-build-cache
         run: |
           echo "GOCACHE=$RUNNER_TEMP/rslint-go-build" >> "$GITHUB_ENV"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
           go version
           sysctl hw.logicalcpu hw.memsize
           echo "GOMAXPROCS=${GOMAXPROCS:-unset}"
@@ -69,13 +70,14 @@ jobs:
 
       # Restore after setup-go has cleaned the runner's old build cache.
       # Actions cache scopes PR writes to the PR; main supplies the fallback.
+      # Refresh daily to avoid uploading a large snapshot for every commit.
       - name: Restore Go build cache (macOS)
         if: runner.os == 'macOS'
         id: restore-go-build-cache
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ runner.temp }}/rslint-go-build
-          key: ci-test-go-build-v1-${{ matrix.runner }}-${{ runner.arch }}-${{ matrix.go-version }}-${{ github.sha }}
+          key: ci-test-go-build-v1-${{ matrix.runner }}-${{ runner.arch }}-${{ matrix.go-version }}-${{ steps.go-build-cache.outputs.date }}
           restore-keys: |
             ci-test-go-build-v1-${{ matrix.runner }}-${{ runner.arch }}-${{ matrix.go-version }}-
 
@@ -133,7 +135,8 @@ jobs:
         if: runner.os == 'macOS' && steps.restore-go-build-cache.outputs.cache-hit != 'true'
         id: trim-go-build-cache
         continue-on-error: true
-        run: node .github/scripts/trim-go-cache.mjs "$GOCACHE" 4096
+        # A cold CLI build already produces about 32 GiB before compression.
+        run: node .github/scripts/trim-go-cache.mjs "$GOCACHE" 32768
 
       - name: Save Go build cache (macOS)
         if: runner.os == 'macOS' && steps.trim-go-build-cache.outcome == 'success'
