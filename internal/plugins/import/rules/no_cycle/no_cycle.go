@@ -7,6 +7,8 @@ import (
 	"math"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -35,7 +37,11 @@ var NoCycleRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		checkSourceFile(ctx, opts)
+		if opts.maxDepth == 1 {
+			checkDirectCycles(ctx, opts)
+		} else {
+			checkSourceFile(ctx, opts)
+		}
 		return rule.RuleListeners{}
 	},
 }
@@ -171,6 +177,45 @@ func checkSourceFile(ctx rule.RuleContext, opts ruleOptions) {
 			reportNode = node.refs[r].Specifier
 		}
 		ctx.ReportNode(reportNode, messageCycle(route))
+	}
+}
+
+func checkDirectCycles(ctx rule.RuleContext, opts ruleOptions) {
+	if ctx.SourceFile == nil || !ctx.Program().IsValid() {
+		return
+	}
+	myPath := ctx.SourceFile.FileName()
+	if myPath == "" || myPath == "<text>" {
+		return
+	}
+	sourceGraph := ctx.Program().ModuleGraph()
+	refs := sourceGraph.References(ctx.SourceFile, opts.referenceKinds)
+	if len(refs) == 0 {
+		return
+	}
+	settings := import_utils.SettingsFor(ctx)
+	cycles := directCyclesFor(ctx, sourceGraph, settings, opts, refs)
+	if len(cycles) == 0 {
+		return
+	}
+	seen := make(map[*ast.SourceFile]bool)
+	for _, cycle := range cycles {
+		ref := cycle.reference
+		if opts.allowUnsafeDynamicCyclicDependency && (ref.Dynamic() || cycle.dynamicBack) {
+			continue
+		}
+		if seen[ref.Target] {
+			continue
+		}
+		// The general search marks a target only when it is visited, after
+		// filtering the initial reference. A skipped dynamic import must not
+		// suppress a later static import of the same file.
+		seen[ref.Target] = true
+		reportNode := ref.Declaration
+		if reportNode == nil {
+			reportNode = ref.Specifier
+		}
+		ctx.ReportNode(reportNode, messageCycle(nil))
 	}
 }
 
