@@ -21,6 +21,7 @@ import (
 // and fixes must all consume this same target/config pair; none may rediscover
 // the target identity from the filesystem mid-operation.
 type documentLintSnapshot struct {
+	cwd                   string
 	target                target.File
 	config                config.RslintConfig
 	resolvedConfig        config.ResolvedFileConfig
@@ -77,6 +78,7 @@ func resolveDocumentLintSnapshotProjects(
 	resolver, err := config.NewProjectPolicyResolverWithPathSpaces(
 		snapshot.config,
 		snapshot.target.ConfigDirectory,
+		snapshot.cwd,
 		fs,
 		snapshot.pathSpaces,
 	)
@@ -313,6 +315,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 	}
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
 	snapshot := documentLintSnapshot{
+		cwd:                   s.cwd,
 		target:                target,
 		config:                selection.entries,
 		resolvedConfig:        selection.resolved,

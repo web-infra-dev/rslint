@@ -2616,6 +2616,143 @@ module.exports = config;`
     },
   );
 
+  test.each([
+    ['no preset', 'none', 'omitted', false],
+    ['direct preset', 'direct', 'omitted', true],
+    ...['js', 'ts', 'mts', 'cjs', 'cts'].map((extension) => [
+      `direct ${extension}`,
+      'direct',
+      'omitted',
+      true,
+      extension,
+    ]),
+    ['helper module', 'helper', 'omitted', false],
+    ['helper function', 'function', 'omitted', true],
+    ['rules spread', 'rules', 'omitted', true],
+    ['explicit root', 'none', 'root', true],
+    ['explicit cwd', 'direct', 'cwd', false],
+    ['null reset', 'direct', 'null', true],
+    ['undefined override', 'direct', 'undefined', false],
+  ])(
+    'projectService root inference: %s',
+    async (_name, preset, boundary, typed, extension = 'mjs') => {
+      const tmp = await mkdtemp(
+        path.join(os.tmpdir(), 'rslint-root-inference-'),
+      );
+      const cwd = path.join(tmp, 'pkg');
+      const coreURL = pathToFileURL(
+        path.resolve(import.meta.dirname, '../dist/index.js'),
+      ).href;
+      await mkdir(cwd);
+      await writeFile(
+        path.join(tmp, 'tsconfig.json'),
+        JSON.stringify({ files: ['pkg/tool.ts'] }),
+      );
+      const source =
+        'const values = [1]; for (const key in values) {} debugger;';
+      await writeFile(path.join(cwd, 'tool.ts'), source);
+      await writeFile(
+        path.join(tmp, 'helper.mjs'),
+        `import {ts} from ${JSON.stringify(coreURL)}; export const base = ts.configs.base; export const get = () => ts.configs.base;`,
+      );
+      const prefix = `import {ts} from ${JSON.stringify(coreURL)}; import {base, get} from './helper.mjs';`;
+      const entry = {
+        none: '{}',
+        direct: 'ts.configs.base',
+        helper: 'base',
+        function: 'get()',
+        rules:
+          '{rules: {...ts.configs.recommended.find(entry => entry.rules).rules}}',
+      }[preset];
+      const options =
+        boundary === 'root'
+          ? `, tsconfigRootDir: ${JSON.stringify(tmp)}`
+          : ['cwd', 'null', 'undefined'].includes(boundary)
+            ? `, tsconfigRootDir: ${JSON.stringify(cwd)}`
+            : '';
+      const reset = ['null', 'undefined'].includes(boundary)
+        ? `,{languageOptions:{parserOptions:{tsconfigRootDir:${boundary}}}}`
+        : '';
+      const configExpression = `[${entry},{plugins:['@typescript-eslint'], languageOptions:{parserOptions:{projectService:true${options}}},rules:{'no-debugger':'error','@typescript-eslint/no-for-in-array':'error'}}${reset}]`;
+      await writeFile(
+        path.join(tmp, `rslint.config.${extension}`),
+        ['cjs', 'cts'].includes(extension)
+          ? `module.exports = import(${JSON.stringify(coreURL)}).then(({ts}) => ${configExpression});`
+          : `${prefix} export default ${configExpression};`,
+      );
+      const instance = new Rslint({
+        cwd,
+        // CJS/CTS are supported through explicit config selection.
+        ...(['cjs', 'cts'].includes(extension)
+          ? { overrideConfigFile: path.join(tmp, `rslint.config.${extension}`) }
+          : {}),
+      });
+      try {
+        for (const results of [
+          await instance.lintFiles(['tool.ts']),
+          await instance.lintText(source, { filePath: 'tool.ts' }),
+        ]) {
+          const ids = results[0].messages.map((message) => message.ruleId);
+          expect(ids).toContain('no-debugger');
+          expect(ids.includes('@typescript-eslint/no-for-in-array')).toBe(
+            typed,
+          );
+        }
+      } finally {
+        await instance.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test('projectService root inference isolates concurrent API instances and fresh reloads', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-root-isolation-'));
+    const coreURL = pathToFileURL(
+      path.resolve(import.meta.dirname, '../dist/index.js'),
+    ).href;
+    const instances = [];
+    try {
+      for (const name of ['a', 'b']) {
+        const root = path.join(tmp, name);
+        await mkdir(path.join(root, 'pkg'), { recursive: true });
+        await writeFile(
+          path.join(root, 'tsconfig.json'),
+          JSON.stringify({ files: ['pkg/tool.ts'] }),
+        );
+        await writeFile(
+          path.join(root, 'pkg/tool.ts'),
+          'const values = [1]; for (const key in values) {}',
+        );
+        await writeFile(
+          path.join(root, 'rslint.config.mjs'),
+          `import {ts} from ${JSON.stringify(coreURL)}; export default [ts.configs.base,{languageOptions:{parserOptions:{projectService:true}},rules:{'@typescript-eslint/no-for-in-array':'error'}}];`,
+        );
+        instances.push(new Rslint({ cwd: path.join(root, 'pkg') }));
+      }
+      const run = () =>
+        Promise.all(
+          instances.map((instance) => instance.lintFiles(['tool.ts'])),
+        );
+      for (const result of await run())
+        expect(result[0].messages.map((message) => message.ruleId)).toEqual([
+          '@typescript-eslint/no-for-in-array',
+        ]);
+      // Reload A with no candidate; B's cached/transitive preset cannot supply it.
+      await writeFile(
+        path.join(tmp, 'a/rslint.config.mjs'),
+        `export default [{plugins:['@typescript-eslint'],languageOptions:{parserOptions:{projectService:true}},rules:{'@typescript-eslint/no-for-in-array':'error'}}];`,
+      );
+      const [a, b] = await run();
+      expect(a[0].messages).toEqual([]);
+      expect(b[0].messages.map((message) => message.ruleId)).toEqual([
+        '@typescript-eslint/no-for-in-array',
+      ]);
+    } finally {
+      await Promise.all(instances.map((instance) => instance.close()));
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   test('projectService lintText lets a null root boundary restore ancestor discovery', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-service-root-reset-'),

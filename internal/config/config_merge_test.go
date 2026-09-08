@@ -41,7 +41,7 @@ func TestProjectPolicyFlatConfigOverrides(t *testing.T) {
 			}
 			// A conflicting declaration outside the target's scope must not be read.
 			config = append(config, ConfigEntry{Files: []string{"other/**"}, LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: ProjectPaths{"missing.json"}}}})
-			policy, err := NewProjectPolicyResolver(config, root, nil).Resolve(PathIdentity{Path: root + "/src/file.ts"})
+			policy, err := NewProjectPolicyResolver(config, root, root, nil).Resolve(PathIdentity{Path: root + "/src/file.ts"})
 			if test.error != "" {
 				if err == nil || !strings.Contains(err.Error(), test.error) {
 					t.Fatalf("expected %q, got %v", test.error, err)
@@ -65,7 +65,7 @@ func TestProjectPolicyFlatConfigOverrides(t *testing.T) {
 			if err := json.Unmarshal(encoded, &roundTrip); err != nil {
 				t.Fatal(err)
 			}
-			actual, err := NewProjectPolicyResolver(roundTrip, root, nil).Resolve(PathIdentity{Path: root + "/src/file.ts"})
+			actual, err := NewProjectPolicyResolver(roundTrip, root, root, nil).Resolve(PathIdentity{Path: root + "/src/file.ts"})
 			if err != nil || !reflect.DeepEqual(actual, policy) {
 				t.Fatalf("JSON changed policy: %+v, %v", actual, err)
 			}
@@ -81,15 +81,67 @@ func TestProjectPolicyRootDirOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	config = ConfigWithAuthoredPathBase(config, root+"/tooling")
-	policy, err := NewProjectPolicyResolver(config, root, nil).Resolve(PathIdentity{Path: root + "/tooling/file.ts"})
-	if err != nil || policy.TsconfigRootDir != root+"/tooling" {
-		t.Fatalf("null must reset to authored config base: %+v, %v", policy, err)
+	policy, err := NewProjectPolicyResolver(config, root, root, nil).Resolve(PathIdentity{Path: root + "/tooling/file.ts"})
+	if err != nil || policy.TsconfigRootDir != root {
+		t.Fatalf("null must reset to invocation cwd: %+v, %v", policy, err)
 	}
 	base := "pkg"
 	config = ConfigWithResolvedBasePaths(RslintConfig{{BasePath: &base, LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{ProjectService: BoolPtr(true)}}}}, root)
-	policy, err = NewProjectPolicyResolver(config, root, nil).Resolve(PathIdentity{Path: root + "/pkg/file.ts"})
+	policy, err = NewProjectPolicyResolver(config, root, root, nil).Resolve(PathIdentity{Path: root + "/pkg/file.ts"})
 	if err != nil || policy.TsconfigRootDir != root {
 		t.Fatalf("basePath must not become the discovery boundary: %+v, %v", policy, err)
+	}
+}
+
+func TestProjectPolicyInferredRootDir(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	cwd := root + "/pkg"
+	for _, test := range []struct {
+		name      string
+		origins   []string
+		overrides string
+		want      string
+		ambiguous bool
+	}{
+		{"no candidate", nil, "", cwd, false},
+		{"one candidate", []string{root}, "", root, false},
+		{"duplicate candidate", []string{root, root}, "", root, false},
+		{"multiple candidates", []string{root, cwd}, "", "", true},
+		{"explicit wins", []string{root, cwd}, fmt.Sprintf(`,{"languageOptions":{"parserOptions":{"tsconfigRootDir":%q}}}`, cwd), cwd, false},
+		{"null restores inferred", []string{root}, fmt.Sprintf(`,{"languageOptions":{"parserOptions":{"tsconfigRootDir":%q}}},{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}`, cwd), root, false},
+		{"null restores ambiguity", []string{root, cwd}, `,{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}`, "", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var entries RslintConfig
+			if err := json.Unmarshal([]byte(`[{"languageOptions":{"parserOptions":{"projectService":true}}}`+test.overrides+`]`), &entries); err != nil {
+				t.Fatal(err)
+			}
+			// An unmatched preset still contributes to config-level inference.
+			entries = append(entries, ConfigEntry{Files: []string{"other/**"}, InferredTSConfigRootDirs: test.origins})
+			encoded, err := json.Marshal(entries)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(encoded, &entries); err != nil {
+				t.Fatal(err)
+			}
+			policy, err := NewProjectPolicyResolver(entries, root, cwd, nil).Resolve(PathIdentity{Path: cwd + "/file.ts"})
+			if test.ambiguous {
+				if err == nil || !strings.Contains(err.Error(), "multiple candidate") {
+					t.Fatalf("expected ambiguity, got %+v, %v", policy, err)
+				}
+			} else if err != nil || policy.TsconfigRootDir != test.want {
+				t.Fatalf("expected %q, got %+v, %v", test.want, policy, err)
+			}
+		})
+	}
+	var entries RslintConfig
+	if err := json.Unmarshal([]byte(fmt.Sprintf(`[{"ignores":["**/excluded.ts"],"inferredTSConfigRootDirs":[%q]},{"languageOptions":{"parserOptions":{"projectService":true}}}]`, root)), &entries); err != nil {
+		t.Fatal(err)
+	}
+	policy, err := NewProjectPolicyResolver(entries, root, cwd, nil).Resolve(PathIdentity{Path: cwd + "/excluded.ts"})
+	if err != nil || !policy.ProjectDisabled {
+		t.Fatalf("provenance changed global ignores: %+v, %v", policy, err)
 	}
 }
 
@@ -125,7 +177,7 @@ func TestProjectPolicyDeclaredProjectsWithoutTargets(t *testing.T) {
 			if err := json.Unmarshal([]byte("["+base+","+test.override+"]"), &config); err != nil {
 				t.Fatal(err)
 			}
-			resolver := NewProjectPolicyResolver(config, root, nil)
+			resolver := NewProjectPolicyResolver(config, root, root, nil)
 			if got := resolver.CanLoadDeclaredProjectsWithoutTargets(); got != test.want {
 				t.Fatalf("CanLoadDeclaredProjectsWithoutTargets() = %v, want %v", got, test.want)
 			}
@@ -140,7 +192,7 @@ func TestProjectPolicyDeclaredProjectsWithoutTargets(t *testing.T) {
 		if err := json.Unmarshal([]byte("["+entry+"]"), &config); err != nil {
 			t.Fatal(err)
 		}
-		if !NewProjectPolicyResolver(config, root, nil).CanLoadDeclaredProjectsWithoutTargets() {
+		if !NewProjectPolicyResolver(config, root, root, nil).CanLoadDeclaredProjectsWithoutTargets() {
 			t.Fatalf("legacy declarations require no targets: %s", entry)
 		}
 	}
@@ -154,7 +206,7 @@ func TestProjectPolicyUnconditionalServiceOverridePreservesAuthoredProjectBase(t
 	config = append(config, ConfigWithAuthoredPathBase(RslintConfig{{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
 		ProjectService: BoolPtr(false),
 	}}}}, root+"/override")...)
-	resolver := NewProjectPolicyResolver(config, root, nil)
+	resolver := NewProjectPolicyResolver(config, root, root, nil)
 	if !resolver.CanLoadDeclaredProjectsWithoutTargets() {
 		t.Fatal("an unscoped false applies in every authored path space")
 	}

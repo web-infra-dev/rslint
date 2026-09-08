@@ -31,6 +31,7 @@ const (
 func (s *Session) BuildLintProjects(
 	configs map[string]rslintconfig.RslintConfig,
 	plan target.Plan,
+	cwd string,
 	singleThreaded bool,
 	scope ProjectLoadScope,
 ) (ProjectSet, error) {
@@ -63,7 +64,7 @@ func (s *Session) BuildLintProjects(
 		if resolver := resolvers[owner]; resolver != nil {
 			return resolver, nil
 		}
-		resolver, err := rslintconfig.NewProjectPolicyResolverWithPathSpaces(configs[owner], owner, s.FS(), plan.PathSpaces())
+		resolver, err := rslintconfig.NewProjectPolicyResolverWithPathSpaces(configs[owner], owner, cwd, s.FS(), plan.PathSpaces())
 		if err != nil {
 			return nil, err
 		}

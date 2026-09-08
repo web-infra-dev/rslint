@@ -458,6 +458,103 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 	}
 }
 
+func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		name         string
+		explicitRoot string
+		inferredRoot bool
+		wantTyped    bool
+	}{
+		{name: "invocation cwd leaves ancestor unowned"},
+		{name: "explicit root admits ancestor", explicitRoot: ".", wantTyped: true},
+		{name: "inferred root admits ancestor", inferredRoot: true, wantTyped: true},
+		{name: "explicit root overrides inferred root", explicitRoot: "pkg", inferredRoot: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, "ancestor"))
+			workspace := tspath.ResolvePath(directory, "pkg")
+			fileName := tspath.ResolvePath(workspace, "target.ts")
+			server := newTestServer()
+			server.cwd = workspace
+			server.fs = bundled.WrapFS(osvfs.FS())
+			server.lintPrograms = newLintProgramStore(server)
+			server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			uri := documentURIFromPath(fileName)
+			const editorText = "debugger;\ndeclare const value: any;\nexport const result = value.member;\n"
+			server.documents[uri] = editorText
+			options := &config.ParserOptions{ProjectService: config.BoolPtr(true)}
+			if test.explicitRoot != "" {
+				options.TsconfigRootDir = tspath.ResolvePath(directory, test.explicitRoot)
+			}
+			entries := config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: options},
+				Rules: config.Rules{
+					"no-debugger": "error", "@typescript-eslint/no-unsafe-member-access": "error",
+				},
+			}}
+			if test.inferredRoot {
+				entries[0].InferredTSConfigRootDirs = []string{directory}
+			}
+			installJSConfigsForTest(server, map[string]config.RslintConfig{directory: entries})
+			snapshot := server.documentLintSnapshot(uri)
+			if snapshot.cwd != workspace || snapshot.target.ConfigDirectory != directory {
+				t.Fatalf("snapshot cwd=%q owner=%q, want nested workspace %q and parent owner %q", snapshot.cwd, snapshot.target.ConfigDirectory, workspace, directory)
+			}
+			if snapshot.projectPolicyError != nil {
+				t.Fatal(snapshot.projectPolicyError)
+			}
+			environment := server.freezeSpeculativeLintEnvironment(uri, snapshot.target)
+			// A later invocation directory would admit the ancestor project. Both
+			// adapters must continue using the policy frozen for this operation.
+			server.cwd = directory
+			for _, speculative := range []bool{false, true} {
+				var generation linter.Generation
+				var release linter.ReleaseFunc
+				var err error
+				wantText := editorText
+				if speculative {
+					wantText = "// speculative text\n" + editorText
+					generation, release, err = acquireSpeculativeGeneration(context.Background(), wantText, snapshot, environment)
+				} else {
+					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				}
+				if release != nil {
+					defer release()
+				}
+				if err != nil || len(generation.Native.Programs) != 1 {
+					t.Fatalf("speculative=%v: programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+				}
+				program := generation.Native.Programs[0]
+				wantConfig := ""
+				if test.wantTyped {
+					wantConfig = tspath.ResolvePath(directory, "tsconfig.json")
+				}
+				if program.Options().ConfigFilePath != wantConfig {
+					t.Fatalf("speculative=%v: config=%q, want %q", speculative, program.Options().ConfigFilePath, wantConfig)
+				}
+				source := program.GetSourceFile(fileName)
+				if source == nil || source.Text() != wantText {
+					t.Fatalf("speculative=%v: generation did not use its editor text", speculative)
+				}
+				foundSyntax, foundTyped := false, false
+				for _, configured := range generation.Native.RulesForFile(source) {
+					foundSyntax = foundSyntax || configured.Name == "no-debugger"
+					foundTyped = foundTyped || configured.RequiresTypeInfo
+				}
+				if !foundSyntax || foundTyped != test.wantTyped {
+					t.Fatalf("speculative=%v: syntax=%v typed=%v, want typed=%v", speculative, foundSyntax, foundTyped, test.wantTyped)
+				}
+			}
+			if server.documents[uri] != editorText {
+				t.Fatal("speculative generation changed resident editor content")
+			}
+		})
+	}
+}
+
 func TestProjectServiceLSPGapKeepsDiagnosticsAndFixes(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	for _, resident := range []bool{false, true} {

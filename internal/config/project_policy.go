@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -35,11 +37,13 @@ func NeedsProjectPolicy(config RslintConfig) bool {
 type ProjectPolicyResolver struct {
 	config          RslintConfig
 	configDirectory string
+	cwd             string
+	inferredRoots   []string
 	matcher         *configTargetResolver
 }
 
-func NewProjectPolicyResolver(config RslintConfig, configDirectory string, fsys vfs.FS) *ProjectPolicyResolver {
-	return &ProjectPolicyResolver{config, configDirectory, newConfigTargetResolver(config, configDirectory, fsys)}
+func NewProjectPolicyResolver(config RslintConfig, configDirectory string, cwd string, fsys vfs.FS) *ProjectPolicyResolver {
+	return &ProjectPolicyResolver{config, configDirectory, cwd, inferredProjectRoots(config), newConfigTargetResolver(config, configDirectory, fsys)}
 }
 
 // NewProjectPolicyResolverWithPathSpaces shares the exact config-match
@@ -47,6 +51,7 @@ func NewProjectPolicyResolver(config RslintConfig, configDirectory string, fsys 
 func NewProjectPolicyResolverWithPathSpaces(
 	config RslintConfig,
 	configDirectory string,
+	cwd string,
 	fsys vfs.FS,
 	pathSpaces *PathSpaceSnapshot,
 ) (*ProjectPolicyResolver, error) {
@@ -54,7 +59,22 @@ func NewProjectPolicyResolverWithPathSpaces(
 	if err != nil {
 		return nil, err
 	}
-	return &ProjectPolicyResolver{config, configDirectory, matcher.resolver}, nil
+	return &ProjectPolicyResolver{config, configDirectory, cwd, inferredProjectRoots(config), matcher.resolver}, nil
+}
+
+// Preset origins belong to the composed config, independent of entry matching.
+// A resolver is reused for every target of that owner in this generation.
+func inferredProjectRoots(config RslintConfig) []string {
+	var roots []string
+	for _, entry := range config {
+		for _, root := range entry.InferredTSConfigRootDirs {
+			root = tspath.NormalizePath(root)
+			if !slices.Contains(roots, root) {
+				roots = append(roots, root)
+			}
+		}
+	}
+	return roots
 }
 
 // CanLoadDeclaredProjectsWithoutTargets preserves program-wide checking for
@@ -101,7 +121,6 @@ func (resolver *ProjectPolicyResolver) Resolve(target PathIdentity) (ProjectPoli
 		return ProjectPolicy{ProjectDisabled: true}, nil
 	}
 	var merged *LanguageOptions
-	defaultRoot := resolver.configDirectory
 	projectBase := resolver.configDirectory
 	for index, entry := range resolver.config {
 		if !decision.key.contains(index) || entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
@@ -109,12 +128,6 @@ func (resolver *ProjectPolicyResolver) Resolve(target PathIdentity) (ProjectPoli
 		}
 		options := entry.LanguageOptions.ParserOptions
 		origin := configEntryPathOrigin(entry, resolver.configDirectory)
-		if options.ProjectService != nil {
-			defaultRoot = origin.directory
-			if origin.basePathScoped {
-				defaultRoot = origin.configArrayBase
-			}
-		}
 		if options.Project != nil {
 			projectBase = origin.directory
 		}
@@ -122,7 +135,7 @@ func (resolver *ProjectPolicyResolver) Resolve(target PathIdentity) (ProjectPoli
 		// and rules are merged later by the file-config resolver.
 		merged = mergeLanguageOptions(merged, &LanguageOptions{ParserOptions: options})
 	}
-	policy := ProjectPolicy{TsconfigRootDir: tspath.NormalizePath(defaultRoot)}
+	policy := ProjectPolicy{TsconfigRootDir: tspath.NormalizePath(resolver.cwd)}
 	if merged == nil || merged.ParserOptions == nil {
 		return policy, nil
 	}
@@ -135,6 +148,15 @@ func (resolver *ProjectPolicyResolver) Resolve(target PathIdentity) (ProjectPoli
 		}
 		policy.TsconfigRootDir = tspath.NormalizePath(options.TsconfigRootDir)
 		projectBase = policy.TsconfigRootDir
+	} else {
+		switch len(resolver.inferredRoots) {
+		case 1:
+			policy.TsconfigRootDir = resolver.inferredRoots[0]
+		default:
+			if len(resolver.inferredRoots) > 1 {
+				return ProjectPolicy{}, fmt.Errorf("no tsconfigRootDir was set, and multiple candidate directories are present:\n - %s\nset parserOptions.tsconfigRootDir explicitly", strings.Join(resolver.inferredRoots, "\n - "))
+			}
+		}
 	}
 	if policy.ProjectService && (options.Project != nil || options.projectAutomatic) {
 		return ProjectPolicy{}, fmt.Errorf("%s: enabling parserOptions.project does nothing when projectService is enabled; remove project or set projectService to false", target.Path)

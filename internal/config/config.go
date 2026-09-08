@@ -18,6 +18,9 @@ type RslintConfig []ConfigEntry
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
 	Name string `json:"name,omitempty"`
+	// InferredTSConfigRootDirs is Node-produced preset provenance, separate from
+	// authored parser options so explicit values and null resets retain meaning.
+	InferredTSConfigRootDirs []string `json:"inferredTSConfigRootDirs,omitempty"`
 	// BasePath is ESLint flat config's entry-local matching base. A pointer
 	// preserves the distinction between omission and an explicitly authored
 	// empty string; both are valid, but only the latter scopes the entry.
@@ -295,7 +298,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		// neutral but remains non-nil for isGlobalIgnoreEntry.
 		hasNonGlobalKey := false
 		for key := range raw {
-			if key != "ignores" && key != "name" && key != "basePath" {
+			if key != "ignores" && key != "name" && key != "basePath" && key != "inferredTSConfigRootDirs" {
 				hasNonGlobalKey = true
 				break
 			}

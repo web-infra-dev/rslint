@@ -56,7 +56,7 @@ parserOptions: {
 }
 ```
 
-Each normalized declared tsconfig path in the effective loaded config catalog produces one TypeScript Program, even when multiple rslint configs reference that path. Parent global ignores can prevent a nested config from entering that catalog during directory discovery. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
+Within legacy explicit-project mode, each normalized declared tsconfig path in the effective loaded config catalog produces one TypeScript Program, even when multiple rslint configs reference that path. Parent global ignores can prevent a nested config from entering that catalog during directory discovery. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently. Explicit and service modes can construct separate Programs for the same tsconfig because project-reference source and declaration-output behavior differs.
 
 **After the effective config catalog is established, each Program includes its tsconfig root files and dependencies loaded through imports and references.** The following lint-phase concepts do not filter that Program scope:
 

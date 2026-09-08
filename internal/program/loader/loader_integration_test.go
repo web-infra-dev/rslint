@@ -44,7 +44,7 @@ func TestBuildLintProjectsSeparatesProjectPolicies(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, scope)
+		projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, dir, true, scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,7 +101,7 @@ func TestBuildLintProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, scope)
+				projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, dir, true, scope)
 				if err != nil || projects.Len() != 2 {
 					t.Fatalf("owning projects = %d, error = %v", projects.Len(), err)
 				}
@@ -177,7 +177,7 @@ func TestBuildLintProjectsKeepsProgramModesSeparate(t *testing.T) {
 						t.Fatal(err)
 					}
 					session := NewSession(fsys)
-					projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, scope)
+					projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, dir, true, scope)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -258,7 +258,7 @@ func TestBuildLintProjectsTypeCheckKeepsInactiveLegacyOwners(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		projects, err := NewSession(fsys).BuildLintProjects(configs, plan, true, ProjectScopeAll)
+		projects, err := NewSession(fsys).BuildLintProjects(configs, plan, dir, true, ProjectScopeAll)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -307,7 +307,7 @@ func TestBuildLintProjectsTypeCheckOverriddenServiceWithoutTargets(t *testing.T)
 				if len(plan.Files) != wantPrograms-1 {
 					t.Fatalf("inactive owner selected lint targets: %+v", plan.Files)
 				}
-				projects, err := NewSession(fsys).BuildLintProjects(configs, plan, true, ProjectScopeAll)
+				projects, err := NewSession(fsys).BuildLintProjects(configs, plan, dir, true, ProjectScopeAll)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -338,7 +338,7 @@ func TestBuildLintProjectsTypeCheckPreservesPerFileExplicitPolicy(t *testing.T) 
 		t.Fatal(err)
 	}
 	session := NewSession(fsys)
-	projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, ProjectScopeAll)
+	projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, dir, true, ProjectScopeAll)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +372,7 @@ func TestBuildLintProjectsDeduplicatesExplicitGroups(t *testing.T) {
 			t.Fatal(err)
 		}
 		session := NewSession(fsys)
-		projects, err := session.BuildLintProjects(configs, plan, false, scope)
+		projects, err := session.BuildLintProjects(configs, plan, dir, false, scope)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -400,7 +400,7 @@ func TestBuildLintProjectsTypeCheckHonorsClearedProjectArray(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	projects, err := NewSession(fsys).BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, ProjectScopeAll)
+	projects, err := NewSession(fsys).BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, dir, true, ProjectScopeAll)
 	if err != nil || projects.Len() != 0 {
 		t.Fatalf("type checking restored a cleared project: count=%d error=%v", projects.Len(), err)
 	}

@@ -150,6 +150,7 @@ func documentLintSnapshotForTest(
 	}
 	target := lspConfigTarget(uriToPath(uri), configDirectory, s.fs)
 	snapshot := documentLintSnapshot{
+		cwd:    s.cwd,
 		target: target,
 		config: entries,
 		pathSpaces: config.NewPathSpaceSnapshot(

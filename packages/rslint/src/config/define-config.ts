@@ -101,9 +101,10 @@ export interface ParserOptions {
    */
   projectService?: boolean;
   /**
-   * Absolute boundary for upward project discovery. Defaults to the governing
-   * config directory. References may point outside it; this does not force the
-   * target to use that directory's tsconfig.
+   * Absolute boundary for upward project discovery. Defaults to the config
+   * directory inferred from TS preset access, or the invocation cwd when no
+   * directory can be inferred. References may point outside this boundary;
+   * it does not force the target to use that directory's tsconfig.
    */
   tsconfigRootDir?: string;
   /**

@@ -347,7 +347,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			if projectConfigs == nil {
 				projectConfigs = map[string]rslintconfig.RslintConfig{configDirectory: rslintConfig}
 			}
-			projects, buildErr = session.BuildLintProjects(projectConfigs, targetPlan, false, loader.ProjectScopeTarget)
+			projects, buildErr = session.BuildLintProjects(projectConfigs, targetPlan, currentDirectory, false, loader.ProjectScopeTarget)
 			if buildErr != nil {
 				return loader.LoadResult{}, buildErr
 			}

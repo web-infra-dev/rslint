@@ -387,7 +387,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		if usesProjectPolicy {
-			projectSet, err = programSession.BuildLintProjects(projectConfigs, targetPlan, singleThreaded, projectScope)
+			projectSet, err = programSession.BuildLintProjects(projectConfigs, targetPlan, workingDirectory, singleThreaded, projectScope)
 			if err != nil {
 				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 			}
@@ -458,7 +458,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		var rebuilt loader.ProjectSet
 		var err error
 		if usesProjectPolicy {
-			rebuilt, err = session.BuildLintProjects(projectConfigs, targetPlan, singleThreaded, projectScope)
+			rebuilt, err = session.BuildLintProjects(projectConfigs, targetPlan, workingDirectory, singleThreaded, projectScope)
 		} else if configMap != nil {
 			if buildAllPrograms {
 				rebuilt, err = session.BuildProjects(configMap, singleThreaded)

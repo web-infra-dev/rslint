@@ -1,3 +1,4 @@
+import { withTSConfigRootDir } from '../tsconfig-root-dir.js';
 import {
   base as tsBase,
   recommended as tsRecommended,
@@ -19,13 +20,27 @@ import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
 
 export const ts = {
   configs: {
-    base: tsBase,
-    recommended: tsRecommended,
-    recommendedTypeChecked: tsRecommendedTypeChecked,
-    strict: tsStrict,
-    strictTypeChecked: tsStrictTypeChecked,
-    stylistic: tsStylistic,
-    stylisticTypeChecked: tsStylisticTypeChecked,
+    get base() {
+      return withTSConfigRootDir(tsBase);
+    },
+    get recommended() {
+      return withTSConfigRootDir(tsRecommended);
+    },
+    get recommendedTypeChecked() {
+      return withTSConfigRootDir(tsRecommendedTypeChecked);
+    },
+    get strict() {
+      return withTSConfigRootDir(tsStrict);
+    },
+    get strictTypeChecked() {
+      return withTSConfigRootDir(tsStrictTypeChecked);
+    },
+    get stylistic() {
+      return withTSConfigRootDir(tsStylistic);
+    },
+    get stylisticTypeChecked() {
+      return withTSConfigRootDir(tsStylisticTypeChecked);
+    },
   },
 };
 

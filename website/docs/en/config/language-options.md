@@ -74,15 +74,19 @@ The editor reuses its existing Program store rather than hosting a second TypeSc
 ## languageOptions.parserOptions.tsconfigRootDir
 
 - **Type:** `string`
-- **Default:** the directory of the governing Rslint config
+- **Default:** the inferred config directory, or the invocation working directory
 
 An absolute directory that stops upward project discovery when the search reaches it. It does not select a tsconfig by itself. If the target is outside this directory's ancestor chain, it can still discover its own ancestors. Project references and `extends` may point outside the boundary. Relative paths are rejected.
 
 JavaScript configurations and legacy JSON migration also accept `null` to reset an inherited boundary to the default. This is runtime compatibility, outside the public TypeScript type. JavaScript configurations checked with `checkJs` and `strictNullChecks` are still subject to that type.
 
-API override entries use their authored working-directory base for the default. A config entry's `basePath` scopes matching without moving this boundary. Unlike typescript-eslint's JavaScript call-stack inference, Rslint uses its resolved config origin, so external config modules have a deterministic base.
+Reading `ts.configs.*` from `rslint.config.*` infers that config directory from the call stack, including access through a helper function called by the config. Reading a preset at a helper module's top level may have no config frame; without a candidate, discovery uses the invocation working directory (`cwd` for the API, workspace root for the language server). A custom config filename also needs an explicit boundary if cwd is unsuitable. A config entry's `basePath` does not move the boundary.
 
-When set with explicit `project`, relative project paths resolve from `tsconfigRootDir`.
+A composed config with candidates from multiple directories must set `tsconfigRootDir` explicitly. A later `null` restores inference, including an ambiguity error; a later `undefined` preserves an inherited explicit value.
+
+Rslint keeps inference with the current configuration, isolated from unrelated API instances and config owners. Array, object, and rules spread retain preset origins. Unused preset accesses and transformations that discard symbol properties (such as JSON serialization) do not contribute candidates. This differs from typescript-eslint's process-wide candidate set; use an explicit path when transforming presets in those ways.
+
+An explicitly set `tsconfigRootDir` also anchors relative `project` paths. Inferred defaults apply to automatic discovery; existing explicit-project path origins described below are preserved.
 
 ## languageOptions.parserOptions.project
 

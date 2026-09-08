@@ -522,6 +522,45 @@ describe('CLI lint target contracts', () => {
     },
   );
 
+  test.each([
+    ['cwd fallback', false, false, false],
+    ['inferred config directory', true, false, true],
+    ['explicit config directory', false, true, true],
+  ])(
+    'projectService CLI root uses %s',
+    async (_name, preset, explicitRoot, typed) => {
+      const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-root-'));
+      const coreURL = pathToFileURL(
+        path.resolve(import.meta.dirname, '../dist/index.js'),
+      ).href;
+      try {
+        await writeFixture(root, {
+          'rslint.config.mjs': `import {ts} from ${JSON.stringify(coreURL)}; export default [${preset ? 'ts.configs.base,' : ''}{plugins:['@typescript-eslint'],languageOptions:{parserOptions:{projectService:true${explicitRoot ? `,tsconfigRootDir:${JSON.stringify(root)}` : ''}}},rules:{'no-debugger':'error','@typescript-eslint/no-for-in-array':'error'}}];`,
+          'tsconfig.json': JSON.stringify({ files: ['pkg/tool.ts'] }),
+          'pkg/tool.ts':
+            'const values = [1]; for (const key in values) {} debugger;',
+        });
+        for (const args of [
+          ['tool.ts'],
+          ['.'],
+          ['--config', '../rslint.config.mjs', 'tool.ts'],
+        ]) {
+          const result = await runCLI(path.join(root, 'pkg'), args);
+          expect(result.code).toBe(1);
+          const rules = parseDiagnostics(result.stdout).map(
+            ({ ruleName }) => ruleName,
+          );
+          expect(rules).toContain('no-debugger');
+          expect(rules.includes('@typescript-eslint/no-for-in-array')).toBe(
+            typed,
+          );
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
   test('projectService keeps automatic, explicit, and disabled targets separate in a broad CLI run', async () => {
     const root = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-cli-service-mixed-'),
