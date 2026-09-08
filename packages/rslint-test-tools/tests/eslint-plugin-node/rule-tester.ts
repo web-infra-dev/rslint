@@ -31,7 +31,7 @@ export class RuleTester {
     _rule: unknown,
     cases: { valid: TestCase[]; invalid: TestCase[] },
   ) {
-    describe(`n/${name}`, () => {
+    describe(`node/${name}`, () => {
       let root: string;
       beforeAll(async () => {
         root = await createTempDir(
@@ -61,10 +61,12 @@ export class RuleTester {
               workingDirectory: root,
               config: [
                 {
-                  plugins: ['n'],
+                  plugins: ['node'],
                   languageOptions: { parserOptions: { projectService: false } },
                   settings: item.settings,
-                  rules: { [`n/${name}`]: ['error', ...(item.options ?? [])] },
+                  rules: {
+                    [`node/${name}`]: ['error', ...(item.options ?? [])],
+                  },
                 },
               ],
               fileContents: { [filename]: item.code },
@@ -82,7 +84,7 @@ export class RuleTester {
                   : message.includes('Unicode BOM')
                     ? 'unexpectedBOM'
                     : 'expectedLF';
-              expect(diagnostic.ruleName).toBe(`n/${name}`);
+              expect(diagnostic.ruleName).toBe(`node/${name}`);
               expect(diagnostic.message).toBe(message);
               expect(diagnostic.messageId).toBe(messageId);
               expect(diagnostic.range).toEqual({

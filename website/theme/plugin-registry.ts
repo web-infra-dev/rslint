@@ -118,8 +118,8 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     ],
   },
   {
-    prefix: 'n',
-    group: 'eslint-plugin-n',
+    prefix: 'node',
+    group: 'eslint-plugin-node',
     importName: '',
     presets: [],
   },

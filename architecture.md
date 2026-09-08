@@ -1507,7 +1507,7 @@ Plugin execution has two paths:
 - bundled Go plugins execute through the shared listener traversal
 - third-party ESLint plugin objects are loaded from JS/TS config on the Node side; Go derives catalog placeholders for their rules and sends per-file batches back to the Node plugin worker over reverse IPC
 
-String plugin declarations select bundled Go plugin namespaces. Live third-party plugin objects require a JS/TS module config. The repository currently ships Go implementations for TypeScript ESLint, Import, Jest, JSX accessibility, Node.js (`n`), Promise, React, React Hooks, Rstest, and Unicorn rule namespaces.
+String plugin declarations select bundled Go plugin namespaces. Live third-party plugin objects require a JS/TS module config. The repository currently ships Go implementations for TypeScript ESLint, Import, Jest, JSX accessibility, Node.js (`node`), Promise, React, React Hooks, Rstest, and Unicorn rule namespaces.
 
 ### Rule Extension Points
 

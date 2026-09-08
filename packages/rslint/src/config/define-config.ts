@@ -18,7 +18,7 @@ const NATIVE_PLUGINS = [
   'import',
   'jest',
   'jsx-a11y',
-  'n',
+  'node',
   'promise',
   'react',
   'react-hooks',
@@ -36,7 +36,7 @@ const NATIVE_PLUGIN_DECL_ALIASES = [
   'eslint-plugin-import',
   'eslint-plugin-jest',
   'eslint-plugin-jsx-a11y',
-  'eslint-plugin-n',
+  'eslint-plugin-node',
   'eslint-plugin-promise',
   'eslint-plugin-react-hooks',
   'eslint-plugin-unicorn',
@@ -226,7 +226,7 @@ export interface RslintConfigEntry {
    *   maps to the ESLint plugin it ports rules from:
    *   `'@typescript-eslint'` → `@typescript-eslint/eslint-plugin`,
    *   `'import'` → `eslint-plugin-import`, `'jest'` → `eslint-plugin-jest`,
-   *   `'jsx-a11y'` → `eslint-plugin-jsx-a11y`, `'n'` → `eslint-plugin-n`,
+   *   `'jsx-a11y'` → `eslint-plugin-jsx-a11y`, `'node'` → `eslint-plugin-n`,
    *   `'promise'` → `eslint-plugin-promise`,
    *   `'react'` → `eslint-plugin-react`, `'react-hooks'` → `eslint-plugin-react-hooks`,
    *   `'unicorn'` → `eslint-plugin-unicorn`.

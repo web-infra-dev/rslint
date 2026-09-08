@@ -2,6 +2,8 @@
 
 Require the correct hashbang for package executables.
 
+The `node` plugin ports rules from `eslint-plugin-n`.
+
 ## Rule Details
 
 This rule finds the nearest `package.json` for each file. Files listed in its
@@ -29,14 +31,14 @@ line endings in the rest of the file.
 
 ## Options
 
-Enable the bundled `n` plugin and configure any of these options:
+Enable the bundled `node` plugin and configure any of these options:
 
 ```javascript
 export default [
   {
-    plugins: ['n'],
+    plugins: ['node'],
     rules: {
-      'n/hashbang': ['error', {
+      'node/hashbang': ['error', {
         ignoreUnpublished: false,
         additionalExecutables: ['scripts/cli.js'],
         executableMap: { '.ts': 'ts-node' },

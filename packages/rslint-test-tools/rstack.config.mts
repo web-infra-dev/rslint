@@ -167,8 +167,8 @@ define.test({
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
     './tests/eslint/rules/no-warning-comments.test.ts',
-    // eslint-plugin-n
-    './tests/eslint-plugin-n/rules/hashbang.test.ts',
+    // eslint-plugin-node
+    './tests/eslint-plugin-node/rules/hashbang.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',

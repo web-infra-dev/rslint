@@ -457,25 +457,29 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     ).toThrow(/must expose a "rules" object/);
   });
 
-  test('throws when an object-form prefix collides with a native plugin name', () => {
-    // Asymmetry: a native NAME is legal in the array form (previous test) but
-    // illegal as an object-form KEY — native rules always win, so mounting a
-    // community plugin under a native prefix would silently shadow it.
-    expect(() =>
-      normalizeConfig([
-        {
-          files: ['**/*.ts'],
-          plugins: { '@typescript-eslint': mockPlugin },
-          rules: {},
-        },
-      ]),
-    ).toThrow(/collides with the built-in plugin/);
-  });
+  test.each(['@typescript-eslint', 'node'])(
+    'throws when an object-form prefix collides with native %s',
+    (prefix) => {
+      // Asymmetry: a native NAME is legal in the array form (previous test) but
+      // illegal as an object-form KEY — native rules always win, so mounting a
+      // community plugin under a native prefix would silently shadow it.
+      expect(() =>
+        normalizeConfig([
+          {
+            files: ['**/*.ts'],
+            plugins: { [prefix]: mockPlugin },
+            rules: {},
+          },
+        ]),
+      ).toThrow(/collides with the built-in plugin/);
+    },
+  );
 
   const RESERVED_DECL_ALIASES = [
     'eslint-plugin-import',
     'eslint-plugin-jest',
     'eslint-plugin-jsx-a11y',
+    'eslint-plugin-node',
     'eslint-plugin-promise',
     'eslint-plugin-react-hooks',
     'eslint-plugin-unicorn',
@@ -493,22 +497,26 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     });
   }
 
-  test('accepts an eslint-plugin-* key that is NOT a native decl-name', () => {
-    // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
-    // so reserving it would wrongly false-reject a legitimate community mount.
-    // The asymmetry must be exact: only the 6 aliased names are reserved.
-    const [entry] = normalizeConfig([
-      {
-        files: ['**/*.ts'],
-        plugins: { 'eslint-plugin-react': mockPlugin },
-        rules: { 'eslint-plugin-react/no-foo': 'error' },
-      },
-    ]) as NormalizedPluginEntry[];
-    expect(entry.plugins).toContain('eslint-plugin-react');
-    expect(entry.eslintPlugins).toEqual({
-      'eslint-plugin-react': { ruleNames: ['no-bar', 'no-foo'] },
-    });
-  });
+  test.each(['eslint-plugin-react', 'eslint-plugin-n', 'n'])(
+    'accepts community %s without reserving an unrelated native name',
+    (prefix) => {
+      // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
+      // so reserving it would wrongly false-reject a legitimate community mount.
+      // The upstream n prefix also remains available to community plugins;
+      // rslint's native Node.js plugin uses node.
+      const [entry] = normalizeConfig([
+        {
+          files: ['**/*.ts'],
+          plugins: { [prefix]: mockPlugin },
+          rules: { [`${prefix}/no-foo`]: 'error' },
+        },
+      ]) as NormalizedPluginEntry[];
+      expect(entry.plugins).toContain(prefix);
+      expect(entry.eslintPlugins).toEqual({
+        [prefix]: { ruleNames: ['no-bar', 'no-foo'] },
+      });
+    },
+  );
 
   test('entries with no plugins carry no community-plugin field', () => {
     const [entry] = normalizeConfig([

@@ -13,7 +13,7 @@ var bundledPluginDeclarations = []bundledPluginDeclaration{
 	{ruleNamespace: "import", declarationNames: []string{"eslint-plugin-import", "import"}},
 	{ruleNamespace: "jest", declarationNames: []string{"eslint-plugin-jest", "jest"}},
 	{ruleNamespace: "jsx-a11y", declarationNames: []string{"eslint-plugin-jsx-a11y", "jsx-a11y"}},
-	{ruleNamespace: "n", declarationNames: []string{"eslint-plugin-n", "n"}},
+	{ruleNamespace: "node", declarationNames: []string{"eslint-plugin-node", "node"}},
 	{ruleNamespace: "promise", declarationNames: []string{"eslint-plugin-promise", "promise"}},
 	{ruleNamespace: "react", declarationNames: []string{"react"}},
 	{ruleNamespace: "react-hooks", declarationNames: []string{"eslint-plugin-react-hooks", "react-hooks"}},

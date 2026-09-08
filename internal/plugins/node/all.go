@@ -1,7 +1,7 @@
-package n_plugin
+package node_plugin
 
 import (
-	"github.com/web-infra-dev/rslint/internal/plugins/n/rules/hashbang"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/hashbang"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 

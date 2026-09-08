@@ -7,7 +7,7 @@ import {
 } from './helpers.js';
 
 describe('CLI JS config plugin enforcement', () => {
-  test.each(['n', 'eslint-plugin-n'])(
+  test.each(['node', 'eslint-plugin-node'])(
     'bundled %s declaration enables hashbang',
     async (plugin) => {
       const tempDir = await createTempDir({
@@ -16,7 +16,7 @@ describe('CLI JS config plugin enforcement', () => {
         'rslint.config.js': `export default [${JSON.stringify({
           plugins: [plugin],
           languageOptions: { parserOptions: { projectService: false } },
-          rules: { 'n/hashbang': 'error' },
+          rules: { 'node/hashbang': 'error' },
         })}];`,
       });
       try {
@@ -24,7 +24,7 @@ describe('CLI JS config plugin enforcement', () => {
           ['cli.js', '--format', 'jsonline'],
           tempDir,
         );
-        expect(result.stdout).toContain('n/hashbang');
+        expect(result.stdout).toContain('node/hashbang');
         expect(result.stdout).toContain('This file needs shebang');
       } finally {
         await cleanupTempDir(tempDir);

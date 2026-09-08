@@ -54,7 +54,7 @@ func isNodeShebang(shebang, executable string) bool {
 
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/rules/hashbang.js
 var HashbangRule = rule.Rule{
-	Name:   "n/hashbang",
+	Name:   "node/hashbang",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		program := ctx.Program()
