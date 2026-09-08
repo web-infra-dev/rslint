@@ -28,14 +28,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Run Darwin only on main and release branches, including release PRs.
-        runner: >-
-          ${{ fromJSON(
-            (github.ref == 'refs/heads/main' ||
-              startsWith(github.head_ref || github.ref_name, 'chore/release-')) &&
-            '["rspack-ubuntu-22.04-large", "rspack-darwin-15.6.1-medium", "rspack-windows-2022-large"]' ||
-            '["rspack-ubuntu-22.04-large", "rspack-windows-2022-large"]'
-          ) }}
+        runner:
+          - rspack-ubuntu-22.04-large
+          - rspack-windows-2022-large
         go-version: ['1.26.0']
     steps:
       - name: Checkout code
@@ -101,9 +96,33 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
-      # Fallback for any runner without a dedicated step above.
+  test-go-darwin:
+    name: Test Go (Darwin)
+    if: ${{ github.ref == 'refs/heads/main' || startsWith(github.head_ref || github.ref_name, 'chore/release-') }}
+    runs-on: rspack-darwin-15.6.1-medium
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: '1.26.0'
+          cache-name: ci-test-go
+
+      - name: Verify compiler shim layout
+        run: go test github.com/microsoft/TypeScript/tsc/shim/checker
+
       - name: Unit Test
-        if: matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
         run: go test -count=1 ./cmd/... ./internal/...
 
   lint:
@@ -413,6 +432,7 @@ jobs:
   done:
     needs:
       - test-go
+      - test-go-darwin
       - test-node
       - test-node-windows
       - test-vscode-windows
@@ -424,4 +444,16 @@ jobs:
     name: CI Done
     steps:
       - run: exit 1
-        if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled')) }}
+        # Darwin may be skipped; all other required jobs must succeed.
+        if: >-
+          ${{ always() && (
+            contains(needs.*.result, 'failure') ||
+            contains(needs.*.result, 'cancelled') ||
+            needs.test-go.result != 'success' ||
+            needs.test-node.result != 'success' ||
+            needs.test-node-windows.result != 'success' ||
+            needs.test-vscode-windows.result != 'success' ||
+            needs.lint.result != 'success' ||
+            needs.test-wasm.result != 'success' ||
+            needs.test-rust.result != 'success'
+          ) }}
