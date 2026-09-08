@@ -61,7 +61,7 @@ The nearest owning project wins over a different tsconfig beside the Rslint conf
 
 `projectService: true` cannot be combined with explicit `project` paths or `project: []`, including values inherited from different matching entries. Remove `project`, or set `projectService: false` to use explicit projects. A later `project: false` or `project: null` clears inherited paths. A later `projectService: false` or `null` disables automatic discovery.
 
-A selected file that does not belong to a discovered project is an error. To lint such files without type information, override both settings for that file scope:
+A selected file that does not belong to a discovered project is an error, even if its enabled rules do not require types. It does not enter the [source-only gap fallback](/guide/type-checking#gap-files). In the JavaScript API, this rejects the lint request; results for other files in that request are not returned. To lint such files without type information, override both settings for that file scope:
 
 ```ts
 {

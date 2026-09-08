@@ -69,7 +69,11 @@ If a file is included by tsconfig but matched by rslint `ignores`, lint rules do
 
 ### Gap files
 
-Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. CLI lint parses and binds them as standalone source files without creating a synthetic Program or TypeChecker, so rules that do not require type information still run while type-aware rules do not. Gap files never enter the program-wide type-check phase. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
+With `projectService` disabled, selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. The lint loader parses and binds these files without providing a TypeChecker, so rules that do not require type information still run while type-aware rules are filtered out. These files never enter the program-wide type-check phase. This fallback does not create a tsconfig for automatic project discovery.
+
+With `projectService: true`, discovery may find an owning project that an explicit project list missed, such as a nested tsconfig. If discovery finds no owning project, the file is an error even when only non-type-aware rules are enabled; it does not enter the gap fallback. This also applies to TypeScript presets that enable service.
+
+For syntax-only files, override both `projectService: false` and `project: false` in the matching file scope; see the [project service configuration example](/config/language-options#languageoptionsparseroptionsprojectservice). To enable type information, include the file in a project selected by its effective parser settings. Upstream's `allowDefaultProject` can instead provide type information for allowed files outside configured projects, but Rslint does not yet support that option. The source-only gap fallback does not provide the same capability.
 
 ## Output
 
