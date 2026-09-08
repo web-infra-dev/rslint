@@ -2339,6 +2339,71 @@ module.exports = config;`
     },
   );
 
+  test.each([
+    {
+      name: 'explicit files',
+      project: { files: ['gap.js', 'source.ts'] },
+      owned: true,
+    },
+    {
+      name: 'triple-slash references',
+      project: { files: ['source.ts'] },
+      source: '/// <reference path="./gap.js" />\n',
+      owned: true,
+    },
+    {
+      name: 'ordinary imports',
+      project: { files: ['source.ts'] },
+      source: "import './gap.js';\n",
+      owned: false,
+    },
+    {
+      name: 'include globs',
+      project: { include: ['**/*'] },
+      owned: false,
+    },
+  ])(
+    'projectService lintFiles handles JavaScript ownership through $name',
+    async ({ project, source = 'export {};\n', owned }) => {
+      const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-service-js-'));
+      await writeFile(
+        path.join(tmp, 'tsconfig.json'),
+        JSON.stringify({ compilerOptions: { allowJs: false }, ...project }),
+      );
+      await writeFile(path.join(tmp, 'source.ts'), source);
+      await writeFile(
+        path.join(tmp, 'gap.js'),
+        'const values = [1, 2];\nfor (const key in values) {}\n',
+      );
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [
+          ts.configs.base,
+          {
+            files: ['**/*.js'],
+            rules: { '@typescript-eslint/no-for-in-array': 'error' },
+          },
+        ],
+      });
+      try {
+        if (owned) {
+          const [result] = await rslint.lintFiles(['gap.js']);
+          expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
+            '@typescript-eslint/no-for-in-array',
+          ]);
+        } else {
+          await expect(rslint.lintFiles(['gap.js'])).rejects.toThrow(
+            /gap\.js.*project service/,
+          );
+        }
+      } finally {
+        await rslint.close();
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
   test('projectService lintText selects the nearest overlay project over a different config-directory project', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-service-overlay-'),

@@ -76,6 +76,42 @@ func (h *recordingHost) host() projectservice.Host {
 	}
 }
 
+func TestServiceProgramKeepsParsedConfigModesIsolated(t *testing.T) {
+	root := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/upstream.txtar").Materialize(t, "js-listed-allowjs-false"))
+	host := newRecordingHost(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	configPath := tspath.ResolvePath(root, "tsconfig.json")
+	parsed, err := host.host().ParseConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalOptions := parsed.CompilerOptions()
+	originalExtensions := originalOptions.AllowNonTsExtensions
+	service, err := host.host().CreateProgram(configPath, parsed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.CompilerOptions() != originalOptions || originalOptions.AllowNonTsExtensions != originalExtensions {
+		t.Fatal("service construction mutated the caller's parsed options")
+	}
+	if !service.Options().AllowNonTsExtensions.IsTrue() || service.Options().AllowJs != core.TSFalse {
+		t.Fatal("service must allow listed JS sources without changing allowJs")
+	}
+	if service.CommandLine().ConfigFile != parsed.ConfigFile || !slices.Equal(service.CommandLine().FileNames(), parsed.FileNames()) {
+		t.Fatal("service construction changed config identity or complete roots")
+	}
+	file := tspath.ResolvePath(root, "gap.js")
+	if service.GetSourceFile(file) == nil {
+		t.Fatal("service must retain the listed JavaScript source")
+	}
+	legacy, err := utils.CreateProgramFromParsedConfigLenient(true, parsed, host.compilerHost(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.GetSourceFile(file) != nil || legacy.Options().AllowNonTsExtensions != originalExtensions {
+		t.Fatal("legacy construction borrowed the service extension policy")
+	}
+}
+
 func fixtureScenarios(t *testing.T, archive *txtarfs.Archive) []string {
 	t.Helper()
 	files, err := archive.FileNames("")

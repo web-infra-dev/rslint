@@ -49,6 +49,8 @@ Discovers the configured TypeScript project for each selected file. This is the 
 
 The nearest owning project wins over a different tsconfig beside the Rslint config or in the current working directory. Reference ownership follows TypeScript's source redirects and reference order. Each selected project keeps its complete root files and dependencies; selecting one lint file limits lint execution, not the type context.
 
+JavaScript files also need an owning project when service is enabled. A JS file explicitly listed in `files` or included through a triple-slash reference can belong to a project even with `allowJs: false`; that option still controls whether config globs and ordinary imports include JS. TypeScript presets enable service without limiting it to TS files, so JS scripts outside configured projects also need an override.
+
 ```ts
 {
   languageOptions: {

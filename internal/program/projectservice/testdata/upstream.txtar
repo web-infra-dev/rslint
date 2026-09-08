@@ -1,4 +1,4 @@
-Boolean project-service observations from typescript-eslint 8.69.0 / TypeScript 6.0.3.
+Boolean project-service observations from typescript-eslint 8.70.0 / TypeScript 6.0.3.
 Project paths, complete roots, and Program reuse were recorded through parser.parseForESLint.
 
 -- nearest-root/expect.json --
@@ -2931,3 +2931,131 @@ export const result: string = nullable;
 {"compilerOptions":{"strict":true,"types":[]},"files":["NODE_MODULES/pkg/file.ts"]}
 -- node-modules-case-boundary/NODE_MODULES/pkg/file.ts --
 export const value = 1;
+
+-- js-listed-allowjs-false/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "gap.js",
+      "config": "tsconfig.json",
+      "roots": [
+        "gap.js",
+        "src/covered.ts"
+      ],
+      "program": 1,
+      "diagnostics": []
+    }
+  ]
+}
+-- js-listed-allowjs-false/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": false
+  },
+  "files": [
+    "gap.js",
+    "src/covered.ts"
+  ]
+}
+-- js-listed-allowjs-false/src/covered.ts --
+export {};
+-- js-listed-allowjs-false/gap.js --
+console.log(1);
+-- js-triple-reference-allowjs-false/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "gap.js",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/covered.ts"
+      ],
+      "program": 1,
+      "diagnostics": []
+    }
+  ]
+}
+-- js-triple-reference-allowjs-false/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": false
+  },
+  "files": [
+    "src/covered.ts"
+  ]
+}
+-- js-triple-reference-allowjs-false/src/covered.ts --
+/// <reference path="../gap.js" />
+-- js-triple-reference-allowjs-false/gap.js --
+console.log(1);
+-- js-imported-allowjs-false/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "gap.js",
+      "error": true
+    }
+  ]
+}
+-- js-imported-allowjs-false/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": false
+  },
+  "files": [
+    "src/covered.ts"
+  ]
+}
+-- js-imported-allowjs-false/src/covered.ts --
+import '../gap.js';
+-- js-imported-allowjs-false/gap.js --
+console.log(1);
+-- js-glob-allowjs-false/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "gap.js",
+      "error": true
+    }
+  ]
+}
+-- js-glob-allowjs-false/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": false
+  },
+  "include": [
+    "**/*"
+  ]
+}
+-- js-glob-allowjs-false/src/covered.ts --
+export {};
+-- js-glob-allowjs-false/gap.js --
+console.log(1);
+-- js-excluded-allowjs/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "gap.js",
+      "error": true
+    }
+  ]
+}
+-- js-excluded-allowjs/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": true
+  },
+  "files": [
+    "src/covered.ts"
+  ]
+}
+-- js-excluded-allowjs/src/covered.ts --
+export {};
+-- js-excluded-allowjs/gap.js --
+console.log(1);

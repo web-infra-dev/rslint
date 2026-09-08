@@ -105,8 +105,17 @@ func CreateProgramFromParsedConfigLenient(singleThreaded bool, config *tsoptions
 
 // CreateProgramFromParsedConfigLenientWithProjectReferences enables the source
 // redirects used for configured-project discovery while preserving complete
-// roots and leaving syntax-diagnostic admission to the caller.
+// roots and leaving syntax-diagnostic admission to the caller. Like the
+// TypeScript project service, it admits explicitly listed and triple-slash
+// referenced JavaScript sources without enabling allowJs for config globs.
 func CreateProgramFromParsedConfigLenientWithProjectReferences(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) (*compiler.Program, error) {
+	// Parsing must retain the authored extension filters. Clone only after
+	// roots are resolved so service options cannot leak into explicit Programs
+	// that share the caller's parsed-config cache.
+	options := *config.CompilerOptions()
+	options.AllowNonTsExtensions = core.TSTrue
+	config = config.WithFileNames(config.FileNames())
+	config.SetCompilerOptions(&options)
 	return createProgramFromParsedConfigLenient(singleThreaded, config, &rootProjectReferenceHost{
 		CompilerHost: host,
 		root:         config,

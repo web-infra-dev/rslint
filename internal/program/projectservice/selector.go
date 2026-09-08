@@ -10,11 +10,11 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 )
 
 // Host supplies one immutable filesystem generation. CreateProgram must retain
-// the parsed config's complete roots and enable source project references.
+// the parsed config's complete roots, enable source project references, and
+// allow non-TS extensions after config parsing, as TypeScript's service does.
 // A missing or unreadable config may be represented by a nil parsed config.
 type Host struct {
 	FS            vfs.FS
@@ -142,8 +142,10 @@ func (q *search) membership(entry *candidate, referenced, allowLoad bool) (Selec
 	if !direct && (referenced || entry.parsed.CompilerOptions().Composite.IsTrue()) {
 		return Selection{}, nil
 	}
-	if len(entry.parsed.FileNames()) == 0 || !direct &&
-		!lintprogram.CompilerOptionsSupportFileName(entry.parsed.CompilerOptions(), q.fileName) {
+	// allowJs filters config globs and ordinary imports, but a service Program
+	// can still own JavaScript through a triple-slash reference. Let the actual
+	// Program decide membership instead of rejecting it from parsed options.
+	if len(entry.parsed.FileNames()) == 0 {
 		return Selection{}, nil
 	}
 	if entry.program == nil {
