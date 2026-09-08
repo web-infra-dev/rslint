@@ -2,7 +2,6 @@
 package nodeutil
 
 import (
-	"path"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -13,6 +12,23 @@ import (
 )
 
 var npmSpecifier = esregexp.MustCompile(`^(@[\w~-][\w.~-]*/)?[\w~-][\w.~-]*`, "")
+
+// These inverse maps are immutable. tsgo owns the emitted extension table;
+// the Node plugin selects preserve mode when no JSX setting is configured.
+var (
+	preservedExtensionAliases = typescriptExtensionAliases(core.JsxEmitPreserve)
+	emittedExtensionAliases   = typescriptExtensionAliases(core.JsxEmitReact)
+)
+
+func typescriptExtensionAliases(jsx core.JsxEmit) map[string][]string {
+	options := &core.CompilerOptions{Jsx: jsx}
+	aliases := map[string][]string{}
+	for _, extension := range tspath.SupportedTSImplementationExtensions {
+		emitted := module.TryGetJSExtensionForFile("index"+extension, options)
+		aliases[emitted] = append(aliases[emitted], extension)
+	}
+	return aliases
+}
 
 // ImportModuleName returns the npm package root after removing loader params.
 // Builtins, relative/absolute paths, import maps and URL imports have no npm name.
@@ -26,18 +42,10 @@ func ImportModuleName(specifier string) (name, resource string) {
 	return name, resource
 }
 
-func isTypeScript(fileName string) bool {
-	switch path.Ext(fileName) {
-	case ".ts", ".tsx", ".mts", ".cts":
-		return true
-	}
-	return false
-}
-
 // HasTypeScriptAlias preserves upstream's prefix exemption for compiler paths.
 // Config parsing, including extends and the nearest-file search, belongs to Program.
 func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
-	if !isTypeScript(fileName) {
+	if !tspath.HasTSFileExtension(fileName) {
 		return false
 	}
 	options := p.NearestCompilerOptions(fileName)
@@ -77,17 +85,16 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 	for i, base := range result.Paths {
 		result.Paths[i] = tspath.ResolvePath(cwd, base)
 	}
-	if isTypeScript(fileName) {
+	if tspath.HasTSFileExtension(fileName) {
 		config := p.NearestCompilerOptions(fileName)
 		if config != nil && config.AllowImportingTsExtensions == core.TSTrue {
 			if result.Extensions == nil {
 				result.Extensions = []string{".js", ".ts", ".mjs", ".mts", ".cjs", ".cts", ".json", ".node"}
 			}
 		} else {
-			result.ExtensionAliases = map[string][]string{".js": {".ts"}, ".mjs": {".mts"}, ".cjs": {".cts"}, ".jsx": {".tsx"}}
+			result.ExtensionAliases = preservedExtensionAliases
 			if config != nil && config.Jsx != core.JsxEmitPreserve && config.Jsx != core.JsxEmitNone {
-				result.ExtensionAliases[".js"] = append(result.ExtensionAliases[".js"], ".tsx")
-				delete(result.ExtensionAliases, ".jsx")
+				result.ExtensionAliases = emittedExtensionAliases
 			}
 		}
 		// Unlike the independent shared lists, upstream selects settings.n as
@@ -124,11 +131,9 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 			}
 			switch preset {
 			case "react", "react-jsx", "react-jsxdev", "react-native", "preserve":
-				result.ExtensionAliases = map[string][]string{".js": {".ts"}, ".mjs": {".mts"}, ".cjs": {".cts"}}
+				result.ExtensionAliases = emittedExtensionAliases
 				if preset == "preserve" {
-					result.ExtensionAliases[".jsx"] = []string{".tsx"}
-				} else {
-					result.ExtensionAliases[".js"] = append(result.ExtensionAliases[".js"], ".tsx")
+					result.ExtensionAliases = preservedExtensionAliases
 				}
 			}
 		}

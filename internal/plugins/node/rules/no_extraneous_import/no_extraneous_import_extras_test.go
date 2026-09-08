@@ -148,6 +148,16 @@ func TestNoExtraneousImportExtras(t *testing.T) {
 func TestNoExtraneousImportResolutionExtras(t *testing.T) {
 	root := extraneousRoot(t, "testdata/resolution.txtar")
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoExtraneousImportRule, []rule_tester.ValidTestCase{
+		// Preserve the final export-path component for tsgo's validation.
+		{Code: "import 'exports-last-node-modules';", FileName: "input.js"},
+		{Code: "import 'exports-last-dot';", FileName: "input.js"},
+		{Code: "import 'exports-last-parent';", FileName: "input.js"},
+		{Code: "import 'exports-array-last-node-modules';", FileName: "input.js"},
+		{Code: "import 'exports-array-last-dot';", FileName: "input.js"},
+		{Code: "import 'exports-array-last-parent';", FileName: "input.js"},
+		// A trailing directory separator must not enable a later target.
+		{Code: "import 'exports-array-directory-slash';", FileName: "input.js"},
+		{Code: "import 'exports-condition-directory-slash';", FileName: "input.js"},
 		// exports-no-condition/js
 		{Code: "import 'exports-no-condition';", FileName: "input.js"},
 		// exports-null-default/js

@@ -18,7 +18,8 @@ import (
 // NodeResolutionOptions selects runtime files independently of the compiler's
 // declaration-file preference. Nil extension/module lists use Node defaults;
 // empty lists disable that search. Conditions adds active export conditions to
-// CommonJS's require condition. Package traversal and exports stay with tsgo.
+// CommonJS's require condition. Package traversal and export-path validation
+// stay with tsgo.
 type NodeResolutionOptions struct {
 	Extensions       []string
 	Modules          []string
@@ -62,7 +63,7 @@ func (p *Program) ResolveNodeModule(name, containingFile string, options NodeRes
 				resolver := view.newResolver(p.CurrentDirectory())
 				base = tspath.ResolvePath(p.CurrentDirectory(), base)
 				result, _ := resolver.ResolveModuleName(name, tspath.ResolvePath(base, "__import__.js"), core.ResolutionModeCommonJS, nil)
-				if !view.invalidPackage && result != nil && result.IsResolved() {
+				if !view.unresolved && result != nil && result.IsResolved() {
 					return view.Realpath(result.ResolvedFileName)
 				}
 			}
@@ -71,19 +72,17 @@ func (p *Program) ResolveNodeModule(name, containingFile string, options NodeRes
 	})
 }
 
-type nodeResolutionHost struct {
-	fs  vfs.FS
-	cwd string
-}
-
-func (h *nodeResolutionHost) FS() vfs.FS                  { return h.fs }
-func (h *nodeResolutionHost) GetCurrentDirectory() string { return h.cwd }
-
-// The private view projects runtime candidates onto tsgo's JavaScript probes.
+// The private view projects runtime candidates onto tsgo's file probes.
 // A marked package target retains its exact extension (including .node or
 // .d.ts); unmarked index/file probes use the caller's extension list. This
 // reuses tsgo's package/exports traversal without exposing a second source host.
 const nodeTargetSuffix = ".__rslint_node_target__.js"
+
+// An extra component preserves every original export-path component for tsgo's
+// validation. A TS probe checks the file directly, without requiring the
+// original target to exist as a directory first.
+const nodeExportSuffix = "/.__rslint_node_export__.ts"
+const nodeDirectoryExportSuffix = "/.__rslint_node_directory_export__.ts"
 
 type nodeResolutionFS struct {
 	vfs.FS
@@ -92,11 +91,12 @@ type nodeResolutionFS struct {
 	explicitExtension string
 	resolved          map[string]string
 	activeDirectories map[string]bool
-	invalidPackage    bool
+	unresolved        bool
 }
 
 func (f *nodeResolutionFS) newResolver(cwd string) *module.Resolver {
-	return module.NewResolver(&nodeResolutionHost{f, cwd}, &core.CompilerOptions{
+	host := compiler.NewCompilerHost(cwd, f, "", nil, nil, nil)
+	return module.NewResolver(host, &core.CompilerOptions{
 		ModuleResolution: core.ModuleResolutionKindBundler,
 		NoDtsResolution:  core.TSTrue, ResolveJsonModule: core.TSTrue,
 		CustomConditions: f.options.Conditions,
@@ -105,6 +105,7 @@ func (f *nodeResolutionFS) newResolver(cwd string) *module.Resolver {
 
 func (f *nodeResolutionFS) physical(name string) string {
 	name = strings.ReplaceAll(name, nodeTargetSuffix+"/", "/")
+	name = strings.ReplaceAll(name, nodeExportSuffix+"/", "/")
 	if index := strings.LastIndex(name, "/node_modules"); index >= 0 && (len(name) == index+13 || name[index+13] == '/') {
 		rest := strings.TrimPrefix(name[index+13:], "/")
 		if tspath.IsRootedDiskPath(f.folder) {
@@ -142,8 +143,12 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 	switch {
 	case strings.HasSuffix(physical, "/package.json"):
 		return f.FS.FileExists(physical)
-	case strings.HasSuffix(physical, nodeTargetSuffix):
-		target := strings.TrimSuffix(physical, nodeTargetSuffix)
+	case strings.HasSuffix(physical, nodeDirectoryExportSuffix):
+		// Upstream rejects directory targets with a trailing separator.
+		f.unresolved = true
+		return true
+	case strings.HasSuffix(physical, nodeTargetSuffix), strings.HasSuffix(physical, nodeExportSuffix):
+		target := strings.TrimSuffix(strings.TrimSuffix(physical, nodeTargetSuffix), nodeExportSuffix)
 		resolved = f.probe(target, false)
 		if resolved == "" && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
 			// enhanced-resolve permits directory exports. Ask tsgo to resolve
@@ -160,6 +165,13 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 				resolved = f.Realpath(result.ResolvedFileName)
 			}
 		}
+		if resolved == "" && strings.HasSuffix(physical, nodeExportSuffix) {
+			// Stop tsgo after its first valid exports target, even when that
+			// target is missing. The caller discards this synthetic result.
+			// This leaves target validation and condition selection in tsgo.
+			f.unresolved = true
+			return true
+		}
 	case f.explicitExtension != "" && strings.HasSuffix(physical, f.explicitExtension):
 		resolved = f.probe(physical, true)
 	case strings.HasSuffix(physical, ".js"):
@@ -172,7 +184,7 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 }
 
 func (f *nodeResolutionFS) DirectoryExists(name string) bool {
-	return f.FS.DirectoryExists(strings.TrimSuffix(f.physical(name), nodeTargetSuffix))
+	return f.FS.DirectoryExists(strings.TrimSuffix(strings.TrimSuffix(f.physical(name), nodeTargetSuffix), nodeExportSuffix))
 }
 
 func (f *nodeResolutionFS) Realpath(name string) string {
@@ -188,7 +200,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 		return text, ok
 	}
 	if !json.Valid([]byte(text)) {
-		f.invalidPackage = true
+		f.unresolved = true
 		return "", false
 	}
 	value, err := hujson.Parse([]byte(text))
@@ -208,9 +220,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 					if literal, ok := member.Value.Value.(hujson.Literal); ok && (string(literal) == "null" || string(literal) == "false" || string(literal) == `""`) {
 						continue
 					}
-					selected := selectNodeExports(&member.Value, f.options.Conditions)
-					literal, _ := member.Value.Value.(hujson.Literal)
-					if !selected || string(literal) == "null" {
+					if !prepareNodeExports(&member.Value, f.options.Conditions) {
 						// A blocked selection must retain an exports map: a bare
 						// null field permits tsgo's legacy main/index fallback.
 						member.Value.Value = &hujson.Object{Members: []hujson.ObjectMember{{
@@ -218,61 +228,54 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 						}}}
 					}
 				}
-				markNodeTargets(&member.Value)
+				suffix := nodeTargetSuffix
+				if key == "exports" {
+					suffix = nodeExportSuffix
+				}
+				markNodeTargets(&member.Value, suffix)
 			}
 		}
 	}
 	return string(value.Pack()), true
 }
 
-// Exports selects a target before checking whether the file exists. tsgo also
-// tries subsequent conditions/array entries when declarations are missing;
-// runtime lookup must not turn such a broken first target into a valid import.
-func selectNodeExports(value *hujson.Value, conditions []string) bool {
+// tsgo owns exports paths, patterns and ordinary condition selection. Only
+// normalize enhanced-resolve's array behavior: primitive entries invalidate an
+// array; nested arrays and unmatched/null conditional entries are skipped.
+func prepareNodeExports(value *hujson.Value, conditions []string) bool {
 	switch object := value.Value.(type) {
 	case *hujson.Object:
-		if len(object.Members) > 0 && strings.HasPrefix(nodePackageMemberName(object.Members[0]), ".") {
-			for i := range object.Members {
-				if !selectNodeExports(&object.Members[i].Value, conditions) {
-					object.Members[i].Value.Value = hujson.Literal("null")
-				}
-			}
-			return true
-		}
 		for i := range object.Members {
-			key := nodePackageMemberName(object.Members[i])
-			if key == "default" || key == "require" || slices.Contains(conditions, key) {
-				candidate := object.Members[i].Value
-				if selectNodeExports(&candidate, conditions) {
-					value.Value = candidate.Value
-					return true
-				}
+			if !prepareNodeExports(&object.Members[i].Value, conditions) {
+				object.Members[i].Value.Value = hujson.Literal("null")
 			}
 		}
-		return false
 	case *hujson.Array:
-		var selected *hujson.Value
-		for _, candidate := range object.Elements {
-			if literal, ok := candidate.Value.(hujson.Literal); ok && literal.Kind() != '"' {
-				// Upstream rejects primitive array entries, even after a valid
-				// target. A null condition value outside an array simply blocks it.
-				value.Value = hujson.Literal("null")
-				return true
-			}
-			if _, nested := candidate.Value.(*hujson.Array); nested {
+		targets := make([]hujson.Value, 0, len(object.Elements))
+		for _, target := range object.Elements {
+			switch candidate := target.Value.(type) {
+			case hujson.Literal:
+				if candidate.Kind() != '"' {
+					return false
+				}
+			case *hujson.Array:
 				continue
-			}
-			if selectNodeExports(&candidate, conditions) {
-				if literal, ok := candidate.Value.(hujson.Literal); ok && literal.Kind() == '"' && selected == nil && validNodeExportTarget(literal.String()) {
-					selected = &candidate
+			case *hujson.Object:
+				selected, ok := nodeExportArrayCondition(candidate, conditions)
+				if !ok {
+					continue
+				}
+				target = selected
+				if literal, ok := target.Value.(hujson.Literal); ok && (literal.Kind() != '"' || literal.String() == "") {
+					continue
 				}
 			}
+			if !prepareNodeExports(&target, conditions) {
+				return false
+			}
+			targets = append(targets, target)
 		}
-		if selected != nil {
-			value.Value = selected.Value
-			return true
-		}
-		return false
+		object.Elements = targets
 	case hujson.Literal:
 		if object.Kind() == '"' {
 			target := object.String()
@@ -284,18 +287,23 @@ func selectNodeExports(value *hujson.Value, conditions []string) bool {
 	return true
 }
 
-func validNodeExportTarget(target string) bool {
-	if !strings.HasPrefix(target, "./") {
-		return false
-	}
-	// Use the same path component rules as tsgo before selecting an array
-	// target. Invalid paths may fall through; missing files may not.
-	for _, part := range tspath.GetPathComponents(target, "")[2:] {
-		if part == "." || part == ".." || part == "node_modules" {
-			return false
+// A conditional null inside an exports array is skipped by enhanced-resolve,
+// while tsgo treats it as a blocked resolution. Select only these array entries
+// here; ordinary conditional exports remain untouched for tsgo to select.
+func nodeExportArrayCondition(object *hujson.Object, conditions []string) (hujson.Value, bool) {
+	for _, member := range object.Members {
+		key := nodePackageMemberName(member)
+		if key == "default" || key == "require" || slices.Contains(conditions, key) {
+			if nested, ok := member.Value.Value.(*hujson.Object); ok {
+				if selected, found := nodeExportArrayCondition(nested, conditions); found {
+					return selected, true
+				}
+			} else {
+				return member.Value, true
+			}
 		}
 	}
-	return true
+	return hujson.Value{}, false
 }
 
 func nodePackageMemberName(member hujson.ObjectMember) string {
@@ -306,19 +314,22 @@ func nodePackageMemberName(member hujson.ObjectMember) string {
 	return name.String()
 }
 
-func markNodeTargets(value *hujson.Value) {
+func markNodeTargets(value *hujson.Value, suffix string) {
 	switch v := value.Value.(type) {
 	case hujson.Literal:
 		if v.Kind() == '"' {
-			value.Value = hujson.String(v.String() + nodeTargetSuffix)
+			if suffix == nodeExportSuffix && strings.HasSuffix(v.String(), "/") {
+				suffix = nodeDirectoryExportSuffix
+			}
+			value.Value = hujson.String(v.String() + suffix)
 		}
 	case *hujson.Object:
 		for i := range v.Members {
-			markNodeTargets(&v.Members[i].Value)
+			markNodeTargets(&v.Members[i].Value, suffix)
 		}
 	case *hujson.Array:
 		for i := range v.Elements {
-			markNodeTargets(&v.Elements[i])
+			markNodeTargets(&v.Elements[i], suffix)
 		}
 	}
 }
@@ -346,20 +357,17 @@ func (p *Program) ReadCompilerOptions(fileName string) *core.CompilerOptions {
 // NearestCompilerOptions reads the nearest tsconfig using the same immutable
 // FS and tsgo config parser, including extends. It does not create a Program.
 func (p *Program) NearestCompilerOptions(fileName string) *core.CompilerOptions {
-	if p.FS() == nil {
+	directory := tspath.GetDirectoryPath(fileName)
+	if p.FS() == nil || directory == "" {
 		return nil
 	}
-	return Cached(p, nearestConfigKey(tspath.GetDirectoryPath(fileName)), func() *core.CompilerOptions {
-		for directory := tspath.GetDirectoryPath(fileName); directory != ""; {
+	return Cached(p, nearestConfigKey(directory), func() *core.CompilerOptions {
+		config, found := tspath.ForEachAncestorDirectory(directory, func(directory string) (string, bool) {
 			config := tspath.ResolvePath(directory, "tsconfig.json")
-			if p.FS().FileExists(config) {
-				return p.ReadCompilerOptions(config)
-			}
-			parent := tspath.GetDirectoryPath(directory)
-			if parent == directory {
-				break
-			}
-			directory = parent
+			return config, p.FS().FileExists(config)
+		})
+		if found {
+			return p.ReadCompilerOptions(config)
 		}
 		return nil
 	})
