@@ -163,6 +163,7 @@ func parseRstestFnCall(
 		ExecutionMode:     resolved.executionMode,
 		Skipped:           resolved.skipped,
 		Todo:              resolved.todo,
+		IsPlaywright:      resolved.profile == rstestProfilePlaywright,
 	}
 	if len(resolved.focusEntries) > 0 {
 		parsed.focus = &rstestFocus{entries: resolved.focusEntries}
@@ -353,6 +354,14 @@ func resolveRstestRoot(
 
 	localName := root.AsIdentifier().Text
 	symbol := resolveRstestRootSymbol(ctx, root)
+	// The source-only binder does not resolve every value-producing TypeScript
+	// declaration (notably namespaces), and can resolve through a declaration
+	// in a nearer module block to an outer import. Do not treat either shape as
+	// an Rstest API merely because its spelling is `test`, `it`, or `describe`.
+	if isRstestRootShadowedByModuleBlock(root, ctx.SourceFile, localName, symbol) ||
+		(symbol == nil && internalUtils.IsShadowed(root, localName)) {
+		return rstestResolvedAPI{}, 0, false
+	}
 	for _, profile := range rstestAllProfiles {
 		name, originalNode, mode := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
 			localName,
@@ -465,6 +474,28 @@ func resolveRstestRoot(
 	}
 
 	return rstestResolvedAPI{}, 0, false
+}
+
+func isRstestRootShadowedByModuleBlock(root *ast.Node, sourceFile *ast.SourceFile, name string, symbol *ast.Symbol) bool {
+	for ancestor := root.Parent; ancestor != nil && ancestor != sourceFile.AsNode(); ancestor = ancestor.Parent {
+		if ancestor.Kind != ast.KindModuleBlock {
+			continue
+		}
+		statements := ancestor.AsModuleBlock().Statements
+		if statements == nil || !internalUtils.HasLocalDeclarationInStatements(statements.Nodes, name) {
+			continue
+		}
+		if symbol == nil {
+			return true
+		}
+		for _, declaration := range symbol.Declarations {
+			if ast.IsNodeDescendantOf(declaration, ancestor) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool) {
