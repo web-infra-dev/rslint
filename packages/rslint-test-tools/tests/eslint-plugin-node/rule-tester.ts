@@ -3,13 +3,22 @@ import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
 import { lint } from '@rslint/core/internal';
 import { createTempDir, cleanupTempDir } from '../cli/js-config/helpers';
 
+interface ExpectedError {
+  messageId: string;
+  message: string;
+  line: number;
+  column: number;
+  endLine: number;
+  endColumn: number;
+}
+
 interface TestCase {
   name?: string;
   code: string;
   filename?: string;
   options?: unknown[];
   settings?: Record<string, unknown>;
-  errors?: string[];
+  errors?: (string | ExpectedError)[];
   output?: string;
 }
 
@@ -26,6 +35,15 @@ const packages = {
 };
 
 export class RuleTester {
+  constructor(
+    private readonly config: {
+      languageOptions?: {
+        globals?: Record<string, 'readonly' | 'writable' | 'off'>;
+        sourceType?: 'script' | 'module' | 'commonjs';
+      };
+    } = {},
+  ) {}
+
   run(
     name: string,
     _rule: unknown,
@@ -62,7 +80,10 @@ export class RuleTester {
               config: [
                 {
                   plugins: ['node'],
-                  languageOptions: { parserOptions: { projectService: false } },
+                  languageOptions: {
+                    ...this.config.languageOptions,
+                    parserOptions: { projectService: false },
+                  },
                   settings: item.settings,
                   rules: {
                     [`node/${name}`]: ['error', ...(item.options ?? [])],
@@ -75,8 +96,23 @@ export class RuleTester {
             expect(result.fileCount).toBe(1);
             expect(result.ruleCount).toBe(1);
             expect(result.diagnostics).toHaveLength(item.errors?.length ?? 0);
-            for (const [i, message] of (item.errors ?? []).entries()) {
+            for (const [i, expected] of (item.errors ?? []).entries()) {
               const diagnostic = result.diagnostics[i];
+              expect(diagnostic.ruleName).toBe(`node/${name}`);
+              expect(diagnostic.suggestions).toBeUndefined();
+              if (typeof expected !== 'string') {
+                expect(diagnostic.message).toBe(expected.message);
+                expect(diagnostic.messageId).toBe(expected.messageId);
+                expect(diagnostic.range).toEqual({
+                  start: { line: expected.line, column: expected.column },
+                  end: { line: expected.endLine, column: expected.endColumn },
+                });
+                expect(diagnostic.fixes).toBeUndefined();
+                continue;
+              }
+              // Hashbang's upstream string expectations describe a fix on
+              // the complete first line.
+              const message = expected;
               const messageId = message.includes('needs shebang')
                 ? 'expectedHashbangNode'
                 : message.includes('needs no shebang')
@@ -84,7 +120,6 @@ export class RuleTester {
                   : message.includes('Unicode BOM')
                     ? 'unexpectedBOM'
                     : 'expectedLF';
-              expect(diagnostic.ruleName).toBe(`node/${name}`);
               expect(diagnostic.message).toBe(message);
               expect(diagnostic.messageId).toBe(messageId);
               expect(diagnostic.range).toEqual({
@@ -98,7 +133,6 @@ export class RuleTester {
                 },
               });
               expect(diagnostic.fixes?.length).toBe(1);
-              expect(diagnostic.suggestions).toBeUndefined();
             }
             if (item.output !== undefined) {
               const fixed = await lint({ ...request, fix: true });
