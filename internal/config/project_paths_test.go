@@ -590,7 +590,7 @@ func TestResolveTsConfigPathsDefaultRemainsAtOwningConfigBase(t *testing.T) {
 	// The root option rebases declared paths; omitted project retains rslint's
 	// owner-level default, including when the authored base is elsewhere.
 	projects, err = ResolveTsConfigPathsWithPolicy(config, configDirectory, osvfs.FS(), ProjectPolicy{
-		TsconfigRootDir: tspath.NormalizePath(authoredDirectory),
+		TSConfigRootDirOverride: tspath.NormalizePath(authoredDirectory),
 	})
 	assert.NilError(t, err)
 	assert.DeepEqual(t, projects, []string{tspath.NormalizePath(ownerProject)})

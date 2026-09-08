@@ -19,3 +19,11 @@ export const expected: number = value;
 export const contextOnly = 1;
 -- outside.ts --
 export const outside = 1;
+-- disabled-source-redirect/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- disabled-source-redirect/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["target.ts"]}
+-- disabled-source-redirect/target.ts --
+export const value = 1;
+-- no-config/target.ts --
+export const value = 1;

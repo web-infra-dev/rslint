@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
-	"github.com/web-infra-dev/rslint/internal/program/projectservice"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -131,9 +131,29 @@ type selectedLintProject struct {
 
 func selectConfiguredLintProject(
 	tsConfigPaths []string,
+	serviceRootDirectory string,
 	target target.File,
+	fs vfs.FS,
 	loaders lintProjectLoaders,
 ) (selectedLintProject, bool, error) {
+	if serviceRootDirectory != "" {
+		discovery := utils.NewTypeScriptProjectDiscovery(fs, func(configPath string) (*tsoptions.ParsedCommandLine, error) {
+			metadata, available, err := loaders.metadata(configPath)
+			if err != nil {
+				return nil, err
+			}
+			if !available || metadata == nil {
+				return nil, fmt.Errorf("no parsed config returned for %q", configPath)
+			}
+			return metadata.commandLine, nil
+		})
+		parsed, err := discovery.Find(target.Path, serviceRootDirectory)
+		if err != nil || parsed == nil {
+			return selectedLintProject{}, false, err
+		}
+		return loadDirectLintProject(parsed.ConfigName(), target, loaders.program)
+	}
+
 	metadataByProject := make([]*lintProjectMetadata, len(tsConfigPaths))
 	if loaders.metadata != nil {
 		for index, tsConfigPath := range tsConfigPaths {
@@ -153,26 +173,7 @@ func selectConfiguredLintProject(
 				!metadata.rootFiles.Contains(target.Path, target.CanonicalPath) {
 				continue
 			}
-			if loaders.program == nil {
-				return selectedLintProject{}, false, fmt.Errorf("configured project root %q cannot load %q", target.Path, tsConfigPath)
-			}
-			program, sourceFile, err := loaders.program(tsConfigPath)
-			if err != nil {
-				return selectedLintProject{}, false, fmt.Errorf("load configured project %q: %w", tsConfigPath, err)
-			}
-			if program == nil || sourceFile == nil {
-				return selectedLintProject{}, false, fmt.Errorf(
-					"configured project root %q was absent from %q",
-					target.Path,
-					tsConfigPath,
-				)
-			}
-			return selectedLintProject{
-				program:    program,
-				sourceFile: sourceFile,
-				configPath: tsConfigPath,
-				directRoot: true,
-			}, true, nil
+			return loadDirectLintProject(tsConfigPath, target, loaders.program)
 		}
 	}
 
@@ -202,15 +203,35 @@ func selectConfiguredLintProject(
 	return selectedLintProject{}, false, nil
 }
 
+func loadDirectLintProject(
+	configPath string,
+	target target.File,
+	loadProgram lintProgramLoader,
+) (selectedLintProject, bool, error) {
+	if loadProgram == nil {
+		return selectedLintProject{}, false, fmt.Errorf("configured project root %q cannot load %q", target.Path, configPath)
+	}
+	program, sourceFile, err := loadProgram(configPath)
+	if err != nil {
+		return selectedLintProject{}, false, fmt.Errorf("load configured project %q: %w", configPath, err)
+	}
+	if program == nil || sourceFile == nil {
+		return selectedLintProject{}, false, fmt.Errorf("configured project root %q was absent from %q", target.Path, configPath)
+	}
+	return selectedLintProject{
+		program: program, sourceFile: sourceFile, configPath: configPath, directRoot: true,
+	}, true, nil
+}
+
 // standaloneLintProjectRequest gives one isolated lint pass a stable parsed
 // project snapshot. Root probing and Program construction share it, so a
 // config cannot be parsed twice or change meaning halfway through selection.
 type standaloneLintProjectRequest struct {
-	target                target.File
-	fs                    vfs.FS
-	loadFS                func() vfs.FS
-	projects              map[string]*lintProjectMetadata
-	loadedServiceProjects map[string]struct{}
+	target           target.File
+	fs               vfs.FS
+	loadFS           func() vfs.FS
+	projects         map[string]*lintProjectMetadata
+	sourceReferences bool
 }
 
 func newStandaloneLintProjectRequest(
@@ -268,7 +289,15 @@ func (request *standaloneLintProjectRequest) program(
 	if err != nil {
 		return nil, nil, err
 	}
-	program, err := createStandaloneLintProgram(metadata, request.filesystem())
+	var program *compiler.Program
+	if request.sourceReferences {
+		program, err = utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
+			true, metadata.commandLine,
+			utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), request.filesystem()),
+		)
+	} else {
+		program, err = createStandaloneLintProgram(metadata, request.filesystem())
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -289,53 +318,6 @@ func (request *standaloneLintProjectRequest) loaders() lintProjectLoaders {
 	}
 }
 
-// service selects configured projects from this request's frozen editor
-// overlay. Its Programs use live reference sources, while legacy explicit
-// projects retain their existing construction mode.
-func (request *standaloneLintProjectRequest) service(rootDir string) (selectedLintProject, error) {
-	fsys := request.filesystem()
-	createProgram := func(configPath string, parsed *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
-		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
-			true,
-			parsed,
-			utils.CreateCompilerHost(tspath.GetDirectoryPath(configPath), fsys),
-		)
-	}
-	selector := projectservice.New(projectservice.Host{
-		FS: fsys,
-		ParseConfig: func(configPath string) (*tsoptions.ParsedCommandLine, error) {
-			metadata, err := request.metadata(configPath)
-			if err != nil {
-				return nil, err
-			}
-			return metadata.commandLine, nil
-		},
-		CreateProgram: createProgram,
-		LoadedProgram: func(configPath string) (*compiler.Program, error) {
-			key := string(lintProgramLexicalPathID(configPath, fsys))
-			if _, loaded := request.loadedServiceProjects[key]; !loaded || !fsys.FileExists(configPath) {
-				return nil, nil //nolint:nilnil // An unloaded or deleted project is a normal cache miss.
-			}
-			// Speculative passes preserve which projects were already loaded,
-			// but rebuild their Programs from this pass's isolated editor text.
-			metadata, err := request.metadata(configPath)
-			if err != nil {
-				return nil, err
-			}
-			return createProgram(configPath, metadata.commandLine)
-		},
-	})
-	selected, err := selector.Select(request.target.Path, rootDir)
-	if err != nil || selected.Program == nil {
-		return selectedLintProject{}, err
-	}
-	return selectedLintProject{
-		program:    selected.Program,
-		sourceFile: sourceFileForTarget(selected.Program, request.target, fsys),
-		configPath: selected.ConfigPath,
-	}, nil
-}
-
 type lintSessionProjectRootCache struct {
 	mu      sync.Mutex
 	entries map[string]lintSessionProjectRootEntry
@@ -344,6 +326,9 @@ type lintSessionProjectRootCache struct {
 type lintSessionProjectRootEntry struct {
 	commandLine *tsoptions.ParsedCommandLine
 	metadata    *lintProjectMetadata
+	// A compatibility fact must not keep a Session's AST graph alive.
+	program           weak.Pointer[compiler.Program]
+	serviceCompatible bool
 }
 
 func newLintSessionProjectRootCache() *lintSessionProjectRootCache {
@@ -371,11 +356,56 @@ func (cache *lintSessionProjectRootCache) metadata(
 		return entry.metadata
 	}
 	metadata := newLintProjectMetadata(configPath, commandLine, fs)
-	cache.entries[key] = lintSessionProjectRootEntry{
-		commandLine: commandLine,
-		metadata:    metadata,
-	}
+	entry.commandLine = commandLine
+	entry.metadata = metadata
+	cache.entries[key] = entry
 	return metadata
+}
+
+// canUseServiceProgram checks the known construction difference between a
+// configured Session Program and service construction. The result belongs to
+// the current Program generation, not merely to its unchanged tsconfig roots.
+func (cache *lintSessionProjectRootCache) canUseServiceProgram(configPath string, program *compiler.Program, fs vfs.FS) bool {
+	if cache == nil {
+		return lintSessionProgramSupportsService(program)
+	}
+	key := string(lintProgramLexicalPathID(configPath, fs))
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	entry := cache.entries[key]
+	if entry.program.Value() == program {
+		return entry.serviceCompatible
+	}
+	entry.program = weak.Make(program)
+	entry.serviceCompatible = lintSessionProgramSupportsService(program)
+	cache.entries[key] = entry
+	return entry.serviceCompatible
+}
+
+func lintSessionProgramSupportsService(program *compiler.Program) bool {
+	if program.Options().AllowNonTsExtensions.IsTrue() {
+		return true
+	}
+	supported := func(fileName string) bool {
+		return lintprogram.CompilerOptionsSupportFileName(program.Options(),
+			tspath.GetCanonicalFileName(fileName, program.UseCaseSensitiveFileNames()))
+	}
+	for _, fileName := range program.CommandLine().FileNames() {
+		if !supported(fileName) {
+			return false
+		}
+	}
+	// A supported target can depend on an explicit JS path reference that the
+	// Session rejected. Inspect existing reference metadata without loading any
+	// additional source or reproducing module resolution.
+	for _, source := range program.GetSourceFiles() {
+		for _, reference := range source.ReferencedFiles {
+			if !supported(reference.FileName) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (cache *lintSessionProjectRootCache) Invalidate() bool {
@@ -389,53 +419,92 @@ func (cache *lintSessionProjectRootCache) Invalidate() bool {
 	return hadState
 }
 
-// selectLintProgram chooses type information according to the authored
-// parserOptions.project order while adapting already-loaded Session Programs
-// and LSP-owned standalone Programs through one project-selection policy.
+// selectLintProgram adapts already-loaded Session Programs and LSP-owned
+// standalone Programs through the same configured-project selection policy.
 func selectLintProgram(
 	uri lsproto.DocumentUri,
 	target target.File,
 	session *project.Session,
 	ctx context.Context,
 	tsConfigPaths []string,
+	serviceRootDirectory string,
 	fs vfs.FS,
 	fallbackLoaders lintProjectLoaders,
 	sessionRoots *lintSessionProjectRootCache,
 ) (*compiler.Program, *ast.SourceFile, bool, error) {
-	_, languageService, loadedProjects, err := session.GetLanguageServiceAndProjectsForFile(ctx, uri)
-	if err != nil {
-		return nil, nil, false, fmt.Errorf("failed to get language service: %w", err)
-	}
-	program := languageService.GetProgram()
-
 	type loadedLintProject struct {
 		program     *compiler.Program
 		commandLine *tsoptions.ParsedCommandLine
 	}
-	loadedByConfig := make(map[tspath.Path]loadedLintProject, len(loadedProjects))
-	for _, candidate := range loadedProjects {
-		if candidate == nil || candidate.GetProgram() == nil {
-			continue
+	loadedByConfig := make(map[tspath.Path]loadedLintProject)
+	var program *compiler.Program
+	var sessionSnapshot *project.Snapshot
+	sessionLoaded := false
+	loadSession := func() error {
+		if session == nil || sessionLoaded {
+			return nil
 		}
-		candidateProgram := candidate.GetProgram()
-		configPath := string(candidate.Id())
-		if configPath == "" {
-			continue
+		_, languageService, loadedProjects, err := session.GetLanguageServiceAndProjectsForFile(ctx, uri)
+		if err != nil {
+			return fmt.Errorf("failed to get language service: %w", err)
 		}
-		commandLine := candidateProgram.CommandLine()
-		if sessionProject, ok := candidate.(*project.Project); ok && sessionProject.CommandLine != nil {
-			commandLine = sessionProject.CommandLine
+		sessionLoaded = true
+		program = languageService.GetProgram()
+		if serviceRootDirectory != "" {
+			sessionSnapshot = session.Snapshot()
 		}
-		loadedByConfig[lintProgramLexicalPathID(configPath, fs)] = loadedLintProject{
-			program:     candidateProgram,
-			commandLine: commandLine,
+		for _, candidate := range loadedProjects {
+			if candidate == nil || candidate.GetProgram() == nil {
+				continue
+			}
+			candidateProgram := candidate.GetProgram()
+			configPath := string(candidate.Id())
+			if configPath == "" {
+				continue
+			}
+			commandLine := candidateProgram.CommandLine()
+			if sessionProject, ok := candidate.(*project.Project); ok && sessionProject.CommandLine != nil {
+				commandLine = sessionProject.CommandLine
+			}
+			loadedByConfig[lintProgramLexicalPathID(configPath, fs)] = loadedLintProject{
+				program: candidateProgram, commandLine: commandLine,
+			}
 		}
+		return nil
+	}
+	if serviceRootDirectory == "" {
+		if err := loadSession(); err != nil {
+			return nil, nil, false, err
+		}
+	}
+	findLoadedProject := func(configPath string) (loadedLintProject, bool) {
+		key := lintProgramLexicalPathID(configPath, fs)
+		if loaded, ok := loadedByConfig[key]; ok {
+			return loaded, true
+		}
+		// A selected direct root can be absent from a Session Program when
+		// source redirects are disabled. Reuse that exact project so the
+		// missing-source error is preserved instead of building a substitute.
+		if sessionSnapshot != nil {
+			if candidate := sessionSnapshot.ProjectCollection.ConfiguredProject(key); candidate != nil && candidate.GetProgram() != nil {
+				loaded := loadedLintProject{program: candidate.GetProgram(), commandLine: candidate.CommandLine}
+				loadedByConfig[key] = loaded
+				return loaded, true
+			}
+		}
+		return loadedLintProject{}, false
 	}
 	loaders := lintProjectLoaders{
 		metadata: func(tsConfigPath string) (*lintProjectMetadata, bool, error) {
-			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
-				metadata := sessionRoots.metadata(tsConfigPath, loadedProject.commandLine, fs)
-				return metadata, metadata != nil, nil
+			// Service discovery reads the current overlay before asking Session
+			// to update any Programs. Its previous command line can predate a
+			// pending config change; existing standalone metadata has its own
+			// watcher invalidation and remains safe to reuse here.
+			if serviceRootDirectory == "" {
+				if loadedProject, ok := findLoadedProject(tsConfigPath); ok {
+					metadata := sessionRoots.metadata(tsConfigPath, loadedProject.commandLine, fs)
+					return metadata, metadata != nil, nil
+				}
 			}
 			if fallbackLoaders.metadata == nil {
 				return nil, false, nil
@@ -443,8 +512,13 @@ func selectLintProgram(
 			return fallbackLoaders.metadata(tsConfigPath)
 		},
 		program: func(tsConfigPath string) (*compiler.Program, *ast.SourceFile, error) {
-			if loadedProject, ok := loadedByConfig[lintProgramLexicalPathID(tsConfigPath, fs)]; ok {
-				return loadedProject.program, sourceFileForTarget(loadedProject.program, target, fs), nil
+			if err := loadSession(); err != nil {
+				return nil, nil, err
+			}
+			if loadedProject, ok := findLoadedProject(tsConfigPath); ok {
+				if serviceRootDirectory == "" || sessionRoots.canUseServiceProgram(tsConfigPath, loadedProject.program, fs) {
+					return loadedProject.program, sourceFileForTarget(loadedProject.program, target, fs), nil
+				}
 			}
 			if fallbackLoaders.program == nil {
 				return nil, nil, nil
@@ -452,12 +526,15 @@ func selectLintProgram(
 			return fallbackLoaders.program(tsConfigPath)
 		},
 	}
-	selected, found, err := selectConfiguredLintProject(tsConfigPaths, target, loaders)
+	selected, found, err := selectConfiguredLintProject(tsConfigPaths, serviceRootDirectory, target, fs, loaders)
 	if err != nil {
 		return nil, nil, false, err
 	}
 	if found {
 		return selected.program, selected.sourceFile, true, nil
+	}
+	if serviceRootDirectory != "" || program == nil {
+		return nil, nil, false, nil
 	}
 	return program, sourceFileForTarget(program, target, fs), false, nil
 }

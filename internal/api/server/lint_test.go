@@ -418,6 +418,41 @@ func TestHandleLint_ProjectServiceUsesTargetConfigAndOverlay(t *testing.T) {
 	}
 }
 
+func TestHandleLint_ProjectServiceDefaultRootUsesInvocation(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "root-default"))
+	cwd := tspath.ResolvePath(dir, "pkg")
+	rootJSON, err := json.Marshal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, entries string
+		wantTyped     int
+	}{
+		{name: "omitted uses invocation cwd"},
+		{name: "null restores invocation cwd", entries: `,{"languageOptions":{"parserOptions":{"tsconfigRootDir":` + string(rootJSON) + `}}},{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}`},
+		{name: "explicit root reaches parent", entries: `,{"languageOptions":{"parserOptions":{"tsconfigRootDir":` + string(rootJSON) + `}}}`, wantTyped: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true}},"rules":{"@typescript-eslint/no-unnecessary-condition":"error","no-debugger":"error"}}` + test.entries + `]`)
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config: config, ConfigDirectory: dir, WorkingDirectory: cwd,
+				Files: []string{tspath.ResolvePath(cwd, "file.ts")},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			counts := make(map[string]int)
+			for _, diagnostic := range response.Diagnostics {
+				counts[diagnostic.RuleName]++
+			}
+			if response.FileCount != 1 || counts["no-debugger"] != 1 || counts["@typescript-eslint/no-unnecessary-condition"] != test.wantTyped {
+				t.Fatalf("inline config default borrowed its synthetic ConfigDirectory: %+v", response)
+			}
+		})
+	}
+}
+
 func TestHandleLint_ProjectServiceKeepsGapResultsAndRules(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
 	config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true}},"rules":{"@typescript-eslint/no-for-in-array":"error","no-debugger":"error"}}]`)

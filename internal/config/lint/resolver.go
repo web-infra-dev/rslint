@@ -20,6 +20,7 @@ type Resolver struct {
 	configsByOwner       map[string]config.RslintConfig
 	config               config.RslintConfig
 	configDirectory      string
+	defaultRootDirectory string
 	targetsBySourcePath  map[string]target.File
 	fsys                 vfs.FS
 	singleResolver       *config.FileConfigResolver
@@ -29,11 +30,16 @@ type Resolver struct {
 // ResolverOptions contains one request's frozen configuration and source-path
 // binding. Catalog and PathSpaces must belong to the same config generation.
 type ResolverOptions struct {
-	ConfigsByOwner      map[string]config.RslintConfig
-	Config              config.RslintConfig
-	ConfigDirectory     string
-	Catalog             *rule.Catalog
-	TargetsBySourcePath map[string]target.File
+	ConfigsByOwner  map[string]config.RslintConfig
+	Config          config.RslintConfig
+	ConfigDirectory string
+	// DefaultRootDirectory is the loaded config module directory, or the
+	// invocation cwd for an inline-only Config. It must not be inferred from
+	// ConfigDirectory, which may instead be a synthetic matching/path base.
+	// ConfigsByOwner supplies each module's own directory and ignores this field.
+	DefaultRootDirectory string
+	Catalog              *rule.Catalog
+	TargetsBySourcePath  map[string]target.File
 	// SourceMappingsIncludeCanonicalPaths indicates that Program binding
 	// already supplied both lexical and canonical source keys, so normalization
 	// needs no filesystem IO.
@@ -51,9 +57,10 @@ func NewResolver(options ResolverOptions) *Resolver {
 		panic("path-space snapshot is required")
 	}
 	resolver := &Resolver{
-		configsByOwner:  options.ConfigsByOwner,
-		config:          options.Config,
-		configDirectory: options.ConfigDirectory,
+		configsByOwner:       options.ConfigsByOwner,
+		config:               options.Config,
+		configDirectory:      options.ConfigDirectory,
+		defaultRootDirectory: options.DefaultRootDirectory,
 		targetsBySourcePath: normalizeSourceTargetMappings(
 			options.TargetsBySourcePath,
 			options.FS,
@@ -125,16 +132,25 @@ func (resolver *Resolver) ResolveTarget(file target.File) (config.ResolvedFileCo
 // ProjectPolicies resolves only owners with service/root/reset options. The
 // returned values carry no project lists, and zero policies need no override.
 func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]config.ProjectPolicy, error) {
-	ownersWithOptions := make(map[*config.FileConfigResolver]bool, len(resolver.configsByOwner))
+	type ownerProjectContext struct {
+		hasOptions    bool
+		rootDirectory string
+	}
+	ownerContexts := make(map[*config.FileConfigResolver]ownerProjectContext, len(resolver.configsByOwner))
 	for owner, entries := range resolver.configsByOwner {
-		ownersWithOptions[resolver.resolversByOwnerPath[owner]] = config.HasProjectOptions(entries)
+		ownerContexts[resolver.resolversByOwnerPath[owner]] = ownerProjectContext{
+			hasOptions: config.HasProjectOptions(entries), rootDirectory: owner,
+		}
 	}
 	singleHasOptions := config.HasProjectOptions(resolver.config)
 	var policies map[target.File]config.ProjectPolicy
 	for _, file := range files {
 		hasOptions := singleHasOptions
+		defaultRootDirectory := resolver.defaultRootDirectory
 		if resolver.configsByOwner != nil {
-			hasOptions = ownersWithOptions[resolver.resolversByOwnerPath[file.ConfigDirectory]]
+			context := ownerContexts[resolver.resolversByOwnerPath[file.ConfigDirectory]]
+			hasOptions = context.hasOptions
+			defaultRootDirectory = context.rootDirectory
 		}
 		if !hasOptions {
 			continue
@@ -143,7 +159,7 @@ func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]
 		if !ok {
 			continue
 		}
-		policy, err := config.ResolveProjectPolicy(resolved)
+		policy, err := config.ResolveProjectPolicy(resolved, defaultRootDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", file.Path, err)
 		}

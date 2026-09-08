@@ -1,7 +1,8 @@
 Boolean project-service observations from typescript-eslint 8.70.0 / TypeScript 6.0.3.
 Project paths, complete roots, and Program reuse were recorded through parser.parseForESLint.
-Unowned observations preserve the missing configured owner; rslint returns a search miss
-instead of reproducing the adapter's rejection so callers can apply source-only gap linting.
+The recorded upstream observations remain unchanged. Explicit rslint observations describe
+root-only gap admission and deterministic disabled-reference discovery; their reasons are
+kept beside the upstream result. No scenario is dropped for differing from upstream.
 
 -- nearest-root/expect.json --
 {
@@ -171,7 +172,11 @@ export const result: string = nullable;
       "strict": true,
       "diagnostics": [
         2322
-      ]
+      ],
+      "rslint": {
+        "unowned": true
+      },
+      "rslintReason": "The target is imported but is not a configured root."
     }
   ]
 }
@@ -1631,7 +1636,11 @@ export const result: string = nullable;
       "strict": true,
       "diagnostics": [
         2322
-      ]
+      ],
+      "rslint": {
+        "unowned": true
+      },
+      "rslintReason": "Reference discovery stays disabled independently of earlier selections."
     }
   ]
 }
@@ -1781,7 +1790,11 @@ export const result: string = nullable;
       ],
       "program": 1,
       "strict": false,
-      "diagnostics": []
+      "diagnostics": [],
+      "rslint": {
+        "unowned": true
+      },
+      "rslintReason": "The target is only imported by the ancestor project."
     }
   ]
 }
@@ -2747,7 +2760,11 @@ export const result: string = nullable;
       "diagnostics": [
         2322
       ],
-      "strict": true
+      "strict": true,
+      "rslint": {
+        "unowned": true
+      },
+      "rslintReason": "Reference discovery does not recreate TypeScript server warm-project state."
     }
   ]
 }
@@ -2985,7 +3002,11 @@ console.log(1);
         "src/covered.ts"
       ],
       "program": 1,
-      "diagnostics": []
+      "diagnostics": [],
+      "rslint": {
+        "unowned": true
+      },
+      "rslintReason": "Triple-slash inclusion does not make the JS target a configured root."
     }
   ]
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -18,10 +17,9 @@ import (
 // speculativeLintEnvironment captures the base filesystem identity, process
 // directory, and open-editor text used to rebuild isolated fix-all generations.
 type speculativeLintEnvironment struct {
-	baseFS                vfs.FS
-	processCwd            string
-	openFiles             map[string]string
-	loadedServiceProjects map[string]struct{}
+	baseFS     vfs.FS
+	processCwd string
+	openFiles  map[string]string
 }
 
 func (s *Server) freezeSpeculativeLintEnvironment(
@@ -29,15 +27,10 @@ func (s *Server) freezeSpeculativeLintEnvironment(
 	target target.File,
 ) speculativeLintEnvironment {
 	openFiles, _ := s.currentEditorOverlayFilesForFrozenTarget(uri, target, "", false)
-	var loadedServiceProjects map[string]struct{}
-	if s.lintPrograms != nil {
-		loadedServiceProjects = maps.Clone(s.lintPrograms.loadedServiceProjects)
-	}
 	return speculativeLintEnvironment{
-		baseFS:                s.fs,
-		processCwd:            s.cwd,
-		openFiles:             openFiles,
-		loadedServiceProjects: loadedServiceProjects,
+		baseFS:     s.fs,
+		processCwd: s.cwd,
+		openFiles:  openFiles,
 	}
 }
 
@@ -70,20 +63,14 @@ func acquireSpeculativeGeneration(
 	overlayFS := newFrozenLintTargetOverlayFS(environment.baseFS, files, target)
 
 	request := newStandaloneLintProjectRequestWithFS(target, overlayFS)
-	request.loadedServiceProjects = environment.loadedServiceProjects
-	var selected selectedLintProject
-	var found bool
-	var err error
-	if snapshot.projectPolicy.ProjectService {
-		selected, err = request.service(snapshot.projectServiceRootDirectory())
-		found = selected.program != nil
-	} else {
-		selected, found, err = selectConfiguredLintProject(
-			snapshot.typeScriptConfigPaths,
-			target,
-			request.loaders(),
-		)
-	}
+	request.sourceReferences = snapshot.projectPolicy.ServiceRootDirectory != ""
+	selected, found, err := selectConfiguredLintProject(
+		snapshot.typeScriptConfigPaths,
+		snapshot.projectPolicy.ServiceRootDirectory,
+		target,
+		overlayFS,
+		request.loaders(),
+	)
 	if err != nil {
 		return linter.Generation{}, nil, err
 	}

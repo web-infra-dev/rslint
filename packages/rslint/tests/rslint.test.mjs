@@ -2354,7 +2354,8 @@ module.exports = config;`
       name: 'triple-slash references',
       project: { files: ['source.ts'] },
       source: '/// <reference path="./gap.js" />\n',
-      owned: true,
+      // TypeScript may load this source, but rslint requires a configured root.
+      owned: false,
     },
     {
       name: 'ordinary imports',

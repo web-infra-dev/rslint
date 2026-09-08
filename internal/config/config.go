@@ -516,6 +516,10 @@ func (lo LanguageOptions) MarshalJSON() ([]byte, error) {
 		if err := json.Unmarshal(encodedParserOptions, &typedParserOptions); err != nil {
 			return nil, err
 		}
+		if lo.ParserOptions.TsconfigRootDir == nil && lo.ParserOptions.rootDirInvalid != nil {
+			// Preserve invalid root values without a float64 round trip.
+			typedParserOptions["tsconfigRootDir"] = lo.ParserOptions.rootDirInvalid
+		}
 		baseParserOptions, _ := configObject(raw["parserOptions"])
 		raw["parserOptions"] = deepMergeConfigObjects(baseParserOptions, typedParserOptions)
 	}
@@ -554,6 +558,7 @@ type ParserOptions struct {
 
 	projectAutomatic bool
 	rootDirSet       bool
+	rootDirInvalid   json.RawMessage
 }
 
 // UnmarshalJSON keeps explicit null/false overrides distinct from omission.
@@ -585,8 +590,13 @@ func (options *ParserOptions) UnmarshalJSON(data []byte) error {
 	}
 	if value, ok := fields["tsconfigRootDir"]; ok {
 		options.rootDirSet = true
-		if err := json.Unmarshal(value, &options.TsconfigRootDir); err != nil {
-			return errors.New("parserOptions.tsconfigRootDir must be an absolute path string")
+		var root *string
+		if err := json.Unmarshal(value, &root); err != nil {
+			// The enclosing object is valid JSON. Keep only this field's
+			// type error until matching and merging determine its final value.
+			options.rootDirInvalid = value
+		} else {
+			options.TsconfigRootDir = root
 		}
 	}
 	return nil
@@ -610,6 +620,8 @@ func (options ParserOptions) MarshalJSON() ([]byte, error) {
 	}
 	if options.TsconfigRootDir != nil {
 		encoded["tsconfigRootDir"] = *options.TsconfigRootDir
+	} else if options.rootDirInvalid != nil {
+		encoded["tsconfigRootDir"] = options.rootDirInvalid
 	} else if options.rootDirSet {
 		encoded["tsconfigRootDir"] = nil
 	}
@@ -1156,6 +1168,7 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			if override.ParserOptions.TsconfigRootDir != nil || override.ParserOptions.rootDirSet {
 				po.TsconfigRootDir = override.ParserOptions.TsconfigRootDir
 				po.rootDirSet = override.ParserOptions.rootDirSet
+				po.rootDirInvalid = override.ParserOptions.rootDirInvalid
 			}
 			merged.ParserOptions = &po
 		}

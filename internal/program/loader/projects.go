@@ -7,11 +7,13 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type configOrders map[string]int
@@ -60,6 +62,10 @@ type projectSpec struct {
 	tsconfigPath string
 	programCwd   string
 	configOrders configOrders
+	// Discovery can supply parsed roots before construction. Service projects
+	// use source references; ordinary declarations keep their existing mode.
+	parsed           *tsoptions.ParsedCommandLine
+	sourceReferences bool
 }
 
 type projectPlan struct {
@@ -145,8 +151,8 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 		contexts := make(map[pathContext][]target.File)
 		for _, file := range targetsByOwner[configDir] {
 			policy := request.Policies[file]
-			key := pathContext{root: policy.TsconfigRootDir, defaultDisabled: policy.DefaultProjectDisabled}
-			if policy.ProjectService || policy.ProjectDisabled {
+			key := pathContext{root: policy.TSConfigRootDirOverride, defaultDisabled: policy.DefaultProjectDisabled}
+			if policy.ServiceRootDirectory != "" || policy.ProjectDisabled {
 				plan.targetProjects[file] = nil
 				if request.Scope != AllDeclared {
 					continue
@@ -176,7 +182,7 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 		})
 		for _, key := range keys {
 			paths, err := rslintconfig.ResolveTsConfigPathsWithPolicy(configMap[configDir], configDir, fsys, rslintconfig.ProjectPolicy{
-				TsconfigRootDir: key.root, DefaultProjectDisabled: key.defaultDisabled,
+				TSConfigRootDirOverride: key.root, DefaultProjectDisabled: key.defaultDisabled,
 			})
 			if err != nil {
 				plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
@@ -213,6 +219,12 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 	}
 	build := func(index int) {
 		spec := plan.specs[index]
+		if spec.parsed != nil {
+			compilerPrograms[index], errs[index] = s.context.createProjectProgramFromParsedConfig(
+				singleThreaded, spec.programCwd, spec.parsed, spec.sourceReferences,
+			)
+			return
+		}
 		compilerPrograms[index], errs[index] = s.context.createProjectProgram(
 			singleThreaded,
 			spec.programCwd,
@@ -271,14 +283,19 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 	}, nil
 }
 
-// BuildProjects applies the caller's construction scope once, then adds the
-// configured projects selected by service targets. Source binding is deferred
-// to LoadCLI/LoadAPI, which consume the resulting candidate lists once.
+// BuildProjects prepares explicit and discovered configs in one project plan,
+// then applies the caller's existing construction scope. LoadCLI/LoadAPI bind
+// targets to that plan once; discovery never creates a separate Program set.
 func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error) {
 	if err := s.validate(); err != nil {
 		return ProjectSet{}, err
 	}
 	plan := buildProjectPlan(request, s.FS())
+	if plan.terminalErr == nil {
+		if err := s.discoverServiceProjects(&plan, request.Targets, request.Policies); err != nil {
+			return ProjectSet{}, err
+		}
+	}
 	var set ProjectSet
 	var err error
 	if request.Scope == Targeted {
@@ -289,8 +306,23 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 	if err != nil {
 		return ProjectSet{}, err
 	}
-	if err := s.appendServiceProjects(&set, request.Targets, request.Policies, request.SingleThreaded); err != nil {
-		return ProjectSet{}, err
+	if request.Scope != Targeted {
+		// Focused execution already validates every selected direct root. Eager
+		// modes need the same check before publishing service selections, even
+		// when type-check-only will never enter the lint binding phase.
+		for _, file := range request.Targets.Files {
+			if request.Policies[file].ServiceRootDirectory == "" {
+				continue
+			}
+			indexes := set.targetProjects[file]
+			if len(indexes) == 0 {
+				continue
+			}
+			program := set.compilerPrograms[indexes[0]]
+			if utils.NewProgramSourceLookup(program, s.FS()).SourceFileForTarget(file.Path, file.CanonicalPath) == nil {
+				return ProjectSet{}, fmt.Errorf("project root %q from %q was absent from its TypeScript Program", file.Path, program.CommandLine().ConfigName())
+			}
+		}
 	}
 	return set, nil
 }

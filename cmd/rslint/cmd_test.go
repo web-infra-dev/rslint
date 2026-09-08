@@ -848,6 +848,58 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 	}
 }
 
+func TestHandleLintCommandTypeCheckProjectConstructionOrder(t *testing.T) {
+	directory := tspath.NormalizePath(t.TempDir())
+	targetPath := tspath.ResolvePath(directory, "target.ts")
+	if err := os.WriteFile(targetPath, []byte("export const value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, selection := range []struct {
+		name    string
+		options *rslintconfig.ParserOptions
+	}{
+		{name: "ordinary project"},
+		{name: "service disabled", options: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false)}},
+		{name: "root override", options: &rslintconfig.ParserOptions{TsconfigRootDir: &directory}},
+		{name: "project reset", options: &rslintconfig.ParserOptions{ProjectDisabled: true}},
+	} {
+		configEntries := rslintconfig.RslintConfig{{
+			LanguageOptions: &rslintconfig.LanguageOptions{
+				ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"./missing.json"}},
+			},
+		}}
+		if selection.options != nil {
+			configEntries = append(configEntries, rslintconfig.ConfigEntry{
+				LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: selection.options},
+			})
+		}
+		for _, typeCheckOnly := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/type-check-only=%t", selection.name, typeCheckOnly), func(t *testing.T) {
+				fsys := &commandRealpathCountingFS{
+					FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+					calls: make(map[string]int),
+				}
+				code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
+					ConfigCatalog:  explicitConfigCatalogForTest(directory, configEntries),
+					AllowFiles:     []string{targetPath},
+					FS:             fsys,
+					TypeCheck:      true,
+					TypeCheckOnly:  typeCheckOnly,
+					Format:         "jsonline",
+					NoColor:        true,
+					SingleThreaded: true,
+				})
+				if code != 1 || !strings.Contains(stderr, "missing.json") {
+					t.Fatalf("declared project error: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+				}
+				if got, want := fsys.callCount(targetPath) > 0, selection.options != nil; got != want {
+					t.Fatalf("target identity resolved before project error = %t, want %t", got, want)
+				}
+			})
+		}
+	}
+}
+
 func TestHandleLintCommandProjectSelectionTypeCheckScope(t *testing.T) {
 	directory := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
 	for _, selection := range []string{"service", "explicit", "scoped explicit"} {

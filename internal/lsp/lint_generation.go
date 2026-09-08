@@ -115,8 +115,13 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		snapshot.target,
 		func() vfs.FS { return server.currentEditorOverlayFSForTarget(p.uri, snapshot.target) },
 	)
+	serviceEnabled := snapshot.projectPolicy.ServiceRootDirectory != ""
+	request.sourceReferences = serviceEnabled
 	loaders := request.loaders()
-	var serviceRequest *lintProgramRequest
+	var selectionFS vfs.FS
+	if !serviceEnabled {
+		selectionFS = server.fs
+	}
 	release := linter.ReleaseFunc(nil)
 	releasePending := false
 	defer func() {
@@ -124,59 +129,35 @@ func (p *documentGenerationProvider) AcquireGeneration(
 			release()
 		}
 	}()
-	if snapshot.projectPolicy.ProjectService && server.lintPrograms != nil {
-		serviceRequest = server.lintPrograms.request(ctx, p.uri, snapshot.target, true)
-		release = serviceRequest.finalize
-		releasePending = true
-	} else if !snapshot.projectPolicy.ProjectService && p.requestPrograms != nil {
+	if p.requestPrograms != nil {
 		loaders, release = p.requestPrograms(ctx, p.uri, snapshot.target)
-		releasePending = release != nil
-	} else if !snapshot.projectPolicy.ProjectService && server.lintPrograms != nil && server.lintPrograms.Usable() {
-		loadProgram, loadMetadata, finalize := server.lintPrograms.Request(
-			ctx,
-			p.uri,
-			snapshot.target,
-		)
-		loaders = lintProjectLoaders{
-			program:  loadProgram,
-			metadata: loadMetadata,
+	} else if server.lintPrograms.Usable() {
+		resident := server.lintPrograms.request(ctx, p.uri, snapshot.target, serviceEnabled)
+		loaders = lintProjectLoaders{program: resident.load, metadata: resident.loadMetadata}
+		release = resident.finalize
+		if serviceEnabled {
+			resident.prepareOverlay()
+			selectionFS = resident.overlayFS
 		}
-		release = finalize
-		releasePending = release != nil
+	}
+	releasePending = release != nil
+	if selectionFS == nil {
+		selectionFS = request.filesystem()
 	}
 
-	var program *compiler.Program
-	var sourceFile *ast.SourceFile
-	var hasTypeInfo bool
-	var err error
-	if snapshot.projectPolicy.ProjectService {
-		var selected selectedLintProject
-		if serviceRequest != nil {
-			selected, err = serviceRequest.service(snapshot.projectServiceRootDirectory())
-		} else {
-			selected, err = request.service(snapshot.projectServiceRootDirectory())
-		}
-		program, sourceFile, hasTypeInfo = selected.program, selected.sourceFile, selected.program != nil
-		if err == nil && !hasTypeInfo {
-			var fsys vfs.FS
-			if serviceRequest != nil {
-				fsys = serviceRequest.overlayFS
-			} else {
-				fsys = request.filesystem()
-			}
-			program, sourceFile, err = createStandaloneFallbackProgram(snapshot.target, fsys)
-		}
-	} else {
-		program, sourceFile, hasTypeInfo, err = selectLintProgram(
-			p.uri,
-			snapshot.target,
-			server.session,
-			ctx,
-			snapshot.typeScriptConfigPaths,
-			server.fs,
-			loaders,
-			server.lintSessionRoots,
-		)
+	program, sourceFile, hasTypeInfo, err := selectLintProgram(
+		p.uri,
+		snapshot.target,
+		server.session,
+		ctx,
+		snapshot.typeScriptConfigPaths,
+		snapshot.projectPolicy.ServiceRootDirectory,
+		selectionFS,
+		loaders,
+		server.lintSessionRoots,
+	)
+	if err == nil && serviceEnabled && !hasTypeInfo {
+		program, sourceFile, err = createStandaloneFallbackProgram(snapshot.target, selectionFS)
 	}
 	if err != nil {
 		return linter.Generation{}, nil, err

@@ -45,11 +45,11 @@ Set `sourceType` directly on `languageOptions`; the legacy `languageOptions.pars
 
 - **Type:** `boolean`
 
-Discovers the configured TypeScript project for each selected file. Enable it explicitly; TypeScript presets do not set this option, matching typescript-eslint presets. Discovery starts beside the source file, checking `tsconfig.json`, then `jsconfig.json`, and continues through ancestors when a config does not own the file. Project references can lead to custom config names such as `tsconfig.app.json`.
+Discovers a TypeScript config that directly includes each selected file through `files` or `include`. Enable it explicitly; TypeScript presets do not set this option, matching typescript-eslint presets. Discovery starts beside the source file, checking `tsconfig.json`, then `jsconfig.json`, and continues through ancestors when a config does not own the file. Project references can lead to custom config names such as `tsconfig.app.json`.
 
 The nearest owning project wins over a different tsconfig beside the Rslint config or in the current working directory. Reference ownership follows TypeScript's source redirects and reference order. Each selected project keeps its complete root files and dependencies; selecting one lint file limits lint execution, not the type context.
 
-JavaScript files use the same ownership discovery when service is enabled. A JS file explicitly listed in `files` or included through a triple-slash reference can belong to a project even with `allowJs: false`; that option still controls whether config globs and ordinary imports include JS. Unowned JS and TS files use source-only gap linting.
+JavaScript files use the same discovery. A JS file explicitly listed in `files` can receive types even with `allowJs: false`; that option still controls JS glob inclusion. Files reached only through imports or triple-slash references are not configured lint roots and use gap linting, whether they are JS or TS.
 
 ```ts
 {
@@ -65,11 +65,11 @@ JavaScript files use the same ownership discovery when service is enabled. A JS 
 
 A selected file that does not belong to a discovered project uses Rslint's existing [source-only gap fallback](/guide/type-checking#gap-files). Syntax diagnostics and rules that do not require types still run; type-aware rules are skipped. Other files in the same lint request keep their own project context. Config and Program failures are still errors.
 
-This differs from typescript-eslint, which rejects unowned files unless `allowDefaultProject` permits them. Rslint does not create a typed default project. To force source-only linting even when a file has an owning project, set both `projectService: false` and `project: false` for that file scope.
+This differs from typescript-eslint, which can admit imported-only files and rejects unowned files unless `allowDefaultProject` permits them. Rslint does not create a typed default project. To force source-only linting even when a file has an owning project, set both `projectService: false` and `project: false` for that file scope.
 
 Object options such as `allowDefaultProject`, `defaultProject`, and `loadTypeScriptPlugins`, as well as `extraFileExtensions`, are not implemented. `project: true` is also unsupported; use `projectService: true` for automatic discovery.
 
-The editor reuses its existing Program store rather than hosting a second TypeScript project service. Normal source/config updates recheck ownership. One long-lived editor difference remains: after all seed documents close, deleting a config, querying a referenced target, and recreating the config may retain its previously loaded identity in Rslint. TypeScript can unload that project in this sequence, leaving it without a configured owner under `disableReferencedProjectLoad` until another document loads it. No stale Program is used while the config is missing.
+When a tsconfig sets `disableReferencedProjectLoad`, Rslint stops discovering projects through those references. This is independent of earlier linted files. Upstream can still use previously loaded referenced projects; Rslint does not reproduce that history-dependent exception. `disableSolutionSearching` stops further ancestor search.
 
 ## languageOptions.parserOptions.tsconfigRootDir
 
@@ -84,7 +84,7 @@ Go resolves the default from the config file selected for each target. An explic
 
 This follows typescript-eslint's documented config-directory default. Its implementation instead infers candidates from preset access on the JavaScript call stack: missing candidates fall back to process cwd, and multiple candidates can produce an ambiguity error. Rslint uses its known config owner directly. These heuristic edge cases differ; no preset access or process-global candidate state is involved.
 
-Rslint validates option types when loading config: values other than strings or the runtime `null` reset are rejected even in unmatched entries. Upstream may ignore those invalid types when the entry does not apply or is overridden.
+Validation applies to the final matched value. Invalid types, relative paths and empty strings in unmatched entries or replaced by a later value do not fail a lint request.
 
 An explicitly set `tsconfigRootDir` also anchors every relative `project` declaration for that target, preserving declaration order. Without it, or after a null reset, each declaration retains its own authored path origin described below. It does not move Rslint's implicit governing-directory `tsconfig.json` fallback when no project paths are declared.
 

@@ -338,6 +338,22 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		allowDirs = []string{cwd}
 	}
 
+	projectRequest := loader.ProjectBuildRequest{
+		Configs:        projectConfigs,
+		Scope:          projectScope,
+		SingleThreaded: singleThreaded,
+	}
+	// Ordinary project type checking builds declarations before lint-target
+	// discovery. Only per-target project options need the target plan first.
+	buildBeforeTargets := projectScope == loader.AllDeclared && !hasProjectOptions
+	var projectSet loader.ProjectSet
+	if buildBeforeTargets {
+		projectSet, err = programSession.BuildProjects(projectRequest)
+		if err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		}
+	}
+
 	// Plain explicit-project type-check-only remains program-wide and skips
 	// target discovery. Per-file service/root options require selected targets
 	// before their effective values can contribute project candidates.
@@ -360,12 +376,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		configResolver = configLint.NewResolver(configLint.ResolverOptions{
-			ConfigsByOwner:  configMap,
-			Config:          rslintConfig,
-			ConfigDirectory: currentDirectory,
-			Catalog:         ruleCatalog,
-			PathSpaces:      targetPlan.PathSpaces(),
-			FS:              fs,
+			ConfigsByOwner:       configMap,
+			Config:               rslintConfig,
+			ConfigDirectory:      currentDirectory,
+			DefaultRootDirectory: currentDirectory,
+			Catalog:              ruleCatalog,
+			PathSpaces:           targetPlan.PathSpaces(),
+			FS:                   fs,
 		})
 		if hasProjectOptions {
 			projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files)
@@ -374,16 +391,13 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			}
 		}
 	}
-	projectRequest := loader.ProjectBuildRequest{
-		Configs:        projectConfigs,
-		Targets:        targetPlan,
-		Policies:       projectPolicies,
-		Scope:          projectScope,
-		SingleThreaded: singleThreaded,
-	}
-	projectSet, err := programSession.BuildProjects(projectRequest)
-	if err != nil {
-		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+	projectRequest.Targets = targetPlan
+	projectRequest.Policies = projectPolicies
+	if !buildBeforeTargets {
+		projectSet, err = programSession.BuildProjects(projectRequest)
+		if err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		}
 	}
 	programs := projectSet.Programs()
 	var loadedPrograms loader.LoadResult

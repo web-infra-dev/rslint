@@ -72,10 +72,10 @@ func resolveDocumentLintSnapshotProjects(
 	fs vfs.FS,
 ) documentLintSnapshot {
 	if config.HasProjectOptions(snapshot.config) {
-		snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig)
+		snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.target.ConfigDirectory)
 	}
 	snapshot.typeScriptConfigPaths = nil
-	if snapshot.projectPolicyError != nil || snapshot.projectPolicy.ProjectService || snapshot.projectPolicy.ProjectDisabled {
+	if snapshot.projectPolicyError != nil || snapshot.projectPolicy.ServiceRootDirectory != "" || snapshot.projectPolicy.ProjectDisabled {
 		return snapshot
 	}
 	// Preserve the owner's declaration order and authored bases. Matched root
@@ -87,13 +87,6 @@ func resolveDocumentLintSnapshotProjects(
 		snapshot.projectPolicy,
 	)
 	return snapshot
-}
-
-func (snapshot documentLintSnapshot) projectServiceRootDirectory() string {
-	if snapshot.projectPolicy.TsconfigRootDir != "" {
-		return snapshot.projectPolicy.TsconfigRootDir
-	}
-	return snapshot.target.ConfigDirectory
 }
 
 func isLintableScriptFile(uri lsproto.DocumentUri) bool {

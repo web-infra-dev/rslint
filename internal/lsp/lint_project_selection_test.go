@@ -59,7 +59,9 @@ func TestSelectConfiguredLintProjectDirectRootOutranksEarlierImport(t *testing.T
 	var programCalls []string
 	selected, found, err := selectConfiguredLintProject(
 		[]string{firstConfig, secondConfig},
+		"",
 		target.File{PathIdentity: config.PathIdentity{Path: targetPath, CanonicalPath: targetPath}},
+		nil,
 		lintProjectLoaders{
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
@@ -105,7 +107,9 @@ func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T
 	var programCalls []string
 	selected, found, err := selectConfiguredLintProject(
 		[]string{firstConfig, secondConfig},
+		"",
 		target.File{PathIdentity: config.PathIdentity{Path: targetPath, CanonicalPath: targetPath}},
+		nil,
 		lintProjectLoaders{
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
@@ -289,6 +293,43 @@ func TestLintSessionProjectRootCacheUsesCommandLineGeneration(t *testing.T) {
 	}
 }
 
+func TestLintSessionProjectRootCacheTracksServiceProgramGeneration(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "javascript-reference"))
+	configPath := tspath.ResolvePath(directory, "tsconfig.json")
+	fsys := bundled.WrapFS(osvfs.FS())
+	metadata, err := parseStandaloneLintProject(configPath, fsys, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := createStandaloneLintProgram(metadata, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := newLintSessionProjectRootCache()
+	if cache.canUseServiceProgram(configPath, first, fsys) {
+		t.Fatal("JS reference rejected by configured construction was considered compatible")
+	}
+	if err := os.WriteFile(tspath.ResolvePath(directory, "target.ts"), []byte("export const result = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second, err := createStandaloneLintProgram(metadata, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.CommandLine() != second.CommandLine() || !cache.canUseServiceProgram(configPath, second, fsys) {
+		t.Fatal("a source-only Program generation did not refresh construction compatibility")
+	}
+	cache.metadata(configPath, second.CommandLine(), fsys)
+	entry := cache.entries[string(lintProgramLexicalPathID(configPath, fsys))]
+	if len(cache.entries) != 1 || entry.program.Value() != second || !entry.serviceCompatible {
+		t.Fatal("config metadata refresh discarded or accumulated Program compatibility generations")
+	}
+	if !cache.Invalidate() || len(cache.entries) != 0 {
+		t.Fatal("project invalidation retained a Program compatibility result")
+	}
+}
+
 func TestResolveTsConfigPathsPreservesSymlinkDeclarationPath(t *testing.T) {
 	root := t.TempDir()
 	realDir := filepath.Join(root, "real")
@@ -349,6 +390,7 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 		unreadConfig string
 		failConfig   string
 		wantError    string
+		withSession  bool
 	}{
 		{name: "nearest complete project", fixture: "nested", target: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
 		{name: "external lint config", fixture: "nested", target: "pkg/src/target.ts", configDir: "tooling", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
@@ -357,6 +399,14 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 		{name: "disabled solution search gap", fixture: "disabled-search", target: "pkg/target.ts", wantRoots: 1},
 		{name: "custom reference", fixture: "solution", target: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.app.json", wantRoots: 1},
 		{name: "unowned target gap", fixture: "unowned", target: "target.ts", wantRoots: 1},
+		// rslint intentionally requires config roots, even when an upstream
+		// service Program would contain these targets through source references.
+		{name: "imported target gap", fixture: "imported-gap", target: "target.ts", wantRoots: 1},
+		{name: "triple slash target gap", fixture: "triple-slash-gap", target: "target.js", wantRoots: 1},
+		{name: "overlapping reference chooses child", fixture: "overlapping-reference", target: "target.ts", wantConfig: "leaf.json", wantRoots: 1},
+		{name: "disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "configured project root"},
+		{name: "Session disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "configured project root", withSession: true},
+		{name: "explicit JS root without allowJs", fixture: "explicit-js", target: "target.js", wantConfig: "tsconfig.json", wantRoots: 1, withSession: true},
 		{name: "unreadable config remains an error", fixture: "unowned", target: "target.ts", failConfig: "tsconfig.json", wantError: "no parsed config returned"},
 		{name: "conflicting explicit project", fixture: "nested", target: "pkg/src/target.ts", project: []string{}, wantError: "enabling parserOptions.project"},
 	} {
@@ -378,6 +428,20 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			uri := documentURIFromPath(fileName)
 			const editorText = "export const editor = 1;\n"
 			server.documents[uri] = editorText
+			if test.withSession {
+				server.backgroundCtx = context.Background()
+				server.defaultLibraryPath = bundled.LibPath()
+				server.initializeParams = &lsproto.InitializeParams{}
+				if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+					t.Fatal(err)
+				}
+				defer server.session.Close()
+				language := lsproto.LanguageKindTypeScript
+				if strings.HasSuffix(fileName, ".js") {
+					language = lsproto.LanguageKindJavaScript
+				}
+				server.session.DidOpenFile(context.Background(), uri, 1, editorText, language)
+			}
 			options := &config.ParserOptions{ProjectService: config.BoolPtr(true), Project: test.project}
 			if test.rootDir != "" {
 				rootDir := tspath.ResolvePath(directory, test.rootDir)
@@ -458,6 +522,116 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSelectConfiguredLintProjectServiceDoesNotProbePrograms(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		fixture, file, wantConfig string
+	}{
+		{fixture: "imported-gap", file: "target.ts"},
+		{fixture: "triple-slash-gap", file: "target.js"},
+		{fixture: "solution", file: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.app.json"},
+		{fixture: "overlapping-reference", file: "target.ts", wantConfig: "leaf.json"},
+	} {
+		t.Run(test.fixture, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, test.fixture))
+			fsys := bundled.WrapFS(osvfs.FS())
+			target := lspConfigTarget(tspath.ResolvePath(directory, test.file), directory, fsys)
+			request := newStandaloneLintProjectRequestWithFS(target, fsys)
+			request.sourceReferences = true
+			loaders := request.loaders()
+			var built []string
+			loaders.program = func(configPath string) (*compiler.Program, *ast.SourceFile, error) {
+				built = append(built, configPath)
+				return request.program(configPath)
+			}
+			selected, found, err := selectConfiguredLintProject(nil, directory, target, fsys, loaders)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.wantConfig == "" {
+				if found || selected.program != nil || len(built) != 0 {
+					t.Fatalf("gap constructed a project: selected=%s Programs=%v", selected.configPath, built)
+				}
+				return
+			}
+			wantConfig := tspath.ResolvePath(directory, test.wantConfig)
+			if !found || selected.configPath != wantConfig || len(built) != 1 || built[0] != wantConfig {
+				t.Fatalf("selection=%s Programs=%v, want only %s", selected.configPath, built, wantConfig)
+			}
+		})
+	}
+}
+
+func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "imported-gap"))
+	fileName := tspath.ResolvePath(directory, "target.ts")
+	uri := documentURIFromPath(fileName)
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	server.backgroundCtx = context.Background()
+	server.defaultLibraryPath = bundled.LibPath()
+	server.initializeParams = &lsproto.InitializeParams{}
+	if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+		t.Fatal(err)
+	}
+	defer server.session.Close()
+	const content = "export const value = 2;\ndebugger;\n"
+	server.documents[uri] = content
+	entries := config.RslintConfig{{
+		LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+		Rules:           config.Rules{"no-debugger": "error"},
+	}}
+	snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+	request := newStandaloneLintProjectRequestWithFS(snapshot.target, server.fs)
+	provider := &documentGenerationProvider{
+		server: server, uri: uri, snapshot: snapshot,
+		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
+			return lintProjectLoaders{
+				program: func(string) (*compiler.Program, *ast.SourceFile, error) {
+					t.Fatal("gap discovery attempted standalone Program construction")
+					return nil, nil, nil
+				},
+				metadata: request.loadMetadata,
+			}, nil
+		},
+	}
+	assertGap := func() {
+		t.Helper()
+		generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+		if release != nil {
+			release()
+		}
+		if err != nil || len(generation.Native.Programs) != 1 {
+			t.Fatalf("gap generation Programs=%d error=%v", len(generation.Native.Programs), err)
+		}
+		gap := generation.Native.Programs[0]
+		if gap.Options().ConfigFilePath != "" || !gap.Options().NoResolve.IsTrue() || gap.GetSourceFile(fileName).Text() != content {
+			t.Fatal("indirect Session membership replaced the frozen gap source")
+		}
+	}
+	// The lint selection phase must not load Session projects just to decide
+	// ownership. DidOpen below is a separate, existing TypeScript lifecycle.
+	if projects := server.session.Snapshot().ProjectCollection.ConfiguredProjects(); len(projects) != 0 {
+		t.Fatal("fixture Session was not cold")
+	}
+	assertGap()
+	if projects := server.session.Snapshot().ProjectCollection.ConfiguredProjects(); len(projects) != 0 {
+		t.Fatal("gap discovery loaded a Session project")
+	}
+	server.session.DidOpenFile(context.Background(), uri, 1, content, "typescript")
+	ls, err := server.session.GetLanguageService(context.Background(), uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+	importingProgram := ls.GetProgram()
+	if importingProgram.Options().ConfigFilePath != tspath.ResolvePath(directory, "tsconfig.json") || importingProgram.GetSourceFile(fileName) == nil {
+		t.Fatal("fixture did not expose an import-containing Session Program")
+	}
+	assertGap()
 }
 
 func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
@@ -765,44 +939,93 @@ func TestProjectServiceLSPTypedGapTyped(t *testing.T) {
 
 func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
-	directory := tspath.NormalizePath(archive.Materialize(t, "reference-sources"))
-	targetPath := tspath.ResolvePath(directory, "app/src/main.ts")
-	referencePath := tspath.ResolvePath(directory, "lib/src/value.ts")
-	server := newTestServer()
-	server.cwd = directory
-	server.fs = bundled.WrapFS(osvfs.FS())
-	uri := documentURIFromPath(targetPath)
-	const targetContent = "import { value } from '../../lib/src/value';\nexport const result: number = value;\n"
-	const referenceContent = "export const value = 42;\n"
-	server.documents[uri] = targetContent
-	server.documents[documentURIFromPath(referencePath)] = referenceContent
-	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
-		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
-	}}}
-	snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
-	for _, speculative := range []bool{false, true} {
-		var generation linter.Generation
-		var err error
-		if speculative {
-			generation, _, err = acquireSpeculativeGeneration(context.Background(), targetContent, snapshot,
-				server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
-		} else {
-			provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
-			generation, _, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
-		}
-		if err != nil {
-			t.Fatalf("speculative=%v: %v", speculative, err)
-		}
-		if len(generation.Native.Programs) != 1 {
-			t.Fatalf("speculative=%v: programs=%d", speculative, len(generation.Native.Programs))
-		}
-		program := generation.Native.Programs[0]
-		if source := program.GetSourceFile(referencePath); source == nil || source.Text() != referenceContent {
-			t.Fatalf("speculative=%v: did not load unsaved referenced source", speculative)
-		}
-		if program.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
-			t.Fatalf("speculative=%v: used stale declaration output", speculative)
-		}
+	for _, test := range []struct {
+		fixture, target, reference, targetContent, referenceContent string
+		wantMismatch                                                bool
+	}{
+		{
+			fixture: "reference-sources", target: "app/src/main.ts", reference: "lib/src/value.ts",
+			targetContent:    "import { value } from '../../lib/src/value';\nexport const result: number = value;\n",
+			referenceContent: "export const value = 42;\n",
+		},
+		{
+			fixture: "javascript-reference", target: "target.ts", reference: "globals.js",
+			targetContent:    "/// <reference path=\"./globals.js\" />\nexport const result: number = globalValue;\n",
+			referenceContent: "var globalValue = 'editor';\n", wantMismatch: true,
+		},
+	} {
+		t.Run(test.fixture, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, test.fixture))
+			targetPath := tspath.ResolvePath(directory, test.target)
+			referencePath := tspath.ResolvePath(directory, test.reference)
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = bundled.WrapFS(osvfs.FS())
+			server.lintSessionRoots = newLintSessionProjectRootCache()
+			server.backgroundCtx = context.Background()
+			server.defaultLibraryPath = bundled.LibPath()
+			server.initializeParams = &lsproto.InitializeParams{}
+			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer server.session.Close()
+			uri := documentURIFromPath(targetPath)
+			referenceURI := documentURIFromPath(referencePath)
+			server.documents[uri] = test.targetContent
+			server.documents[referenceURI] = test.referenceContent
+			language := lsproto.LanguageKindTypeScript
+			if strings.HasSuffix(referencePath, ".js") {
+				language = lsproto.LanguageKindJavaScript
+			}
+			server.session.DidOpenFile(context.Background(), referenceURI, 1, test.referenceContent, language)
+			server.session.DidOpenFile(context.Background(), uri, 1, test.targetContent, "typescript")
+			if test.wantMismatch {
+				ls, err := server.session.GetLanguageService(context.Background(), uri)
+				if err != nil || ls.GetProgram().GetSourceFile(targetPath) == nil || ls.GetProgram().GetSourceFile(referencePath) != nil {
+					t.Fatalf("fixture did not expose a JS reference rejected by a target-containing Session Program: %v", err)
+				}
+			}
+			entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+				ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
+			}}}
+			snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+			for _, speculative := range []bool{false, true} {
+				var generation linter.Generation
+				var release linter.ReleaseFunc
+				var err error
+				if speculative {
+					generation, release, err = acquireSpeculativeGeneration(context.Background(), test.targetContent, snapshot,
+						server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+				} else {
+					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				}
+				if release != nil {
+					defer release()
+				}
+				if err != nil || len(generation.Native.Programs) != 1 {
+					t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+				}
+				program := generation.Native.Programs[0]
+				if source := program.GetSourceFile(referencePath); source == nil || source.Text() != test.referenceContent {
+					t.Fatalf("speculative=%v: did not load unsaved referenced source", speculative)
+				}
+				if test.wantMismatch {
+					foundMismatch := false
+					for _, diagnostic := range program.NoEmitDiagnostics(context.Background()) {
+						foundMismatch = foundMismatch || diagnostic.Code() == 2322
+						if diagnostic.Code() == 2304 {
+							t.Fatalf("speculative=%v: JS global was missing from the type context", speculative)
+						}
+					}
+					if !foundMismatch {
+						t.Fatalf("speculative=%v: lost the JS global's string-to-number type mismatch", speculative)
+					}
+				} else if program.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
+					t.Fatalf("speculative=%v: used stale declaration output", speculative)
+				}
+			}
+		})
 	}
 }
 
@@ -821,7 +1044,7 @@ func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
 	server.jsConfigs = map[string]config.RslintConfig{directory: entries}
 	uri := documentURIFromPath(tspath.ResolvePath(directory, "pkg/src/target.ts"))
 	snapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshotForTest(server, uri, entries, directory, false, nil), server.fs)
-	if snapshot.projectPolicyError != nil || !snapshot.projectPolicy.ProjectService || len(snapshot.typeScriptConfigPaths) != 0 {
+	if snapshot.projectPolicyError != nil || snapshot.projectPolicy.ServiceRootDirectory == "" || len(snapshot.typeScriptConfigPaths) != 0 {
 		t.Fatalf("TypeScript policy=%+v paths=%v error=%v", snapshot.projectPolicy, snapshot.typeScriptConfigPaths, snapshot.projectPolicyError)
 	}
 	jsURI := documentURIFromPath(tspath.ResolvePath(directory, "target.js"))

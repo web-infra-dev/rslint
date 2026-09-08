@@ -259,6 +259,62 @@ func TestBuildProjectsKeepsProgramModesSeparate(t *testing.T) {
 	}
 }
 
+func TestBuildProjectsValidatesServiceSourcesBeforePublishing(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service_modes.txtar")
+	for _, test := range []struct {
+		name, fixture, file string
+		wantProjects        int
+		wantError           bool
+	}{
+		{name: "configured root", file: "a.ts", wantProjects: 1},
+		{name: "selected source absent", fixture: "disabled-source-redirect", file: "target.ts", wantError: true},
+		{name: "no configured owner", fixture: "no-config", file: "target.ts"},
+	} {
+		for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
+			t.Run(test.name+"/"+strconv.Itoa(int(scope)), func(t *testing.T) {
+				dir := tspath.NormalizePath(archive.Materialize(t, test.fixture))
+				file := tspath.ResolvePath(dir, test.file)
+				config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{
+					ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)},
+				}}}
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{file}})
+				if err != nil || len(plan.Files) != 1 {
+					t.Fatalf("target selection: files=%v, error=%v", plan.Files, err)
+				}
+				session := NewSession(fsys)
+				projects, err := session.buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, scope, true)
+				if test.wantError {
+					// AllDeclared may be consumed without LoadCLI/LoadAPI by
+					// --type-check-only, so construction must report this failure.
+					if err == nil || !strings.Contains(err.Error(), "was absent") || !strings.Contains(err.Error(), file) {
+						t.Fatalf("selected source failure became a published project/gap: projects=%d, error=%v", projects.Len(), err)
+					}
+					return
+				}
+				if err != nil || projects.Len() != test.wantProjects {
+					t.Fatalf("project construction: projects=%d, error=%v; want %d", projects.Len(), err, test.wantProjects)
+				}
+				binding, err := session.LoadAPI(projects, plan, dir, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(binding.Programs) != 1 || len(binding.TargetsByProgram) != 1 || !slices.Equal(binding.TargetsByProgram[0], []string{file}) {
+					t.Fatalf("target binding changed: %v", binding.TargetsByProgram)
+				}
+				program := binding.Programs[0]
+				source := program.GetSourceFile(file)
+				if source == nil || program.CanProvideTypeChecker(source) != (test.wantProjects != 0) {
+					t.Fatalf("wrong source/type capability for %s", file)
+				}
+				if test.wantProjects == 0 && (!program.Options().NoResolve.IsTrue() || !program.Options().NoLib.IsTrue()) {
+					t.Fatal("unowned target did not use the existing source-only gap Program")
+				}
+			})
+		}
+	}
+}
+
 func TestBuildProjectsScopesInactiveOwners(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
 	configs := map[string]rslintconfig.RslintConfig{
@@ -2714,6 +2770,36 @@ func TestLoadProgramsRejectsCaseFoldedSourceWithDifferentCanonicalIdentity(t *te
 	}
 	if got := binding.TargetsByProgram[1]; len(got) != 1 || got[0] != lower {
 		t.Fatalf("lower-case target must bind to its exact compatibility source, got %v", got)
+	}
+}
+
+func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdentity(t *testing.T) {
+	const configDir = "/repo"
+	const upper = "/repo/Source.ts"
+	const lower = "/repo/source.ts"
+	fsys := &exactCaseProgramFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			configDir + "/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["Source.ts"]}`,
+			upper:                        "export const upper = 1;\n",
+			lower:                        "export const lower = 2;\n",
+		},
+	}
+	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{
+		ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)},
+	}}}
+	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: configDir, FS: fsys, Files: []string{lower}})
+	if err != nil || len(plan.Files) != 1 || plan.Files[0].CanonicalPath != lower {
+		t.Fatalf("fixture must retain the distinct physical target: files=%v error=%v", plan.Files, err)
+	}
+	for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
+		t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
+			projects, err := NewSession(fsys).buildProjectsWithOptionsForTest(t,
+				map[string]rslintconfig.RslintConfig{configDir: config}, plan, scope, true)
+			if err == nil || !strings.Contains(err.Error(), "was absent") || !strings.Contains(err.Error(), lower) {
+				t.Fatalf("case-folded source escaped selected-root validation: projects=%d error=%v", projects.Len(), err)
+			}
+		})
 	}
 }
 

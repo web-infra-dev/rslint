@@ -8,27 +8,22 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config/target"
-	"github.com/web-infra-dev/rslint/internal/program/projectservice"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // lintProgramStore owns standalone Programs selected for editor linting.
-// Legacy explicit-project selection may use Session-owned Programs instead;
-// service selection reuses a distinct mode with live reference sources.
+// Both explicit and discovered projects prefer Session-owned Programs.
+// Standalone fallbacks retain their compiler construction mode in the cache key.
 type lintProgramStore struct {
 	server              *Server
 	coverage            *lintProgramCoverage
 	programs            map[lintProgramKey]*lintProgramState
 	projectMetadata     map[string]*lintProjectMetadata
 	observedRootConfigs map[string]struct{}
-	// Configured project identity outlives a cached Program. Watch events
-	// invalidate source generations without making loaded references cold.
-	loadedServiceProjects map[string]struct{}
 }
 
 type lintProgramKey struct {
@@ -65,12 +60,11 @@ type lintProgramRequest struct {
 
 func newLintProgramStore(server *Server) *lintProgramStore {
 	return &lintProgramStore{
-		server:                server,
-		coverage:              newLintProgramCoverage(server),
-		programs:              make(map[lintProgramKey]*lintProgramState),
-		projectMetadata:       make(map[string]*lintProjectMetadata),
-		observedRootConfigs:   make(map[string]struct{}),
-		loadedServiceProjects: make(map[string]struct{}),
+		server:              server,
+		coverage:            newLintProgramCoverage(server),
+		programs:            make(map[lintProgramKey]*lintProgramState),
+		projectMetadata:     make(map[string]*lintProjectMetadata),
+		observedRootConfigs: make(map[string]struct{}),
 	}
 }
 
@@ -120,60 +114,12 @@ func (r *lintProgramRequest) key(configPath string) lintProgramKey {
 
 func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
 	if r.sourceReferences {
-		program, err := utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
+		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
 			true, metadata.commandLine,
 			utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys),
 		)
-		if err == nil {
-			r.store.loadedServiceProjects[string(lintProgramLexicalPathID(metadata.configPath, fsys))] = struct{}{}
-		}
-		return program, err
 	}
 	return createStandaloneLintProgram(metadata, fsys)
-}
-
-func (r *lintProgramRequest) service(rootDir string) (selectedLintProject, error) {
-	r.prepareOverlay()
-	selector := projectservice.New(projectservice.Host{
-		FS: r.overlayFS,
-		ParseConfig: func(configPath string) (*tsoptions.ParsedCommandLine, error) {
-			metadata, err := r.metadata(configPath)
-			if err != nil {
-				return nil, err
-			}
-			return metadata.commandLine, nil
-		},
-		CreateProgram: func(configPath string, _ *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
-			program, _, err := r.load(configPath)
-			return program, err
-		},
-		LoadedProgram: func(configPath string) (*compiler.Program, error) {
-			key := string(lintProgramLexicalPathID(configPath, r.overlayFS))
-			if _, loaded := r.store.loadedServiceProjects[key]; !loaded || !r.overlayFS.FileExists(configPath) {
-				return nil, nil //nolint:nilnil // An unloaded or deleted project is a normal cache miss.
-			}
-			program, _, err := r.load(configPath)
-			return program, err
-		},
-	})
-	selected, err := selector.Select(r.target.Path, rootDir)
-	if err != nil || selected.Program == nil {
-		r.usedKey = lintProgramKey{}
-		r.usedState = nil
-		return selectedLintProject{}, err
-	}
-	// A redirect fallback can win after other containing candidates were
-	// probed. Finalize lazy reads from the selected Program, not the last probe.
-	r.usedKey = r.key(selected.ConfigPath)
-	r.usedState = r.store.programs[r.usedKey]
-	if r.usedState != nil && r.usedState.program != selected.Program {
-		r.usedState = nil
-	}
-	return selectedLintProject{
-		program:    selected.Program,
-		sourceFile: sourceFileForTarget(selected.Program, r.target, r.overlayFS),
-		configPath: selected.ConfigPath,
-	}, nil
 }
 
 func (r *lintProgramRequest) loadMetadata(

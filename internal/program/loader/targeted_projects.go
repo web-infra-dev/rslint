@@ -120,7 +120,13 @@ func (c *buildContext) createProjectProgramFromParsedConfig(
 	singleThreaded bool,
 	cwd string,
 	config *tsoptions.ParsedCommandLine,
+	sourceReferences bool,
 ) (*compiler.Program, error) {
+	if sourceReferences {
+		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
+			singleThreaded, config, c.newCompilerHostWithCache(cwd),
+		)
+	}
 	return utils.CreateProgramFromParsedConfigLenient(
 		singleThreaded,
 		config,
@@ -132,10 +138,13 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 	slot := &execution.slots[index]
 	spec := execution.plan.specs[index]
 	slot.parseOnce.Do(func() {
-		_, slot.config, slot.parseErr = execution.session.context.parseConfig(
-			spec.programCwd,
-			spec.tsconfigPath,
-		)
+		slot.config = spec.parsed
+		if slot.config == nil {
+			_, slot.config, slot.parseErr = execution.session.context.parseConfig(
+				spec.programCwd,
+				spec.tsconfigPath,
+			)
+		}
 		if slot.parseErr == nil && slot.config == nil {
 			slot.parseErr = errors.New("no parsed config returned")
 		}
@@ -165,6 +174,7 @@ func (execution *targetedProjectExecution) build(index int) error {
 			execution.singleThreaded,
 			spec.programCwd,
 			parsed.config,
+			spec.sourceReferences,
 		)
 	})
 	if slot.buildErr != nil {

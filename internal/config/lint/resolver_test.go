@@ -2,7 +2,9 @@ package lint
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -255,7 +257,7 @@ func TestResolverLiteralOwnerWinsCanonicalAlias(t *testing.T) {
 		t.Fatalf("canonical alias changed literal owner: real=%v alias=%v", configuredRuleNameSet(realResolved.EnabledRules), configuredRuleNameSet(alias.EnabledRules))
 	}
 	policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget})
-	if err != nil || len(policies) != 1 || !policies[aliasTarget].ProjectService {
+	if err != nil || len(policies) != 1 || policies[aliasTarget].ServiceRootDirectory != "/symlink" {
 		t.Fatalf("policy gate used an alias instead of its literal owner: %v, %v", policies, err)
 	}
 }
@@ -269,7 +271,7 @@ func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
 		{name: "ordinary project declarations do not project", input: `[{"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"project":["second.json"]}}}]`},
 		{name: "unmatched options are neutral", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":"relative","project":true}}}]`},
 		{name: "empty match remains zero", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":false}}}]`},
-		{name: "matched service", input: `[{"languageOptions":{"parserOptions":{"projectService":true}}}]`, want: config.ProjectPolicy{ProjectService: true}},
+		{name: "matched service", input: `[{"languageOptions":{"parserOptions":{"projectService":true}}}]`, want: config.ProjectPolicy{ServiceRootDirectory: "/repo"}},
 		{name: "service false retains explicit declarations", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"projectService":false}}}]`, want: config.ProjectPolicy{DefaultProjectDisabled: true}},
 		{name: "matched reset", input: `[{"languageOptions":{"parserOptions":{"project":null}}}]`, want: config.ProjectPolicy{ProjectDisabled: true}},
 		{name: "root error includes target", input: `[{"languageOptions":{"parserOptions":{"tsconfigRootDir":"relative"}}}]`, error: "absolute path"},
@@ -292,6 +294,74 @@ func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
 				t.Fatalf("policies=%v error=%v, want %+v", policies, err, test.want)
 			}
 		})
+	}
+}
+
+func TestResolverServiceRootUsesConfigSource(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	for _, test := range []struct {
+		name, matchingDirectory, defaultRootDirectory string
+	}{
+		{name: "loaded module", matchingDirectory: root + "/config", defaultRootDirectory: root + "/config"},
+		{name: "inline API uses invocation cwd", matchingDirectory: root + "/synthetic-owner", defaultRootDirectory: root + "/invocation"},
+	} {
+		for _, reset := range []bool{false, true} {
+			t.Run(test.name+"/nullReset="+strconv.FormatBool(reset), func(t *testing.T) {
+				input := `[{"languageOptions":{"parserOptions":{"projectService":true}}}]`
+				if reset {
+					input = fmt.Sprintf(`[{"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":%q}}},{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}]`, root+"/previous")
+				}
+				var entries config.RslintConfig
+				if err := json.Unmarshal([]byte(input), &entries); err != nil {
+					t.Fatal(err)
+				}
+				resolver := newBaseResolver(ResolverOptions{
+					Config: entries, ConfigDirectory: test.matchingDirectory, DefaultRootDirectory: test.defaultRootDirectory,
+				})
+				file := targetForTest(test.matchingDirectory+"/file.ts", test.matchingDirectory)
+				policies, err := resolver.ProjectPolicies([]target.File{file})
+				want := config.ProjectPolicy{ServiceRootDirectory: test.defaultRootDirectory}
+				if err != nil || policies[file] != want {
+					t.Fatalf("policy=%+v error=%v, want %+v", policies[file], err, want)
+				}
+				bound := resolver.WithSourceMappings(map[string]target.File{file.Path: file}, nil, true)
+				boundPolicies, err := bound.ProjectPolicies([]target.File{file})
+				if err != nil || !reflect.DeepEqual(boundPolicies, policies) {
+					t.Fatalf("source binding changed config defaults: %v, %v", boundPolicies, err)
+				}
+			})
+		}
+	}
+}
+
+func TestResolverServiceRootUsesEachModuleOwner(t *testing.T) {
+	service := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}}}}
+	resolver := newBaseResolver(ResolverOptions{
+		ConfigsByOwner:       map[string]config.RslintConfig{"/repo": service, "/repo/pkg": service},
+		DefaultRootDirectory: "/unrelated-invocation",
+	})
+	files := []target.File{targetForTest("/repo/file.ts", "/repo"), targetForTest("/repo/pkg/file.ts", "/repo/pkg")}
+	policies, err := resolver.ProjectPolicies(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if policies[file].ServiceRootDirectory != file.ConfigDirectory {
+			t.Fatalf("nested owner used another module's default root: %v", policies)
+		}
+	}
+}
+
+func TestResolverServiceRootKeepsModuleOriginForCanonicalAlias(t *testing.T) {
+	service := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}}}}
+	resolver := newBaseResolver(ResolverOptions{
+		ConfigsByOwner: map[string]config.RslintConfig{"/symlink": service},
+		FS:             &ownerAliasResolverFS{FS: osvfs.FS()},
+	})
+	file := targetForTest("/real/file.ts", "/real")
+	policies, err := resolver.ProjectPolicies([]target.File{file})
+	if err != nil || policies[file].ServiceRootDirectory != "/symlink" {
+		t.Fatalf("canonical lookup replaced the loaded module's origin: %v, %v", policies, err)
 	}
 }
 

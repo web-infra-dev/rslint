@@ -1839,6 +1839,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
+		"",
 		fsys,
 		standaloneLoaders(sourceURI),
 		s.lintSessionRoots,
@@ -1859,6 +1860,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{importConfig, firstConfig},
+		"",
 		fsys,
 		standaloneLoaders(sourceURI),
 		s.lintSessionRoots,
@@ -1908,6 +1910,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
+		"",
 		fsys,
 		standaloneLoaders(gapURI),
 		s.lintSessionRoots,
@@ -1976,6 +1979,7 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 		s.session,
 		ctx,
 		[]string{configPath},
+		"",
 		fsys,
 		lintProjectLoaders{
 			program: func(string) (*compiler.Program, *ast.SourceFile, error) {
@@ -2003,6 +2007,42 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 	}
 	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(configPath, fsys) {
 		t.Fatalf("selected Program config = %q, want %q", program.Options().ConfigFilePath, configPath)
+	}
+
+	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
+	}}}
+	serviceRequest := newStandaloneLintProjectRequestWithFS(lspConfigTarget(sourcePath, dir, fsys), fsys)
+	var serviceProgram *compiler.Program
+	provider := &documentGenerationProvider{
+		server: s, uri: uri,
+		snapshot: documentLintSnapshotForTest(s, uri, entries, dir, false, nil),
+		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
+			return lintProjectLoaders{
+				program: func(string) (*compiler.Program, *ast.SourceFile, error) {
+					loaderCalls++
+					return nil, nil, errors.New("service must reuse the Session Program")
+				},
+				metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
+					rootLoaderCalls++
+					return serviceRequest.loadMetadata(configPath)
+				},
+			}, nil
+		},
+		buildGeneration: func(selected *compiler.Program, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+			serviceProgram = selected
+			if !typed {
+				t.Fatal("direct service root lost type information")
+			}
+			return buildDocumentGeneration(selected, source, lintTarget, cwd, typed, snapshot)
+		},
+	}
+	_, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})
+	if release != nil {
+		release()
+	}
+	if err != nil || serviceProgram != program || loaderCalls != 0 || rootLoaderCalls != 1 {
+		t.Fatalf("service duplicated Session ownership: same Program=%v builds=%d parses=%d error=%v", serviceProgram == program, loaderCalls, rootLoaderCalls, err)
 	}
 }
 

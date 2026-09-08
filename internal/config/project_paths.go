@@ -63,13 +63,13 @@ func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]s
 // ResolveTsConfigPathsWithPolicy keeps the original declaration order and raw
 // patterns. A root override changes only their literal base; disabling the
 // default project never discards an explicitly declared project. Only
-// TsconfigRootDir and DefaultProjectDisabled affect this path projection;
+// TSConfigRootDirOverride and DefaultProjectDisabled affect this projection;
 // callers choose whether service or disabled binding needs these declarations.
 func ResolveTsConfigPathsWithPolicy(rslintConfig RslintConfig, cwd string, fs vfs.FS, policy ProjectPolicy) ([]string, error) {
 	if fs == nil {
 		return nil, nil
 	}
-	tsConfigs, err := resolveDeclaredProjectPaths(fs, rslintConfig, cwd, policy.TsconfigRootDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fs, rslintConfig, cwd, policy.TSConfigRootDirOverride)
 	if err != nil {
 		return nil, err
 	}

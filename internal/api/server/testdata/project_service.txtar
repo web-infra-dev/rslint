@@ -12,3 +12,10 @@ debugger;
 export const values = [1, 2];
 for (const key in values) {}
 debugger;
+-- root-default/tsconfig.json --
+{"compilerOptions":{"strict":false},"include":["pkg/file.ts"]}
+-- root-default/pkg/tsconfig.json --
+{"files":[]}
+-- root-default/pkg/file.ts --
+export function keep(x: string | undefined) { return x != null; }
+debugger;

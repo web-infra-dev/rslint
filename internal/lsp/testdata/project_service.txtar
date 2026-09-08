@@ -93,3 +93,40 @@ export const other = 1;
 declare const value: any;
 -- flat-policy/pkg[1]/safe.d.ts --
 declare const value: { member: number };
+-- imported-gap/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["importer.ts"]}
+-- imported-gap/importer.ts --
+import { value } from './target';
+export const result = value;
+-- imported-gap/target.ts --
+export const value = 1;
+-- triple-slash-gap/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["importer.ts"]}
+-- triple-slash-gap/importer.ts --
+/// <reference path="./target.js" />
+export const result = 1;
+-- triple-slash-gap/target.js --
+export const value = 1;
+-- overlapping-reference/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- overlapping-reference/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true,"strict":true,"outDir":"dist"},"files":["target.ts"]}
+-- overlapping-reference/target.ts --
+export const value = 1;
+-- disabled-source-redirect/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- disabled-source-redirect/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["target.ts"]}
+-- disabled-source-redirect/target.ts --
+export const value = 1;
+-- explicit-js/tsconfig.json --
+{"compilerOptions":{"noLib":true,"allowJs":false},"files":["target.js"]}
+-- explicit-js/target.js --
+export const value = 1;
+-- javascript-reference/tsconfig.json --
+{"compilerOptions":{"allowJs":false},"files":["target.ts"]}
+-- javascript-reference/target.ts --
+/// <reference path="./globals.js" />
+export const result: number = globalValue;
+-- javascript-reference/globals.js --
+var globalValue = 42;

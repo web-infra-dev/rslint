@@ -261,7 +261,7 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 		}
 		options := entry.LanguageOptions.ParserOptions
 		if options.rootDirSet && options.TsconfigRootDir == nil {
-			// Preserve runtime-only null resets without widening the public TS type.
+			// Keep null and invalid values for per-target resolution in JavaScript.
 			useTypeScript = false
 			break
 		}
@@ -680,6 +680,8 @@ func formatLanguageOptions(lo *LanguageOptions) string {
 
 	if po.TsconfigRootDir != nil {
 		poFields = append(poFields, "        tsconfigRootDir: '"+escapeJSString(*po.TsconfigRootDir)+"'")
+	} else if po.rootDirInvalid != nil {
+		poFields = append(poFields, "        tsconfigRootDir: "+string(po.rootDirInvalid))
 	} else if po.rootDirSet {
 		poFields = append(poFields, "        tsconfigRootDir: null")
 	}

@@ -525,43 +525,45 @@ func TestMigrate_LanguageOptions_ProjectRootDirectory(t *testing.T) {
 	assertContains(t, content, "tsconfigRootDir: '"+escapeJSString(rootDir)+"'")
 }
 
-func TestMigrate_LanguageOptions_NullRootDirectoryUsesJavaScript(t *testing.T) {
-	for _, test := range []struct {
-		packageType string
-		configName  string
-	}{
-		{"module", "rslint.config.js"},
-		{"commonjs", "rslint.config.mjs"},
-	} {
-		t.Run(test.packageType, func(t *testing.T) {
-			dir := t.TempDir()
-			boundary := tspath.NormalizePath(filepath.Join(dir, "pkg"))
-			encodedBoundary, err := json.Marshal(boundary)
-			if err != nil {
-				t.Fatal(err)
-			}
-			writeFile(t, filepath.Join(dir, "tsconfig.json"), "{}")
-			writeFile(t, filepath.Join(dir, "package.json"), `{"type":"`+test.packageType+`"}`)
-			writeFile(t, filepath.Join(dir, "rslint.json"), `[
-				{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":`+string(encodedBoundary)+`}}},
-				{"files":["pkg/**/*.ts"],"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}
-			]`)
-			if err := InitDefaultConfig(dir); err != nil {
-				t.Fatal(err)
-			}
-			content := readFile(t, filepath.Join(dir, test.configName))
-			assertContains(t, content, "ts.configs.recommended")
-			assertContains(t, content, "projectService: true")
-			assertContains(t, content, "files: ['pkg/**/*.ts']")
-			first := strings.Index(content, "tsconfigRootDir: '"+escapeJSString(boundary)+"'")
-			reset := strings.Index(content, "tsconfigRootDir: null")
-			if first < 0 || reset <= first || strings.Count(content, "tsconfigRootDir:") != 2 {
-				t.Fatalf("migration changed the authored boundary and reset order:\n%s", content)
-			}
-			if _, err := os.Stat(filepath.Join(dir, "rslint.config.ts")); !os.IsNotExist(err) {
-				t.Fatalf("runtime-only null must not produce a TypeScript config: %v", err)
-			}
-		})
+func TestMigrate_LanguageOptions_NonStringRootDirectoryUsesJavaScript(t *testing.T) {
+	for _, root := range []string{`null`, `42`, `9007199254740993`, `true`, `false`, `[]`, `["/unused",42]`, `{}`, `{"nested":[true,9007199254740993]}`} {
+		for _, test := range []struct {
+			packageType string
+			configName  string
+		}{
+			{"module", "rslint.config.js"},
+			{"commonjs", "rslint.config.mjs"},
+		} {
+			t.Run(root+"/"+test.packageType, func(t *testing.T) {
+				dir := t.TempDir()
+				boundary := tspath.NormalizePath(filepath.Join(dir, "pkg"))
+				encodedBoundary, err := json.Marshal(boundary)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeFile(t, filepath.Join(dir, "tsconfig.json"), "{}")
+				writeFile(t, filepath.Join(dir, "package.json"), `{"type":"`+test.packageType+`"}`)
+				writeFile(t, filepath.Join(dir, "rslint.json"), `[
+					{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":`+string(encodedBoundary)+`}}},
+					{"files":["pkg/**/*.ts"],"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"tsconfigRootDir":`+root+`}}}
+				]`)
+				if err := InitDefaultConfig(dir); err != nil {
+					t.Fatal(err)
+				}
+				content := readFile(t, filepath.Join(dir, test.configName))
+				assertContains(t, content, "ts.configs.recommended")
+				assertContains(t, content, "projectService: true")
+				assertContains(t, content, "files: ['pkg/**/*.ts']")
+				first := strings.Index(content, "tsconfigRootDir: '"+escapeJSString(boundary)+"'")
+				override := strings.Index(content, "tsconfigRootDir: "+root)
+				if first < 0 || override <= first || strings.Count(content, "tsconfigRootDir:") != 2 {
+					t.Fatalf("migration changed the authored root value or override order:\n%s", content)
+				}
+				if _, err := os.Stat(filepath.Join(dir, "rslint.config.ts")); !os.IsNotExist(err) {
+					t.Fatalf("runtime-only roots must not produce a TypeScript config: %v", err)
+				}
+			})
+		}
 	}
 }
 

@@ -34,7 +34,7 @@ An entry's [`basePath`](/config/base-path) anchors explicit project literals or 
 
 ## Automatic project discovery
 
-With an explicit [`projectService: true`](/config/language-options#languageoptionsparseroptionsprojectservice), rslint discovers the projects that own the selected files. Nested tsconfigs and project references are followed; a tsconfig beside the lint config does not override the source's local project.
+With an explicit [`projectService: true`](/config/language-options#languageoptionsparseroptionsprojectservice), rslint discovers configs whose `files` or `include` roots contain the selected files. Discovery reads config metadata and does not build Programs to probe imports. Nested tsconfigs and project references are followed; a tsconfig beside the lint config does not override the source's local project.
 
 With service enabled and no explicit project declarations, `rslint --type-check-only packages/app/src/file.ts` finds that file's project and checks the whole project, including sibling files. It does not first build an implicit root project for that service target. No arguments select the current directory's lint scope for discovery. Type-check-only never executes lint rules.
 
@@ -70,7 +70,7 @@ When service/root/clear options require target discovery, all actual targets con
 
 When there are no explicit paths, only ordinary targets that allow the default can request the implicit owner tsconfig. If an owner has no selected targets at all, program-wide checking retains its original declaration/default lookup without guessing effective scoped options. An empty service-only scope therefore builds no Programs in plain lint, but type-check-only can still check the owner's default tsconfig. These scope rules belong to Rslint; ESLint has no corresponding type-check flags.
 
-Shared explicit projects are constructed once per invocation. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Explicit and service modes can require separate Programs for the same tsconfig because reference source and declaration-output behavior differs. Ownership probes may construct complete candidates to inspect import membership even when the target ultimately uses gap linting.
+Shared explicit projects are constructed once per invocation. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Explicit and service modes can require separate Programs for the same tsconfig because reference source and declaration-output behavior differs. Ordinary explicit-project ownership probes may construct complete candidates to inspect import membership even when the target ultimately uses gap linting.
 
 **Every checked Program includes its tsconfig root files and dependencies loaded through imports and references.** These filters affect lint targets and service/root context discovery, but do not trim a checked Program or the owner's ordinary explicit declaration list:
 
