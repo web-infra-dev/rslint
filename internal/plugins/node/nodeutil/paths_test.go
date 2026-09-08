@@ -74,6 +74,29 @@ func TestBinAliases(t *testing.T) {
 	}
 }
 
+func TestWorkspaceDependencyPatterns(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		patterns any
+		want     bool
+	}{
+		{"packages/app", []any{`./{packages,apps}/*/`}, true},
+		{"packages/app", map[string]any{"packages": []any{`packages/@(app|lib)`}}, true},
+		{"packages/.hidden", []any{`packages/*`}, true},
+		// Upstream treats 1..3 literally.
+		{"packages/2", []any{`packages/{1..3}`}, true},
+		{"packages/excluded", []any{`!packages/excluded`, `packages/*`}, false},
+		{"packages/app", []any{`packages\*\`}, true},
+		{"123", []any{123.0}, true},
+		{"packages/app", []any{"", "!", "packages/other"}, false},
+		{"packages/app", map[string]any{"packages": false}, false},
+	} {
+		if got := matchesWorkspace(test.name, test.patterns); got != test.want {
+			t.Errorf("matchesWorkspace(%q, %#v) = %v, want %v", test.name, test.patterns, got, test.want)
+		}
+	}
+}
+
 func TestConvertPath(t *testing.T) {
 	for _, test := range []struct{ pattern, input, want string }{
 		{"src/**", "src/bin/test.js", "bin/test.js"},

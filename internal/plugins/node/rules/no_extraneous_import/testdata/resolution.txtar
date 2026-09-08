@@ -1,0 +1,154 @@
+-- node_modules/dot.name/index.js --
+export default 1;
+-- node_modules/dot.name/package.json --
+{}
+-- node_modules/exports-bad-condition/index.js --
+export default 1;
+-- node_modules/exports-bad-condition/package.json --
+{"exports":{"1":"./bad.js","default":"./index.js"}}
+-- node_modules/exports-directory-broken/dir/index.js --
+export default 1;
+-- node_modules/exports-directory-broken/dir/package.json --
+{"main":"missing.js"}
+-- node_modules/exports-directory-broken/package.json --
+{"exports":"./dir"}
+-- node_modules/exports-directory-cycle/dir/index.js --
+export default 1;
+-- node_modules/exports-directory-cycle/dir/package.json --
+{"main":"."}
+-- node_modules/exports-directory-cycle/package.json --
+{"exports":"./dir"}
+-- node_modules/exports-directory-main/dir/entry.js --
+export default 1;
+-- node_modules/exports-directory-main/dir/package.json --
+{"main":"entry.js"}
+-- node_modules/exports-directory-main/package.json --
+{"exports":"./dir"}
+-- node_modules/exports-directory-slash/dir/index.js --
+export default 1;
+-- node_modules/exports-directory-slash/package.json --
+{"exports":"./dir/"}
+-- node_modules/exports-directory/dir/index.js --
+export default 1;
+-- node_modules/exports-directory/package.json --
+{"exports":"./dir"}
+-- node_modules/exports-empty/index.js --
+export default 1;
+-- node_modules/exports-empty/package.json --
+{"exports":""}
+-- node_modules/exports-extensionless/index.js --
+export default 1;
+-- node_modules/exports-extensionless/package.json --
+{"exports":"./index"}
+-- node_modules/exports-false/index.js --
+export default 1;
+-- node_modules/exports-false/package.json --
+{"exports":false}
+-- node_modules/exports-invalid/index.js --
+export default 1;
+-- node_modules/exports-invalid/package.json --
+{"exports":["not-relative","./index.js"]}
+-- node_modules/exports-js/index.js --
+export default 1;
+-- node_modules/exports-js/package.json --
+{"exports":"./index.js"}
+-- node_modules/exports-late-null/index.js --
+export default 1;
+-- node_modules/exports-late-null/package.json --
+{"exports":["./index.js",null]}
+-- node_modules/exports-main/index.js --
+export default 1;
+-- node_modules/exports-main/package.json --
+{"exports":"./missing.js","main":"index.js"}
+-- node_modules/exports-nested-array/index.js --
+export default 1;
+-- node_modules/exports-nested-array/package.json --
+{"exports":[["./index.js"],"./missing.js"]}
+-- node_modules/exports-no-condition/index.js --
+export default 1;
+-- node_modules/exports-no-condition/package.json --
+{"exports":{"browser":"./index.js"}}
+-- node_modules/exports-null-condition/index.js --
+export default 1;
+-- node_modules/exports-null-condition/package.json --
+{"exports":[{"import":null},"./index.js"]}
+-- node_modules/exports-null-default/index.js --
+export default 1;
+-- node_modules/exports-null-default/package.json --
+{"exports":{"import":null,"default":"./index.js"}}
+-- node_modules/exports-null/index.js --
+export default 1;
+-- node_modules/exports-null/package.json --
+{"exports":[null,"./index.js"]}
+-- node_modules/exports-number/index.js --
+export default 1;
+-- node_modules/exports-number/package.json --
+{"exports":[1,"./index.js"]}
+-- node_modules/exports-parent-array/index.js --
+export default 1;
+-- node_modules/exports-parent-array/package.json --
+{"exports":["./../main-js/index.js","./index.js"]}
+-- node_modules/exports-parent/package.json --
+{"exports":"./../main-js/index.js"}
+-- node_modules/exports-pattern/lib/file.ts --
+export default 1;
+-- node_modules/exports-pattern/package.json --
+{"exports":{"./*":"./lib/*.js"}}
+-- node_modules/exports-query/index.js --
+export default 1;
+-- node_modules/exports-query/package.json --
+{"exports":"./index.js?raw#hash"}
+-- node_modules/exports-ts/index.ts --
+export default 1;
+-- node_modules/exports-ts/package.json --
+{"exports":"./index.js"}
+-- node_modules/ext-appended/package.json --
+{}
+-- node_modules/ext-appended/sub.js.js --
+export default 1;
+-- node_modules/main-double-extension/index.js.js --
+export default 1;
+-- node_modules/main-double-extension/package.json --
+{"main":"index.js"}
+-- node_modules/main-extensionless/index.ts --
+export default 1;
+-- node_modules/main-extensionless/package.json --
+{"main":"index"}
+-- node_modules/main-js/index.js --
+export default 1;
+-- node_modules/main-js/package.json --
+{"main":"index.js"}
+-- node_modules/main-json/data.json --
+{}
+-- node_modules/main-json/package.json --
+{"main":"data.json"}
+-- node_modules/main-parent/package.json --
+{"main":"../main-js/index.js"}
+-- node_modules/main-query/index.js --
+export default 1;
+-- node_modules/main-query/package.json --
+{"main":"index.js?raw#hash"}
+-- node_modules/main-ts/index.ts --
+export default 1;
+-- node_modules/main-ts/package.json --
+{"main":"index.js"}
+-- node_modules/no-main-ts/index.ts --
+export default 1;
+-- node_modules/no-main-ts/package.json --
+{}
+-- node_modules/subpath-js/index.js --
+export default 1;
+-- node_modules/subpath-js/package.json --
+{}
+-- node_modules/subpath-ts/index.ts --
+export default 1;
+-- node_modules/subpath-ts/package.json --
+{}
+-- node_modules/tsx/index.tsx --
+export default 1;
+-- node_modules/tsx/package.json --
+{}
+-- package.json --
+{"name":"review","dependencies":{"@types/main-js":"*"}}
+-- react.json --
+{"compilerOptions":{"jsx":"react"}}
