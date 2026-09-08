@@ -6,6 +6,8 @@ Prefer `Date.now()` when reading the current timestamp. This avoids creating
 a `Date` object only to convert it into the number of milliseconds since the
 Unix Epoch.
 
+This rule is enabled in the Unicorn recommended preset.
+
 Examples of **incorrect** code for this rule:
 
 ```javascript

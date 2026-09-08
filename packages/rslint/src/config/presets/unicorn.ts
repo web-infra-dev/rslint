@@ -229,7 +229,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-classlist-toggle': 'error', // not implemented
     // 'unicorn/prefer-code-point': 'error', // not implemented
     // 'unicorn/prefer-continue': 'error', // not implemented
-    // 'unicorn/prefer-date-now': 'error', // not implemented
+    'unicorn/prefer-date-now': 'error',
     // 'unicorn/prefer-default-parameters': 'error', // not implemented
     // 'unicorn/prefer-direct-iteration': 'error', // not implemented
     // 'unicorn/prefer-dispose': 'off', // not implemented

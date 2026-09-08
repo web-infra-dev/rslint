@@ -48,9 +48,11 @@ var PreferDateNowRule = rule.Rule{
 					Methods:         []string{"getTime", "valueOf"},
 					ArgumentsLength: &zeroArguments,
 				}); ok && isNewDate(utils.ESTreeRuntimeExpression(method.Object)) {
+					methodName := method.Property.Text()
 					report(method.Property, node, rule.RuleMessage{
 						Id:          "prefer-date-now-over-methods",
-						Description: "Prefer `Date.now()` over `Date#" + method.Property.Text() + "()`.",
+						Description: "Prefer `Date.now()` over `Date#" + methodName + "()`.",
+						Data:        map[string]string{"method": methodName},
 					})
 					return
 				}

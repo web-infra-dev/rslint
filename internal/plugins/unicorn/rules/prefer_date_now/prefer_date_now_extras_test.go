@@ -76,8 +76,26 @@ func TestPreferDateNowExtras(t *testing.T) {
 }
 
 func TestPreferDateNowEditDemand(t *testing.T) {
-	const source = `function clock(){return(/** @type {number} */ (+new Date))in {}}`
-	const fixedSource = `function clock(){return (/** @type {number} */ (Date.now())) in {}}`
+	t.Run("keyword spacing", func(t *testing.T) {
+		testPreferDateNowEditDemand(t,
+			`function clock(){return(/** @type {number} */ (+new Date))in {}}`,
+			`function clock(){return (/** @type {number} */ (Date.now())) in {}}`,
+			rule.RuleMessage{Id: dateMessageID, Description: "Prefer `Date.now()` over `new Date()`."},
+		)
+	})
+	for _, method := range []string{"getTime", "valueOf"} {
+		t.Run(method, func(t *testing.T) {
+			testPreferDateNowEditDemand(t, "new Date()."+method+"()", "Date.now()", rule.RuleMessage{
+				Id:          methodMessageID,
+				Description: "Prefer `Date.now()` over `Date#" + method + "()`.",
+				Data:        map[string]string{"method": method},
+			})
+		})
+	}
+}
+
+func testPreferDateNowEditDemand(t *testing.T, source, fixedSource string, message rule.RuleMessage) {
+	t.Helper()
 	root := fixtures.GetRootDir()
 	fileName := tspath.ResolvePath(root.Dir, "edit-demand.js")
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: source})
@@ -112,6 +130,9 @@ func TestPreferDateNowEditDemand(t *testing.T) {
 		diagnostics[demand] = got[0]
 	}
 	base := diagnostics[rule.EditDemandNone]
+	if !reflect.DeepEqual(base.Message, message) {
+		t.Fatalf("message = %#v, want %#v", base.Message, message)
+	}
 	for demand, diagnostic := range diagnostics {
 		metadata := diagnostic
 		metadata.FixesPtr = nil
