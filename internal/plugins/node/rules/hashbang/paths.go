@@ -174,7 +174,12 @@ func isUnpublished(program *program.Program, absolute, relative string) bool {
 			continue
 		}
 		negated := strings.HasPrefix(pattern, "!")
-		body := strings.TrimRight(path.Clean(strings.TrimPrefix(strings.TrimPrefix(pattern, "!"), "/")), "/")
+		body := pattern
+		// Remove only one marker: !/foo.js must retain /foo.js.
+		if negated || strings.HasPrefix(body, "/") {
+			body = body[1:]
+		}
+		body = strings.TrimRight(path.Clean(body), "/")
 		if strings.ContainsAny(body, "{}") || strings.Contains(body, "(") {
 			patterns := []string{body, body + "/**"}
 			if negated {

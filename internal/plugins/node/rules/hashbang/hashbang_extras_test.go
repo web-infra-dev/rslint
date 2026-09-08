@@ -203,6 +203,15 @@ func TestHashbangUnpublished(t *testing.T) {
 		// The shared brace expander treats a zero step as one. Upstream's
 		// publication matcher leaves the sequence unexpanded instead.
 		{"zero-step/lib/cli1.js", false},
+		// Removing ! must preserve the leading slash for both matcher paths.
+		{"rooted-exclusion/lib/foo.js", false},
+		{"rooted-exclusion/lib/nested/foo.js", false},
+		{"unrooted-exclusion/lib/foo.js", true},
+		{"unrooted-exclusion/lib/nested/foo.js", true},
+		{"rooted-extended-exclusion/lib/foo.js", false},
+		{"rooted-extended-exclusion/lib/nested/foo.js", false},
+		{"unrooted-extended-exclusion/lib/foo.js", true},
+		{"unrooted-extended-exclusion/lib/nested/foo.js", true},
 	} {
 		t.Run(test.file, func(t *testing.T) {
 			program, _, err := rule_tester.NewProgramHelper(root).CreateTestProgram("hello();", "empty/probe.js", "tsconfig.json")
@@ -221,11 +230,34 @@ func TestHashbangUnpublished(t *testing.T) {
 			}
 		})
 	}
-	// A published supplementary-character filename must be checked when
-	// ignoreUnpublished is enabled, including its diagnostic and removal fix.
+	// Publication filtering must preserve executable diagnostics and fixes,
+	// including when an unrelated root exclusion or Unicode pattern is present.
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &HashbangRule,
-		[]rule_tester.ValidTestCase{},
+		[]rule_tester.ValidTestCase{
+			{FileName: "unrooted-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
+			{FileName: "unrooted-extended-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
+		},
 		[]rule_tester.InvalidTestCase{
+			{
+				FileName: "rooted-exclusion/lib/foo.js",
+				Code:     "hello();",
+				Options:  map[string]any{"ignoreUnpublished": true},
+				Output:   []string{"#!/usr/bin/env node\nhello();"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectedHashbangNode",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 9,
+				}},
+			},
+			{
+				FileName: "rooted-extended-exclusion/lib/foo.js",
+				Code:     "hello();",
+				Options:  map[string]any{"ignoreUnpublished": true},
+				Output:   []string{"#!/usr/bin/env node\nhello();"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "expectedHashbangNode",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 9,
+				}},
+			},
 			{
 				FileName: "unicode/lib/😀.js",
 				Code:     "#!/usr/bin/env node\nhello();",

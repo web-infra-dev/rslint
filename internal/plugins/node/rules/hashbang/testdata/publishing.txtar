@@ -28,3 +28,12 @@ lib/drop.js
 
 -- zero-step/package.json --
 {"files":["lib/cli{1..3..0}.js"]}
+
+-- rooted-exclusion/package.json --
+{"bin":"lib/foo.js","files":["lib","!/foo.js"]}
+-- unrooted-exclusion/package.json --
+{"bin":"lib/foo.js","files":["lib","!foo.js"]}
+-- rooted-extended-exclusion/package.json --
+{"bin":"lib/foo.js","files":["lib","!/@(foo).js"]}
+-- unrooted-extended-exclusion/package.json --
+{"bin":"lib/foo.js","files":["lib","!@(foo).js"]}
