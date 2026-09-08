@@ -35,7 +35,14 @@ func SpaceAroundKeywordFixes(sourceFile *ast.SourceFile, node *ast.Node) []rule.
 		return nil
 	}
 
-	outer := utils.OutermostParenthesizedExpression(node)
+	// JSDoc casts insert wrappers that ESTree does not expose. Cross those
+	// wrappers as well as parentheses to find the complete source range.
+	outer := node
+	for outer.Parent != nil &&
+		(ast.IsParenthesizedExpression(outer.Parent) || utils.IsJSDocTypeCastWrapper(outer.Parent)) &&
+		outer.Parent.Expression() == outer {
+		outer = outer.Parent
+	}
 	textRange := utils.TrimNodeTextRange(sourceFile, outer)
 	var fixes []rule.RuleFix
 

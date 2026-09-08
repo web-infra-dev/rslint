@@ -211,10 +211,12 @@ func TestShouldAddParenthesesToMemberExpressionObject(t *testing.T) {
 
 func TestSpaceAroundKeywordFixesUsesESTreeTokenClasses(t *testing.T) {
 	tests := []struct {
-		name      string
-		code      string
-		target    string
-		wantFixes int
+		name       string
+		code       string
+		target     string
+		javascript bool
+		wantFixes  int
+		wantOutput string
 	}{
 		{
 			name:   "TypeScript as stays identifier-like",
@@ -227,28 +229,87 @@ func TestSpaceAroundKeywordFixesUsesESTreeTokenClasses(t *testing.T) {
 			target: "consume(value)",
 		},
 		{
-			name:      "ECMAScript keyword after",
-			code:      "const result = consume(value)instanceof Array;",
-			target:    "consume(value)",
-			wantFixes: 1,
+			name:       "ECMAScript keyword after",
+			code:       "const result = consume(value)instanceof Array;",
+			target:     "consume(value)",
+			wantFixes:  1,
+			wantOutput: "const result = consume(value) instanceof Array;",
 		},
 		{
-			name:      "contextual of before",
-			code:      "for (const item of[].concat(value)) {}",
-			target:    "[].concat(value)",
-			wantFixes: 1,
+			name:       "contextual of before",
+			code:       "for (const item of[].concat(value)) {}",
+			target:     "[].concat(value)",
+			wantFixes:  1,
+			wantOutput: "for (const item of [].concat(value)) {}",
 		},
 		{
-			name:      "contextual await before",
-			code:      "async function consume() { await[].concat(value); }",
-			target:    "[].concat(value)",
-			wantFixes: 1,
+			name:       "contextual await before",
+			code:       "async function consume() { await[].concat(value); }",
+			target:     "[].concat(value)",
+			wantFixes:  1,
+			wantOutput: "async function consume() { await [].concat(value); }",
+		},
+		{
+			name:       "JSDoc type cast inside parentheses",
+			code:       "function clock(){return(/** @type {number} */ (consume(value)));}",
+			target:     "consume(value)",
+			javascript: true,
+			wantFixes:  1,
+			wantOutput: "function clock(){return (/** @type {number} */ (consume(value)));}",
+		},
+		{
+			name:       "JSDoc type cast between keywords",
+			code:       "function clock(){return(/** @type {number} */ (consume(value)))in {};}",
+			target:     "consume(value)",
+			javascript: true,
+			wantFixes:  2,
+			wantOutput: "function clock(){return (/** @type {number} */ (consume(value))) in {};}",
+		},
+		{
+			name:       "JSDoc satisfies cast inside parentheses",
+			code:       "function clock(){return(/** @satisfies {number} */ (consume(value)));}",
+			target:     "consume(value)",
+			javascript: true,
+			wantFixes:  1,
+			wantOutput: "function clock(){return (/** @satisfies {number} */ (consume(value)));}",
+		},
+		{
+			name:       "nested JSDoc casts",
+			code:       "function clock(){return(/** @type {number} */ (/** @satisfies {number} */ (consume(value))));}",
+			target:     "consume(value)",
+			javascript: true,
+			wantFixes:  1,
+			wantOutput: "function clock(){return (/** @type {number} */ (/** @satisfies {number} */ (consume(value))));}",
+		},
+		{
+			name:       "existing JSDoc keyword spacing",
+			code:       "function clock(){return (/** @type {number} */ (consume(value))) in {};}",
+			target:     "consume(value)",
+			javascript: true,
+		},
+		{
+			name:   "authored TypeScript as is a boundary",
+			code:   "function clock(){return(consume(value) as number);}",
+			target: "consume(value)",
+		},
+		{
+			name:   "authored TypeScript satisfies is a boundary",
+			code:   "function clock(){return(consume(value) satisfies number);}",
+			target: "consume(value)",
+		},
+		{
+			name:   "authored TypeScript non-null assertion is a boundary",
+			code:   "function clock(){return(consume(value)!);}",
+			target: "consume(value)",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			sourceFile := parseTestSource(test.code)
+			if test.javascript {
+				sourceFile = parseTestJavaScript(test.code)
+			}
 			node := findTestCall(t, sourceFile, test.target)
 			fixes := SpaceAroundKeywordFixes(sourceFile, node)
 			if len(fixes) != test.wantFixes {
@@ -260,6 +321,18 @@ func TestSpaceAroundKeywordFixesUsesESTreeTokenClasses(t *testing.T) {
 					t.Fatalf("SpaceAroundKeywordFixes(%q) inserted %q, want one space",
 						test.code, fix.Text)
 				}
+			}
+			output := test.code
+			for i := len(fixes) - 1; i >= 0; i-- {
+				fix := fixes[i]
+				output = output[:fix.Range.Pos()] + fix.Text + output[fix.Range.End():]
+			}
+			wantOutput := test.wantOutput
+			if wantOutput == "" {
+				wantOutput = test.code
+			}
+			if output != wantOutput {
+				t.Fatalf("SpaceAroundKeywordFixes(%q) produced %q, want %q", test.code, output, wantOutput)
 			}
 		})
 	}
