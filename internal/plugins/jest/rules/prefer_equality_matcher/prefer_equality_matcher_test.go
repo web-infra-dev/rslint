@@ -31,6 +31,7 @@ func TestPreferEqualityMatcherRule(t *testing.T) {
 			{Code: `expect.hasAssertions`},
 			{Code: `expect.hasAssertions()`},
 			{Code: `expect.assertions(1)`},
+			{Code: `expect(true).toBe(...true)`},
 			{Code: `expect(a == 1).toBe(true)`},
 			{Code: `expect(1 == a).toBe(true)`},
 			{Code: `expect(a == b).toBe(true)`},
@@ -129,7 +130,46 @@ func TestPreferEqualityMatcherRule(t *testing.T) {
 						Line:      1,
 						Column:    17,
 						Suggestions: expectSuggestions(func(equalityMatcher string) string {
-							return `expect(a).` + equalityMatcher + `(b as boolean);`
+							return `expect(a).` + equalityMatcher + `(b);`
+						}),
+					},
+				},
+			},
+			{
+				Code: `expect(a === b).toBe(true as const);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useEqualityMatcher",
+						Line:      1,
+						Column:    17,
+						Suggestions: expectSuggestions(func(equalityMatcher string) string {
+							return `expect(a).` + equalityMatcher + `(b);`
+						}),
+					},
+				},
+			},
+			{
+				Code: `expect((f(), a) === b).toBe(true);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useEqualityMatcher",
+						Line:      1,
+						Column:    24,
+						Suggestions: expectSuggestions(func(equalityMatcher string) string {
+							return `expect((f(), a)).` + equalityMatcher + `(b);`
+						}),
+					},
+				},
+			},
+			{
+				Code: `expect(a === (f(), b)).toBe(true);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useEqualityMatcher",
+						Line:      1,
+						Column:    24,
+						Suggestions: expectSuggestions(func(equalityMatcher string) string {
+							return `expect(a).` + equalityMatcher + `((f(), b));`
 						}),
 					},
 				},

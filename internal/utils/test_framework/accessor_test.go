@@ -248,6 +248,37 @@ func TestRemoveAccessorEntryRanges(t *testing.T) {
 	}
 }
 
+func TestInsertMemberBeforeAccessor(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{name: "property", code: `a.b()`, want: `a.x.b()`},
+		{name: "element", code: `a['b']()`, want: `a.x['b']()`},
+		{name: "optional property", code: `a?.b()`, want: `a?.x.b()`},
+		{name: "optional element", code: `a?.['b']()`, want: `a?.x['b']()`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, call := parseFirstCall(t, test.code)
+			entries := GetMemberEntries(call)
+			if len(entries) < 2 {
+				t.Fatalf("no member accessor in %q", test.code)
+			}
+			textRange, text, ok := InsertMemberBeforeAccessor(&entries[1], "x")
+			if !ok {
+				t.Fatalf("InsertMemberBeforeAccessor returned false for %q", test.code)
+			}
+			got := test.code[:textRange.Pos()] + text + test.code[textRange.End():]
+			if got != test.want {
+				t.Errorf("output = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func TestAccessorRejectsUnsupportedNodes(t *testing.T) {
 	t.Run("nil node", func(t *testing.T) {
 		if _, ok := AccessorRange(nil, nil); ok {
@@ -261,6 +292,9 @@ func TestAccessorRejectsUnsupportedNodes(t *testing.T) {
 		}
 		if IsAccessorNode(nil) {
 			t.Error("IsAccessorNode(nil) = true, want false")
+		}
+		if _, _, ok := InsertMemberBeforeAccessor(nil, "x"); ok {
+			t.Error("InsertMemberBeforeAccessor(nil) = true, want false")
 		}
 	})
 

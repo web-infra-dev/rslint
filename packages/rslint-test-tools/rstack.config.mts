@@ -665,6 +665,7 @@ define.test({
     './tests/rstest/rules/prefer-called-times.test.ts',
     './tests/rstest/rules/prefer-called-with.test.ts',
     './tests/rstest/rules/prefer-each.test.ts',
+    './tests/rstest/rules/prefer-equality-matcher.test.ts',
     './tests/rstest/rules/prefer-expect-type-of.test.ts',
     './tests/rstest/rules/prefer-hooks-in-order.test.ts',
     './tests/rstest/rules/prefer-import-in-mock.test.ts',
