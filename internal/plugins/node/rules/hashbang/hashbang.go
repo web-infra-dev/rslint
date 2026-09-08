@@ -2,12 +2,13 @@ package hashbang
 
 import (
 	_ "embed"
+	"path"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/config/gitignore"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -52,6 +53,14 @@ func isNodeShebang(shebang, executable string) bool {
 	return command == executable
 }
 
+func fileExtension(fileName string) string {
+	base := path.Base(fileName)
+	if strings.HasPrefix(base, ".") && !strings.Contains(base[1:], ".") {
+		return ""
+	}
+	return path.Ext(fileName)
+}
+
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/rules/hashbang.js
 var HashbangRule = rule.Rule{
 	Name:   "node/hashbang",
@@ -62,7 +71,7 @@ var HashbangRule = rule.Rule{
 			return nil
 		}
 		fileName := ctx.SourceFile.FileName()
-		pkg := findPackage(program, fileName)
+		pkg := nodeutil.FindPackage(program, fileName)
 		if pkg == nil {
 			return nil
 		}
@@ -70,17 +79,17 @@ var HashbangRule = rule.Rule{
 		if len(options) > 0 {
 			opts, _ = options[0].(map[string]any)
 		}
-		relative := tspath.GetRelativePathFromDirectory(pkg.directory, fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
-		converted, ok := convertPath(relative, opts, ctx.Settings)
+		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+		converted, ok := nodeutil.ConvertPath(relative, opts, ctx.Settings)
 		if !ok {
 			return nil
 		}
-		absolute := tspath.ResolvePath(pkg.directory, converted)
-		additional := gitignore.NewMatcher(utils.ToStringSlice(opts["additionalExecutables"]), false).Match(converted)
-		if ignore, _ := opts["ignoreUnpublished"].(bool); ignore && !additional && isUnpublished(program, absolute, converted) {
+		absolute := tspath.ResolvePath(pkg.Directory(), converted)
+		additional := nodeutil.MatchIgnorePatterns(program, utils.ToStringSlice(opts["additionalExecutables"]), converted)
+		if ignore, _ := opts["ignoreUnpublished"].(bool); ignore && !additional && nodeutil.IsUnpublished(program, absolute, converted) {
 			return nil
 		}
-		needsShebang := additional || isBinFile(absolute, pkg.data["bin"], pkg.directory)
+		needsShebang := additional || pkg.IsBinFile(absolute)
 		executable := "node"
 		if mapping, ok := opts["executableMap"].(map[string]any); ok {
 			if value, ok := mapping[fileExtension(fileName)].(string); ok {

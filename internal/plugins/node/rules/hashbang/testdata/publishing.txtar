@@ -37,3 +37,8 @@ lib/drop.js
 {"bin":"lib/foo.js","files":["lib","!/@(foo).js"]}
 -- unrooted-extended-exclusion/package.json --
 {"bin":"lib/foo.js","files":["lib","!@(foo).js"]}
+
+-- class-exclusion/package.json --
+{"bin":"lib/foo.js","files":["lib/[!b]oo.js","lib/[^b]oo.js"]}
+-- newline-files/package.json --
+{"bin":"lib/foo.js","files":["lib/foo.js\nbar.js"]}

@@ -290,6 +290,11 @@ func TestMatchOptions(t *testing.T) {
 		options minimatch3.Options
 		want    bool
 	}{
+		{name: "default trims pattern whitespace", pattern: " file ", path: "file", want: true},
+		{name: "preserved whitespace is literal", pattern: " file ", path: " file ", options: minimatch3.Options{PreserveWhitespace: true}, want: true},
+		{name: "preserved whitespace does not select trimmed name", pattern: " file ", path: "file", options: minimatch3.Options{PreserveWhitespace: true}, want: false},
+		{name: "preserved non-ASCII whitespace", pattern: "file\u00a0", path: "file\u00a0", options: minimatch3.Options{PreserveWhitespace: true}, want: true},
+
 		{
 			name:    "Dot lets a wildcard reach a dot name",
 			pattern: "/src/*",
@@ -554,6 +559,25 @@ func TestMatchNoCase(t *testing.T) {
 // The length is the one String.prototype.length reports, in UTF-16 code units,
 // so a pattern written in characters that take three bytes to spell fits three
 // times what its size in memory would allow.
+// Compare the optimized ASCII literal branch against the existing regexp path.
+// A character class forces actual regexp matching for each tested first byte.
+func TestNoCaseLiteralMatchesRegexp(t *testing.T) {
+	for _, literal := range []string{"a", "K", "S", "I", "tools", "TOOL.JS", ".hidden", "0", "_", "file-name"} {
+		expression := "[" + literal[:1] + "]" + literal[1:]
+		plain := minimatch3.New(literal, minimatch3.Options{NoCase: true, Dot: true})
+		regex := minimatch3.New(expression, minimatch3.Options{NoCase: true, Dot: true})
+		names := []string{literal, "", literal + "x", "K", "ſ", "ı", "İ", "😀", "\n", "\r", "\u2028"}
+		for b := byte(0); b < 128; b++ {
+			names = append(names, string(b)+literal[1:])
+		}
+		for _, name := range names {
+			if got, want := plain.Match(name), regex.Match(name); got != want {
+				t.Errorf("%q with %q: literal=%v regexp=%v", literal, name, got, want)
+			}
+		}
+	}
+}
+
 func TestMatchOverLongPattern(t *testing.T) {
 	longest := strings.Repeat("a/", 32767) + "a"
 	tooLong := strings.Repeat("a/", 32768) + "a"

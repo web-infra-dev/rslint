@@ -48,9 +48,12 @@ import (
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
-// Options mirrors the minimatch options a caller can pass. The zero value is
-// minimatch's own default behavior.
+// Options follows minimatch, with PreserveWhitespace for already-normalized
+// input from other glob syntaxes. The zero value is minimatch's own default.
 type Options struct {
+	// PreserveWhitespace disables minimatch's initial String.trim for callers
+	// that supply already-normalized patterns with significant whitespace.
+	PreserveWhitespace bool
 	// Dot lets a wildcard match a name starting with a period. Without it,
 	// `a/**/b` does not match `a/.d/b`.
 	Dot bool
@@ -133,6 +136,8 @@ type patternPart struct {
 	globstar bool
 	literal  string
 	re       *regexp2.Regexp
+	// ASCII literals under /i need neither a regexp nor UTF-16 allocation.
+	asciiNoCase bool
 }
 
 // Matcher is a compiled pattern, ready to match any number of paths.
@@ -161,7 +166,9 @@ func New(pattern string, options Options) *Matcher {
 		return m
 	}
 
-	m.pattern = ecmascript.StringTrim(pattern)
+	if !options.PreserveWhitespace {
+		m.pattern = ecmascript.StringTrim(pattern)
+	}
 	m.make()
 	return m
 }
@@ -264,6 +271,10 @@ func (m *Matcher) parsePart(pattern string) (patternPart, bool) {
 	}
 	if pattern == "" {
 		return patternPart{}, true
+	}
+	if m.options.NoCase && !strings.ContainsAny(pattern, "*?[]\\!+@()\r\n") &&
+		strings.IndexFunc(pattern, func(r rune) bool { return r >= 0x80 }) < 0 {
+		return patternPart{literal: pattern, asciiNoCase: true}, true
 	}
 
 	source, hasMagic, ok := m.parseSource(pattern, false)
@@ -961,6 +972,21 @@ func (m *Matcher) matchOneFrom(file []string, row []patternPart, fi int, pi int,
 }
 
 func (p patternPart) match(name string) bool {
+	if p.asciiNoCase {
+		if name == p.literal {
+			return true
+		}
+		// Non-Unicode JS /i never folds a non-ASCII character into ASCII.
+		if len(name) != len(p.literal) {
+			return false
+		}
+		for i := range len(name) {
+			if name[i] >= 0x80 || esregexp.Canonicalize(rune(name[i]), false) != esregexp.Canonicalize(rune(p.literal[i]), false) {
+				return false
+			}
+		}
+		return true
+	}
 	if p.re == nil {
 		// A part without wildcards has to match exactly.
 		return name == p.literal || (strings.IndexByte(name, 0xED) >= 0 && ecmascript.CombineSurrogatePairs(name) == p.literal)

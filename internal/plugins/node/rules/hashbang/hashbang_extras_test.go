@@ -1,8 +1,8 @@
 package hashbang
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"reflect"
-	"sync"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -39,46 +39,6 @@ func TestHashbangSourceBoundaries(t *testing.T) {
 		})
 }
 
-func TestHashbangPackageGeneration(t *testing.T) {
-	base := hashbangRoot(t)
-	create := func(metadata string) *lintprogram.Program {
-		t.Helper()
-		root := base
-		root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
-			tspath.ResolvePath(root.Dir, "string-bin/package.json"):        metadata,
-			tspath.ResolvePath(root.Dir, "string-bin/nested/package.json"): "null",
-		})
-		raw, _, err := rule_tester.NewProgramHelper(root).CreateTestProgram("hello();", "string-bin/nested/a.js", "tsconfig.json")
-		if err != nil {
-			t.Fatal(err)
-		}
-		return lintprogram.NewFromCompiler(raw)
-	}
-	first := create(`{"bin":"bin/first.js"}`)
-	name := tspath.ResolvePath(base.Dir, "string-bin/nested/a.js")
-	var packages [16]*packageJSON
-	var group sync.WaitGroup
-	for index := range packages {
-		group.Go(func() {
-			packages[index] = findPackage(first, name)
-		})
-	}
-	group.Wait()
-	pkg := packages[0]
-	if pkg == nil || pkg.data["bin"] != "bin/first.js" {
-		t.Fatalf("invalid nested metadata did not fall back to parent: %#v", pkg)
-	}
-	for _, got := range packages {
-		if got != pkg {
-			t.Error("package decoding was not shared within the Program")
-		}
-	}
-	second := create(`{"bin":"bin/second.js"}`)
-	if got := findPackage(second, name); got == nil || got == pkg || got.data["bin"] != "bin/second.js" {
-		t.Fatalf("package metadata leaked between Programs: %#v", got)
-	}
-}
-
 func TestHashbangExtras(t *testing.T) {
 	nodeError := rule_tester.InvalidTestCaseError{MessageId: "expectedHashbangNode", Message: `This file needs shebang "#!/usr/bin/env node".`, Line: 1, Column: 1, EndLine: 1, EndColumn: 1}
 	unicodeError := nodeError
@@ -91,14 +51,18 @@ func TestHashbangExtras(t *testing.T) {
 			{FileName: "string-bin/bin/test.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"ignoreUnpublished": false, "additionalExecutables": []any{}, "executableMap": map[string]any{".js": "node"}, "convertPath": map[string]any{}}},
 			{FileName: "string-bin/lib/test.js", Code: "#!/usr/bin/env node"}, // Upstream only recognizes hashbangs ending in LF.
 			{FileName: "unpublished/something.test.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"additionalExecutables": []any{"*.TEST.js"}, "ignoreUnpublished": true}},
-			// The shared matcher folds the Kelvin sign, unlike upstream ignore's JS /i.
-			{FileName: "no-bin-field/K.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"additionalExecutables": []any{"K.js"}}},
-			// Git ignore patterns still count a supplementary character once;
-			// upstream ignore selects this file with two wildcards instead.
-			{FileName: "no-bin-field/😀.js", Code: "", Options: map[string]any{"additionalExecutables": []any{"??.js"}}},
+			// JavaScript /i does not fold the Kelvin sign to the Latin letter K.
+			{FileName: "no-bin-field/K.js", Code: "hello();", Options: map[string]any{"additionalExecutables": []any{"K.js"}}},
+			// Two wildcards select the two UTF-16 code units in an emoji filename.
+			{FileName: "no-bin-field/😀.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"additionalExecutables": []any{"??.js"}}},
 			{FileName: "string-bin/src/bin/test.js", Code: "#!/usr/bin/env node\nhello();", Settings: map[string]any{"n": map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/", ""}}}, "node": map[string]any{"convertPath": map[string]any{}}}},
 			{FileName: "string-bin/src/bin/test.js", Code: "hello();", Options: map[string]any{"convertPath": map[string]any{}}, Settings: map[string]any{"n": map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/", ""}}}}},
 			{FileName: "string-bin/src/bin/test.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"convertPath": []any{map[string]any{"include": []any{"src/**"}, "exclude": []any{"src/lib/**"}, "replace": []any{"^src/", ""}}}}},
+			// An explicit pattern array does not split embedded newlines.
+			{FileName: "no-bin-field/b.js", Code: "hello();", Options: map[string]any{"additionalExecutables": []any{"*.js\n!a.js"}}},
+			// A convertPath backslash is literal, so this pattern must not
+			// accidentally turn the ordinary source into the bin entry.
+			{FileName: "string-bin/src/a.js", Code: "hello();", Options: map[string]any{"convertPath": map[string]any{`src/\*.js`: []any{".*", "bin/test.js"}}}},
 			// The adapter skips an invalid conversion regexp rather than crash or apply a fix to the wrong path.
 			{FileName: "string-bin/bin/test.js", Code: "hello();", Options: map[string]any{"convertPath": map[string]any{"**": []any{"[", ""}}}},
 		}, []rule_tester.InvalidTestCase{
@@ -114,45 +78,6 @@ func TestHashbangExtras(t *testing.T) {
 }
 
 func TestHashbangPaths(t *testing.T) {
-	for _, test := range []struct{ pattern, input, want string }{
-		{"src/**", "src/bin/test.js", "bin/test.js"},
-		{"src/file?.js", "src/file1.js", "src/file1.js"},
-		{"src/[ab].js", "src/a.js", "src/a.js"},
-		{"src/{a,b}.js", "src/a.js", "src/a.js"},
-		{"src/**", "src/.hidden.js", ".hidden.js"},
-	} {
-		got, ok := convertPath(test.input, map[string]any{"convertPath": map[string]any{test.pattern: []any{"^src/", ""}}}, nil)
-		if !ok || got != test.want {
-			t.Errorf("%q with %q = %q, %v; want %q", test.input, test.pattern, got, ok, test.want)
-		}
-	}
-	// Object order is unavailable after config decoding. Use array form when
-	// overlapping patterns need priority; this is an explicit documented difference.
-	mapping := map[string]any{"src/**": []any{"^src/", "first/"}, "**": []any{"^src/", "second/"}}
-	got, ok := convertPath("src/a.js", map[string]any{"convertPath": mapping}, nil)
-	if !ok || got != "second/a.js" {
-		t.Fatalf("object order = %q, %v", got, ok)
-	}
-	ordered := []any{map[string]any{"include": []any{"src/**"}, "replace": []any{"^src/", "first/"}}, map[string]any{"include": []any{"**"}, "replace": []any{"^src/", "second/"}}}
-	got, ok = convertPath("src/a.js", map[string]any{"convertPath": ordered}, nil)
-	if !ok || got != "first/a.js" {
-		t.Fatalf("array order = %q, %v", got, ok)
-	}
-	// Named and unnamed captures share JavaScript's lexical numbering.
-	got, ok = convertPath("src/cli.js", map[string]any{"convertPath": map[string]any{"**": []any{`(?<dir>src)/(.*)`, "$1/$2"}}}, nil)
-	if !ok || got != "src/cli.js" {
-		t.Fatalf("mixed capture numbering = %q, %v", got, ok)
-	}
-	for _, bin := range []any{[]any{"bin/test"}, map[string]any{"cli": "bin/test"}, "bin/test"} {
-		if !isBinFile("/pkg/bin/test.js", bin, "/pkg") {
-			t.Errorf("bin resolution failed: %#v", bin)
-		}
-	}
-	for _, bin := range []any{nil, false, 42, "", map[string]any{"cli": false}} {
-		if isBinFile("/pkg/bin/test.js", bin, "/pkg") {
-			t.Errorf("invalid bin matched: %#v", bin)
-		}
-	}
 	for name, want := range map[string]string{".hidden": "", "cli": "", "cli.ts": ".ts", ".cli.js": ".js", "cli.": "."} {
 		if got := fileExtension(name); got != want {
 			t.Errorf("extension of %q = %q, want %q", name, got, want)
@@ -191,6 +116,8 @@ func TestHashbangUnpublished(t *testing.T) {
 		want bool
 	}{
 		{"git/secret.js", true}, {"git/open.js", false},
+		{"class-exclusion/lib/foo.js", false},
+		{"newline-files/lib/foo.js", true},
 		{"npm/secret.js", false}, {"npm/private.js", true},
 		{"files/lib/keep.js", false}, {"files/lib/drop.js", true}, {"files/outside.js", true},
 		{"files/src/cli.js", false}, {"files/package.json", false},
@@ -220,12 +147,12 @@ func TestHashbangUnpublished(t *testing.T) {
 			}
 			p := lintprogram.NewFromCompiler(program)
 			absolute := tspath.ResolvePath(root.Dir, test.file)
-			pkg := findPackage(p, absolute)
+			pkg := nodeutil.FindPackage(p, absolute)
 			if pkg == nil {
 				t.Fatal("package not found")
 			}
-			relative := tspath.GetRelativePathFromDirectory(pkg.directory, absolute, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
-			if got := isUnpublished(p, absolute, relative); got != test.want {
+			relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), absolute, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+			if got := nodeutil.IsUnpublished(p, absolute, relative); got != test.want {
 				t.Errorf("unpublished = %v, want %v", got, test.want)
 			}
 		})
@@ -234,10 +161,18 @@ func TestHashbangUnpublished(t *testing.T) {
 	// including when an unrelated root exclusion or Unicode pattern is present.
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &HashbangRule,
 		[]rule_tester.ValidTestCase{
+			{FileName: "newline-files/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
 			{FileName: "unrooted-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
 			{FileName: "unrooted-extended-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				FileName: "class-exclusion/lib/foo.js",
+				Code:     "hello();",
+				Options:  map[string]any{"ignoreUnpublished": true},
+				Output:   []string{"#!/usr/bin/env node\nhello();"},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbangNode", Line: 1, Column: 1, EndLine: 1, EndColumn: 9}},
+			},
 			{
 				FileName: "rooted-exclusion/lib/foo.js",
 				Code:     "hello();",
