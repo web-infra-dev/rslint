@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
 type canonicalPathBaseFS struct {
@@ -372,6 +373,31 @@ func TestHandleLint_SelectedTargetResolvesGoverningProject(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "missing.json") {
 		t.Fatalf("selected target must resolve its governing project, got %v", err)
+	}
+}
+
+func TestHandleLint_ProjectServiceUsesTargetConfigAndOverlay(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	for _, useService := range []bool{true, false} {
+		options := `"projectService":true`
+		if !useService {
+			options = `"projectService":false,"project":"tsconfig.json"`
+		}
+		config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{` + options + `}},"rules":{"@typescript-eslint/no-unnecessary-condition":"error","no-debugger":"error"}}]`)
+		response, err := (&Handler{}).HandleLint(api.LintRequest{
+			Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+			Files:        []string{tspath.ResolvePath(dir, "pkg/file.ts")},
+			FileContents: map[string]string{tspath.ResolvePath(dir, "pkg/file.ts"): `export function keep(x: string | undefined) { return x != null; }`},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.FileCount != 1 {
+			t.Fatalf("wrong API target scope: %+v", response)
+		}
+		if useService && len(response.Diagnostics) != 0 || !useService && len(response.Diagnostics) == 0 {
+			t.Fatalf("wrong effective TypeScript options (service=%v): %+v", useService, response)
+		}
 	}
 }
 

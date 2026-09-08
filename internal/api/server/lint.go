@@ -343,11 +343,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		var projects loader.ProjectSet
 		var buildErr error
 		if len(targetPlan.Files) > 0 {
-			if configMap != nil {
-				projects, buildErr = session.BuildTargetProjects(configMap, targetPlan, false)
-			} else {
-				projects, buildErr = session.BuildTargetProject(configDirectory, rslintConfig, targetPlan, false)
+			projectConfigs := configMap
+			if projectConfigs == nil {
+				projectConfigs = map[string]rslintconfig.RslintConfig{configDirectory: rslintConfig}
 			}
+			projects, buildErr = session.BuildLintProjects(projectConfigs, targetPlan, false, loader.ProjectScopeTarget)
 			if buildErr != nil {
 				return loader.LoadResult{}, buildErr
 			}

@@ -1,0 +1,26 @@
+-- tsconfig.json --
+{"files":["unrelated.ts"]}
+-- unrelated.ts --
+export const unrelated: number = "wrong";
+-- a/tsconfig.json --
+{"compilerOptions":{"strict":true},"include":["src/**/*.ts"]}
+-- a/src/file.ts --
+export const selected = 1;
+-- a/src/sibling.ts --
+export const sibling: number = "wrong";
+-- a/src/disabled.ts --
+export const disabled: number = "wrong";
+-- b/tsconfig.json --
+{"compilerOptions":{"strict":false},"include":["src/**/*.ts"]}
+-- b/custom.json --
+{"compilerOptions":{"strict":true},"files":["src/file.ts"]}
+-- b/src/file.ts --
+export const selected: string = undefined;
+-- outside/file.ts --
+export const outside = 1;
+-- shared.json --
+{"files":["a/src/file.ts","b/src/file.ts"]}
+-- service/tsconfig.json --
+{"files":["file.ts"]}
+-- service/file.ts --
+export const service = 1;

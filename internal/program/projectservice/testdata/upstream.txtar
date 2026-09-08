@@ -1,0 +1,2933 @@
+Boolean project-service observations from typescript-eslint 8.69.0 / TypeScript 6.0.3.
+Project paths, complete roots, and Program reuse were recorded through parser.parseForESLint.
+
+-- nearest-root/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts",
+        "src/sibling.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- nearest-root/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-root/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-root/src/sibling.ts --
+export const sibling = 1;
+-- nearest-nested/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/src/file.ts",
+        "pkg/src/sibling.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- nearest-nested/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-nested/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-nested/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-nested/pkg/src/sibling.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-excludes-parent-includes/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/other.ts",
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": false,
+      "diagnostics": []
+    }
+  ]
+}
+-- nearest-excludes-parent-includes/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-excludes-parent-includes/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "other.ts"
+  ]
+}
+-- nearest-excludes-parent-includes/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-excludes-parent-includes/pkg/other.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-excludes-no-parent/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "outside/file.ts",
+      "error": true
+    }
+  ]
+}
+-- nearest-excludes-no-parent/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- nearest-excludes-no-parent/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-excludes-no-parent/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- excluded-imported/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "outside/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- excluded-imported/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "outside"
+  ]
+}
+-- excluded-imported/src/file.ts --
+import { result } from '../outside/file'; export { result };
+-- excluded-imported/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- composite-excluded-imported/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "outside/file.ts",
+      "error": true
+    }
+  ]
+}
+-- composite-excluded-imported/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "composite": true,
+    "types": []
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "outside"
+  ]
+}
+-- composite-excluded-imported/src/file.ts --
+import { result } from '../outside/file'; export { result };
+-- composite-excluded-imported/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-empty-files-parent-includes/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": false,
+      "diagnostics": []
+    }
+  ]
+}
+-- nearest-empty-files-parent-includes/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-empty-files-parent-includes/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": []
+}
+-- nearest-empty-files-parent-includes/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-extends/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- nearest-extends/base.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "pkg/src/**/*.ts"
+  ]
+}
+-- nearest-extends/pkg/tsconfig.json --
+{
+  "extends": "../base.json"
+}
+-- nearest-extends/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-standard-reference/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-standard-reference/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg"
+    }
+  ]
+}
+-- solution-standard-reference/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "composite": true,
+    "types": []
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-standard-reference/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-custom-reference/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.app.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-custom-reference/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/tsconfig.app.json"
+    }
+  ]
+}
+-- solution-custom-reference/pkg/tsconfig.app.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "composite": true,
+    "types": []
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-custom-reference/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-nested-custom-references/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.app.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-nested-custom-references/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/tsconfig.solution.json"
+    }
+  ]
+}
+-- solution-nested-custom-references/pkg/tsconfig.solution.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ]
+}
+-- solution-nested-custom-references/pkg/tsconfig.app.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "composite": true,
+    "types": []
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-nested-custom-references/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-overlapping-references/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/loose.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": false,
+      "diagnostics": []
+    }
+  ]
+}
+-- solution-overlapping-references/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/loose.json"
+    },
+    {
+      "path": "./pkg/strict.json"
+    }
+  ]
+}
+-- solution-overlapping-references/pkg/loose.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-overlapping-references/pkg/strict.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-overlapping-references/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-root-and-reference-include/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.app.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-root-and-reference-include/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "references": [
+    {
+      "path": "./pkg/tsconfig.app.json"
+    }
+  ]
+}
+-- solution-root-and-reference-include/pkg/tsconfig.app.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-root-and-reference-include/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-nearest-excludes-parent-reference/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.app.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-nearest-excludes-parent-reference/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/tsconfig.app.json"
+    }
+  ]
+}
+-- solution-nearest-excludes-parent-reference/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "other.ts"
+  ]
+}
+-- solution-nearest-excludes-parent-reference/pkg/tsconfig.app.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-nearest-excludes-parent-reference/pkg/other.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-nearest-excludes-parent-reference/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-reference-cycle/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.app.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-reference-cycle/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/tsconfig.app.json"
+    }
+  ]
+}
+-- solution-reference-cycle/pkg/tsconfig.app.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "references": [
+    {
+      "path": ".."
+    }
+  ]
+}
+-- solution-reference-cycle/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-missing-reference/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.app.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-missing-reference/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./missing"
+    },
+    {
+      "path": "./pkg/tsconfig.app.json"
+    }
+  ]
+}
+-- solution-missing-reference/pkg/tsconfig.app.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- solution-missing-reference/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-deep-reference-priority/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/inner.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-deep-reference-priority/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "references": [
+    {
+      "path": "./pkg/outer.json"
+    }
+  ]
+}
+-- solution-deep-reference-priority/pkg/outer.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "references": [
+    {
+      "path": "./inner.json"
+    }
+  ]
+}
+-- solution-deep-reference-priority/pkg/inner.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- solution-deep-reference-priority/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-owned-versus-ancestor-reference/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- nearest-owned-versus-ancestor-reference/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/custom.json"
+    }
+  ]
+}
+-- nearest-owned-versus-ancestor-reference/pkg/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-owned-versus-ancestor-reference/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-owned-versus-ancestor-reference/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-reference-imported-only/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "consumer/index.ts",
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": false,
+      "diagnostics": []
+    }
+  ]
+}
+-- solution-reference-imported-only/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "references": [
+    {
+      "path": "./consumer/custom.json"
+    }
+  ]
+}
+-- solution-reference-imported-only/consumer/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "index.ts"
+  ]
+}
+-- solution-reference-imported-only/consumer/index.ts --
+import '../pkg/src/file';
+-- solution-reference-imported-only/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-root-disable-source-redirect/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "error": true
+    }
+  ]
+}
+-- solution-root-disable-source-redirect/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": false,
+    "types": [],
+    "disableSourceOfProjectReferenceRedirect": true
+  },
+  "references": [
+    {
+      "path": "./pkg/custom.json"
+    }
+  ]
+}
+-- solution-root-disable-source-redirect/pkg/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- solution-root-disable-source-redirect/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-first-deep-versus-second-shallow/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "target/file.ts",
+      "config": "b/custom.json",
+      "roots": [
+        "target/file.ts"
+      ],
+      "program": 1,
+      "strict": false,
+      "diagnostics": []
+    }
+  ]
+}
+-- solution-first-deep-versus-second-shallow/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./a/solution.json"
+    },
+    {
+      "path": "./b/custom.json"
+    }
+  ]
+}
+-- solution-first-deep-versus-second-shallow/a/solution.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./custom.json"
+    }
+  ]
+}
+-- solution-first-deep-versus-second-shallow/a/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../target/**/*.ts"
+  ]
+}
+-- solution-first-deep-versus-second-shallow/b/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../target/**/*.ts"
+  ]
+}
+-- solution-first-deep-versus-second-shallow/target/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-first-grandchild-versus-second-child/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "target/file.ts",
+      "config": "a/custom.json",
+      "roots": [
+        "target/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-first-grandchild-versus-second-child/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./a/solution.json"
+    },
+    {
+      "path": "./b/solution.json"
+    }
+  ]
+}
+-- solution-first-grandchild-versus-second-child/a/solution.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./nested.json"
+    }
+  ]
+}
+-- solution-first-grandchild-versus-second-child/a/nested.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./custom.json"
+    }
+  ]
+}
+-- solution-first-grandchild-versus-second-child/a/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../target/**/*.ts"
+  ]
+}
+-- solution-first-grandchild-versus-second-child/b/solution.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./custom.json"
+    }
+  ]
+}
+-- solution-first-grandchild-versus-second-child/b/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../target/**/*.ts"
+  ]
+}
+-- solution-first-grandchild-versus-second-child/target/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-only-reference-imports-target/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "target/file.ts",
+      "error": true
+    }
+  ]
+}
+-- solution-only-reference-imports-target/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./consumer/custom.json"
+    }
+  ]
+}
+-- solution-only-reference-imports-target/consumer/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "index.ts"
+  ]
+}
+-- solution-only-reference-imports-target/consumer/index.ts --
+import '../target/file';
+-- solution-only-reference-imports-target/target/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- root-import-reference-direct/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "target/file.ts",
+      "config": "consumer/custom.json",
+      "roots": [
+        "target/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- root-import-reference-direct/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "root.ts"
+  ],
+  "references": [
+    {
+      "path": "./consumer/custom.json"
+    }
+  ]
+}
+-- root-import-reference-direct/root.ts --
+import './target/file';
+-- root-import-reference-direct/consumer/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../target/**/*.ts"
+  ]
+}
+-- root-import-reference-direct/target/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- root-and-reference-import-deep-direct/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "target/file.ts",
+      "config": "consumer/deep.json",
+      "roots": [
+        "target/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- root-and-reference-import-deep-direct/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "root.ts"
+  ],
+  "references": [
+    {
+      "path": "./consumer/custom.json"
+    }
+  ]
+}
+-- root-and-reference-import-deep-direct/root.ts --
+import './target/file';
+-- root-and-reference-import-deep-direct/consumer/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "index.ts"
+  ],
+  "references": [
+    {
+      "path": "./deep.json"
+    }
+  ]
+}
+-- root-and-reference-import-deep-direct/consumer/index.ts --
+import '../target/file';
+-- root-and-reference-import-deep-direct/consumer/deep.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../target/**/*.ts"
+  ]
+}
+-- root-and-reference-import-deep-direct/target/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- config-directory-versus-target/expect.json --
+{
+  "rootDirectory": "tooling",
+  "steps": [
+    {
+      "file": "repo/src/file.ts",
+      "config": "repo/tsconfig.json",
+      "roots": [
+        "repo/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- config-directory-versus-target/tooling/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../repo/**/*.ts"
+  ]
+}
+-- config-directory-versus-target/repo/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- config-directory-versus-target/repo/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- cwd-config-target-three-dirs/expect.json --
+{
+  "rootDirectory": "tooling",
+  "steps": [
+    {
+      "file": "repo/src/file.ts",
+      "config": "repo/tsconfig.json",
+      "roots": [
+        "repo/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- cwd-config-target-three-dirs/working/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../repo/**/*.ts"
+  ]
+}
+-- cwd-config-target-three-dirs/tooling/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "../repo/**/*.ts"
+  ]
+}
+-- cwd-config-target-three-dirs/repo/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- cwd-config-target-three-dirs/repo/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- root-boundary-prevents-parent-search/expect.json --
+{
+  "rootDirectory": "pkg",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "error": true
+    }
+  ]
+}
+-- root-boundary-prevents-parent-search/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- root-boundary-prevents-parent-search/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- root-boundary-outside-target/expect.json --
+{
+  "rootDirectory": "tooling",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- root-boundary-outside-target/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- root-boundary-outside-target/tooling/placeholder --
+
+-- root-boundary-outside-target/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- no-config/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "error": true
+    }
+  ]
+}
+-- no-config/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- custom-unreferenced-only/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "error": true
+    }
+  ]
+}
+-- custom-unreferenced-only/tsconfig.eslint.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- custom-unreferenced-only/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- jsconfig-only/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.js",
+      "config": "jsconfig.json",
+      "roots": [
+        "src/file.js",
+        "src/typescript-file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": []
+    },
+    {
+      "file": "src/typescript-file.ts",
+      "config": "jsconfig.json",
+      "roots": [
+        "src/file.js",
+        "src/typescript-file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- jsconfig-only/jsconfig.json --
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "strict": true,
+    "types": []
+  }
+}
+-- jsconfig-only/src/typescript-file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- jsconfig-only/src/file.js --
+export const value = 1;
+-- js-ts-same-basename/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.js",
+      "error": true
+    },
+    {
+      "file": "src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- js-ts-same-basename/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": true,
+    "types": []
+  }
+}
+-- js-ts-same-basename/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- js-ts-same-basename/src/file.js --
+export const value = 1;
+-- tsconfig-versus-jsconfig/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.js",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.js"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": []
+    }
+  ]
+}
+-- tsconfig-versus-jsconfig/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": true,
+    "types": []
+  }
+}
+-- tsconfig-versus-jsconfig/jsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": false,
+    "types": []
+  }
+}
+-- tsconfig-versus-jsconfig/src/file.js --
+export const value = 1;
+-- js-allowjs-false/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.js",
+      "error": true
+    }
+  ]
+}
+-- js-allowjs-false/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- js-allowjs-false/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- js-allowjs-false/src/file.js --
+export const value = 1;
+-- js-allowjs-true/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.js",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.js"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": []
+    }
+  ]
+}
+-- js-allowjs-true/tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": true,
+    "types": []
+  }
+}
+-- js-allowjs-true/src/file.js --
+export const value = 1;
+-- solution-disable-referenced-project-load/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "error": true
+    }
+  ]
+}
+-- solution-disable-referenced-project-load/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableReferencedProjectLoad": true
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/custom.json"
+    }
+  ]
+}
+-- solution-disable-referenced-project-load/pkg/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- solution-disable-referenced-project-load/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-disabled-reference-load-warm/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/file.ts",
+        "outside/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    },
+    {
+      "file": "outside/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/file.ts",
+        "outside/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-disabled-reference-load-warm/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableReferencedProjectLoad": true
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg"
+    }
+  ]
+}
+-- solution-disabled-reference-load-warm/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "file.ts",
+    "../outside/file.ts"
+  ]
+}
+-- solution-disabled-reference-load-warm/pkg/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-disabled-reference-load-warm/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-disabled-reference-load-cold/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "outside/file.ts",
+      "error": true
+    },
+    {
+      "file": "pkg/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/file.ts",
+        "outside/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- solution-disabled-reference-load-cold/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableReferencedProjectLoad": true
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg"
+    }
+  ]
+}
+-- solution-disabled-reference-load-cold/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "file.ts",
+    "../outside/file.ts"
+  ]
+}
+-- solution-disabled-reference-load-cold/pkg/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-disabled-reference-load-cold/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-disable-solution-searching/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "error": true
+    }
+  ]
+}
+-- solution-disable-solution-searching/tsconfig.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./pkg/custom.json"
+    }
+  ]
+}
+-- solution-disable-solution-searching/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableSolutionSearching": true
+  },
+  "include": [
+    "other.ts"
+  ]
+}
+-- solution-disable-solution-searching/pkg/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- solution-disable-solution-searching/pkg/other.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- solution-disable-solution-searching/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-excluded-imported-by-parent/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "index.ts"
+      ],
+      "program": 1,
+      "strict": false,
+      "diagnostics": []
+    }
+  ]
+}
+-- nearest-excluded-imported-by-parent/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "index.ts"
+  ]
+}
+-- nearest-excluded-imported-by-parent/index.ts --
+import './pkg/src/file';
+-- nearest-excluded-imported-by-parent/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "other.ts"
+  ]
+}
+-- nearest-excluded-imported-by-parent/pkg/other.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-excluded-imported-by-parent/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nearest-jsconfig-tsconfig-parent/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/src/file.ts",
+      "config": "pkg/jsconfig.json",
+      "roots": [
+        "pkg/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- nearest-jsconfig-tsconfig-parent/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nearest-jsconfig-tsconfig-parent/pkg/jsconfig.json --
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "strict": true,
+    "types": []
+  }
+}
+-- nearest-jsconfig-tsconfig-parent/pkg/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- tsconfig-excludes-jsconfig-includes/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "config": "jsconfig.json",
+      "roots": [
+        "other.ts",
+        "src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- tsconfig-excludes-jsconfig-includes/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "other.ts"
+  ]
+}
+-- tsconfig-excludes-jsconfig-includes/jsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "types": []
+  }
+}
+-- tsconfig-excludes-jsconfig-includes/other.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- tsconfig-excludes-jsconfig-includes/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- multiple-targets-same-project/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts",
+        "src/sibling.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    },
+    {
+      "file": "src/sibling.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts",
+        "src/sibling.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    },
+    {
+      "file": "src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts",
+        "src/sibling.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- multiple-targets-same-project/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- multiple-targets-same-project/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- multiple-targets-same-project/src/sibling.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- multiple-targets-nested-projects/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "a/file.ts",
+      "config": "a/tsconfig.json",
+      "roots": [
+        "a/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    },
+    {
+      "file": "b/file.ts",
+      "config": "b/tsconfig.json",
+      "roots": [
+        "b/file.ts"
+      ],
+      "program": 2,
+      "strict": false,
+      "diagnostics": []
+    },
+    {
+      "file": "a/file.ts",
+      "config": "a/tsconfig.json",
+      "roots": [
+        "a/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- multiple-targets-nested-projects/a/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- multiple-targets-nested-projects/a/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- multiple-targets-nested-projects/b/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- multiple-targets-nested-projects/b/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- invalid-json/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- invalid-json/tsconfig.json --
+{ "compilerOptions": { "strict": true }, "include": ["src"]
+-- invalid-json/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- invalid-options/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- invalid-options/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "imaginaryOption": true,
+    "types": []
+  }
+}
+-- invalid-options/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- missing-extends/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ]
+}
+-- missing-extends/tsconfig.json --
+{
+  "extends": "./missing.json",
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- missing-extends/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- missing-input-file/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.ts",
+      "error": true
+    }
+  ]
+}
+-- missing-input-file/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
+-- missing-input-file/src/other.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- nonstandard-extension/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.vue",
+      "error": true
+    }
+  ]
+}
+-- nonstandard-extension/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- nonstandard-extension/src/file.vue --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- symlink-directory/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "link/src/file.ts",
+      "config": "link/tsconfig.json",
+      "roots": [
+        "link/src/file.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    },
+    {
+      "file": "real/src/file.ts",
+      "config": "real/tsconfig.json",
+      "roots": [
+        "real/src/file.ts"
+      ],
+      "program": 2,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ],
+  "symlinks": [
+    [
+      "link",
+      "real"
+    ]
+  ]
+}
+-- symlink-directory/real/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- symlink-directory/real/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- symlink-file-local-config/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "link/file.ts",
+      "config": "link/tsconfig.json",
+      "roots": [
+        "link/file.ts"
+      ],
+      "program": 1,
+      "strict": false,
+      "diagnostics": []
+    },
+    {
+      "file": "real/file.ts",
+      "config": "real/tsconfig.json",
+      "roots": [
+        "real/file.ts"
+      ],
+      "program": 2,
+      "strict": true,
+      "diagnostics": [
+        2322
+      ]
+    }
+  ],
+  "symlinks": [
+    [
+      "link/file.ts",
+      "real/file.ts"
+    ]
+  ]
+}
+-- symlink-file-local-config/real/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- symlink-file-local-config/real/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- symlink-file-local-config/link/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- node-modules-target/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "node_modules/pkg/file.ts",
+      "error": true
+    }
+  ]
+}
+-- node-modules-target/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- node-modules-target/src/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- node-modules-target/node_modules/pkg/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- declaration-target/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "src/file.d.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "src/file.d.ts"
+      ],
+      "program": 1,
+      "strict": true,
+      "diagnostics": []
+    }
+  ]
+}
+-- declaration-target/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- declaration-target/src/file.d.ts --
+export declare const value: string;
+-- cache-root-boundary-after-parent-loaded/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/a.ts",
+      "rootDirectory": ".",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/a.ts",
+        "pkg/b.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ],
+      "strict": true
+    },
+    {
+      "file": "pkg/b.ts",
+      "rootDirectory": "pkg",
+      "error": true
+    }
+  ]
+}
+-- cache-root-boundary-after-parent-loaded/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- cache-root-boundary-after-parent-loaded/pkg/a.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- cache-root-boundary-after-parent-loaded/pkg/b.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- cache-root-boundary-before-parent-loaded/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/b.ts",
+      "rootDirectory": "pkg",
+      "error": true
+    },
+    {
+      "file": "pkg/a.ts",
+      "rootDirectory": ".",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/a.ts",
+        "pkg/b.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ],
+      "strict": true
+    },
+    {
+      "file": "pkg/b.ts",
+      "rootDirectory": "pkg",
+      "error": true
+    }
+  ]
+}
+-- cache-root-boundary-before-parent-loaded/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- cache-root-boundary-before-parent-loaded/pkg/a.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- cache-root-boundary-before-parent-loaded/pkg/b.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- cache-disabled-ref-parsed-only/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "trigger.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "trigger.ts"
+      ],
+      "program": 1,
+      "diagnostics": [],
+      "strict": true
+    },
+    {
+      "file": "outside/file.ts",
+      "error": true
+    }
+  ]
+}
+-- cache-disabled-ref-parsed-only/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "disableReferencedProjectLoad": true,
+    "types": []
+  },
+  "files": [
+    "trigger.ts"
+  ],
+  "references": [
+    {
+      "path": "./custom.json"
+    }
+  ]
+}
+-- cache-disabled-ref-parsed-only/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "outside/file.ts"
+  ]
+}
+-- cache-disabled-ref-parsed-only/trigger.ts --
+export const value = 1;
+-- cache-disabled-ref-parsed-only/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- cache-ancestor-after-redirect-fallback-continues/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/file.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/file.ts"
+      ],
+      "program": 1,
+      "diagnostics": [],
+      "strict": false
+    }
+  ]
+}
+-- cache-ancestor-after-redirect-fallback-continues/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- cache-ancestor-after-redirect-fallback-continues/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "disableReferencedProjectLoad": true,
+    "disableSolutionSearching": false,
+    "types": []
+  },
+  "references": [
+    {
+      "path": "../custom.json"
+    }
+  ]
+}
+-- cache-ancestor-after-redirect-fallback-continues/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "pkg/file.ts"
+  ]
+}
+-- cache-ancestor-after-redirect-fallback-continues/pkg/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- cache-ancestor-after-redirect-fallback-stopped/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/file.ts",
+      "config": "pkg/tsconfig.json",
+      "roots": [
+        "pkg/file.ts"
+      ],
+      "program": 1,
+      "diagnostics": [],
+      "strict": true
+    }
+  ]
+}
+-- cache-ancestor-after-redirect-fallback-stopped/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": false,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- cache-ancestor-after-redirect-fallback-stopped/pkg/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "disableReferencedProjectLoad": true,
+    "disableSolutionSearching": true,
+    "types": []
+  },
+  "references": [
+    {
+      "path": "../custom.json"
+    }
+  ]
+}
+-- cache-ancestor-after-redirect-fallback-stopped/custom.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "pkg/file.ts"
+  ]
+}
+-- cache-ancestor-after-redirect-fallback-stopped/pkg/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+-- attack-warm-composite-import-only-nearest/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "index.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "index.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        6307
+      ],
+      "strict": true
+    },
+    {
+      "file": "outside/file.ts",
+      "error": true
+    }
+  ]
+}
+-- attack-warm-composite-import-only-nearest/tsconfig.json --
+{
+  "compilerOptions": {
+    "strict": true,
+    "composite": true,
+    "types": []
+  },
+  "files": [
+    "index.ts"
+  ]
+}
+-- attack-warm-composite-import-only-nearest/index.ts --
+import './outside/file';
+-- attack-warm-composite-import-only-nearest/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-warm-referenced-import-only-enabled/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "consumer/index.ts",
+      "config": "consumer/tsconfig.json",
+      "roots": [
+        "consumer/index.ts"
+      ],
+      "program": 1,
+      "diagnostics": [],
+      "strict": true
+    },
+    {
+      "file": "outside/file.ts",
+      "error": true
+    }
+  ]
+}
+-- attack-warm-referenced-import-only-enabled/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableReferencedProjectLoad": false
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./consumer/tsconfig.json"
+    }
+  ]
+}
+-- attack-warm-referenced-import-only-enabled/consumer/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "index.ts"
+  ]
+}
+-- attack-warm-referenced-import-only-enabled/consumer/index.ts --
+import '../outside/file';
+-- attack-warm-referenced-import-only-enabled/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-warm-referenced-import-only-disabled/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "consumer/index.ts",
+      "config": "consumer/tsconfig.json",
+      "roots": [
+        "consumer/index.ts"
+      ],
+      "program": 1,
+      "diagnostics": [],
+      "strict": true
+    },
+    {
+      "file": "outside/file.ts",
+      "error": true
+    }
+  ]
+}
+-- attack-warm-referenced-import-only-disabled/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableReferencedProjectLoad": true
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./consumer/tsconfig.json"
+    }
+  ]
+}
+-- attack-warm-referenced-import-only-disabled/consumer/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "index.ts"
+  ]
+}
+-- attack-warm-referenced-import-only-disabled/consumer/index.ts --
+import '../outside/file';
+-- attack-warm-referenced-import-only-disabled/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-parsed-only-bridge-to-loaded-leaf/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "leaf/index.ts",
+      "config": "leaf/tsconfig.json",
+      "roots": [
+        "leaf/index.ts",
+        "outside/file.ts"
+      ],
+      "program": 1,
+      "diagnostics": [],
+      "strict": true
+    },
+    {
+      "file": "trigger.ts",
+      "config": "tsconfig.json",
+      "roots": [
+        "trigger.ts"
+      ],
+      "program": 2,
+      "diagnostics": []
+    },
+    {
+      "file": "outside/file.ts",
+      "config": "leaf/tsconfig.json",
+      "roots": [
+        "leaf/index.ts",
+        "outside/file.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ],
+      "strict": true
+    }
+  ]
+}
+-- attack-parsed-only-bridge-to-loaded-leaf/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableReferencedProjectLoad": true
+  },
+  "files": [
+    "trigger.ts"
+  ],
+  "references": [
+    {
+      "path": "./bridge.json"
+    }
+  ]
+}
+-- attack-parsed-only-bridge-to-loaded-leaf/bridge.json --
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./leaf/tsconfig.json"
+    }
+  ]
+}
+-- attack-parsed-only-bridge-to-loaded-leaf/leaf/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "index.ts",
+    "../outside/file.ts"
+  ]
+}
+-- attack-parsed-only-bridge-to-loaded-leaf/trigger.ts --
+export const trigger = 1;
+-- attack-parsed-only-bridge-to-loaded-leaf/leaf/index.ts --
+export const seed = 1;
+-- attack-parsed-only-bridge-to-loaded-leaf/outside/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-stop-solution-same-directory-jsconfig/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "file.ts",
+      "error": true
+    }
+  ]
+}
+-- attack-stop-solution-same-directory-jsconfig/tsconfig.json --
+{
+  "compilerOptions": {
+    "disableSolutionSearching": true
+  },
+  "files": [
+    "other.ts"
+  ]
+}
+-- attack-stop-solution-same-directory-jsconfig/jsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "file.ts"
+  ]
+}
+-- attack-stop-solution-same-directory-jsconfig/other.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-stop-solution-same-directory-jsconfig/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-node-modules-boundary-config/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "node_modules/pkg/file.ts",
+      "config": "node_modules/tsconfig.json",
+      "roots": [
+        "node_modules/pkg/file.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ],
+      "strict": true
+    }
+  ]
+}
+-- attack-node-modules-boundary-config/node_modules/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  },
+  "files": [
+    "pkg/file.ts"
+  ]
+}
+-- attack-node-modules-boundary-config/node_modules/pkg/file.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-sibling-roots-same-directory-cache/expect.json --
+{
+  "rootDirectory": ".",
+  "steps": [
+    {
+      "file": "pkg/a.ts",
+      "rootDirectory": ".",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/a.ts",
+        "pkg/b.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ],
+      "strict": true
+    },
+    {
+      "file": "pkg/b.ts",
+      "rootDirectory": "tooling",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/a.ts",
+        "pkg/b.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ],
+      "strict": true
+    },
+    {
+      "file": "pkg/a.ts",
+      "rootDirectory": ".",
+      "config": "tsconfig.json",
+      "roots": [
+        "pkg/a.ts",
+        "pkg/b.ts"
+      ],
+      "program": 1,
+      "diagnostics": [
+        2322
+      ],
+      "strict": true
+    }
+  ]
+}
+-- attack-sibling-roots-same-directory-cache/tsconfig.json --
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "strict": true,
+    "types": [],
+    "noEmit": true
+  }
+}
+-- attack-sibling-roots-same-directory-cache/pkg/a.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-sibling-roots-same-directory-cache/pkg/b.ts --
+export const nullable: string | undefined = undefined;
+export const result: string = nullable;
+
+-- attack-sibling-roots-same-directory-cache/tooling/placeholder --
+
+-- node-modules-case-boundary/tsconfig.json --
+{"compilerOptions":{"strict":true,"types":[]},"files":["NODE_MODULES/pkg/file.ts"]}
+-- node-modules-case-boundary/NODE_MODULES/pkg/file.ts --
+export const value = 1;

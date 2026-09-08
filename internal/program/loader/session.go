@@ -21,6 +21,9 @@ type Session struct {
 	context            *buildContext
 	initialPrograms    []*compiler.Program
 	initialProgramsSet bool
+	// Used only by the sequential explicit-policy groups in BuildLintProjects.
+	// Slots share their existing parse/build synchronization within that pass.
+	projectSlots map[string]*targetedProjectSlot
 }
 
 func NewSession(fsys vfs.FS) *Session {

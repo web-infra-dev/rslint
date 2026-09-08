@@ -19,6 +19,9 @@ import (
 type projectTargetBinding struct {
 	targets []target.File
 	owners  []int
+	// complete includes import fallback and intentionally unbound targets.
+	// Such targets must not borrow another parser policy's Programs.
+	complete bool
 }
 
 type targetedProjectSlot struct {
@@ -40,7 +43,7 @@ type targetedProjectExecution struct {
 	session        *Session
 	plan           projectPlan
 	singleThreaded bool
-	slots          []targetedProjectSlot
+	slots          []*targetedProjectSlot
 }
 
 type targetedProjectBuildQueue struct {
@@ -108,12 +111,24 @@ func newTargetedProjectExecution(
 	plan projectPlan,
 	singleThreaded bool,
 ) *targetedProjectExecution {
-	return &targetedProjectExecution{
+	execution := &targetedProjectExecution{
 		session:        session,
 		plan:           plan,
 		singleThreaded: singleThreaded,
-		slots:          make([]targetedProjectSlot, len(plan.specs)),
+		slots:          make([]*targetedProjectSlot, len(plan.specs)),
 	}
+	for index, spec := range plan.specs {
+		key := exactPathID(spec.tsconfigPath)
+		slot := session.projectSlots[key]
+		if slot == nil {
+			slot = &targetedProjectSlot{}
+			if session.projectSlots != nil {
+				session.projectSlots[key] = slot
+			}
+		}
+		execution.slots[index] = slot
+	}
+	return execution
 }
 
 func (c *buildContext) createProjectProgramFromParsedConfig(
@@ -129,7 +144,7 @@ func (c *buildContext) createProjectProgramFromParsedConfig(
 }
 
 func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlot, error) {
-	slot := &execution.slots[index]
+	slot := execution.slots[index]
 	spec := execution.plan.specs[index]
 	slot.parseOnce.Do(func() {
 		_, slot.config, slot.parseErr = execution.session.context.parseConfig(
@@ -153,7 +168,7 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 }
 
 func (execution *targetedProjectExecution) build(index int) error {
-	slot := &execution.slots[index]
+	slot := execution.slots[index]
 	spec := execution.plan.specs[index]
 	slot.buildOnce.Do(func() {
 		parsed, err := execution.parse(index)
@@ -177,7 +192,7 @@ func (execution *targetedProjectExecution) containsTarget(
 	index int,
 	target target.File,
 ) bool {
-	slot := &execution.slots[index]
+	slot := execution.slots[index]
 	if slot.program == nil {
 		return false
 	}
@@ -327,7 +342,7 @@ func (execution *targetedProjectExecution) projectSet(
 		if index >= len(keep) || !keep[index] {
 			continue
 		}
-		slot := &execution.slots[index]
+		slot := execution.slots[index]
 		if slot.program == nil {
 			continue
 		}

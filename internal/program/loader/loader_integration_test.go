@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -23,8 +24,241 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestBuildLintProjectsSeparatesProjectPolicies(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+		{Files: []string{"b/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false), Project: rslintconfig.ProjectPaths{"b/custom.json"}}}},
+		{Files: []string{"**/disabled.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false), ProjectDisabled: true}}},
+		{Files: []string{"never/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"missing.json"}}}},
+	}
+	for _, scope := range []ProjectLoadScope{ProjectScopeTarget, ProjectScopeOwner} {
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		session := NewSession(fsys)
+		plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts", dir + "/a/src/disabled.ts", dir + "/b/src/file.ts"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if projects.Len() != 2 {
+			t.Fatalf("expected two owning projects, got %d", projects.Len())
+		}
+		binding, err := session.LoadAPI(projects, plan, dir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(binding.Programs) != 3 {
+			t.Fatalf("disabled target must get its own source-only Program: %d", len(binding.Programs))
+		}
+		for index, sources := range binding.TargetsByProgram {
+			if len(sources) != 1 {
+				t.Fatalf("exact target scope changed: %v", binding.TargetsByProgram)
+			}
+			if strings.HasSuffix(sources[0], "/disabled.ts") {
+				if index < projects.Len() {
+					t.Fatal("disabled target borrowed a configured Program")
+				}
+				continue
+			}
+			program := projects.compilerPrograms[index]
+			wantConfig := dir + "/a/tsconfig.json"
+			if strings.Contains(sources[0], "/b/") {
+				wantConfig = dir + "/b/custom.json"
+			} else if len(program.CommandLine().FileNames()) != 3 {
+				t.Fatal("single-target lint truncated the owning project's roots")
+			}
+			if program.Options().ConfigFilePath != wantConfig || !program.Options().Strict.IsTrue() {
+				t.Fatalf("wrong project/options: %+v", program.Options())
+			}
+		}
+	}
+}
+
+func TestBuildLintProjectsRejectsUnownedServiceTarget(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}}
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/outside/file.ts"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewSession(fsys).BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, ProjectScopeTarget)
+	if err == nil || !strings.Contains(err.Error(), "project service") {
+		t.Fatalf("unowned service target must fail: %v", err)
+	}
+}
+
+func TestBuildLintProjectsTypeCheckKeepsInactiveLegacyOwners(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	service := rslintconfig.RslintConfig{{Files: []string{"src/**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}}
+	for _, explicitlyDisabled := range []bool{false, true} {
+		legacyOptions := &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"custom.json"}}
+		if explicitlyDisabled {
+			legacyOptions.ProjectService = rslintconfig.BoolPtr(false)
+		}
+		configs := map[string]rslintconfig.RslintConfig{
+			dir + "/a": service,
+			dir + "/b": {{Ignores: []string{"**"}}, {LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: legacyOptions}}},
+		}
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		plan, err := target.Resolve(target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		projects, err := NewSession(fsys).BuildLintProjects(configs, plan, true, ProjectScopeAll)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if projects.Len() != 2 {
+			t.Fatalf("type checking lost the ignored explicit owner: %d", projects.Len())
+		}
+		if !containsTSDiagnostic(collectProgramTypeDiagnostics(t, projects.Programs()), "TS2322") {
+			t.Fatal("complete selected projects must retain sibling type errors")
+		}
+	}
+}
+
+func TestBuildLintProjectsTypeCheckOverriddenServiceWithoutTargets(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	for _, reset := range []string{"false", "null"} {
+		for _, withActiveOwner := range []bool{false, true} {
+			t.Run(reset+"/active-owner="+strconv.FormatBool(withActiveOwner), func(t *testing.T) {
+				projectOwner := tspath.ResolvePath(dir, "b")
+				otherOwner := tspath.ResolvePath(dir, "a")
+				var override rslintconfig.RslintConfig
+				if err := json.Unmarshal([]byte(`[{"languageOptions":{"parserOptions":{"projectService":`+reset+`}}}]`), &override); err != nil {
+					t.Fatal(err)
+				}
+				config := rslintconfig.RslintConfig{{Ignores: []string{"**"}}}
+				config = append(config, rslintconfig.ConfigWithAuthoredPathBase(rslintconfig.RslintConfig{{
+					LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+						ProjectService: rslintconfig.BoolPtr(true), Project: rslintconfig.ProjectPaths{"custom.json"},
+					}},
+				}}, projectOwner)...)
+				config = append(config, rslintconfig.ConfigWithAuthoredPathBase(override, otherOwner)...)
+				configs := map[string]rslintconfig.RslintConfig{projectOwner: config}
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				request := target.Request{ConfigMap: configs, ConfigDirectory: dir, FS: fsys, Directories: []string{projectOwner}}
+				wantPrograms := 1
+				if withActiveOwner {
+					configs[otherOwner] = rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+						ProjectService: rslintconfig.BoolPtr(true),
+					}}}}
+					request.Files = []string{tspath.ResolvePath(otherOwner, "src/file.ts")}
+					wantPrograms++
+				}
+				plan, err := target.Resolve(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(plan.Files) != wantPrograms-1 {
+					t.Fatalf("inactive owner selected lint targets: %+v", plan.Files)
+				}
+				projects, err := NewSession(fsys).BuildLintProjects(configs, plan, true, ProjectScopeAll)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if projects.Len() != wantPrograms {
+					t.Fatalf("overridden service lost the inactive explicit project: %d", projects.Len())
+				}
+				foundProject := false
+				for _, program := range projects.compilerPrograms {
+					foundProject = foundProject || program.Options().ConfigFilePath == tspath.ResolvePath(projectOwner, "custom.json")
+				}
+				if !foundProject {
+					t.Fatal("unconditional service override changed the authored project path")
+				}
+			})
+		}
+	}
+}
+
+func TestBuildLintProjectsTypeCheckPreservesPerFileExplicitPolicy(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false)}}},
+		{Files: []string{"b/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"a/tsconfig.json", "b/custom.json"}}}},
+	}
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts", dir + "/b/src/file.ts"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := NewSession(fsys)
+	projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, ProjectScopeAll)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projects.Len() != 2 {
+		t.Fatalf("explicit projects must be built once: %d", projects.Len())
+	}
+	binding, err := session.LoadAPI(projects, plan, dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(binding.Programs) != 3 || len(binding.TargetsByProgram[2]) != 1 || binding.TargetsByProgram[2][0] != dir+"/a/src/file.ts" {
+		t.Fatalf("type checking widened the lint target's parser policy: %v", binding.TargetsByProgram)
+	}
+}
+
+func TestBuildLintProjectsDeduplicatesExplicitGroups(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	legacy := rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"../shared.json"}}}}}
+	configs := map[string]rslintconfig.RslintConfig{
+		tspath.ResolvePath(dir, "a"):       legacy,
+		tspath.ResolvePath(dir, "b"):       legacy,
+		tspath.ResolvePath(dir, "service"): {{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}},
+	}
+	for _, scope := range []ProjectLoadScope{ProjectScopeTarget, ProjectScopeOwner, ProjectScopeAll} {
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		plan, err := target.Resolve(target.Request{
+			ConfigMap: configs, ConfigDirectory: dir, FS: fsys,
+			Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts"), tspath.ResolvePath(dir, "service/file.ts")},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		session := NewSession(fsys)
+		projects, err := session.BuildLintProjects(configs, plan, false, scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if projects.Len() != 2 {
+			t.Fatalf("scope %d duplicated the shared explicit project: %d", scope, projects.Len())
+		}
+		binding, err := session.LoadAPI(projects, plan, dir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(binding.Programs) != 2 || len(binding.TargetsByProgram[0])+len(binding.TargetsByProgram[1]) != 3 {
+			t.Fatalf("shared projects lost config ownership: %v", binding.TargetsByProgram)
+		}
+	}
+}
+
+func TestBuildLintProjectsTypeCheckHonorsClearedProjectArray(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := rslintconfig.RslintConfig{
+		{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false), Project: rslintconfig.ProjectPaths{"a/tsconfig.json"}}}},
+		{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{}}}},
+	}
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{tspath.ResolvePath(dir, "a/src/file.ts")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects, err := NewSession(fsys).BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, ProjectScopeAll)
+	if err != nil || projects.Len() != 0 {
+		t.Fatalf("type checking restored a cleared project: count=%d error=%v", projects.Len(), err)
+	}
+}
 
 type targetPlanRealpathCountingFS struct {
 	vfs.FS

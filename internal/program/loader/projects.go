@@ -111,7 +111,16 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 	if parallel {
 		s.context.enableConcurrentProgramQueries()
 	}
+	var execution *targetedProjectExecution
+	if s.projectSlots != nil {
+		execution = newTargetedProjectExecution(s, plan, singleThreaded)
+	}
 	build := func(index int) {
+		if execution != nil {
+			errs[index] = execution.build(index)
+			compilerPrograms[index] = execution.slots[index].program
+			return
+		}
 		spec := plan.specs[index]
 		compilerPrograms[index], errs[index] = s.context.createProjectProgram(
 			singleThreaded,

@@ -242,7 +242,11 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 	// Build the output file
 	var buf strings.Builder
 	buf.WriteString(imports.buildImportLine())
-	buf.WriteString("\nexport default defineConfig([\n")
+	buf.WriteByte('\n')
+	if imports.needTS {
+		buf.WriteString("// Preserve the original project settings when applying TypeScript rule presets.\n")
+	}
+	buf.WriteString("export default defineConfig([\n")
 	for i, entry := range configEntries {
 		buf.WriteString(entry)
 		if i < len(configEntries)-1 {
@@ -400,7 +404,9 @@ func generateEntryCode(entry ConfigEntry, imports *importCollector, hasTSConfig 
 	// Generate preset references
 	var parts []string
 	if hasTS {
-		parts = append(parts, "  ts.configs.recommended")
+		// The preset's only language option is projectService:true. Migration
+		// preserves the original entries' project modes and matching scopes.
+		parts = append(parts, "  ts.configs.recommended.map(({ languageOptions, ...config }) => config)")
 	} else {
 		parts = append(parts, "  js.configs.recommended")
 	}
@@ -415,7 +421,7 @@ func generateEntryCode(entry ConfigEntry, imports *importCollector, hasTSConfig 
 	remainingRules := deduplicateRules(entry.Rules, presetRules)
 
 	// Build the user override entry (ignores, languageOptions, settings, remaining rules)
-	overrideFields := buildOverrideFields(entry, remainingRules, hasTS)
+	overrideFields := buildOverrideFields(entry, remainingRules)
 
 	// If override entry has content, add it after presets
 	if overrideFields != "" {
@@ -520,7 +526,7 @@ func normalizeSeverity(s string) string {
 
 // buildOverrideFields generates the user override object with remaining rules,
 // ignores, languageOptions, and settings.
-func buildOverrideFields(entry ConfigEntry, remainingRules Rules, hasTS bool) string {
+func buildOverrideFields(entry ConfigEntry, remainingRules Rules) string {
 	var fields []string
 
 	// files (skip empty arrays)
@@ -533,8 +539,7 @@ func buildOverrideFields(entry ConfigEntry, remainingRules Rules, hasTS bool) st
 		fields = append(fields, "    ignores: "+formatStringArray(entry.Ignores))
 	}
 
-	// languageOptions (skip if it matches preset defaults)
-	if lo := formatLanguageOptions(entry.LanguageOptions, hasTS); lo != "" {
+	if lo := formatLanguageOptions(entry.LanguageOptions); lo != "" {
 		fields = append(fields, lo)
 	}
 
@@ -646,10 +651,8 @@ func formatRuleValue(value interface{}) string {
 	}
 }
 
-// formatLanguageOptions formats languageOptions, skipping fields that match preset defaults.
-// For TS preset: projectService defaults to true, so only output if explicitly false or if project is set.
-// For JS preset: no defaults, output everything.
-func formatLanguageOptions(lo *LanguageOptions, hasTS bool) string {
+// formatLanguageOptions preserves authored project modes and explicit resets.
+func formatLanguageOptions(lo *LanguageOptions) string {
 	if lo == nil || lo.ParserOptions == nil {
 		return ""
 	}
@@ -657,17 +660,22 @@ func formatLanguageOptions(lo *LanguageOptions, hasTS bool) string {
 
 	var poFields []string
 
-	// projectService
 	if po.ProjectService != nil {
-		defaultPS := hasTS // TS preset defaults to true
-		if *po.ProjectService != defaultPS {
-			poFields = append(poFields, "        projectService: "+strconv.FormatBool(*po.ProjectService))
-		}
+		poFields = append(poFields, "        projectService: "+strconv.FormatBool(*po.ProjectService))
 	}
 
-	// project paths
-	if len(po.Project) > 0 {
+	if po.Project != nil {
 		poFields = append(poFields, "        project: "+formatStringArray([]string(po.Project)))
+	} else if po.ProjectDisabled {
+		poFields = append(poFields, "        project: false")
+	} else if po.projectAutomatic {
+		poFields = append(poFields, "        project: true")
+	}
+
+	if po.TsconfigRootDir != "" {
+		poFields = append(poFields, "        tsconfigRootDir: '"+escapeJSString(po.TsconfigRootDir)+"'")
+	} else if po.rootDirSet {
+		poFields = append(poFields, "        tsconfigRootDir: null")
 	}
 
 	if len(poFields) == 0 {

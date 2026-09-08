@@ -252,6 +252,9 @@ func (s *Session) bindTargetsToProjects(
 
 		bound := false
 		for _, programIndex := range programIndexes {
+			if set.targetBinding != nil && set.targetBinding.complete {
+				break
+			}
 			if bindTargetToProgram(
 				&binding,
 				set,

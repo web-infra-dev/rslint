@@ -100,10 +100,43 @@ func CreateProgramFromOptionsLenient(singleThreaded bool, compilerOptions *core.
 // loaders that own config parsing use this to preserve their cache boundary
 // without duplicating compiler construction.
 func CreateProgramFromParsedConfigLenient(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) (*compiler.Program, error) {
+	return createProgramFromParsedConfigLenient(singleThreaded, config, host, false)
+}
+
+// CreateProgramFromParsedConfigLenientWithProjectReferences enables the source
+// redirects used for configured-project discovery while preserving complete
+// roots and leaving syntax-diagnostic admission to the caller.
+func CreateProgramFromParsedConfigLenientWithProjectReferences(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) (*compiler.Program, error) {
+	return createProgramFromParsedConfigLenient(singleThreaded, config, &rootProjectReferenceHost{
+		CompilerHost: host,
+		root:         config,
+		rootPath:     tspath.ToPath(config.ConfigName(), host.GetCurrentDirectory(), host.FS().UseCaseSensitiveFileNames()),
+	}, true)
+}
+
+// ts-go identifies a reference cycle back to the current project by its parsed
+// ConfigFile identity. Re-parsing that root would make its own sources look
+// like redirected reference sources and suppress their semantic diagnostics.
+// Other project reads continue through the caller's metadata/cache host.
+type rootProjectReferenceHost struct {
+	compiler.CompilerHost
+	root     *tsoptions.ParsedCommandLine
+	rootPath tspath.Path
+}
+
+func (host *rootProjectReferenceHost) GetResolvedProjectReference(fileName string, path tspath.Path) *tsoptions.ParsedCommandLine {
+	if path == host.rootPath {
+		return host.root
+	}
+	return host.CompilerHost.GetResolvedProjectReference(fileName, path)
+}
+
+func createProgramFromParsedConfigLenient(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost, useSourceOfProjectReference bool) (*compiler.Program, error) {
 	opts := compiler.ProgramOptions{
-		Config:         config,
-		SingleThreaded: core.TSTrue,
-		Host:           host,
+		Config:                      config,
+		SingleThreaded:              core.TSTrue,
+		Host:                        host,
+		UseSourceOfProjectReference: useSourceOfProjectReference,
 	}
 	if !singleThreaded {
 		opts.SingleThreaded = core.TSFalse

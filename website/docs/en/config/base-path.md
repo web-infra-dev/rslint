@@ -48,7 +48,7 @@ Absolute paths are used as written. An empty string is also valid and still coun
 
 ## TypeScript projects
 
-`basePath` moves explicit `languageOptions.parserOptions.project` literals and globs. It does not move the governing config's implicit `tsconfig.json` fallback or change Rslint's owner-wide project collection. An explicit `project: []` still disables the fallback.
+`basePath` moves explicit `languageOptions.parserOptions.project` literals and globs unless `tsconfigRootDir` is set. It does not move the governing config's implicit `tsconfig.json` fallback or the automatic discovery boundary. Legacy configs using only explicit project paths retain config-wide declaration collection; configs with `projectService` or `tsconfigRootDir` resolve the matching entries' project policy per target. An explicit `project: []` disables the legacy fallback and cannot be combined with enabled `projectService`. See [parser options](/config/language-options#languageoptionsparseroptionsprojectservice).
 
 Because explicit projects are collected for the governing config, a missing project can still report an error even when the entry's `files` patterns select no lint target. See [`languageOptions.parserOptions.project`](/config/language-options#languageoptionsparseroptionsproject) for the complete project behavior.
 

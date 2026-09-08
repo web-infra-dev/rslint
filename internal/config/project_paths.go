@@ -81,7 +81,7 @@ func hasExplicitProjectSetting(config RslintConfig) bool {
 	for _, entry := range config {
 		if entry.LanguageOptions != nil &&
 			entry.LanguageOptions.ParserOptions != nil &&
-			entry.LanguageOptions.ParserOptions.Project != nil {
+			(entry.LanguageOptions.ParserOptions.Project != nil || entry.LanguageOptions.ParserOptions.ProjectDisabled) {
 			return true
 		}
 	}

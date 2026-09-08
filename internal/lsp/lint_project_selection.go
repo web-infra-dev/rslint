@@ -17,6 +17,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/projectservice"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -205,10 +206,11 @@ func selectConfiguredLintProject(
 // project snapshot. Root probing and Program construction share it, so a
 // config cannot be parsed twice or change meaning halfway through selection.
 type standaloneLintProjectRequest struct {
-	target   target.File
-	fs       vfs.FS
-	loadFS   func() vfs.FS
-	projects map[string]*lintProjectMetadata
+	target                target.File
+	fs                    vfs.FS
+	loadFS                func() vfs.FS
+	projects              map[string]*lintProjectMetadata
+	loadedServiceProjects map[string]struct{}
 }
 
 func newStandaloneLintProjectRequest(
@@ -285,6 +287,53 @@ func (request *standaloneLintProjectRequest) loaders() lintProjectLoaders {
 		program:  request.program,
 		metadata: request.loadMetadata,
 	}
+}
+
+// service selects configured projects from this request's frozen editor
+// overlay. Its Programs use live reference sources, while legacy explicit
+// projects retain their existing construction mode.
+func (request *standaloneLintProjectRequest) service(rootDir string) (selectedLintProject, error) {
+	fsys := request.filesystem()
+	createProgram := func(configPath string, parsed *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
+		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
+			true,
+			parsed,
+			utils.CreateCompilerHost(tspath.GetDirectoryPath(configPath), fsys),
+		)
+	}
+	selector := projectservice.New(projectservice.Host{
+		FS: fsys,
+		ParseConfig: func(configPath string) (*tsoptions.ParsedCommandLine, error) {
+			metadata, err := request.metadata(configPath)
+			if err != nil {
+				return nil, err
+			}
+			return metadata.commandLine, nil
+		},
+		CreateProgram: createProgram,
+		LoadedProgram: func(configPath string) (*compiler.Program, error) {
+			key := string(lintProgramLexicalPathID(configPath, fsys))
+			if _, loaded := request.loadedServiceProjects[key]; !loaded || !fsys.FileExists(configPath) {
+				return nil, nil //nolint:nilnil // An unloaded or deleted project is a normal cache miss.
+			}
+			// Speculative passes preserve which projects were already loaded,
+			// but rebuild their Programs from this pass's isolated editor text.
+			metadata, err := request.metadata(configPath)
+			if err != nil {
+				return nil, err
+			}
+			return createProgram(configPath, metadata.commandLine)
+		},
+	})
+	selected, err := selector.Select(request.target.Path, rootDir)
+	if err != nil {
+		return selectedLintProject{}, err
+	}
+	return selectedLintProject{
+		program:    selected.Program,
+		sourceFile: sourceFileForTarget(selected.Program, request.target, fsys),
+		configPath: selected.ConfigPath,
+	}, nil
 }
 
 type lintSessionProjectRootCache struct {

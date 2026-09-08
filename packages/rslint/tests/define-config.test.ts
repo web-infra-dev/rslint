@@ -1,6 +1,10 @@
 import { describe, test, expect } from 'rstack/test';
 import { defineConfig, globalIgnores } from '../src/config/define-config.js';
-import type { RuleEntry, RulesRecord } from '../src/config/define-config.js';
+import type {
+  ParserOptions,
+  RuleEntry,
+  RulesRecord,
+} from '../src/config/define-config.js';
 
 describe('globalIgnores', () => {
   test('returns a config entry containing only the ignores', () => {
@@ -51,10 +55,10 @@ describe('RuleEntry / RulesRecord typing', () => {
     const withOptions: RuleEntry<Options> = ['error', { allow: ['log'] }];
     // @ts-expect-error `nope` isn't a key of Options' option object
     const wrongShape: RuleEntry<Options> = ['error', { nope: true }];
-    // @ts-expect-error Options has no third tuple slot
     const tooManyArgs: RuleEntry<Options> = [
       'error',
       { allow: ['log'] },
+      // @ts-expect-error Options has no third tuple slot
       'extra',
     ];
 
@@ -80,6 +84,39 @@ describe('RuleEntry / RulesRecord typing', () => {
 });
 
 describe('defineConfig languageOptions typing', () => {
+  test('accepts supported project modes and explicit resets', () => {
+    const parserOptions: ParserOptions[] = [
+      { projectService: true, tsconfigRootDir: '/workspace' },
+      { projectService: false, project: './tsconfig.app.json' },
+      { projectService: null, project: [] },
+      { project: false },
+      { project: null, tsconfigRootDir: null },
+    ];
+    const config = defineConfig(
+      parserOptions.map((options) => ({
+        languageOptions: { parserOptions: options },
+      })),
+    );
+    expect(
+      config.flat().map((entry) => entry.languageOptions?.parserOptions),
+    ).toEqual(parserOptions);
+
+    defineConfig([
+      {
+        languageOptions: {
+          // @ts-expect-error only boolean projectService is supported
+          parserOptions: { projectService: { allowDefaultProject: ['*.js'] } },
+        },
+      },
+      {
+        languageOptions: {
+          // @ts-expect-error legacy project:true is unsupported
+          parserOptions: { project: true },
+        },
+      },
+    ]);
+  });
+
   test('accepts every supported sourceType', () => {
     const config = defineConfig([
       { languageOptions: { sourceType: 'module' } },

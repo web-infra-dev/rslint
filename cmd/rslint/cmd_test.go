@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -834,6 +835,34 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 	})
 	if code != 0 {
 		t.Fatalf("type-check-only exit = %d, stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestHandleLintCommandProjectServiceTypeCheckScope(t *testing.T) {
+	directory := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := rslintconfig.RslintConfig{{
+		Files:           []string{"**/*.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}},
+		Rules:           rslintconfig.Rules{"no-debugger": "error"},
+	}}
+	for _, mode := range []string{"lint", "type-check", "type-check-only"} {
+		t.Run(mode, func(t *testing.T) {
+			code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
+				ConfigCatalog: explicitConfigCatalogForTest(directory, config),
+				AllowFiles:    []string{tspath.ResolvePath(directory, "pkg/file.ts")},
+				TypeCheck:     mode != "lint", TypeCheckOnly: mode == "type-check-only",
+				Format: "jsonline", NoColor: true, SingleThreaded: true,
+			})
+			if code != 1 || strings.Contains(stdout, "unrelated.ts") {
+				t.Fatalf("wrong project scope: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+			if strings.Contains(stdout, "sibling.ts") != (mode != "lint") {
+				t.Fatalf("type checking must use complete selected project roots: %q", stdout)
+			}
+			if strings.Contains(stdout, "no-debugger") != (mode != "type-check-only") {
+				t.Fatalf("wrong rule execution for %s: %q", mode, stdout)
+			}
+		})
 	}
 }
 

@@ -1,0 +1,6 @@
+-- tsconfig.json --
+{"compilerOptions":{"strict":false},"include":["pkg/**/*.ts"]}
+-- pkg/tsconfig.json --
+{"compilerOptions":{"strict":true},"include":["*.ts"]}
+-- pkg/file.ts --
+debugger;

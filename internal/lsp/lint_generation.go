@@ -107,12 +107,16 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		snapshot.resolvedConfig.GloballyIgnored {
 		return emptyLintGeneration(server.cwd), nil, nil
 	}
+	if snapshot.projectPolicyError != nil {
+		return linter.Generation{}, nil, snapshot.projectPolicyError
+	}
 
 	request := newStandaloneLintProjectRequest(
 		snapshot.target,
 		func() vfs.FS { return server.currentEditorOverlayFSForTarget(p.uri, snapshot.target) },
 	)
 	loaders := request.loaders()
+	var serviceRequest *lintProgramRequest
 	release := linter.ReleaseFunc(nil)
 	releasePending := false
 	defer func() {
@@ -120,10 +124,14 @@ func (p *documentGenerationProvider) AcquireGeneration(
 			release()
 		}
 	}()
-	if p.requestPrograms != nil {
+	if snapshot.projectPolicy.ProjectService && server.lintPrograms != nil {
+		serviceRequest = server.lintPrograms.request(ctx, p.uri, snapshot.target, true)
+		release = serviceRequest.finalize
+		releasePending = true
+	} else if !snapshot.projectPolicy.ProjectService && p.requestPrograms != nil {
 		loaders, release = p.requestPrograms(ctx, p.uri, snapshot.target)
 		releasePending = release != nil
-	} else if server.lintPrograms != nil && server.lintPrograms.Usable() {
+	} else if !snapshot.projectPolicy.ProjectService && server.lintPrograms != nil && server.lintPrograms.Usable() {
 		loadProgram, loadMetadata, finalize := server.lintPrograms.Request(
 			ctx,
 			p.uri,
@@ -137,16 +145,30 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		releasePending = release != nil
 	}
 
-	program, sourceFile, hasTypeInfo, err := selectLintProgram(
-		p.uri,
-		snapshot.target,
-		server.session,
-		ctx,
-		snapshot.typeScriptConfigPaths,
-		server.fs,
-		loaders,
-		server.lintSessionRoots,
-	)
+	var program *compiler.Program
+	var sourceFile *ast.SourceFile
+	var hasTypeInfo bool
+	var err error
+	if snapshot.projectPolicy.ProjectService {
+		var selected selectedLintProject
+		if serviceRequest != nil {
+			selected, err = serviceRequest.service(snapshot.projectPolicy.TsconfigRootDir)
+		} else {
+			selected, err = request.service(snapshot.projectPolicy.TsconfigRootDir)
+		}
+		program, sourceFile, hasTypeInfo = selected.program, selected.sourceFile, err == nil
+	} else {
+		program, sourceFile, hasTypeInfo, err = selectLintProgram(
+			p.uri,
+			snapshot.target,
+			server.session,
+			ctx,
+			snapshot.typeScriptConfigPaths,
+			server.fs,
+			loaders,
+			server.lintSessionRoots,
+		)
+	}
 	if err != nil {
 		return linter.Generation{}, nil, err
 	}

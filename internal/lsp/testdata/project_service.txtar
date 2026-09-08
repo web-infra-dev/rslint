@@ -1,0 +1,79 @@
+-- nested/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":false},"include":["**/*.ts"]}
+-- nested/tooling/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":false},"files":[]}
+-- nested/pkg/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":true},"files":["src/target.ts","src/sibling.ts","ambient.d.ts"]}
+-- nested/pkg/src/target.ts --
+export const disk = 0;
+-- nested/pkg/src/sibling.ts --
+export const sibling = 1;
+-- nested/pkg/ambient.d.ts --
+declare const ambient: number;
+-- ancestor/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["pkg/target.ts"]}
+-- ancestor/pkg/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["other.ts"]}
+-- ancestor/pkg/target.ts --
+export const value = 1;
+-- ancestor/pkg/other.ts --
+export const other = 2;
+-- disabled-search/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["pkg/target.ts"]}
+-- disabled-search/pkg/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableSolutionSearching":true},"files":["other.ts"]}
+-- disabled-search/pkg/target.ts --
+export const value = 1;
+-- disabled-search/pkg/other.ts --
+export const other = 2;
+-- solution/tsconfig.json --
+{"files":[],"references":[{"path":"./pkg/tsconfig.app.json"}]}
+-- solution/pkg/tsconfig.app.json --
+{"compilerOptions":{"composite":true,"noLib":true},"files":["src/target.ts"]}
+-- solution/pkg/src/target.ts --
+export const value = 1;
+-- unowned/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":[]}
+-- unowned/target.ts --
+export const value = 1;
+-- reference-sources/app/tsconfig.json --
+{"compilerOptions":{"composite":true,"module":"esnext","moduleResolution":"bundler","outDir":"out","strict":true},"files":["src/main.ts"],"references":[{"path":"../lib"}]}
+-- reference-sources/app/src/main.ts --
+import { value } from '../../lib/src/value';
+export const result: number = value;
+-- reference-sources/lib/tsconfig.json --
+{"compilerOptions":{"composite":true,"rootDir":"src","outDir":"dist"},"files":["src/value.ts"]}
+-- reference-sources/lib/src/value.ts --
+export const value = 'disk';
+-- reference-sources/lib/dist/value.d.ts --
+export declare const value: string;
+-- warm-references/tsconfig.json --
+{"compilerOptions":{"disableReferencedProjectLoad":true},"files":[],"references":[{"path":"./shared"}]}
+-- warm-references/shared/tsconfig.json --
+{"compilerOptions":{"noLib":true,"composite":true},"files":["first.ts","../app/second.ts"]}
+-- warm-references/shared/first.ts --
+export const first = 1;
+-- warm-references/app/second.ts --
+export const second = 2;
+-- aliases/real/tsconfig.json --
+{"compilerOptions":{"strict":true,"noLib":true},"files":["file.ts"]}
+-- aliases/real/file.ts --
+export const value = 1;
+-- aliases/alias/tsconfig.json --
+{"compilerOptions":{"strict":false,"noLib":true},"files":["file.ts"]}
+-- fallback-finalizer/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableReferencedProjectLoad":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- fallback-finalizer/jsconfig.json --
+{"compilerOptions":{"noLib":true,"disableReferencedProjectLoad":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- fallback-finalizer/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true},"files":["target.ts"]}
+-- fallback-finalizer/target.ts --
+export const target = 1;
+-- transient-service-project/tsconfig.json --
+{"compilerOptions":{"disableReferencedProjectLoad":true},"files":[],"references":[{"path":"./shared"}]}
+-- transient-service-project/shared/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["../app/second.ts"]}
+-- transient-service-project/shared/unowned.ts --
+export const unowned = 1;
+-- transient-service-project/app/second.ts --
+export const second = 2;

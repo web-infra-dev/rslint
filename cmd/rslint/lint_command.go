@@ -313,7 +313,15 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// expensive work until preflight has succeeded and the interactive start
 	// line is visible. The pre-override snapshots preserve the prior project
 	// selection semantics: --rule changes rules, not project discovery.
-	if buildAllPrograms {
+	projectConfigs := targetConfigMap
+	if projectConfigs == nil {
+		projectConfigs = map[string]rslintconfig.RslintConfig{currentDirectory: targetRslintConfig}
+	}
+	usesProjectPolicy := false
+	for _, config := range projectConfigs {
+		usesProjectPolicy = usesProjectPolicy || rslintconfig.NeedsProjectPolicy(config)
+	}
+	if buildAllPrograms && !usesProjectPolicy {
 		if targetConfigMap != nil {
 			projectSet, err = programSession.BuildProjects(targetConfigMap, singleThreaded)
 		} else {
@@ -339,6 +347,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		cwd,
 		fs.UseCaseSensitiveFileNames(),
 	)
+	projectScope := loader.ProjectScopeTarget
+	if buildAllPrograms {
+		projectScope = loader.ProjectScopeAll
+	} else if broadProjectLoad {
+		projectScope = loader.ProjectScopeOwner
+	}
 
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
 	// This keeps an explicit --config outside the current directory from
@@ -354,9 +368,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		targetPlan     target.Plan
 		loadedPrograms loader.LoadResult
 	)
-	// --type-check-only is program-wide and pays no lint-target discovery,
-	// target binding/parsing, config-resolution, or Program-loading cost.
-	if !typeCheckOnly {
+	// Legacy --type-check-only remains program-wide. Automatic discovery
+	// needs the selected paths to find their projects, then checks each whole
+	// selected Program without resolving or executing lint rules.
+	if !typeCheckOnly || usesProjectPolicy {
 		targetPlan, err = target.Resolve(target.Request{
 			ConfigMap:       targetConfigMap,
 			Config:          targetRslintConfig,
@@ -371,7 +386,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
-		if !buildAllPrograms {
+		if usesProjectPolicy {
+			projectSet, err = programSession.BuildLintProjects(projectConfigs, targetPlan, singleThreaded, projectScope)
+			if err != nil {
+				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+			}
+		} else if !buildAllPrograms {
 			if configMap != nil {
 				if broadProjectLoad {
 					projectSet, err = programSession.BuildProjectsForTargetOwners(configMap, targetPlan, singleThreaded)
@@ -390,11 +410,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 			}
 		}
-		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
-		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		programs = projectSet.Programs()
+		if !typeCheckOnly {
+			loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
+			if err != nil {
+				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+			}
+			programs = loadedPrograms.Programs
 		}
-		programs = loadedPrograms.Programs
 	}
 
 	// Metadata was sufficient for planning, but execution requires the exact
@@ -434,7 +457,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	createPrograms := func(session *loader.Session) (loader.LoadResult, error) {
 		var rebuilt loader.ProjectSet
 		var err error
-		if configMap != nil {
+		if usesProjectPolicy {
+			rebuilt, err = session.BuildLintProjects(projectConfigs, targetPlan, singleThreaded, projectScope)
+		} else if configMap != nil {
 			if buildAllPrograms {
 				rebuilt, err = session.BuildProjects(configMap, singleThreaded)
 			} else if broadProjectLoad {

@@ -45,7 +45,9 @@ Set `sourceType` directly on `languageOptions`; the legacy `languageOptions.pars
 
 - **Type:** `boolean`
 
-Enables TypeScript's project service for automatic tsconfig discovery. This is the default in `ts.configs.recommended`.
+Discovers the configured TypeScript project for each selected file. This is the default in `ts.configs.recommended`. Discovery starts beside the source file, checking `tsconfig.json`, then `jsconfig.json`, and continues through ancestors when a config does not own the file. Project references can lead to custom config names such as `tsconfig.app.json`.
+
+The nearest owning project wins over a different tsconfig beside the Rslint config or in the current working directory. Reference ownership follows TypeScript's source redirects and reference order. Each selected project keeps its complete root files and dependencies; selecting one lint file limits lint execution, not the type context.
 
 ```ts
 {
@@ -57,9 +59,37 @@ Enables TypeScript's project service for automatic tsconfig discovery. This is t
 }
 ```
 
+`projectService: true` cannot be combined with explicit `project` paths or `project: []`, including values inherited from different matching entries. Remove `project`, or set `projectService: false` to use explicit projects. A later `project: false` or `project: null` clears inherited paths. A later `projectService: false` or `null` disables automatic discovery.
+
+A selected file that does not belong to a discovered project is an error. To lint such files without type information, override both settings for that file scope:
+
+```ts
+{
+  files: ['scripts/**/*.js'],
+  languageOptions: {
+    parserOptions: { projectService: false, project: false },
+  },
+}
+```
+
+Only the boolean form is supported. Object options such as `allowDefaultProject`, `defaultProject`, and `loadTypeScriptPlugins`, as well as `extraFileExtensions`, are not implemented. `project: true` is also unsupported; use `projectService: true` for automatic discovery.
+
+The editor reuses its existing Program store rather than hosting a second TypeScript project service. Normal source/config updates recheck ownership. One long-lived editor difference remains: after all seed documents close, deleting a config, querying a referenced target, and recreating the config may retain its previously loaded identity in Rslint. TypeScript can unload that project in this sequence, making `disableReferencedProjectLoad` reject it until another document loads it. No stale Program is used while the config is missing.
+
+## languageOptions.parserOptions.tsconfigRootDir
+
+- **Type:** `string | null`
+- **Default:** the directory of the governing Rslint config
+
+An absolute directory that stops upward project discovery when the search reaches it. It does not select a tsconfig by itself. If the target is outside this directory's ancestor chain, it can still discover its own ancestors. Project references and `extends` may point outside the boundary. Relative paths are rejected; `null` resets an inherited boundary to the default.
+
+API override entries use their authored working-directory base for the default. A config entry's `basePath` scopes matching without moving this boundary. Unlike typescript-eslint's JavaScript call-stack inference, Rslint uses its resolved config origin, so external config modules have a deterministic base.
+
+When set with explicit `project`, relative project paths resolve from `tsconfigRootDir`.
+
 ## languageOptions.parserOptions.project
 
-- **Type:** `string | string[]`
+- **Type:** `string | string[] | false | null`
 
 Specifies explicit `tsconfig.json` paths. Glob patterns are supported for monorepos. Files included by these tsconfigs receive full type information, enabling type-aware rules such as `@typescript-eslint/no-floating-promises` and `@typescript-eslint/await-thenable`.
 
@@ -69,15 +99,18 @@ Files outside all tsconfigs are still linted, but only rules that do not require
 {
   languageOptions: {
     parserOptions: {
+      projectService: false,
       project: ['./tsconfig.json', './packages/*/tsconfig.json'],
     },
   },
 }
 ```
 
-When an entry has `basePath`, its explicit project literals and globs resolve from that directory. This changes only their path origin: Rslint's existing governing-config project collection remains owner-wide, so `files` and `ignores` do not filter which declared projects the loader considers.
+When an entry has `basePath`, its explicit project literals and globs resolve from that directory unless `tsconfigRootDir` is set. With `projectService` or `tsconfigRootDir` settings, the matching entries determine each target's effective project policy. Configs using only legacy explicit project paths retain their existing config-wide declaration collection and first-root-before-import selection order.
 
-Omit `project` to use the governing config directory's default `tsconfig.json`; `basePath` alone does not move that fallback. An explicit `project: []` disables that fallback for the governing config. See the [`basePath` configuration reference](/config/base-path) for the path-origin rules.
+When both project settings are omitted, Rslint retains the governing config directory's default `tsconfig.json` fallback; `basePath` alone does not move it. An explicit `project: []`, `false`, or `null` disables that fallback. See the [`basePath` configuration reference](/config/base-path) for the path-origin rules.
+
+With automatic discovery, `--type-check` and `--type-check-only` discover projects from the selected file/directory scope, then check the complete selected projects. Legacy explicit project configs, including `projectService: false` with explicit paths, retain program-wide type checking. Configs that mix automatic and explicit discovery, clear inherited projects, or set `tsconfigRootDir` resolve their policies from selected targets.
 
 ## languageOptions.globals
 

@@ -28,9 +28,19 @@ rslint --type-check .         # lint + type-check
 rslint --type-check-only .    # type-check only
 ```
 
-When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. An explicit `project: []` disables that fallback for the governing config. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
+When both `parserOptions.project` and `projectService` are omitted, rslint uses `tsconfig.json` in the governing config directory when present. An explicit `project: []`, `false`, or `null` disables that fallback. If neither configured projects nor that fallback tsconfig exist, type-check produces no diagnostics for that config.
 
-An entry's [`basePath`](/config/base-path) becomes the anchor for its explicit project literals or globs. It does not move the implicit governing-directory `tsconfig.json` fallback or change Rslint's existing owner-wide project collection. Program-wide type checking still builds every explicit project declaration in the effective config catalog; `files`, `ignores`, `.gitignore`, and CLI target scope do not reduce that Program's TypeScript diagnostics.
+An entry's [`basePath`](/config/base-path) anchors explicit project literals or globs unless `tsconfigRootDir` is set. It does not move the implicit governing-directory fallback. Legacy explicit project configs, including `projectService: false` with explicit paths, retain program-wide declaration loading. In every mode, lint target filters do not reduce a selected Program's TypeScript diagnostics.
+
+## Automatic project discovery
+
+With [`projectService: true`](/config/language-options#languageoptionsparseroptionsprojectservice), including TypeScript presets, rslint discovers the projects that own the selected files. Nested tsconfigs and project references are followed; a tsconfig beside the lint config does not override the source's local project.
+
+For example, `rslint --type-check-only packages/app/src/file.ts` finds that file's project and checks the whole project, including sibling files. It does not first build an unrelated root tsconfig. No arguments select the current directory's lint scope for discovery. Type-check-only uses target discovery for project selection but never executes lint rules.
+
+Configs mixing automatic and explicit policies, clearing inherited projects, or setting `tsconfigRootDir` also resolve their project policies from the selected scope. An unowned service target is an error. To use explicit paths with a TypeScript preset, set `projectService: false`; leaving both enabled is a configuration error.
+
+An unconditional `projectService: false` or `null` overrides earlier preset settings. Ordinary explicit project declarations then retain program-wide checking even when no lint targets are selected. An override with `files`, entry-level `ignores`, or `basePath` still needs per-file matching and cannot disable service for every target.
 
 ## What gets type-checked
 

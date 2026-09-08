@@ -27,6 +27,8 @@ type documentLintSnapshot struct {
 	pathSpaces            *config.PathSpaceSnapshot
 	ruleCatalog           *rule.Catalog
 	configResolved        bool
+	projectPolicy         config.ProjectPolicy
+	projectPolicyError    error
 	typeScriptConfigPaths []string
 	configKey             string
 	pluginGeneration      string
@@ -62,8 +64,43 @@ func resolveDocumentLintSnapshotConfig(
 	}
 	snapshot.resolvedConfig = resolver.ResolveTarget(snapshot.target.Identity())
 	snapshot.configResolved = true
+	return resolveDocumentLintSnapshotProjects(snapshot, fs)
+}
+
+func resolveDocumentLintSnapshotProjects(
+	snapshot documentLintSnapshot,
+	fs vfs.FS,
+) documentLintSnapshot {
+	if !config.NeedsProjectPolicy(snapshot.config) {
+		return snapshot
+	}
+	resolver, err := config.NewProjectPolicyResolverWithPathSpaces(
+		snapshot.config,
+		snapshot.target.ConfigDirectory,
+		fs,
+		snapshot.pathSpaces,
+	)
+	if err != nil {
+		snapshot.projectPolicyError = err
+		return snapshot
+	}
+	snapshot.projectPolicy, snapshot.projectPolicyError = resolver.Resolve(snapshot.target.Identity())
+	snapshot.typeScriptConfigPaths = nil
+	if snapshot.projectPolicyError != nil || snapshot.projectPolicy.ProjectService || snapshot.projectPolicy.ProjectDisabled {
+		return snapshot
+	}
+	// Policy paths already use their authored base. Resolve only this file's
+	// effective declaration, never the union of other flat-config entries.
+	snapshot.typeScriptConfigPaths, snapshot.projectPolicyError = resolveTsConfigPathsWithFS(
+		config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+			ParserOptions: &config.ParserOptions{Project: snapshot.projectPolicy.Project},
+		}}},
+		snapshot.target.ConfigDirectory,
+		fs,
+	)
 	return snapshot
 }
+
 func isLintableScriptFile(uri lsproto.DocumentUri) bool {
 	return config.IsSupportedLintFile(uriToPath(uri))
 }
@@ -275,7 +312,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		typeScriptConfigPaths = s.tsConfigPathsByConfig[selection.configKey]
 	}
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
-	return documentLintSnapshot{
+	snapshot := documentLintSnapshot{
 		target:                target,
 		config:                selection.entries,
 		resolvedConfig:        selection.resolved,
@@ -287,6 +324,10 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		pluginGeneration:      s.eslintPluginConfigGeneration,
 		unavailable:           selection.configKey != "" && unavailable,
 	}
+	if snapshot.configResolved {
+		snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
+	}
+	return snapshot
 }
 
 // getConfigForURI is retained for package-level helpers and tests. Production

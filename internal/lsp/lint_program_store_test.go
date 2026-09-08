@@ -17,6 +17,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
 type lintProgramStoreFixture struct {
@@ -125,6 +127,392 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	}
 	if sourceFile.Text() != changed {
 		t.Fatalf("updated source text = %q, want %q", sourceFile.Text(), changed)
+	}
+}
+
+func TestLintProgramStoreProjectServiceReusesModeAndUpdatesSource(t *testing.T) {
+	const original = "export const value = 1;\n"
+	fixture := newLintProgramStoreFixture(t, original)
+	loadService := func() *compiler.Program {
+		t.Helper()
+		request := fixture.store.request(context.Background(), fixture.sourceURI,
+			lspConfigTarget(fixture.sourcePath, fixture.server.cwd, fixture.server.fs), true)
+		selected, err := request.service(fixture.server.cwd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.finalize()
+		return selected.program
+	}
+	first := loadService()
+	if second := loadService(); second != first {
+		t.Fatal("unchanged service request rebuilt its configured Program")
+	}
+	legacy := fixture.load(t)
+	if legacy == first {
+		t.Fatal("service and legacy requests reused different reference modes")
+	}
+	if afterLegacy := loadService(); afterLegacy != first {
+		t.Fatal("legacy request evicted the service-mode Program")
+	}
+	const changed = "export const value = 2;\n"
+	fixture.server.documents[fixture.sourceURI] = changed
+	fixture.store.DidChange(fixture.sourceURI, changed)
+	updated := loadService()
+	if updated == first || updated.GetSourceFile(fixture.sourcePath).Text() != changed {
+		t.Fatal("service cache did not advance to the editor generation")
+	}
+	if first.GetSourceFile(fixture.sourcePath).Text() != original {
+		t.Fatal("updating the service cache mutated a previous Program")
+	}
+	if !fixture.store.Invalidate() || len(fixture.store.programs) != 0 {
+		t.Fatal("invalidation did not discard both Program modes")
+	}
+}
+
+func TestLintProgramStoreProjectServiceUsesPreviouslyLoadedReference(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "warm-references"))
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	server.lintPrograms = store
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(relativePath string) (*compiler.Program, error) {
+		fileName := tspath.ResolvePath(directory, relativePath)
+		uri := documentURIFromPath(fileName)
+		server.documents[uri] = "export const value = 1;\n"
+		request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		selected, err := request.service(directory)
+		return selected.program, err
+	}
+	if _, err := load("app/second.ts"); err == nil {
+		t.Fatal("disableReferencedProjectLoad admitted a cold referenced project")
+	}
+	legacyTarget := tspath.ResolvePath(directory, "shared/first.ts")
+	legacyRequest := store.request(context.Background(), documentURIFromPath(legacyTarget), lspConfigTarget(legacyTarget, directory, server.fs), false)
+	if _, _, err := legacyRequest.load(tspath.ResolvePath(directory, "shared/tsconfig.json")); err != nil {
+		t.Fatal(err)
+	}
+	legacyRequest.finalize()
+	if _, err := load("app/second.ts"); err == nil {
+		t.Fatal("a legacy Program made the project service's reference warm")
+	}
+	first, err := load("shared/first.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := load("app/second.ts")
+	if err != nil {
+		t.Fatalf("previously loaded reference became unavailable: %v", err)
+	}
+	if second != first {
+		t.Fatal("warm reference did not reuse its existing Program")
+	}
+	fileName := tspath.ResolvePath(directory, "app/second.ts")
+	uri := documentURIFromPath(fileName)
+	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
+	}}}
+	snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+	environment := server.freezeSpeculativeLintEnvironment(uri, snapshot.target)
+	const fixedContent = "export const fixed = 3;\n"
+	generation, release, err := acquireSpeculativeGeneration(context.Background(), fixedContent, snapshot, environment)
+	if release != nil {
+		defer release()
+	}
+	if err != nil {
+		t.Fatalf("speculative generation lost the warm reference: %v", err)
+	}
+	if len(generation.Native.Programs) != 1 {
+		t.Fatalf("speculative Programs=%d", len(generation.Native.Programs))
+	}
+	speculative := generation.Native.Programs[0]
+	if speculative.Options().ConfigFilePath != first.Options().ConfigFilePath {
+		t.Fatal("speculative generation selected a different warm project")
+	}
+	if speculative.GetSourceFile(fileName).Text() != fixedContent || speculative.GetSourceFile(fileName) == first.GetSourceFile(fileName) {
+		t.Fatal("speculative generation reused resident text")
+	}
+	if first.GetSourceFile(fileName).Text() != server.documents[uri] {
+		t.Fatal("speculative generation changed resident source text")
+	}
+}
+
+func TestLintProgramStoreProjectServiceReselectsAfterConfigChanges(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "ancestor"))
+	fileName := tspath.ResolvePath(directory, "pkg/target.ts")
+	uri := documentURIFromPath(fileName)
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(rootDir string) (selectedLintProject, error) {
+		request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		return request.service(rootDir)
+	}
+	first, err := load(directory)
+	if err != nil || first.configPath != tspath.ResolvePath(directory, "tsconfig.json") {
+		t.Fatalf("initial selection=%s error=%v", first.configPath, err)
+	}
+	if _, err := load(tspath.ResolvePath(directory, "pkg")); err == nil {
+		t.Fatal("cached parent project crossed the new root boundary")
+	}
+	nearestConfig := tspath.ResolvePath(directory, "pkg/tsconfig.json")
+	configURI := documentURIFromPath(nearestConfig)
+	const nearestContent = `{"compilerOptions":{"noLib":true,"strict":true},"files":["target.ts"]}`
+	server.documents[configURI] = nearestContent
+	store.DidOpen(configURI, nearestContent, true)
+	nearest, err := load(directory)
+	if err != nil || nearest.configPath != nearestConfig || !nearest.program.Options().Strict.IsTrue() {
+		t.Fatalf("unsaved nearest config selection=%s error=%v", nearest.configPath, err)
+	}
+	delete(server.documents, configURI)
+	store.DidClose(configURI)
+	restored, err := load(directory)
+	if err != nil || restored.configPath != first.configPath {
+		t.Fatalf("closed config selection=%s error=%v", restored.configPath, err)
+	}
+	const parentContent = `{"compilerOptions":{"noLib":true,"strict":true},"files":["pkg/target.ts"]}`
+	if err := os.WriteFile(first.configPath, []byte(parentContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !store.DidChangeWatchedFiles([]*lsproto.FileEvent{{Uri: documentURIFromPath(first.configPath), Type: lsproto.FileChangeTypeChanged}}) {
+		t.Fatal("watched config change retained service state")
+	}
+	updated, err := load(directory)
+	if err != nil || updated.program == restored.program || !updated.program.Options().Strict.IsTrue() {
+		t.Fatalf("watched config did not update compiler options: %v", err)
+	}
+}
+
+func TestLintProgramStoreProjectServiceFinalizesSelectedFallback(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "fallback-finalizer"))
+	fileName := tspath.ResolvePath(directory, "target.ts")
+	uri := documentURIFromPath(fileName)
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+	selected, err := request.service(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedKey := request.key(tspath.ResolvePath(directory, "tsconfig.json"))
+	laterKey := request.key(tspath.ResolvePath(directory, "jsconfig.json"))
+	if selected.configPath != tspath.ResolvePath(directory, "tsconfig.json") || store.programs[selectedKey] == nil || store.programs[laterKey] == nil {
+		t.Fatalf("did not exercise an earlier fallback after a later containing probe: selected=%s Programs=%v", selected.configPath, store.programs)
+	}
+	// Emulate a checker's lazy dependency read outside the existing coverage.
+	selected.program.Host().FS().FileExists(tspath.NormalizePath(filepath.Join(t.TempDir(), "lazy.d.ts")))
+	request.finalize()
+	if store.programs[selectedKey] != nil {
+		t.Fatal("selected fallback retained lazy reads predating watcher coverage")
+	}
+	if store.programs[laterKey] == nil {
+		t.Fatal("finalization incorrectly evicted the last probe instead of the selected fallback")
+	}
+}
+
+func TestLintProgramStoreProjectServiceUpdatesReferencedSources(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "reference-sources"))
+	fileName := tspath.ResolvePath(directory, "app/src/main.ts")
+	referencePath := tspath.ResolvePath(directory, "lib/src/value.ts")
+	uri := documentURIFromPath(fileName)
+	referenceURI := documentURIFromPath(referencePath)
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	const original = "export const value = 42;\n"
+	server.documents[referenceURI] = original
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func() *compiler.Program {
+		request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		selected, err := request.service(directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return selected.program
+	}
+	first := load()
+	if first.GetSourceFile(referencePath).Text() != original {
+		t.Fatal("initial service Program did not use referenced editor source")
+	}
+	if diagnostics := first.GetSemanticDiagnostics(context.Background(), first.GetSourceFile(fileName)); len(diagnostics) != 0 {
+		t.Fatalf("initial semantic diagnostics=%v", diagnostics)
+	}
+	const changed = "export const value = false;\n"
+	server.documents[referenceURI] = changed
+	store.DidChange(referenceURI, changed)
+	updated := load()
+	if updated == first || updated.GetSourceFile(referencePath).Text() != changed {
+		t.Fatal("referenced editor change did not advance the consuming Program")
+	}
+	if first.GetSourceFile(referencePath).Text() != original {
+		t.Fatal("reference update mutated the prior Program")
+	}
+	if !updated.IsSourceFromProjectReference(updated.GetSourceFile(referencePath).Path()) ||
+		updated.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
+		t.Fatal("incremental update lost project source-reference semantics")
+	}
+	foundMismatch := false
+	for _, diagnostic := range updated.GetSemanticDiagnostics(context.Background(), updated.GetSourceFile(fileName)) {
+		foundMismatch = foundMismatch || diagnostic.Code() == 2322
+	}
+	if !foundMismatch {
+		t.Fatal("updated consumer did not report the new referenced boolean-to-number mismatch")
+	}
+}
+
+func TestLintProgramStoreProjectServicePreservesLoadedProjectsAfterInvalidation(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, event := range []string{"source", "config-options", "config-membership", "cache-disabled"} {
+		t.Run(event, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, "warm-references"))
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = bundled.WrapFS(osvfs.FS())
+			store := newLintProgramStore(server)
+			store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			load := func(relativePath string) (selectedLintProject, error) {
+				fileName := tspath.ResolvePath(directory, relativePath)
+				request := store.request(context.Background(), documentURIFromPath(fileName), lspConfigTarget(fileName, directory, server.fs), true)
+				defer request.finalize()
+				return request.service(directory)
+			}
+			first, err := load("shared/first.ts")
+			if err != nil {
+				t.Fatal(err)
+			}
+			changedPath := tspath.ResolvePath(directory, "app/second.ts")
+			content := "export const changed = 3;\n"
+			switch event {
+			case "config-options", "config-membership":
+				changedPath = tspath.ResolvePath(directory, "shared/tsconfig.json")
+				content = `{"compilerOptions":{"noLib":true,"composite":true,"strict":true},"files":["first.ts","../app/second.ts"]}`
+				if event == "config-membership" {
+					content = `{"compilerOptions":{"noLib":true,"composite":true},"files":["first.ts"]}`
+				}
+			case "cache-disabled":
+				store.coverage.disabled = true
+			}
+			if err := os.WriteFile(changedPath, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			store.DidChangeWatchedFiles([]*lsproto.FileEvent{{Uri: documentURIFromPath(changedPath), Type: lsproto.FileChangeTypeChanged}})
+			if len(store.programs) != 0 {
+				t.Fatal("watch event retained a stale Program")
+			}
+			selected, err := load("app/second.ts")
+			if event == "config-membership" {
+				if err == nil {
+					t.Fatal("loaded identity bypassed the updated project membership")
+				}
+				return
+			}
+			if err != nil || selected.program == first.program || selected.configPath != first.configPath {
+				t.Fatalf("warm project after %s: selected=%s error=%v", event, selected.configPath, err)
+			}
+			if event == "config-options" && !selected.program.Options().Strict.IsTrue() {
+				t.Fatal("loaded project retained stale compiler options")
+			}
+			if event == "source" && selected.sourceFile.Text() != content {
+				t.Fatal("loaded project retained stale source text")
+			}
+			if event == "cache-disabled" && len(store.programs) != 0 {
+				t.Fatal("disabled cache retained a rebuilt Program")
+			}
+		})
+	}
+}
+
+func TestLintProgramStoreProjectServiceRemembersConstructedProbe(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "transient-service-project"))
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(relativePath string) (selectedLintProject, error) {
+		fileName := tspath.ResolvePath(directory, relativePath)
+		request := store.request(context.Background(), documentURIFromPath(fileName), lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		return request.service(directory)
+	}
+	if _, err := load("app/second.ts"); err == nil {
+		t.Fatal("a parsed reference counted as an already loaded project")
+	}
+	if _, err := load("shared/unowned.ts"); err == nil {
+		t.Fatal("non-containing nearest project admitted an unowned target")
+	}
+	if len(store.programs) != 0 {
+		t.Fatal("non-containing probe retained its Program")
+	}
+	selected, err := load("app/second.ts")
+	if err != nil || selected.configPath != tspath.ResolvePath(directory, "shared/tsconfig.json") {
+		t.Fatalf("previously constructed project was lost: selected=%s error=%v", selected.configPath, err)
+	}
+}
+
+func TestLintProgramStoreProjectServiceCaseInsensitiveIdentity(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	const directory = "/repo"
+	files := make(map[string]string)
+	names, err := archive.FileNames("warm-references")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range names {
+		content, err := archive.ReadFile("warm-references/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[tspath.ResolvePath(directory, name)] = string(content)
+		if strings.HasPrefix(name, "shared/") {
+			files[tspath.ResolvePath(directory, "SHARED/"+strings.TrimPrefix(name, "shared/"))] = string(content)
+		}
+	}
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = &exactCaseLSPProgramFS{FS: bundled.WrapFS(osvfs.FS()), files: files}
+	store := newLintProgramStore(server)
+	server.lintPrograms = store
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(relativePath string) selectedLintProject {
+		fileName := tspath.ResolvePath(directory, relativePath)
+		request := store.request(context.Background(), documentURIFromPath(fileName), lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		selected, err := request.service(directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return selected
+	}
+	first := load("SHARED/first.ts")
+	second := load("app/second.ts")
+	if second.program != first.program {
+		t.Fatal("reference spelling changed the identity of a case-insensitive configured project")
+	}
+	fileName := tspath.ResolvePath(directory, "app/second.ts")
+	target := lspConfigTarget(fileName, directory, server.fs)
+	environment := server.freezeSpeculativeLintEnvironment(documentURIFromPath(fileName), target)
+	request := newStandaloneLintProjectRequestWithFS(target, server.fs)
+	request.loadedServiceProjects = environment.loadedServiceProjects
+	selected, err := request.service(directory)
+	if err != nil || lintProgramLexicalPathID(selected.configPath, server.fs) != lintProgramLexicalPathID(first.configPath, server.fs) {
+		t.Fatalf("speculative case-insensitive reference selection=%s error=%v", selected.configPath, err)
 	}
 }
 

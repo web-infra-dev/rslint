@@ -121,3 +121,5 @@ If no entry matches a selected file, no lint rules run for it, but the file is s
 Rslint no longer loads `rslint.json` or `rslint.jsonc` while linting. Passing one to `--config` is rejected; automatic discovery ignores those filenames.
 
 Run `rslint --init` in a project that still has a legacy JSON/JSONC file to migrate it to a JS/TS module config. The migration preserves custom rules and settings while deduplicating rules already covered by recommended presets.
+
+The migration also preserves each entry's parser options and file matching scope. It does not enable the recommended TypeScript preset's `projectService` default for a legacy configuration that did not request it.

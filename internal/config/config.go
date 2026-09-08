@@ -546,8 +546,52 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 // ParserOptions contains parser-specific configuration.
 // ProjectService uses *bool to distinguish "not set" (nil) from "explicitly false".
 type ParserOptions struct {
-	ProjectService *bool        `json:"projectService,omitempty"`
-	Project        ProjectPaths `json:"project,omitempty"`
+	ProjectService  *bool        `json:"projectService,omitempty"`
+	Project         ProjectPaths `json:"project,omitempty"`
+	TsconfigRootDir string       `json:"tsconfigRootDir,omitempty"`
+	ProjectDisabled bool         `json:"-"`
+
+	projectAutomatic bool
+	rootDirSet       bool
+}
+
+// UnmarshalJSON keeps explicit null/false overrides distinct from omission.
+// This matters when a later flat-config entry clears a preset's project mode.
+func (options *ParserOptions) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*options = ParserOptions{}
+	if value, ok := fields["projectService"]; ok {
+		var enabled bool
+		if err := json.Unmarshal(value, &enabled); err != nil {
+			return errors.New("parserOptions.projectService supports only a boolean; object options are not supported")
+		}
+		options.ProjectService = BoolPtr(enabled)
+	}
+	if value, ok := fields["project"]; ok {
+		switch string(value) {
+		case "false", "null", `""`:
+			options.ProjectDisabled = true
+		case "true":
+			options.projectAutomatic = true
+		default:
+			if err := json.Unmarshal(value, &options.Project); err != nil {
+				return fmt.Errorf("parserOptions.project: %w", err)
+			}
+		}
+	}
+	if value, ok := fields["tsconfigRootDir"]; ok {
+		options.rootDirSet = true
+		if err := json.Unmarshal(value, &options.TsconfigRootDir); err != nil {
+			return errors.New("parserOptions.tsconfigRootDir must be an absolute path string")
+		}
+		if string(value) != "null" && !tspath.IsRootedDiskPath(options.TsconfigRootDir) {
+			return errors.New("parserOptions.tsconfigRootDir must be an absolute path")
+		}
+	}
+	return nil
 }
 
 // MarshalJSON preserves the three project states used by resolution: omitted,
@@ -561,6 +605,15 @@ func (options ParserOptions) MarshalJSON() ([]byte, error) {
 	}
 	if options.Project != nil {
 		encoded["project"] = options.Project
+	} else if options.ProjectDisabled {
+		encoded["project"] = false
+	} else if options.projectAutomatic {
+		encoded["project"] = true
+	}
+	if options.TsconfigRootDir != "" {
+		encoded["tsconfigRootDir"] = options.TsconfigRootDir
+	} else if options.rootDirSet {
+		encoded["tsconfigRootDir"] = nil
 	}
 	return json.Marshal(encoded)
 }
@@ -1097,8 +1150,14 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			if override.ParserOptions.ProjectService != nil {
 				po.ProjectService = override.ParserOptions.ProjectService
 			}
-			if override.ParserOptions.Project != nil {
+			if override.ParserOptions.Project != nil || override.ParserOptions.ProjectDisabled || override.ParserOptions.projectAutomatic {
 				po.Project = override.ParserOptions.Project
+				po.ProjectDisabled = override.ParserOptions.ProjectDisabled
+				po.projectAutomatic = override.ParserOptions.projectAutomatic
+			}
+			if override.ParserOptions.TsconfigRootDir != "" || override.ParserOptions.rootDirSet {
+				po.TsconfigRootDir = override.ParserOptions.TsconfigRootDir
+				po.rootDirSet = override.ParserOptions.rootDirSet
 			}
 			merged.ParserOptions = &po
 		}

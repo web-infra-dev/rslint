@@ -256,6 +256,10 @@ func (s *Server) rebuildTsConfigPaths() error {
 	if len(s.jsConfigs) > 0 {
 		byConfig = make(map[string][]string, len(s.jsConfigs))
 		for dir, entries := range s.jsConfigs {
+			if config.NeedsProjectPolicy(entries) {
+				// Effective projects are resolved in each document's frozen policy.
+				continue
+			}
 			paths, err := s.resolveTsConfigPaths(entries, dir)
 			if err != nil {
 				return fmt.Errorf("resolve tsconfig paths for %q: %w", dir, err)

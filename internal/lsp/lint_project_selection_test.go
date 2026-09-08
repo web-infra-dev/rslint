@@ -4,12 +4,15 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -17,6 +20,8 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -322,5 +327,226 @@ func TestResolveTsConfigPathsPreservesSymlinkDeclarationPath(t *testing.T) {
 	}
 	if !metadata.Contains(aliasSource, "") || metadata.Contains(realSource, "") {
 		t.Fatal("symlinked tsconfig did not resolve includes from its declared directory")
+	}
+}
+
+func TestProjectServiceLSPGenerationParity(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		name         string
+		fixture      string
+		target       string
+		configDir    string
+		rootDir      string
+		wantConfig   string
+		wantRoots    int
+		project      []string
+		unreadConfig string
+		wantError    string
+	}{
+		{name: "nearest complete project", fixture: "nested", target: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
+		{name: "external lint config", fixture: "nested", target: "pkg/src/target.ts", configDir: "tooling", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
+		{name: "ancestor after nearest exclusion", fixture: "ancestor", target: "pkg/target.ts", wantConfig: "tsconfig.json", wantRoots: 1},
+		{name: "root boundary", fixture: "ancestor", target: "pkg/target.ts", rootDir: "pkg", wantError: "not found by the project service"},
+		{name: "disabled solution search", fixture: "disabled-search", target: "pkg/target.ts", wantError: "not found by the project service"},
+		{name: "custom reference", fixture: "solution", target: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.app.json", wantRoots: 1},
+		{name: "unowned target", fixture: "unowned", target: "target.ts", wantError: "not found by the project service"},
+		{name: "conflicting explicit project", fixture: "nested", target: "pkg/src/target.ts", project: []string{}, wantError: "enabling parserOptions.project"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, test.fixture))
+			fileName := tspath.ResolvePath(directory, test.target)
+			configDirectory := tspath.ResolvePath(directory, test.configDir)
+			fsys := &configReadCountingFS{FS: bundled.WrapFS(osvfs.FS())}
+			if test.unreadConfig != "" {
+				fsys.target = tspath.ResolvePath(directory, test.unreadConfig)
+			}
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = fsys
+			uri := documentURIFromPath(fileName)
+			const editorText = "export const editor = 1;\n"
+			server.documents[uri] = editorText
+			options := &config.ParserOptions{ProjectService: config.BoolPtr(true), Project: test.project}
+			if test.rootDir != "" {
+				options.TsconfigRootDir = tspath.ResolvePath(directory, test.rootDir)
+			}
+			entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: options}}}
+			snapshot := documentLintSnapshotForTest(server, uri, entries, configDirectory, false, nil)
+			for _, speculative := range []bool{false, true} {
+				var generation linter.Generation
+				var release linter.ReleaseFunc
+				var err error
+				text := editorText
+				if speculative {
+					text = "export const preview = 2;\n"
+					generation, release, err = acquireSpeculativeGeneration(
+						context.Background(), text, snapshot,
+						server.freezeSpeculativeLintEnvironment(uri, snapshot.target),
+					)
+				} else {
+					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				}
+				if release != nil {
+					defer release()
+				}
+				if test.wantError != "" {
+					if err == nil || !strings.Contains(err.Error(), test.wantError) {
+						t.Fatalf("speculative=%v: error=%v, want %q", speculative, err, test.wantError)
+					}
+					continue
+				}
+				if err != nil {
+					t.Fatalf("speculative=%v: %v", speculative, err)
+				}
+				if len(generation.Native.Programs) != 1 {
+					t.Fatalf("speculative=%v: programs=%d, want 1", speculative, len(generation.Native.Programs))
+				}
+				program := generation.Native.Programs[0]
+				if got := program.Options().ConfigFilePath; got != tspath.ResolvePath(directory, test.wantConfig) {
+					t.Fatalf("speculative=%v: config=%q, want %q", speculative, got, test.wantConfig)
+				}
+				if len(program.RootFileNames()) != test.wantRoots {
+					t.Fatalf("speculative=%v: roots=%v", speculative, program.RootFileNames())
+				}
+				source := program.GetSourceFile(fileName)
+				if source == nil || source.Text() != text {
+					t.Fatalf("speculative=%v: generation did not use its editor text", speculative)
+				}
+				if targets := generation.Native.TargetsByProgram; len(targets) != 1 || len(targets[0]) != 1 || targets[0][0] != fileName {
+					t.Fatalf("speculative=%v: extra lint targets=%v", speculative, targets)
+				}
+				if server.documents[uri] != editorText {
+					t.Fatal("speculative generation changed resident editor content")
+				}
+			}
+			if test.unreadConfig != "" && fsys.reads != 0 {
+				t.Fatalf("read unrelated root config %d times", fsys.reads)
+			}
+		})
+	}
+}
+
+func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "reference-sources"))
+	targetPath := tspath.ResolvePath(directory, "app/src/main.ts")
+	referencePath := tspath.ResolvePath(directory, "lib/src/value.ts")
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	uri := documentURIFromPath(targetPath)
+	const targetContent = "import { value } from '../../lib/src/value';\nexport const result: number = value;\n"
+	const referenceContent = "export const value = 42;\n"
+	server.documents[uri] = targetContent
+	server.documents[documentURIFromPath(referencePath)] = referenceContent
+	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
+	}}}
+	snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+	for _, speculative := range []bool{false, true} {
+		var generation linter.Generation
+		var err error
+		if speculative {
+			generation, _, err = acquireSpeculativeGeneration(context.Background(), targetContent, snapshot,
+				server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+		} else {
+			provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+			generation, _, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+		}
+		if err != nil {
+			t.Fatalf("speculative=%v: %v", speculative, err)
+		}
+		if len(generation.Native.Programs) != 1 {
+			t.Fatalf("speculative=%v: programs=%d", speculative, len(generation.Native.Programs))
+		}
+		program := generation.Native.Programs[0]
+		if source := program.GetSourceFile(referencePath); source == nil || source.Text() != referenceContent {
+			t.Fatalf("speculative=%v: did not load unsaved referenced source", speculative)
+		}
+		if program.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
+			t.Fatalf("speculative=%v: used stale declaration output", speculative)
+		}
+	}
+}
+
+func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "nested"))
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	entries := config.RslintConfig{
+		{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}}},
+		{Files: []string{"**/*.js"}, LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+			ProjectService: config.BoolPtr(false), Project: []string{"./missing.json"},
+		}}},
+	}
+	server.jsConfigs = map[string]config.RslintConfig{directory: entries}
+	if err := server.rebuildTsConfigPaths(); err != nil {
+		t.Fatalf("eagerly expanded an unrelated flat-config project: %v", err)
+	}
+	uri := documentURIFromPath(tspath.ResolvePath(directory, "pkg/src/target.ts"))
+	snapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshotForTest(server, uri, entries, directory, false, nil), server.fs)
+	if snapshot.projectPolicyError != nil || !snapshot.projectPolicy.ProjectService || len(snapshot.typeScriptConfigPaths) != 0 {
+		t.Fatalf("TypeScript policy=%+v paths=%v error=%v", snapshot.projectPolicy, snapshot.typeScriptConfigPaths, snapshot.projectPolicyError)
+	}
+	jsURI := documentURIFromPath(tspath.ResolvePath(directory, "target.js"))
+	jsSnapshot := resolveDocumentLintSnapshotConfig(documentLintSnapshotForTest(server, jsURI, entries, directory, false, nil), server.fs)
+	if jsSnapshot.projectPolicyError == nil || !strings.Contains(jsSnapshot.projectPolicyError.Error(), "missing.json") {
+		t.Fatalf("matching explicit project error=%v", jsSnapshot.projectPolicyError)
+	}
+}
+
+func TestProjectServiceLSPLexicalAliases(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "aliases"))
+	realFile := tspath.ResolvePath(directory, "real/file.ts")
+	aliasFile := tspath.ResolvePath(directory, "alias/file.ts")
+	if err := os.Symlink(realFile, aliasFile); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	server.lintPrograms = newLintProgramStore(server)
+	server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
+	}}}
+	sources := make(map[string]*ast.SourceFile)
+	for _, fileName := range []string{aliasFile, realFile, aliasFile, realFile} {
+		uri := documentURIFromPath(fileName)
+		const content = "export const value = 1;\n"
+		server.documents[uri] = content
+		snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+		provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+		generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+		if release != nil {
+			defer release()
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(generation.Native.Programs) != 1 {
+			t.Fatalf("%s: programs=%d", fileName, len(generation.Native.Programs))
+		}
+		program := generation.Native.Programs[0]
+		wantConfig := tspath.ResolvePath(tspath.GetDirectoryPath(fileName), "tsconfig.json")
+		if program.Options().ConfigFilePath != wantConfig {
+			t.Fatalf("%s: config=%q, want %q", fileName, program.Options().ConfigFilePath, wantConfig)
+		}
+		if program.Options().Strict.IsTrue() != (fileName == realFile) {
+			t.Fatalf("%s: selected the physical alias's compiler options", fileName)
+		}
+		source := program.GetSourceFile(fileName)
+		if previous := sources[fileName]; previous != nil && previous != source {
+			t.Fatalf("%s: unchanged lexical project was rebuilt", fileName)
+		}
+		sources[fileName] = source
+	}
+	if sources[aliasFile] == sources[realFile] {
+		t.Fatal("lexical alias projects shared one source identity")
 	}
 }

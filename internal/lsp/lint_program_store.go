@@ -8,21 +8,32 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config/target"
+	"github.com/web-infra-dev/rslint/internal/program/projectservice"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// lintProgramStore owns standalone Programs that fill gaps left by Session.
-// Session-owned Programs always remain authoritative.
+// lintProgramStore owns standalone Programs selected for editor linting.
+// Legacy explicit-project selection may use Session-owned Programs instead;
+// service selection reuses a distinct mode with live reference sources.
 type lintProgramStore struct {
 	server              *Server
 	coverage            *lintProgramCoverage
-	programs            map[string]*lintProgramState
+	programs            map[lintProgramKey]*lintProgramState
 	projectMetadata     map[string]*lintProjectMetadata
 	observedRootConfigs map[string]struct{}
+	// Configured project identity outlives a cached Program. Watch events
+	// invalidate source generations without making loaded references cold.
+	loadedServiceProjects map[string]struct{}
+}
+
+type lintProgramKey struct {
+	configPath       string
+	sourceReferences bool
 }
 
 type lintProgramState struct {
@@ -45,7 +56,8 @@ type lintProgramRequest struct {
 	target            target.File
 	freshOnly         bool
 	overlayPrepared   bool
-	usedConfig        string
+	sourceReferences  bool
+	usedKey           lintProgramKey
 	usedState         *lintProgramState
 	projectMetadata   map[string]*lintProjectMetadata
 	transientMetadata map[string]struct{}
@@ -53,11 +65,12 @@ type lintProgramRequest struct {
 
 func newLintProgramStore(server *Server) *lintProgramStore {
 	return &lintProgramStore{
-		server:              server,
-		coverage:            newLintProgramCoverage(server),
-		programs:            make(map[string]*lintProgramState),
-		projectMetadata:     make(map[string]*lintProjectMetadata),
-		observedRootConfigs: make(map[string]struct{}),
+		server:                server,
+		coverage:              newLintProgramCoverage(server),
+		programs:              make(map[lintProgramKey]*lintProgramState),
+		projectMetadata:       make(map[string]*lintProjectMetadata),
+		observedRootConfigs:   make(map[string]struct{}),
+		loadedServiceProjects: make(map[string]struct{}),
 	}
 }
 
@@ -70,6 +83,16 @@ func (s *lintProgramStore) Request(
 	uri lsproto.DocumentUri,
 	target target.File,
 ) (lintProgramLoader, lintProjectMetadataLoader, func()) {
+	request := s.request(ctx, uri, target, false)
+	return request.load, request.loadMetadata, request.finalize
+}
+
+func (s *lintProgramStore) request(
+	ctx context.Context,
+	uri lsproto.DocumentUri,
+	target target.File,
+	sourceReferences bool,
+) *lintProgramRequest {
 	target.Path = tspath.NormalizePath(target.Path)
 	if target.CanonicalPath != "" {
 		target.CanonicalPath = tspath.NormalizePath(target.CanonicalPath)
@@ -77,15 +100,78 @@ func (s *lintProgramStore) Request(
 	if target.CanonicalParentPath != "" {
 		target.CanonicalParentPath = tspath.NormalizePath(target.CanonicalParentPath)
 	}
-	request := &lintProgramRequest{
+	return &lintProgramRequest{
 		store:             s,
 		ctx:               ctx,
 		uri:               uri,
 		target:            target,
+		sourceReferences:  sourceReferences,
 		projectMetadata:   make(map[string]*lintProjectMetadata),
 		transientMetadata: make(map[string]struct{}),
 	}
-	return request.load, request.loadMetadata, request.finalize
+}
+
+func (r *lintProgramRequest) key(configPath string) lintProgramKey {
+	if r.sourceReferences {
+		configPath = string(lintProgramLexicalPathID(configPath, r.store.server.fs))
+	}
+	return lintProgramKey{tspath.NormalizePath(configPath), r.sourceReferences}
+}
+
+func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
+	if r.sourceReferences {
+		program, err := utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
+			true, metadata.commandLine,
+			utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys),
+		)
+		if err == nil {
+			r.store.loadedServiceProjects[string(lintProgramLexicalPathID(metadata.configPath, fsys))] = struct{}{}
+		}
+		return program, err
+	}
+	return createStandaloneLintProgram(metadata, fsys)
+}
+
+func (r *lintProgramRequest) service(rootDir string) (selectedLintProject, error) {
+	r.prepareOverlay()
+	selector := projectservice.New(projectservice.Host{
+		FS: r.overlayFS,
+		ParseConfig: func(configPath string) (*tsoptions.ParsedCommandLine, error) {
+			metadata, err := r.metadata(configPath)
+			if err != nil {
+				return nil, err
+			}
+			return metadata.commandLine, nil
+		},
+		CreateProgram: func(configPath string, _ *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
+			program, _, err := r.load(configPath)
+			return program, err
+		},
+		LoadedProgram: func(configPath string) (*compiler.Program, error) {
+			key := string(lintProgramLexicalPathID(configPath, r.overlayFS))
+			if _, loaded := r.store.loadedServiceProjects[key]; !loaded || !r.overlayFS.FileExists(configPath) {
+				return nil, nil //nolint:nilnil // An unloaded or deleted project is a normal cache miss.
+			}
+			program, _, err := r.load(configPath)
+			return program, err
+		},
+	})
+	selected, err := selector.Select(r.target.Path, rootDir)
+	if err != nil {
+		return selectedLintProject{}, err
+	}
+	// A redirect fallback can win after other containing candidates were
+	// probed. Finalize lazy reads from the selected Program, not the last probe.
+	r.usedKey = r.key(selected.ConfigPath)
+	r.usedState = r.store.programs[r.usedKey]
+	if r.usedState != nil && r.usedState.program != selected.Program {
+		r.usedState = nil
+	}
+	return selectedLintProject{
+		program:    selected.Program,
+		sourceFile: sourceFileForTarget(selected.Program, r.target, r.overlayFS),
+		configPath: selected.ConfigPath,
+	}, nil
 }
 
 func (r *lintProgramRequest) loadMetadata(
@@ -118,7 +204,7 @@ func (r *lintProgramRequest) metadata(
 		return metadata, nil
 	}
 	if !r.freshOnly && r.store.Usable() {
-		if state := r.store.programs[configFileName]; state != nil && state.metadata != nil {
+		if state := r.store.programs[r.key(configFileName)]; state != nil && state.metadata != nil {
 			r.projectMetadata[configFileName] = state.metadata
 			return state.metadata, nil
 		}
@@ -198,7 +284,7 @@ func (r *lintProgramRequest) load(
 		return r.loadFresh(configFileName)
 	}
 
-	state := r.store.programs[configFileName]
+	state := r.store.programs[r.key(configFileName)]
 	if state == nil {
 		return r.rebuild(configFileName, r.projectMetadata[configFileName])
 	}
@@ -264,7 +350,7 @@ func (r *lintProgramRequest) loadFresh(
 	if err != nil {
 		return nil, nil, err
 	}
-	program, err := createStandaloneLintProgram(metadata, r.overlayFS)
+	program, err := r.createProgram(metadata, r.overlayFS)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -275,7 +361,7 @@ func (r *lintProgramRequest) rebuild(
 	configFileName string,
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
-	delete(r.store.programs, configFileName)
+	delete(r.store.programs, r.key(configFileName))
 	if metadata == nil {
 		var err error
 		metadata, err = r.metadata(configFileName)
@@ -285,7 +371,7 @@ func (r *lintProgramRequest) rebuild(
 	}
 	_, metadataIsTransient := r.transientMetadata[configFileName]
 	if r.freshOnly || !r.store.Usable() || metadataIsTransient {
-		program, err := createStandaloneLintProgram(metadata, r.overlayFS)
+		program, err := r.createProgram(metadata, r.overlayFS)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -296,7 +382,7 @@ func (r *lintProgramRequest) rebuild(
 	// once so no filesystem change can fall into the registration gap.
 	for attempt := range 2 {
 		tracker := newLintTrackingFS(r.overlayFS)
-		program, err := createStandaloneLintProgram(metadata, tracker)
+		program, err := r.createProgram(metadata, tracker)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -332,7 +418,7 @@ func (r *lintProgramRequest) rebuild(
 			return program, sourceFile, nil
 		}
 		delete(r.store.projectMetadata, configFileName)
-		r.store.programs[configFileName] = state
+		r.store.programs[r.key(configFileName)] = state
 		return r.result(configFileName, state)
 	}
 	panic("unreachable")
@@ -348,7 +434,7 @@ func (r *lintProgramRequest) result(
 	)
 	if sourceFile != nil {
 		state.rememberSelectedTarget(r.target, r.store.server.fs)
-		r.usedConfig = configFileName
+		r.usedKey = r.key(configFileName)
 		r.usedState = state
 	}
 	return state.program, sourceFile, nil
@@ -378,7 +464,7 @@ func (r *lintProgramRequest) finalize() {
 	if !safe || added {
 		// Rules and the checker can perform lazy reads. New watcher coverage is
 		// active now, but this Program predates it.
-		delete(r.store.programs, r.usedConfig)
+		delete(r.store.programs, r.usedKey)
 	}
 }
 

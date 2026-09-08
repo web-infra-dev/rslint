@@ -1,0 +1,10 @@
+-- tsconfig.json --
+{"files":["unrelated.ts"]}
+-- unrelated.ts --
+export const unrelated: number = "wrong";
+-- pkg/tsconfig.json --
+{"compilerOptions":{"strict":true},"include":["*.ts"]}
+-- pkg/file.ts --
+debugger;
+-- pkg/sibling.ts --
+export const sibling: number = "wrong";

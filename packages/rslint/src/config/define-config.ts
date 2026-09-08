@@ -94,14 +94,22 @@ export interface RulesRecord {
  */
 export interface ParserOptions {
   /**
-   * Enable project service for typed linting (runs the TypeScript language
-   * service behind the scenes).
+   * Discover each file's configured TypeScript project, including nested
+   * tsconfig/jsconfig files and project references. Cannot be combined with
+   * `project` paths or an empty project array. Object options are unsupported.
    */
-  projectService?: boolean;
+  projectService?: boolean | null;
+  /**
+   * Absolute boundary for upward project discovery. Defaults to the governing
+   * config directory. References may point outside it; this does not force the
+   * target to use that directory's tsconfig.
+   */
+  tsconfigRootDir?: string | null;
   /**
    * tsconfig.json path(s) used for typed linting. Glob patterns are supported.
    * Omit this field to use a governing config's default `tsconfig.json`; pass
-   * an empty array to disable that fallback.
+   * an empty array, false, or null to disable that fallback. Set projectService
+   * to false when using explicit paths with a TypeScript preset.
    *
    * @example
    * project: './tsconfig.json'
@@ -110,7 +118,7 @@ export interface ParserOptions {
    * @example
    * project: ['./tsconfig.*.json']
    */
-  project?: string | string[];
+  project?: string | string[] | false | null;
 }
 
 /**

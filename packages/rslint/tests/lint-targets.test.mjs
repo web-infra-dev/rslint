@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const cliScript = path.resolve(import.meta.dirname, '../bin/rslint.js');
 const cliTimeoutMs = 30_000;
@@ -286,6 +287,229 @@ describe('CLI basePath product contract', () => {
 });
 
 describe('CLI lint target contracts', () => {
+  test('projectService migration preserves explicit projects across separately inserted TypeScript presets', async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-cli-service-migrate-'),
+    );
+    try {
+      await writeFixture(root, {
+        'rslint.json': JSON.stringify([
+          {
+            plugins: ['@typescript-eslint'],
+            languageOptions: { parserOptions: { project: './custom.json' } },
+            rules: { '@typescript-eslint/no-for-in-array': 'error' },
+          },
+          {
+            plugins: ['@typescript-eslint'],
+            rules: { 'no-console': 'error' },
+          },
+        ]),
+        'tsconfig.json': JSON.stringify({ files: [] }),
+        'custom.json': JSON.stringify({ files: ['probe.ts'] }),
+        'probe.ts':
+          'const values = [1]; for (const key in values) { console.log(key); }\n',
+        'node_modules/@rslint/core/package.json': JSON.stringify({
+          name: '@rslint/core',
+          type: 'module',
+          exports: './index.js',
+        }),
+        'node_modules/@rslint/core/index.js': `export * from ${JSON.stringify(
+          pathToFileURL(path.resolve(import.meta.dirname, '../dist/index.js'))
+            .href,
+        )};\n`,
+      });
+      const migration = await runCLI(root, ['--init']);
+      expect(migration.code, migration.stderr).toBe(0);
+
+      const result = await runCLI(root, ['probe.ts']);
+      expect(result.code, result.stderr).toBe(1);
+      const diagnostics = parseDiagnostics(result.stdout);
+      expect(diagnostics.map(({ ruleName }) => ruleName).sort()).toEqual([
+        '@typescript-eslint/no-for-in-array',
+        'no-console',
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('projectService migration preserves disabled and default project modes in mutually exclusive file scopes', async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-cli-service-migrate-scopes-'),
+    );
+    try {
+      await writeFixture(root, {
+        'rslint.json': JSON.stringify([
+          {
+            files: ['tools/**/*.ts'],
+            plugins: ['@typescript-eslint'],
+            languageOptions: { parserOptions: { projectService: false } },
+            rules: {
+              '@typescript-eslint/no-for-in-array': 'error',
+              'no-console': 'error',
+            },
+          },
+          {
+            files: ['src/**/*.ts'],
+            plugins: ['@typescript-eslint'],
+            rules: {
+              '@typescript-eslint/no-for-in-array': 'error',
+              'no-console': 'error',
+            },
+          },
+        ]),
+        'tsconfig.json': JSON.stringify({
+          files: ['tools/probe.ts', 'src/probe.ts'],
+        }),
+        'tools/probe.ts':
+          'export const values = [1]; for (const key in values) { console.log(key); }\n',
+        'src/probe.ts':
+          'export const values = [1]; for (const key in values) { console.log(key); }\n',
+        'node_modules/@rslint/core/package.json': JSON.stringify({
+          name: '@rslint/core',
+          type: 'module',
+          exports: './index.js',
+        }),
+        'node_modules/@rslint/core/index.js': `export * from ${JSON.stringify(
+          pathToFileURL(path.resolve(import.meta.dirname, '../dist/index.js'))
+            .href,
+        )};\n`,
+      });
+      const migration = await runCLI(root, ['--init']);
+      expect(migration.code, migration.stderr).toBe(0);
+
+      const result = await runCLI(root, ['tools', 'src']);
+      expect(result.code, result.stderr).toBe(1);
+      expect(
+        normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
+      ).toEqual([
+        {
+          filePath: path.join(root, 'src', 'probe.ts'),
+          ruleName: '@typescript-eslint/no-for-in-array',
+        },
+        {
+          filePath: path.join(root, 'src', 'probe.ts'),
+          ruleName: 'no-console',
+        },
+        {
+          filePath: path.join(root, 'tools', 'probe.ts'),
+          ruleName: 'no-console',
+        },
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    { mode: [], expectedRules: ['no-debugger'] },
+    {
+      mode: ['--type-check'],
+      expectedRules: ['TypeScript(TS2322)', 'no-debugger'],
+    },
+    { mode: ['--type-check-only'], expectedRules: ['TypeScript(TS2322)'] },
+  ])(
+    'projectService discovers the selected file project and preserves full type context (%j)',
+    async ({ mode, expectedRules }) => {
+      const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-service-'));
+      try {
+        await writeFixture(root, {
+          'rslint.config.mjs': `export default [{
+  files: ['**/*.ts'],
+  languageOptions: { parserOptions: { projectService: true } },
+  rules: { 'no-debugger': 'error' },
+}];\n`,
+          'tsconfig.json': JSON.stringify({
+            files: ['unrelated.ts', 'packages/app/src/target.ts'],
+          }),
+          'unrelated.ts': 'export const wrong: number = "root";\n',
+          'packages/app/tsconfig.json': JSON.stringify({
+            files: ['src/target.ts', 'src/peer.ts'],
+          }),
+          'packages/app/src/target.ts': 'debugger;\nexport {};\n',
+          'packages/app/src/peer.ts': 'export const wrong: number = "peer";\n',
+        });
+        const result = await runCLI(root, [
+          ...mode,
+          'packages/app/src/target.ts',
+        ]);
+        expect(result.code).toBe(1);
+        const diagnostics = parseDiagnostics(result.stdout);
+        expect(diagnostics.map(({ ruleName }) => ruleName).sort()).toEqual(
+          [...expectedRules].sort(),
+        );
+        expect(
+          absoluteDiagnosticPaths(root, diagnostics, 'no-debugger'),
+        ).toEqual(
+          mode.includes('--type-check-only')
+            ? []
+            : [path.join(root, 'packages', 'app', 'src', 'target.ts')],
+        );
+        expect(
+          absoluteDiagnosticPaths(root, diagnostics, 'TypeScript(TS2322)'),
+        ).toEqual(
+          mode.length === 0
+            ? []
+            : [path.join(root, 'packages', 'app', 'src', 'peer.ts')],
+        );
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test('projectService keeps automatic, explicit, and disabled targets separate in a broad CLI run', async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-cli-service-mixed-'),
+    );
+    try {
+      await writeFixture(root, {
+        'rslint.config.mjs': `export default [
+  {
+    files: ['**/*.ts'],
+    plugins: ['@typescript-eslint'],
+    languageOptions: { parserOptions: { projectService: true } },
+    rules: { '@typescript-eslint/no-for-in-array': 'error', 'no-debugger': 'error' },
+  },
+  {
+    files: ['legacy/*.ts'],
+    languageOptions: { parserOptions: { projectService: false, project: './custom.json' } },
+  },
+  {
+    files: ['scripts/*.ts'],
+    languageOptions: { parserOptions: { projectService: false, project: false } },
+  },
+];\n`,
+        'app/tsconfig.json': JSON.stringify({ files: ['probe.ts'] }),
+        'app/probe.ts': 'const values = [1]; for (const key in values) {}\n',
+        'custom.json': JSON.stringify({ files: ['legacy/probe.ts'] }),
+        'legacy/tsconfig.json': JSON.stringify({ files: [] }),
+        'legacy/probe.ts': 'const values = [1]; for (const key in values) {}\n',
+        'scripts/probe.ts':
+          'const values = [1]; for (const key in values) {}\ndebugger;\n',
+      });
+      const result = await runCLI(root, ['.']);
+      expect(result.code).toBe(1);
+      const diagnostics = parseDiagnostics(result.stdout);
+      expect(normalizedDiagnostics(root, diagnostics)).toEqual([
+        {
+          filePath: path.join(root, 'app', 'probe.ts'),
+          ruleName: '@typescript-eslint/no-for-in-array',
+        },
+        {
+          filePath: path.join(root, 'legacy', 'probe.ts'),
+          ruleName: '@typescript-eslint/no-for-in-array',
+        },
+        {
+          filePath: path.join(root, 'scripts', 'probe.ts'),
+          ruleName: 'no-debugger',
+        },
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('external config keeps authored paths and invocation target scope', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rslint-cli-external-'));
     const configDir = path.join(root, 'configs');
