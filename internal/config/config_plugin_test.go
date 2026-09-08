@@ -19,6 +19,7 @@ func TestEslintPluginDeclNameAliases_PinnedForJSGuard(t *testing.T) {
 		"eslint-plugin-import":      {},
 		"eslint-plugin-jest":        {},
 		"eslint-plugin-jsx-a11y":    {},
+		"eslint-plugin-n":           {},
 		"eslint-plugin-promise":     {},
 		"eslint-plugin-react-hooks": {},
 		"eslint-plugin-unicorn":     {},
@@ -46,6 +47,8 @@ func TestNormalizePluginName(t *testing.T) {
 		{"eslint-plugin-import", "import"},
 		{"import", "import"},
 		{"react", "react"},
+		{"n", "n"},
+		{"eslint-plugin-n", "n"},
 		// Unknown plugins: returned as-is
 		{"eslint-plugin-react", "eslint-plugin-react"},
 		{"custom-plugin", "custom-plugin"},

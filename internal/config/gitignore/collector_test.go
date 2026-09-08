@@ -965,3 +965,38 @@ func TestCollectors_StopAtChildConfigBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestMatcherExplicitPatterns(t *testing.T) {
+	cases := []struct {
+		patterns  []string
+		path      string
+		sensitive bool
+		want      bool
+	}{
+		{[]string{"*.js"}, "nested/a.js", true, true},
+		{[]string{"/*.js"}, "nested/a.js", true, false},
+		{[]string{"build/", "!build/a.js"}, "build/a.js", true, true},
+		{[]string{"build/*", "!build/a.js"}, "build/a.js", true, false},
+		{[]string{"build/", "!build/", "build/drop.js"}, "build/drop.js", true, true},
+		{[]string{"build/", "!build/", "build/drop.js"}, "build/keep.js", true, false},
+		{[]string{"cache/"}, "cache", true, false},
+		{[]string{"cache/"}, "cache/", true, true},
+		{[]string{"cache/**"}, "cache", true, false},
+		{[]string{"cache/**"}, "cache/file.js", true, true},
+		{[]string{`\#literal`, `\!literal`, `trailing\ `, "# comment"}, "#literal", true, true},
+		{[]string{`\#literal`, `\!literal`, `trailing\ `}, "!literal", true, true},
+		{[]string{`trailing\ `}, "trailing ", true, true},
+		{[]string{"*.JS"}, "a.js", false, true},
+		{[]string{"*.JS"}, "a.js", true, false},
+		{[]string{"**"}, "../a.js", true, false},
+		{[]string{"**"}, "./a.js", true, false},
+		{[]string{"**"}, "a//b.js", true, false},
+		{[]string{"**"}, "/a.js", true, false},
+		{[]string{"**"}, "", true, false},
+	}
+	for _, test := range cases {
+		if got := NewMatcher(test.patterns, test.sensitive).Match(test.path); got != test.want {
+			t.Errorf("patterns %q, path %q: got %v, want %v", test.patterns, test.path, got, test.want)
+		}
+	}
+}

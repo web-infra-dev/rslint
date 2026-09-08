@@ -1,0 +1,85 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "convertPath": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {},
+              "patternProperties": {
+                "^.+$": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "uniqueItems": true
+                  },
+                  "replace": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                },
+                "additionalProperties": false,
+                "required": ["include", "replace"]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "ignoreUnpublished": {
+          "type": "boolean"
+        },
+        "additionalExecutables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "executableMap": {
+          "type": "object",
+          "patternProperties": {
+            "^\\.\\w+$": {
+              "type": "string",
+              "pattern": "^[\\w-]+$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
