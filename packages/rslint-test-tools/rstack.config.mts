@@ -169,6 +169,7 @@ define.test({
     './tests/eslint/rules/no-warning-comments.test.ts',
     // eslint-plugin-node
     './tests/eslint-plugin-node/rules/hashbang.test.ts',
+    './tests/eslint-plugin-node/rules/no-exports-assign.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
