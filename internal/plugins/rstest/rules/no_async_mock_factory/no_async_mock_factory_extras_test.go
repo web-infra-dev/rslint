@@ -80,6 +80,30 @@ rs.mock('./sum', factory)`},
 rs.mock('./sum', factory)`},
 			{Code: `import { syncModuleFactory } from './async-mock-factories';
 rs.mock('./sum', syncModuleFactory)`},
+			// A local class named `Promise` is not the one the runtime checks
+			// against: `new Promise()` hands back an ordinary object here.
+			{Code: `export {};
+class Promise { sum = 0; }
+rs.doMockRequire('./sum', () => new Promise())`},
+
+			// ---- a path that returns nothing ----
+			// A false `flag` reaches the end of the body and returns
+			// `undefined`, which is not a promise, so the factory only
+			// sometimes hands one back.
+			{Code: `rs.doMockRequire('./sum', () => { if (flag) return Promise.resolve({ sum: 0 }); })`},
+			{Code: `rs.mock('./sum', function () {
+  if (flag) {
+    return Promise.resolve({ sum: 0 });
+  }
+})`},
+			// The declaration is not the factory that is installed: the name is
+			// written to before the call, and the type layer sees only
+			// `() => unknown`.
+			{Code: `function factory(): unknown {
+  return Promise.resolve({ sum: 0 });
+}
+factory = () => ({ sum: 0 });
+rs.doMock('./sum', factory)`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- shapes the build does rewrite ----
@@ -326,6 +350,42 @@ rs.mock('./sum', async () => buildMock())`,
 					Column:    18,
 					EndLine:   1,
 					EndColumn: 62,
+				}},
+			},
+			// Removing `async` would leave the annotation promising a promise
+			// the factory no longer returns, and unwrapping `Promise.resolve`
+			// has the same problem, so neither is suggested.
+			{
+				Code: `rs.mock('./sum', async (): Promise<{ sum: number }> => ({ sum: 0 }))`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "asyncMockFactory",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 68,
+				}},
+			},
+			{
+				Code: `rs.mock('./sum', (): Promise<{ sum: number }> => Promise.resolve({ sum: 0 }))`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "asyncMockFactory",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 77,
+				}},
+			},
+			// A nested function's computed name is evaluated in this body, so
+			// the `await` in it is the factory's own and dropping `async` would
+			// not parse.
+			{
+				Code: `rs.mock('./sum', async () => ({ [await ready]() { return 0; } }))`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "asyncMockFactory",
+					Line:      1,
+					Column:    18,
+					EndLine:   1,
+					EndColumn: 65,
 				}},
 			},
 			// A `return` statement takes the object without parentheses; a

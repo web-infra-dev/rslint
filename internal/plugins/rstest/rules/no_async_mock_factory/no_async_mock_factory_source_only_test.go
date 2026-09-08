@@ -60,6 +60,13 @@ rs.mock('./sum', () => rs.importActual('./sum'));`,
 			want: 0,
 		},
 		{
+			// The binder's reachability is available without a TypeChecker, so
+			// the fall-through path is seen here too.
+			name:   "path that returns nothing",
+			source: `rs.doMockRequire('./sum', () => { if (flag) return Promise.resolve({ sum: 0 }); });`,
+			want:   0,
+		},
+		{
 			name:   "synchronous factory",
 			source: `rs.mock('./sum', () => ({ sum: () => 0 }));`,
 			want:   0,

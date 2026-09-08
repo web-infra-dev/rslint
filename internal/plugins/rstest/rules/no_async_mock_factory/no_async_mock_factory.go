@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -199,6 +200,16 @@ func classifyFunction(ctx rule.RuleContext, fn *ast.Node) verdict {
 		return verdictPromise
 	}
 
+	// A path that runs off the end of a block body hands back `undefined`,
+	// which the runtime's `instanceof Promise` check lets through: such a
+	// factory only sometimes returns a promise, and this rule reports the ones
+	// that certainly do. `async` is settled above, where the implicit
+	// `undefined` is wrapped like every other value the body hands back.
+	if body := fn.Body(); body != nil && body.Kind == ast.KindBlock &&
+		utils.IsFunctionEndReachable(fn) {
+		return verdictUnknown
+	}
+
 	returned, ok := returnedExpressions(fn)
 	if !ok || len(returned) == 0 {
 		return verdictUnknown
@@ -212,9 +223,10 @@ func classifyFunction(ctx rule.RuleContext, fn *ast.Node) verdict {
 }
 
 // classifyThroughDeclaration follows an identifier to a declaration in this
-// file. A name that resolves to more than one declaration, to another file, or
-// to anything but a `const` function or a function declaration is left to the
-// type layer, where a reassignment or a re-export is accounted for.
+// file. A name that resolves to more than one declaration, to another file, to
+// anything but a `const` function or a function declaration, or to a function
+// declaration that is written to, is left to the type layer, where a
+// reassignment or a re-export is accounted for.
 func classifyThroughDeclaration(ctx rule.RuleContext, factory *ast.Node) verdict {
 	if factory.Kind != ast.KindIdentifier || ctx.Refs == nil {
 		return verdictUnknown
@@ -230,6 +242,12 @@ func classifyThroughDeclaration(ctx rule.RuleContext, factory *ast.Node) verdict
 
 	switch declaration.Kind {
 	case ast.KindFunctionDeclaration:
+		// A function declaration's name is a writable binding, and an
+		// assignment to it adds no declaration of its own: the body below is
+		// the installed factory only while nothing writes to the name.
+		if isWrittenTo(ctx, symbol) {
+			return verdictUnknown
+		}
 		return classifyFunction(ctx, declaration)
 	case ast.KindVariableDeclaration:
 		if !ast.IsVarConst(declaration) {
@@ -244,6 +262,17 @@ func classifyThroughDeclaration(ctx rule.RuleContext, factory *ast.Node) verdict
 	return verdictUnknown
 }
 
+// isWrittenTo reports whether anything in this file assigns to the symbol,
+// which would replace the value its declaration describes.
+func isWrittenTo(ctx rule.RuleContext, symbol *ast.Symbol) bool {
+	for _, reference := range ctx.Refs.References(symbol) {
+		if utils.IsWriteReference(reference) {
+			return true
+		}
+	}
+	return false
+}
+
 // classifyByType asks the TypeChecker, and only ever answers verdictPromise or
 // verdictUnknown: it exists to decide the cases syntax could not, never to
 // overrule it.
@@ -254,7 +283,7 @@ func classifyByType(ctx rule.RuleContext, factory *ast.Node) verdict {
 	if ctx.TypeChecker == nil {
 		return verdictUnknown
 	}
-	if alwaysReturnsPromise(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(factory)) {
+	if alwaysReturnsPromise(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(factory)) {
 		return verdictPromise
 	}
 	return verdictUnknown
@@ -265,7 +294,7 @@ func classifyByType(ctx rule.RuleContext, factory *ast.Node) verdict {
 // their signatures has to return a promise: a type that mixes an async factory
 // with a synchronous one leaves the outcome to run time, and this rule stays
 // silent rather than report a call that may well work.
-func alwaysReturnsPromise(typeChecker *checker.Checker, t *checker.Type) bool {
+func alwaysReturnsPromise(sourceProgram *lintprogram.Program, typeChecker *checker.Checker, t *checker.Type) bool {
 	if t == nil {
 		return false
 	}
@@ -275,7 +304,7 @@ func alwaysReturnsPromise(typeChecker *checker.Checker, t *checker.Type) bool {
 			return false
 		}
 		for _, part := range parts {
-			if !alwaysReturnsPromise(typeChecker, part) {
+			if !alwaysReturnsPromise(sourceProgram, typeChecker, part) {
 				return false
 			}
 		}
@@ -287,7 +316,7 @@ func alwaysReturnsPromise(typeChecker *checker.Checker, t *checker.Type) bool {
 		return false
 	}
 	for _, signature := range signatures {
-		if !isPromiseInstanceType(typeChecker, checker.Checker_getReturnTypeOfSignature(typeChecker, signature), 0) {
+		if !isPromiseInstanceType(sourceProgram, typeChecker, checker.Checker_getReturnTypeOfSignature(typeChecker, signature), 0) {
 			return false
 		}
 	}
@@ -295,14 +324,17 @@ func alwaysReturnsPromise(typeChecker *checker.Checker, t *checker.Type) bool {
 }
 
 // isPromiseInstanceType reports whether a value of type t is an instance of
-// `Promise`, matching the type by its name.
+// the global `Promise`. The name alone does not settle it: a file is free to
+// declare its own `Promise`, and a value of that type is not what the
+// runtime's `instanceof Promise` looks for, so the symbol has to come from the
+// default library.
 //
 // utils.IsThenableType is deliberately not used. It answers "has a `then` whose
 // first parameter is a callback", which is wider than the `instanceof Promise`
 // the runtime performs, and the gap is reachable: mocking a module that itself
 // exports `then` gives the factory a thenable return type while the runtime
 // accepts it happily.
-func isPromiseInstanceType(typeChecker *checker.Checker, t *checker.Type, depth int) bool {
+func isPromiseInstanceType(sourceProgram *lintprogram.Program, typeChecker *checker.Checker, t *checker.Type, depth int) bool {
 	if t == nil || depth > 8 {
 		return false
 	}
@@ -315,7 +347,7 @@ func isPromiseInstanceType(typeChecker *checker.Checker, t *checker.Type, depth 
 			return false
 		}
 		for _, part := range parts {
-			if !isPromiseInstanceType(typeChecker, part, depth+1) {
+			if !isPromiseInstanceType(sourceProgram, typeChecker, part, depth+1) {
 				return false
 			}
 		}
@@ -324,7 +356,7 @@ func isPromiseInstanceType(typeChecker *checker.Checker, t *checker.Type, depth 
 	if utils.IsIntersectionType(t) {
 		// `Promise<T> & Branded` is still a promise at run time.
 		for _, part := range t.Types() {
-			if isPromiseInstanceType(typeChecker, part, depth+1) {
+			if isPromiseInstanceType(sourceProgram, typeChecker, part, depth+1) {
 				return true
 			}
 		}
@@ -336,7 +368,8 @@ func isPromiseInstanceType(typeChecker *checker.Checker, t *checker.Type, depth 
 		checker.Type_objectFlags(resolved)&checker.ObjectFlagsReference != 0 {
 		resolved = resolved.Target()
 	}
-	if symbol := checker.Type_symbol(resolved); symbol != nil && symbol.Name == "Promise" {
+	if symbol := checker.Type_symbol(resolved); symbol != nil && symbol.Name == "Promise" &&
+		utils.IsSymbolFromDefaultLibrary(sourceProgram, symbol) {
 		return true
 	}
 	if checker.Type_objectFlags(resolved)&checker.ObjectFlagsClassOrInterface == 0 {
@@ -344,7 +377,7 @@ func isPromiseInstanceType(typeChecker *checker.Checker, t *checker.Type, depth 
 	}
 	// A subclass of Promise is an instance of Promise.
 	for _, base := range checker.Checker_getBaseTypes(typeChecker, resolved) {
-		if isPromiseInstanceType(typeChecker, base, depth+1) {
+		if isPromiseInstanceType(sourceProgram, typeChecker, base, depth+1) {
 			return true
 		}
 	}
@@ -461,6 +494,15 @@ func returnedExpressions(fn *ast.Node) ([]*ast.Node, bool) {
 // `import … with { rstest: 'importActual' }` moves code across statements.
 func suggestions(ctx rule.RuleContext, factory *ast.Node) []rule.RuleSuggestion {
 	if !isFunctionExpressionLike(factory) {
+		return nil
+	}
+	// Both rewrites take the promise out of the value while leaving the
+	// factory's own return type as written, so an annotated
+	// `(): Promise<T> => …` would be left annotating a `T`. Rewriting the
+	// annotation as well is a second edit with its own shapes to get right —
+	// `PromiseLike<T>`, a union, an alias — so an annotated factory is simply
+	// left alone.
+	if factory.Type() != nil {
 		return nil
 	}
 	returned, complete := returnedExpressions(factory)
@@ -592,8 +634,10 @@ func isDefinitelyNotPromise(node *ast.Node) bool {
 }
 
 // bodyAwaits reports whether the function's own body suspends: an `await`
-// expression, `for await`, or an `await using` declaration. A nested function
-// has its own body and does not count.
+// expression, `for await`, or an `await using` declaration. A nested function's
+// body does not count — but everything else written on that nested function
+// does: a computed member name and a decorator are evaluated where the function
+// appears, which is this body.
 func bodyAwaits(fn *ast.Node) bool {
 	body := fn.Body()
 	if body == nil {
@@ -607,7 +651,13 @@ func bodyAwaits(fn *ast.Node) bool {
 			return found
 		}
 		if ast.IsFunctionLike(node) {
-			return false
+			nestedBody := node.Body()
+			return node.ForEachChild(func(child *ast.Node) bool {
+				if child == nestedBody {
+					return false
+				}
+				return walk(child)
+			})
 		}
 		switch node.Kind {
 		case ast.KindAwaitExpression:
