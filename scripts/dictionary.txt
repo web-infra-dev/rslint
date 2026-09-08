@@ -402,6 +402,7 @@ Nkoo
 nocase
 noconfig
 nodesep
+nodeutil
 noembed
 noglobstar
 nolint
