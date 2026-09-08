@@ -1,5 +1,7 @@
 Boolean project-service observations from typescript-eslint 8.70.0 / TypeScript 6.0.3.
 Project paths, complete roots, and Program reuse were recorded through parser.parseForESLint.
+Unowned observations preserve the missing configured owner; rslint returns a search miss
+instead of reproducing the adapter's rejection so callers can apply source-only gap linting.
 
 -- nearest-root/expect.json --
 {
@@ -132,7 +134,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "outside/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -200,7 +202,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "outside/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -1041,7 +1043,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "target/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -1307,7 +1309,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "pkg/src/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -1363,7 +1365,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "src/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -1376,7 +1378,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "src/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -1442,7 +1444,7 @@ export const value = 1;
   "steps": [
     {
       "file": "src/file.js",
-      "error": true
+      "unowned": true
     },
     {
       "file": "src/file.ts",
@@ -1511,7 +1513,7 @@ export const value = 1;
   "steps": [
     {
       "file": "src/file.js",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -1562,7 +1564,7 @@ export const value = 1;
   "steps": [
     {
       "file": "pkg/src/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -1661,7 +1663,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "outside/file.ts",
-      "error": true
+      "unowned": true
     },
     {
       "file": "pkg/file.ts",
@@ -1716,7 +1718,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "pkg/src/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2103,7 +2105,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "src/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2129,7 +2131,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "src/file.vue",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2258,7 +2260,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "node_modules/pkg/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2327,7 +2329,7 @@ export declare const value: string;
     {
       "file": "pkg/b.ts",
       "rootDirectory": "pkg",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2354,7 +2356,7 @@ export const result: string = nullable;
     {
       "file": "pkg/b.ts",
       "rootDirectory": "pkg",
-      "error": true
+      "unowned": true
     },
     {
       "file": "pkg/a.ts",
@@ -2373,7 +2375,7 @@ export const result: string = nullable;
     {
       "file": "pkg/b.ts",
       "rootDirectory": "pkg",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2409,7 +2411,7 @@ export const result: string = nullable;
     },
     {
       "file": "outside/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2577,7 +2579,7 @@ export const result: string = nullable;
     },
     {
       "file": "outside/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2614,7 +2616,7 @@ export const result: string = nullable;
     },
     {
       "file": "outside/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2665,7 +2667,7 @@ export const result: string = nullable;
     },
     {
       "file": "outside/file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2790,7 +2792,7 @@ export const result: string = nullable;
   "steps": [
     {
       "file": "file.ts",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -2996,7 +2998,7 @@ console.log(1);
   "steps": [
     {
       "file": "gap.js",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -3019,7 +3021,7 @@ console.log(1);
   "steps": [
     {
       "file": "gap.js",
-      "error": true
+      "unowned": true
     }
   ]
 }
@@ -3042,7 +3044,7 @@ console.log(1);
   "steps": [
     {
       "file": "gap.js",
-      "error": true
+      "unowned": true
     }
   ]
 }

@@ -15,7 +15,8 @@ import (
 // Host supplies one immutable filesystem generation. CreateProgram must retain
 // the parsed config's complete roots, enable source project references, and
 // allow non-TS extensions after config parsing, as TypeScript's service does.
-// A missing or unreadable config may be represented by a nil parsed config.
+// ParseConfig is called only for existing configs and must return a parsed
+// config or an error; an unreadable config is not an ordinary search miss.
 type Host struct {
 	FS            vfs.FS
 	ParseConfig   func(configPath string) (*tsoptions.ParsedCommandLine, error)
@@ -28,6 +29,8 @@ type Host struct {
 }
 
 // Selection is the configured project that supplies this file's type context.
+// A zero Selection means no configured project owns the file. Callers decide
+// how to lint that file without a configured type context.
 type Selection struct {
 	Program    *compiler.Program
 	ConfigPath string
@@ -89,8 +92,7 @@ func (s *Selector) candidate(configPath string, allowLoad bool) (*candidate, err
 		return nil, fmt.Errorf("parse TypeScript project %q: %w", configPath, err)
 	}
 	if parsed == nil {
-		s.candidates[key] = nil
-		return nil, nil //nolint:nilnil // No configured project is a normal search miss.
+		return nil, fmt.Errorf("parse TypeScript project %q: no parsed config returned", configPath)
 	}
 	entry = &candidate{path: configPath, parsed: parsed}
 	s.candidates[key] = entry
@@ -216,6 +218,8 @@ func (q *search) references(parent *candidate, allowLoad bool) (Selection, error
 // Select searches from the caller-visible file path. rootDirectory bounds
 // ancestor discovery only when the search actually reaches that directory;
 // config extends and references remain free to point outside that boundary.
+// Ordinary search misses return a zero Selection and no error; host failures
+// and selected projects that cannot provide the source still return errors.
 func (s *Selector) Select(fileName, rootDirectory string) (Selection, error) {
 	fileName = tspath.NormalizePath(fileName)
 	query := search{
@@ -243,19 +247,12 @@ func (s *Selector) Select(fileName, rootDirectory string) (Selection, error) {
 				return selection, err
 			}
 			if entry.parsed.CompilerOptions().DisableSolutionSearching.IsTrue() {
-				return query.result()
+				return query.fallback, nil
 			}
 		}
 		if s.path(directory) == rootPath || tspath.GetBaseFileName(string(s.path(directory))) == "node_modules" ||
 			tspath.GetDirectoryPath(directory) == directory {
-			return query.result()
+			return query.fallback, nil
 		}
 	}
-}
-
-func (q *search) result() (Selection, error) {
-	if q.fallback.Program != nil {
-		return q.fallback, nil
-	}
-	return Selection{}, fmt.Errorf("%q was not found by the project service; include it in a tsconfig.json or disable projectService for this file", q.fileName)
 }

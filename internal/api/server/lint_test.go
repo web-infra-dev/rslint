@@ -401,6 +401,33 @@ func TestHandleLint_ProjectServiceUsesTargetConfigAndOverlay(t *testing.T) {
 	}
 }
 
+func TestHandleLint_ProjectServiceKeepsGapResultsAndRules(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true}},"rules":{"@typescript-eslint/no-for-in-array":"error","no-debugger":"error"}}]`)
+	covered := tspath.ResolvePath(dir, "pkg/file.ts")
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
+		Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+		Files:        []string{covered, tspath.ResolvePath(dir, "loose.ts"), tspath.ResolvePath(dir, "loose.js")},
+		FileContents: map[string]string{covered: "export const values = [1, 2];\nfor (const key in values) {}\ndebugger;\n"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.FileCount != 3 || len(response.Diagnostics) != 4 {
+		t.Fatalf("gap request lost results or ran typed gap rules: %+v", response)
+	}
+	counts := make(map[string]int)
+	for _, diagnostic := range response.Diagnostics {
+		counts[diagnostic.RuleName]++
+		if diagnostic.RuleName == "@typescript-eslint/no-for-in-array" && diagnostic.FilePath != "pkg/file.ts" {
+			t.Fatalf("gap file ran a type-aware rule: %+v", diagnostic)
+		}
+	}
+	if counts["no-debugger"] != 3 || counts["@typescript-eslint/no-for-in-array"] != 1 {
+		t.Fatalf("wrong syntax/typed rule projection: %v", counts)
+	}
+}
+
 // When multiple declared projects contain a target, the first project owns the
 // lint pass and the API reports one caller-visible result.
 func TestHandleLint_FirstContainingProgramReportsFileOnce(t *testing.T) {

@@ -421,7 +421,7 @@ func TestMigrate_LanguageOptions_ProjectServiceTrue(t *testing.T) {
 	}
 
 	content := readFile(t, filepath.Join(dir, "rslint.config.ts"))
-	assertContains(t, content, "ts.configs.recommended.map(({ languageOptions, ...config }) => config)")
+	assertContains(t, content, "ts.configs.recommended")
 	assertContains(t, content, "projectService: true")
 	assertContains(t, content, "no-console")
 }

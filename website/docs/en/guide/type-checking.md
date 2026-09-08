@@ -34,13 +34,13 @@ An entry's [`basePath`](/config/base-path) anchors explicit project literals or 
 
 ## Automatic project discovery
 
-With [`projectService: true`](/config/language-options#languageoptionsparseroptionsprojectservice), including TypeScript presets, rslint discovers the projects that own the selected files. Nested tsconfigs and project references are followed; a tsconfig beside the lint config does not override the source's local project.
+With an explicit [`projectService: true`](/config/language-options#languageoptionsparseroptionsprojectservice), rslint discovers the projects that own the selected files. Nested tsconfigs and project references are followed; a tsconfig beside the lint config does not override the source's local project.
 
 For example, `rslint --type-check-only packages/app/src/file.ts` finds that file's project and checks the whole project, including sibling files. It does not first build an unrelated root tsconfig. No arguments select the current directory's lint scope for discovery. Type-check-only uses target discovery for project selection but never executes lint rules.
 
-Configs mixing automatic and explicit policies, clearing inherited projects, or setting `tsconfigRootDir` also resolve their project policies from the selected scope. An unowned service target is an error. To use explicit paths with a TypeScript preset, set `projectService: false`; leaving both enabled is a configuration error.
+Configs mixing automatic and explicit policies, clearing inherited projects, or setting `tsconfigRootDir` also resolve their project policies from the selected scope. Unowned service targets use source-only gap linting. TypeScript presets do not enable service; if another matching entry enables it, set `projectService: false` to use explicit project paths. Leaving both enabled is a configuration error.
 
-An unconditional `projectService: false` or `null` overrides earlier preset settings. Ordinary explicit project declarations then retain program-wide checking even when no lint targets are selected. An override with `files`, entry-level `ignores`, or `basePath` still needs per-file matching and cannot disable service for every target.
+An unconditional `projectService: false` or `null` overrides earlier matching entries. Ordinary explicit project declarations then retain program-wide checking even when no lint targets are selected. An override with `files`, entry-level `ignores`, or `basePath` still needs per-file matching and cannot disable service for every target.
 
 ## What gets type-checked
 
@@ -58,22 +58,22 @@ parserOptions: {
 
 Each normalized declared tsconfig path in the effective loaded config catalog produces one TypeScript Program, even when multiple rslint configs reference that path. Parent global ignores can prevent a nested config from entering that catalog during directory discovery. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
 
-**After the effective config catalog is established, each Program's type-check scope is its tsconfig `include` / `files` minus `exclude`.** The following lint-phase concepts do not filter that Program scope:
+**After the effective config catalog is established, each Program includes its tsconfig root files and dependencies loaded through imports and references.** The following lint-phase concepts do not filter that Program scope:
 
 - rslint config's `files` patterns
 - rslint config's `ignores` patterns (root-level or per-entry)
 - `.gitignore`
 - CLI file / directory arguments — `rslint --type-check-only foo.ts` still type-checks every file in the program(s), not just `foo.ts`
 
-If a file is included by tsconfig but matched by rslint `ignores`, lint rules do not run on it, but **type errors for it are still reported**. To exclude it from type-check as well, add it to the tsconfig's `exclude` or prepend `// @ts-nocheck` to the file.
+If a file is included by tsconfig but matched by rslint `ignores`, lint rules do not run on it, but **type errors for it are still reported**. The tsconfig's `exclude` filters `include` discovery; imports and references can still bring an excluded file into the Program. `// @ts-nocheck` disables semantic checking of that file.
 
 ### Gap files
 
-With `projectService` disabled, selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. The lint loader parses and binds these files without providing a TypeChecker, so rules that do not require type information still run while type-aware rules are filtered out. These files never enter the program-wide type-check phase. This fallback does not create a tsconfig for automatic project discovery.
+Selected files without a project under their effective parser settings (root-level scripts, ad-hoc config files, etc.) are called _gap files_. This includes JavaScript, TypeScript, and the other supported script extensions. The lint loader parses and binds them without providing a TypeChecker, so rules that do not require type information still run while type-aware rules are skipped. The source-only fallback itself does not participate in program-wide type checking. If the same file also belongs to a complete Program selected for another target, `--type-check` can still report TypeScript diagnostics for it through that Program. This fallback does not create a tsconfig for automatic project discovery.
 
-With `projectService: true`, discovery may find an owning project that an explicit project list missed, such as a nested tsconfig. If discovery finds no owning project, the file is an error even when only non-type-aware rules are enabled; it does not enter the gap fallback. This also applies to TypeScript presets that enable service.
+With `projectService: true`, discovery can find an owning project that an explicit project list missed, such as a nested tsconfig. When discovery finds no owning project, the file follows the same gap fallback. Other files keep their selected projects. Actual config or Program failures still report errors.
 
-For syntax-only files, override both `projectService: false` and `project: false` in the matching file scope; see the [project service configuration example](/config/language-options#languageoptionsparseroptionsprojectservice). To enable type information, include the file in a project selected by its effective parser settings. Upstream's `allowDefaultProject` can instead provide type information for allowed files outside configured projects, but Rslint does not yet support that option. The source-only gap fallback does not provide the same capability.
+To enable type information for a gap file, include it in a project selected by its effective parser settings. Upstream typescript-eslint instead rejects unowned service files by default and supports `allowDefaultProject` to provide type information for allowed files outside configured projects. Rslint does not yet support that option; its source-only gap fallback is not equivalent.
 
 ## Output
 
@@ -165,7 +165,7 @@ jobs:
 
 ## `--type-check-only`
 
-Skips every lint rule and runs only the type-check phase. Use this when CI splits "type-check" and "lint" into separate steps and you want the type-check step to pay zero lint-side cost.
+Skips every lint rule and runs only the type-check phase. Use this when CI splits "type-check" and "lint" into separate steps to avoid lint-rule execution. Automatic project discovery still resolves the selected file/directory scope.
 
 ```bash
 rslint --type-check-only .
@@ -180,15 +180,15 @@ rslint --type-check-only .
 | `--type-check`      |     ✓      |        ✓         |                      no                      |
 | `--type-check-only` |     ✗      |        ✓         |                     yes                      |
 
-<sup>\*</sup> The lint phase emits per-file stderr warnings like `<file> was not found, skipping` and `<file> is ignored because of a matching ignore pattern`. In `--type-check-only` the lint phase doesn't run, so these are suppressed — they would otherwise mislead users into thinking the file wasn't type-checked, when in fact Phase 2 is independent of CLI scope and rslint ignores (see [What gets type-checked](#what-gets-type-checked)).
+<sup>\*</sup> The lint phase emits per-file stderr warnings like `<file> was not found, skipping` and `<file> is ignored because of a matching ignore pattern`. In `--type-check-only` the lint phase doesn't run, so these are suppressed — they would otherwise mislead users into thinking the file wasn't type-checked, because type checking covers every file in each selected Program. Automatic and mixed project discovery still use the selected scope to choose those Programs (see [What gets type-checked](#what-gets-type-checked)).
 
 ## Flag matrix
 
-| Flag             | `--type-check`                                       | `--type-check-only`                          |
-| ---------------- | ---------------------------------------------------- | -------------------------------------------- |
-| `--fix`          | Applies lint fixes. Type errors have no auto-fix.    | **Rejected** (exit code 2).                  |
-| `--rule`         | Overrides lint rules normally.                       | **Rejected** (exit code 2).                  |
-| `--quiet`        | Suppresses warnings; type errors always shown.       | No-op — the lint phase produces nothing.     |
-| `--format`       | Type errors rendered in the chosen format.           | Same.                                        |
-| `--max-warnings` | Counts lint warnings only.                           | Always zero warnings (lint phase skipped).   |
-| File/dir args    | Restricts lint scope. Type-check stays program-wide. | Lint skipped. Type-check still program-wide. |
+| Flag             | `--type-check`                                                                                        | `--type-check-only`                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `--fix`          | Applies lint fixes. Type errors have no auto-fix.                                                     | **Rejected** (exit code 2).                                            |
+| `--rule`         | Overrides lint rules normally.                                                                        | **Rejected** (exit code 2).                                            |
+| `--quiet`        | Suppresses warnings; type errors always shown.                                                        | No-op — the lint phase produces nothing.                               |
+| `--format`       | Type errors rendered in the chosen format.                                                            | Same.                                                                  |
+| `--max-warnings` | Counts lint warnings only.                                                                            | Always zero warnings (lint phase skipped).                             |
+| File/dir args    | Restricts lint targets and automatic project discovery. Type-check covers complete selected Programs. | Selects projects in automatic mode; checks complete selected Programs. |

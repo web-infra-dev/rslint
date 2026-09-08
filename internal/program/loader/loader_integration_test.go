@@ -82,17 +82,68 @@ func TestBuildLintProjectsSeparatesProjectPolicies(t *testing.T) {
 	}
 }
 
-func TestBuildLintProjectsRejectsUnownedServiceTarget(t *testing.T) {
+func TestBuildLintProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
-	config := rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}}
-	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/outside/file.ts"}})
-	if err != nil {
-		t.Fatal(err)
+	config := rslintconfig.RslintConfig{
+		{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+		{Files: []string{"b/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false), Project: rslintconfig.ProjectPaths{"gap-overlap.json"}}}},
 	}
-	_, err = NewSession(fsys).BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, ProjectScopeTarget)
-	if err == nil || !strings.Contains(err.Error(), "project service") {
-		t.Fatalf("unowned service target must fail: %v", err)
+	files := []string{tspath.ResolvePath(dir, "b/src/file.ts"), tspath.ResolvePath(dir, "a/src/file.ts")}
+	for _, extension := range []string{"ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"} {
+		files = append(files, tspath.ResolvePath(dir, "outside/file."+extension))
+	}
+	for _, scope := range []ProjectLoadScope{ProjectScopeTarget, ProjectScopeOwner, ProjectScopeAll} {
+		for _, mode := range []string{"cli", "api"} {
+			t.Run(mode+"/scope-"+strconv.Itoa(int(scope)), func(t *testing.T) {
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				session := NewSession(fsys)
+				plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
+				if err != nil {
+					t.Fatal(err)
+				}
+				projects, err := session.BuildLintProjects(map[string]rslintconfig.RslintConfig{dir: config}, plan, true, scope)
+				if err != nil || projects.Len() != 2 {
+					t.Fatalf("owning projects = %d, error = %v", projects.Len(), err)
+				}
+				// The explicit target's complete Program also contains the gaps.
+				// Those files must retain their own service policy's miss.
+				var overlap bool
+				for _, program := range projects.compilerPrograms {
+					overlap = overlap || program.GetSourceFile(files[2]) != nil
+				}
+				if !overlap {
+					t.Fatal("fixture did not create overlapping project membership")
+				}
+				load := session.LoadAPI
+				if mode == "cli" {
+					load = session.LoadCLI
+				}
+				binding, err := load(projects, plan, dir, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				seen := make(map[string]int)
+				for index, sources := range binding.TargetsByProgram {
+					program := binding.Programs[index]
+					for _, source := range sources {
+						seen[source]++
+						file := program.GetSourceFile(source)
+						wantTypes := !strings.Contains(source, "/outside/")
+						if file == nil || program.CanProvideTypeChecker(file) != wantTypes {
+							t.Fatalf("%s: wrong checker capability, want types=%v", source, wantTypes)
+						}
+					}
+				}
+				if len(seen) != len(files) {
+					t.Fatalf("target scope changed: %v", seen)
+				}
+				for _, file := range files {
+					if seen[file] != 1 {
+						t.Fatalf("%s linted %d times", file, seen[file])
+					}
+				}
+			})
+		}
 	}
 }
 

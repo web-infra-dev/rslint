@@ -326,7 +326,7 @@ func (request *standaloneLintProjectRequest) service(rootDir string) (selectedLi
 		},
 	})
 	selected, err := selector.Select(request.target.Path, rootDir)
-	if err != nil {
+	if err != nil || selected.Program == nil {
 		return selectedLintProject{}, err
 	}
 	return selectedLintProject{
@@ -475,14 +475,21 @@ func sourceFileForTarget(
 		SourceFileForTarget(target.Path, target.CanonicalPath)
 }
 
-func createStandaloneFallbackProgram(filename string, cwd string, fs vfs.FS) (*compiler.Program, error) {
-	host := utils.CreateCompilerHost(cwd, fs)
-	return utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+// createStandaloneFallbackProgram parses exactly the frozen target when no
+// configured project owns it. Both editor adapters supply the same overlay
+// used for project selection and mark this generation as lacking type info.
+func createStandaloneFallbackProgram(target target.File, fs vfs.FS) (*compiler.Program, *ast.SourceFile, error) {
+	host := utils.CreateCompilerHost(target.ConfigDirectory, fs)
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
 		Target:    core.ScriptTargetESNext,
 		Module:    core.ModuleKindESNext,
 		Jsx:       core.JsxEmitPreserve,
 		AllowJs:   core.TSTrue,
 		NoLib:     core.TSTrue,
 		NoResolve: core.TSTrue,
-	}, []string{filename}, host)
+	}, []string{target.Path}, host)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create fallback lint program: %w", err)
+	}
+	return program, sourceFileForTarget(program, target, fs), nil
 }

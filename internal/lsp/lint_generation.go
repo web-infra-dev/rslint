@@ -156,7 +156,16 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		} else {
 			selected, err = request.service(snapshot.projectPolicy.TsconfigRootDir)
 		}
-		program, sourceFile, hasTypeInfo = selected.program, selected.sourceFile, err == nil
+		program, sourceFile, hasTypeInfo = selected.program, selected.sourceFile, selected.program != nil
+		if err == nil && !hasTypeInfo {
+			var fsys vfs.FS
+			if serviceRequest != nil {
+				fsys = serviceRequest.overlayFS
+			} else {
+				fsys = request.filesystem()
+			}
+			program, sourceFile, err = createStandaloneFallbackProgram(snapshot.target, fsys)
+		}
 	} else {
 		program, sourceFile, hasTypeInfo, err = selectLintProgram(
 			p.uri,

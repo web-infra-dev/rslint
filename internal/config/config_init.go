@@ -243,9 +243,6 @@ func migrateJSONConfig(directory, jsonFileName string) error {
 	var buf strings.Builder
 	buf.WriteString(imports.buildImportLine())
 	buf.WriteByte('\n')
-	if imports.needTS {
-		buf.WriteString("// Preserve the original project settings when applying TypeScript rule presets.\n")
-	}
 	buf.WriteString("export default defineConfig([\n")
 	for i, entry := range configEntries {
 		buf.WriteString(entry)
@@ -404,9 +401,7 @@ func generateEntryCode(entry ConfigEntry, imports *importCollector, hasTSConfig 
 	// Generate preset references
 	var parts []string
 	if hasTS {
-		// The preset's only language option is projectService:true. Migration
-		// preserves the original entries' project modes and matching scopes.
-		parts = append(parts, "  ts.configs.recommended.map(({ languageOptions, ...config }) => config)")
+		parts = append(parts, "  ts.configs.recommended")
 	} else {
 		parts = append(parts, "  js.configs.recommended")
 	}

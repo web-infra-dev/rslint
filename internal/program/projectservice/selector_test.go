@@ -35,6 +35,7 @@ type selectionExpectation struct {
 		Strict        *bool    `json:"strict"`
 		Diagnostics   []int    `json:"diagnostics"`
 		Error         bool     `json:"error"`
+		Unowned       bool     `json:"unowned"`
 	} `json:"steps"`
 }
 
@@ -175,6 +176,12 @@ func TestUpstreamProjectSelection(t *testing.T) {
 					t.Errorf("%s: %v", step.File, err)
 					continue
 				}
+				if step.Unowned {
+					if selected.Program != nil || selected.ConfigPath != "" {
+						t.Errorf("%s: unowned target selected %s", step.File, selected.ConfigPath)
+					}
+					continue
+				}
 				if selected.ConfigPath != tspath.ResolvePath(root, step.Config) {
 					t.Errorf("%s: selected %s, want %s", step.File, selected.ConfigPath, step.Config)
 				}
@@ -236,6 +243,7 @@ func TestSelectionBuildsOnlyRelevantProjects(t *testing.T) {
 	}{
 		{name: "nearest-nested", target: "pkg/src/file.ts", want: "pkg/tsconfig.json"},
 		{name: "solution-first-deep-versus-second-shallow", target: "target/file.ts", want: "b/custom.json"},
+		{name: "no-config", target: "src/file.ts"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := tspath.NormalizePath(archive.Materialize(t, test.name))
@@ -244,6 +252,12 @@ func TestSelectionBuildsOnlyRelevantProjects(t *testing.T) {
 			selected, err := selector.Select(tspath.ResolvePath(root, test.target), root)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if test.want == "" {
+				if selected.Program != nil || len(host.built) != 0 {
+					t.Fatalf("no-config target constructed a project: %v", host.built)
+				}
+				return
 			}
 			want := tspath.ResolvePath(root, test.want)
 			if selected.ConfigPath != want || len(host.built) != 1 || host.built[want] != 1 {
@@ -257,16 +271,25 @@ func TestSelectionPropagatesHostFailure(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/upstream.txtar")
 	root := tspath.NormalizePath(archive.Materialize(t, "nearest-root"))
 	want := errors.New("fixture host failure")
-	for _, stage := range []string{"parse", "build"} {
+	for _, stage := range []string{"parse", "build", "nil-parse", "nil-build"} {
 		t.Run(stage, func(t *testing.T) {
 			host := newRecordingHost(bundled.WrapFS(osvfs.FS())).host()
-			if stage == "parse" {
+			switch stage {
+			case "parse":
 				host.ParseConfig = func(string) (*tsoptions.ParsedCommandLine, error) { return nil, want }
-			} else {
+			case "build":
 				host.CreateProgram = func(string, *tsoptions.ParsedCommandLine) (*compiler.Program, error) { return nil, want }
+			case "nil-parse":
+				host.ParseConfig = func(string) (*tsoptions.ParsedCommandLine, error) {
+					return nil, nil //nolint:nilnil // Model a failed config read reported without an error.
+				}
+			case "nil-build":
+				host.CreateProgram = func(string, *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
+					return nil, nil //nolint:nilnil // Model a host that cannot construct the configured Program.
+				}
 			}
 			_, err := projectservice.New(host).Select(tspath.ResolvePath(root, "src/file.ts"), root)
-			if !errors.Is(err, want) {
+			if err == nil || !strings.HasPrefix(stage, "nil-") && !errors.Is(err, want) {
 				t.Fatalf("error = %v, want host failure", err)
 			}
 		})
@@ -286,7 +309,7 @@ func TestSelectionKeepsLexicalConfigIdentity(t *testing.T) {
 			host := newRecordingHost(fsys)
 			selected, err := projectservice.New(host.host()).Select(tspath.ResolvePath(root, "NODE_MODULES/pkg/file.ts"), root)
 			if !caseSensitive {
-				if err == nil || len(host.built) != 0 {
+				if err != nil || selected.Program != nil || len(host.built) != 0 {
 					t.Fatalf("node_modules boundary was crossed: selected %s, built %v", selected.ConfigPath, host.built)
 				}
 			} else if err != nil || selected.ConfigPath != tspath.ResolvePath(root, "tsconfig.json") {
@@ -376,8 +399,8 @@ func TestSelectionReusesLoadedProjects(t *testing.T) {
 							t.Fatalf("selection = %v, error = %v, want resident %s", selected, err, configPath)
 						}
 					case "missing":
-						if err == nil {
-							t.Fatalf("cold reference selected %s", selected.ConfigPath)
+						if err != nil || selected.Program != nil {
+							t.Fatalf("cold reference selected %s, error = %v", selected.ConfigPath, err)
 						}
 					case "failed":
 						if !errors.Is(err, wantFailure) {

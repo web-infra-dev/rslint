@@ -128,13 +128,17 @@ func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T
 
 type configReadCountingFS struct {
 	vfs.FS
-	target string
-	reads  int
+	target     string
+	reads      int
+	unreadable bool
 }
 
 func (fs *configReadCountingFS) ReadFile(path string) (string, bool) {
 	if tspath.NormalizePath(path) == fs.target {
 		fs.reads++
+		if fs.unreadable {
+			return "", false
+		}
 	}
 	return fs.FS.ReadFile(path)
 }
@@ -342,15 +346,17 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 		wantRoots    int
 		project      []string
 		unreadConfig string
+		failConfig   string
 		wantError    string
 	}{
 		{name: "nearest complete project", fixture: "nested", target: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
 		{name: "external lint config", fixture: "nested", target: "pkg/src/target.ts", configDir: "tooling", wantConfig: "pkg/tsconfig.json", wantRoots: 3, unreadConfig: "tsconfig.json"},
 		{name: "ancestor after nearest exclusion", fixture: "ancestor", target: "pkg/target.ts", wantConfig: "tsconfig.json", wantRoots: 1},
-		{name: "root boundary", fixture: "ancestor", target: "pkg/target.ts", rootDir: "pkg", wantError: "not found by the project service"},
-		{name: "disabled solution search", fixture: "disabled-search", target: "pkg/target.ts", wantError: "not found by the project service"},
+		{name: "root boundary gap", fixture: "ancestor", target: "pkg/target.ts", rootDir: "pkg", wantRoots: 1},
+		{name: "disabled solution search gap", fixture: "disabled-search", target: "pkg/target.ts", wantRoots: 1},
 		{name: "custom reference", fixture: "solution", target: "pkg/src/target.ts", wantConfig: "pkg/tsconfig.app.json", wantRoots: 1},
-		{name: "unowned target", fixture: "unowned", target: "target.ts", wantError: "not found by the project service"},
+		{name: "unowned target gap", fixture: "unowned", target: "target.ts", wantRoots: 1},
+		{name: "unreadable config remains an error", fixture: "unowned", target: "target.ts", failConfig: "tsconfig.json", wantError: "no parsed config returned"},
 		{name: "conflicting explicit project", fixture: "nested", target: "pkg/src/target.ts", project: []string{}, wantError: "enabling parserOptions.project"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -360,6 +366,10 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			fsys := &configReadCountingFS{FS: bundled.WrapFS(osvfs.FS())}
 			if test.unreadConfig != "" {
 				fsys.target = tspath.ResolvePath(directory, test.unreadConfig)
+			}
+			if test.failConfig != "" {
+				fsys.target = tspath.ResolvePath(directory, test.failConfig)
+				fsys.unreadable = true
 			}
 			server := newTestServer()
 			server.cwd = directory
@@ -371,7 +381,13 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			if test.rootDir != "" {
 				options.TsconfigRootDir = tspath.ResolvePath(directory, test.rootDir)
 			}
-			entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: options}}}
+			entries := config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: options},
+				Rules: config.Rules{
+					"no-debugger": "error", "@typescript-eslint/no-unsafe-member-access": "error",
+				},
+			}}
 			snapshot := documentLintSnapshotForTest(server, uri, entries, configDirectory, false, nil)
 			for _, speculative := range []bool{false, true} {
 				var generation linter.Generation
@@ -404,7 +420,11 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 					t.Fatalf("speculative=%v: programs=%d, want 1", speculative, len(generation.Native.Programs))
 				}
 				program := generation.Native.Programs[0]
-				if got := program.Options().ConfigFilePath; got != tspath.ResolvePath(directory, test.wantConfig) {
+				wantConfig := test.wantConfig
+				if wantConfig != "" {
+					wantConfig = tspath.ResolvePath(directory, wantConfig)
+				}
+				if got := program.Options().ConfigFilePath; got != wantConfig {
 					t.Fatalf("speculative=%v: config=%q, want %q", speculative, got, test.wantConfig)
 				}
 				if len(program.RootFileNames()) != test.wantRoots {
@@ -413,6 +433,16 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 				source := program.GetSourceFile(fileName)
 				if source == nil || source.Text() != text {
 					t.Fatalf("speculative=%v: generation did not use its editor text", speculative)
+				}
+				wantRules := 2
+				if wantConfig == "" {
+					wantRules = 1
+					if !program.Options().NoResolve.IsTrue() || !program.Options().NoLib.IsTrue() {
+						t.Fatal("project gap used a dependency-resolving type context")
+					}
+				}
+				if rules := generation.Native.RulesForFile(source); len(rules) != wantRules {
+					t.Fatalf("speculative=%v: configured rules=%v, want %d", speculative, rules, wantRules)
 				}
 				if targets := generation.Native.TargetsByProgram; len(targets) != 1 || len(targets[0]) != 1 || targets[0][0] != fileName {
 					t.Fatalf("speculative=%v: extra lint targets=%v", speculative, targets)
@@ -423,6 +453,192 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			}
 			if test.unreadConfig != "" && fsys.reads != 0 {
 				t.Fatalf("read unrelated root config %d times", fsys.reads)
+			}
+		})
+	}
+}
+
+func TestProjectServiceLSPGapKeepsDiagnosticsAndFixes(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, resident := range []bool{false, true} {
+		for _, sourceKind := range []string{"syntax-rule", "syntax-error", "unsaved-file"} {
+			malformed := sourceKind == "syntax-error"
+			name := "standalone"
+			if resident {
+				name = "resident"
+			}
+			name += "/" + sourceKind
+			t.Run(name, func(t *testing.T) {
+				directory := tspath.NormalizePath(archive.Materialize(t, "unowned"))
+				fileName := tspath.ResolvePath(directory, "target.ts")
+				if sourceKind == "unsaved-file" {
+					if err := os.Remove(fileName); err != nil {
+						t.Fatal(err)
+					}
+				}
+				server := newTestServer()
+				server.cwd = directory
+				server.fs = bundled.WrapFS(osvfs.FS())
+				if resident {
+					server.lintPrograms = newLintProgramStore(server)
+					server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+				}
+				uri := documentURIFromPath(fileName)
+				content := "declare const opaque: any;\nexport const result = (() => { var value = opaque.member; return value; })();\n"
+				if malformed {
+					content = "var value = ;\n"
+				}
+				server.documents[uri] = content
+				entries := config.RslintConfig{{
+					Plugins:         []string{"@typescript-eslint"},
+					LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+					Rules:           config.Rules{"no-var": "error", "@typescript-eslint/no-unsafe-member-access": "error"},
+				}}
+				snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+				preview := "// speculative text\n" + content
+				for _, speculative := range []bool{false, true} {
+					var result linter.PipelineResult
+					var err error
+					if speculative {
+						result, err = speculativePipelineResultForTest(server, context.Background(), uri, preview, snapshot)
+					} else {
+						result, err = configuredDocumentPipelineResultForTest(server, context.Background(), uri, entries, directory, false, nil)
+					}
+					if err != nil {
+						t.Fatalf("speculative=%v: %v", speculative, err)
+					}
+					observation := result.Observation.Native
+					if observation.HasTargetSyntaxErrors != malformed || len(observation.Diagnostics) != 1 {
+						t.Fatalf("speculative=%v: unexpected gap diagnostics %+v", speculative, observation.Diagnostics)
+					}
+					diagnostic := observation.Diagnostics[0]
+					if malformed {
+						if !strings.HasPrefix(diagnostic.RuleName, "TypeScript(TS") {
+							t.Fatalf("speculative=%v: syntax diagnostic was lost: %+v", speculative, diagnostic)
+						}
+					} else if diagnostic.RuleName != "no-var" {
+						t.Fatalf("speculative=%v: expected only the syntax rule, got %+v", speculative, diagnostic)
+					}
+				}
+				wantFixed := preview
+				if !malformed {
+					wantFixed = strings.Replace(preview, "var value", "let value", 1)
+				}
+				if fixed := runSpeculativeFixAllForTest(t, server, context.Background(), uri, preview, snapshot); fixed != wantFixed {
+					t.Fatalf("gap fix-all=%q, want %q", fixed, wantFixed)
+				}
+				if server.documents[uri] != content {
+					t.Fatal("gap fix-all mutated the resident editor text")
+				}
+				if resident && len(server.lintPrograms.programs) != 0 {
+					t.Fatal("a source-only fallback became a resident configured Program")
+				}
+			})
+		}
+	}
+}
+
+func TestProjectServiceLSPTypedGapTyped(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "ancestor"))
+	fileName := tspath.ResolvePath(directory, "pkg/target.ts")
+	configPath := tspath.ResolvePath(directory, "tsconfig.json")
+	server := newTestServer()
+	server.cwd = directory
+	fsys := &configReadCountingFS{FS: bundled.WrapFS(osvfs.FS()), target: configPath}
+	server.fs = fsys
+	server.lintPrograms = newLintProgramStore(server)
+	server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	uri := documentURIFromPath(fileName)
+	const content = "declare const opaque: any;\nexport const result = (() => { var value = opaque.member; return value; })();\n"
+	server.documents[uri] = content
+	entries := config.RslintConfig{{
+		Plugins:         []string{"@typescript-eslint"},
+		LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+		Rules:           config.Rules{"no-var": "error", "@typescript-eslint/no-unsafe-member-access": "error"},
+	}}
+	snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+	var firstTypedSource *ast.SourceFile
+	for _, phase := range []struct {
+		name       string
+		config     string
+		typed      bool
+		unreadable bool
+	}{
+		{name: "typed", config: `{"compilerOptions":{"noLib":true},"files":["pkg/target.ts"]}`, typed: true},
+		{name: "gap", config: `{"compilerOptions":{"noLib":true},"files":[]}`},
+		{name: "unreadable-config", config: `{"compilerOptions":{"noLib":true},"files":["pkg/target.ts"]}`, unreadable: true},
+		{name: "typed-again", config: `{"compilerOptions":{"noLib":true,"strict":true},"files":["pkg/target.ts"]}`, typed: true},
+	} {
+		t.Run(phase.name, func(t *testing.T) {
+			if err := os.WriteFile(configPath, []byte(phase.config), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			fsys.unreadable = phase.unreadable
+			server.lintPrograms.DidChangeWatchedFiles([]*lsproto.FileEvent{{Uri: documentURIFromPath(configPath), Type: lsproto.FileChangeTypeChanged}})
+			var previousSource *ast.SourceFile
+			for _, speculative := range []bool{false, false, true} {
+				var generation linter.Generation
+				var release linter.ReleaseFunc
+				var err error
+				wantText := content
+				if speculative {
+					wantText = "// speculative generation\n" + content
+					generation, release, err = acquireSpeculativeGeneration(context.Background(), wantText, snapshot,
+						server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+				} else {
+					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				}
+				if release != nil {
+					defer release()
+				}
+				if phase.unreadable {
+					if err == nil || !strings.Contains(err.Error(), "no parsed config returned") {
+						t.Fatalf("speculative=%v: unreadable config was reduced to a gap: %v", speculative, err)
+					}
+					continue
+				}
+				if err != nil || len(generation.Native.Programs) != 1 {
+					t.Fatalf("speculative=%v: programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+				}
+				program := generation.Native.Programs[0]
+				wantConfig := ""
+				if phase.typed {
+					wantConfig = configPath
+				}
+				if program.Options().ConfigFilePath != wantConfig {
+					t.Fatalf("speculative=%v: config=%s, want %s", speculative, program.Options().ConfigFilePath, wantConfig)
+				}
+				source := program.GetSourceFile(fileName)
+				if source == nil || source.Text() != wantText {
+					t.Fatalf("speculative=%v: generation used stale editor text", speculative)
+				}
+				foundSyntax, foundTyped := false, false
+				for _, configured := range generation.Native.RulesForFile(source) {
+					foundSyntax = foundSyntax || configured.Name == "no-var"
+					foundTyped = foundTyped || configured.RequiresTypeInfo
+				}
+				if !foundSyntax || foundTyped != phase.typed {
+					t.Fatalf("speculative=%v: syntax=%v typed=%v, want typed=%v", speculative, foundSyntax, foundTyped, phase.typed)
+				}
+				if !speculative && phase.typed {
+					if previousSource != nil && previousSource != source {
+						t.Fatal("cache hit rebuilt an unchanged configured Program")
+					}
+					previousSource = source
+					if firstTypedSource == nil {
+						firstTypedSource = source
+					} else if phase.name == "typed-again" && (source == firstTypedSource || !program.Options().Strict.IsTrue()) {
+						t.Fatal("restored membership reused the old configured generation")
+					}
+				}
+			}
+			if server.documents[uri] != content {
+				t.Fatal("speculative transition changed editor text")
+			}
+			if !phase.typed && len(server.lintPrograms.programs) != 0 {
+				t.Fatal("gap retained a configured Program after membership invalidation")
 			}
 		})
 	}

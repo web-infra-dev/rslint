@@ -18,6 +18,22 @@ export const disabled: number = "wrong";
 export const selected: string = undefined;
 -- outside/file.ts --
 export const outside = 1;
+-- outside/file.tsx --
+export const outside = 1;
+-- outside/file.mts --
+export const outside = 1;
+-- outside/file.cts --
+export const outside = 1;
+-- outside/file.js --
+export const outside = 1;
+-- outside/file.jsx --
+export const outside = 1;
+-- outside/file.mjs --
+export const outside = 1;
+-- outside/file.cjs --
+exports.outside = 1;
+-- gap-overlap.json --
+{"compilerOptions":{"allowJs":true},"files":["b/src/file.ts","outside/file.ts","outside/file.tsx","outside/file.mts","outside/file.cts","outside/file.js","outside/file.jsx","outside/file.mjs","outside/file.cjs"]}
 -- shared.json --
 {"files":["a/src/file.ts","b/src/file.ts"]}
 -- service/tsconfig.json --

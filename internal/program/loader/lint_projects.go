@@ -162,6 +162,9 @@ func (s *Session) BuildLintProjects(
 		if err != nil {
 			return ProjectSet{}, err
 		}
+		if selected.Program == nil {
+			continue // The loader's existing gap path handles this unbound target.
+		}
 		programIndex, found := programIndexes[selected.Program]
 		if !found {
 			programIndex = len(set.compilerPrograms)

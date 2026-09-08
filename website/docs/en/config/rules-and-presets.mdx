@@ -35,6 +35,6 @@ export default defineConfig([
 ]);
 ```
 
-Every `ts.configs.*` preset declares the `@typescript-eslint` plugin and enables `parserOptions.projectService`, so the type-checked variants run as-is.
+Every `ts.configs.*` preset declares the `@typescript-eslint` plugin. Like upstream, presets do not set project discovery options. Enable `parserOptions.projectService: true` explicitly for automatic discovery, or use `parserOptions.project` to select TypeScript projects. Type-aware rules run only for files with a selected project; [gap files](/guide/type-checking#gap-files) retain source-only linting.
 
 To configure a rule manually, see [`rules`](/config/rules). To enable rules outside a preset, see [`plugins`](/config/plugins). The complete [Rules](/rules/) reference documents rule-specific options.

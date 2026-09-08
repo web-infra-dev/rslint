@@ -97,6 +97,7 @@ export interface ParserOptions {
    * Discover each file's configured TypeScript project, including nested
    * tsconfig/jsconfig files and project references. Cannot be combined with
    * `project` paths or an empty project array. Object options are unsupported.
+   * Files without an owning project use source-only linting and skip typed rules.
    */
   projectService?: boolean | null;
   /**
@@ -107,9 +108,10 @@ export interface ParserOptions {
   tsconfigRootDir?: string | null;
   /**
    * tsconfig.json path(s) used for typed linting. Glob patterns are supported.
-   * Omit this field to use a governing config's default `tsconfig.json`; pass
-   * an empty array, false, or null to disable that fallback. Set projectService
-   * to false when using explicit paths with a TypeScript preset.
+   * Omit both project and projectService to use the governing config's default
+   * `tsconfig.json`; pass an empty array, false, or null to disable that fallback.
+   * Set projectService
+   * to false if automatic discovery was enabled by an earlier matching entry.
    *
    * @example
    * project: './tsconfig.json'

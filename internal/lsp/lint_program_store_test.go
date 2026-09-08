@@ -188,8 +188,8 @@ func TestLintProgramStoreProjectServiceUsesPreviouslyLoadedReference(t *testing.
 		selected, err := request.service(directory)
 		return selected.program, err
 	}
-	if _, err := load("app/second.ts"); err == nil {
-		t.Fatal("disableReferencedProjectLoad admitted a cold referenced project")
+	if program, err := load("app/second.ts"); err != nil || program != nil {
+		t.Fatalf("cold reference should remain a project gap: program=%v error=%v", program, err)
 	}
 	legacyTarget := tspath.ResolvePath(directory, "shared/first.ts")
 	legacyRequest := store.request(context.Background(), documentURIFromPath(legacyTarget), lspConfigTarget(legacyTarget, directory, server.fs), false)
@@ -197,8 +197,8 @@ func TestLintProgramStoreProjectServiceUsesPreviouslyLoadedReference(t *testing.
 		t.Fatal(err)
 	}
 	legacyRequest.finalize()
-	if _, err := load("app/second.ts"); err == nil {
-		t.Fatal("a legacy Program made the project service's reference warm")
+	if program, err := load("app/second.ts"); err != nil || program != nil {
+		t.Fatalf("legacy Program changed the service gap: program=%v error=%v", program, err)
 	}
 	first, err := load("shared/first.ts")
 	if err != nil {
@@ -260,8 +260,8 @@ func TestLintProgramStoreProjectServiceReselectsAfterConfigChanges(t *testing.T)
 	if err != nil || first.configPath != tspath.ResolvePath(directory, "tsconfig.json") {
 		t.Fatalf("initial selection=%s error=%v", first.configPath, err)
 	}
-	if _, err := load(tspath.ResolvePath(directory, "pkg")); err == nil {
-		t.Fatal("cached parent project crossed the new root boundary")
+	if selected, err := load(tspath.ResolvePath(directory, "pkg")); err != nil || selected.program != nil {
+		t.Fatalf("root boundary should leave a project gap: config=%s error=%v", selected.configPath, err)
 	}
 	nearestConfig := tspath.ResolvePath(directory, "pkg/tsconfig.json")
 	configURI := documentURIFromPath(nearestConfig)
@@ -416,8 +416,8 @@ func TestLintProgramStoreProjectServicePreservesLoadedProjectsAfterInvalidation(
 			}
 			selected, err := load("app/second.ts")
 			if event == "config-membership" {
-				if err == nil {
-					t.Fatal("loaded identity bypassed the updated project membership")
+				if err != nil || selected.program != nil {
+					t.Fatalf("updated membership should leave a project gap: config=%s error=%v", selected.configPath, err)
 				}
 				return
 			}
@@ -451,11 +451,11 @@ func TestLintProgramStoreProjectServiceRemembersConstructedProbe(t *testing.T) {
 		defer request.finalize()
 		return request.service(directory)
 	}
-	if _, err := load("app/second.ts"); err == nil {
-		t.Fatal("a parsed reference counted as an already loaded project")
+	if selected, err := load("app/second.ts"); err != nil || selected.program != nil {
+		t.Fatalf("parsed reference should leave a project gap: config=%s error=%v", selected.configPath, err)
 	}
-	if _, err := load("shared/unowned.ts"); err == nil {
-		t.Fatal("non-containing nearest project admitted an unowned target")
+	if selected, err := load("shared/unowned.ts"); err != nil || selected.program != nil {
+		t.Fatalf("non-containing project should leave a gap: config=%s error=%v", selected.configPath, err)
 	}
 	if len(store.programs) != 0 {
 		t.Fatal("non-containing probe retained its Program")

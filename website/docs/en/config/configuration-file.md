@@ -122,4 +122,4 @@ Rslint no longer loads `rslint.json` or `rslint.jsonc` while linting. Passing on
 
 Run `rslint --init` in a project that still has a legacy JSON/JSONC file to migrate it to a JS/TS module config. The migration preserves custom rules and settings while deduplicating rules already covered by recommended presets.
 
-The migration also preserves each entry's parser options and file matching scope. It does not enable the recommended TypeScript preset's `projectService` default for a legacy configuration that did not request it.
+The migration also preserves each entry's parser options and file matching scope. TypeScript presets do not set `projectService`, so migration retains explicit project discovery settings without adding automatic discovery.

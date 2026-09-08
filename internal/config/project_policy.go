@@ -58,7 +58,7 @@ func NewProjectPolicyResolverWithPathSpaces(
 }
 
 // CanLoadDeclaredProjectsWithoutTargets preserves program-wide checking for
-// legacy explicit projects, including presets whose service setting is later
+// legacy explicit projects, including earlier entries whose service setting is later
 // disabled for every target. Scoped overrides still require target matching.
 func (resolver *ProjectPolicyResolver) CanLoadDeclaredProjectsWithoutTargets() bool {
 	if !NeedsProjectPolicy(resolver.config) {

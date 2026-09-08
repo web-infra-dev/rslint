@@ -157,7 +157,9 @@ func (r *lintProgramRequest) service(rootDir string) (selectedLintProject, error
 		},
 	})
 	selected, err := selector.Select(r.target.Path, rootDir)
-	if err != nil {
+	if err != nil || selected.Program == nil {
+		r.usedKey = lintProgramKey{}
+		r.usedState = nil
 		return selectedLintProject{}, err
 	}
 	// A redirect fallback can win after other containing candidates were

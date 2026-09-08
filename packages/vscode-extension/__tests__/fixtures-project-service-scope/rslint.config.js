@@ -1,6 +1,5 @@
-// Matches the shape of `ts.configs.recommended`: parserOptions only sets
-// `projectService: true`, with no explicit `project`. tsconfig.json's
-// `include` covers `src` only.
+// Explicitly enable projectService without an explicit project.
+// The tsconfig includes src only, so other files exercise gap linting.
 export default [
   { ignores: ['**/dist/**'] },
   {

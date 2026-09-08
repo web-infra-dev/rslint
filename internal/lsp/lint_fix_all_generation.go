@@ -76,7 +76,7 @@ func acquireSpeculativeGeneration(
 	var err error
 	if snapshot.projectPolicy.ProjectService {
 		selected, err = request.service(snapshot.projectPolicy.TsconfigRootDir)
-		found = err == nil
+		found = selected.program != nil
 	} else {
 		selected, found, err = selectConfiguredLintProject(
 			snapshot.typeScriptConfigPaths,
@@ -112,11 +112,10 @@ func acquireSpeculativeGeneration(
 		return newGeneration(selected.program, selected.sourceFile, true), nil, nil
 	}
 
-	program, err := createStandaloneFallbackProgram(target.Path, target.ConfigDirectory, overlayFS)
+	program, sourceFile, err := createStandaloneFallbackProgram(target, overlayFS)
 	if err != nil {
-		return linter.Generation{}, nil, fmt.Errorf("create fallback lint program: %w", err)
+		return linter.Generation{}, nil, err
 	}
-	sourceFile := sourceFileForTarget(program, target, overlayFS)
 	if sourceFile == nil {
 		return emptyLintGeneration(environment.processCwd), nil, nil
 	}

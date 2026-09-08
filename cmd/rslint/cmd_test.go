@@ -866,6 +866,43 @@ func TestHandleLintCommandProjectServiceTypeCheckScope(t *testing.T) {
 	}
 }
 
+func TestHandleLintCommandProjectServiceGapScope(t *testing.T) {
+	directory := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "gaps"))
+	config := rslintconfig.RslintConfig{{
+		Plugins:         []string{"@typescript-eslint"},
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}},
+		Rules:           rslintconfig.Rules{"no-debugger": "error", "@typescript-eslint/no-for-in-array": "error"},
+	}}
+	for _, mode := range []string{"lint", "type-check", "type-check-only"} {
+		for _, scope := range []string{"file", "directory", "default"} {
+			t.Run(mode+"/"+scope, func(t *testing.T) {
+				args := lintArgs{
+					ConfigCatalog: explicitConfigCatalogForTest(directory, config),
+					TypeCheck:     mode != "lint", TypeCheckOnly: mode == "type-check-only",
+					Format: "jsonline", NoColor: true, SingleThreaded: true,
+				}
+				wantSyntax := 3
+				wantTyped := 1
+				switch scope {
+				case "file":
+					args.AllowFiles = []string{tspath.ResolvePath(directory, "loose.ts"), tspath.ResolvePath(directory, "loose.js")}
+					wantSyntax, wantTyped = 2, 0
+				case "directory":
+					args.AllowDirs = []string{directory}
+				}
+				wantExit := 1
+				if mode == "type-check-only" {
+					wantExit, wantSyntax, wantTyped = 0, 0, 0
+				}
+				code, stdout, stderr := runLintCommandForTest(t, directory, args)
+				if code != wantExit || strings.Count(stdout, "no-debugger") != wantSyntax || strings.Count(stdout, "no-for-in-array") != wantTyped {
+					t.Fatalf("gap scope: exit=%d stdout=%q stderr=%q; want exit=%d syntax=%d typed=%d", code, stdout, stderr, wantExit, wantSyntax, wantTyped)
+				}
+			})
+		}
+	}
+}
+
 func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 	directory := t.TempDir()
 	rootPath := filepath.Join(directory, "index.ts")
