@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1386,7 +1387,7 @@ func TestLoadProgramsBindsRealpathTargetToProgramSourceName(t *testing.T) {
 	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 || targetsByProgram[0][0] != sourceName {
 		t.Fatalf("expected realpath target to bind back to source name %q, got %v", sourceName, targetsByProgram)
 	}
-	if target := lintTargetBySourcePath[sourceName]; target.Path != realTarget {
+	if target := lintTargetBySourcePath[exactPathID(sourceName)]; target.Path != realTarget {
 		t.Fatalf("expected source path %q to retain lint target %q, got %+v", sourceName, realTarget, target)
 	}
 }
@@ -1427,18 +1428,24 @@ func TestLoadProgramsUsesPhysicalConfigSpaceForSymlinkedConfigRoot(t *testing.T)
 		t.Fatalf("expected real target to bind to config Program, got %v", binding.TargetsByProgram)
 	}
 	sourcePath := binding.TargetsByProgram[0][0]
-	lintTarget := binding.LintTargetBySourcePath[sourcePath]
+	lintTarget, ok := binding.LintTargetBySourcePath[exactPathID(sourcePath)]
+	if !ok {
+		t.Fatalf("missing lint target for Program source %q", sourcePath)
+	}
 	if canonicalPathID(lintTarget.CanonicalPath, fsys) != canonicalPathID(realTarget, fsys) {
 		t.Fatalf("binding lost canonical target identity: source=%q binding=%+v target=%q", sourcePath, lintTarget, realTarget)
 	}
 
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		Config:                 cfg,
-		CurrentDirectory:       linkDir,
-		LintTargetBySourcePath: binding.LintTargetBySourcePath,
-		FS:                     fsys,
+	resolver := configLint.NewResolver(configLint.ResolverOptions{
+		Config:                              cfg,
+		ConfigDirectory:                     linkDir,
+		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
+		SourceMappingsIncludeCanonicalPaths: true,
+		Catalog:                             rules.All(),
+		PathSpaces:                          rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{linkDir: cfg}, fsys),
+		FS:                                  fsys,
 	})
-	rules := resolver.EnabledRulesForFile(sourcePath)
+	rules := resolver.EnabledRulesForSourcePath(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-debugger" {
 		t.Fatalf("expected files selector to match in physical config space, got %v", configuredRuleNameSet(rules))
 	}
@@ -1486,17 +1493,20 @@ func TestLoadProgramsConfigMatchingDoesNotDependOnProgramSourcePath(t *testing.T
 		t.Fatalf("fixture must bind through physical Program source %q, got %q", expectedSourcePath, sourcePath)
 	}
 	expectedTargetPath := linkPath
-	if target := binding.LintTargetBySourcePath[sourcePath]; target.Path != expectedTargetPath {
+	if target := binding.LintTargetBySourcePath[exactPathID(sourcePath)]; target.Path != expectedTargetPath {
 		t.Fatalf("binding must retain lexical target %q, got %+v", expectedTargetPath, target)
 	}
 
-	resolver := newLintConfigResolver(lintConfigResolverOptions{
-		Config:                 cfg,
-		CurrentDirectory:       rootDir,
-		LintTargetBySourcePath: binding.LintTargetBySourcePath,
-		FS:                     fsys,
+	resolver := configLint.NewResolver(configLint.ResolverOptions{
+		Config:                              cfg,
+		ConfigDirectory:                     rootDir,
+		TargetsBySourcePath:                 binding.LintTargetBySourcePath,
+		SourceMappingsIncludeCanonicalPaths: true,
+		Catalog:                             rules.All(),
+		PathSpaces:                          rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{rootDir: cfg}, fsys),
+		FS:                                  fsys,
 	})
-	rules := resolver.EnabledRulesForFile(sourcePath)
+	rules := resolver.EnabledRulesForSourcePath(sourcePath)
 	if len(rules) != 1 || rules[0].Name != "no-console" {
 		t.Fatalf("Program membership changed the lexical files match: %v", configuredRuleNameSet(rules))
 	}
@@ -1551,7 +1561,7 @@ func TestLoadProgramsBindsFileSymlinkOutsideProgramRoot(t *testing.T) {
 	if len(binding.TargetsByProgram[0]) != 1 || binding.TargetsByProgram[0][0] != sourceName {
 		t.Fatalf("expected target to bind to Program source %q, got %v", sourceName, binding.TargetsByProgram)
 	}
-	if target := binding.LintTargetBySourcePath[sourceName]; target.ConfigDirectory != repoDir {
+	if target := binding.LintTargetBySourcePath[exactPathID(sourceName)]; target.ConfigDirectory != repoDir {
 		t.Fatalf("expected bound source owner %q, got %+v", repoDir, target)
 	}
 }
@@ -1610,7 +1620,7 @@ func TestLoadProgramsDoesNotBorrowParentConfigProgram(t *testing.T) {
 		t.Fatalf("expected target only in a source-only Program, got targets=%v", binding.TargetsByProgram)
 	}
 	sourceOnlySource := binding.TargetsByProgram[1][0]
-	if target := binding.LintTargetBySourcePath[sourceOnlySource]; target.ConfigDirectory != tspath.NormalizePath(childDir) {
+	if target := binding.LintTargetBySourcePath[exactPathID(sourceOnlySource)]; target.ConfigDirectory != tspath.NormalizePath(childDir) {
 		t.Fatalf("expected source-only owner %q, got %+v", tspath.NormalizePath(childDir), target)
 	}
 	if binding.Programs[1].CanProvideTypeChecker(binding.Programs[1].SourceFiles()[0]) {
@@ -1653,7 +1663,11 @@ func TestTypeCheckDeduplicatesSyntaxFromSourceOnlyAndParentProgram(t *testing.T)
 		t.Fatalf("expected one malformed source-only lint target, got %v", diagnostics)
 	}
 	diagnostics = append(diagnostics, collectProgramTypeDiagnostics(t, binding.Programs)...)
-	remapDiagnosticTargetPaths(diagnostics, binding.LintTargetBySourcePath)
+	for index := range diagnostics {
+		if lintTarget, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, diagnostics[index].FilePath, fsys); ok {
+			diagnostics[index].FilePath = lintTarget.Path
+		}
+	}
 	if len(diagnostics) < 2 {
 		t.Fatalf("fixture must exercise both source-only syntax and parent Program type-check paths, got %+v", diagnostics)
 	}
@@ -1691,10 +1705,10 @@ func TestBuildProjectsDeduplicatesSharedTsconfigAndRetainsOwners(t *testing.T) {
 	if len(set.compilerPrograms) != 1 || len(set.configOrders) != 1 {
 		t.Fatalf("shared tsconfig must produce one Program, got programs=%d orders=%d", len(set.compilerPrograms), len(set.configOrders))
 	}
-	if order, ok := set.configOrders[0][rootKey]; !ok || order != 0 {
+	if order, ok := set.configOrders[0][exactPathID(rootKey)]; !ok || order != 0 {
 		t.Fatalf("missing root config association: %v", set.configOrders[0])
 	}
-	if order, ok := set.configOrders[0][childKey]; !ok || order != 0 {
+	if order, ok := set.configOrders[0][exactPathID(childKey)]; !ok || order != 0 {
 		t.Fatalf("missing child config association: %v", set.configOrders[0])
 	}
 }

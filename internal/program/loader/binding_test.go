@@ -10,7 +10,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
+	"github.com/web-infra-dev/rslint/internal/rules"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -566,9 +568,27 @@ func TestSourceTargetMappingWindowsDrive(t *testing.T) {
 	want := target.File{PathIdentity: rslintconfig.PathIdentity{Path: "c:/Repo/link.ts"}}
 	mapping := make(map[string]target.File)
 	storeSourceTargetMapping(mapping, "C:/Repo/link.ts", "C:/Physical/a.ts", want)
+	cfg := rslintconfig.RslintConfig{{
+		Files: []string{"link.ts"},
+		Rules: rslintconfig.Rules{"no-debugger": "error"},
+	}}
+	resolver := configLint.NewResolver(configLint.ResolverOptions{
+		Config:                              cfg,
+		ConfigDirectory:                     "C:/Repo",
+		TargetsBySourcePath:                 mapping,
+		SourceMappingsIncludeCanonicalPaths: true,
+		Catalog:                             rules.All(),
+		PathSpaces:                          rslintconfig.NewPathSpaceSnapshot(map[string]rslintconfig.RslintConfig{"C:/Repo": cfg}, nil),
+	})
 	for _, path := range []string{"C:/Repo/link.ts", "c:/Repo/link.ts", "C:/Physical/a.ts", "c:/Physical/a.ts"} {
+		if got, ok := mapping[exactPathID(path)]; !ok || got != want {
+			t.Errorf("binding key for %q = (%+v, %v), want %+v", path, got, ok, want)
+		}
 		if got, ok := target.LookupSourceTarget(mapping, path, nil); !ok || got != want {
 			t.Errorf("lookup %q = (%+v, %v), want %+v", path, got, ok, want)
+		}
+		if got := resolver.EnabledRulesForSourcePath(path); len(got) != 1 || got[0].Name != "no-debugger" {
+			t.Errorf("source mapping %q lost the target's configured rule: %v", path, configuredRuleNameSet(got))
 		}
 	}
 }
