@@ -3,6 +3,7 @@ package test_framework
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -92,4 +93,34 @@ func CallArgumentListRange(sourceFile *ast.SourceFile, call *ast.Node) (core.Tex
 		}
 	}
 	return core.TextRange{}, false
+}
+
+// CallTypeArgumentListRange returns the span covering a call's explicit type
+// argument list, angle brackets included. Matchers such as toBeNull take no
+// type parameters, so a fix that swaps the matcher name has to drop the type
+// arguments the previous matcher accepted.
+func CallTypeArgumentListRange(sourceFile *ast.SourceFile, call *ast.Node) (core.TextRange, bool) {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return core.TextRange{}, false
+	}
+	callExpression := call.AsCallExpression()
+	typeArguments := callExpression.TypeArguments
+	if typeArguments == nil || callExpression.Expression == nil {
+		return core.TextRange{}, false
+	}
+
+	start := callExpression.Expression.End()
+	if callExpression.QuestionDotToken != nil {
+		start = callExpression.QuestionDotToken.End()
+	}
+	openAngle := scanner.GetRangeOfTokenAtPosition(sourceFile, start)
+	closeAngle := scanner.GetRangeOfTokenAtPosition(sourceFile, typeArguments.End())
+
+	text := sourceFile.Text()
+	if openAngle.Pos() >= len(text) || text[openAngle.Pos()] != '<' ||
+		closeAngle.Pos() >= len(text) || text[closeAngle.Pos()] != '>' ||
+		closeAngle.End() <= openAngle.Pos() {
+		return core.TextRange{}, false
+	}
+	return core.NewTextRange(openAngle.Pos(), closeAngle.End()), true
 }

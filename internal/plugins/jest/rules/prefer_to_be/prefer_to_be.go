@@ -50,25 +50,31 @@ func buildFixes(ctx rule.RuleContext, match shared.Match) []rule.RuleFix {
 		return nil
 	}
 
-	var renameFix rule.RuleFix
-	if match.Expect.MatcherEntry.Node.Kind == ast.KindIdentifier {
-		// Match replaceAccessorFixer exactly: an identifier accessor remains an
-		// identifier even in `expect(x)[toEqual](1)`.
-		renameFix = rule.RuleFixReplace(ctx.SourceFile, match.Expect.MatcherEntry.Node, replacement)
-	} else {
-		var ok bool
-		renameFix, ok = jestUtils.ReplaceMemberNameFix(
-			ctx,
-			&match.Expect.MatcherEntry,
-			replacement,
-		)
-		if !ok {
-			return nil
-		}
+	// NOTE: replaceAccessorFixer keeps an identifier accessor bare, which turns
+	// `expect(x)[toEqual](1)` into a reference to an undeclared `toBe`. A
+	// computed key is quoted instead so the fixed code still runs.
+	renameFix, ok := jestUtils.ReplaceMemberNameFix(
+		ctx,
+		&match.Expect.MatcherEntry,
+		replacement,
+	)
+	if !ok {
+		return nil
 	}
 	fixes := []rule.RuleFix{renameFix}
 
 	arguments := match.Expect.MatcherCall.Arguments()
+	if match.Kind != shared.KindToBe {
+		// NOTE: the dedicated matchers declare no type parameters, so type
+		// arguments written for toBe/toEqual have to go with the value
+		// arguments. Upstream leaves them behind and produces TS2558.
+		if typeArgumentsRange, hasTypeArguments := testFramework.CallTypeArgumentListRange(
+			ctx.SourceFile,
+			match.Expect.MatcherCall,
+		); hasTypeArguments {
+			fixes = append(fixes, rule.RuleFixRemoveRange(typeArgumentsRange))
+		}
+	}
 	if match.Kind != shared.KindToBe && len(arguments) > 0 {
 		argumentsRange, ok := testFramework.CallArgumentListRange(
 			ctx.SourceFile,

@@ -111,6 +111,32 @@ func TestPreferToBeExtras(t *testing.T) {
 				Output: []string{"expect(value)[`toBe`](1);"},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBe", Line: 1, Column: 15}},
 			},
+			// Diverges from @vitest/eslint-plugin: the dedicated matchers declare
+			// no type parameters, so type arguments go with the value arguments
+			// instead of leaving the fixed assertion failing with TS2558.
+			{
+				Code:   `expect(null).toEqual<null>(null);`,
+				Output: []string{`expect(null).toBeNull();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBeNull", Line: 1, Column: 14}},
+			},
+			{
+				Code:   `expect(value).not.toBeDefined<never>();`,
+				Output: []string{`expect(value).toBeUndefined();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBeUndefined", Line: 1, Column: 19}},
+			},
+			// toBe shares toEqual's single type parameter, so its type argument
+			// stays.
+			{
+				Code:   `expect(value).toEqual<number>(1);`,
+				Output: []string{`expect(value).toBe<number>(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBe", Line: 1, Column: 15}},
+			},
+			// A comment inside the removed type arguments withholds the fix, as
+			// it does inside the removed value arguments.
+			{
+				Code:   `expect(null).toEqual</* keep */ null>(null);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBeNull", Line: 1, Column: 14}},
+			},
 			// ---- Dimension 4: a trailing call cannot replace matcher arguments ----
 			{
 				Code:   `expect(value).toEqual(1)();`,

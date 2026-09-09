@@ -178,6 +178,11 @@ func NewRule(config Config) rule.Rule {
 		Schema: rule.EmptyArraySchema,
 		Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			runtime := config.Prepare(ctx)
+			// A matcher call can be reached from more than one call expression
+			// in its own chain: the `.then()` of
+			// `expect(p).resolves.toEqual(1).then(done)` resolves back to the
+			// same `toEqual` call. Each assertion is reported once.
+			reported := map[*ast.Node]struct{}{}
 			return rule.RuleListeners{
 				ast.KindCallExpression: func(node *ast.Node) {
 					if runtime.Parse == nil || config.Message == nil {
@@ -187,6 +192,10 @@ func NewRule(config Config) rule.Rule {
 					if !ok {
 						return
 					}
+					if _, seen := reported[matched.Expect.MatcherCall]; seen {
+						return
+					}
+					reported[matched.Expect.MatcherCall] = struct{}{}
 
 					message := config.Message(matched.Kind)
 					ctx.ReportNodeWithDeferredFixes(

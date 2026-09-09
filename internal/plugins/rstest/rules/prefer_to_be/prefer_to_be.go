@@ -59,6 +59,26 @@ func buildFixes(ctx rule.RuleContext, match shared.Match) []rule.RuleFix {
 	}
 	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(nameRange, nameText)}
 
+	if match.Kind != shared.KindToBe {
+		// NOTE: unlike @vitest/eslint-plugin, type arguments are removed with
+		// the value arguments. toBeNull, toBeNaN, toBeUndefined and toBeDefined
+		// declare no type parameters, so keeping `toEqual<null>`'s type
+		// argument would leave the fixed assertion failing with TS2558.
+		if typeArgumentsRange, hasTypeArguments := testFramework.CallTypeArgumentListRange(
+			ctx.SourceFile,
+			match.Expect.MatcherCall,
+		); hasTypeArguments {
+			if internalUtils.HasCommentInSpan(
+				ctx.Comments.All(),
+				typeArgumentsRange.Pos(),
+				typeArgumentsRange.End(),
+			) {
+				return nil
+			}
+			fixes = append(fixes, rule.RuleFixRemoveRange(typeArgumentsRange))
+		}
+	}
+
 	if match.Kind != shared.KindToBe && len(match.Expect.MatcherCall.Arguments()) > 0 {
 		argumentsRange, ok := testFramework.CallArgumentListRange(
 			ctx.SourceFile,

@@ -72,3 +72,36 @@ func TestCallArgumentListRange(t *testing.T) {
 		})
 	}
 }
+
+func TestCallTypeArgumentListRange(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{name: "single", code: `expect(value).toEqual<null>(null)`, want: `<null>`},
+		{name: "nested", code: `expect(value).toEqual<Array<null>>(null)`, want: `<Array<null>>`},
+		{name: "spaced", code: `expect(value).toEqual  < null > (null)`, want: `< null >`},
+		{name: "optional call", code: `expect(value).toEqual?.<null>(null)`, want: `<null>`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile, call := parseFirstCall(t, test.code)
+			textRange, ok := CallTypeArgumentListRange(sourceFile, call)
+			if !ok {
+				t.Fatalf("CallTypeArgumentListRange returned false for %q", test.code)
+			}
+			if got := test.code[textRange.Pos():textRange.End()]; got != test.want {
+				t.Fatalf("type argument list = %q, want %q", got, test.want)
+			}
+		})
+	}
+
+	t.Run("no type arguments", func(t *testing.T) {
+		sourceFile, call := parseFirstCall(t, `expect(value).toEqual(null)`)
+		if _, ok := CallTypeArgumentListRange(sourceFile, call); ok {
+			t.Fatal("CallTypeArgumentListRange returned true without type arguments")
+		}
+	})
+}

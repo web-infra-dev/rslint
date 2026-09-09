@@ -97,12 +97,34 @@ func TestPreferToBeExtras(t *testing.T) {
 				Output: []string{"expect(value)['toBe'](1);"},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBe", Line: 1, Column: 15}},
 			},
-			// Locks in upstream's textual handling of computed identifier
-			// accessors, including its rewrite of the key identifier itself.
+			// Diverges from upstream: replaceAccessorFixer rewrites the key
+			// identifier in place, producing a reference to an undeclared
+			// `toBe`. A computed key is quoted so the fixed code still runs.
 			{
 				Code:   `const toEqual = 'toEqual'; expect(value)[toEqual](1);`,
-				Output: []string{`const toEqual = 'toEqual'; expect(value)[toBe](1);`},
+				Output: []string{`const toEqual = 'toEqual'; expect(value)['toBe'](1);`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBe", Line: 1, Column: 42}},
+			},
+			// Diverges from upstream: the dedicated matchers declare no type
+			// parameters, so type arguments are removed with the value
+			// arguments instead of leaving the assertion failing with TS2558.
+			{
+				Code:   `expect(null).toEqual<null>(null);`,
+				Output: []string{`expect(null).toBeNull();`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBeNull", Line: 1, Column: 14}},
+			},
+			{
+				Code:   `expect(value).toEqual<number>(1);`,
+				Output: []string{`expect(value).toBe<number>(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBe", Line: 1, Column: 15}},
+			},
+			// Diverges from upstream: an outer call in the same chain resolves
+			// back to this matcher call, which upstream reports twice at the
+			// same location.
+			{
+				Code:   `expect(promise).resolves.toEqual(null).then(done);`,
+				Output: []string{`expect(promise).resolves.toBeNull().then(done);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToBeNull", Line: 1, Column: 26}},
 			},
 			// ---- Dimension 4: same-kind nesting reports each independent assertion ----
 			{
