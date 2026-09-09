@@ -58,6 +58,9 @@ var ExtensionsNotSupportingExtensionlessResolution = tspath.ExtensionsNotSupport
 func FileExtensionIs(path string, extension string) bool
 //go:linkname FileExtensionIsOneOf github.com/microsoft/TypeScript/tsc/internal/tspath.FileExtensionIsOneOf
 func FileExtensionIsOneOf(path string, extensions []string) bool
+func ForEachAncestorDirectory[T any](directory string, callback func(directory string) (result T, stop bool)) (result T, ok bool) {
+	return tspath.ForEachAncestorDirectory[T](directory, callback)
+}
 //go:linkname GetAnyExtensionFromPath github.com/microsoft/TypeScript/tsc/internal/tspath.GetAnyExtensionFromPath
 func GetAnyExtensionFromPath(path string, extensions []string, ignoreCase bool) string
 //go:linkname GetBaseFileName github.com/microsoft/TypeScript/tsc/internal/tspath.GetBaseFileName

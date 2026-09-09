@@ -170,6 +170,7 @@ define.test({
     // eslint-plugin-node
     './tests/eslint-plugin-node/rules/hashbang.test.ts',
     './tests/eslint-plugin-node/rules/no-exports-assign.test.ts',
+    './tests/eslint-plugin-node/rules/no-extraneous-import.test.ts',
     './tests/eslint-plugin-node/rules/no-process-exit.test.ts',
 
     // eslint-plugin-import
@@ -747,6 +748,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-blob-reading-methods.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-date-now.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',

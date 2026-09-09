@@ -1,0 +1,35 @@
+Runtime resolution service fixtures.
+-- input.js --
+import 'pkg';
+-- package.json --
+{}
+-- node_modules/pkg/index.js --
+export default 1;
+-- vendor/pkg/index.js --
+export default 2;
+-- node_modules/@types/only-types/index.d.ts --
+export declare const value: number;
+-- node_modules/custom/index.custom --
+custom runtime file
+-- node_modules/conditional/package.json --
+{"exports":{"types":"./index.d.ts","import":"./import.js","require":"./require.js"}}
+-- node_modules/conditional/import.js --
+export default 1;
+-- node_modules/conditional/require.js --
+module.exports = 1;
+-- node_modules/conditional/index.d.ts --
+export declare const value: number;
+-- node_modules/custom/pkg/index.js --
+export default 1;
+-- node_modules/custom/directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/directory/lib/index.js --
+export default 1;
+-- vendor/node_modules/directory/package.json --
+{"exports":"./lib"}
+-- vendor/node_modules/directory/lib/index.js --
+export default 1;
+-- node_modules/custom/node_modules/directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/node_modules/directory/lib/index.js --
+export default 1;

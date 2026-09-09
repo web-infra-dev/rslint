@@ -165,6 +165,9 @@ caches immutable compiled publication data per package and source generation.
 Configured pattern caches include the complete ordered list in their key.
 Publication paths and metadata exemptions are interpreted relative to the
 containing package, independently of the process working directory.
+`nodeutil` also owns workspace dependency checks, runtime import resolution and
+the Node rules' TypeScript config lookups. It reuses tsgo's resolver and config
+parser through the Program's existing filesystem and generation-scoped cache.
 The glob matcher uses code-unit input for regexp2; rule callers do not select a
 character encoding or translate backend capture numbers. These packages do not
 decide which files to lint or discover ignore files; those policies belong to
@@ -1535,6 +1538,16 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 - **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.1.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
+
+`cmd/tsgo` dispatches two one-shot subcommands, each parsing its own options.
+`project --api --config <path>` returns the existing binary project information;
+the Rust client selects this command, and flag-only invocations remain compatible.
+`config --config <path>` resolves tsconfig inheritance and prints
+`FinalCompilerOptions` directly as JSON for JavaScript consumers to `JSON.parse`.
+This command includes defaults and implied values for the exported option subset,
+without creating a Program or checking source code. Parsing errors go to stderr
+with a nonzero exit code. Both commands default to `tsconfig.json` in the working
+directory and use the same pinned compiler without its JavaScript API.
 
 ### Future Enhancements
 

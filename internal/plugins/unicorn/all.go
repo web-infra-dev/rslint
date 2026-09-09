@@ -36,6 +36,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
@@ -85,6 +86,7 @@ func GetAllRules() []rule.Rule {
 		prefer_array_flat_map.PreferArrayFlatMapRule,
 		prefer_array_some.PreferArraySomeRule,
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
+		prefer_date_now.PreferDateNowRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		prefer_set_has.PreferSetHasRule,
