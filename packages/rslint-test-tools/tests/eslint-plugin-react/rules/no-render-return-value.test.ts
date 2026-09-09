@@ -93,6 +93,19 @@ ruleTester.run('no-render-return-value', {} as never, {
       errors: [{ messageId: 'noReturnValue' }],
     },
 
+    // ---- Upstream: defaultVersion is used when version is omitted ----
+    {
+      code: `var instance = React.render(<div />, document.body);`,
+      settings: { react: { defaultVersion: '0.13.0' } },
+      errors: [{ messageId: 'noReturnValue' }],
+    },
+
+    // ---- Upstream: a computed property key consumes the render result ----
+    {
+      code: `var value = { [ReactDOM.render(<div />, document.body)]: true };`,
+      errors: [{ messageId: 'noReturnValue' }],
+    },
+
     // ---- Parens transparent ----
     {
       code: `var x = (ReactDOM.render(<div />, document.body));`,

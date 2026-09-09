@@ -24,6 +24,8 @@ var (
 )
 
 func calleeObjectRe(settings map[string]interface{}) *regexp.Regexp {
+	settings = withDefaultReactVersion(settings)
+
 	// >= 15.0.0 — the default branch when version is unset (ParseReactVersion
 	// returns 999,999,999) and therefore ≥ 15.
 	if !reactutil.ReactVersionLessThan(settings, 15, 0, 0) {
@@ -40,6 +42,37 @@ func calleeObjectRe(settings map[string]interface{}) *regexp.Regexp {
 		return reReact
 	}
 	return reReactDOM
+}
+
+// withDefaultReactVersion mirrors eslint-plugin-react's version-setting
+// precedence for this rule: an explicit version wins, while defaultVersion is
+// used when version is absent. Non-string values are left to the existing
+// defensive version parser.
+func withDefaultReactVersion(settings map[string]interface{}) map[string]interface{} {
+	reactSettings, ok := settings["react"].(map[string]interface{})
+	if !ok {
+		return settings
+	}
+	if _, hasVersion := reactSettings["version"]; hasVersion {
+		return settings
+	}
+	defaultVersion, ok := reactSettings["defaultVersion"].(string)
+	if !ok || defaultVersion == "" {
+		return settings
+	}
+
+	resolvedReactSettings := make(map[string]interface{}, len(reactSettings)+1)
+	for key, value := range reactSettings {
+		resolvedReactSettings[key] = value
+	}
+	resolvedReactSettings["version"] = defaultVersion
+
+	resolvedSettings := make(map[string]interface{}, len(settings))
+	for key, value := range settings {
+		resolvedSettings[key] = value
+	}
+	resolvedSettings["react"] = resolvedReactSettings
+	return resolvedSettings
 }
 
 // matchedObjectName reports the Identifier text of the call's callee object
@@ -165,6 +198,22 @@ var NoRenderReturnValueRule = rule.Rule{
 // skipped so `(a) => (call())` reaches the same ArrowFunction.
 func consumesReturnValue(parent *ast.Node, call *ast.Node) bool {
 	switch parent.Kind {
+	case ast.KindComputedPropertyName:
+		computed := parent.AsComputedPropertyName()
+		if ast.SkipParentheses(computed.Expression) != call || parent.Parent == nil {
+			return false
+		}
+		owner := parent.Parent
+		switch owner.Kind {
+		case ast.KindPropertyAssignment,
+			ast.KindBindingElement:
+			return true
+		case ast.KindMethodDeclaration,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor:
+			return owner.Parent != nil && owner.Parent.Kind == ast.KindObjectLiteralExpression
+		}
+		return false
 	case ast.KindVariableDeclaration,
 		ast.KindPropertyAssignment,
 		ast.KindReturnStatement:
