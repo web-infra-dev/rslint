@@ -7,6 +7,31 @@ import {
 } from './helpers.js';
 
 describe('CLI JS config plugin enforcement', () => {
+  test.each(['node', 'eslint-plugin-node'])(
+    'bundled %s declaration enables hashbang',
+    async (plugin) => {
+      const tempDir = await createTempDir({
+        'package.json': JSON.stringify({ type: 'module', bin: './cli.js' }),
+        'cli.js': 'console.log("hello");\n',
+        'rslint.config.js': `export default [${JSON.stringify({
+          plugins: [plugin],
+          languageOptions: { parserOptions: { projectService: false } },
+          rules: { 'node/hashbang': 'error' },
+        })}];`,
+      });
+      try {
+        const result = await runRslint(
+          ['cli.js', '--format', 'jsonline'],
+          tempDir,
+        );
+        expect(result.stdout).toContain('node/hashbang');
+        expect(result.stdout).toContain('This file needs shebang');
+      } finally {
+        await cleanupTempDir(tempDir);
+      }
+    },
+  );
+
   test('plugin rule should be blocked when plugin is not declared', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
