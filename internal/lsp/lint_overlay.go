@@ -112,16 +112,18 @@ func (fs *frozenLintTargetOverlayFS) Realpath(filePath string) string {
 
 func addEditorOverlayTarget(files map[string]string, target target.File, content string) {
 	if target.Path != "" {
-		files[tspath.NormalizePath(target.Path)] = content
+		files[utils.NormalizeAbsoluteDrive(tspath.NormalizePath(target.Path))] = content
 	}
 	if target.CanonicalPath != "" {
-		files[tspath.NormalizePath(target.CanonicalPath)] = content
+		files[utils.NormalizeAbsoluteDrive(tspath.NormalizePath(target.CanonicalPath))] = content
 	}
 }
 
 func (s *Server) addEditorOverlayFile(files map[string]string, filePath string, content string) string {
 	filePath = tspath.NormalizePath(filePath)
-	files[filePath] = content
+	// Use one overlay key for drive aliases, so the selected target's later
+	// write replaces any competing editor content for its physical file.
+	files[utils.NormalizeAbsoluteDrive(filePath)] = content
 	caseSensitive := true
 	if s.fs != nil {
 		caseSensitive = s.fs.UseCaseSensitiveFileNames()
@@ -131,7 +133,7 @@ func (s *Server) addEditorOverlayFile(files map[string]string, filePath string, 
 	}
 	if realPath := s.fs.Realpath(filePath); realPath != "" {
 		realPath = tspath.NormalizePath(realPath)
-		files[realPath] = content
+		files[utils.NormalizeAbsoluteDrive(realPath)] = content
 		return string(tspath.ToPath(realPath, "", caseSensitive))
 	}
 	return string(tspath.ToPath(filePath, "", caseSensitive))

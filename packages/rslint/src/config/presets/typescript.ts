@@ -1,11 +1,6 @@
 import type { RslintConfigEntry, RuleEntry } from '../define-config.js';
 
 const base: RslintConfigEntry = {
-  languageOptions: {
-    parserOptions: {
-      projectService: true,
-    },
-  },
   plugins: ['@typescript-eslint'],
 };
 

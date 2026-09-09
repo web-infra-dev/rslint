@@ -14,9 +14,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/project"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type lintProgramStoreFixture struct {
@@ -76,12 +80,19 @@ func newLintProgramStoreFixture(t *testing.T, source string) *lintProgramStoreFi
 
 func (f *lintProgramStoreFixture) request(
 	uri lsproto.DocumentUri,
-) (lintProgramLoader, lintProjectMetadataLoader, func()) {
-	return f.store.Request(
+) (func(string) (*compiler.Program, *ast.SourceFile, error), lintProjectMetadataLoader, func()) {
+	loader, metadata, finalize := f.store.Request(
 		context.Background(),
 		uri,
 		lspConfigTarget(uriToPath(uri), f.server.cwd, f.server.fs),
 	)
+	return func(path string) (*compiler.Program, *ast.SourceFile, error) {
+		selected, _, err := metadata(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		return loader(selected)
+	}, metadata, finalize
 }
 
 func (f *lintProgramStoreFixture) load(t *testing.T) *compiler.Program {
@@ -125,6 +136,393 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 	}
 	if sourceFile.Text() != changed {
 		t.Fatalf("updated source text = %q, want %q", sourceFile.Text(), changed)
+	}
+}
+
+func selectLintProgramRequestForTest(request *lintProgramRequest, rootDirectory string) (selectedLintProject, error) {
+	request.prepareOverlay()
+	selected, _, err := selectConfiguredLintProject(nil, rootDirectory, request.target, request.overlayFS, lintProjectLoaders{
+		program: request.load, metadata: request.loadMetadata,
+	})
+	return selected, err
+}
+
+func TestLintProgramStoreProjectServiceReusesModeAndUpdatesSource(t *testing.T) {
+	const original = "export const value = 1;\n"
+	fixture := newLintProgramStoreFixture(t, original)
+	loadService := func() *compiler.Program {
+		t.Helper()
+		request := fixture.store.request(context.Background(), fixture.sourceURI,
+			lspConfigTarget(fixture.sourcePath, fixture.server.cwd, fixture.server.fs), true)
+		selected, err := selectLintProgramRequestForTest(request, fixture.server.cwd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.finalize()
+		return selected.program
+	}
+	first := loadService()
+	if second := loadService(); second != first {
+		t.Fatal("unchanged service request rebuilt its configured Program")
+	}
+	legacy := fixture.load(t)
+	if legacy == first {
+		t.Fatal("service and legacy requests reused different reference modes")
+	}
+	if afterLegacy := loadService(); afterLegacy != first {
+		t.Fatal("legacy request evicted the service-mode Program")
+	}
+	const changed = "export const value = 2;\n"
+	fixture.server.documents[fixture.sourceURI] = changed
+	fixture.store.DidChange(fixture.sourceURI, changed)
+	updated := loadService()
+	if updated == first || updated.GetSourceFile(fixture.sourcePath).Text() != changed {
+		t.Fatal("service cache did not advance to the editor generation")
+	}
+	if first.GetSourceFile(fixture.sourcePath).Text() != original {
+		t.Fatal("updating the service cache mutated a previous Program")
+	}
+	if !fixture.store.Invalidate() || len(fixture.store.programs) != 0 {
+		t.Fatal("invalidation did not discard both Program modes")
+	}
+}
+
+func TestLintProgramStoreProjectServiceIgnoresPreviouslyLoadedReferences(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "warm-references"))
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	server.lintPrograms = store
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(relativePath string) (*compiler.Program, error) {
+		fileName := tspath.ResolvePath(directory, relativePath)
+		uri := documentURIFromPath(fileName)
+		server.documents[uri] = "export const value = 1;\n"
+		request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		selected, err := selectLintProgramRequestForTest(request, directory)
+		return selected.program, err
+	}
+	if program, err := load("app/second.ts"); err != nil || program != nil {
+		t.Fatalf("cold reference should remain a project gap: program=%v error=%v", program, err)
+	}
+	legacyTarget := tspath.ResolvePath(directory, "shared/first.ts")
+	legacyRequest := store.request(context.Background(), documentURIFromPath(legacyTarget), lspConfigTarget(legacyTarget, directory, server.fs), false)
+	legacyMetadata, err := legacyRequest.metadata(tspath.ResolvePath(directory, "shared/tsconfig.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := legacyRequest.load(legacyMetadata); err != nil {
+		t.Fatal(err)
+	}
+	legacyRequest.finalize()
+	if program, err := load("app/second.ts"); err != nil || program != nil {
+		t.Fatalf("legacy Program changed the service gap: program=%v error=%v", program, err)
+	}
+	first, err := load("shared/first.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := load("app/second.ts")
+	// rslint's direct-root discovery does not emulate TS Server's warm-project
+	// exception to disableReferencedProjectLoad.
+	if err != nil || second != nil || first == nil {
+		t.Fatalf("loaded reference bypassed disabled traversal: program=%v error=%v", second, err)
+	}
+	fileName := tspath.ResolvePath(directory, "app/second.ts")
+	uri := documentURIFromPath(fileName)
+	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
+	}}}
+	snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+	environment := server.freezeSpeculativeLintEnvironment(uri, snapshot.target)
+	const fixedContent = "export const fixed = 3;\n"
+	generation, release, err := acquireSpeculativeGeneration(context.Background(), fixedContent, snapshot, environment)
+	if release != nil {
+		defer release()
+	}
+	if err != nil {
+		t.Fatalf("speculative gap: %v", err)
+	}
+	if len(generation.Native.Programs) != 1 {
+		t.Fatalf("speculative Programs=%d", len(generation.Native.Programs))
+	}
+	speculative := generation.Native.Programs[0]
+	if speculative.Options().ConfigFilePath != "" || !speculative.Options().NoResolve.IsTrue() {
+		t.Fatal("speculative generation bypassed disabled reference traversal")
+	}
+	if speculative.GetSourceFile(fileName).Text() != fixedContent || speculative.GetSourceFile(fileName) == first.GetSourceFile(fileName) {
+		t.Fatal("speculative generation reused resident text")
+	}
+	if first.GetSourceFile(fileName).Text() != server.documents[uri] {
+		t.Fatal("speculative generation changed resident source text")
+	}
+}
+
+func TestLintProgramStoreProjectServiceReselectsAfterConfigChanges(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "ancestor"))
+	fileName := tspath.ResolvePath(directory, "pkg/target.ts")
+	uri := documentURIFromPath(fileName)
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(rootDir string) (selectedLintProject, error) {
+		request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		return selectLintProgramRequestForTest(request, rootDir)
+	}
+	first, err := load(directory)
+	if err != nil || first.configPath != tspath.ResolvePath(directory, "tsconfig.json") {
+		t.Fatalf("initial selection=%s error=%v", first.configPath, err)
+	}
+	if selected, err := load(tspath.ResolvePath(directory, "pkg")); err != nil || selected.program != nil {
+		t.Fatalf("root boundary should leave a project gap: config=%s error=%v", selected.configPath, err)
+	}
+	nearestConfig := tspath.ResolvePath(directory, "pkg/tsconfig.json")
+	configURI := documentURIFromPath(nearestConfig)
+	const nearestContent = `{"compilerOptions":{"noLib":true,"strict":true},"files":["target.ts"]}`
+	server.documents[configURI] = nearestContent
+	store.DidOpen(configURI, nearestContent, true)
+	nearest, err := load(directory)
+	if err != nil || nearest.configPath != nearestConfig || !nearest.program.Options().Strict.IsTrue() {
+		t.Fatalf("unsaved nearest config selection=%s error=%v", nearest.configPath, err)
+	}
+	delete(server.documents, configURI)
+	store.DidClose(configURI)
+	restored, err := load(directory)
+	if err != nil || restored.configPath != first.configPath {
+		t.Fatalf("closed config selection=%s error=%v", restored.configPath, err)
+	}
+	const parentContent = `{"compilerOptions":{"noLib":true,"strict":true},"files":["pkg/target.ts"]}`
+	if err := os.WriteFile(first.configPath, []byte(parentContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !store.DidChangeWatchedFiles([]*lsproto.FileEvent{{Uri: documentURIFromPath(first.configPath), Type: lsproto.FileChangeTypeChanged}}) {
+		t.Fatal("watched config change retained service state")
+	}
+	updated, err := load(directory)
+	if err != nil || updated.program == restored.program || !updated.program.Options().Strict.IsTrue() {
+		t.Fatalf("watched config did not update compiler options: %v", err)
+	}
+}
+
+func TestLintProgramStoreProjectServiceFinalizesSelectedProject(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "fallback-finalizer"))
+	fileName := tspath.ResolvePath(directory, "target.ts")
+	uri := documentURIFromPath(fileName)
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+	selected, err := selectLintProgramRequestForTest(request, directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedKey := request.key(tspath.ResolvePath(directory, "tsconfig.json"))
+	laterKey := request.key(tspath.ResolvePath(directory, "jsconfig.json"))
+	if selected.configPath != tspath.ResolvePath(directory, "tsconfig.json") || store.programs[selectedKey] == nil || store.programs[laterKey] != nil {
+		t.Fatalf("built a Program beyond the metadata-selected project: selected=%s Programs=%v", selected.configPath, store.programs)
+	}
+	// Emulate a checker's lazy dependency read outside the existing coverage.
+	selected.program.Host().FS().FileExists(tspath.NormalizePath(filepath.Join(t.TempDir(), "lazy.d.ts")))
+	request.finalize()
+	if store.programs[selectedKey] != nil {
+		t.Fatal("selected fallback retained lazy reads predating watcher coverage")
+	}
+	if store.programs[laterKey] != nil {
+		t.Fatal("finalization created an unrelated project")
+	}
+}
+
+func TestLintProgramStoreProjectServiceUpdatesReferencedSources(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "reference-sources"))
+	fileName := tspath.ResolvePath(directory, "app/src/main.ts")
+	referencePath := tspath.ResolvePath(directory, "lib/src/value.ts")
+	uri := documentURIFromPath(fileName)
+	referenceURI := documentURIFromPath(referencePath)
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	const original = "export const value = 42;\n"
+	server.documents[referenceURI] = original
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func() *compiler.Program {
+		request := store.request(context.Background(), uri, lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		selected, err := selectLintProgramRequestForTest(request, directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return selected.program
+	}
+	first := load()
+	if first.GetSourceFile(referencePath).Text() != original {
+		t.Fatal("initial service Program did not use referenced editor source")
+	}
+	if diagnostics := first.GetSemanticDiagnostics(context.Background(), first.GetSourceFile(fileName)); len(diagnostics) != 0 {
+		t.Fatalf("initial semantic diagnostics=%v", diagnostics)
+	}
+	const changed = "export const value = false;\n"
+	server.documents[referenceURI] = changed
+	store.DidChange(referenceURI, changed)
+	updated := load()
+	if updated == first || updated.GetSourceFile(referencePath).Text() != changed {
+		t.Fatal("referenced editor change did not advance the consuming Program")
+	}
+	if first.GetSourceFile(referencePath).Text() != original {
+		t.Fatal("reference update mutated the prior Program")
+	}
+	if !updated.IsSourceFromProjectReference(updated.GetSourceFile(referencePath).Path()) ||
+		updated.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
+		t.Fatal("incremental update lost project source-reference semantics")
+	}
+	foundMismatch := false
+	for _, diagnostic := range updated.GetSemanticDiagnostics(context.Background(), updated.GetSourceFile(fileName)) {
+		foundMismatch = foundMismatch || diagnostic.Code() == 2322
+	}
+	if !foundMismatch {
+		t.Fatal("updated consumer did not report the new referenced boolean-to-number mismatch")
+	}
+}
+
+func TestLintProgramStoreProjectServiceKeepsDisabledReferencesColdAfterInvalidation(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, event := range []string{"source", "config-options", "config-membership", "cache-disabled"} {
+		t.Run(event, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, "warm-references"))
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = bundled.WrapFS(osvfs.FS())
+			store := newLintProgramStore(server)
+			store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			load := func(relativePath string) (selectedLintProject, error) {
+				fileName := tspath.ResolvePath(directory, relativePath)
+				request := store.request(context.Background(), documentURIFromPath(fileName), lspConfigTarget(fileName, directory, server.fs), true)
+				defer request.finalize()
+				return selectLintProgramRequestForTest(request, directory)
+			}
+			first, err := load("shared/first.ts")
+			if err != nil {
+				t.Fatal(err)
+			}
+			changedPath := tspath.ResolvePath(directory, "app/second.ts")
+			content := "export const changed = 3;\n"
+			switch event {
+			case "config-options", "config-membership":
+				changedPath = tspath.ResolvePath(directory, "shared/tsconfig.json")
+				content = `{"compilerOptions":{"noLib":true,"composite":true,"strict":true},"files":["first.ts","../app/second.ts"]}`
+				if event == "config-membership" {
+					content = `{"compilerOptions":{"noLib":true,"composite":true},"files":["first.ts"]}`
+				}
+			case "cache-disabled":
+				store.coverage.disabled = true
+			}
+			if err := os.WriteFile(changedPath, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			store.DidChangeWatchedFiles([]*lsproto.FileEvent{{Uri: documentURIFromPath(changedPath), Type: lsproto.FileChangeTypeChanged}})
+			if len(store.programs) != 0 {
+				t.Fatal("watch event retained a stale Program")
+			}
+			selected, err := load("app/second.ts")
+			if err != nil || selected.program != nil {
+				t.Fatalf("disabled reference traversal after %s: selected=%s error=%v", event, selected.configPath, err)
+			}
+			if len(store.programs) != 0 || first.program == nil {
+				t.Fatal("unowned target constructed a Program or initial seed did not load")
+			}
+		})
+	}
+}
+
+func TestLintProgramStoreProjectServiceDoesNotConstructUnownedProbes(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "transient-service-project"))
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(relativePath string) (selectedLintProject, error) {
+		fileName := tspath.ResolvePath(directory, relativePath)
+		request := store.request(context.Background(), documentURIFromPath(fileName), lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		return selectLintProgramRequestForTest(request, directory)
+	}
+	if selected, err := load("app/second.ts"); err != nil || selected.program != nil {
+		t.Fatalf("parsed reference should leave a project gap: config=%s error=%v", selected.configPath, err)
+	}
+	if selected, err := load("shared/unowned.ts"); err != nil || selected.program != nil {
+		t.Fatalf("non-containing project should leave a gap: config=%s error=%v", selected.configPath, err)
+	}
+	if len(store.programs) != 0 {
+		t.Fatal("non-containing probe retained its Program")
+	}
+	selected, err := load("app/second.ts")
+	if err != nil || selected.program != nil || len(store.programs) != 0 {
+		t.Fatalf("unowned probe changed later ownership: selected=%s error=%v", selected.configPath, err)
+	}
+}
+
+func TestLintProgramStoreProjectServiceCaseInsensitiveIdentity(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	const directory = "/repo"
+	files := make(map[string]string)
+	names, err := archive.FileNames("warm-references")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range names {
+		content, err := archive.ReadFile("warm-references/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Exercise path identity under ordinary reference traversal, independent
+		// of historical project loading.
+		content = []byte(strings.ReplaceAll(string(content), `"disableReferencedProjectLoad":true`, `"disableReferencedProjectLoad":false`))
+		files[tspath.ResolvePath(directory, name)] = string(content)
+		if strings.HasPrefix(name, "shared/") {
+			files[tspath.ResolvePath(directory, "SHARED/"+strings.TrimPrefix(name, "shared/"))] = string(content)
+		}
+	}
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = &exactCaseLSPProgramFS{FS: bundled.WrapFS(osvfs.FS()), files: files}
+	store := newLintProgramStore(server)
+	server.lintPrograms = store
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	load := func(relativePath string) selectedLintProject {
+		fileName := tspath.ResolvePath(directory, relativePath)
+		request := store.request(context.Background(), documentURIFromPath(fileName), lspConfigTarget(fileName, directory, server.fs), true)
+		defer request.finalize()
+		selected, err := selectLintProgramRequestForTest(request, directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return selected
+	}
+	first := load("SHARED/first.ts")
+	second := load("app/second.ts")
+	if second.program != first.program {
+		t.Fatal("reference spelling changed the identity of a case-insensitive configured project")
+	}
+	fileName := tspath.ResolvePath(directory, "app/second.ts")
+	target := lspConfigTarget(fileName, directory, server.fs)
+	request := newStandaloneLintProjectRequestWithFS(target, server.fs)
+	request.sourceReferences = true
+	selected, _, err := selectConfiguredLintProject(nil, directory, target, server.fs, request.loaders())
+	if err != nil || lintProgramLexicalPathID(selected.configPath, server.fs) != lintProgramLexicalPathID(first.configPath, server.fs) {
+		t.Fatalf("speculative case-insensitive reference selection=%s error=%v", selected.configPath, err)
 	}
 }
 
@@ -254,41 +652,103 @@ func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T)
 }
 
 func TestLintProgramStoreDoesNotRetainProgramWithTransientProjectMetadata(t *testing.T) {
-	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
-	metadata, err := parseStandaloneLintProject(
-		fixture.configPath,
-		fixture.server.fs,
-		fixture.server.fs,
-	)
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, transientReference := range []bool{false, true} {
+		name := "root"
+		if transientReference {
+			name = "reference"
+		}
+		t.Run(name, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, "snapshot-references"))
+			configPath := tspath.ResolvePath(directory, "app/tsconfig.json")
+			refPath := tspath.ResolvePath(directory, "lib/tsconfig.json")
+			server := newTestServer()
+			server.cwd = tspath.ResolvePath(directory, "app")
+			server.fs = bundled.WrapFS(osvfs.FS())
+			store := newLintProgramStore(server)
+			store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			metadata, err := parseStandaloneLintProject(configPath, server.fs, server.fs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reference, err := parseStandaloneLintProject(refPath, server.fs, server.fs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := lspConfigTarget(tspath.ResolvePath(directory, "app/target.ts"), server.cwd, server.fs)
+			request := store.request(context.Background(), documentURIFromPath(target.Path), target, true)
+			request.projectMetadata[configPath] = metadata
+			request.projectMetadata[refPath] = reference
+			transientPath := configPath
+			if transientReference {
+				transientPath = refPath
+			}
+			request.transientMetadata[transientPath] = struct{}{}
+			if _, sourceFile, err := request.load(metadata); err != nil || sourceFile == nil {
+				t.Fatalf("transient Program source=%v error=%v", sourceFile, err)
+			}
+			request.finalize()
+			if len(store.programs) != 0 {
+				t.Fatal("Program retained metadata predating stable watcher coverage")
+			}
+		})
+	}
+}
+
+func TestLintProgramStoreProjectServiceTracksMissingReferences(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "snapshot-references"))
+	rootPath := tspath.ResolvePath(directory, "app/tsconfig.json")
+	refPath := tspath.ResolvePath(directory, "lib/tsconfig.json")
+	reference, err := os.ReadFile(refPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	configPath := tspath.NormalizePath(fixture.configPath)
-	request := &lintProgramRequest{
-		store: fixture.store,
-		ctx:   context.Background(),
-		uri:   fixture.sourceURI,
-		target: lspConfigTarget(
-			fixture.sourcePath,
-			fixture.server.cwd,
-			fixture.server.fs,
-		),
-		projectMetadata: map[string]*lintProjectMetadata{
-			configPath: metadata,
-		},
-		transientMetadata: map[string]struct{}{
-			configPath: {},
-		},
-	}
-
-	if _, sourceFile, err := request.load(configPath); err != nil {
+	if err := os.Remove(refPath); err != nil {
 		t.Fatal(err)
-	} else if sourceFile == nil {
-		t.Fatal("transient Program did not contain its direct root")
 	}
-	request.finalize()
-	if len(fixture.store.programs) != 0 {
-		t.Fatal("Program built from metadata predating watcher coverage became resident")
+	server := newTestServer()
+	server.cwd = tspath.ResolvePath(directory, "app")
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	target := lspConfigTarget(tspath.ResolvePath(directory, "app/target.ts"), server.cwd, server.fs)
+	uri := documentURIFromPath(target.Path)
+	load := func() (*compiler.Program, *lintProgramState) {
+		t.Helper()
+		request := store.request(context.Background(), uri, target, true)
+		selected, err := selectLintProgramRequestForTest(request, server.cwd)
+		if err != nil || selected.sourceFile == nil {
+			t.Fatalf("selected source=%v error=%v", selected.sourceFile, err)
+		}
+		request.finalize()
+		return selected.program, store.programs[request.key(rootPath)]
+	}
+	first, state := load()
+	if state == nil {
+		t.Fatal("missing reference prevented resident Program creation")
+	}
+	if _, tracked := state.failedLookups[lintProgramLexicalPathID(refPath, server.fs)]; !tracked {
+		t.Fatal("missing external reference bypassed failed-lookup tracking")
+	}
+	if err := os.WriteFile(refPath, reference, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Discovery sees the new reference before its watcher event arrives. Its
+	// snapshot must constrain the resident Program too, with no Session help.
+	second, _ := load()
+	if second == first {
+		t.Fatal("new reference reused the Program from its missing-config generation")
+	}
+	found := false
+	second.RangeResolvedProjectReference(func(_ tspath.Path, parsed, _ *tsoptions.ParsedCommandLine, _ int) bool {
+		if parsed != nil && lintProgramLexicalPathID(parsed.ConfigName(), server.fs) == lintProgramLexicalPathID(refPath, server.fs) {
+			found = true
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("created reference did not enter the rebuilt Program")
 	}
 }
 
@@ -346,6 +806,66 @@ func TestLintProgramStoreReopenSameContentStaysWarm(t *testing.T) {
 
 	if reopened := fixture.load(t); reopened != first {
 		t.Fatal("close and reopen with unchanged content rebuilt the Program")
+	}
+}
+
+func TestLintProgramStoreWindowsDriveURIs(t *testing.T) {
+	for _, scenario := range []string{"unchanged reopen", "new included file", "unsaved included file"} {
+		t.Run(scenario, func(t *testing.T) {
+			const content = "export const value = 1;\n"
+			// Model both drive spellings, including Realpath preserving C:.
+			// Keep incoming editor URIs uppercase to exercise the protocol boundary.
+			files := make(map[string]string)
+			for _, drive := range []string{"C:", "c:"} {
+				files[drive+"/repo/tsconfig.json"] = `{"compilerOptions":{"noLib":true},"include":["src/**/*.ts"]}`
+				files[drive+"/repo/src/index.ts"] = content
+			}
+			server := newTestServer()
+			server.cwd = "C:/repo"
+			server.fs = &exactCaseLSPProgramFS{FS: utils.NewOverlayVFS(&mockFS{}, files), files: files}
+			server.initializeParams = &lsproto.InitializeParams{}
+			fixture := &lintProgramStoreFixture{
+				server: server, store: newLintProgramStore(server),
+				configPath: "C:/repo/tsconfig.json", sourcePath: "C:/repo/src/index.ts",
+				sourceURI: "file:///C:/repo/src/index.ts",
+			}
+			fixture.store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			server.documents[fixture.sourceURI] = content
+			first := fixture.load(t)
+
+			if scenario == "unchanged reopen" {
+				delete(server.documents, fixture.sourceURI)
+				fixture.store.DidClose(fixture.sourceURI)
+				server.documents[fixture.sourceURI] = content
+				fixture.store.DidOpen(fixture.sourceURI, content, true)
+				if fixture.load(t) != first {
+					t.Fatal("unchanged uppercase-drive URI rebuilt its Program")
+				}
+				return
+			}
+
+			exists := scenario == "new included file"
+			if exists {
+				files["C:/repo/src/new.ts"] = content
+				files["c:/repo/src/new.ts"] = content
+			}
+			const newURI = lsproto.DocumentUri("file:///C%3A/repo/src/new.ts")
+			const editorContent = "export const value = 2;\n"
+			server.documents[newURI] = editorContent
+			fixture.store.DidOpen(newURI, editorContent, exists)
+			if len(fixture.store.programs) != 0 || len(fixture.store.projectMetadata) != 0 {
+				t.Fatal("new uppercase-drive URI retained stale project state")
+			}
+			load, _, finalize := fixture.request(newURI)
+			program, source, err := load(fixture.configPath)
+			finalize()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if program == first || source == nil || source.Text() != editorContent {
+				t.Fatal("new uppercase-drive URI did not bind its editor content")
+			}
+		})
 	}
 }
 
@@ -497,29 +1017,31 @@ func TestLintProgramStoreWatchedSymlinkSourceChangeRebuilds(t *testing.T) {
 }
 
 func TestLintProgramStoreWatchedChangeRefreshesCustomProjectDiagnostics(t *testing.T) {
-	const content = "export const value = 1;\n"
-	fixture := newLintProgramStoreFixture(t, content)
-	fixture.load(t)
-	fixture.server.lintPrograms = fixture.store
-
-	dependencyURI := documentURIFromPath(
-		filepath.Join(filepath.Dir(fixture.sourcePath), "dependency.ts"),
-	)
-	if err := fixture.server.handleDidChangeWatchedFiles(
-		context.Background(),
-		&lsproto.DidChangeWatchedFilesParams{
-			Changes: []*lsproto.FileEvent{{
-				Uri:  dependencyURI,
-				Type: lsproto.FileChangeTypeChanged,
-			}},
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-fixture.server.refreshCh:
-	default:
-		t.Fatal("custom-project watcher invalidation did not schedule diagnostics")
+	for _, loaded := range []bool{false, true} {
+		t.Run(strconv.FormatBool(loaded), func(t *testing.T) {
+			fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+			if loaded {
+				fixture.load(t)
+			}
+			fixture.server.lintPrograms = fixture.store
+			// A missing explicit path/glob can fail policy resolution before a
+			// Program is loaded. A delivered creation event must still relint.
+			customURI := documentURIFromPath(tspath.ResolvePath(fixture.server.cwd, "custom.json"))
+			if err := fixture.server.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+				Changes: []*lsproto.FileEvent{{Uri: customURI, Type: lsproto.FileChangeTypeCreated}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case <-fixture.server.refreshCh:
+			default:
+				t.Fatal("custom-project watcher event did not schedule diagnostics")
+			}
+			delete(fixture.server.documents, fixture.sourceURI)
+			if fixture.store.DidChangeWatchedFiles([]*lsproto.FileEvent{{Uri: customURI, Type: lsproto.FileChangeTypeChanged}}) {
+				t.Fatal("empty store without open documents requested diagnostics")
+			}
+		})
 	}
 }
 
@@ -592,7 +1114,7 @@ func TestLintProgramStoreOpeningNewIncludedFileRebuilds(t *testing.T) {
 	if rebuilt == first {
 		t.Fatal("newly included source did not rebuild the Program")
 	}
-	if sourceFile == nil || sourceFile.FileName() != tspath.NormalizePath(newPath) {
+	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName(), fixture.server.fs) != lintProgramLexicalPathID(newPath, fixture.server.fs) {
 		t.Fatalf("newly included source missing from rebuilt Program: %v", sourceFile)
 	}
 }
@@ -641,7 +1163,7 @@ func TestLintProgramStoreOpeningNewImportedFileRebuildsBeforeWatchEvent(t *testi
 		t.Fatal("newly resolved import did not rebuild the Program")
 	}
 	if sourceFile == nil ||
-		sourceFile.FileName() != tspath.NormalizePath(importedPath) {
+		lintProgramLexicalPathID(sourceFile.FileName(), fixture.server.fs) != lintProgramLexicalPathID(importedPath, fixture.server.fs) {
 		t.Fatalf("newly resolved import missing from rebuilt Program: %v", sourceFile)
 	}
 }
@@ -726,13 +1248,17 @@ func TestLintProgramStoreReusesFrozenTargetForResidentAndRebuild(t *testing.T) {
 
 	load := func() *ast.SourceFile {
 		t.Helper()
-		loader, _, finalize := fixture.store.Request(
+		loader, loadMetadata, finalize := fixture.store.Request(
 			context.Background(),
 			fixture.sourceURI,
 			target,
 		)
 		defer finalize()
-		_, sourceFile, err := loader(fixture.configPath)
+		metadata, _, err := loadMetadata(fixture.configPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, sourceFile, err := loader(metadata)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -825,12 +1351,16 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 		return nil
 	}
 
-	loader, _, finalize := store.Request(
+	loader, loadMetadata, finalize := store.Request(
 		context.Background(),
 		sourceURI,
 		lspConfigTarget(sourcePath, workspace, server.fs),
 	)
-	if _, _, err := loader(configPath); err != nil {
+	metadata, _, err := loadMetadata(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := loader(metadata); err != nil {
 		t.Fatal(err)
 	}
 	finalize()

@@ -1,10 +1,13 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // --- Existing init tests (updated) ---
@@ -402,7 +405,7 @@ func TestMigrate_NumericSeverity(t *testing.T) {
 	assertContains(t, content, "no-console")
 }
 
-func TestMigrate_LanguageOptions_ProjectServiceMatchesDefault(t *testing.T) {
+func TestMigrate_LanguageOptions_ProjectServiceTrue(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "tsconfig.json"), "{}")
 	writeFile(t, filepath.Join(dir, "rslint.json"), `[{
@@ -420,8 +423,8 @@ func TestMigrate_LanguageOptions_ProjectServiceMatchesDefault(t *testing.T) {
 	}
 
 	content := readFile(t, filepath.Join(dir, "rslint.config.ts"))
-	// projectService: true is the TS preset default → should be omitted
-	assertNotContains(t, content, "projectService")
+	assertContains(t, content, "ts.configs.recommended")
+	assertContains(t, content, "projectService: true")
 	assertContains(t, content, "no-console")
 }
 
@@ -444,7 +447,7 @@ func TestMigrate_LanguageOptions_ProjectServiceFalse(t *testing.T) {
 	}
 
 	content := readFile(t, filepath.Join(dir, "rslint.config.ts"))
-	// projectService: false differs from TS preset default → kept
+	// Keep the authored mode independently of the inserted presets.
 	assertContains(t, content, "projectService: false")
 	assertContains(t, content, "tsconfig.json")
 }
@@ -467,8 +470,114 @@ func TestMigrate_LanguageOptions_ProjectPaths(t *testing.T) {
 	}
 
 	content := readFile(t, filepath.Join(dir, "rslint.config.ts"))
+	assertNotContains(t, content, "projectService")
 	assertContains(t, content, "packages/*/tsconfig.json")
 	assertContains(t, content, "tsconfig.base.json")
+}
+
+func TestMigrate_LanguageOptions_ProjectModeOverrides(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		options string
+		want    []string
+	}{
+		{"empty project", `{"project":[]}`, []string{"project: []"}},
+		{"false project", `{"project":false}`, []string{"project: false"}},
+		{"null project", `{"project":null}`, []string{"project: false"}},
+		{"null service", `{"projectService":null}`, []string{"projectService: false"}},
+		{"service with cleared project", `{"projectService":true,"project":null}`, []string{"projectService: true", "project: false"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, "tsconfig.json"), "{}")
+			writeFile(t, filepath.Join(dir, "rslint.json"), `[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":`+test.options+`}}]`)
+			if err := InitDefaultConfig(dir); err != nil {
+				t.Fatal(err)
+			}
+			content := readFile(t, filepath.Join(dir, "rslint.config.ts"))
+			for _, expected := range test.want {
+				assertContains(t, content, expected)
+			}
+			if strings.Contains(test.options, `"projectService":true`) {
+				assertNotContains(t, content, "projectService: false")
+			} else if !strings.Contains(test.options, "projectService") {
+				assertNotContains(t, content, "projectService")
+			}
+		})
+	}
+}
+
+func TestMigrate_LanguageOptions_ProjectRootDirectory(t *testing.T) {
+	dir := t.TempDir()
+	rootDir := filepath.ToSlash(filepath.Join(dir, "project's config"))
+	encodedRoot, err := json.Marshal(rootDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "tsconfig.json"), "{}")
+	writeFile(t, filepath.Join(dir, "rslint.json"), `[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"project":"./custom.json","tsconfigRootDir":`+string(encodedRoot)+`}}}]`)
+	if err := InitDefaultConfig(dir); err != nil {
+		t.Fatal(err)
+	}
+	content := readFile(t, filepath.Join(dir, "rslint.config.ts"))
+	assertNotContains(t, content, "projectService")
+	assertContains(t, content, "project: ['./custom.json']")
+	assertContains(t, content, "tsconfigRootDir: '"+escapeJSString(rootDir)+"'")
+}
+
+func TestMigrate_LanguageOptions_NonStringRootDirectoryUsesJavaScript(t *testing.T) {
+	for _, root := range []string{`null`, `42`, `9007199254740993`, `true`, `false`, `[]`, `["/unused",42]`, `{}`, `{"nested":[true,9007199254740993]}`} {
+		for _, test := range []struct {
+			packageType string
+			configName  string
+		}{
+			{"module", "rslint.config.js"},
+			{"commonjs", "rslint.config.mjs"},
+		} {
+			t.Run(root+"/"+test.packageType, func(t *testing.T) {
+				dir := t.TempDir()
+				boundary := tspath.NormalizePath(filepath.Join(dir, "pkg"))
+				encodedBoundary, err := json.Marshal(boundary)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeFile(t, filepath.Join(dir, "tsconfig.json"), "{}")
+				writeFile(t, filepath.Join(dir, "package.json"), `{"type":"`+test.packageType+`"}`)
+				writeFile(t, filepath.Join(dir, "rslint.json"), `[
+					{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":`+string(encodedBoundary)+`}}},
+					{"files":["pkg/**/*.ts"],"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"tsconfigRootDir":`+root+`}}}
+				]`)
+				if err := InitDefaultConfig(dir); err != nil {
+					t.Fatal(err)
+				}
+				content := readFile(t, filepath.Join(dir, test.configName))
+				assertContains(t, content, "ts.configs.recommended")
+				assertContains(t, content, "projectService: true")
+				assertContains(t, content, "files: ['pkg/**/*.ts']")
+				first := strings.Index(content, "tsconfigRootDir: '"+escapeJSString(boundary)+"'")
+				override := strings.Index(content, "tsconfigRootDir: "+root)
+				if first < 0 || override <= first || strings.Count(content, "tsconfigRootDir:") != 2 {
+					t.Fatalf("migration changed the authored root value or override order:\n%s", content)
+				}
+				if _, err := os.Stat(filepath.Join(dir, "rslint.config.ts")); !os.IsNotExist(err) {
+					t.Fatalf("runtime-only roots must not produce a TypeScript config: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestMigrate_LanguageOptions_FalseServiceForJSEntry(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "rslint.json"), `[
+		{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true}}},
+		{"files":["scripts/*.js"],"languageOptions":{"parserOptions":{"projectService":false}}}
+	]`)
+	if err := InitDefaultConfig(dir); err != nil {
+		t.Fatal(err)
+	}
+	content := readFile(t, filepath.Join(dir, "rslint.config.mjs"))
+	assertContains(t, content, "projectService: false")
 }
 
 func TestMigrate_IgnoresInSingleEntry_ExtractedAsGlobal(t *testing.T) {
@@ -765,7 +874,7 @@ func TestMigrate_RealWorldConfig(t *testing.T) {
 	assertContains(t, content, "prefer-includes")
 	assertContains(t, content, "no-console")
 
-	// Language options preserved (projectService: false differs from preset default)
+	// Preserve the authored project mode.
 	assertContains(t, content, "projectService: false")
 	assertContains(t, content, "tsconfig.build.json")
 
@@ -1106,7 +1215,7 @@ func TestMigrate_LanguageOptions_EmptyParserOptions(t *testing.T) {
 
 	content := readFile(t, filepath.Join(dir, "rslint.config.ts"))
 	// Empty parserOptions → no languageOptions output
-	assertNotContains(t, content, "languageOptions")
+	assertNotContains(t, content, "languageOptions:")
 }
 
 func TestMigrate_LanguageOptions_ProjectServiceTrueForJSEntry(t *testing.T) {
@@ -1295,7 +1404,7 @@ func TestBuildOverrideFieldsPreservesFilesAndGroups(t *testing.T) {
 		Files:             []string{"special.ts"},
 		FilePatternGroups: [][]string{{"**/*.js", "!**/*.test.js"}},
 	}
-	got := buildOverrideFields(entry, nil, false)
+	got := buildOverrideFields(entry, nil)
 	if !strings.Contains(got, "files: ['special.ts', ['**/*.js', '!**/*.test.js']]") {
 		t.Fatalf("expected mixed files selectors in generated override, got:\n%s", got)
 	}

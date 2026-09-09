@@ -1,0 +1,21 @@
+-- tsconfig.json --
+{"compilerOptions":{"strict":false},"include":["pkg/**/*.ts"]}
+-- pkg/tsconfig.json --
+{"compilerOptions":{"strict":true},"include":["*.ts"]}
+-- pkg/file.ts --
+debugger;
+-- loose.ts --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;
+-- loose.js --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;
+-- root-default/tsconfig.json --
+{"compilerOptions":{"strict":false},"include":["pkg/file.ts"]}
+-- root-default/pkg/tsconfig.json --
+{"files":[]}
+-- root-default/pkg/file.ts --
+export function keep(x: string | undefined) { return x != null; }
+debugger;

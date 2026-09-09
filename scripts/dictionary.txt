@@ -747,3 +747,5 @@ reparses
 batgo
 Swatinem
 CBOR
+allowjs
+projectservice

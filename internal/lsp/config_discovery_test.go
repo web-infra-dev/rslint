@@ -297,7 +297,6 @@ func installLastGoodConfig(s *Server, root string) {
 	s.jsConfigs = map[string]config.RslintConfig{root: entries}
 	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
-	s.tsConfigPathsByConfig = map[string][]string{root: nil}
 	s.eslintPluginConfigGeneration = "last-good"
 	s.ruleCatalog, _ = deriveLSPRuleCatalog(s.currentRuleCatalog(), []config.EslintPluginEntry{{
 		Prefix:    "last-good",
@@ -1093,7 +1092,6 @@ func TestHandleConfigRefreshPartialFailureAtCommittedBoundaryAborts(t *testing.T
 	installLastGoodConfig(s, root)
 	s.jsConfigs[nested] = config.RslintConfig{{Rules: config.Rules{"old-nested": "error"}}}
 	s.jsConfigOwnerIndex = target.NewOwnerIndex(s.jsConfigs, s.fs)
-	s.tsConfigPathsByConfig[nested] = nil
 
 	result := startConfigRefreshForTest(s, "config-change")
 	rootLoad := nextConfigReverseRequest(t, outgoing, methodLoadConfigs)

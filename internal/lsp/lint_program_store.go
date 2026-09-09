@@ -15,14 +15,20 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// lintProgramStore owns standalone Programs that fill gaps left by Session.
-// Session-owned Programs always remain authoritative.
+// lintProgramStore owns standalone Programs selected for editor linting.
+// Both explicit and discovered projects prefer Session-owned Programs.
+// Standalone fallbacks retain their compiler construction mode in the cache key.
 type lintProgramStore struct {
 	server              *Server
 	coverage            *lintProgramCoverage
-	programs            map[string]*lintProgramState
+	programs            map[lintProgramKey]*lintProgramState
 	projectMetadata     map[string]*lintProjectMetadata
 	observedRootConfigs map[string]struct{}
+}
+
+type lintProgramKey struct {
+	configPath       string
+	sourceReferences bool
 }
 
 type lintProgramState struct {
@@ -45,7 +51,8 @@ type lintProgramRequest struct {
 	target            target.File
 	freshOnly         bool
 	overlayPrepared   bool
-	usedConfig        string
+	sourceReferences  bool
+	usedKey           lintProgramKey
 	usedState         *lintProgramState
 	projectMetadata   map[string]*lintProjectMetadata
 	transientMetadata map[string]struct{}
@@ -55,7 +62,7 @@ func newLintProgramStore(server *Server) *lintProgramStore {
 	return &lintProgramStore{
 		server:              server,
 		coverage:            newLintProgramCoverage(server),
-		programs:            make(map[string]*lintProgramState),
+		programs:            make(map[lintProgramKey]*lintProgramState),
 		projectMetadata:     make(map[string]*lintProjectMetadata),
 		observedRootConfigs: make(map[string]struct{}),
 	}
@@ -70,6 +77,16 @@ func (s *lintProgramStore) Request(
 	uri lsproto.DocumentUri,
 	target target.File,
 ) (lintProgramLoader, lintProjectMetadataLoader, func()) {
+	request := s.request(ctx, uri, target, false)
+	return request.load, request.loadMetadata, request.finalize
+}
+
+func (s *lintProgramStore) request(
+	ctx context.Context,
+	uri lsproto.DocumentUri,
+	target target.File,
+	sourceReferences bool,
+) *lintProgramRequest {
 	target.Path = tspath.NormalizePath(target.Path)
 	if target.CanonicalPath != "" {
 		target.CanonicalPath = tspath.NormalizePath(target.CanonicalPath)
@@ -77,15 +94,35 @@ func (s *lintProgramStore) Request(
 	if target.CanonicalParentPath != "" {
 		target.CanonicalParentPath = tspath.NormalizePath(target.CanonicalParentPath)
 	}
-	request := &lintProgramRequest{
+	return &lintProgramRequest{
 		store:             s,
 		ctx:               ctx,
 		uri:               uri,
 		target:            target,
+		sourceReferences:  sourceReferences,
 		projectMetadata:   make(map[string]*lintProjectMetadata),
 		transientMetadata: make(map[string]struct{}),
 	}
-	return request.load, request.loadMetadata, request.finalize
+}
+
+func (r *lintProgramRequest) key(configPath string) lintProgramKey {
+	if r.sourceReferences {
+		configPath = string(lintProgramLexicalPathID(configPath, r.store.server.fs))
+	}
+	return lintProgramKey{tspath.NormalizePath(configPath), r.sourceReferences}
+}
+
+func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
+	if r.sourceReferences {
+		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
+			true, metadata.commandLine,
+			newLintProjectReferenceHost(
+				utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys),
+				r.projectMetadata,
+			),
+		)
+	}
+	return createStandaloneLintProgram(metadata, fsys)
 }
 
 func (r *lintProgramRequest) loadMetadata(
@@ -118,7 +155,7 @@ func (r *lintProgramRequest) metadata(
 		return metadata, nil
 	}
 	if !r.freshOnly && r.store.Usable() {
-		if state := r.store.programs[configFileName]; state != nil && state.metadata != nil {
+		if state := r.store.programs[r.key(configFileName)]; state != nil && state.metadata != nil {
 			r.projectMetadata[configFileName] = state.metadata
 			return state.metadata, nil
 		}
@@ -190,17 +227,17 @@ func (r *lintProgramRequest) parseProjectMetadata(
 }
 
 func (r *lintProgramRequest) load(
-	configFileName string,
+	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
 	r.prepareOverlay()
-	configFileName = tspath.NormalizePath(configFileName)
+	configFileName := metadata.configPath
 	if r.freshOnly || !r.store.Usable() {
-		return r.loadFresh(configFileName)
+		return r.loadFresh(metadata)
 	}
 
-	state := r.store.programs[configFileName]
-	if state == nil {
-		return r.rebuild(configFileName, r.projectMetadata[configFileName])
+	state := r.store.programs[r.key(configFileName)]
+	if state == nil || !r.matchesMetadata(state, metadata) {
+		return r.rebuild(configFileName, metadata)
 	}
 
 	targetSource := state.sources.SourceFileForTarget(
@@ -257,14 +294,31 @@ func (r *lintProgramRequest) load(
 	return r.result(configFileName, state)
 }
 
-func (r *lintProgramRequest) loadFresh(
-	configFileName string,
-) (*compiler.Program, *ast.SourceFile, error) {
-	metadata, err := r.metadata(configFileName)
-	if err != nil {
-		return nil, nil, err
+// matchesMetadata checks only snapshots this request has already observed.
+// Watchers still own invalidation; a newly observed reference may not be
+// discarded merely because the resident root snapshot is unchanged.
+func (r *lintProgramRequest) matchesMetadata(state *lintProgramState, root *lintProjectMetadata) bool {
+	if state.metadata != root || len(r.transientMetadata) != 0 {
+		return false
 	}
-	program, err := createStandaloneLintProgram(metadata, r.overlayFS)
+	rootPath := lintProgramLexicalPathID(root.configPath, r.store.server.fs)
+	for _, metadata := range r.projectMetadata {
+		path := lintProgramLexicalPathID(metadata.configPath, r.store.server.fs)
+		if path == rootPath {
+			continue
+		}
+		if built, referenced := state.program.GetResolvedProjectReferenceFor(path); referenced &&
+			!lintProjectSnapshotsEqual(metadata.commandLine, built, r.store.server.fs) {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *lintProgramRequest) loadFresh(
+	metadata *lintProjectMetadata,
+) (*compiler.Program, *ast.SourceFile, error) {
+	program, err := r.createProgram(metadata, r.overlayFS)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -275,7 +329,7 @@ func (r *lintProgramRequest) rebuild(
 	configFileName string,
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
-	delete(r.store.programs, configFileName)
+	delete(r.store.programs, r.key(configFileName))
 	if metadata == nil {
 		var err error
 		metadata, err = r.metadata(configFileName)
@@ -283,9 +337,11 @@ func (r *lintProgramRequest) rebuild(
 			return nil, nil, err
 		}
 	}
-	_, metadataIsTransient := r.transientMetadata[configFileName]
-	if r.freshOnly || !r.store.Usable() || metadataIsTransient {
-		program, err := createStandaloneLintProgram(metadata, r.overlayFS)
+	// A selected reference may also predate stable watcher coverage. The host
+	// can retain any successful metadata from this request, so none of those
+	// snapshots may cross the request boundary while coverage is unsettled.
+	if r.freshOnly || !r.store.Usable() || len(r.transientMetadata) != 0 {
+		program, err := r.createProgram(metadata, r.overlayFS)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -296,7 +352,7 @@ func (r *lintProgramRequest) rebuild(
 	// once so no filesystem change can fall into the registration gap.
 	for attempt := range 2 {
 		tracker := newLintTrackingFS(r.overlayFS)
-		program, err := createStandaloneLintProgram(metadata, tracker)
+		program, err := r.createProgram(metadata, tracker)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -332,7 +388,7 @@ func (r *lintProgramRequest) rebuild(
 			return program, sourceFile, nil
 		}
 		delete(r.store.projectMetadata, configFileName)
-		r.store.programs[configFileName] = state
+		r.store.programs[r.key(configFileName)] = state
 		return r.result(configFileName, state)
 	}
 	panic("unreachable")
@@ -348,7 +404,7 @@ func (r *lintProgramRequest) result(
 	)
 	if sourceFile != nil {
 		state.rememberSelectedTarget(r.target, r.store.server.fs)
-		r.usedConfig = configFileName
+		r.usedKey = r.key(configFileName)
 		r.usedState = state
 	}
 	return state.program, sourceFile, nil
@@ -378,7 +434,7 @@ func (r *lintProgramRequest) finalize() {
 	if !safe || added {
 		// Rules and the checker can perform lazy reads. New watcher coverage is
 		// active now, but this Program predates it.
-		delete(r.store.programs, r.usedConfig)
+		delete(r.store.programs, r.usedKey)
 	}
 }
 
@@ -415,9 +471,9 @@ func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) {
 	s.markContent(uriToPath(uri), content, false)
 }
 
-// DidChangeWatchedFiles returns whether resident state was discarded. The
-// caller uses that signal to refresh diagnostics even when Session does not
-// own the custom project that registered the watcher.
+// DidChangeWatchedFiles returns whether diagnostics need to be refreshed. A
+// custom project path may previously have failed to resolve, leaving no
+// resident Program even though a filesystem change alters its lint policy.
 func (s *lintProgramStore) DidChangeWatchedFiles(
 	changes []*lsproto.FileEvent,
 ) bool {
@@ -432,7 +488,8 @@ func (s *lintProgramStore) DidChangeWatchedFiles(
 			) || discarded
 			continue
 		}
-		return s.Invalidate() || discarded
+		invalidated := s.Invalidate()
+		return invalidated || discarded || len(s.server.documents) > 0
 	}
 	return discarded
 }

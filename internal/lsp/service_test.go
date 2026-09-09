@@ -26,6 +26,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -64,6 +65,7 @@ func TestNewServerInitializesRuleCatalog(t *testing.T) {
 }
 
 func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) {
+	clear(s.tsConfigPathsByConfig)
 	s.jsConfigs = configs
 	s.jsConfigOwnerIndex = target.NewOwnerIndex(configs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
@@ -144,6 +146,13 @@ func documentLintSnapshotForTest(
 	usesConfigCatalog bool,
 	typeScriptConfigPaths []string,
 ) documentLintSnapshot {
+	if typeScriptConfigPaths != nil {
+		entries = append(append(config.RslintConfig(nil), entries...), config.ConfigEntry{
+			LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+				Project: config.ProjectPaths(typeScriptConfigPaths),
+			}},
+		})
+	}
 	ruleCatalog := rules.All()
 	if usesConfigCatalog {
 		ruleCatalog = s.currentRuleCatalog()
@@ -156,9 +165,8 @@ func documentLintSnapshotForTest(
 			map[string]config.RslintConfig{target.ConfigDirectory: entries},
 			s.fs,
 		),
-		ruleCatalog:           ruleCatalog,
-		typeScriptConfigPaths: typeScriptConfigPaths,
-		pluginGeneration:      s.eslintPluginConfigGeneration,
+		ruleCatalog:      ruleCatalog,
+		pluginGeneration: s.eslintPluginConfigGeneration,
 	}
 	if usesConfigCatalog {
 		snapshot.configKey = target.ConfigDirectory
@@ -1282,6 +1290,7 @@ func TestGetConfigForURI_NestedConfigs(t *testing.T) {
 
 func TestGetConfigForURI_WindowsURI(t *testing.T) {
 	s := newTestServer()
+	s.fs = &caseInsensitiveLSPTestFS{}
 
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"C:/Users/project": {
@@ -1360,8 +1369,8 @@ func TestDocumentURIFromPath_WindowsDriveRoundTrip(t *testing.T) {
 	if uri != "file:///C:/Users/Test%20User/project/index.ts" {
 		t.Fatalf("documentURIFromPath(%q) = %q", filePath, uri)
 	}
-	if got := uriToPath(uri); got != filePath {
-		t.Fatalf("uriToPath(%q) = %q, want %q", uri, got, filePath)
+	if got := uriToPath(uri); got != uri.FileName() {
+		t.Fatalf("uriToPath(%q) = %q, want tsgo filename %q", uri, got, uri.FileName())
 	}
 }
 
@@ -1374,12 +1383,12 @@ func TestUriToPath(t *testing.T) {
 		{"file:///home/user/project", "/home/user/project"},
 		{"file:///project/src/index.ts", "/project/src/index.ts"},
 		// Windows (uppercase and lowercase drive letters)
-		{"file:///C:/Users/project", "C:/Users/project"},
-		{"file:///D:/src/index.ts", "D:/src/index.ts"},
+		{"file:///C:/Users/project", "c:/Users/project"},
+		{"file:///D:/src/index.ts", "d:/src/index.ts"},
 		{"file:///c:/Users/project", "c:/Users/project"},
 		// Percent-encoded paths (spaces, CJK, VS Code colon encoding)
 		{"file:///path%20with%20spaces/file.ts", "/path with spaces/file.ts"},
-		{"file:///C%3A/Users/project", "C:/Users/project"},
+		{"file:///C%3A/Users/project", "c:/Users/project"},
 		{"file:///project/%E4%B8%AD%E6%96%87/file.ts", "/project/中文/file.ts"},
 		{"file:///Users/John%20Doe/my%20project/src/index.ts", "/Users/John Doe/my project/src/index.ts"},
 		// Edge cases
@@ -1435,9 +1444,9 @@ func TestCloseAndReopen(t *testing.T) {
 	}
 }
 
-// ======== tsConfigPaths lifecycle tests ========
+// ======== per-document project paths ========
 
-func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
+func TestDocumentProjectPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{"/project-a/tsconfig.json": true}}
 
@@ -1461,18 +1470,16 @@ func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 		},
 	})
 
-	s.rebuildTsConfigPaths()
-
-	entryA := s.tsConfigPathsByConfig["/project-a"]
+	entryA := s.documentLintSnapshot("file:///project-a/target.ts").typeScriptConfigPaths
 	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
 		t.Errorf("expected project-a to resolve to its tsconfig, got %v", entryA)
 	}
-	if entry, ok := s.tsConfigPathsByConfig["/project-b"]; !ok || entry != nil {
-		t.Errorf("expected project-b entry present and nil (no tsconfig), got present=%v value=%v", ok, entry)
+	if entry := s.documentLintSnapshot("file:///project-b/target.ts").typeScriptConfigPaths; entry != nil {
+		t.Errorf("expected project-b to have no tsconfig, got %v", entry)
 	}
 }
 
-func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
+func TestDocumentProjectPaths_AllConfigsHaveProject(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{
 		"/project-a/tsconfig.json": true,
@@ -1500,13 +1507,11 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 		},
 	})
 
-	s.rebuildTsConfigPaths()
-
-	entryA := s.tsConfigPathsByConfig["/project-a"]
+	entryA := s.documentLintSnapshot("file:///project-a/target.ts").typeScriptConfigPaths
 	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
 		t.Errorf("expected project-a → /project-a/tsconfig.json, got %v", entryA)
 	}
-	entryB := s.tsConfigPathsByConfig["/project-b"]
+	entryB := s.documentLintSnapshot("file:///project-b/target.ts").typeScriptConfigPaths
 	if len(entryB) != 1 || entryB[0] != "/project-b/tsconfig.json" {
 		t.Errorf("expected project-b → /project-b/tsconfig.json, got %v", entryB)
 	}
@@ -1519,7 +1524,7 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 // rslint.config.ts but no tsconfig.json, which used to flip the whole
 // workspace's type-aware rules without checking the governing config's
 // resolved tsconfigs.
-func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
+func TestDocumentProjectPaths_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{"/project/tsconfig.json": true}}
 
@@ -1540,31 +1545,27 @@ func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T
 		},
 	})
 
-	s.rebuildTsConfigPaths()
-
 	// File under root config → root's resolved tsconfig.
-	rootPaths := s.tsConfigPathsForURI("file:///project/test/skills.test.ts")
+	rootPaths := s.documentLintSnapshot("file:///project/test/skills.test.ts").typeScriptConfigPaths
 	if len(rootPaths) != 1 || rootPaths[0] != "/project/tsconfig.json" {
 		t.Errorf("expected root-config file to see [/project/tsconfig.json], got %v", rootPaths)
 	}
 
 	// File under nested template config -> nil (no type info), scoped to this
 	// config only; the root config's list above must remain unaffected.
-	nestedPaths := s.tsConfigPathsForURI("file:///project/template-rslint/foo.ts")
+	nestedPaths := s.documentLintSnapshot("file:///project/template-rslint/foo.ts").typeScriptConfigPaths
 	if nestedPaths != nil {
 		t.Errorf("expected nested-config file to see nil tsconfig paths (no type info), got %v", nestedPaths)
 	}
 }
 
-func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
+func TestDocumentProjectPaths_NoConfig(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
 
-	// No discovered configs.
-	s.rebuildTsConfigPaths()
-
-	if s.tsConfigPathsByConfig != nil {
-		t.Errorf("expected no project map when no config, got %v", s.tsConfigPathsByConfig)
+	s.cwd = "/project"
+	if paths := s.documentLintSnapshot("file:///project/target.ts").typeScriptConfigPaths; paths != nil {
+		t.Errorf("expected no project paths when no config or tsconfig exists, got %v", paths)
 	}
 }
 
@@ -1840,6 +1841,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
+		config.ProjectPolicy{},
 		fsys,
 		standaloneLoaders(sourceURI),
 		s.lintSessionRoots,
@@ -1860,6 +1862,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{importConfig, firstConfig},
+		config.ProjectPolicy{},
 		fsys,
 		standaloneLoaders(sourceURI),
 		s.lintSessionRoots,
@@ -1909,6 +1912,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
+		config.ProjectPolicy{},
 		fsys,
 		standaloneLoaders(gapURI),
 		s.lintSessionRoots,
@@ -1977,9 +1981,10 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 		s.session,
 		ctx,
 		[]string{configPath},
+		config.ProjectPolicy{},
 		fsys,
 		lintProjectLoaders{
-			program: func(string) (*compiler.Program, *ast.SourceFile, error) {
+			program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
 				loaderCalls++
 				return nil, nil, errors.New("standalone loader must not run")
 			},
@@ -2004,6 +2009,42 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 	}
 	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(configPath, fsys) {
 		t.Fatalf("selected Program config = %q, want %q", program.Options().ConfigFilePath, configPath)
+	}
+
+	entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
+		ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
+	}}}
+	serviceRequest := newStandaloneLintProjectRequestWithFS(lspConfigTarget(sourcePath, dir, fsys), fsys)
+	var serviceProgram *compiler.Program
+	provider := &documentGenerationProvider{
+		server: s, uri: uri,
+		snapshot: documentLintSnapshotForTest(s, uri, entries, dir, false, nil),
+		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
+			return lintProjectLoaders{
+				program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+					loaderCalls++
+					return nil, nil, errors.New("service must reuse the Session Program")
+				},
+				metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
+					rootLoaderCalls++
+					return serviceRequest.loadMetadata(configPath)
+				},
+			}, nil
+		},
+		buildGeneration: func(selected *compiler.Program, source *ast.SourceFile, lintTarget target.File, cwd string, typed bool, snapshot documentLintSnapshot) linter.Generation {
+			serviceProgram = selected
+			if !typed {
+				t.Fatal("direct service root lost type information")
+			}
+			return buildDocumentGeneration(selected, source, lintTarget, cwd, typed, snapshot)
+		},
+	}
+	_, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})
+	if release != nil {
+		release()
+	}
+	if err != nil || serviceProgram != program || loaderCalls != 0 || rootLoaderCalls != 1 {
+		t.Fatalf("service duplicated Session ownership: same Program=%v builds=%d parses=%d error=%v", serviceProgram == program, loaderCalls, rootLoaderCalls, err)
 	}
 }
 
@@ -2124,73 +2165,89 @@ type realpathAliasLSPTestFS struct {
 func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
 	filePath = tspath.NormalizePath(filePath)
 	aliasRoot := tspath.NormalizePath(fs.aliasRoot)
-	if filePath == aliasRoot {
-		return tspath.NormalizePath(fs.realRoot)
-	}
-	if strings.HasPrefix(filePath, aliasRoot+"/") {
-		return tspath.NormalizePath(fs.realRoot) + strings.TrimPrefix(filePath, aliasRoot)
+	if relative, within := config.RelativePathWithinConfigRoot(filePath, aliasRoot, true); within {
+		return tspath.ResolvePath(tspath.NormalizePath(fs.realRoot), relative)
 	}
 	return fs.FS.Realpath(filePath)
 }
 
 func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRealpath(t *testing.T) {
-	root := t.TempDir()
-	realRoot := filepath.Join(root, "node_modules", "real-workspace")
-	aliasRoot := filepath.Join(root, "alias-workspace")
-	realFile := filepath.Join(realRoot, "src", "index.ts")
-	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(realFile, []byte("const diskValue = 1;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	tsConfigPath := filepath.Join(realRoot, "tsconfig.json")
-	if err := os.WriteFile(tsConfigPath, []byte(`{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	s := newTestServer()
-	s.cwd = aliasRoot
-	s.fs = &realpathAliasLSPTestFS{
-		FS:        bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		aliasRoot: aliasRoot,
-		realRoot:  realRoot,
-	}
-	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
-	uri := documentURIFromPath(aliasFile)
-	realURI := documentURIFromPath(realFile)
-	const openContent = "const editorValue = 2;\n"
-	s.documents[realURI] = "const competingAliasValue = 3;\n"
-	s.documents[uri] = openContent
-
-	editorOverlay := s.currentEditorOverlayFSForTarget(
-		uri,
-		lspConfigTarget(aliasFile, aliasRoot, s.fs),
-	)
-	for _, filePath := range []string{aliasFile, realFile} {
-		if got, ok := editorOverlay.ReadFile(tspath.NormalizePath(filePath)); !ok || got != openContent {
-			t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
+	for _, portableWindows := range []bool{false, true} {
+		name := "native paths"
+		if portableWindows {
+			name = "Windows drive aliases"
 		}
-	}
+		t.Run(name, func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			if portableWindows {
+				root = "C:/Repo"
+			}
+			realRoot := tspath.ResolvePath(root, "node_modules/real-workspace")
+			aliasRoot := tspath.ResolvePath(root, "alias-workspace")
+			realFile := tspath.ResolvePath(realRoot, "src/index.ts")
+			tsConfigPath := tspath.ResolvePath(realRoot, "tsconfig.json")
+			const diskContent = "const diskValue = 1;\n"
+			const tsConfigContent = `{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`
+			var baseFS vfs.FS
+			if portableWindows {
+				// Both drive spellings address the same physical files. Realpath may
+				// preserve either spelling, while the incoming URIs retain uppercase C:.
+				files := make(map[string]string)
+				for _, drive := range []string{"C:", "c:"} {
+					files[drive+strings.TrimPrefix(realFile, "C:")] = diskContent
+					files[drive+strings.TrimPrefix(tsConfigPath, "C:")] = tsConfigContent
+				}
+				baseFS = &exactCaseLSPProgramFS{FS: utils.NewOverlayVFS(&mockFS{}, files), files: files}
+			} else {
+				if err := os.MkdirAll(tspath.GetDirectoryPath(realFile), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(realFile, []byte(diskContent), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(tsConfigPath, []byte(tsConfigContent), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				baseFS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			}
 
-	const fixedContent = "debugger;\n"
-	result, err := configuredSpeculativePipelineResultForTest(s,
-		uri,
-		context.Background(),
-		fixedContent,
-		config.RslintConfig{{
-			Files: []string{"src/**/*.ts"},
-			Rules: config.Rules{"no-debugger": "error"},
-		}},
-		aliasRoot,
-		false,
-		[]string{tsConfigPath},
-	)
-	if err != nil {
-		t.Fatalf("runConfiguredLintForContent failed: %v", err)
-	}
-	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("canonical program read stale disk content: %+v", result.Observation.Native.Diagnostics)
+			s := newTestServer()
+			s.cwd = aliasRoot
+			s.fs = &realpathAliasLSPTestFS{FS: baseFS, aliasRoot: aliasRoot, realRoot: realRoot}
+			aliasFile := tspath.ResolvePath(aliasRoot, "src/index.ts")
+			uri := documentURIFromPath(aliasFile)
+			realURI := documentURIFromPath(realFile)
+			const openContent = "const editorValue = 2;\n"
+			s.documents[realURI] = "const competingAliasValue = 3;\n"
+			s.documents[uri] = openContent
+
+			editorOverlay := s.currentEditorOverlayFSForTarget(uri, lspConfigTarget(aliasFile, aliasRoot, s.fs))
+			for _, filePath := range []string{aliasFile, realFile} {
+				if got, ok := editorOverlay.ReadFile(filePath); !ok || got != openContent {
+					t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
+				}
+			}
+
+			const fixedContent = "debugger;\n"
+			result, err := configuredSpeculativePipelineResultForTest(s,
+				uri,
+				context.Background(),
+				fixedContent,
+				config.RslintConfig{{Files: []string{"src/**/*.ts"}, Rules: config.Rules{"no-debugger": "error"}}},
+				aliasRoot,
+				false,
+				[]string{tsConfigPath},
+			)
+			if err != nil {
+				t.Fatalf("runConfiguredLintForContent failed: %v", err)
+			}
+			if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+				t.Fatalf("canonical program read stale disk content: %+v", result.Observation.Native.Diagnostics)
+			}
+			if got := result.Observation.Native.Diagnostics[0].SourceFile.Text(); got != fixedContent {
+				t.Fatalf("canonical diagnostic source = %q, want speculative content", got)
+			}
+		})
 	}
 }
 
@@ -2609,62 +2666,66 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 	}
 }
 
-// documentGenerationProvider must early-return for files matching the config's
-// `ignores` patterns, WITHOUT touching the session. This test proves the
-// guard semantically (not just by coincidence of a no-op session):
-//
-//  1. Positive: call with session=nil AND an ignored path. The call must
-//     return empty diagnostics with no error. Passing a nil session is the
-//     key trick — if the guard is removed, the very next line dereferences
-//     session and panics, making the test fail loudly rather than silently.
-//  2. Control: call with session=nil AND a non-ignored path. The call MUST
-//     panic (runtime nil-pointer dereference). This proves the only thing
-//     keeping the positive case alive is the ignore early-return, not some
-//     accidental nil-session tolerance downstream.
+// Ignored documents must return before requesting projects. The same source in
+// a non-ignored file must reach project loading and produce a native diagnostic.
 func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	ctx := context.Background()
-	cwd := "/project"
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	cwd := tspath.NormalizePath(archive.Materialize(t, "ignored-documents"))
 	s := newTestServer()
 	s.cwd = cwd
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	caseSensitive := s.fs.UseCaseSensitiveFileNames()
 	cfg := config.RslintConfig{
 		// Global ignores entry: hides everything under lib/.
 		{Ignores: []string{"lib/**"}},
 		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 
-	ignoredURI := lsproto.DocumentUri("file:///project/lib/util.ts")
-	normalURI := lsproto.DocumentUri("file:///project/src/main.ts")
-
-	t.Run("ignored file returns empty without touching session", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("runLintWithSession panicked on ignored file (early-return missing?): %v", r)
+	for _, tt := range []struct {
+		name    string
+		file    string
+		ignored bool
+	}{
+		{name: "ignored file does not request projects", file: "lib/util.ts", ignored: true},
+		{name: "non-ignored file produces a native diagnostic", file: "src/main.ts"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := tspath.ResolvePath(cwd, tt.file)
+			uri := documentURIFromPath(filePath)
+			projectRequests := 0
+			provider := &documentGenerationProvider{
+				server:   s,
+				uri:      uri,
+				snapshot: documentLintSnapshotForTest(s, uri, cfg, cwd, false, nil),
+				requestPrograms: func(_ context.Context, _ lsproto.DocumentUri, lintTarget target.File) (lintProjectLoaders, linter.ReleaseFunc) {
+					projectRequests++
+					return newStandaloneLintProjectRequestWithFS(lintTarget, s.fs).loaders(), nil
+				},
 			}
-		}()
-
-		result, err := configuredDocumentPipelineResultForTest(s, ctx, ignoredURI, cfg, cwd, false, nil)
-		if err != nil {
-			t.Fatalf("expected nil error, got %v", err)
-		}
-		diags := result.Observation.Native.Diagnostics
-		if len(diags) != 0 {
-			t.Errorf("expected 0 diagnostics for ignored file, got %d: %+v", len(diags), diags)
-		}
-	})
-
-	t.Run("non-ignored file falls through to session (nil-session → panic)", func(t *testing.T) {
-		// This control test asserts the inverse: without a matching ignore,
-		// the function proceeds to `session.GetLanguageService(...)` which
-		// must nil-dereference. If this test stops panicking, it means some
-		// other short-circuit has crept in and the positive test above may
-		// be passing for the wrong reason.
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
+			generation, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})
+			if err != nil {
+				t.Fatalf("acquire document generation: %v", err)
 			}
-		}()
-		_, _ = configuredDocumentPipelineResultForTest(s, ctx, normalURI, cfg, cwd, false, nil)
-	})
+			result, err := runLSPGenerationForTest(ctx, generation, release, linter.ArtifactDemand{})
+			if err != nil {
+				t.Fatalf("lint document: %v", err)
+			}
+			diags := result.Observation.Native.Diagnostics
+			if tt.ignored {
+				if projectRequests != 0 || len(diags) != 0 {
+					t.Fatalf("ignored file requested projects %d times and produced diagnostics: %+v", projectRequests, diags)
+				}
+				return
+			}
+			if projectRequests != 1 || len(diags) != 1 || diags[0].RuleName != "no-debugger" {
+				t.Fatalf("non-ignored file requested projects %d times and produced diagnostics: %+v", projectRequests, diags)
+			}
+			if tspath.ToPath(diags[0].FilePath, "", caseSensitive) != tspath.ToPath(filePath, "", caseSensitive) {
+				t.Fatalf("diagnostic path = %q, want %q", diags[0].FilePath, filePath)
+			}
+		})
+	}
 }
 
 func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) {

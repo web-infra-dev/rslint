@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/ipc"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
 type canonicalPathBaseFS struct {
@@ -372,6 +373,110 @@ func TestHandleLint_SelectedTargetResolvesGoverningProject(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "missing.json") {
 		t.Fatalf("selected target must resolve its governing project, got %v", err)
+	}
+}
+
+func TestHandleLint_ProjectServiceUsesTargetConfigAndOverlay(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	for _, test := range []struct {
+		name            string
+		projectEntries  string
+		wantDiagnostics int
+		wantError       string
+	}{
+		{name: "nearest service", projectEntries: `{"languageOptions":{"parserOptions":{"projectService":true}}}`},
+		{name: "explicit root", projectEntries: `{"languageOptions":{"parserOptions":{"projectService":false,"project":"tsconfig.json"}}}`, wantDiagnostics: 1},
+		{name: "first declared project is root", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}}`, wantDiagnostics: 1},
+		{name: "first declared project is nested", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}}`},
+		{name: "unmatched project remains declared", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":"missing.json"}}}`, wantError: "missing.json"},
+		{name: "unmatched service is neutral", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"files":["unused.ts"],"languageOptions":{"parserOptions":{"projectService":true}}}`},
+		{name: "matched project false is gap", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":false}}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"rules":{"@typescript-eslint/no-unnecessary-condition":"error","no-debugger":"error"}},` + test.projectEntries + `]`)
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+				Files:        []string{tspath.ResolvePath(dir, "pkg/file.ts")},
+				FileContents: map[string]string{tspath.ResolvePath(dir, "pkg/file.ts"): `export function keep(x: string | undefined) { return x != null; }`},
+			})
+			if test.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantError) {
+					t.Fatalf("error=%v, want %q", err, test.wantError)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.FileCount != 1 {
+				t.Fatalf("wrong API target scope: %+v", response)
+			}
+			if len(response.Diagnostics) != test.wantDiagnostics {
+				t.Fatalf("wrong effective TypeScript options: %+v", response)
+			}
+		})
+	}
+}
+
+func TestHandleLint_ProjectServiceDefaultRootUsesInvocation(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "root-default"))
+	cwd := tspath.ResolvePath(dir, "pkg")
+	rootJSON, err := json.Marshal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, entries string
+		wantTyped     int
+	}{
+		{name: "omitted uses invocation cwd"},
+		{name: "null restores invocation cwd", entries: `,{"languageOptions":{"parserOptions":{"tsconfigRootDir":` + string(rootJSON) + `}}},{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}`},
+		{name: "explicit root reaches parent", entries: `,{"languageOptions":{"parserOptions":{"tsconfigRootDir":` + string(rootJSON) + `}}}`, wantTyped: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true}},"rules":{"@typescript-eslint/no-unnecessary-condition":"error","no-debugger":"error"}}` + test.entries + `]`)
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config: config, ConfigDirectory: dir, WorkingDirectory: cwd,
+				Files: []string{tspath.ResolvePath(cwd, "file.ts")},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			counts := make(map[string]int)
+			for _, diagnostic := range response.Diagnostics {
+				counts[diagnostic.RuleName]++
+			}
+			if response.FileCount != 1 || counts["no-debugger"] != 1 || counts["@typescript-eslint/no-unnecessary-condition"] != test.wantTyped {
+				t.Fatalf("inline config default borrowed its synthetic ConfigDirectory: %+v", response)
+			}
+		})
+	}
+}
+
+func TestHandleLint_ProjectServiceKeepsGapResultsAndRules(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := json.RawMessage(`[{"plugins":["@typescript-eslint"],"languageOptions":{"parserOptions":{"projectService":true}},"rules":{"@typescript-eslint/no-for-in-array":"error","no-debugger":"error"}}]`)
+	covered := tspath.ResolvePath(dir, "pkg/file.ts")
+	response, err := (&Handler{}).HandleLint(api.LintRequest{
+		Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+		Files:        []string{covered, tspath.ResolvePath(dir, "loose.ts"), tspath.ResolvePath(dir, "loose.js")},
+		FileContents: map[string]string{covered: "export const values = [1, 2];\nfor (const key in values) {}\ndebugger;\n"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.FileCount != 3 || len(response.Diagnostics) != 4 {
+		t.Fatalf("gap request lost results or ran typed gap rules: %+v", response)
+	}
+	counts := make(map[string]int)
+	for _, diagnostic := range response.Diagnostics {
+		counts[diagnostic.RuleName]++
+		if diagnostic.RuleName == "@typescript-eslint/no-for-in-array" && diagnostic.FilePath != "pkg/file.ts" {
+			t.Fatalf("gap file ran a type-aware rule: %+v", diagnostic)
+		}
+	}
+	if counts["no-debugger"] != 3 || counts["@typescript-eslint/no-for-in-array"] != 1 {
+		t.Fatalf("wrong syntax/typed rule projection: %v", counts)
 	}
 }
 

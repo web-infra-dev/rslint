@@ -156,7 +156,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode)
 			node.directory,
 			node.ownerPath,
 			node.canonicalDirectory,
-		); found && candidate.directory != node.ownerDir {
+		); found && rslintconfig.ExactPathID(candidate.directory) != rslintconfig.ExactPathID(node.ownerDir) {
 			state := coordinator.modules.state(candidate.path)
 			if state == nil {
 				result.pending = &suspendedDiscoveryNode{node: node, candidate: candidate}

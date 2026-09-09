@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -816,6 +817,11 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 	}
 	write("index.ts", "export const value: number = 1;\n")
 	write("tsconfig.json", `{"files":["index.ts"]}`)
+	scanOnlyDirectory := tspath.NormalizePath(filepath.Join(directory, "scan-only"))
+	if err := os.MkdirAll(scanOnlyDirectory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write("scan-only/unowned.ts", "debugger;\n")
 	configEntries := rslintconfig.RslintConfig{{
 		LanguageOptions: &rslintconfig.LanguageOptions{
 			ParserOptions: &rslintconfig.ParserOptions{
@@ -824,8 +830,10 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 		},
 	}}
 
+	fsys := &directoryAccessSpyFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS()))}
 	code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
 		ConfigCatalog:  explicitConfigCatalogForTest(directory, configEntries),
+		FS:             fsys,
 		TypeCheck:      true,
 		TypeCheckOnly:  true,
 		Format:         "jsonline",
@@ -835,18 +843,160 @@ func TestTypeCheckOnlySkipsLintConfigResolution(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("type-check-only exit = %d, stdout=%q stderr=%q", code, stdout, stderr)
 	}
+	if slices.Contains(fsys.accessedDirs, scanOnlyDirectory) {
+		t.Fatalf("explicit-project type-check-only scanned lint targets: %v", fsys.accessedDirs)
+	}
+}
+
+func TestHandleLintCommandTypeCheckProjectConstructionOrder(t *testing.T) {
+	directory := tspath.NormalizePath(t.TempDir())
+	targetPath := tspath.ResolvePath(directory, "target.ts")
+	if err := os.WriteFile(targetPath, []byte("export const value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, selection := range []struct {
+		name    string
+		options *rslintconfig.ParserOptions
+	}{
+		{name: "ordinary project"},
+		{name: "service disabled", options: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false)}},
+		{name: "root override", options: &rslintconfig.ParserOptions{TsconfigRootDir: &directory}},
+		{name: "project reset", options: &rslintconfig.ParserOptions{ProjectDisabled: true}},
+	} {
+		configEntries := rslintconfig.RslintConfig{{
+			LanguageOptions: &rslintconfig.LanguageOptions{
+				ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"./missing.json"}},
+			},
+		}}
+		if selection.options != nil {
+			configEntries = append(configEntries, rslintconfig.ConfigEntry{
+				LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: selection.options},
+			})
+		}
+		for _, typeCheckOnly := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/type-check-only=%t", selection.name, typeCheckOnly), func(t *testing.T) {
+				fsys := &commandRealpathCountingFS{
+					FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+					calls: make(map[string]int),
+				}
+				code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
+					ConfigCatalog:  explicitConfigCatalogForTest(directory, configEntries),
+					AllowFiles:     []string{targetPath},
+					FS:             fsys,
+					TypeCheck:      true,
+					TypeCheckOnly:  typeCheckOnly,
+					Format:         "jsonline",
+					NoColor:        true,
+					SingleThreaded: true,
+				})
+				if code != 1 || !strings.Contains(stderr, "missing.json") {
+					t.Fatalf("declared project error: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+				}
+				if got, want := fsys.callCount(targetPath) > 0, selection.options != nil; got != want {
+					t.Fatalf("target identity resolved before project error = %t, want %t", got, want)
+				}
+			})
+		}
+	}
+}
+
+func TestHandleLintCommandProjectSelectionTypeCheckScope(t *testing.T) {
+	directory := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	for _, selection := range []string{"service", "explicit", "scoped explicit"} {
+		options := &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}
+		if selection != "service" {
+			options = &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"./tsconfig.json", "./pkg/tsconfig.json"}}
+		}
+		config := rslintconfig.RslintConfig{{
+			Files:           []string{"**/*.ts"},
+			LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: options},
+			Rules:           rslintconfig.Rules{"no-debugger": "error"},
+		}}
+		if selection == "scoped explicit" {
+			config = append(config, rslintconfig.ConfigEntry{
+				Files:           []string{"unused/**"},
+				LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"./missing.json"}}},
+			})
+		}
+		for _, mode := range []string{"lint", "type-check", "type-check-only"} {
+			t.Run(selection+"/"+mode, func(t *testing.T) {
+				code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
+					ConfigCatalog: explicitConfigCatalogForTest(directory, config),
+					AllowFiles:    []string{tspath.ResolvePath(directory, "pkg/file.ts")},
+					TypeCheck:     mode != "lint", TypeCheckOnly: mode == "type-check-only",
+					Format: "jsonline", NoColor: true, SingleThreaded: true,
+				})
+				if selection == "scoped explicit" {
+					if code != 1 || !strings.Contains(stderr, "missing.json") {
+						t.Fatalf("raw project declarations must retain validation: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+					}
+					return
+				}
+				wantUnrelated := selection == "explicit" && mode != "lint"
+				if code != 1 || strings.Contains(stdout, "unrelated.ts") != wantUnrelated {
+					t.Fatalf("wrong project scope: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+				}
+				if strings.Contains(stdout, "sibling.ts") != (mode != "lint") {
+					t.Fatalf("type checking must use complete selected project roots: %q", stdout)
+				}
+				if strings.Contains(stdout, "no-debugger") != (mode != "type-check-only") {
+					t.Fatalf("wrong rule execution for %s: %q", mode, stdout)
+				}
+			})
+		}
+	}
+}
+
+func TestHandleLintCommandProjectServiceGapScope(t *testing.T) {
+	directory := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "gaps"))
+	config := rslintconfig.RslintConfig{{
+		Plugins:         []string{"@typescript-eslint"},
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}},
+		Rules:           rslintconfig.Rules{"no-debugger": "error", "@typescript-eslint/no-for-in-array": "error"},
+	}}
+	for _, mode := range []string{"lint", "type-check", "type-check-only"} {
+		for _, scope := range []string{"file", "directory", "default"} {
+			t.Run(mode+"/"+scope, func(t *testing.T) {
+				args := lintArgs{
+					ConfigCatalog: explicitConfigCatalogForTest(directory, config),
+					TypeCheck:     mode != "lint", TypeCheckOnly: mode == "type-check-only",
+					Format: "jsonline", NoColor: true, SingleThreaded: true,
+				}
+				wantSyntax := 3
+				wantTyped := 1
+				switch scope {
+				case "file":
+					args.AllowFiles = []string{tspath.ResolvePath(directory, "loose.ts"), tspath.ResolvePath(directory, "loose.js")}
+					wantSyntax, wantTyped = 2, 0
+				case "directory":
+					args.AllowDirs = []string{directory}
+				}
+				wantExit := 1
+				if mode == "type-check-only" {
+					wantExit, wantSyntax, wantTyped = 0, 0, 0
+				}
+				code, stdout, stderr := runLintCommandForTest(t, directory, args)
+				if code != wantExit || strings.Count(stdout, "no-debugger") != wantSyntax || strings.Count(stdout, "no-for-in-array") != wantTyped {
+					t.Fatalf("gap scope: exit=%d stdout=%q stderr=%q; want exit=%d syntax=%d typed=%d", code, stdout, stderr, wantExit, wantSyntax, wantTyped)
+				}
+			})
+		}
+	}
 }
 
 func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 	directory := t.TempDir()
-	rootPath := filepath.Join(directory, "index.ts")
-	if err := os.WriteFile(rootPath, []byte("export const value: number = 1;\n"), 0o644); err != nil {
-		t.Fatal(err)
+	rootPath := filepath.Join(directory, "sibling.ts")
+	for _, name := range []string{"index.ts", "sibling.ts"} {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte("export const value: number = 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(`{"files":["index.ts"]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(`{"files":["index.ts","sibling.ts"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	configEntries := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
 		LanguageOptions: &rslintconfig.LanguageOptions{
 			ParserOptions: &rslintconfig.ParserOptions{
 				Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
@@ -862,6 +1012,7 @@ func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 		}
 		code, stdout, stderr := runLintCommandForTest(t, directory, lintArgs{
 			ConfigCatalog:  explicitConfigCatalogForTest(directory, configEntries),
+			AllowFiles:     []string{tspath.NormalizePath(filepath.Join(directory, "index.ts"))},
 			FS:             fsys,
 			TypeCheck:      true,
 			TypeCheckOnly:  true,
@@ -991,7 +1142,7 @@ func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 	})
 }
 
-func TestHandleLintCommandFocusedFileBuildsOnlyDirectProject(t *testing.T) {
+func TestHandleLintCommandPreservesProjectConstructionScope(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string]string{
 		"target.ts":            `export const target = 1;`,
@@ -1008,11 +1159,7 @@ func TestHandleLintCommandFocusedFileBuildsOnlyDirectProject(t *testing.T) {
 	}
 	dir = tspath.NormalizePath(dir)
 	targetPath := tspath.ResolvePath(dir, "target.ts")
-	fsys := &commandReadCountingFS{
-		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		reads: make(map[string]int),
-	}
-	config := rslintconfig.RslintConfig{{
+	config := rslintconfig.RslintConfig{{Ignores: []string{"import-main.ts", "unrelated.ts"}}, {
 		Files: []string{"**/*.ts"},
 		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
 			Project: rslintconfig.ProjectPaths{
@@ -1022,25 +1169,35 @@ func TestHandleLintCommandFocusedFileBuildsOnlyDirectProject(t *testing.T) {
 			},
 		}},
 	}}
-	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		ConfigCatalog: &discovery.ConfigCatalog{
-			Configs:  map[string]rslintconfig.RslintConfig{dir: config},
-			Explicit: true,
-		},
-		AllowFiles:     []string{targetPath},
-		Format:         "default",
-		NoColor:        true,
-		SingleThreaded: true,
-		FS:             fsys,
-	})
-	if code != 0 {
-		t.Fatalf("focused lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
-	}
-	if got := fsys.readCount(tspath.ResolvePath(dir, "import-main.ts")); got != 0 {
-		t.Fatalf("earlier import-only project source was read %d time(s)", got)
-	}
-	if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); got != 0 {
-		t.Fatalf("project after the direct winner was parsed %d time(s)", got)
+	for _, broad := range []bool{false, true} {
+		t.Run(fmt.Sprintf("broad=%t", broad), func(t *testing.T) {
+			fsys := &commandReadCountingFS{
+				FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+				reads: make(map[string]int),
+			}
+			args := lintArgs{
+				ConfigCatalog:  explicitConfigCatalogForTest(dir, config),
+				Format:         "default",
+				NoColor:        true,
+				SingleThreaded: true,
+				FS:             fsys,
+			}
+			if !broad {
+				args.AllowFiles = []string{targetPath}
+			}
+			code, stdout, stderr := runLintCommandForTest(t, dir, args)
+			if code != 0 {
+				t.Fatalf("lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+			// Both scopes lint only target.ts. Broad loading retains its eager
+			// project strategy; focused loading screens roots before imports.
+			for _, name := range []string{"import-main.ts", "tsconfig-later.json"} {
+				got := fsys.readCount(tspath.ResolvePath(dir, name))
+				if (got > 0) != broad {
+					t.Fatalf("%s reads=%d, broad=%t", name, got, broad)
+				}
+			}
+		})
 	}
 }
 
@@ -1734,7 +1891,11 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	programSession := loader.NewSession(fs)
-	programSet, err := programSession.BuildProject(dir, activeConfig, true)
+	programSet, err := programSession.BuildProjects(loader.ProjectBuildRequest{
+		Configs:        map[string]rslintconfig.RslintConfig{dir: activeConfig},
+		Scope:          loader.AllDeclared,
+		SingleThreaded: true,
+	})
 	if err != nil {
 		t.Fatalf("BuildProject: %v", err)
 	}
@@ -1806,7 +1967,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	}
 }
 
-func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
+func TestLintModesKeepDeclaredTypeCheckWhenAllTargetsAreIgnored(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "ignored.ts")
 	entries := rslintconfig.RslintConfig{
@@ -1827,25 +1988,24 @@ func TestPlainLintSkipsProjectResolutionWhenAllTargetsAreIgnored(t *testing.T) {
 		t.Fatalf("write target: %v", err)
 	}
 
-	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
-		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
-		Format:         "default",
-		AllowFiles:     []string{tspath.NormalizePath(target)},
-		SingleThreaded: true,
-	})
-	if code != 0 {
-		t.Fatalf("plain lint resolved an inactive project: code=%d stdout=%s stderr=%s", code, stdout, stderr)
-	}
-
-	code, stdout, stderr = runLintCommandForTest(t, dir, lintArgs{
-		ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
-		Format:         "default",
-		AllowFiles:     []string{tspath.NormalizePath(target)},
-		SingleThreaded: true,
-		TypeCheck:      true,
-	})
-	if code != 1 || !strings.Contains(stderr, "missing.json") || strings.Contains(stdout, "missing.json") {
-		t.Fatalf("type-check must resolve every configured project: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	for _, mode := range []string{"lint", "type-check", "type-check-only"} {
+		t.Run(mode, func(t *testing.T) {
+			code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+				ConfigCatalog:  explicitConfigCatalogForTest(dir, entries),
+				Format:         "default",
+				AllowFiles:     []string{tspath.NormalizePath(target)},
+				SingleThreaded: true,
+				TypeCheck:      mode != "lint",
+				TypeCheckOnly:  mode == "type-check-only",
+			})
+			if mode == "lint" {
+				if code != 0 || strings.Contains(stdout+stderr, "missing.json") {
+					t.Fatalf("lint resolved an inactive project: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+				}
+			} else if code != 1 || !strings.Contains(stdout+stderr, "missing.json") {
+				t.Fatalf("%s skipped a declared project: code=%d stdout=%s stderr=%s", mode, code, stdout, stderr)
+			}
+		})
 	}
 }
 

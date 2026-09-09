@@ -3,10 +3,457 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"reflect"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
+
+func projectPolicyForTargetForTest(entries RslintConfig, owner string, fsys vfs.FS, target PathIdentity) (ProjectPolicy, error) {
+	resolved := NewFileConfigResolverWithFS(entries, owner, fsys, baseRuleCatalog()).ResolveTarget(target)
+	return ResolveProjectPolicy(resolved, owner)
+}
+
+func TestProjectPolicyFlatConfigOverrides(t *testing.T) {
+	owner := tspath.NormalizePath(t.TempDir())
+	for _, test := range []struct {
+		name, entries string
+		want          ProjectPolicy
+		error         string
+	}{
+		{name: "preset conflict", entries: `[{"projectService":true},{"project":"custom.json"}]`, error: "remove project"},
+		{name: "empty array conflict", entries: `[{"projectService":true,"project":[]}]`, error: "remove project"},
+		{name: "automatic conflict", entries: `[{"projectService":true,"project":true}]`, error: "remove project"},
+		{name: "clear project false", entries: `[{"project":"custom.json"},{"projectService":true,"project":false}]`, want: ProjectPolicy{ServiceRootDirectory: owner}},
+		{name: "clear project null", entries: `[{"project":"custom.json"},{"projectService":true,"project":null}]`, want: ProjectPolicy{ServiceRootDirectory: owner}},
+		{name: "clear service false", entries: `[{"projectService":true},{"projectService":false,"project":"custom.json"}]`, want: ProjectPolicy{DefaultProjectDisabled: true}},
+		{name: "clear service null", entries: `[{"projectService":true},{"projectService":null}]`, want: ProjectPolicy{DefaultProjectDisabled: true}},
+		{name: "matched false reset", entries: `[{"project":"custom.json"},{"project":false}]`, want: ProjectPolicy{ProjectDisabled: true}},
+		{name: "matched null reset", entries: `[{"project":"custom.json"},{"project":null}]`, want: ProjectPolicy{ProjectDisabled: true}},
+		{name: "ordinary empty array", entries: `[{"project":"custom.json"},{"project":[]}]`},
+		{name: "restore after reset", entries: `[{"project":false},{"project":"custom.json"}]`},
+		{name: "automatic unsupported", entries: `[{"project":true}]`, error: "not supported"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var options []ParserOptions
+			if err := json.Unmarshal([]byte(test.entries), &options); err != nil {
+				t.Fatal(err)
+			}
+			var entries RslintConfig
+			for index := range options {
+				entries = append(entries, ConfigEntry{Files: []string{"**/*.ts"}, LanguageOptions: &LanguageOptions{ParserOptions: &options[index]}})
+			}
+			entries = append(entries, ConfigEntry{Files: []string{"other/**"}, LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: ProjectPaths{"missing.json"}}}})
+			encoded, err := json.Marshal(entries)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var roundTrip RslintConfig
+			if err := json.Unmarshal(encoded, &roundTrip); err != nil {
+				t.Fatal(err)
+			}
+			for _, candidate := range []RslintConfig{entries, roundTrip} {
+				policy, err := projectPolicyForTargetForTest(candidate, owner, nil, PathIdentity{Path: owner + "/src/file.ts"})
+				if test.error != "" {
+					if err == nil || !strings.Contains(err.Error(), test.error) {
+						t.Fatalf("want %q, got %v", test.error, err)
+					}
+				} else if err != nil || policy != test.want {
+					t.Fatalf("policy=%+v error=%v, want %+v", policy, err, test.want)
+				}
+			}
+		})
+	}
+}
+
+func TestProjectPolicyServiceRootDefaults(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	matchingDirectory := root + "/matching"
+	defaultRootDirectory := root + "/config-module"
+	explicitRootDirectory := root + "/explicit"
+	for _, test := range []struct {
+		name, options string
+		want          ProjectPolicy
+	}{
+		{
+			name: "omitted uses supplied config origin", options: `[{"projectService":true}]`,
+			want: ProjectPolicy{ServiceRootDirectory: defaultRootDirectory},
+		},
+		{
+			name:    "null resets to the same config origin",
+			options: fmt.Sprintf(`[{"projectService":true,"tsconfigRootDir":%q},{"tsconfigRootDir":null}]`, explicitRootDirectory),
+			want:    ProjectPolicy{ServiceRootDirectory: defaultRootDirectory},
+		},
+		{
+			name:    "explicit root is resolved before service consumption",
+			options: fmt.Sprintf(`[{"projectService":true,"tsconfigRootDir":%q}]`, explicitRootDirectory+"/nested/../"),
+			want:    ProjectPolicy{ServiceRootDirectory: explicitRootDirectory, TSConfigRootDirOverride: explicitRootDirectory},
+		},
+		{
+			name:    "disabled service keeps only explicit project override",
+			options: fmt.Sprintf(`[{"projectService":false,"tsconfigRootDir":%q}]`, explicitRootDirectory),
+			want:    ProjectPolicy{DefaultProjectDisabled: true, TSConfigRootDirOverride: explicitRootDirectory},
+		},
+		{name: "ordinary omission does not inject a default root", options: `[{}]`},
+		{name: "ordinary null does not inject a default root", options: `[{"tsconfigRootDir":null}]`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var options []ParserOptions
+			if err := json.Unmarshal([]byte(test.options), &options); err != nil {
+				t.Fatal(err)
+			}
+			var entries RslintConfig
+			for index := range options {
+				entries = append(entries, ConfigEntry{LanguageOptions: &LanguageOptions{ParserOptions: &options[index]}})
+			}
+			resolved := NewFileConfigResolverWithFS(entries, matchingDirectory, nil, baseRuleCatalog()).ResolveTarget(PathIdentity{Path: matchingDirectory + "/file.ts"})
+			policy, err := ResolveProjectPolicy(resolved, defaultRootDirectory)
+			if err != nil || policy != test.want {
+				t.Fatalf("policy=%+v error=%v, want %+v", policy, err, test.want)
+			}
+		})
+	}
+}
+
+func TestProjectPolicyServiceDefaultDoesNotRebaseDeclaredPaths(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	owner, authored, serviceDefault := root+"/owner", root+"/authored[1]", root+"/config-module"
+	createTestFile(t, authored+"/project.json")
+	createTestFile(t, serviceDefault+"/project.json")
+	for _, suffix := range []string{"", `,{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}`} {
+		t.Run("nullReset="+strconv.FormatBool(suffix != ""), func(t *testing.T) {
+			entries := ConfigWithAuthoredPathBase(RslintConfig{{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: ProjectPaths{"./project.json"}}}}}, authored)
+			var service RslintConfig
+			if err := json.Unmarshal([]byte(`[{"languageOptions":{"parserOptions":{"projectService":true,"project":false}}}`+suffix+`]`), &service); err != nil {
+				t.Fatal(err)
+			}
+			entries = append(entries, service...)
+			resolved := NewFileConfigResolverWithFS(entries, owner, osvfs.FS(), baseRuleCatalog()).ResolveTarget(PathIdentity{Path: owner + "/file.ts"})
+			policy, err := ResolveProjectPolicy(resolved, serviceDefault)
+			if err != nil || policy.ServiceRootDirectory != serviceDefault || policy.TSConfigRootDirOverride != "" {
+				t.Fatalf("service root became an ordinary project override: %+v, %v", policy, err)
+			}
+			paths, err := ResolveTsConfigPathsWithPolicy(entries, owner, osvfs.FS(), policy)
+			if err != nil || !reflect.DeepEqual(paths, []string{authored + "/project.json"}) {
+				t.Fatalf("service default changed declared project origin: %v, %v", paths, err)
+			}
+		})
+	}
+}
+
+func TestHasProjectOptions(t *testing.T) {
+	for _, test := range []struct {
+		options string
+		want    bool
+	}{
+		{`{}`, false}, {`{"project":"one.json"}`, false}, {`{"project":["one.json","two.json"]}`, false}, {`{"project":[]}`, false},
+		{`{"projectService":true}`, true}, {`{"projectService":false}`, true}, {`{"projectService":null}`, true},
+		{`{"project":false}`, true}, {`{"project":null}`, true}, {`{"project":true}`, true},
+		{`{"tsconfigRootDir":null}`, true}, {`{"tsconfigRootDir":""}`, true}, {`{"tsconfigRootDir":42}`, true},
+	} {
+		t.Run(test.options, func(t *testing.T) {
+			var options ParserOptions
+			if err := json.Unmarshal([]byte(test.options), &options); err != nil {
+				t.Fatal(err)
+			}
+			entries := RslintConfig{{Rules: Rules{"no-debugger": "error"}}, {Files: []string{"unused.ts"}, LanguageOptions: &LanguageOptions{ParserOptions: &options}}}
+			if got := HasProjectOptions(entries); got != test.want {
+				t.Fatalf("HasProjectOptions=%v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestProjectPolicyPreservesOwnerDeclarations(t *testing.T) {
+	owner := tspath.NormalizePath(t.TempDir())
+	for _, name := range []string{"first.json", "second.json", "tsconfig.json"} {
+		createTestFile(t, tspath.ResolvePath(owner, name))
+	}
+	for _, test := range []struct {
+		name, options string
+		matched       bool
+		want          []string
+	}{
+		{name: "ordinary project order", options: `{}`, want: []string{"first.json", "second.json"}},
+		{name: "empty array keeps earlier declarations", options: `{"project":[]}`, matched: true, want: []string{"first.json", "second.json"}},
+		{name: "service false keeps declarations", options: `{"projectService":false}`, matched: true, want: []string{"first.json", "second.json"}},
+		{name: "service null keeps declarations", options: `{"projectService":null}`, matched: true, want: []string{"first.json", "second.json"}},
+		{name: "unmatched service neutral", options: `{"projectService":true}`, want: []string{"first.json", "second.json"}},
+		{name: "unmatched root neutral", options: `{"tsconfigRootDir":"."}`, want: []string{"first.json", "second.json"}},
+		{name: "unmatched reset neutral", options: `{"project":false}`, want: []string{"first.json", "second.json"}},
+		{name: "matched false reset keeps raw declarations", options: `{"project":false}`, matched: true, want: []string{"first.json", "second.json"}},
+		{name: "matched null reset keeps raw declarations", options: `{"project":null}`, matched: true, want: []string{"first.json", "second.json"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var options ParserOptions
+			if err := json.Unmarshal([]byte(test.options), &options); err != nil {
+				t.Fatal(err)
+			}
+			selector := "unused.ts"
+			if test.matched {
+				selector = "target.ts"
+			}
+			entries := RslintConfig{
+				{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: ProjectPaths{"first.json"}}}},
+				{Files: []string{"unused.ts"}, LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: ProjectPaths{"second.json"}}}},
+				{Files: []string{selector}, LanguageOptions: &LanguageOptions{ParserOptions: &options}},
+			}
+			policy, err := projectPolicyForTargetForTest(entries, owner, osvfs.FS(), PathIdentity{Path: owner + "/target.ts"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			paths, err := ResolveTsConfigPathsWithPolicy(entries, owner, osvfs.FS(), policy)
+			var want []string
+			for _, name := range test.want {
+				want = append(want, tspath.ResolvePath(owner, name))
+			}
+			if err != nil || !reflect.DeepEqual(paths, want) {
+				t.Fatalf("paths=%v error=%v, want %v", paths, err, want)
+			}
+		})
+	}
+}
+
+func TestProjectPolicyDefaultFallbackAndEmptyDeclarations(t *testing.T) {
+	owner := tspath.NormalizePath(t.TempDir())
+	createTestFile(t, owner+"/tsconfig.json")
+	for _, declaration := range []ProjectPaths{nil, {}} {
+		for _, test := range []struct {
+			options              string
+			matched, wantDefault bool
+		}{
+			{`{"projectService":true}`, false, true}, {`{"projectService":false}`, false, true},
+			{`{"project":false}`, false, true}, {`{"project":null}`, false, true},
+			{`{"projectService":false}`, true, false}, {`{"projectService":null}`, true, false},
+			{`{"project":false}`, true, true}, {`{"project":null}`, true, true},
+		} {
+			t.Run(fmt.Sprintf("empty=%t/match=%t/%s", declaration != nil, test.matched, test.options), func(t *testing.T) {
+				var options ParserOptions
+				if err := json.Unmarshal([]byte(test.options), &options); err != nil {
+					t.Fatal(err)
+				}
+				selector := "unused.ts"
+				if test.matched {
+					selector = "target.ts"
+				}
+				entries := RslintConfig{
+					{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: declaration}}},
+					{Files: []string{selector}, LanguageOptions: &LanguageOptions{ParserOptions: &options}},
+				}
+				policy, err := projectPolicyForTargetForTest(entries, owner, osvfs.FS(), PathIdentity{Path: owner + "/target.ts"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				paths, err := ResolveTsConfigPathsWithPolicy(entries, owner, osvfs.FS(), policy)
+				var want []string
+				if test.wantDefault && declaration == nil {
+					want = []string{owner + "/tsconfig.json"}
+				}
+				if err != nil || !reflect.DeepEqual(paths, want) {
+					t.Fatalf("paths=%v error=%v, want %v", paths, err, want)
+				}
+			})
+		}
+	}
+}
+
+func TestProjectPolicyPreservesLiteralBaseForProjectPatterns(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	owner, first, second, boundary := root+"/owner", root+"/first[1]", root+"/second[2]", root+"/boundary[3]"
+	for _, test := range []struct {
+		name, suffix string
+		root         string
+	}{
+		{name: "authored bases"},
+		{name: "root override", suffix: fmt.Sprintf(`,{"languageOptions":{"parserOptions":{"tsconfigRootDir":%q}}}`, boundary), root: boundary},
+		{name: "null reset", suffix: fmt.Sprintf(`,{"languageOptions":{"parserOptions":{"tsconfigRootDir":%q}}},{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}`, boundary)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for _, dir := range []string{first, second, boundary} {
+				for _, file := range []string{"first.json", "second.json"} {
+					createTestFile(t, tspath.ResolvePath(dir, file))
+				}
+			}
+			entries := ConfigWithAuthoredPathBase(RslintConfig{{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: ProjectPaths{"./first*.json"}}}}}, first)
+			entries = append(entries, ConfigWithAuthoredPathBase(RslintConfig{{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: ProjectPaths{"./second.json"}}}}}, second)...)
+			var override RslintConfig
+			if err := json.Unmarshal([]byte(`[{"languageOptions":{"parserOptions":{"projectService":false}}}`+test.suffix+`]`), &override); err != nil {
+				t.Fatal(err)
+			}
+			entries = append(entries, override...)
+			policy, err := projectPolicyForTargetForTest(entries, owner, osvfs.FS(), PathIdentity{Path: owner + "/target.ts"})
+			if err != nil || policy.TSConfigRootDirOverride != test.root {
+				t.Fatalf("policy=%+v error=%v", policy, err)
+			}
+			want := []string{first + "/first.json", second + "/second.json"}
+			if test.root != "" {
+				want = []string{boundary + "/first.json", boundary + "/second.json"}
+			}
+			paths, err := ResolveTsConfigPathsWithPolicy(entries, owner, osvfs.FS(), policy)
+			if err != nil || !reflect.DeepEqual(paths, want) {
+				t.Fatalf("paths=%v error=%v, want %v", paths, err, want)
+			}
+		})
+	}
+}
+
+func TestProjectPolicyRootValidationAfterMerge(t *testing.T) {
+	owner := tspath.NormalizePath(t.TempDir())
+	previous := owner + "/previous-boundary"
+	explicit := owner + "/boundary"
+	for _, root := range []struct {
+		name, value, errorMessage string
+	}{
+		{"relative", `"."`, "absolute path"},
+		{"empty", `""`, "absolute path"},
+		{"number", `42`, "absolute path string"},
+		{"precise number", `9007199254740993`, "absolute path string"},
+		{"true", `true`, "absolute path string"},
+		{"false", `false`, "absolute path string"},
+		{"empty array", `[]`, "absolute path string"},
+		{"array", `["/unused",42]`, "absolute path string"},
+		{"empty object", `{}`, "absolute path string"},
+		{"object", `{"value":42,"nested":[true,9007199254740993]}`, "absolute path string"},
+	} {
+		for _, service := range []bool{true, false} {
+			for _, test := range []struct {
+				name        string
+				files       string
+				suffix      string
+				wantRoot    string
+				wantError   bool
+				wantIgnored bool
+			}{
+				{name: "matched", files: "src/**", wantError: true},
+				{name: "later omission retains invalid root", files: "src/**", suffix: `,{"languageOptions":{"parserOptions":{}}}`, wantError: true},
+				{name: "unmatched", files: "elsewhere/**", wantRoot: previous},
+				{name: "overridden", files: "src/**", suffix: fmt.Sprintf(`,{"languageOptions":{"parserOptions":{"tsconfigRootDir":%q}}}`, explicit), wantRoot: explicit},
+				{name: "null reset", files: "src/**", suffix: `,{"languageOptions":{"parserOptions":{"tsconfigRootDir":null}}}`, wantRoot: ""},
+				{name: "global ignore", files: "src/**", suffix: `,{"ignores":["src/**"]}`, wantIgnored: true},
+			} {
+				name := fmt.Sprintf("root=%s/service=%t/%s", root.name, service, test.name)
+				t.Run(name, func(t *testing.T) {
+					input := fmt.Sprintf(`[{
+						"files":["**/*.ts"],
+						"languageOptions":{"parserOptions":{"projectService":%t,"tsconfigRootDir":%q}}
+					},{"files":[%q],"languageOptions":{"parserOptions":{"tsconfigRootDir":%s}}}%s]`, service, previous, test.files, root.value, test.suffix)
+					var original RslintConfig
+					if err := json.Unmarshal([]byte(input), &original); err != nil {
+						t.Fatalf("root validation ran before matching and merging: %v", err)
+					}
+					encoded, err := json.Marshal(original)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var roundTrip RslintConfig
+					if err := json.Unmarshal(encoded, &roundTrip); err != nil {
+						t.Fatal(err)
+					}
+					for _, config := range []struct {
+						name    string
+						entries RslintConfig
+					}{
+						{"original", original},
+						{"JSON round trip", roundTrip},
+					} {
+						t.Run(config.name, func(t *testing.T) {
+							options := config.entries[1].LanguageOptions.ParserOptions
+							encodedOptions, err := json.Marshal(options)
+							if err != nil {
+								t.Fatal(err)
+							}
+							var fields map[string]json.RawMessage
+							if err := json.Unmarshal(encodedOptions, &fields); err != nil {
+								t.Fatal(err)
+							}
+							if string(fields["tsconfigRootDir"]) != root.value {
+								t.Fatalf("explicit root changed during round trip: %s, want %s", fields["tsconfigRootDir"], root.value)
+							}
+							policy, err := projectPolicyForTargetForTest(config.entries, owner, nil, PathIdentity{Path: owner + "/src/file.ts"})
+							if test.wantError {
+								if err == nil || !strings.Contains(err.Error(), root.errorMessage) {
+									t.Fatalf("expected final root validation even when service=%t, got %+v, %v", service, policy, err)
+								}
+								return
+							}
+							want := ProjectPolicy{TSConfigRootDirOverride: test.wantRoot, DefaultProjectDisabled: !service}
+							if service {
+								want.ServiceRootDirectory = test.wantRoot
+								if want.ServiceRootDirectory == "" {
+									want.ServiceRootDirectory = owner
+								}
+							}
+							if test.wantIgnored {
+								want = ProjectPolicy{}
+							}
+							if err != nil || !reflect.DeepEqual(policy, want) {
+								t.Fatalf("policy = %+v, error = %v; want %+v", policy, err, want)
+							}
+						})
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestProjectPolicyRootPathNormalization(t *testing.T) {
+	owner := tspath.NormalizePath(t.TempDir())
+	root := tspath.NormalizePath(filepath.VolumeName(owner) + string(filepath.Separator))
+	for _, test := range []struct {
+		name, value, want string
+		invalid           bool
+	}{
+		{name: "absolute", value: owner, want: owner},
+		{name: "trailing separator", value: owner + "/", want: owner},
+		{name: "dot segments", value: owner + "/nested/.././", want: owner},
+		{name: "filesystem root", value: root, want: root},
+		{name: "relative", value: "relative", invalid: true},
+		{name: "empty", value: "", invalid: true},
+		{name: "drive path", value: "C:/repo/", want: "C:/repo", invalid: runtime.GOOS != "windows"},
+		{name: "backslash root", value: `\repo`, invalid: true},
+		{name: "network root", value: `\\server\share\repo`, invalid: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			entries := RslintConfig{{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{TsconfigRootDir: &test.value}}}}
+			policy, err := projectPolicyForTargetForTest(entries, owner, nil, PathIdentity{Path: owner + "/file.ts"})
+			if test.invalid {
+				if err == nil || !strings.Contains(err.Error(), "absolute path") {
+					t.Fatalf("expected invalid host path, got %+v, %v", policy, err)
+				}
+				return
+			}
+			if err != nil || policy.TSConfigRootDirOverride != test.want {
+				t.Fatalf("root=%q error=%v, want %q", policy.TSConfigRootDirOverride, err, test.want)
+			}
+		})
+	}
+}
+
+func TestParserOptionsRejectUnsupportedServiceOptions(t *testing.T) {
+	for _, input := range []string{
+		`{"projectService":{}}`,
+		`{"projectService":{"allowDefaultProject":["*.js"]}}`,
+		`{"projectService":42}`,
+		`{"projectService":"true"}`,
+		`{"projectService":[]}`,
+		`{"project":42}`,
+		`{"project":{}}`,
+		`{"project":[42]}`,
+		`{"tsconfigRootDir":}`,
+	} {
+		var options ParserOptions
+		if err := json.Unmarshal([]byte(input), &options); err == nil {
+			t.Fatalf("expected unsupported options to fail: %s", input)
+		}
+	}
+}
 
 func TestGetConfigForFile_ExplicitRulesOnly(t *testing.T) {
 	config := RslintConfig{

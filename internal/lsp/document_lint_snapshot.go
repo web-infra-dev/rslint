@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"net/url"
-	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
@@ -27,6 +26,8 @@ type documentLintSnapshot struct {
 	pathSpaces            *config.PathSpaceSnapshot
 	ruleCatalog           *rule.Catalog
 	configResolved        bool
+	projectPolicy         config.ProjectPolicy
+	projectPolicyError    error
 	typeScriptConfigPaths []string
 	configKey             string
 	pluginGeneration      string
@@ -62,8 +63,31 @@ func resolveDocumentLintSnapshotConfig(
 	}
 	snapshot.resolvedConfig = resolver.ResolveTarget(snapshot.target.Identity())
 	snapshot.configResolved = true
+	return resolveDocumentLintSnapshotProjects(snapshot, fs)
+}
+
+func resolveDocumentLintSnapshotProjects(
+	snapshot documentLintSnapshot,
+	fs vfs.FS,
+) documentLintSnapshot {
+	if config.HasProjectOptions(snapshot.config) {
+		snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.target.ConfigDirectory)
+	}
+	snapshot.typeScriptConfigPaths = nil
+	if snapshot.projectPolicyError != nil || snapshot.projectPolicy.ServiceRootDirectory != "" || snapshot.projectPolicy.ProjectDisabled {
+		return snapshot
+	}
+	// Preserve the owner's declaration order and authored bases. Matched root
+	// options can rebase those declarations without another config matcher.
+	snapshot.typeScriptConfigPaths, snapshot.projectPolicyError = config.ResolveTsConfigPathsWithPolicy(
+		snapshot.config,
+		snapshot.target.ConfigDirectory,
+		fs,
+		snapshot.projectPolicy,
+	)
 	return snapshot
 }
+
 func isLintableScriptFile(uri lsproto.DocumentUri) bool {
 	return config.IsSupportedLintFile(uriToPath(uri))
 }
@@ -72,7 +96,7 @@ func uriToPath(uri lsproto.DocumentUri) string {
 	// Convert file:// URI to file path using net/url for proper percent-decoding.
 	// Handles spaces (%20), CJK characters, and other encoded chars in paths.
 	// file:///home/user       → /home/user  (Unix)
-	// file:///C:/Users        → C:/Users    (Windows — strip the leading slash)
+	// file:///C:/Users        → c:/Users    (Windows — same drive spelling as tsgo)
 	// file:///path%20name/f   → /path name/f
 	uriStr := string(uri)
 	if uriStr == "" {
@@ -86,9 +110,10 @@ func uriToPath(uri lsproto.DocumentUri) string {
 	if u.Host != "" {
 		return "//" + u.Host + p
 	}
-	// Windows drive letter: /C:/... → C:/...
-	if len(p) >= 3 && p[0] == '/' && unicode.IsLetter(rune(p[1])) && p[2] == ':' {
-		return p[1:]
+	if len(p) > 0 && p[0] == '/' {
+		if volume, path, ok := tspath.SplitVolumePath(p[1:]); ok {
+			return volume + path
+		}
 	}
 	return p
 }
@@ -270,23 +295,36 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 	target := lspTargetIdentity(uriToPath(uri), s.fs)
 	selection := s.selectDocumentConfig(target)
 	target.ConfigDirectory = selection.directory
-	var typeScriptConfigPaths []string
-	if selection.configKey != "" {
-		typeScriptConfigPaths = s.tsConfigPathsByConfig[selection.configKey]
-	}
 	_, unavailable := s.jsUnavailableConfigs[selection.configKey]
-	return documentLintSnapshot{
-		target:                target,
-		config:                selection.entries,
-		resolvedConfig:        selection.resolved,
-		pathSpaces:            selection.pathSpaces,
-		ruleCatalog:           selection.ruleCatalog,
-		configResolved:        !selection.configMissing,
-		typeScriptConfigPaths: typeScriptConfigPaths,
-		configKey:             selection.configKey,
-		pluginGeneration:      s.eslintPluginConfigGeneration,
-		unavailable:           selection.configKey != "" && unavailable,
+	snapshot := documentLintSnapshot{
+		target:           target,
+		config:           selection.entries,
+		resolvedConfig:   selection.resolved,
+		pathSpaces:       selection.pathSpaces,
+		ruleCatalog:      selection.ruleCatalog,
+		configResolved:   !selection.configMissing,
+		configKey:        selection.configKey,
+		pluginGeneration: s.eslintPluginConfigGeneration,
+		unavailable:      selection.configKey != "" && unavailable,
 	}
+	if snapshot.configResolved {
+		if config.HasProjectOptions(snapshot.config) {
+			snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
+		} else if snapshot.configKey != "" {
+			paths, cached := s.tsConfigPathsByConfig[snapshot.configKey]
+			if !cached {
+				paths, snapshot.projectPolicyError = resolveTsConfigPathsWithFS(snapshot.config, snapshot.target.ConfigDirectory, s.fs)
+				if snapshot.projectPolicyError == nil {
+					if s.tsConfigPathsByConfig == nil {
+						s.tsConfigPathsByConfig = make(map[string][]string)
+					}
+					s.tsConfigPathsByConfig[snapshot.configKey] = paths
+				}
+			}
+			snapshot.typeScriptConfigPaths = paths
+		}
+	}
+	return snapshot
 }
 
 // getConfigForURI is retained for package-level helpers and tests. Production
@@ -341,18 +379,4 @@ func (s *Server) jsConfigKeyForTarget(target target.File) (string, bool) {
 	}
 	_, active := s.jsConfigs[configDir]
 	return configDir, active
-}
-
-// tsConfigPathsForURI returns parserOptions.project paths from the config owner
-// selected by getConfigForURI. A nested config with no tsconfig therefore does
-// not affect type-info decisions for sibling configs.
-//
-// A nil return means the governing config has no resolved tsconfig, so callers
-// must disable type-aware rules for this file.
-func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
-	target := lspTargetIdentity(uriToPath(uri), s.fs)
-	if configKey, ok := s.jsConfigKeyForTarget(target); ok {
-		return s.tsConfigPathsByConfig[configKey]
-	}
-	return nil
 }

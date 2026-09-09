@@ -23,7 +23,7 @@ func NewProgramSourceLookup(program *compiler.Program, fs vfs.FS) *ProgramSource
 }
 
 func exactProgramSourcePathID(filePath string) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
+	return NormalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
 }
 
 func (lookup *ProgramSourceLookup) canonicalPathID(filePath string) string {

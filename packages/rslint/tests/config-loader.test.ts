@@ -8,6 +8,8 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import vm from 'node:vm';
+import { ts } from '../src/config/presets/index.js';
 
 function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-config-loader-test-'));
@@ -603,5 +605,41 @@ describe('collectPluginMeta', () => {
     expect(eslintPluginEntries).toEqual([
       { prefix: 'local', ruleNames: ['no-bar', 'no-foo', 'zzz'] },
     ]);
+  });
+});
+
+describe('TypeScript preset values', () => {
+  test.each(Object.keys(ts.configs) as (keyof typeof ts.configs)[])(
+    '%s keeps its identity across config and helper reads',
+    (name) => {
+      const preset = ts.configs[name];
+      for (const filename of ['rslint.config.mjs', 'helper.mjs']) {
+        const reread = vm.runInNewContext(
+          'ts.configs[name]',
+          { ts, name },
+          {
+            filename: path.join(os.tmpdir(), filename),
+          },
+        );
+        expect(reread).toBe(preset);
+      }
+    },
+  );
+
+  test('configuring a preset before exporting it preserves the modification', () => {
+    const base = ts.configs.base;
+    const previousFiles = base.files;
+    try {
+      const entries = vm.runInNewContext(
+        "ts.configs.base.files = ['src/**/*.ts']; [ts.configs.base]",
+        { ts },
+        { filename: path.join(os.tmpdir(), 'rslint.config.mjs') },
+      );
+      expect(normalizeConfig(entries)[0].files).toEqual(['src/**/*.ts']);
+      expect(entries[0]).toBe(base);
+    } finally {
+      if (previousFiles === undefined) delete base.files;
+      else base.files = previousFiles;
+    }
   });
 });

@@ -68,7 +68,7 @@ func TestResolveDeclaredProjectPaths_GlobExpansion(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
@@ -90,7 +90,7 @@ func TestResolveDeclaredProjectPaths_NoMatches(t *testing.T) {
 		},
 	}
 
-	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.ErrorContains(t, err, "glob pattern")
 }
 
@@ -113,7 +113,7 @@ func TestResolveDeclaredProjectPaths_MixedGlobAndNonGlob(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "tsconfig.json")),
@@ -147,7 +147,7 @@ func TestResolveDeclaredProjectPathsUsesResolvedBasePathOrigin(t *testing.T) {
 		}},
 	}}, configArrayBase)
 
-	paths, err := resolveDeclaredProjectPaths(osvfs.FS(), config, filepath.Join(root, "configs"))
+	paths, err := resolveDeclaredProjectPaths(osvfs.FS(), config, filepath.Join(root, "configs"), "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, paths, []string{filepath.ToSlash(projectPath)})
 }
@@ -171,7 +171,7 @@ func TestResolveDeclaredProjectPaths_DeduplicatesMatches(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
@@ -196,7 +196,7 @@ func TestResolveDeclaredProjectPaths_GlobExpansionWithOverlayVFS(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
@@ -217,7 +217,7 @@ func TestResolveDeclaredProjectPaths_NonExistentNonGlobFile(t *testing.T) {
 		},
 	}
 
-	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.ErrorContains(t, err, "doesn't exist")
 }
 
@@ -238,7 +238,7 @@ func TestResolveDeclaredProjectPaths_DoubleStarPattern(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/stores/tsconfig.json")),
@@ -266,7 +266,7 @@ func TestResolveDeclaredProjectPaths_SingleStarDoesNotMatchNested(t *testing.T) 
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
@@ -286,7 +286,7 @@ func TestResolveDeclaredProjectPaths_NonExistentSearchRoot(t *testing.T) {
 		},
 	}
 
-	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	_, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.ErrorContains(t, err, "glob pattern")
 }
 
@@ -311,7 +311,7 @@ func TestResolveDeclaredProjectPaths_DoubleStarWithSymlinkCycle(t *testing.T) {
 	}
 
 	// Should complete without hanging, finding only the real tsconfig
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.Assert(t, len(tsConfigs) >= 1, "should find at least the real tsconfig.json")
 
@@ -342,7 +342,7 @@ func TestResolveDeclaredProjectPaths_QuestionMarkPattern(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/a/tsconfig.json")),
@@ -368,7 +368,7 @@ func TestResolveDeclaredProjectPaths_CharacterClassPattern(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "tsconfig1.json")),
@@ -394,7 +394,7 @@ func TestResolveDeclaredProjectPaths_NegatedCharacterClass(t *testing.T) {
 		},
 	}
 
-	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir)
+	tsConfigs, err := resolveDeclaredProjectPaths(fsys, rslintConfig, tmpDir, "")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, tsConfigs, []string{
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/b/tsconfig.json")),
@@ -585,6 +585,13 @@ func TestResolveTsConfigPathsDefaultRemainsAtOwningConfigBase(t *testing.T) {
 		Rules: Rules{"no-debugger": "error"},
 	}}, authoredDirectory)
 	projects, err := ResolveTsConfigPaths(config, configDirectory, osvfs.FS())
+	assert.NilError(t, err)
+	assert.DeepEqual(t, projects, []string{tspath.NormalizePath(ownerProject)})
+	// The root option rebases declared paths; omitted project retains rslint's
+	// owner-level default, including when the authored base is elsewhere.
+	projects, err = ResolveTsConfigPathsWithPolicy(config, configDirectory, osvfs.FS(), ProjectPolicy{
+		TSConfigRootDirOverride: tspath.NormalizePath(authoredDirectory),
+	})
 	assert.NilError(t, err)
 	assert.DeepEqual(t, projects, []string{tspath.NormalizePath(ownerProject)})
 }

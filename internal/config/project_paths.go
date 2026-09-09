@@ -11,7 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
-func resolveDeclaredProjectPaths(fsys vfs.FS, rslintConfig RslintConfig, configDirectory string) ([]string, error) {
+func resolveDeclaredProjectPaths(fsys vfs.FS, rslintConfig RslintConfig, configDirectory string, rootOverride string) ([]string, error) {
 	tsConfigs := []string{}
 	seenPaths := make(map[string]struct{})
 
@@ -20,6 +20,9 @@ func resolveDeclaredProjectPaths(fsys vfs.FS, rslintConfig RslintConfig, configD
 			continue
 		}
 		entryBaseDirectory := configEntryBaseDirectory(entry, configDirectory)
+		if rootOverride != "" {
+			entryBaseDirectory = rootOverride
+		}
 
 		for _, config := range entry.LanguageOptions.ParserOptions.Project {
 			if containsGlobPattern(config) {
@@ -54,10 +57,19 @@ func resolveDeclaredProjectPaths(fsys vfs.FS, rslintConfig RslintConfig, configD
 // Returns (nil, nil) when no tsconfigs are found. Returns (nil, err) when
 // config validation fails (e.g. glob matched no files, tsconfig doesn't exist).
 func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]string, error) {
+	return ResolveTsConfigPathsWithPolicy(rslintConfig, cwd, fs, ProjectPolicy{})
+}
+
+// ResolveTsConfigPathsWithPolicy keeps the original declaration order and raw
+// patterns. A root override changes only their literal base; disabling the
+// default project never discards an explicitly declared project. Only
+// TSConfigRootDirOverride and DefaultProjectDisabled affect this projection;
+// callers choose whether service or disabled binding needs these declarations.
+func ResolveTsConfigPathsWithPolicy(rslintConfig RslintConfig, cwd string, fs vfs.FS, policy ProjectPolicy) ([]string, error) {
 	if fs == nil {
 		return nil, nil
 	}
-	tsConfigs, err := resolveDeclaredProjectPaths(fs, rslintConfig, cwd)
+	tsConfigs, err := resolveDeclaredProjectPaths(fs, rslintConfig, cwd, policy.TSConfigRootDirOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +77,7 @@ func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]s
 		// An explicit empty list means "use no TypeScript project". It must not
 		// silently turn into the default tsconfig.json; callers that want the
 		// default discovery behavior omit parserOptions.project.
-		if hasExplicitProjectSetting(rslintConfig) {
+		if policy.DefaultProjectDisabled || hasExplicitProjectSetting(rslintConfig) {
 			return nil, nil
 		}
 		defaultTsConfig := tspath.ResolvePath(cwd, "tsconfig.json")

@@ -123,6 +123,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		configDirectory = currentDirectory
 	}
 	configDirectory = tspath.NormalizePath(configDirectory)
+	// Inline API config has no module directory. Its matching/path base can
+	// differ from the invocation cwd and must not become the discovery root.
+	defaultRootDirectory := currentDirectory
 	if len(rslintConfig) > 0 {
 		rslintConfig = rslintconfig.ConfigWithResolvedBasePaths(
 			rslintConfig,
@@ -246,6 +249,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				// incorrectly drop it, even though explicit flat-config semantics say
 				// the selected module governs the complete supplied target set.
 				configDirectory = configDirectories[0]
+				defaultRootDirectory = configDirectory
 				rslintConfig = append(rslintconfig.RslintConfig(nil), configCatalog.Configs[configDirectory]...)
 				pluginConfigKeyByOwner = map[string]string{configDirectory: configDirectory}
 				configGitignoreFrozen = true
@@ -336,21 +340,36 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	if err != nil {
 		return nil, fmt.Errorf("resolve lint targets: %w", err)
 	}
+	configResolver := configLint.NewResolver(configLint.ResolverOptions{
+		ConfigsByOwner:       configMap,
+		Config:               rslintConfig,
+		ConfigDirectory:      configDirectory,
+		DefaultRootDirectory: defaultRootDirectory,
+		Catalog:              ruleCatalog,
+		PathSpaces:           targetPlan.PathSpaces(),
+		FS:                   fs,
+	})
+	projectPolicies, err := configResolver.ProjectPolicies(targetPlan.Files)
+	if err != nil {
+		return nil, err
+	}
+	projectConfigs := configMap
+	if projectConfigs == nil {
+		projectConfigs = map[string]rslintconfig.RslintConfig{configDirectory: rslintConfig}
+	}
+	projectRequest := loader.ProjectBuildRequest{
+		Configs:  projectConfigs,
+		Targets:  targetPlan,
+		Policies: projectPolicies,
+		Scope:    loader.Targeted,
+	}
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
 	buildBinding := func(session *loader.Session) (loader.LoadResult, error) {
-		var projects loader.ProjectSet
-		var buildErr error
-		if len(targetPlan.Files) > 0 {
-			if configMap != nil {
-				projects, buildErr = session.BuildTargetProjects(configMap, targetPlan, false)
-			} else {
-				projects, buildErr = session.BuildTargetProject(configDirectory, rslintConfig, targetPlan, false)
-			}
-			if buildErr != nil {
-				return loader.LoadResult{}, buildErr
-			}
+		projects, buildErr := session.BuildProjects(projectRequest)
+		if buildErr != nil {
+			return loader.LoadResult{}, buildErr
 		}
 		return session.LoadAPI(projects, targetPlan, configDirectory, false)
 	}
@@ -377,16 +396,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 	}
 	generationForBinding := func(binding loader.LoadResult, generationFS vfs.FS) linter.Generation {
-		fileConfigResolver := configLint.NewResolver(configLint.ResolverOptions{
-			ConfigsByOwner:                      configMap,
-			Config:                              rslintConfig,
-			ConfigDirectory:                     configDirectory,
-			Catalog:                             ruleCatalog,
-			TargetsBySourcePath:                 binding.LintTargetBySourcePath,
-			SourceMappingsIncludeCanonicalPaths: true,
-			PathSpaces:                          targetPlan.PathSpaces(),
-			FS:                                  generationFS,
-		})
+		fileConfigResolver := configResolver.WithSourceMappings(binding.LintTargetBySourcePath, generationFS, true)
 		targetPathForSourcePath := func(sourcePath string) string {
 			if lintTarget, bound := fileConfigResolver.TargetForSourcePath(sourcePath); bound {
 				return lintTarget.Path

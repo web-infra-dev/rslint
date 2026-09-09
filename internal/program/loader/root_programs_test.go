@@ -22,7 +22,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_cycle"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/rules"
 )
 
 func rootProgramTestPlan(dir string, names ...string) target.Plan {
@@ -480,7 +479,7 @@ func buildProjectsForConfigs(
 	singleThreaded bool,
 	context *buildContext,
 ) (ProjectSet, error) {
-	return sessionForTest(context).BuildProjects(configs, singleThreaded)
+	return sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: configs, Scope: AllDeclared, SingleThreaded: singleThreaded})
 }
 
 func buildProjectsForConfig(
@@ -489,7 +488,7 @@ func buildProjectsForConfig(
 	singleThreaded bool,
 	context *buildContext,
 ) (ProjectSet, error) {
-	return sessionForTest(context).BuildProject(configDirectory, config, singleThreaded)
+	return sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{configDirectory: config}, Scope: AllDeclared, SingleThreaded: singleThreaded})
 }
 
 func executeProjectPlanForTest(
@@ -619,17 +618,6 @@ func collectTargetSyntacticDiagnostics(
 	return diagnostics
 }
 
-func remapDiagnosticTargetPaths(
-	diagnostics []rule.RuleDiagnostic,
-	mapping map[string]target.File,
-) {
-	for index := range diagnostics {
-		if target, ok := mapping[diagnostics[index].FilePath]; ok {
-			diagnostics[index].FilePath = target.Path
-		}
-	}
-}
-
 func deduplicateTypeScriptDiagnostics(
 	diagnostics []rule.RuleDiagnostic,
 	fsys vfs.FS,
@@ -672,39 +660,6 @@ func deduplicateTypeScriptDiagnostics(
 		result = append(result, diagnostic)
 	}
 	return result
-}
-
-type lintConfigResolverOptions struct {
-	Config                 rslintconfig.RslintConfig
-	CurrentDirectory       string
-	LintTargetBySourcePath map[string]target.File
-	FS                     vfs.FS
-}
-
-type testLintConfigResolver struct {
-	resolver           *rslintconfig.FileConfigResolver
-	lintTargetBySource map[string]target.File
-}
-
-func newLintConfigResolver(opts lintConfigResolverOptions) *testLintConfigResolver {
-	return &testLintConfigResolver{
-		resolver: rslintconfig.NewFileConfigResolverWithFS(
-			opts.Config,
-			opts.CurrentDirectory,
-			opts.FS,
-			rules.All(),
-		),
-		lintTargetBySource: opts.LintTargetBySourcePath,
-	}
-}
-
-func (resolver *testLintConfigResolver) EnabledRulesForFile(fileName string) []rule.ConfiguredRule {
-	target, ok := resolver.lintTargetBySource[fileName]
-	if !ok {
-		target.Path = fileName
-	}
-	rules, _ := resolver.resolver.EnabledRulesForTarget(target.Path, target.CanonicalPath)
-	return rules
 }
 
 func configuredRuleNameSet(rules []rule.ConfiguredRule) map[string]struct{} {

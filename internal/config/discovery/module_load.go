@@ -46,6 +46,7 @@ type moduleLoadCoordinator struct {
 
 	statesByPath     map[string]*configLoadState
 	stateByIdentity  map[tspath.Path]*configLoadState
+	ownerByIdentity  map[string]string
 	failureByPath    map[string]ConfigFailure
 	nextCandidateID  int
 	configsRequested int
@@ -69,6 +70,7 @@ func newModuleLoadCoordinator(
 		singleThreaded:  singleThreaded,
 		statesByPath:    make(map[string]*configLoadState),
 		stateByIdentity: make(map[tspath.Path]*configLoadState),
+		ownerByIdentity: make(map[string]string),
 		failureByPath:   make(map[string]ConfigFailure),
 	}
 }
@@ -142,6 +144,15 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 	request.Candidates = make([]ConfigLoadCandidate, 0, len(paths))
 	for _, path := range paths {
 		candidate := groupByPath[path].candidate
+		// Competing filenames in one directory must share an original owner
+		// spelling before Node receives its opaque routing key.
+		ownerID := rslintconfig.ExactPathID(candidate.directory)
+		if owner, exists := coordinator.ownerByIdentity[ownerID]; exists {
+			candidate.directory = owner
+		} else {
+			coordinator.ownerByIdentity[ownerID] = candidate.directory
+		}
+		groupByPath[path].candidate = candidate
 		coordinator.nextCandidateID++
 		id := fmt.Sprintf("config-%06d", coordinator.nextCandidateID)
 		request.Candidates = append(request.Candidates, ConfigLoadCandidate{

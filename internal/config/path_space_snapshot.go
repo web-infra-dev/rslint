@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // PathSpaceSnapshot freezes every authored config base used by one evaluation
@@ -125,10 +126,11 @@ func (snapshot *PathSpaceSnapshot) ResolvePath(
 	return matchPath, matchDir, nil
 }
 
-// ExactPathID returns the case-sensitive normalized identity used for frozen
-// paths and canonical-file deduplication.
+// ExactPathID returns the normalized identity used for frozen paths and
+// canonical-file deduplication. Windows drive letters are case-insensitive;
+// directory and file names retain their exact casing.
 func ExactPathID(filePath string) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
+	return utils.NormalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
 }
 
 // PathsEqual compares two paths using TypeScript's cross-platform path rules.

@@ -51,6 +51,9 @@ func acquireSpeculativeGeneration(
 		snapshot.resolvedConfig.GloballyIgnored {
 		return emptyLintGeneration(environment.processCwd), nil, nil
 	}
+	if snapshot.projectPolicyError != nil {
+		return linter.Generation{}, nil, snapshot.projectPolicyError
+	}
 
 	files := make(map[string]string, len(environment.openFiles)+2)
 	for path, text := range environment.openFiles {
@@ -60,9 +63,12 @@ func acquireSpeculativeGeneration(
 	overlayFS := newFrozenLintTargetOverlayFS(environment.baseFS, files, target)
 
 	request := newStandaloneLintProjectRequestWithFS(target, overlayFS)
-	selected, found, err := selectConfiguredLintProject(
+	request.sourceReferences = snapshot.projectPolicy.ServiceRootDirectory != ""
+	program, sourceFile, hasTypeInfo, err := acquireLintProgram(
 		snapshot.typeScriptConfigPaths,
+		snapshot.projectPolicy,
 		target,
+		overlayFS,
 		request.loaders(),
 	)
 	if err != nil {
@@ -86,22 +92,10 @@ func acquireSpeculativeGeneration(
 			readText,
 		)
 	}
-	if found {
-		if selected.sourceFile == nil {
-			return emptyLintGeneration(environment.processCwd), nil, nil
-		}
-		return newGeneration(selected.program, selected.sourceFile, true), nil, nil
-	}
-
-	program, err := createStandaloneFallbackProgram(target.Path, target.ConfigDirectory, overlayFS)
-	if err != nil {
-		return linter.Generation{}, nil, fmt.Errorf("create fallback lint program: %w", err)
-	}
-	sourceFile := sourceFileForTarget(program, target, overlayFS)
 	if sourceFile == nil {
 		return emptyLintGeneration(environment.processCwd), nil, nil
 	}
-	return newGeneration(program, sourceFile, false), nil, nil
+	return newGeneration(program, sourceFile, hasTypeInfo), nil, nil
 }
 
 type speculativeGenerationAcquire func(

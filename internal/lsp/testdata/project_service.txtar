@@ -1,0 +1,175 @@
+-- nested/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":false},"include":["**/*.ts"]}
+-- nested/tooling/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":false},"files":[]}
+-- nested/pkg/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":true},"files":["src/target.ts","src/sibling.ts","ambient.d.ts"]}
+-- nested/pkg/src/target.ts --
+export const disk = 0;
+-- nested/pkg/src/sibling.ts --
+export const sibling = 1;
+-- nested/pkg/ambient.d.ts --
+declare const ambient: number;
+-- ancestor/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["pkg/target.ts"]}
+-- ancestor/pkg/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["other.ts"]}
+-- ancestor/pkg/target.ts --
+export const value = 1;
+-- ancestor/pkg/other.ts --
+export const other = 2;
+-- disabled-search/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["pkg/target.ts"]}
+-- disabled-search/pkg/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableSolutionSearching":true},"files":["other.ts"]}
+-- disabled-search/pkg/target.ts --
+export const value = 1;
+-- disabled-search/pkg/other.ts --
+export const other = 2;
+-- solution/tsconfig.json --
+{"files":[],"references":[{"path":"./pkg/tsconfig.app.json"}]}
+-- solution/pkg/tsconfig.app.json --
+{"compilerOptions":{"composite":true,"noLib":true},"files":["src/target.ts"]}
+-- solution/pkg/src/target.ts --
+export const value = 1;
+-- unowned/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":[]}
+-- unowned/target.ts --
+export const value = 1;
+-- reference-sources/app/tsconfig.json --
+{"compilerOptions":{"composite":true,"module":"esnext","moduleResolution":"bundler","outDir":"out","strict":true},"files":["src/main.ts"],"references":[{"path":"../lib"}]}
+-- reference-sources/app/src/main.ts --
+import { value } from '../../lib/src/value';
+export const result: number = value;
+-- reference-sources/lib/tsconfig.json --
+{"compilerOptions":{"composite":true,"rootDir":"src","outDir":"dist"},"files":["src/value.ts"]}
+-- reference-sources/lib/src/value.ts --
+export const value = 'disk';
+-- reference-sources/lib/dist/value.d.ts --
+export declare const value: string;
+-- warm-references/tsconfig.json --
+{"compilerOptions":{"disableReferencedProjectLoad":true},"files":[],"references":[{"path":"./shared"}]}
+-- warm-references/shared/tsconfig.json --
+{"compilerOptions":{"noLib":true,"composite":true},"files":["first.ts","../app/second.ts"]}
+-- warm-references/shared/first.ts --
+export const first = 1;
+-- warm-references/app/second.ts --
+export const second = 2;
+-- aliases/real/tsconfig.json --
+{"compilerOptions":{"strict":true,"noLib":true},"files":["file.ts"]}
+-- aliases/real/file.ts --
+export const value = 1;
+-- aliases/alias/tsconfig.json --
+{"compilerOptions":{"strict":false,"noLib":true},"files":["file.ts"]}
+-- fallback-finalizer/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableReferencedProjectLoad":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- fallback-finalizer/jsconfig.json --
+{"compilerOptions":{"noLib":true,"disableReferencedProjectLoad":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- fallback-finalizer/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true},"files":["target.ts"]}
+-- fallback-finalizer/target.ts --
+export const target = 1;
+-- transient-service-project/tsconfig.json --
+{"compilerOptions":{"disableReferencedProjectLoad":true},"files":[],"references":[{"path":"./shared"}]}
+-- transient-service-project/shared/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["../app/second.ts"]}
+-- transient-service-project/shared/unowned.ts --
+export const unowned = 1;
+-- transient-service-project/app/second.ts --
+export const second = 2;
+-- flat-policy/pkg[1]/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- flat-policy/pkg[1]/tsconfig.unsafe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- flat-policy/pkg[1]/tsconfig.safe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","safe.d.ts"]}
+-- flat-policy/pkg[1]/tsconfig.other.json --
+{"compilerOptions":{"noLib":true},"files":["other.ts"]}
+-- flat-policy/pkg[1]/target.ts --
+export const result: string = value.member;
+-- flat-policy/pkg[1]/other.ts --
+export const other = 1;
+-- flat-policy/pkg[1]/unsafe.d.ts --
+declare const value: any;
+-- flat-policy/pkg[1]/safe.d.ts --
+declare const value: { member: number };
+-- imported-gap/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["importer.ts"]}
+-- imported-gap/importer.ts --
+import { value } from './target';
+export const result = value;
+-- imported-gap/target.ts --
+export const value = 1;
+-- triple-slash-gap/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["importer.ts"]}
+-- triple-slash-gap/importer.ts --
+/// <reference path="./target.js" />
+export const result = 1;
+-- triple-slash-gap/target.js --
+export const value = 1;
+-- overlapping-reference/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- overlapping-reference/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true,"strict":true,"outDir":"dist"},"files":["target.ts"]}
+-- overlapping-reference/target.ts --
+export const value = 1;
+-- disabled-source-redirect/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- disabled-source-redirect/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["target.ts"]}
+-- disabled-source-redirect/target.ts --
+export const value = 1;
+-- explicit-js/tsconfig.json --
+{"compilerOptions":{"noLib":true,"allowJs":false},"files":["target.js"]}
+-- explicit-js/target.js --
+export const value = 1;
+-- javascript-reference/tsconfig.json --
+{"compilerOptions":{"allowJs":false},"files":["target.ts"]}
+-- javascript-reference/target.ts --
+/// <reference path="./globals.js" />
+export const result: number = globalValue;
+-- javascript-reference/globals.js --
+var globalValue = 42;
+-- ignored-documents/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["lib/util.ts","src/main.ts"]}
+-- ignored-documents/lib/util.ts --
+debugger;
+-- ignored-documents/src/main.ts --
+debugger;
+-- disabled-binding/tsconfig.json --
+{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler"},"files":["target.ts","other.ts"]}
+-- disabled-binding/target.ts --
+import { other } from './other';
+export const value = (() => { var local = other; return local; })();
+-- disabled-binding/other.ts --
+import { value } from './target';
+export const other = value;
+-- disabled-binding/tsconfig.other.json --
+{"compilerOptions":{"noLib":true},"files":["unowned.ts"]}
+-- disabled-binding/unowned.ts --
+export const unowned = 1;
+-- snapshot-options/tsconfig.json --
+{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","paths":{"payload":["./unsafe.d.ts"]}},"files":["target.ts"]}
+-- snapshot-options/target.ts --
+import { value } from 'payload';
+export const result = value.member;
+-- snapshot-options/unsafe.d.ts --
+export declare const value: any;
+-- snapshot-options/safe.d.ts --
+export declare const value: { member: number };
+-- snapshot-references/app/tsconfig.json --
+{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","composite":true,"outDir":"dist"},"files":["target.ts"],"references":[{"path":"../unchanged"},{"path":"../lib"}]}
+-- snapshot-references/app/target.ts --
+import { value } from '../lib/value';
+export const result = value.member;
+-- snapshot-references/unchanged/tsconfig.json --
+{"compilerOptions":{"noLib":true,"composite":true},"files":[]}
+-- snapshot-references/lib/tsconfig.json --
+{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","composite":true,"outDir":"dist","paths":{"payload":["./unsafe.d.ts"]}},"files":["value.ts"]}
+-- snapshot-references/lib/value.ts --
+import { value as payload } from 'payload';
+export const value = payload;
+-- snapshot-references/lib/unsafe.d.ts --
+export declare const value: any;
+-- snapshot-references/lib/safe.d.ts --
+export declare const value: { member: number };

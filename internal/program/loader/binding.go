@@ -88,8 +88,7 @@ func storeSourceTargetMapping(
 	if mapping == nil {
 		return
 	}
-	normalizedSource := tspath.NormalizePath(sourcePath)
-	mapping[normalizedSource] = target
+	mapping[exactPathID(sourcePath)] = target
 	if canonicalSourcePath != "" {
 		mapping[exactPathID(canonicalSourcePath)] = target
 	}
