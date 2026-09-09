@@ -1,4 +1,4 @@
-package no_extraneous_require
+package nodeutil
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -34,10 +34,11 @@ type requireCallTracker struct {
 	calls             []*ast.Node
 }
 
-// collectRequireCalls follows the require/require.resolve aliases used by
-// upstream's visitRequire. Binding queries use RefStore; name enumeration uses
-// ReferenceIndex. Separate paths may report the same call, as upstream does.
-func collectRequireCalls(ctx rule.RuleContext) []*ast.Node {
+// CollectRequireCalls returns require() and require.resolve() calls, following
+// aliases and destructuring as upstream's visitRequire does. It respects
+// effective globals, shadowing and writes to global roots. Calls are returned
+// in traversal order; separate alias paths can return the same call more than once.
+func CollectRequireCalls(ctx rule.RuleContext) []*ast.Node {
 	tracker := requireCallTracker{
 		ctx:           ctx,
 		names:         utils.NewReferenceIndex(ctx.SourceFile, nil),

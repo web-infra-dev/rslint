@@ -46,7 +46,7 @@ var NoExtraneousRequireRule = rule.Rule{
 		}
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
-				calls := collectRequireCalls(ctx)
+				calls := nodeutil.CollectRequireCalls(ctx)
 				// ESLint presents diagnostics in source order, including when
 				// alias traversal reaches a later call before a direct call.
 				slices.SortStableFunc(calls, func(a, b *ast.Node) int { return cmp.Compare(a.Pos(), b.Pos()) })
