@@ -2165,11 +2165,8 @@ type realpathAliasLSPTestFS struct {
 func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
 	filePath = tspath.NormalizePath(filePath)
 	aliasRoot := tspath.NormalizePath(fs.aliasRoot)
-	if filePath == aliasRoot {
-		return tspath.NormalizePath(fs.realRoot)
-	}
-	if strings.HasPrefix(filePath, aliasRoot+"/") {
-		return tspath.NormalizePath(fs.realRoot) + strings.TrimPrefix(filePath, aliasRoot)
+	if relative, within := config.RelativePathWithinConfigRoot(filePath, aliasRoot, true); within {
+		return tspath.ResolvePath(tspath.NormalizePath(fs.realRoot), relative)
 	}
 	return fs.FS.Realpath(filePath)
 }

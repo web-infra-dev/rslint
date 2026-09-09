@@ -600,7 +600,8 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 				if rules := generation.Native.RulesForFile(source); len(rules) != wantRules {
 					t.Fatalf("speculative=%v: configured rules=%v, want %d", speculative, rules, wantRules)
 				}
-				if targets := generation.Native.TargetsByProgram; len(targets) != 1 || len(targets[0]) != 1 || targets[0][0] != fileName {
+				if targets := generation.Native.TargetsByProgram; len(targets) != 1 || len(targets[0]) != 1 ||
+					config.ExactPathID(targets[0][0]) != config.ExactPathID(fileName) {
 					t.Fatalf("speculative=%v: extra lint targets=%v", speculative, targets)
 				}
 				if server.documents[uri] != editorText {

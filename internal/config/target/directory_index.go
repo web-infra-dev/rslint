@@ -9,10 +9,10 @@ import (
 )
 
 type configDirectoryIndex struct {
-	configKeyByPath          map[tspath.Path]string
+	configKeyByPath          map[string]string
 	caseFoldedConfigKeys     map[tspath.Path][]string
-	canonicalConfigKeyByPath map[tspath.Path]string
-	ambiguousCanonicalPaths  map[tspath.Path]struct{}
+	canonicalConfigKeyByPath map[string]string
+	ambiguousCanonicalPaths  map[string]struct{}
 	normalizedByKey          map[string]string
 	canonicalByKey           map[string]string
 	childrenByKey            map[string][]string
@@ -24,10 +24,10 @@ func newConfigDirectoryIndexWithPathSpaces(
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
 ) *configDirectoryIndex {
 	index := &configDirectoryIndex{
-		configKeyByPath:          make(map[tspath.Path]string, len(configMap)),
+		configKeyByPath:          make(map[string]string, len(configMap)),
 		caseFoldedConfigKeys:     make(map[tspath.Path][]string, len(configMap)),
-		canonicalConfigKeyByPath: make(map[tspath.Path]string, len(configMap)),
-		ambiguousCanonicalPaths:  make(map[tspath.Path]struct{}),
+		canonicalConfigKeyByPath: make(map[string]string, len(configMap)),
+		ambiguousCanonicalPaths:  make(map[string]struct{}),
 		normalizedByKey:          make(map[string]string, len(configMap)),
 		canonicalByKey:           make(map[string]string, len(configMap)),
 		childrenByKey:            make(map[string][]string, len(configMap)),
@@ -43,7 +43,7 @@ func newConfigDirectoryIndexWithPathSpaces(
 			normalized = tspath.RemoveTrailingDirectorySeparators(normalized)
 		}
 		index.normalizedByKey[configKey] = normalized
-		pathID := tspath.ToPath(normalized, "", true)
+		pathID := rslintconfig.ExactPathID(normalized)
 		if _, exists := index.configKeyByPath[pathID]; !exists {
 			index.configKeyByPath[pathID] = configKey
 		}
@@ -55,7 +55,7 @@ func newConfigDirectoryIndexWithPathSpaces(
 			panic("config owner is missing from path-space snapshot: " + normalized)
 		}
 		index.canonicalByKey[configKey] = canonical
-		canonicalID := tspath.ToPath(canonical, "", true)
+		canonicalID := rslintconfig.ExactPathID(canonical)
 		if _, ambiguous := index.ambiguousCanonicalPaths[canonicalID]; ambiguous {
 			continue
 		}
@@ -135,7 +135,7 @@ func (index *configDirectoryIndex) nearestConfigForIdentity(
 		canonicalParent = tspath.GetDirectoryPath(tspath.NormalizePath(identity.CanonicalPath))
 	}
 	for lexicalDirectory := tspath.GetDirectoryPath(filePath); lexicalDirectory != ""; {
-		if configKey, ok := index.configKeyByPath[tspath.ToPath(lexicalDirectory, "", true)]; ok {
+		if configKey, ok := index.configKeyByPath[rslintconfig.ExactPathID(lexicalDirectory)]; ok {
 			return configKey, true
 		}
 		if canonicalParent != "" {
@@ -179,7 +179,7 @@ func (index *configDirectoryIndex) configKeyForLexicalDirectory(
 	if index == nil {
 		return "", false
 	}
-	if configKey, ok := index.configKeyByPath[tspath.ToPath(directory, "", true)]; ok {
+	if configKey, ok := index.configKeyByPath[rslintconfig.ExactPathID(directory)]; ok {
 		return configKey, true
 	}
 	if fsys == nil {
@@ -204,11 +204,11 @@ func (index *configDirectoryIndex) configKeyForLexicalDirectory(
 
 func (index *configDirectoryIndex) nearestConfigInPathSpace(
 	filePath string,
-	configKeyByPath map[tspath.Path]string,
+	configKeyByPath map[string]string,
 ) (string, bool) {
 	current := tspath.GetDirectoryPath(filePath)
 	for current != "" {
-		if configKey, ok := configKeyByPath[tspath.ToPath(current, "", true)]; ok {
+		if configKey, ok := configKeyByPath[rslintconfig.ExactPathID(current)]; ok {
 			return configKey, true
 		}
 		next := tspath.GetDirectoryPath(current)

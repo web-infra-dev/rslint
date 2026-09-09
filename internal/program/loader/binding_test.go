@@ -561,3 +561,14 @@ func TestProgramFileIndex_UsesTspathIdentityAcrossFilesystemRoots(t *testing.T) 
 		})
 	}
 }
+
+func TestSourceTargetMappingWindowsDrive(t *testing.T) {
+	want := target.File{PathIdentity: rslintconfig.PathIdentity{Path: "c:/Repo/link.ts"}}
+	mapping := make(map[string]target.File)
+	storeSourceTargetMapping(mapping, "C:/Repo/link.ts", "C:/Physical/a.ts", want)
+	for _, path := range []string{"C:/Repo/link.ts", "c:/Repo/link.ts", "C:/Physical/a.ts", "c:/Physical/a.ts"} {
+		if got, ok := target.LookupSourceTarget(mapping, path, nil); !ok || got != want {
+			t.Errorf("lookup %q = (%+v, %v), want %+v", path, got, ok, want)
+		}
+	}
+}

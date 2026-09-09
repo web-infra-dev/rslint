@@ -22,6 +22,27 @@ func (fs *pathSpaceTestFS) Realpath(filePath string) string {
 }
 
 func TestResolveConfigFilePathSpace(t *testing.T) {
+	t.Run("drive spelling preserves lexical selectors through a directory symlink", func(t *testing.T) {
+		fs := &pathSpaceTestFS{
+			caseSensitive: false,
+			realPaths: map[string]string{
+				"C:/Repo":                           "C:/Repo",
+				"c:/Repo/workspace/linked-src":      "C:/Physical/src",
+				"c:/Repo/workspace/linked-src/a.ts": "C:/Physical/src/a.ts",
+			},
+		}
+		const file = "c:/Repo/workspace/linked-src/a.ts"
+		entries := RslintConfig{{
+			Files: []string{"workspace/linked-src/*.ts"},
+			Rules: Rules{"rule": "error"},
+		}}
+		resolved := NewFileConfigResolverWithFS(entries, "C:/Repo", fs, rules.All()).ResolveTarget(PathIdentity{
+			Path: file, CanonicalPath: "C:/Physical/src/a.ts", CanonicalParentPath: "C:/Physical/src",
+		})
+		if resolved.MergedConfig == nil || resolved.MergedConfig.Rules["rule"] == nil {
+			t.Fatalf("drive spelling lost the lexical selector: %#v", resolved)
+		}
+	})
 	t.Run("symlink aliases use the physical config root", func(t *testing.T) {
 		fs := &pathSpaceTestFS{
 			caseSensitive: true,
@@ -169,6 +190,30 @@ func TestResolveConfigFilePathSpace(t *testing.T) {
 			t.Fatalf("shared alias file-symlink selector did not match: %#v", merged)
 		}
 	})
+}
+
+func TestRelativePathWithinConfigRootWindowsDrive(t *testing.T) {
+	for _, test := range []struct {
+		file, root, relative string
+		within               bool
+	}{
+		{"c:/Repo/src/a.ts", "C:/Repo", "src/a.ts", true},
+		{"C:/Repo", "c:/Repo", "", true},
+		{"c:/Repo/src/a.ts", "C:/", "Repo/src/a.ts", true},
+		{"d:/Repo/src/a.ts", "C:/Repo", "", false},
+		{"c:/repo/src/a.ts", "C:/Repo", "", false},
+		{"c:/Repo-other/a.ts", "C:/Repo", "", false},
+	} {
+		t.Run(test.file+" within "+test.root, func(t *testing.T) {
+			relative, within := RelativePathWithinConfigRoot(test.file, test.root, true)
+			if relative != test.relative || within != test.within {
+				t.Fatalf("relative containment = (%q, %v), want (%q, %v)", relative, within, test.relative, test.within)
+			}
+			if within := isPathWithinNormalizedRoot(test.file, test.root); within != test.within {
+				t.Fatalf("fast containment = %v, want %v", within, test.within)
+			}
+		})
+	}
 }
 
 func TestResolveConfigDirectoryPathSpace(t *testing.T) {

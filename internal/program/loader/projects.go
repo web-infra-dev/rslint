@@ -76,7 +76,7 @@ type projectPlan struct {
 }
 
 func exactPathID(filePath string) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
+	return rslintconfig.ExactPathID(filePath)
 }
 
 func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {

@@ -228,37 +228,45 @@ func TestResolverTargetConfigSurvivesSourceBinding(t *testing.T) {
 	}
 }
 
-type ownerAliasResolverFS struct{ vfs.FS }
+type ownerAliasResolverFS struct {
+	vfs.FS
+	root string
+}
 
-func (*ownerAliasResolverFS) Realpath(path string) string {
-	if path == "/symlink" || strings.HasPrefix(path, "/symlink/") {
-		return "/real" + strings.TrimPrefix(path, "/symlink")
+func (fs *ownerAliasResolverFS) Realpath(path string) string {
+	alias := fs.root + "/symlink"
+	if path == alias || strings.HasPrefix(path, alias+"/") {
+		return fs.root + "/real" + strings.TrimPrefix(path, alias)
 	}
 	return path
 }
 
 func TestResolverLiteralOwnerWinsCanonicalAlias(t *testing.T) {
-	service := true
-	resolver := newBaseResolver(ResolverOptions{
-		ConfigsByOwner: map[string]config.RslintConfig{
-			"/real": {{Rules: config.Rules{"no-debugger": "error"}}},
-			"/symlink": {{Rules: config.Rules{"no-console": "error"}, LanguageOptions: &config.LanguageOptions{
-				ParserOptions: &config.ParserOptions{ProjectService: &service},
-			}}},
-		},
-		FS: &ownerAliasResolverFS{FS: osvfs.FS()},
-	})
-	realTarget := targetForTest("/real/file.ts", "/real")
-	aliasTarget := targetForTest("/symlink/file.ts", "/symlink")
-	realResolved, _ := resolver.ResolveTarget(realTarget)
-	alias, _ := resolver.ResolveTarget(aliasTarget)
-	if len(realResolved.EnabledRules) != 1 || realResolved.EnabledRules[0].Name != "no-debugger" ||
-		len(alias.EnabledRules) != 1 || alias.EnabledRules[0].Name != "no-console" {
-		t.Fatalf("canonical alias changed literal owner: real=%v alias=%v", configuredRuleNameSet(realResolved.EnabledRules), configuredRuleNameSet(alias.EnabledRules))
-	}
-	policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget})
-	if err != nil || len(policies) != 1 || policies[aliasTarget].ServiceRootDirectory != "/symlink" {
-		t.Fatalf("policy gate used an alias instead of its literal owner: %v, %v", policies, err)
+	for _, root := range []string{"", "C:"} {
+		t.Run(root, func(t *testing.T) {
+			service := true
+			resolver := newBaseResolver(ResolverOptions{
+				ConfigsByOwner: map[string]config.RslintConfig{
+					root + "/real": {{Rules: config.Rules{"no-debugger": "error"}}},
+					root + "/symlink": {{Rules: config.Rules{"no-console": "error"}, LanguageOptions: &config.LanguageOptions{
+						ParserOptions: &config.ParserOptions{ProjectService: &service},
+					}}},
+				},
+				FS: &ownerAliasResolverFS{FS: osvfs.FS(), root: root},
+			})
+			realTarget := targetForTest(root+"/real/file.ts", strings.ToLower(root)+"/real")
+			aliasTarget := targetForTest(root+"/symlink/file.ts", root+"/symlink")
+			realResolved, _ := resolver.ResolveTarget(realTarget)
+			alias, _ := resolver.ResolveTarget(aliasTarget)
+			if len(realResolved.EnabledRules) != 1 || realResolved.EnabledRules[0].Name != "no-debugger" ||
+				len(alias.EnabledRules) != 1 || alias.EnabledRules[0].Name != "no-console" {
+				t.Fatalf("canonical alias changed literal owner: real=%v alias=%v", configuredRuleNameSet(realResolved.EnabledRules), configuredRuleNameSet(alias.EnabledRules))
+			}
+			policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget})
+			if err != nil || len(policies) != 1 || policies[aliasTarget].ServiceRootDirectory != root+"/symlink" {
+				t.Fatalf("policy gate used an alias instead of its literal owner: %v, %v", policies, err)
+			}
+		})
 	}
 }
 

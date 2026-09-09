@@ -125,10 +125,20 @@ func (snapshot *PathSpaceSnapshot) ResolvePath(
 	return matchPath, matchDir, nil
 }
 
-// ExactPathID returns the case-sensitive normalized identity used for frozen
-// paths and canonical-file deduplication.
+// ExactPathID returns the normalized identity used for frozen paths and
+// canonical-file deduplication. Windows drive letters are case-insensitive;
+// directory and file names retain their exact casing.
 func ExactPathID(filePath string) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
+	return string(tspath.ToPath(normalizeAbsoluteDrive(tspath.NormalizePath(filePath)), "", true))
+}
+
+func normalizeAbsoluteDrive(filePath string) string {
+	// A drive-relative spelling such as A:leaf can also be a POSIX filename.
+	if len(filePath) >= 3 && filePath[0] >= 'A' && filePath[0] <= 'Z' && filePath[1] == ':' && filePath[2] == '/' {
+		volume, path, _ := tspath.SplitVolumePath(filePath)
+		return volume + path
+	}
+	return filePath
 }
 
 // PathsEqual compares two paths using TypeScript's cross-platform path rules.

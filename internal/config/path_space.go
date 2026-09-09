@@ -338,6 +338,8 @@ func hasDistinctFileIdentityWithCanonicalParent(
 // RelativePathWithinConfigRoot returns filePath relative to configDir when it
 // is inside the config's lexical path space.
 func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
+	filePath = normalizeAbsoluteDrive(filePath)
+	configDir = normalizeAbsoluteDrive(configDir)
 	options := tspath.ComparePathsOptions{
 		CurrentDirectory:          configDir,
 		UseCaseSensitiveFileNames: useCaseSensitive,
@@ -351,8 +353,10 @@ func RelativePathWithinConfigRoot(filePath string, configDir string, useCaseSens
 	return tspath.GetRelativePathFromDirectory(configDir, filePath, options), true
 }
 
-// isPathWithinNormalizedRoot is the allocation-free containment check for
-// already-normalized, case-sensitive paths used by frozen target identities.
+// isPathWithinNormalizedRoot checks containment for already-normalized paths,
+// retaining exact directory names while ignoring Windows drive-letter case.
 func isPathWithinNormalizedRoot(filePath string, root string) bool {
+	filePath = normalizeAbsoluteDrive(filePath)
+	root = normalizeAbsoluteDrive(root)
 	return filePath == root || tspath.StartsWithDirectory(filePath, root, true)
 }

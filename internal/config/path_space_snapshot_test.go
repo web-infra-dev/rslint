@@ -5,6 +5,26 @@ import (
 	"testing"
 )
 
+func TestExactPathIDWindowsDrive(t *testing.T) {
+	for _, test := range []struct {
+		left, right string
+		equal       bool
+	}{
+		{`C:\Repo\src\a.ts`, "c:/Repo/src/a.ts", true},
+		{"C:/Repo/a.ts", "D:/Repo/a.ts", false},
+		{"C:/Repo/a.ts", "c:/repo/a.ts", false},
+		{"C:/Repo/A.ts", "c:/Repo/a.ts", false},
+		{"A:leaf", "a:leaf", false},
+		{"/Repo/a.ts", "/repo/a.ts", false},
+	} {
+		t.Run(test.left+" vs "+test.right, func(t *testing.T) {
+			if equal := ExactPathID(test.left) == ExactPathID(test.right); equal != test.equal {
+				t.Fatalf("identity equality = %v, want %v", equal, test.equal)
+			}
+		})
+	}
+}
+
 func TestPathSpaceSnapshotRequiresEveryAuthoredBase(t *testing.T) {
 	configDirectory := "/repo/config"
 	config := ConfigWithAuthoredPathBase(

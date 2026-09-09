@@ -87,16 +87,18 @@ func NewResolver(options ResolverOptions) *Resolver {
 	}
 	resolver.resolversByOwnerPath = make(map[string]*config.FileConfigResolver, len(options.ConfigsByOwner)*2)
 	ownerDirectories := make([]string, 0, len(options.ConfigsByOwner))
+	literalOwners := make(map[string]struct{}, len(options.ConfigsByOwner))
 	for ownerDirectory := range options.ConfigsByOwner {
 		ownerDirectories = append(ownerDirectories, ownerDirectory)
+		literalOwners[config.ExactPathID(ownerDirectory)] = struct{}{}
 	}
 	sort.Strings(ownerDirectories)
 	for _, ownerDirectory := range ownerDirectories {
 		fileResolver := newFileResolver(options.ConfigsByOwner[ownerDirectory], ownerDirectory)
-		resolver.resolversByOwnerPath[ownerDirectory] = fileResolver
+		resolver.resolversByOwnerPath[config.ExactPathID(ownerDirectory)] = fileResolver
 		physicalDirectory, _ := options.PathSpaces.PhysicalDirectory(ownerDirectory)
 		canonicalOwner := config.ExactPathID(physicalDirectory)
-		if _, isLiteralOwner := options.ConfigsByOwner[canonicalOwner]; !isLiteralOwner {
+		if _, isLiteralOwner := literalOwners[canonicalOwner]; !isLiteralOwner {
 			resolver.resolversByOwnerPath[canonicalOwner] = fileResolver
 		}
 	}
@@ -122,7 +124,7 @@ func (resolver *Resolver) ResolveTarget(file target.File) (config.ResolvedFileCo
 	if resolver.singleResolver != nil {
 		return resolver.singleResolver.ResolveTarget(file.Identity()), true
 	}
-	fileResolver := resolver.resolversByOwnerPath[file.ConfigDirectory]
+	fileResolver := resolver.resolversByOwnerPath[config.ExactPathID(file.ConfigDirectory)]
 	if fileResolver == nil {
 		return config.ResolvedFileConfig{}, false
 	}
@@ -138,7 +140,7 @@ func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]
 	}
 	ownerContexts := make(map[*config.FileConfigResolver]ownerProjectContext, len(resolver.configsByOwner))
 	for owner, entries := range resolver.configsByOwner {
-		ownerContexts[resolver.resolversByOwnerPath[owner]] = ownerProjectContext{
+		ownerContexts[resolver.resolversByOwnerPath[config.ExactPathID(owner)]] = ownerProjectContext{
 			hasOptions: config.HasProjectOptions(entries), rootDirectory: owner,
 		}
 	}
@@ -148,7 +150,7 @@ func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]
 		hasOptions := singleHasOptions
 		defaultRootDirectory := resolver.defaultRootDirectory
 		if resolver.configsByOwner != nil {
-			context := ownerContexts[resolver.resolversByOwnerPath[file.ConfigDirectory]]
+			context := ownerContexts[resolver.resolversByOwnerPath[config.ExactPathID(file.ConfigDirectory)]]
 			hasOptions = context.hasOptions
 			defaultRootDirectory = context.rootDirectory
 		}

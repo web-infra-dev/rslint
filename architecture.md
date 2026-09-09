@@ -1163,6 +1163,11 @@ requested physical ancestor of an aliased `ScanRoot` is outside, not beneath,
 that root and therefore receives its own scope; this keeps every directory the
 target walker can scan covered by the same Git-source frontier.
 
+Shared path identities and containment ignore ASCII Windows drive-letter case
+while retaining directory and file spelling. Catalog keys and caller-visible
+paths keep their original strings. These comparisons need no realpath proof
+for a drive-only difference, including for new files that do not exist on disk.
+Owner indexes and Program source mappings use this same config path identity.
 Ownership lookup never compares depth across lexical and physical path spaces:
 the nearest exact lexical config wins, a native case alias is accepted only
 after filesystem identity verification, and realpath ancestry is consulted only
