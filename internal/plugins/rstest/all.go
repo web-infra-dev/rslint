@@ -37,6 +37,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_once"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_times"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_called_with"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_comparison_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_equality_matcher"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
@@ -99,6 +100,7 @@ func GetAllRules() []rule.Rule {
 		prefer_called_once.PreferCalledOnceRule,
 		prefer_called_times.PreferCalledTimesRule,
 		prefer_called_with.PreferCalledWithRule,
+		prefer_comparison_matcher.PreferComparisonMatcherRule,
 		prefer_each.PreferEachRule,
 		prefer_equality_matcher.PreferEqualityMatcherRule,
 		prefer_expect_type_of.PreferExpectTypeOfRule,
