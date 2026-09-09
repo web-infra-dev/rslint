@@ -58,12 +58,12 @@ func isNodeBuiltin(specifier string) bool {
 }
 
 // HasTypeScriptAlias preserves upstream's prefix exemption for compiler paths.
-// Config parsing, including extends and the nearest-file search, belongs to Program.
+// Config parsing reuses tsgo and reads through the Program's filesystem.
 func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
 	if !tspath.HasTSFileExtension(fileName) {
 		return false
 	}
-	options := p.NearestCompilerOptions(fileName)
+	options := nearestCompilerOptions(p, fileName)
 	if options == nil || options.Paths == nil {
 		return false
 	}
@@ -78,8 +78,8 @@ func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
 // ImportResolutionOptions implements the documented resolverConfig.modules
 // option and the shared Node extension/lookup settings. convertPath is accepted
 // by no-extraneous-import's schema but, as upstream, does not affect this check.
-func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool, options, settings map[string]any) program.NodeResolutionOptions {
-	result := program.NodeResolutionOptions{
+func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool, options, settings map[string]any) ResolutionOptions {
+	result := ResolutionOptions{
 		Extensions: StringListSetting("tryExtensions", options, settings),
 		Paths:      StringListSetting("resolvePaths", options, settings),
 		Conditions: []string{"node", "require", "import"},
@@ -104,7 +104,7 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 		result.Paths[i] = tspath.ResolvePath(cwd, base)
 	}
 	if tspath.HasTSFileExtension(fileName) {
-		config := p.NearestCompilerOptions(fileName)
+		config := nearestCompilerOptions(p, fileName)
 		if config != nil && config.AllowImportingTsExtensions == core.TSTrue {
 			if result.Extensions == nil {
 				result.Extensions = []string{".js", ".ts", ".mjs", ".mts", ".cjs", ".cts", ".json", ".node"}
@@ -136,7 +136,7 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 			case "react", "react-jsx", "react-jsxdev", "react-native", "preserve":
 			default:
 				if configPath, ok := shared["tsconfigPath"].(string); ok && configPath != "" {
-					config = p.ReadCompilerOptions(configPath)
+					config = readCompilerOptions(p, configPath)
 					if config != nil && config.AllowImportingTsExtensions == core.TSTrue {
 						result.ExtensionAliases = nil
 					} else if config != nil {

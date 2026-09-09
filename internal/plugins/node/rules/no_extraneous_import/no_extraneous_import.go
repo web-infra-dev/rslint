@@ -7,7 +7,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
-	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -34,7 +33,7 @@ var NoExtraneousImportRule = rule.Rule{
 			opts, _ = options[0].(map[string]any)
 		}
 		allowed := nodeutil.StringListSetting("allowModules", opts, ctx.Settings)
-		var resolutionOptions [2]*program.NodeResolutionOptions
+		var resolutionOptions [2]*nodeutil.ResolutionOptions
 		extraneousName := func(specifier string, typeOnly bool) string {
 			name, resource := nodeutil.ImportModuleName(specifier)
 			if name == "" || pkg.AllowsDependency(p, name) || slices.Contains(allowed, name) ||
@@ -50,7 +49,7 @@ var NoExtraneousImportRule = rule.Rule{
 				resolution := nodeutil.ImportResolutionOptions(p, fileName, typeOnly, opts, ctx.Settings)
 				resolutionOptions[index] = &resolution
 			}
-			if p.ResolveNodeModule(resource, fileName, *resolutionOptions[index]) != "" {
+			if nodeutil.ResolveModule(p, resource, fileName, *resolutionOptions[index]) != "" {
 				return name
 			}
 			return ""

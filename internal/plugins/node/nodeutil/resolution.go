@@ -1,4 +1,4 @@
-package program
+package nodeutil
 
 import (
 	"encoding/json"
@@ -13,14 +13,15 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/tailscale/hujson"
+	"github.com/web-infra-dev/rslint/internal/program"
 )
 
-// NodeResolutionOptions selects runtime files independently of the compiler's
+// ResolutionOptions selects runtime files independently of the compiler's
 // declaration-file preference. Nil extension/module lists use Node defaults;
 // empty lists disable that search. Conditions adds active export conditions to
 // CommonJS's require condition. Package traversal and export-path validation
 // stay with tsgo.
-type NodeResolutionOptions struct {
+type ResolutionOptions struct {
 	Extensions       []string
 	Modules          []string
 	Paths            []string
@@ -30,9 +31,9 @@ type NodeResolutionOptions struct {
 
 type nodeResolutionKey struct{ name, file, options string }
 
-// ResolveNodeModule resolves a runtime package through this generation's FS.
+// ResolveModule resolves a runtime package through this generation's FS.
 // It does not load the result into the Program or fall back to @types packages.
-func (p *Program) ResolveNodeModule(name, containingFile string, options NodeResolutionOptions) string {
+func ResolveModule(p *program.Program, name, containingFile string, options ResolutionOptions) string {
 	if p.FS() == nil {
 		return ""
 	}
@@ -40,7 +41,7 @@ func (p *Program) ResolveNodeModule(name, containingFile string, options NodeRes
 	if err != nil {
 		return ""
 	}
-	return Cached(p, nodeResolutionKey{name, containingFile, string(encoded)}, func() string {
+	return program.Cached(p, nodeResolutionKey{name, containingFile, string(encoded)}, func() string {
 		if options.Extensions == nil {
 			options.Extensions = []string{".js", ".json", ".node", ".mjs", ".cjs"}
 		}
@@ -87,7 +88,7 @@ const nodeDirectoryExportSuffix = "/.__rslint_node_directory_export__.ts"
 type nodeResolutionFS struct {
 	vfs.FS
 	folder            string
-	options           NodeResolutionOptions
+	options           ResolutionOptions
 	explicitExtension string
 	resolved          map[string]string
 	activeDirectories map[string]bool
@@ -341,14 +342,14 @@ func markNodeTargets(value *hujson.Value, suffix string) {
 type nearestConfigKey string
 type compilerOptionsKey string
 
-// ReadCompilerOptions parses an explicit config through this generation's FS.
+// readCompilerOptions parses an explicit config through this generation's FS.
 // Returned options are cached and must be treated as immutable.
-func (p *Program) ReadCompilerOptions(fileName string) *core.CompilerOptions {
+func readCompilerOptions(p *program.Program, fileName string) *core.CompilerOptions {
 	if p.FS() == nil {
 		return nil
 	}
 	fileName = tspath.ResolvePath(p.CurrentDirectory(), fileName)
-	return Cached(p, compilerOptionsKey(fileName), func() *core.CompilerOptions {
+	return program.Cached(p, compilerOptionsKey(fileName), func() *core.CompilerOptions {
 		host := compiler.NewCompilerHost(p.CurrentDirectory(), p.FS(), p.DefaultLibraryPath(), nil, nil, nil)
 		parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(fileName, &core.CompilerOptions{}, nil, host, nil)
 		if parsed != nil {
@@ -358,20 +359,20 @@ func (p *Program) ReadCompilerOptions(fileName string) *core.CompilerOptions {
 	})
 }
 
-// NearestCompilerOptions reads the nearest tsconfig using the same immutable
+// nearestCompilerOptions reads the nearest tsconfig using the same immutable
 // FS and tsgo config parser, including extends. It does not create a Program.
-func (p *Program) NearestCompilerOptions(fileName string) *core.CompilerOptions {
+func nearestCompilerOptions(p *program.Program, fileName string) *core.CompilerOptions {
 	directory := tspath.GetDirectoryPath(fileName)
 	if p.FS() == nil || directory == "" {
 		return nil
 	}
-	return Cached(p, nearestConfigKey(directory), func() *core.CompilerOptions {
+	return program.Cached(p, nearestConfigKey(directory), func() *core.CompilerOptions {
 		config, found := tspath.ForEachAncestorDirectory(directory, func(directory string) (string, bool) {
 			config := tspath.ResolvePath(directory, "tsconfig.json")
 			return config, p.FS().FileExists(config)
 		})
 		if found {
-			return p.ReadCompilerOptions(config)
+			return readCompilerOptions(p, config)
 		}
 		return nil
 	})

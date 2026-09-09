@@ -165,13 +165,9 @@ caches immutable compiled publication data per package and source generation.
 Configured pattern caches include the complete ordered list in their key.
 Publication paths and metadata exemptions are interpreted relative to the
 containing package, independently of the process working directory.
-Node dependency rules share package and nearest-workspace dependency metadata
-through `nodeutil`. `Program.ResolveNodeModule` adapts tsgo's package and exports
-resolution to runtime extensions and configured module directories, without
-loading another source graph or substituting an `@types` package for a runtime
-package. Its results are cached by source generation, import, file and options.
-`Program.NearestCompilerOptions` reads the nearest tsconfig and its inherited
-options through the same filesystem for Node's TypeScript path exemptions.
+`nodeutil` also owns workspace dependency checks, runtime import resolution and
+the Node rules' TypeScript config lookups. It reuses tsgo's resolver and config
+parser through the Program's existing filesystem and generation-scoped cache.
 The glob matcher uses code-unit input for regexp2; rule callers do not select a
 character encoding or translate backend capture numbers. These packages do not
 decide which files to lint or discover ignore files; those policies belong to
