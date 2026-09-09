@@ -170,6 +170,7 @@ define.test({
     // eslint-plugin-node
     './tests/eslint-plugin-node/rules/hashbang.test.ts',
     './tests/eslint-plugin-node/rules/no-exports-assign.test.ts',
+    './tests/eslint-plugin-node/rules/no-process-exit.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',

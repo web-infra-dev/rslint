@@ -1,4 +1,4 @@
-# n/no-process-exit
+# node/no-process-exit
 
 ## Rule Details
 
