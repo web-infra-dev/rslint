@@ -1,6 +1,7 @@
 package reactutil
 
 import (
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -86,10 +87,10 @@ func GetReactCreateClass(settings map[string]interface{}) string {
 var reactVersionRe = regexp.MustCompile(`(\d+)(?:\.(\d+))?(?:\.(\d+))?`)
 
 // ParseReactVersion returns the (major, minor, patch) triple of
-// `settings.react.version`. When the setting is missing, not a string, empty,
-// or not recognizable as a version, it defaults to (999, 999, 999) — matching
-// eslint-plugin-react's `getReactVersionFromContext`, which treats an absent
-// version as "latest".
+// `settings.react.version`. When version is absent, settings.react.defaultVersion
+// is used; an absent or unrecognizable fallback defaults to (999, 999, 999).
+// Numeric settings are stringified before parsing, matching
+// eslint-plugin-react's getReactVersionFromContext behavior.
 func ParseReactVersion(settings map[string]interface{}) (int, int, int) {
 	if settings == nil {
 		return 999, 999, 999
@@ -98,14 +99,70 @@ func ParseReactVersion(settings map[string]interface{}) (int, int, int) {
 	if !ok {
 		return 999, 999, 999
 	}
-	raw, _ := reactSettings["version"].(string)
-	raw = ecmascript.StringTrim(raw)
-	if raw == "" {
-		return 999, 999, 999
+	fallback := [3]int{999, 999, 999}
+	if rawDefault, ok := reactVersionSettingString(reactSettings["defaultVersion"]); ok {
+		if parsed, ok := parseReactVersionString(rawDefault); ok {
+			fallback = parsed
+		}
 	}
+	raw, ok := reactVersionSettingString(reactSettings["version"])
+	if !ok || raw == "detect" {
+		// Resolving "detect" against node_modules remains an intentional
+		// difference. Use the configured fallback when available.
+		return fallback[0], fallback[1], fallback[2]
+	}
+	parsed, ok := parseReactVersionString(raw)
+	if !ok {
+		return fallback[0], fallback[1], fallback[2]
+	}
+	return parsed[0], parsed[1], parsed[2]
+}
+
+func reactVersionSettingString(value any) (string, bool) {
+	switch value := value.(type) {
+	case string:
+		value = ecmascript.StringTrim(value)
+		return value, value != ""
+	case float64:
+		if value == 0 {
+			return "", false
+		}
+		return ecmascript.NumberToString(value), true
+	case float32:
+		if value == 0 {
+			return "", false
+		}
+		return ecmascript.NumberToString(float64(value)), true
+	case json.Number:
+		number, err := value.Float64()
+		if err != nil || number == 0 {
+			return "", false
+		}
+		return ecmascript.NumberToString(number), true
+	case int:
+		if value == 0 {
+			return "", false
+		}
+		return strconv.Itoa(value), true
+	case int64:
+		if value == 0 {
+			return "", false
+		}
+		return strconv.FormatInt(value, 10), true
+	case bool:
+		if !value {
+			return "", false
+		}
+		return "true", true
+	default:
+		return "", false
+	}
+}
+
+func parseReactVersionString(raw string) ([3]int, bool) {
 	m := reactVersionRe.FindStringSubmatch(raw)
 	if m == nil {
-		return 999, 999, 999
+		return [3]int{}, false
 	}
 	toInt := func(s string) int {
 		if s == "" {
@@ -117,7 +174,7 @@ func ParseReactVersion(settings map[string]interface{}) (int, int, int) {
 		}
 		return n
 	}
-	return toInt(m[1]), toInt(m[2]), toInt(m[3])
+	return [3]int{toInt(m[1]), toInt(m[2]), toInt(m[3])}, true
 }
 
 // ReactVersionLessThan reports whether `settings.react.version` is strictly

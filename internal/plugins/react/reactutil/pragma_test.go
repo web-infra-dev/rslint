@@ -1,6 +1,7 @@
 package reactutil
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -8,6 +9,41 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+func TestParseReactVersion(t *testing.T) {
+	t.Parallel()
+
+	settings := func(values map[string]interface{}) map[string]interface{} {
+		return map[string]interface{}{"react": values}
+	}
+	for _, testCase := range []struct {
+		name     string
+		settings map[string]interface{}
+		want     [3]int
+	}{
+		{name: "absent defaults to latest", want: [3]int{999, 999, 999}},
+		{name: "explicit string", settings: settings(map[string]interface{}{"version": "18.2"}), want: [3]int{18, 2, 0}},
+		{name: "default version", settings: settings(map[string]interface{}{"defaultVersion": "18.2.0"}), want: [3]int{18, 2, 0}},
+		{name: "explicit version wins over default", settings: settings(map[string]interface{}{"version": "19.0.0", "defaultVersion": "18.2.0"}), want: [3]int{19, 0, 0}},
+		{name: "invalid explicit uses default", settings: settings(map[string]interface{}{"version": "invalid", "defaultVersion": "18.2.0"}), want: [3]int{18, 2, 0}},
+		{name: "numeric version", settings: settings(map[string]interface{}{"version": 17}), want: [3]int{17, 0, 0}},
+		{name: "decimal numeric version", settings: settings(map[string]interface{}{"version": 17.2}), want: [3]int{17, 2, 0}},
+		{name: "decoded numeric version", settings: settings(map[string]interface{}{"version": json.Number("17.2")}), want: [3]int{17, 2, 0}},
+		{name: "negative numeric version", settings: settings(map[string]interface{}{"version": -1, "defaultVersion": "18.2.0"}), want: [3]int{1, 0, 0}},
+		{name: "false version is absent", settings: settings(map[string]interface{}{"version": false, "defaultVersion": "18.2.0"}), want: [3]int{18, 2, 0}},
+		{name: "detect uses fallback", settings: settings(map[string]interface{}{"version": "detect", "defaultVersion": "18.2.0"}), want: [3]int{18, 2, 0}},
+		{name: "detect without fallback remains latest", settings: settings(map[string]interface{}{"version": "detect"}), want: [3]int{999, 999, 999}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			major, minor, patch := ParseReactVersion(testCase.settings)
+			if got := [3]int{major, minor, patch}; got != testCase.want {
+				t.Fatalf("ParseReactVersion() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
 
 // TestJsxAnnotationInComment pins the port of upstream pragmaUtil's
 // `/@jsx\s+([^\s]+)/` to the cases where a compiled RE2 pattern would answer

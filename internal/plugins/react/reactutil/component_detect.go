@@ -85,6 +85,12 @@ func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass strin
 		if !ast.IsFunctionLike(p) {
 			continue
 		}
+		// ESTree omits redundant parentheses. Walk through the wrappers
+		// retained by ts-go before inspecting the function's property.
+		functionValue := p
+		for functionValue.Parent != nil && functionValue.Parent.Kind == ast.KindParenthesizedExpression {
+			functionValue = functionValue.Parent
+		}
 		// `key: function() {...}` — FE wrapped in PropertyAssignment;
 		// its parent is the ObjectLiteralExpression.
 		// `key() {...}` shorthand — MethodDeclaration / GetAccessor /
@@ -94,7 +100,7 @@ func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass strin
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 			objLit = p.Parent
 		default:
-			propEntry := p.Parent
+			propEntry := functionValue.Parent
 			if propEntry == nil || propEntry.Kind != ast.KindPropertyAssignment {
 				continue
 			}
@@ -108,15 +114,26 @@ func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass strin
 		for arg.Parent != nil && arg.Parent.Kind == ast.KindParenthesizedExpression {
 			arg = arg.Parent
 		}
-		callExpr := arg.Parent
-		if callExpr == nil || callExpr.Kind != ast.KindCallExpression {
+		callLike := arg.Parent
+		if callLike == nil {
 			continue
 		}
-		call := callExpr.AsCallExpression()
-		if !isObjectArgumentOf(call, arg) {
+		var callee *ast.Node
+		var arguments *ast.NodeList
+		switch callLike.Kind {
+		case ast.KindCallExpression:
+			call := callLike.AsCallExpression()
+			callee, arguments = call.Expression, call.Arguments
+		case ast.KindNewExpression:
+			newExpression := callLike.AsNewExpression()
+			callee, arguments = newExpression.Expression, newExpression.Arguments
+		default:
 			continue
 		}
-		if IsCreateClassCall(call, pragma, createClass) {
+		if !nodeListContains(arguments, arg) {
+			continue
+		}
+		if isCreateClassCallee(callee, pragma, createClass) {
 			return objLit
 		}
 	}
