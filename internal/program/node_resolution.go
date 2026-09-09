@@ -100,6 +100,9 @@ func (f *nodeResolutionFS) newResolver(cwd string) *module.Resolver {
 		ModuleResolution: core.ModuleResolutionKindBundler,
 		NoDtsResolution:  core.TSTrue, ResolveJsonModule: core.TSTrue,
 		CustomConditions: f.options.Conditions,
+		// Keep probes in the projected namespace. The caller maps the selected
+		// file via Realpath; tsgo must not remap an already physical path.
+		PreserveSymlinks: core.TSTrue,
 	}, "", "", append(slices.Clone(f.options.Extensions), f.explicitExtension))
 }
 
@@ -158,8 +161,9 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 				f.activeDirectories = map[string]bool{}
 			}
 			f.activeDirectories[target] = true
-			directory := tspath.GetDirectoryPath(target)
-			result, _ := f.newResolver(directory).ResolveModuleName("./"+tspath.GetBaseFileName(target), tspath.ResolvePath(directory, "__import__.js"), core.ResolutionModeCommonJS, nil)
+			logicalTarget := strings.TrimSuffix(strings.TrimSuffix(name, nodeTargetSuffix), nodeExportSuffix)
+			directory := tspath.GetDirectoryPath(logicalTarget)
+			result, _ := f.newResolver(directory).ResolveModuleName("./"+tspath.GetBaseFileName(logicalTarget), tspath.ResolvePath(directory, "__import__.js"), core.ResolutionModeCommonJS, nil)
 			delete(f.activeDirectories, target)
 			if result != nil && result.IsResolved() {
 				resolved = f.Realpath(result.ResolvedFileName)

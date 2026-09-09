@@ -88,24 +88,26 @@ extension substitution, using the same formats as upstream.
 
 ## Differences from upstream
 
-Only `resolverConfig.modules`, the resolver override officially supported by
-upstream, is supported. Other enhanced-resolve overrides are not applied. For
-example, `resolverConfig: { alias: { virtual: './local.js' } }` does not make an
-otherwise missing `virtual` package resolvable in rslint. Use TypeScript `paths`
-for local aliases, or `allowModules` to exempt installed packages.
+Only `resolverConfig.modules` changes how this rule finds imported packages in
+rslint. Other `resolverConfig` options, such as `alias`, are ignored. For example,
+suppose `virtual` is neither declared nor installed, but `local.js` exists. With
+`resolverConfig: { alias: { virtual: './local.js' } }`, eslint-plugin-n reports
+`import 'virtual'` as an undeclared dependency; rslint ignores the alias and
+reports nothing.
+For local aliases in TypeScript files, use `compilerOptions.paths`. To allow an
+undeclared package, add its name to `allowModules`.
 
-Workspace patterns use rslint's glob matcher, which also supports numeric brace
-ranges. For example, `packages/{1..3}` includes
-`packages/2` in rslint; upstream instead matches the literal directory
-`packages/1..3`. Use explicit alternatives such as `packages/{1,2,3}` for
-consistent matching in both tools.
+With `workspaces: ['packages/{1..3}']`, rslint treats `packages/1`, `packages/2`
+and `packages/3` as workspace members; eslint-plugin-n instead matches the literal
+directory `packages/1..3`. An installed dependency declared only at the workspace
+root is therefore accepted by rslint in `packages/2`, but reported by
+eslint-plugin-n. Use `packages/{1,2,3}` to include the same packages in both tools.
 
-Character classes also differ: `[^a]` negates `a` in rslint, while upstream
-treats `^` as a literal class member. With `workspaces: ['packages/[^a]*']`,
-upstream includes `packages/app` but rslint excludes it. An import of an installed
-`workspace-dep` declared only at the workspace root is therefore reported by
-rslint in that child package, while upstream accepts it. Use `[!a]` for a negated
-character class with the same meaning in both matchers.
+With `workspaces: ['packages/[^a]*']`, eslint-plugin-n includes `packages/app`
+but rslint excludes it. An installed dependency declared only at the workspace
+root is therefore reported by rslint in that child package, but accepted by
+eslint-plugin-n. Use `packages/[!a]*` to exclude package names starting with `a`
+in both tools.
 
 ## References
 

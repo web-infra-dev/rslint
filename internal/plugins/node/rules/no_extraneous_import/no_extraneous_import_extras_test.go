@@ -75,11 +75,24 @@ import '_tls_wrap';`, FileName: "input.js"},
 		{Code: "import 'runtime';", FileName: "input.js", Settings: map[string]any{"node": map[string]any{"tryExtensions": []any{}}}},
 		// TS implicit extensions
 		{Code: "import 'only-ts';", FileName: "input.ts"},
+		// Only null or absent settings.n falls back to settings.node for TS mappings.
+		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": false, "node": map[string]any{"typescriptExtensionMap": "react"}}},
+		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": float64(0), "node": map[string]any{"typescriptExtensionMap": "react"}}},
+		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": "", "node": map[string]any{"typescriptExtensionMap": "react"}}},
+		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": "unused", "node": map[string]any{"typescriptExtensionMap": "react"}}},
+		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": []any{}, "node": map[string]any{"typescriptExtensionMap": "react"}}},
+		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": map[string]any{}, "node": map[string]any{"typescriptExtensionMap": "react"}}},
 		// TS alias exemption
 		{Code: "import 'alias/part'; import 'alias-other';", FileName: "aliases/input.ts"},
 		// malformed package stops resolution
 		{Code: "import 'runtime';", FileName: "malformed/input.js"},
 	}, []rule_tester.InvalidTestCase{
+		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": nil, "node": map[string]any{"typescriptExtensionMap": "react"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"tsx-only" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 27}}},
+		// Directory exports resolve with relative and absolute custom module folders.
+		{Code: "import 'export-directory';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"modules": "node_modules/custom"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"export-directory" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+		{Code: "import 'export-directory';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"modules": tspath.ResolvePath(root.Dir, "node_modules/custom")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"export-directory" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+		{Code: "import 'export-directory';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"modules": "vendor/node_modules"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"export-directory" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+		{Code: "import 'export-directory';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"modules": "node_modules/custom/node_modules"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"export-directory" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
 		// A builtin package root must not exempt arbitrary paths or lookalikes.
 		{Code: "import '_http_agent/subpath'; import '_http_agent_extra'; import 'test';", FileName: "input.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "extraneous", Message: `"_http_agent" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 29},

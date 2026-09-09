@@ -2,6 +2,8 @@ package program_test
 
 import (
 	"maps"
+	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -53,6 +55,13 @@ func TestResolveNodeModuleGenerationAndOptions(t *testing.T) {
 		{"pkg", lintprogram.NodeResolutionOptions{}, "/node-runtime/node_modules/pkg/index.js"},
 		{"pkg", lintprogram.NodeResolutionOptions{Modules: []string{}}, ""},
 		{"pkg", lintprogram.NodeResolutionOptions{Modules: []string{"/node-runtime/vendor"}}, "/node-runtime/vendor/pkg/index.js"},
+		// Module directories may themselves contain a node_modules component.
+		{"pkg", lintprogram.NodeResolutionOptions{Modules: []string{"node_modules/custom"}}, "/node-runtime/node_modules/custom/pkg/index.js"},
+		{"pkg", lintprogram.NodeResolutionOptions{Modules: []string{"/node-runtime/node_modules/custom"}}, "/node-runtime/node_modules/custom/pkg/index.js"},
+		{"directory", lintprogram.NodeResolutionOptions{Modules: []string{"node_modules/custom"}}, "/node-runtime/node_modules/custom/directory/lib/index.js"},
+		{"directory", lintprogram.NodeResolutionOptions{Modules: []string{"/node-runtime/node_modules/custom"}}, "/node-runtime/node_modules/custom/directory/lib/index.js"},
+		{"directory", lintprogram.NodeResolutionOptions{Modules: []string{"vendor/node_modules"}}, "/node-runtime/vendor/node_modules/directory/lib/index.js"},
+		{"directory", lintprogram.NodeResolutionOptions{Modules: []string{"node_modules/custom/node_modules"}}, "/node-runtime/node_modules/custom/node_modules/directory/lib/index.js"},
 		{"only-types", lintprogram.NodeResolutionOptions{}, ""},
 		{"custom", lintprogram.NodeResolutionOptions{}, ""},
 		{"custom", lintprogram.NodeResolutionOptions{Extensions: []string{".custom"}}, "/node-runtime/node_modules/custom/index.custom"},
@@ -82,6 +91,22 @@ func TestResolveNodeModuleGenerationAndOptions(t *testing.T) {
 	if got := (*lintprogram.Program)(nil).ResolveNodeModule("pkg", "/input.js", lintprogram.NodeResolutionOptions{}); got != "" {
 		t.Errorf("invalid Program resolved %q", got)
 	}
+	t.Run("symlinked directory export", func(t *testing.T) {
+		root := tspath.NormalizePath(archive.Materialize(t, ""))
+		target := tspath.ResolvePath(root, "node_modules/custom/directory")
+		if err := os.Symlink(target, tspath.ResolvePath(root, "node_modules/custom/linked")); err != nil {
+			if runtime.GOOS == "windows" {
+				t.Skipf("symlink creation is unavailable: %v", err)
+			}
+			t.Fatal(err)
+		}
+		fileName := tspath.ResolvePath(root, "input.ts")
+		p, _, _ := programForImport(t, map[string]string{fileName: "import 'linked';"}, fileName)
+		want := osvfs.FS().Realpath(tspath.ResolvePath(target, "lib/index.js"))
+		if got := p.ResolveNodeModule("linked", fileName, lintprogram.NodeResolutionOptions{Modules: []string{"node_modules/custom"}}); got != want {
+			t.Errorf("symlinked directory export = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestNearestCompilerOptionsGeneration(t *testing.T) {

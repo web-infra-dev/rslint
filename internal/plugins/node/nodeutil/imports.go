@@ -117,10 +117,11 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 		}
 		// Unlike the independent shared lists, upstream selects settings.n as
 		// a whole before settings.node for these extension-mapping settings.
-		shared, ok := settings["n"].(map[string]any)
-		if !ok {
-			shared, _ = settings["node"].(map[string]any)
+		sharedValue := settings["n"]
+		if sharedValue == nil {
+			sharedValue = settings["node"]
 		}
+		shared, _ := sharedValue.(map[string]any)
 		if pairs, ok := shared["typescriptExtensionMap"].([]any); ok {
 			result.ExtensionAliases = map[string][]string{}
 			for _, pair := range pairs {

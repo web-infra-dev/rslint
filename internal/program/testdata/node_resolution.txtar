@@ -19,3 +19,17 @@ export default 1;
 module.exports = 1;
 -- node_modules/conditional/index.d.ts --
 export declare const value: number;
+-- node_modules/custom/pkg/index.js --
+export default 1;
+-- node_modules/custom/directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/directory/lib/index.js --
+export default 1;
+-- vendor/node_modules/directory/package.json --
+{"exports":"./lib"}
+-- vendor/node_modules/directory/lib/index.js --
+export default 1;
+-- node_modules/custom/node_modules/directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/node_modules/directory/lib/index.js --
+export default 1;

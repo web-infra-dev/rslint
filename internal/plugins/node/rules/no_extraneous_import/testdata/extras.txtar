@@ -1,4 +1,16 @@
 Runtime package and option regressions.
+-- node_modules/custom/export-directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/export-directory/lib/index.js --
+export default 1;
+-- vendor/node_modules/export-directory/package.json --
+{"exports":"./lib"}
+-- vendor/node_modules/export-directory/lib/index.js --
+export default 1;
+-- node_modules/custom/node_modules/export-directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/node_modules/export-directory/lib/index.js --
+export default 1;
 -- local.js --
 export default 1;
 -- package.json --
