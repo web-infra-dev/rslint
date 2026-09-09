@@ -1,6 +1,6 @@
 // cspell:ignore globrex licen npmignore
 // Package nodeutil contains the package metadata and publication policies shared
-// by rules ported from eslint-plugin-n. It does not resolve JavaScript imports.
+// by rules ported from eslint-plugin-n. Import resolution is delegated to Program.
 package nodeutil
 
 import (

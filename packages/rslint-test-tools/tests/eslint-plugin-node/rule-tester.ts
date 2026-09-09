@@ -37,6 +37,7 @@ const packages = {
 export class RuleTester {
   constructor(
     private readonly config: {
+      fixtureFiles?: Record<string, string>;
       languageOptions?: {
         globals?: Record<string, 'readonly' | 'writable' | 'off'>;
         sourceType?: 'script' | 'module' | 'commonjs';
@@ -53,12 +54,13 @@ export class RuleTester {
       let root: string;
       beforeAll(async () => {
         root = await createTempDir(
-          Object.fromEntries(
-            Object.entries(packages).map(([name, pkg]) => [
-              `${name}/package.json`,
-              JSON.stringify(pkg),
-            ]),
-          ),
+          this.config.fixtureFiles ??
+            Object.fromEntries(
+              Object.entries(packages).map(([name, pkg]) => [
+                `${name}/package.json`,
+                JSON.stringify(pkg),
+              ]),
+            ),
         );
       });
       afterAll(async () => {

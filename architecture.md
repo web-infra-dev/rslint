@@ -165,6 +165,9 @@ caches immutable compiled publication data per package and source generation.
 Configured pattern caches include the complete ordered list in their key.
 Publication paths and metadata exemptions are interpreted relative to the
 containing package, independently of the process working directory.
+`nodeutil` also owns workspace dependency checks, runtime import resolution and
+the Node rules' TypeScript config lookups. It reuses tsgo's resolver and config
+parser through the Program's existing filesystem and generation-scoped cache.
 The glob matcher uses code-unit input for regexp2; rule callers do not select a
 character encoding or translate backend capture numbers. These packages do not
 decide which files to lint or discover ignore files; those policies belong to

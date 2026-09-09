@@ -1,0 +1,171 @@
+Runtime package and option regressions.
+-- node_modules/custom/export-directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/export-directory/lib/index.js --
+export default 1;
+-- vendor/node_modules/export-directory/package.json --
+{"exports":"./lib"}
+-- vendor/node_modules/export-directory/lib/index.js --
+export default 1;
+-- node_modules/custom/node_modules/export-directory/package.json --
+{"exports":"./lib"}
+-- node_modules/custom/node_modules/export-directory/lib/index.js --
+export default 1;
+-- local.js --
+export default 1;
+-- package.json --
+{"name": "app", "dependencies": {"declared": "*", "@types/typed": "*", "@types/scope__typed": "*"}, "optionalDependencies": {"optional": "*"}}
+-- node_modules/runtime/index.js --
+export const value = 1;
+-- node_modules/runtime/part.js --
+export const value = 1;
+-- node_modules/@scope/runtime/part.js --
+export const value = 1;
+-- node_modules/@scope/runtime/index.js --
+export const value = 1;
+-- node_modules/@scope/typed/index.js --
+export const value = 1;
+-- node_modules/typed/index.js --
+export const value = 1;
+-- node_modules/@types/only/index.d.ts --
+export declare const value: number;
+-- node_modules/only-ts/index.ts --
+export const value = 1;
+-- node_modules/only-mjs/index.mjs --
+export const value = 1;
+-- node_modules/only-cjs/index.cjs --
+exports.value = 1;
+-- node_modules/only-json/index.json --
+{}
+-- node_modules/only-node/index.node --
+native fixture
+-- node_modules/extensionless/index --
+runtime fixture
+-- node_modules/custom/index.custom --
+runtime fixture
+-- node_modules/entry/package.json --
+{"main":"lib/entry.js"}
+-- node_modules/entry/lib/entry.js --
+export const value = 1;
+-- node_modules/directory-main/package.json --
+{"main":"lib"}
+-- node_modules/directory-main/lib/index.js --
+export const value = 1;
+-- node_modules/decl-only/package.json --
+{"main":"index.d.ts"}
+-- node_modules/decl-only/index.d.ts --
+export declare const value: number;
+-- node_modules/conditional/package.json --
+{"exports":{"types":"./index.d.ts","import":"./index.mjs","require":"./index.cjs"}}
+-- node_modules/conditional/index.d.ts --
+export declare const value: number;
+-- node_modules/conditional/index.mjs --
+export const value = 1;
+-- node_modules/conditional/index.cjs --
+exports.value = 1;
+-- node_modules/types-export/package.json --
+{"exports":{"types":"./index.d.ts"}}
+-- node_modules/types-export/index.d.ts --
+export declare const value: number;
+-- node_modules/exports/package.json --
+{"exports":{".":"./index.js","./parts/*":"./src/*.js","./blocked":null}}
+-- node_modules/exports/index.js --
+export const value = 1;
+-- node_modules/exports/src/part.js --
+export const value = 1;
+-- node_modules/exports/private.js --
+export const value = 1;
+-- node_modules/false/index.js --
+export default 1;
+-- node_modules/42/index.js --
+export default 1;
+-- node_modules/null/index.js --
+export default 1;
+-- extra/node_modules/external/index.js --
+export default 1;
+-- bower_components/bower/index.js --
+export default 1;
+-- nested/package.json --
+null
+-- malformed/package.json --
+{"name":
+-- invalid-fields/package.json --
+{"name":42,"dependencies":["runtime"],"devDependencies":null,"peerDependencies":false,"optionalDependencies":12}
+-- aliases/tsconfig.json --
+{"extends":"../tsconfig.base.json","compilerOptions":{"paths":{"alias/*":["./src/*"]}}}
+-- aliases/src/part.ts --
+export default 1;
+-- node_modules/alias/part.js --
+export default 1;
+-- node_modules/alias-other/index.js --
+export default 1;
+-- tsconfig.base.json --
+{"compilerOptions":{"jsx":"preserve"}}
+-- explicit/tsconfig.json --
+{"compilerOptions":{"allowImportingTsExtensions":true}}
+-- node_modules/tsx-only/index.tsx --
+export default <div/>;
+-- node_modules/versioned/package.json --
+{"main":"index.js","typesVersions":{"*":{"*":["missing.d.ts"]}}}
+-- node_modules/versioned/index.js --
+export default 1;
+-- node_modules/broken-condition/package.json --
+{"exports":{"import":"./missing.js","require":"./index.js"}}
+-- node_modules/broken-condition/index.js --
+export default 1;
+-- node_modules/array-export/package.json --
+{"exports":["./missing.js","./index.js"]}
+-- node_modules/array-export/index.js --
+export default 1;
+-- jsx-options.json --
+{"compilerOptions":{"jsx":"react"}}
+-- node_modules/nested-conditions/package.json --
+{"exports":{"node":{"browser":"./browser.js"},"default":"./index.js"}}
+-- node_modules/nested-conditions/index.js --
+export default 1;
+-- node_modules/array-conditions/package.json --
+{"exports":[{"browser":"./browser.js"},"./index.js"]}
+-- node_modules/array-conditions/index.js --
+export default 1;
+-- node_modules/_http_agent/index.js --
+export default 1;
+-- node_modules/_http_client/index.js --
+export default 1;
+-- node_modules/_http_common/index.js --
+export default 1;
+-- node_modules/_http_incoming/index.js --
+export default 1;
+-- node_modules/_http_outgoing/index.js --
+export default 1;
+-- node_modules/_http_server/index.js --
+export default 1;
+-- node_modules/_stream_duplex/index.js --
+export default 1;
+-- node_modules/_stream_passthrough/index.js --
+export default 1;
+-- node_modules/_stream_readable/index.js --
+export default 1;
+-- node_modules/_stream_transform/index.js --
+export default 1;
+-- node_modules/_stream_wrap/index.js --
+export default 1;
+-- node_modules/_stream_writable/index.js --
+export default 1;
+-- node_modules/_tls_common/index.js --
+export default 1;
+-- node_modules/_tls_wrap/index.js --
+export default 1;
+-- node_modules/_http_agent/subpath.js --
+export default 1;
+-- node_modules/_http_agent_extra/index.js --
+export default 1;
+-- node_modules/test/index.js --
+export default 1;
+-- workspace-caret/package.json --
+{"workspaces":["packages/[^a]*"],"dependencies":{"workspace-dep":"*"}}
+-- workspace-caret/packages/app/package.json --
+{"name":"workspace-app"}
+-- workspace-caret/packages/lib/package.json --
+{"name":"workspace-lib"}
+-- workspace-caret/node_modules/workspace-dep/index.js --
+export default 1;

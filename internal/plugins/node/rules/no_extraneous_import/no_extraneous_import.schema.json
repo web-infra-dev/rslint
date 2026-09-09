@@ -1,0 +1,86 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowModules": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(?:virtual:)?(?:@[a-zA-Z0-9_\\-.]+/)?[a-zA-Z0-9_\\-.]+$"
+          },
+          "uniqueItems": true
+        },
+        "convertPath": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {},
+              "patternProperties": {
+                "^.+$": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "uniqueItems": true
+                  },
+                  "replace": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                },
+                "additionalProperties": false,
+                "required": ["include", "replace"]
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "resolvePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "resolverConfig": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
