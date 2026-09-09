@@ -77,7 +77,7 @@ func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
 
 // ImportResolutionOptions implements the documented resolverConfig.modules
 // option and the shared Node extension/lookup settings. convertPath is accepted
-// by no-extraneous-import's schema but, as upstream, does not affect this check.
+// by the extraneous rules' schemas but, as upstream, does not affect these checks.
 func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool, options, settings map[string]any) ResolutionOptions {
 	result := ResolutionOptions{
 		Extensions: StringListSetting("tryExtensions", options, settings),
@@ -157,5 +157,13 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 			}
 		}
 	}
+	return result
+}
+
+// RequireResolutionOptions uses the same lookup and TypeScript settings as
+// imports, but CommonJS does not activate the import or types export conditions.
+func RequireResolutionOptions(p *program.Program, fileName string, options, settings map[string]any) ResolutionOptions {
+	result := ImportResolutionOptions(p, fileName, false, options, settings)
+	result.Conditions = []string{"node", "require"}
 	return result
 }
