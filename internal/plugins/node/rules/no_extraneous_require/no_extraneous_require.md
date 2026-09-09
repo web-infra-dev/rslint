@@ -1,4 +1,4 @@
-# node/no-extraneous-require
+# no-extraneous-require
 
 Disallow loading installed packages that are not declared in `package.json`.
 
