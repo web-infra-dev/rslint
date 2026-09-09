@@ -638,6 +638,7 @@ define.test({
     './tests/rstest/rules/consistent-each-for.test.ts',
     './tests/rstest/rules/consistent-rstest-namespace.test.ts',
     './tests/rstest/rules/consistent-test-filename.test.ts',
+    './tests/rstest/rules/consistent-test-it.test.ts',
     './tests/rstest/rules/expect-expect.test.ts',
     './tests/rstest/rules/hoisted-apis-on-top.test.ts',
     './tests/rstest/rules/max-expects.test.ts',

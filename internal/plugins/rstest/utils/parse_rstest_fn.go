@@ -163,6 +163,7 @@ func parseRstestFnCall(
 		ExecutionMode:     resolved.executionMode,
 		Skipped:           resolved.skipped,
 		Todo:              resolved.todo,
+		IsPlaywright:      resolved.profile == rstestProfilePlaywright,
 	}
 	if len(resolved.focusEntries) > 0 {
 		parsed.focus = &rstestFocus{entries: resolved.focusEntries}
