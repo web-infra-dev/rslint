@@ -3,7 +3,9 @@
 package consistent_test_it
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -151,9 +153,9 @@ func TestConsistentTestItExtras(t *testing.T) {
 			{Code: "const { it } = require('@rstest/core'); it('case');", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 41, EndLine: 1, EndColumn: 43}}},
 			// CommonJS can reuse the existing named base API.
 			{Code: "import { test } from '@rstest/core'; const { it } = require('@rstest/core'); it('case');", Output: []string{"import { test } from '@rstest/core'; const { it } = require('@rstest/core'); test('case');"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 78, EndLine: 1, EndColumn: 80}}},
-			// A reassignable CommonJS binding no longer holds what its pattern declares.
+			// A mutable CommonJS binding no longer holds what its pattern declares.
 			{Code: "import { test } from '@rstest/core'; let { it } = require('@rstest/core'); it = it.extend({ account: {} }); it('case', ({ account }) => {});", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 109, EndLine: 1, EndColumn: 111}}},
-			// A reassignable CommonJS binding no longer holds what its pattern declares.
+			// A mutable CommonJS binding no longer holds what its pattern declares.
 			{Code: "import { test } from '@rstest/core'; let { it } = require('@rstest/core'); it('case');", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 76, EndLine: 1, EndColumn: 78}}},
 			// A class static block is a variable environment of its own.
 			{Code: "import { it, test } from '@rstest/core'; class C { static { if (true) { var test = () => {}; } it('case', () => {}); } }", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 96, EndLine: 1, EndColumn: 98}}},
@@ -303,5 +305,104 @@ namespace local { namespace it {}; it('not a registration'); }`
 		} else if !reflect.DeepEqual(baseline, diagnostics) {
 			t.Fatalf("demand %d changed diagnostics", demand)
 		}
+	}
+}
+
+// TestConsistentTestItSourceOnlyShadowing pins the shadowing filter that runs
+// only without type information, where the binder resolves no symbol for a
+// namespace. Each `namespace it {}` shadows its own scope alone, so the
+// registrations outside them must still be reported: the filter answers one
+// scope walk per scope, and a coarser cache would let one silence the others.
+func TestConsistentTestItSourceOnlyShadowing(t *testing.T) {
+	root := fixtures.GetRootDir()
+	fileName := tspath.ResolvePath(root.Dir, "consistent-test-it-source-only-shadowing.ts")
+	code := `it('before');
+function outer() { namespace it {}; it('function body'); }
+class Holder { static { namespace it {}; it('static block'); } }
+namespace group { namespace it {}; it('module block'); }
+it('after');`
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            utils.CreateCompilerHost(root.Dir, fs),
+		CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if program.CanProvideTypeChecker(program.SourceFiles()[0]) {
+		t.Fatal("expected source-only Program")
+	}
+	var lines []int
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program: program, File: fileName,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: ConsistentTestItRule.Name, Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners { return ConsistentTestItRule.Run(ctx, nil) },
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) {
+			lines = append(lines, strings.Count(code[:d.Range.End()], "\n")+1)
+		}},
+	})
+	if want := []int{1, 5}; !reflect.DeepEqual(lines, want) {
+		t.Fatalf("reported lines %v, want %v", lines, want)
+	}
+}
+
+// BenchmarkConsistentTestItRegistrations guards the cost of the shadowing
+// filter on files made of many global registrations. The declaration-name index
+// keeps a plain file off the scope walk; a file that also declares the name —
+// as an unrelated member, parameter, or local — must stay linear through the
+// per-scope cache rather than walking once per registration.
+func BenchmarkConsistentTestItRegistrations(b *testing.B) {
+	const registrations = 5000
+	preludes := []struct{ name, prelude string }{
+		{name: "plain", prelude: ""},
+		{name: "unrelated-method", prelude: "const helper = { it() {} };\n"},
+		{name: "unrelated-property", prelude: "const helper = { it: 1 };\n"},
+		{name: "unrelated-param", prelude: "function helper(it) { return it; }\n"},
+		{name: "unrelated-local", prelude: "function helper() { const it = 1; return it; }\n"},
+	}
+	var body strings.Builder
+	for index := range registrations {
+		fmt.Fprintf(&body, "it('case %d', () => {});\n", index)
+	}
+	root := fixtures.GetRootDir()
+	for _, variant := range preludes {
+		b.Run(variant.name, func(b *testing.B) {
+			fileName := tspath.ResolvePath(root.Dir, "consistent-test-it-bench-"+variant.name+".ts")
+			fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: variant.prelude + body.String()})
+			program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:   []string{fileName},
+				Host:            utils.CreateCompilerHost(root.Dir, fs),
+				CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+				SingleThreaded:  true,
+			})
+			if err != nil {
+				b.Fatal(err)
+			}
+			if program.CanProvideTypeChecker(program.SourceFiles()[0]) {
+				b.Fatal("expected source-only Program")
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				count := 0
+				linter.LintSingleFile(linter.LintSingleFileOptions{
+					Program: program, File: fileName,
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{Name: ConsistentTestItRule.Name, Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners { return ConsistentTestItRule.Run(ctx, nil) },
+						}}
+					},
+					Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) { count++ }},
+				})
+				if count != registrations {
+					b.Fatalf("got %d diagnostics, want %d", count, registrations)
+				}
+			}
+		})
 	}
 }
