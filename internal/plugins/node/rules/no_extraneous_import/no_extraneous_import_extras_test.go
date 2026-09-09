@@ -22,6 +22,24 @@ func TestNoExtraneousImportExtras(t *testing.T) {
 		{Code: "import 'virtual';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./local.js"}}}},
 		// non npm sources
 		{Code: "import './local'; import '/absolute'; import 'node:fs'; import 'fs'; import 'data:text/javascript,0'; import 'https://example.com/a.js'; import '#internal'; import 'virtual:thing';", FileName: "input.js"},
+		// Node's legacy internal builtins cannot be shadowed by installed packages.
+		{Code: `import '_http_agent';
+import '_http_client';
+import '_http_common';
+import '_http_incoming';
+import '_http_outgoing';
+import '_http_server';
+import '_stream_duplex';
+import '_stream_passthrough';
+import '_stream_readable';
+import '_stream_transform';
+import '_stream_wrap';
+import '_stream_writable';
+import '_tls_common';
+import '_tls_wrap';`, FileName: "input.js"},
+		{Code: "export * from '_http_agent'; import('_stream_readable'); import 'node:_tls_wrap';", FileName: "input.js"},
+		// Documented difference: upstream's caret class excludes lib and reports.
+		{Code: "import 'workspace-dep';", FileName: "workspace-caret/packages/lib/input.js"},
 		// declared and self
 		{Code: "import 'declared'; export * from 'optional/sub'; import 'app/sub';", FileName: "input.js"},
 		// missing runtime
@@ -50,6 +68,7 @@ func TestNoExtraneousImportExtras(t *testing.T) {
 		{Code: "import 'external';", FileName: "input.js", Options: []any{map[string]any{"resolvePaths": []any{}}}, Settings: map[string]any{"node": map[string]any{"resolvePaths": []any{"extra"}}}},
 		// custom modules overrides
 		{Code: "import 'runtime';", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{"bower_components"}}}}},
+		{Code: "import 'runtime';", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": "bower_components"}}}},
 		// empty modules
 		{Code: "import 'runtime';", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{}}}}},
 		// empty extensions
@@ -61,6 +80,14 @@ func TestNoExtraneousImportExtras(t *testing.T) {
 		// malformed package stops resolution
 		{Code: "import 'runtime';", FileName: "malformed/input.js"},
 	}, []rule_tester.InvalidTestCase{
+		// A builtin package root must not exempt arbitrary paths or lookalikes.
+		{Code: "import '_http_agent/subpath'; import '_http_agent_extra'; import 'test';", FileName: "input.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "extraneous", Message: `"_http_agent" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 29},
+			{MessageId: "extraneous", Message: `"_http_agent_extra" is extraneous.`, Line: 1, Column: 38, EndLine: 1, EndColumn: 57},
+			{MessageId: "extraneous", Message: `"test" is extraneous.`, Line: 1, Column: 66, EndLine: 1, EndColumn: 72},
+		}},
+		// Documented difference: upstream's caret class includes app and accepts.
+		{Code: "import 'workspace-dep';", FileName: "workspace-caret/packages/app/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"workspace-dep" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 23}}},
 		// An unmatched nested condition may fall through before target selection.
 		{Code: "import 'nested-conditions'; import 'array-conditions';", FileName: "input.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "extraneous", Message: `"nested-conditions" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 27},
@@ -121,6 +148,13 @@ func TestNoExtraneousImportExtras(t *testing.T) {
 		{Code: "import 'external';", FileName: "input.js", Settings: map[string]any{"node": map[string]any{"resolvePaths": []any{"extra"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: "\"external\" is extraneous.", Line: 1, Column: 8, EndLine: 1, EndColumn: 18}}},
 		// custom modules option
 		{Code: "import 'bower';", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{"node_modules", "bower_components"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: "\"bower\" is extraneous.", Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
+		// Scalar module directories preserve relative, absolute and shared forms.
+		{Code: "import 'bower';", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": "bower_components"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"bower" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
+		{Code: "import 'bower';", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": tspath.ResolvePath(root.Dir, "bower_components")}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"bower" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
+		{Code: "import 'bower';", FileName: "input.js", Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"modules": "bower_components"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"bower" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
+		{Code: "import 'bower';", FileName: "input.js", Settings: map[string]any{"n": map[string]any{"resolverConfig": map[string]any{"modules": "bower_components"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"bower" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
+		// An empty scalar keeps enhanced-resolve's default module directory.
+		{Code: "import 'runtime';", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": ""}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"runtime" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 17}}},
 		// custom modules shared
 		{Code: "import 'bower';", FileName: "input.js", Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"modules": []any{"bower_components"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: "\"bower\" is extraneous.", Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
 		// empty resolver overrides settings

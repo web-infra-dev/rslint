@@ -85,6 +85,12 @@ func TestWorkspaceDependencyPatterns(t *testing.T) {
 		{"packages/.hidden", []any{`packages/*`}, true},
 		// Upstream treats 1..3 literally.
 		{"packages/2", []any{`packages/{1..3}`}, true},
+		// Upstream treats ^ as a literal class member; minimatch negates it.
+		{"packages/app", []any{`packages/[^a]*`}, false},
+		{"packages/lib", []any{`packages/[^a]*`}, true},
+		// The ! form negates character classes in both matchers.
+		{"packages/app", []any{`packages/[!a]*`}, false},
+		{"packages/lib", []any{`packages/[!a]*`}, true},
 		{"packages/excluded", []any{`!packages/excluded`, `packages/*`}, false},
 		{"packages/app", []any{`packages\*\`}, true},
 		{"123", []any{123.0}, true},

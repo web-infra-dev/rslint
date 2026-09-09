@@ -67,9 +67,10 @@ export default defineConfig([
   Scoped names are supported; allowing a package also allows its subdirectories.
 - `resolvePaths`: additional base directories for package resolution, relative
   to the working directory. The importing file's directory is also searched.
-- `resolverConfig.modules`: module directories to search. The default is
-  `['node_modules']`. Names such as `bower_components` are searched up the
-  directory tree; absolute directories are also supported.
+- `resolverConfig.modules`: a module directory string or an array of directories
+  to search. The default is `['node_modules']`. Names such as `bower_components`
+  are searched up the directory tree; absolute directories are also supported.
+  An empty string uses the default; an empty array disables module lookup.
 - `convertPath`: accepts the upstream object or array syntax. This option has
   no effect on this rule in upstream v18.3.0 or in rslint.
 
@@ -98,6 +99,13 @@ ranges. For example, `packages/{1..3}` includes
 `packages/2` in rslint; upstream instead matches the literal directory
 `packages/1..3`. Use explicit alternatives such as `packages/{1,2,3}` for
 consistent matching in both tools.
+
+Character classes also differ: `[^a]` negates `a` in rslint, while upstream
+treats `^` as a literal class member. With `workspaces: ['packages/[^a]*']`,
+upstream includes `packages/app` but rslint excludes it. An import of an installed
+`workspace-dep` declared only at the workspace root is therefore reported by
+rslint in that child package, while upstream accepts it. Use `[!a]` for a negated
+character class with the same meaning in both matchers.
 
 ## References
 

@@ -34,12 +34,27 @@ func typescriptExtensionAliases(jsx core.JsxEmit) map[string][]string {
 // Builtins, relative/absolute paths, import maps and URL imports have no npm name.
 func ImportModuleName(specifier string) (name, resource string) {
 	resource, _, _ = strings.Cut(specifier, "!")
-	if core.NodeCoreModules()[resource] || strings.HasPrefix(resource, "data:") ||
+	if isNodeBuiltin(resource) || strings.HasPrefix(resource, "data:") ||
 		strings.HasPrefix(resource, "http://") || strings.HasPrefix(resource, "https://") || !npmSpecifier.Test(resource) {
 		return "", resource
 	}
 	name, _ = module.ParsePackageName(resource)
 	return name, resource
+}
+
+func isNodeBuiltin(specifier string) bool {
+	if core.NodeCoreModules()[specifier] {
+		return true
+	}
+	// tsgo intentionally filters out underscore-prefixed internal modules.
+	// Node's isBuiltin still includes these legacy names (verified on Node 22).
+	switch strings.TrimPrefix(specifier, "node:") {
+	case "_http_agent", "_http_client", "_http_common", "_http_incoming", "_http_outgoing", "_http_server",
+		"_stream_duplex", "_stream_passthrough", "_stream_readable", "_stream_transform", "_stream_wrap", "_stream_writable",
+		"_tls_common", "_tls_wrap":
+		return true
+	}
+	return false
 }
 
 // HasTypeScriptAlias preserves upstream's prefix exemption for compiler paths.
@@ -75,6 +90,9 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 	for _, value := range settingValues("resolverConfig", options, settings) {
 		if config, ok := value.(map[string]any); ok {
 			result.Modules = stringArray(config["modules"])
+			if directory, ok := config["modules"].(string); ok && directory != "" {
+				result.Modules = []string{directory}
+			}
 			break
 		}
 	}

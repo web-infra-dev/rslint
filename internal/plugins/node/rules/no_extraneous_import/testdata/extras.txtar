@@ -115,3 +115,45 @@ export default 1;
 {"exports":[{"browser":"./browser.js"},"./index.js"]}
 -- node_modules/array-conditions/index.js --
 export default 1;
+-- node_modules/_http_agent/index.js --
+export default 1;
+-- node_modules/_http_client/index.js --
+export default 1;
+-- node_modules/_http_common/index.js --
+export default 1;
+-- node_modules/_http_incoming/index.js --
+export default 1;
+-- node_modules/_http_outgoing/index.js --
+export default 1;
+-- node_modules/_http_server/index.js --
+export default 1;
+-- node_modules/_stream_duplex/index.js --
+export default 1;
+-- node_modules/_stream_passthrough/index.js --
+export default 1;
+-- node_modules/_stream_readable/index.js --
+export default 1;
+-- node_modules/_stream_transform/index.js --
+export default 1;
+-- node_modules/_stream_wrap/index.js --
+export default 1;
+-- node_modules/_stream_writable/index.js --
+export default 1;
+-- node_modules/_tls_common/index.js --
+export default 1;
+-- node_modules/_tls_wrap/index.js --
+export default 1;
+-- node_modules/_http_agent/subpath.js --
+export default 1;
+-- node_modules/_http_agent_extra/index.js --
+export default 1;
+-- node_modules/test/index.js --
+export default 1;
+-- workspace-caret/package.json --
+{"workspaces":["packages/[^a]*"],"dependencies":{"workspace-dep":"*"}}
+-- workspace-caret/packages/app/package.json --
+{"name":"workspace-app"}
+-- workspace-caret/packages/lib/package.json --
+{"name":"workspace-lib"}
+-- workspace-caret/node_modules/workspace-dep/index.js --
+export default 1;

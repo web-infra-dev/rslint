@@ -62,8 +62,8 @@ func matchesWorkspace(relative string, workspaces any) bool {
 		negative := strings.HasPrefix(raw, "!")
 		pattern := strings.TrimSuffix(strings.TrimPrefix(raw, "!"), "/")
 		pattern = strings.TrimRight(strings.TrimPrefix(strings.ReplaceAll(pattern, `\`, "/"), "./"), "/")
-		// Reuse rslint's extended glob grammar. Numeric brace ranges are a
-		// documented extension over the upstream grammar.
+		// Reuse rslint's extended glob grammar. Numeric brace ranges and caret
+		// character classes have documented differences from upstream.
 		if pattern != "" && minimatch3.Match(pattern, relative, minimatch3.Options{Dot: true, NoNegate: true, NoComment: true, PreserveWhitespace: true}) {
 			if negative {
 				return false
