@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type lintProgramStoreFixture struct {
@@ -808,6 +809,66 @@ func TestLintProgramStoreReopenSameContentStaysWarm(t *testing.T) {
 	}
 }
 
+func TestLintProgramStoreWindowsDriveURIs(t *testing.T) {
+	for _, scenario := range []string{"unchanged reopen", "new included file", "unsaved included file"} {
+		t.Run(scenario, func(t *testing.T) {
+			const content = "export const value = 1;\n"
+			// Model both drive spellings, including Realpath preserving C:.
+			// Keep incoming editor URIs uppercase to exercise the protocol boundary.
+			files := make(map[string]string)
+			for _, drive := range []string{"C:", "c:"} {
+				files[drive+"/repo/tsconfig.json"] = `{"compilerOptions":{"noLib":true},"include":["src/**/*.ts"]}`
+				files[drive+"/repo/src/index.ts"] = content
+			}
+			server := newTestServer()
+			server.cwd = "C:/repo"
+			server.fs = &exactCaseLSPProgramFS{FS: utils.NewOverlayVFS(&mockFS{}, files), files: files}
+			server.initializeParams = &lsproto.InitializeParams{}
+			fixture := &lintProgramStoreFixture{
+				server: server, store: newLintProgramStore(server),
+				configPath: "C:/repo/tsconfig.json", sourcePath: "C:/repo/src/index.ts",
+				sourceURI: "file:///C:/repo/src/index.ts",
+			}
+			fixture.store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			server.documents[fixture.sourceURI] = content
+			first := fixture.load(t)
+
+			if scenario == "unchanged reopen" {
+				delete(server.documents, fixture.sourceURI)
+				fixture.store.DidClose(fixture.sourceURI)
+				server.documents[fixture.sourceURI] = content
+				fixture.store.DidOpen(fixture.sourceURI, content, true)
+				if fixture.load(t) != first {
+					t.Fatal("unchanged uppercase-drive URI rebuilt its Program")
+				}
+				return
+			}
+
+			exists := scenario == "new included file"
+			if exists {
+				files["C:/repo/src/new.ts"] = content
+				files["c:/repo/src/new.ts"] = content
+			}
+			const newURI = lsproto.DocumentUri("file:///C%3A/repo/src/new.ts")
+			const editorContent = "export const value = 2;\n"
+			server.documents[newURI] = editorContent
+			fixture.store.DidOpen(newURI, editorContent, exists)
+			if len(fixture.store.programs) != 0 || len(fixture.store.projectMetadata) != 0 {
+				t.Fatal("new uppercase-drive URI retained stale project state")
+			}
+			load, _, finalize := fixture.request(newURI)
+			program, source, err := load(fixture.configPath)
+			finalize()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if program == first || source == nil || source.Text() != editorContent {
+				t.Fatal("new uppercase-drive URI did not bind its editor content")
+			}
+		})
+	}
+}
+
 func TestLintProgramStoreUnsavedFileSaveRemainsIncremental(t *testing.T) {
 	const content = "export const value = 1;\n"
 	fixture := newLintProgramStoreFixture(t, content)
@@ -1053,7 +1114,7 @@ func TestLintProgramStoreOpeningNewIncludedFileRebuilds(t *testing.T) {
 	if rebuilt == first {
 		t.Fatal("newly included source did not rebuild the Program")
 	}
-	if sourceFile == nil || sourceFile.FileName() != tspath.NormalizePath(newPath) {
+	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName(), fixture.server.fs) != lintProgramLexicalPathID(newPath, fixture.server.fs) {
 		t.Fatalf("newly included source missing from rebuilt Program: %v", sourceFile)
 	}
 }
@@ -1102,7 +1163,7 @@ func TestLintProgramStoreOpeningNewImportedFileRebuildsBeforeWatchEvent(t *testi
 		t.Fatal("newly resolved import did not rebuild the Program")
 	}
 	if sourceFile == nil ||
-		sourceFile.FileName() != tspath.NormalizePath(importedPath) {
+		lintProgramLexicalPathID(sourceFile.FileName(), fixture.server.fs) != lintProgramLexicalPathID(importedPath, fixture.server.fs) {
 		t.Fatalf("newly resolved import missing from rebuilt Program: %v", sourceFile)
 	}
 }

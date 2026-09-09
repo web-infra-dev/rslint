@@ -1290,6 +1290,7 @@ func TestGetConfigForURI_NestedConfigs(t *testing.T) {
 
 func TestGetConfigForURI_WindowsURI(t *testing.T) {
 	s := newTestServer()
+	s.fs = &caseInsensitiveLSPTestFS{}
 
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"C:/Users/project": {
@@ -1368,8 +1369,8 @@ func TestDocumentURIFromPath_WindowsDriveRoundTrip(t *testing.T) {
 	if uri != "file:///C:/Users/Test%20User/project/index.ts" {
 		t.Fatalf("documentURIFromPath(%q) = %q", filePath, uri)
 	}
-	if got := uriToPath(uri); got != filePath {
-		t.Fatalf("uriToPath(%q) = %q, want %q", uri, got, filePath)
+	if got := uriToPath(uri); got != uri.FileName() {
+		t.Fatalf("uriToPath(%q) = %q, want tsgo filename %q", uri, got, uri.FileName())
 	}
 }
 
@@ -1382,12 +1383,12 @@ func TestUriToPath(t *testing.T) {
 		{"file:///home/user/project", "/home/user/project"},
 		{"file:///project/src/index.ts", "/project/src/index.ts"},
 		// Windows (uppercase and lowercase drive letters)
-		{"file:///C:/Users/project", "C:/Users/project"},
-		{"file:///D:/src/index.ts", "D:/src/index.ts"},
+		{"file:///C:/Users/project", "c:/Users/project"},
+		{"file:///D:/src/index.ts", "d:/src/index.ts"},
 		{"file:///c:/Users/project", "c:/Users/project"},
 		// Percent-encoded paths (spaces, CJK, VS Code colon encoding)
 		{"file:///path%20with%20spaces/file.ts", "/path with spaces/file.ts"},
-		{"file:///C%3A/Users/project", "C:/Users/project"},
+		{"file:///C%3A/Users/project", "c:/Users/project"},
 		{"file:///project/%E4%B8%AD%E6%96%87/file.ts", "/project/中文/file.ts"},
 		{"file:///Users/John%20Doe/my%20project/src/index.ts", "/Users/John Doe/my project/src/index.ts"},
 		// Edge cases

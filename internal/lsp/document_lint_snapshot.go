@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"net/url"
-	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
@@ -97,7 +96,7 @@ func uriToPath(uri lsproto.DocumentUri) string {
 	// Convert file:// URI to file path using net/url for proper percent-decoding.
 	// Handles spaces (%20), CJK characters, and other encoded chars in paths.
 	// file:///home/user       → /home/user  (Unix)
-	// file:///C:/Users        → C:/Users    (Windows — strip the leading slash)
+	// file:///C:/Users        → c:/Users    (Windows — same drive spelling as tsgo)
 	// file:///path%20name/f   → /path name/f
 	uriStr := string(uri)
 	if uriStr == "" {
@@ -111,9 +110,10 @@ func uriToPath(uri lsproto.DocumentUri) string {
 	if u.Host != "" {
 		return "//" + u.Host + p
 	}
-	// Windows drive letter: /C:/... → C:/...
-	if len(p) >= 3 && p[0] == '/' && unicode.IsLetter(rune(p[1])) && p[2] == ':' {
-		return p[1:]
+	if len(p) > 0 && p[0] == '/' {
+		if volume, path, ok := tspath.SplitVolumePath(p[1:]); ok {
+			return volume + path
+		}
 	}
 	return p
 }

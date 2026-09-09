@@ -214,7 +214,7 @@ func TestHandleDidChangeWatchedFilesReevaluatesCustomProject(t *testing.T) {
 						t.Fatalf("%s speculative=%v generation=%+v error=%v", step.name, speculative, generation, err)
 					}
 					options := generation.Native.Programs[0].Options()
-					if options.ConfigFilePath != customPath || options.Strict.IsTrue() != step.strict {
+					if lintProgramLexicalPathID(options.ConfigFilePath, s.fs) != lintProgramLexicalPathID(customPath, s.fs) || options.Strict.IsTrue() != step.strict {
 						t.Fatalf("%s speculative=%v selected stale project: %+v", step.name, speculative, options)
 					}
 					if release != nil {

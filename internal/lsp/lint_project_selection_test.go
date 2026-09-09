@@ -141,7 +141,7 @@ type configReadCountingFS struct {
 }
 
 func (fs *configReadCountingFS) ReadFile(path string) (string, bool) {
-	if tspath.NormalizePath(path) == fs.target {
+	if lintProgramLexicalPathID(path, fs.FS) == lintProgramLexicalPathID(fs.target, fs.FS) {
 		fs.reads++
 		if fs.unreadable {
 			return "", false
@@ -190,7 +190,7 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sourceFile == nil || sourceFile.FileName() != tspath.NormalizePath(firstSource) {
+	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName(), fs) != lintProgramLexicalPathID(firstSource, fs) {
 		t.Fatalf("Program did not use the selected parsed snapshot: %v", sourceFile)
 	}
 	if program.GetSourceFile(tspath.NormalizePath(secondSource)) != nil {
@@ -580,7 +580,7 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 				if wantConfig != "" {
 					wantConfig = tspath.ResolvePath(directory, wantConfig)
 				}
-				if got := program.Options().ConfigFilePath; got != wantConfig {
+				if got := program.Options().ConfigFilePath; lintProgramLexicalPathID(got, fsys) != lintProgramLexicalPathID(wantConfig, fsys) {
 					t.Fatalf("speculative=%v: config=%q, want %q", speculative, got, test.wantConfig)
 				}
 				if len(program.RootFileNames()) != test.wantRoots {
@@ -648,7 +648,8 @@ func TestSelectConfiguredLintProjectServiceDoesNotProbePrograms(t *testing.T) {
 				return
 			}
 			wantConfig := tspath.ResolvePath(directory, test.wantConfig)
-			if !found || selected.configPath != wantConfig || len(built) != 1 || built[0] != wantConfig {
+			if !found || lintProgramLexicalPathID(selected.configPath, fsys) != lintProgramLexicalPathID(wantConfig, fsys) ||
+				len(built) != 1 || lintProgramLexicalPathID(built[0], fsys) != lintProgramLexicalPathID(wantConfig, fsys) {
 				t.Fatalf("selection=%s Programs=%v, want only %s", selected.configPath, built, wantConfig)
 			}
 		})
@@ -822,7 +823,7 @@ func TestProjectServiceLSPFrozenRootDirectory(t *testing.T) {
 						if test.wantTyped {
 							wantConfig = tspath.ResolvePath(directory, "tsconfig.json")
 						}
-						if program.Options().ConfigFilePath != wantConfig {
+						if lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
 							t.Fatalf("speculative=%v: config=%q, want %q", speculative, program.Options().ConfigFilePath, wantConfig)
 						}
 						source := program.GetSourceFile(fileName)
@@ -1181,7 +1182,7 @@ func TestProjectServiceLSPTypedGapTyped(t *testing.T) {
 				if phase.typed {
 					wantConfig = configPath
 				}
-				if program.Options().ConfigFilePath != wantConfig {
+				if lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
 					t.Fatalf("speculative=%v: config=%s, want %s", speculative, program.Options().ConfigFilePath, wantConfig)
 				}
 				source := program.GetSourceFile(fileName)
@@ -1441,7 +1442,7 @@ func TestDocumentProjectPolicyUsesFlatConfigAndRawBases(t *testing.T) {
 					t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
 				}
 				program := generation.Native.Programs[0]
-				if !test.gap && program.Options().ConfigFilePath != tspath.ResolvePath(directory, test.wantConfig) {
+				if !test.gap && lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(tspath.ResolvePath(directory, test.wantConfig), server.fs) {
 					t.Fatalf("speculative=%v: selected %q, want %s", speculative, program.Options().ConfigFilePath, test.wantConfig)
 				}
 				result, err := runLSPGenerationForTest(context.Background(), generation, release, linter.ArtifactDemand{})
@@ -1499,7 +1500,7 @@ func TestProjectServiceLSPLexicalAliases(t *testing.T) {
 		}
 		program := generation.Native.Programs[0]
 		wantConfig := tspath.ResolvePath(tspath.GetDirectoryPath(fileName), "tsconfig.json")
-		if program.Options().ConfigFilePath != wantConfig {
+		if lintProgramLexicalPathID(program.Options().ConfigFilePath, server.fs) != lintProgramLexicalPathID(wantConfig, server.fs) {
 			t.Fatalf("%s: config=%q, want %q", fileName, program.Options().ConfigFilePath, wantConfig)
 		}
 		if program.Options().Strict.IsTrue() != (fileName == realFile) {
