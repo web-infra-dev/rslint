@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // PathSpaceSnapshot freezes every authored config base used by one evaluation
@@ -129,17 +130,7 @@ func (snapshot *PathSpaceSnapshot) ResolvePath(
 // canonical-file deduplication. Windows drive letters are case-insensitive;
 // directory and file names retain their exact casing.
 func ExactPathID(filePath string) string {
-	return normalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
-}
-
-func normalizeAbsoluteDrive(filePath string) string {
-	// SplitVolumePath also accepts drive-relative paths. Keep those spellings
-	// intact, and avoid rebuilding paths whose volume is already canonical.
-	volume, path, ok := tspath.SplitVolumePath(filePath)
-	if ok && tspath.GetRootLength(filePath) > len(volume) && filePath[:len(volume)] != volume {
-		return volume + path
-	}
-	return filePath
+	return utils.NormalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
 }
 
 // PathsEqual compares two paths using TypeScript's cross-platform path rules.

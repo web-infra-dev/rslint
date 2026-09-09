@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -610,6 +611,143 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 			}
 			if test.unreadConfig != "" && fsys.reads != 0 {
 				t.Fatalf("read unrelated root config %d times", fsys.reads)
+			}
+		})
+	}
+}
+
+func TestLSPWindowsAbsoluteRootsKeepGenerationContext(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	globalBytes, err := archive.ReadFile("javascript-reference/globals.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	globalText := string(globalBytes)
+	for _, test := range []struct {
+		name        string
+		service     bool
+		resident    bool
+		jsReference bool
+	}{
+		{name: "ordinary Session"},
+		{name: "service Session", service: true},
+		{name: "service fresh fallback", service: true, jsReference: true},
+		{name: "service resident fallback", service: true, resident: true, jsReference: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			const configPath = "C:/Repo/tsconfig.json"
+			const sourcePath = "C:/Repo/new.ts"
+			const uri = lsproto.DocumentUri("file:///C:/Repo/new.ts")
+			roots := []string{sourcePath}
+			content := "export function value() { var local = 1; return local; }\n"
+			if test.jsReference {
+				roots = append(roots, "C:/Repo/globals.js")
+				content = "/// <reference path=\"./globals.js\" />\nexport function value() { var local = globalValue; return local; }\n"
+			}
+			configText, err := json.Marshal(map[string]any{
+				"compilerOptions": map[string]any{"noLib": true, "allowJs": false},
+				"files":           roots,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Both drive spellings address the same disk files. The target is
+			// absent from disk, so Realpath preserves the spelling it receives.
+			files := make(map[string]string)
+			for _, drive := range []string{"C:", "c:"} {
+				files[drive+"/Repo/tsconfig.json"] = string(configText)
+				files[drive+"/Repo/globals.js"] = globalText
+			}
+			server := newTestServer()
+			server.cwd = "C:/Repo"
+			server.fs = &exactCaseLSPProgramFS{FS: utils.NewOverlayVFS(&mockFS{}, files), files: files}
+			server.backgroundCtx = context.Background()
+			server.initializeParams = &lsproto.InitializeParams{}
+			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer server.session.Close()
+			if test.resident {
+				server.lintPrograms = newLintProgramStore(server)
+				server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error {
+					return nil
+				}
+			}
+			if server.fs.FileExists(sourcePath) {
+				t.Fatal("fixture target must exist only in the editor overlay")
+			}
+			server.documents[uri] = content
+			server.session.DidOpenFile(context.Background(), uri, 1, content, lsproto.LanguageKindTypeScript)
+			options := &config.ParserOptions{}
+			if test.service {
+				options.ProjectService = config.BoolPtr(true)
+			} else {
+				options.Project = config.ProjectPaths{"./tsconfig.json"}
+			}
+			entries := config.RslintConfig{{
+				LanguageOptions: &config.LanguageOptions{ParserOptions: options},
+				Rules:           config.Rules{"no-var": "error"},
+			}}
+			snapshot := documentLintSnapshotForTest(server, uri, entries, server.cwd, false, nil)
+			languageService, err := server.session.GetLanguageService(context.Background(), uri)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sessionProgram := languageService.GetProgram()
+			sessionSource := sessionProgram.GetSourceFile(snapshot.target.Path)
+			if sessionSource == nil || config.ExactPathID(sessionSource.FileName()) != config.ExactPathID(sourcePath) || snapshot.target.Path != "c:/Repo/new.ts" {
+				t.Fatalf("fixture lost the source across drive spellings: source=%v target=%q", sessionSource, snapshot.target.Path)
+			}
+			if compatible := lintSessionProgramSupportsService(sessionProgram); compatible == test.jsReference {
+				t.Fatalf("Session service compatibility=%v, want %v", compatible, !test.jsReference)
+			}
+			for _, speculative := range []bool{false, true} {
+				var generation linter.Generation
+				var release linter.ReleaseFunc
+				if speculative {
+					generation, release, err = acquireSpeculativeGeneration(context.Background(), content, snapshot,
+						server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+				} else {
+					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				}
+				if release != nil {
+					defer release()
+				}
+				if err != nil || len(generation.Native.Programs) != 1 {
+					t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+				}
+				program := generation.Native.Programs[0]
+				if got := program.Options().ConfigFilePath; config.ExactPathID(got) != config.ExactPathID(configPath) {
+					t.Fatalf("speculative=%v: selected config=%q, want %q", speculative, got, configPath)
+				}
+				source := program.GetSourceFile(snapshot.target.Path)
+				if source == nil || source.Text() != content {
+					t.Fatalf("speculative=%v: selected Program lost editor content", speculative)
+				}
+				if test.jsReference {
+					if reference := program.GetSourceFile("C:/Repo/globals.js"); reference == nil || reference.Text() != globalText {
+						t.Fatalf("speculative=%v: fallback lost the selected Program's JavaScript context", speculative)
+					}
+				}
+				if !speculative && !test.jsReference && source != sessionSource {
+					t.Fatal("normal diagnostics unnecessarily rebuilt the compatible Session Program")
+				}
+				result, err := runLSPGenerationForTest(context.Background(), generation, nil,
+					linter.ArtifactDemand{Native: rule.EditDemandAutofix})
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics := result.Observation.Native.Diagnostics
+				if len(diagnostics) != 1 || diagnostics[0].RuleName != "no-var" || len(diagnostics[0].Fixes()) != 1 {
+					t.Fatalf("speculative=%v: lost native diagnostic or fix: %+v", speculative, diagnostics)
+				}
+				if diagnostics[0].Fixes()[0].Text != "let" {
+					t.Fatalf("speculative=%v: unexpected native fix: %+v", speculative, diagnostics[0].Fixes())
+				}
+				if diagnostics[0].SourceFile.Text() != content || server.documents[uri] != content {
+					t.Fatalf("speculative=%v: diagnostic or resident document used the wrong content", speculative)
+				}
 			}
 		})
 	}

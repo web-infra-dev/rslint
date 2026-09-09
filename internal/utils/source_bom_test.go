@@ -84,6 +84,26 @@ func TestSourceHasBOMFromOverlay(t *testing.T) {
 	if size := fs.Stat(cleanOnDisk).Size(); size != int64(len("let a = 1;\n")) {
 		t.Errorf("overlay Stat size = %d, want the size without the mark", size)
 	}
+
+	t.Run("Windows realpath alias", func(t *testing.T) {
+		const alias = "C:/Link/source.ts"
+		const canonical = "c:/Physical/source.ts"
+		base := newMemoryReadFS(nil)
+		base.realPaths[alias] = "C:/Physical/source.ts"
+		files := map[string]string{canonical: BOM + "let value = 1;"}
+		overlay := NewOverlayVFS(base, files)
+		if !SourceHasBOM(overlay, alias) {
+			t.Fatal("realpath drive spelling lost the overlay BOM")
+		}
+		if text, ok := overlay.ReadFile(alias); !ok || text != "let value = 1;" {
+			t.Fatalf("realpath drive spelling lost the overlay text: %q, %v", text, ok)
+		}
+		files[canonical] = "let value = 20;"
+		info := overlay.Stat(alias)
+		if SourceHasBOM(overlay, alias) || info == nil || info.Size() != int64(len(files[canonical])) {
+			t.Fatal("BOM and Stat did not observe the updated caller map")
+		}
+	})
 }
 
 func TestRestoreSourceBOM(t *testing.T) {

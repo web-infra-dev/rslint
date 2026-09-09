@@ -1167,7 +1167,14 @@ Shared path identities and containment ignore ASCII Windows drive-letter case
 while retaining directory and file spelling. Catalog keys and caller-visible
 paths keep their original strings. These comparisons need no realpath proof
 for a drive-only difference, including for new files that do not exist on disk.
-Owner indexes and Program source mappings use this same config path identity.
+Owner indexes, Program source validation and source mappings share the drive
+primitive in `internal/utils`; config still owns path-space and ownership policy.
+Editor overlays accept either drive spelling for files and directories without
+folding names or retaining a separate alias index. LSP uses that drive identity
+when assembling overlay content, so the selected document overrides other open
+aliases of the same target. Before loading config modules,
+discovery chooses one raw owner-directory spelling for drive-equivalent
+candidates, so candidate priority, Git scopes and plugin routing share one owner.
 Ownership lookup never compares depth across lexical and physical path spaces:
 the nearest exact lexical config wins, a native case alias is accepted only
 after filesystem identity verification, and realpath ancestry is consulted only

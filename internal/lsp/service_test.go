@@ -2172,63 +2172,82 @@ func (fs *realpathAliasLSPTestFS) Realpath(filePath string) string {
 }
 
 func TestRunConfiguredLintForContent_OverlaysLexicalTargetIntoDefaultExcludedRealpath(t *testing.T) {
-	root := t.TempDir()
-	realRoot := filepath.Join(root, "node_modules", "real-workspace")
-	aliasRoot := filepath.Join(root, "alias-workspace")
-	realFile := filepath.Join(realRoot, "src", "index.ts")
-	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(realFile, []byte("const diskValue = 1;\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	tsConfigPath := filepath.Join(realRoot, "tsconfig.json")
-	if err := os.WriteFile(tsConfigPath, []byte(`{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	s := newTestServer()
-	s.cwd = aliasRoot
-	s.fs = &realpathAliasLSPTestFS{
-		FS:        bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		aliasRoot: aliasRoot,
-		realRoot:  realRoot,
-	}
-	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
-	uri := documentURIFromPath(aliasFile)
-	realURI := documentURIFromPath(realFile)
-	const openContent = "const editorValue = 2;\n"
-	s.documents[realURI] = "const competingAliasValue = 3;\n"
-	s.documents[uri] = openContent
-
-	editorOverlay := s.currentEditorOverlayFSForTarget(
-		uri,
-		lspConfigTarget(aliasFile, aliasRoot, s.fs),
-	)
-	for _, filePath := range []string{aliasFile, realFile} {
-		if got, ok := editorOverlay.ReadFile(tspath.NormalizePath(filePath)); !ok || got != openContent {
-			t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
+	for _, portableWindows := range []bool{false, true} {
+		name := "native paths"
+		if portableWindows {
+			name = "Windows drive aliases"
 		}
-	}
+		t.Run(name, func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			if portableWindows {
+				root = "C:/Repo"
+			}
+			realRoot := tspath.ResolvePath(root, "node_modules/real-workspace")
+			aliasRoot := tspath.ResolvePath(root, "alias-workspace")
+			realFile := tspath.ResolvePath(realRoot, "src/index.ts")
+			tsConfigPath := tspath.ResolvePath(realRoot, "tsconfig.json")
+			const diskContent = "const diskValue = 1;\n"
+			const tsConfigContent = `{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`
+			var baseFS vfs.FS
+			if portableWindows {
+				// Both drive spellings address the same physical files. Realpath may
+				// preserve either spelling, while the incoming URIs retain uppercase C:.
+				files := make(map[string]string)
+				for _, drive := range []string{"C:", "c:"} {
+					files[drive+strings.TrimPrefix(realFile, "C:")] = diskContent
+					files[drive+strings.TrimPrefix(tsConfigPath, "C:")] = tsConfigContent
+				}
+				baseFS = &exactCaseLSPProgramFS{FS: utils.NewOverlayVFS(&mockFS{}, files), files: files}
+			} else {
+				if err := os.MkdirAll(tspath.GetDirectoryPath(realFile), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(realFile, []byte(diskContent), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(tsConfigPath, []byte(tsConfigContent), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				baseFS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			}
 
-	const fixedContent = "debugger;\n"
-	result, err := configuredSpeculativePipelineResultForTest(s,
-		uri,
-		context.Background(),
-		fixedContent,
-		config.RslintConfig{{
-			Files: []string{"src/**/*.ts"},
-			Rules: config.Rules{"no-debugger": "error"},
-		}},
-		aliasRoot,
-		false,
-		[]string{tsConfigPath},
-	)
-	if err != nil {
-		t.Fatalf("runConfiguredLintForContent failed: %v", err)
-	}
-	if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("canonical program read stale disk content: %+v", result.Observation.Native.Diagnostics)
+			s := newTestServer()
+			s.cwd = aliasRoot
+			s.fs = &realpathAliasLSPTestFS{FS: baseFS, aliasRoot: aliasRoot, realRoot: realRoot}
+			aliasFile := tspath.ResolvePath(aliasRoot, "src/index.ts")
+			uri := documentURIFromPath(aliasFile)
+			realURI := documentURIFromPath(realFile)
+			const openContent = "const editorValue = 2;\n"
+			s.documents[realURI] = "const competingAliasValue = 3;\n"
+			s.documents[uri] = openContent
+
+			editorOverlay := s.currentEditorOverlayFSForTarget(uri, lspConfigTarget(aliasFile, aliasRoot, s.fs))
+			for _, filePath := range []string{aliasFile, realFile} {
+				if got, ok := editorOverlay.ReadFile(filePath); !ok || got != openContent {
+					t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
+				}
+			}
+
+			const fixedContent = "debugger;\n"
+			result, err := configuredSpeculativePipelineResultForTest(s,
+				uri,
+				context.Background(),
+				fixedContent,
+				config.RslintConfig{{Files: []string{"src/**/*.ts"}, Rules: config.Rules{"no-debugger": "error"}}},
+				aliasRoot,
+				false,
+				[]string{tsConfigPath},
+			)
+			if err != nil {
+				t.Fatalf("runConfiguredLintForContent failed: %v", err)
+			}
+			if len(result.Observation.Native.Diagnostics) != 1 || result.Observation.Native.Diagnostics[0].RuleName != "no-debugger" {
+				t.Fatalf("canonical program read stale disk content: %+v", result.Observation.Native.Diagnostics)
+			}
+			if got := result.Observation.Native.Diagnostics[0].SourceFile.Text(); got != fixedContent {
+				t.Fatalf("canonical diagnostic source = %q, want speculative content", got)
+			}
+		})
 	}
 }
 

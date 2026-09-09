@@ -53,8 +53,10 @@ func (vfs *OverlayVFS) DirectoryExists(path string) bool {
 	if !strings.HasSuffix(normalizedPath, "/") {
 		normalizedPath = normalizedPath + "/"
 	}
+	alternatePath := alternateAbsoluteDrivePath(normalizedPath)
 	for virtualFilePath := range vfs.VirtualFiles {
-		if strings.HasPrefix(virtualFilePath, normalizedPath) {
+		if strings.HasPrefix(virtualFilePath, normalizedPath) ||
+			(alternatePath != "" && strings.HasPrefix(virtualFilePath, alternatePath)) {
 			return true
 		}
 	}
@@ -69,9 +71,13 @@ func (vfs *OverlayVFS) GetAccessibleEntries(path string) (result vfs.Entries) {
 	if !strings.HasSuffix(normalizedPath, "/") {
 		normalizedPath = normalizedPath + "/"
 	}
+	alternatePath := alternateAbsoluteDrivePath(normalizedPath)
 
 	for virtualFilePath := range vfs.VirtualFiles {
 		withoutPrefix, found := strings.CutPrefix(virtualFilePath, normalizedPath)
+		if !found && alternatePath != "" {
+			withoutPrefix, found = strings.CutPrefix(virtualFilePath, alternatePath)
+		}
 		if !found {
 			continue
 		}
@@ -145,7 +151,7 @@ func (vfs *OverlayVFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error {
 }
 
 func (vfs *OverlayVFS) Realpath(path string) string {
-	if _, ok := vfs.VirtualFiles[path]; ok {
+	if _, ok := vfs.directVirtualFile(path); ok {
 		if realPath := vfs.fs.Realpath(path); realPath != "" {
 			return realPath
 		}
@@ -176,15 +182,40 @@ func (vfs *OverlayVFS) Remove(path string) error {
 }
 
 func (vfs *OverlayVFS) virtualFile(path string) (string, bool) {
-	if src, ok := vfs.VirtualFiles[path]; ok {
+	if src, ok := vfs.directVirtualFile(path); ok {
 		return src, true
 	}
 	realPath := vfs.fs.Realpath(path)
 	if realPath == "" || realPath == path {
 		return "", false
 	}
-	src, ok := vfs.VirtualFiles[realPath]
-	return src, ok
+	return vfs.directVirtualFile(realPath)
+}
+
+// directVirtualFile keeps the caller's map live and gives exact entries
+// precedence. Drive aliases need no filesystem proof, including unsaved files.
+func (vfs *OverlayVFS) directVirtualFile(path string) (string, bool) {
+	if src, ok := vfs.VirtualFiles[path]; ok {
+		return src, true
+	}
+	if alternatePath := alternateAbsoluteDrivePath(path); alternatePath != "" {
+		src, ok := vfs.VirtualFiles[alternatePath]
+		return src, ok
+	}
+	return "", false
+}
+
+// alternateAbsoluteDrivePath lets raw overlay maps accept either spelling
+// without copying mutable input maps or indexing aliases across generations.
+func alternateAbsoluteDrivePath(path string) string {
+	volume, suffix, ok := tspath.SplitVolumePath(path)
+	if !ok || tspath.GetRootLength(path) <= len(volume) {
+		return ""
+	}
+	if path[:len(volume)] == volume {
+		volume = strings.ToUpper(volume) //nolint:forbidigo // SplitVolumePath returns an ASCII Windows drive volume.
+	}
+	return volume + suffix
 }
 
 func NewOverlayVFS(baseFS vfs.FS, virtualFiles map[string]string) vfs.FS {

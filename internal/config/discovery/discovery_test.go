@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type fakeConfigModuleLoader struct {
@@ -1061,70 +1062,116 @@ func TestConfigDiscoveryFileCoverIgnoreKeepsTraversalButFiltersCandidates(t *tes
 }
 
 func TestConfigDiscoveryAutomaticCandidateWinsSameDirectoryLiteralConflict(t *testing.T) {
-	root := t.TempDir()
-	rootConfig := writeConfigCandidate(t, root, "rslint.config.js")
-	ignoredJS := writeConfigCandidate(t, root, "packages/app/rslint.config.js")
-	automaticMJS := writeConfigCandidate(t, root, "packages/app/rslint.config.mjs")
+	root := tspath.NormalizePath(t.TempDir())
+	writeConfigCandidate(t, root, "rslint.config.js")
+	writeConfigCandidate(t, root, "packages/app/rslint.config.js")
+	writeConfigCandidate(t, root, "packages/app/rslint.config.mjs")
 	literal := writeDiscoveryFixture(t, root, "packages/app/index.ts", "export {}\n")
 	appDir := tspath.CombinePaths(root, "packages/app")
+	writeDiscoveryFixture(t, root, "packages/app/.gitignore", "ignored.ts\n")
+
+	virtualFiles := make(map[string]string)
+	realPaths := make(map[string]string)
+	for _, drive := range []string{"C:", "c:"} {
+		for _, name := range []string{"", "packages", "packages/app"} {
+			realPaths[tspath.ResolvePath(drive+"/Repo", name)] = tspath.ResolvePath("c:/Repo", name)
+		}
+		for _, name := range []string{"rslint.config.js", "packages/app/rslint.config.js", "packages/app/rslint.config.mjs", "packages/app/index.ts", "packages/app/.gitignore"} {
+			path := tspath.ResolvePath(drive+"/Repo", name)
+			virtualFiles[path] = ""
+			realPaths[path] = tspath.ResolvePath("c:/Repo", name)
+			if name == "packages/app/.gitignore" {
+				virtualFiles[path] = "ignored.ts\n"
+			}
+		}
+	}
+	windowsFS := &configDiscoveryRealpathFS{
+		FS: utils.NewOverlayVFS(&configDiscoveryCaseSensitivityFS{
+			FS: discoveryTestFS(), caseSensitive: false,
+		}, virtualFiles),
+		realPaths: realPaths,
+	}
 
 	for _, test := range []struct {
-		name         string
-		directory    string
-		includesRoot bool
+		name, root, literal, owner string
+		directories                []string
+		includesRoot               bool
+		fs                         vfs.FS
 	}{
-		{name: "literal activates first", directory: root, includesRoot: true},
-		{name: "automatic activates first", directory: appDir},
+		{name: "literal activates first", root: root, directories: []string{root}, literal: literal, owner: appDir, includesRoot: true, fs: discoveryTestFS()},
+		{name: "automatic activates first", root: root, directories: []string{appDir}, literal: literal, owner: appDir, fs: discoveryTestFS()},
+		{name: "same drive", root: "C:/Repo", directories: []string{"C:/Repo/packages/app"}, literal: "C:/Repo/packages/app/index.ts", owner: "C:/Repo/packages/app", fs: windowsFS},
+		{name: "mixed drive automatic first", root: "C:/Repo", directories: []string{"C:/Repo/packages/app"}, literal: "c:/Repo/packages/app/index.ts", owner: "C:/Repo/packages/app", fs: windowsFS},
+		{name: "mixed drive literal first", root: "C:/Repo", directories: []string{"C:/Repo"}, literal: "c:/Repo/packages/app/index.ts", owner: "c:/Repo/packages/app", includesRoot: true, fs: windowsFS},
+		{name: "mixed drive directory roots", root: "C:/Repo", directories: []string{"C:/Repo", "c:/Repo/packages/app"}, literal: "C:/Repo/packages/app/index.ts", owner: "c:/Repo/packages/app", includesRoot: true, fs: windowsFS},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			for iteration := range 5 {
 				loader := newFixtureConfigLoader()
+				rootConfig := tspath.CombinePaths(test.root, "rslint.config.js")
 				loader.configs[rootConfig] = rslintconfig.RslintConfig{
 					{Ignores: []string{"packages/app/rslint.config.js"}},
 					{Name: "root", Rules: rslintconfig.Rules{}},
 				}
-				loader.configs[ignoredJS] = namedConfig("literal-js")
-				loader.configs[automaticMJS] = namedConfig("automatic-mjs")
 				loader.plugins[rootConfig] = []rslintconfig.EslintPluginEntry{{Prefix: "root-plugin"}}
-				loader.plugins[ignoredJS] = []rslintconfig.EslintPluginEntry{{Prefix: "literal-js-plugin"}}
-				loader.plugins[automaticMJS] = []rslintconfig.EslintPluginEntry{{Prefix: "automatic-mjs-plugin"}}
-
-				catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{
-					CWD:         root,
-					Directories: []string{test.directory},
-					Files:       []DiscoveryFile{{Path: literal, Explicit: true}},
-				})
-				if got := catalog.Configs[appDir][0].Name; got != "automatic-mjs" {
-					t.Fatalf("iteration %d selected config = %q, want automatic .mjs", iteration, got)
+				for _, owner := range []string{test.root + "/packages/app", tspath.GetDirectoryPath(test.literal), test.owner} {
+					ignoredJS := tspath.CombinePaths(owner, "rslint.config.js")
+					automaticMJS := tspath.CombinePaths(owner, "rslint.config.mjs")
+					loader.configs[ignoredJS] = namedConfig("literal-js")
+					loader.configs[automaticMJS] = namedConfig("automatic-mjs")
+					loader.plugins[ignoredJS] = []rslintconfig.EslintPluginEntry{{Prefix: "literal-js-plugin"}}
+					loader.plugins[automaticMJS] = []rslintconfig.EslintPluginEntry{{Prefix: "automatic-mjs-plugin"}}
 				}
-				scope := catalog.Scopes[appDir]
-				if scope.ExplicitOnly || !reflect.DeepEqual(scope.ExplicitFiles, []string{literal}) {
+
+				catalog, err := DiscoverAutomatic(context.Background(), test.fs, loader, ConfigDiscoveryRequest{
+					CWD:         test.root,
+					Directories: test.directories,
+					Files:       []DiscoveryFile{{Path: test.literal, Explicit: true}},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := namedConfigEntry(catalog.Configs[test.owner]).Name; got != "automatic-mjs" {
+					t.Fatalf("iteration %d selected config = %q, want automatic .mjs; owners=%v", iteration, got, catalog.ConfigDirectories())
+				}
+				scope := catalog.Scopes[test.owner]
+				if scope.ExplicitOnly || !reflect.DeepEqual(scope.ExplicitFiles, []string{test.literal}) {
 					t.Fatalf("iteration %d mixed scope = %+v", iteration, scope)
+				}
+				if !catalog.Configs[test.owner].IsFileIgnored(test.owner+"/ignored.ts", test.owner) {
+					t.Fatal("merged owner lost its collected Git ignore")
 				}
 				wantPlugins := []string{"automatic-mjs-plugin"}
 				if test.includesRoot {
 					wantPlugins = append(wantPlugins, "root-plugin")
 				}
 				if got := pluginPrefixes(catalog.EslintPlugins); !reflect.DeepEqual(got, wantPlugins) {
-					t.Fatalf("iteration %d effective plugins = %v", iteration, got)
+					t.Fatalf("iteration %d effective plugins = %v, want %v", iteration, got, wantPlugins)
+				}
+				if len(catalog.Configs) != len(wantPlugins) || len(catalog.Scopes) != len(wantPlugins) {
+					t.Fatalf("one directory produced multiple owners: configs=%v scopes=%v", catalog.ConfigDirectories(), catalog.Scopes)
 				}
 
-				idByPath := make(map[string]string)
+				var wantIDs []string
 				for _, batch := range loader.batches {
 					for _, candidate := range batch.Candidates {
-						idByPath[candidate.ConfigPath] = candidate.ID
+						if candidate.ConfigPath == rootConfig {
+							if test.includesRoot {
+								wantIDs = append(wantIDs, candidate.ID)
+							}
+							continue
+						}
+						if candidate.ConfigDirectory != test.owner {
+							t.Fatalf("candidate routing owner=%q, catalog owner=%q", candidate.ConfigDirectory, test.owner)
+						}
+						if tspath.GetBaseFileName(candidate.ConfigPath) == "rslint.config.mjs" {
+							wantIDs = append(wantIDs, candidate.ID)
+						}
 					}
-				}
-				wantIDs := []string{idByPath[automaticMJS]}
-				if test.includesRoot {
-					wantIDs = append(wantIDs, idByPath[rootConfig])
 				}
 				sort.Strings(wantIDs)
 				if !reflect.DeepEqual(catalog.EffectiveConfigIDs, wantIDs) {
 					t.Fatalf("iteration %d effective IDs = %v, want %v", iteration, catalog.EffectiveConfigIDs, wantIDs)
-				}
-				if slices.Contains(catalog.EffectiveConfigIDs, idByPath[ignoredJS]) {
-					t.Fatalf("iteration %d activated literal-only candidate: %v", iteration, catalog.EffectiveConfigIDs)
 				}
 			}
 		})
