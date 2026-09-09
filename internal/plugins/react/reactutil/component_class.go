@@ -21,13 +21,23 @@ func IsCreateClassCall(call *ast.CallExpression, pragma, createClass string) boo
 	if call == nil {
 		return false
 	}
+	return isCreateClassCallee(call.Expression, pragma, createClass)
+}
+
+// isCreateClassCallee reports whether callee is `<createClass>` or
+// `<pragma>.<createClass>`. It is shared by CallExpression and NewExpression
+// handling because both node kinds expose a callee in ESTree.
+func isCreateClassCallee(callee *ast.Node, pragma, createClass string) bool {
+	if callee == nil {
+		return false
+	}
 	if pragma == "" {
 		pragma = DefaultReactPragma
 	}
 	if createClass == "" {
 		createClass = DefaultReactCreateClass
 	}
-	callee := ast.SkipParentheses(call.Expression)
+	callee = ast.SkipParentheses(callee)
 	switch callee.Kind {
 	case ast.KindIdentifier:
 		return callee.AsIdentifier().Text == createClass
@@ -302,11 +312,15 @@ func ExtendsReactPureComponent(classNode *ast.Node, pragma string) bool {
 }
 
 func isObjectArgumentOf(call *ast.CallExpression, obj *ast.Node) bool {
-	if call.Arguments == nil {
+	return call != nil && nodeListContains(call.Arguments, obj)
+}
+
+func nodeListContains(nodes *ast.NodeList, target *ast.Node) bool {
+	if nodes == nil {
 		return false
 	}
-	for _, arg := range call.Arguments.Nodes {
-		if arg == obj {
+	for _, arg := range nodes.Nodes {
+		if arg == target {
 			return true
 		}
 	}

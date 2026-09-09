@@ -21,11 +21,11 @@ var NoStringRefsRule = rule.Rule{
 			detectTemplateLiterals, _ = optsMap["noTemplateLiterals"].(bool)
 		}
 
-		pragma := reactutil.GetReactPragma(ctx.Settings)
+		pragma := reactutil.GetReactPragmaFromContext(ctx)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		// `this.refs` is writable in React 18.3.0 and later, so only check on versions < 18.3.0.
-		// When `react.version` is absent the setting defaults to "latest" (999.999.999),
-		// which disables the check.
+		// When `react.version` is absent, `react.defaultVersion` is used before
+		// falling back to "latest" (999.999.999), which disables the check.
 		checkRefsUsage := reactutil.ReactVersionLessThan(ctx.Settings, 18, 3, 0)
 
 		reportStringRef := func(node *ast.Node) {
