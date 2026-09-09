@@ -5,10 +5,17 @@ import (
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// utilityNamespaces are the two names the utilities object is written under.
-// `@rstest/core` exports one object twice, as `rstest` and as `rs`
+// UtilityNamespaceNames are the two names the utilities object is written
+// under. `@rstest/core` exports one object twice, as `rstest` and as `rs`
 // (packages/core/src/runtime/api/public.ts), and registers both onto
 // `globalThis` under `globals: true`.
+//
+// ParseRstestPluginManagedCall reads the receiver as written, so a call it
+// matches spells one of these two out. A rule that wants to skip a file before
+// walking it can therefore ask the source file's identifier index for them.
+var UtilityNamespaceNames = [...]string{"rs", "rstest"}
+
+// utilityNamespaces is UtilityNamespaceNames as a lookup.
 var utilityNamespaces = map[string]bool{
 	"rs":     true,
 	"rstest": true,

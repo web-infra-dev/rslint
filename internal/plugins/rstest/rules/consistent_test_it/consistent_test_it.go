@@ -39,7 +39,7 @@ var ConsistentTestItRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		outside, inside := parseOptions(options)
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
-		scan := &shadowScan{sourceFile: ctx.SourceFile}
+		scan := &shadowScan{shadowed: utils.NewShadowCache(ctx.SourceFile)}
 		// Both listeners resolve registrations through the same filter so a
 		// shadowed `describe` cannot unbalance the suite depth counter.
 		registration := func(node *ast.Node) *rstestUtils.ParsedRstestFnCall {
@@ -218,127 +218,11 @@ func isMutableRequireBinding(symbol *ast.Symbol) bool {
 // shadowed spellings as Rstest APIs. Correcting that inside the parser would
 // put a full scope walk on the path of every registration in every file, and
 // so on every rule that uses the parser; this rule pays for its own strictness
-// instead.
+// instead. utils.ShadowCache keeps that cost off the common path: a file that
+// never declares `test`, `it` or `describe` answers from one indexing pass, and
+// a file that does answers once per scope rather than once per registration.
 type shadowScan struct {
-	sourceFile *ast.SourceFile
-	names      map[string]bool
-	shadowed   map[shadowKey]bool
-}
-
-// shadowKey identifies one scope walk: the nearest enclosing node the walk
-// inspects, the name it looks for, and — only for the few scopes whose answer
-// depends on which child the walk entered through — that child.
-type shadowKey struct {
-	scope *ast.Node
-	entry *ast.Node
-	name  string
-}
-
-// declaresName reports whether the file binds name anywhere, from a single
-// indexing pass. Every binding has a declaration name, so this is a superset of
-// what the scope walk can find: a miss rules the walk out, and a hit only costs
-// the walk. Test files rarely declare `test`, `it`, or `describe` themselves,
-// which keeps the walk off the common path entirely.
-func (scan *shadowScan) declaresName(name string) bool {
-	if scan.names == nil {
-		scan.names = map[string]bool{}
-		if scan.sourceFile != nil {
-			var visit func(*ast.Node)
-			visit = func(node *ast.Node) {
-				if node.Kind == ast.KindIdentifier && ast.IsDeclarationName(node) && bindsDeclaredName(node) {
-					scan.names[node.Text()] = true
-				}
-				node.ForEachChild(func(child *ast.Node) bool {
-					visit(child)
-					return false
-				})
-			}
-			visit(scan.sourceFile.AsNode())
-		}
-	}
-	return scan.names[name]
-}
-
-// bindsDeclaredName reports whether an identifier in declaration-name position
-// introduces a binding a scope walk can find. Member names — object literal and
-// class members, enum members, type parameters, JSX attributes — name a
-// property, so an unrelated `const helper = { test() {} }` must not put `test`
-// in the index and send every global `test(...)` down the walk.
-func bindsDeclaredName(name *ast.Node) bool {
-	if name.Parent == nil {
-		return false
-	}
-	switch name.Parent.Kind {
-	case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
-		ast.KindPropertyDeclaration, ast.KindPropertySignature,
-		ast.KindMethodDeclaration, ast.KindMethodSignature,
-		ast.KindGetAccessor, ast.KindSetAccessor,
-		ast.KindEnumMember, ast.KindTypeParameter, ast.KindJsxAttribute:
-		return false
-	}
-	return true
-}
-
-// isShadowed answers utils.IsShadowed once per (scope, name). A name the index
-// cannot rule out — a parameter or local called `test` anywhere in the file —
-// otherwise puts a full walk, including a scan of every top-level statement, on
-// every registration, which is quadratic in the number of registrations.
-func (scan *shadowScan) isShadowed(root *ast.Node, name string) bool {
-	scope, entry := shadowScope(root)
-	if scope == nil {
-		return utils.IsShadowed(root, name)
-	}
-	key := shadowKey{scope: scope, name: name}
-	if shadowScopeReadsEntry(scope) {
-		key.entry = entry
-	}
-	if result, cached := scan.shadowed[key]; cached {
-		return result
-	}
-	// Every node between root and scope is a plain expression: the walk neither
-	// inspects it nor counts it as a crossed scope, so resuming from entry sees
-	// exactly what a walk from root would.
-	result := utils.IsShadowed(entry, name)
-	if scan.shadowed == nil {
-		scan.shadowed = map[shadowKey]bool{}
-	}
-	scan.shadowed[key] = result
-	return result
-}
-
-// shadowScope returns the nearest ancestor of node that a scope walk inspects,
-// along with the child of it that the walk arrives through.
-func shadowScope(node *ast.Node) (scope *ast.Node, entry *ast.Node) {
-	entry = node
-	for current := node.Parent; current != nil; current = current.Parent {
-		if isShadowScope(current) {
-			return current, entry
-		}
-		entry = current
-	}
-	return nil, nil
-}
-
-// isShadowScope lists every node kind utils.IsShadowed acts on, so that two
-// registrations sharing a scope share its answer.
-func isShadowScope(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindSourceFile, ast.KindBlock, ast.KindModuleBlock, ast.KindCaseBlock,
-		ast.KindCatchClause, ast.KindClassStaticBlockDeclaration, ast.KindEnumDeclaration,
-		ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
-		ast.KindParameter:
-		return true
-	}
-	return ast.IsFunctionLikeDeclaration(node) || ast.IsClassLike(node)
-}
-
-// shadowScopeReadsEntry reports whether a scope's answer depends on the child
-// the walk arrives through: a parameter decorator, a class expression's own
-// name, and a function's parameter environment are all outside the scope that
-// encloses the rest of the construct.
-func shadowScopeReadsEntry(scope *ast.Node) bool {
-	return scope.Kind == ast.KindParameter || scope.Kind == ast.KindClassExpression ||
-		ast.IsFunctionLikeDeclaration(scope)
+	shadowed *utils.ShadowCache
 }
 
 func (scan *shadowScan) isShadowedRegistration(ctx rule.RuleContext, parsed *rstestUtils.ParsedRstestFnCall) bool {
@@ -351,7 +235,7 @@ func (scan *shadowScan) isShadowedRegistration(ctx rule.RuleContext, parsed *rst
 	if isShadowedByModuleBlock(root, ctx.SourceFile, name, symbol) {
 		return true
 	}
-	return symbol == nil && scan.declaresName(name) && scan.isShadowed(root, name)
+	return symbol == nil && scan.shadowed.IsShadowed(root, name)
 }
 
 // isShadowedByModuleBlock reports whether a `namespace`/`module` body between

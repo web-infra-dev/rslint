@@ -597,6 +597,26 @@ func hasFunctionScopeDeclaration(body *ast.Node, name string) bool {
 // declarations, namespace bodies, function parameters, catch variables, and
 // hoisted var and function declarations.
 func IsShadowed(node *ast.Node, name string) bool {
+	return isShadowed(node, name, nil)
+}
+
+// fileShadowKey identifies the source-file arm of one walk. It carries the file
+// as well as the name so that a cache handed to isShadowed can never answer for
+// the wrong file.
+type fileShadowKey struct {
+	sourceFile *ast.Node
+	name       string
+}
+
+// isShadowed is IsShadowed with the source-file arm optionally memoized. That
+// arm is the only part of the walk whose cost is proportional to the file — it
+// scans every top-level statement and then the whole file for hoisted `var` and
+// function declarations — while every other arm costs no more than the nesting
+// depth of the node. It also reads nothing but the SourceFile and the name: no
+// prevChild, no crossed-scope state, no parameter-decorator state. So it is
+// exactly the part that can be answered once per (file, name) and shared by
+// every walk in that file, however different their scopes.
+func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool {
 	prevChild := node
 	inParameterDecorator := false
 	crossedScope := false
@@ -607,16 +627,7 @@ func IsShadowed(node *ast.Node, name string) bool {
 		}
 		switch current.Kind {
 		case ast.KindSourceFile:
-			sf := current.AsSourceFile()
-			if sf != nil && sf.Statements != nil {
-				if HasLocalDeclarationInStatements(sf.Statements.Nodes, name) {
-					return true
-				}
-			}
-			if HasHoistedVarDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
-				return true
-			}
-			return false
+			return sourceFileShadows(current, name, files)
 
 		case ast.KindBlock:
 			if HasShadowingDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
@@ -730,6 +741,30 @@ func IsShadowed(node *ast.Node, name string) bool {
 		current = current.Parent
 	}
 	return false
+}
+
+// sourceFileShadows answers the walk's source-file arm, reading only the file
+// and the name. A non-nil cache turns the file-sized scan into one lookup for
+// every later walk asking about the same name in the same file.
+func sourceFileShadows(sourceFile *ast.Node, name string, files map[fileShadowKey]bool) bool {
+	key := fileShadowKey{sourceFile: sourceFile, name: name}
+	if files != nil {
+		if cached, ok := files[key]; ok {
+			return cached
+		}
+	}
+	result := false
+	if sf := sourceFile.AsSourceFile(); sf != nil && sf.Statements != nil {
+		result = HasLocalDeclarationInStatements(sf.Statements.Nodes, name)
+	}
+	if !result {
+		result = HasHoistedVarDeclaration(sourceFile, name) ||
+			hasHoistedFunctionDeclaration(sourceFile, name)
+	}
+	if files != nil {
+		files[key] = result
+	}
+	return result
 }
 
 // IsQualifiedNamespaceSegment reports whether a module declaration is one
