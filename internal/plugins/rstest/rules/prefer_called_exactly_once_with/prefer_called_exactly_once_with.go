@@ -163,6 +163,7 @@ type chainAssertion struct {
 type mergeCandidate struct {
 	hits      []chainAssertion
 	statement *ast.Node
+	arguments []*ast.Node
 	// position is the trimmed start offset of statement, used to order the
 	// pair and to bound the mock-reset search between them.
 	position int
@@ -341,20 +342,7 @@ func mergeCandidateForStatement(
 	if len(arguments) == 0 {
 		return nil
 	}
-	// The fix keeps one `expect(...)` call and deletes the other, so every
-	// argument of the surviving call is evaluated once instead of twice. Equal
-	// source text does not make that safe: `expect(getMock())` may return a
-	// different mock each time, and dropping an evaluation drops whatever the
-	// expression did. Such a pair is still worth reporting, but the merge is
-	// the author's to make.
-	fixable := len(parsed.Matchers) == 1
-	for _, argument := range arguments {
-		if !isStableExpression(argument) {
-			fixable = false
-			break
-		}
-	}
-	candidate := &mergeCandidate{hits: hits, fixable: fixable}
+	candidate := &mergeCandidate{hits: hits, arguments: arguments, fixable: len(parsed.Matchers) == 1}
 
 	candidate.statement = statement
 	candidate.position = internalUtils.TrimNodeTextRange(sourceFile, statement).Pos()
@@ -909,30 +897,35 @@ func reportPair(
 	// The later assertion carries the report, as upstream does; the earlier one
 	// alone would point at code that reads fine until the second one shows up.
 	reportNode := second.hits[0].node
-	if !first.fixable || !second.fixable {
-		ctx.ReportNode(reportNode, message)
-		return
-	}
-	matcherRange, replacement, ok := test_framework.AccessorReplacement(
-		ctx.SourceFile,
-		with.node,
-		with.combined,
-	)
-	if !ok {
-		ctx.ReportNode(reportNode, message)
-		return
-	}
-	removeRange := statementRemovalRange(ctx.SourceFile, once.statement)
-	if removeRange.Overlaps(matcherRange) {
-		ctx.ReportNode(reportNode, message)
-		return
-	}
-	ctx.ReportNodeWithFixes(
-		reportNode,
-		message,
-		rule.RuleFixReplaceRange(matcherRange, replacement),
-		rule.RuleFixRemoveRange(removeRange),
-	)
+	ctx.ReportNodeWithDeferredFixes(reportNode, message, func() []rule.RuleFix {
+		if !first.fixable || !second.fixable {
+			return nil
+		}
+		// Merging removes an evaluation of every expect argument, not just the mock.
+		for _, candidate := range candidates {
+			for _, argument := range candidate.arguments {
+				if !isStableExpression(argument) {
+					return nil
+				}
+			}
+		}
+		matcherRange, replacement, ok := test_framework.AccessorReplacement(
+			ctx.SourceFile,
+			with.node,
+			with.combined,
+		)
+		if !ok {
+			return nil
+		}
+		removeRange := statementRemovalRange(ctx.SourceFile, once.statement)
+		if removeRange.Overlaps(matcherRange) {
+			return nil
+		}
+		return []rule.RuleFix{
+			rule.RuleFixReplaceRange(matcherRange, replacement),
+			rule.RuleFixRemoveRange(removeRange),
+		}
+	})
 }
 
 // pendingReport is one resolved merge, held until the whole block is analysed

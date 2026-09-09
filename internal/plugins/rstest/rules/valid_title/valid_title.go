@@ -460,7 +460,7 @@ var ValidTitleRule = rule.Rule{
 						ignored = true
 					}
 					if !ignored && arg.Kind != ast.KindTemplateExpression {
-						ctx.ReportNodeWithFixes(arg, rule.RuleMessage{
+						ctx.ReportNode(arg, rule.RuleMessage{
 							Id:          "titleMustBeString",
 							Description: "Title must be a string",
 						})
@@ -511,19 +511,17 @@ var ValidTitleRule = rule.Rule{
 				if !co.ignoreSpaces {
 					trimmed := ecmascript.StringTrim(title)
 					if len(trimmed) != len(title) {
-						raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
-						fix := accidentalSpaceReplacement(raw)
-						if fix == raw {
-							ctx.ReportNode(arg, rule.RuleMessage{
-								Id:          "accidentalSpace",
-								Description: "should not have leading or trailing spaces",
-							})
-						} else {
-							ctx.ReportNodeWithFixes(arg, rule.RuleMessage{
-								Id:          "accidentalSpace",
-								Description: "should not have leading or trailing spaces",
-							}, rule.RuleFixReplace(ctx.SourceFile, arg, fix))
-						}
+						ctx.ReportNodeWithDeferredFixes(arg, rule.RuleMessage{
+							Id:          "accidentalSpace",
+							Description: "should not have leading or trailing spaces",
+						}, func() []rule.RuleFix {
+							raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
+							fix := accidentalSpaceReplacement(raw)
+							if fix == raw {
+								return nil
+							}
+							return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, arg, fix)}
+						})
 					}
 				}
 
@@ -541,16 +539,17 @@ var ValidTitleRule = rule.Rule{
 					firstTok = title[:i]
 				}
 				if ecmascript.EqualsWhenLowercased(firstTok, fnName) {
-					raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 					msg := rule.RuleMessage{
 						Id:          "duplicatePrefix",
 						Description: "should not have duplicate prefix",
 					}
-					if fix, ok := duplicatePrefixReplacement(raw, fnName); ok {
-						ctx.ReportNodeWithFixes(arg, msg, rule.RuleFixReplace(ctx.SourceFile, arg, fix))
-					} else {
-						ctx.ReportNode(arg, msg)
-					}
+					ctx.ReportNodeWithDeferredFixes(arg, msg, func() []rule.RuleFix {
+						raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
+						if fix, ok := duplicatePrefixReplacement(raw, fnName); ok {
+							return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, arg, fix)}
+						}
+						return nil
+					})
 				}
 
 				if me := matcherFor(fnName, co.mustNotMatch); me.re.Test(title) {
