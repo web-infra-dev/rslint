@@ -26,6 +26,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -2648,62 +2649,66 @@ func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.
 	}
 }
 
-// documentGenerationProvider must early-return for files matching the config's
-// `ignores` patterns, WITHOUT touching the session. This test proves the
-// guard semantically (not just by coincidence of a no-op session):
-//
-//  1. Positive: call with session=nil AND an ignored path. The call must
-//     return empty diagnostics with no error. Passing a nil session is the
-//     key trick — if the guard is removed, the very next line dereferences
-//     session and panics, making the test fail loudly rather than silently.
-//  2. Control: call with session=nil AND a non-ignored path. The call MUST
-//     panic (runtime nil-pointer dereference). This proves the only thing
-//     keeping the positive case alive is the ignore early-return, not some
-//     accidental nil-session tolerance downstream.
+// Ignored documents must return before requesting projects. The same source in
+// a non-ignored file must reach project loading and produce a native diagnostic.
 func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	ctx := context.Background()
-	cwd := "/project"
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	cwd := tspath.NormalizePath(archive.Materialize(t, "ignored-documents"))
 	s := newTestServer()
 	s.cwd = cwd
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	caseSensitive := s.fs.UseCaseSensitiveFileNames()
 	cfg := config.RslintConfig{
 		// Global ignores entry: hides everything under lib/.
 		{Ignores: []string{"lib/**"}},
 		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 
-	ignoredURI := lsproto.DocumentUri("file:///project/lib/util.ts")
-	normalURI := lsproto.DocumentUri("file:///project/src/main.ts")
-
-	t.Run("ignored file returns empty without touching session", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("runLintWithSession panicked on ignored file (early-return missing?): %v", r)
+	for _, tt := range []struct {
+		name    string
+		file    string
+		ignored bool
+	}{
+		{name: "ignored file does not request projects", file: "lib/util.ts", ignored: true},
+		{name: "non-ignored file produces a native diagnostic", file: "src/main.ts"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := tspath.ResolvePath(cwd, tt.file)
+			uri := documentURIFromPath(filePath)
+			projectRequests := 0
+			provider := &documentGenerationProvider{
+				server:   s,
+				uri:      uri,
+				snapshot: documentLintSnapshotForTest(s, uri, cfg, cwd, false, nil),
+				requestPrograms: func(_ context.Context, _ lsproto.DocumentUri, lintTarget target.File) (lintProjectLoaders, linter.ReleaseFunc) {
+					projectRequests++
+					return newStandaloneLintProjectRequestWithFS(lintTarget, s.fs).loaders(), nil
+				},
 			}
-		}()
-
-		result, err := configuredDocumentPipelineResultForTest(s, ctx, ignoredURI, cfg, cwd, false, nil)
-		if err != nil {
-			t.Fatalf("expected nil error, got %v", err)
-		}
-		diags := result.Observation.Native.Diagnostics
-		if len(diags) != 0 {
-			t.Errorf("expected 0 diagnostics for ignored file, got %d: %+v", len(diags), diags)
-		}
-	})
-
-	t.Run("non-ignored file falls through to session (nil-session → panic)", func(t *testing.T) {
-		// This control test asserts the inverse: without a matching ignore,
-		// the function proceeds to `session.GetLanguageService(...)` which
-		// must nil-dereference. If this test stops panicking, it means some
-		// other short-circuit has crept in and the positive test above may
-		// be passing for the wrong reason.
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
+			generation, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})
+			if err != nil {
+				t.Fatalf("acquire document generation: %v", err)
 			}
-		}()
-		_, _ = configuredDocumentPipelineResultForTest(s, ctx, normalURI, cfg, cwd, false, nil)
-	})
+			result, err := runLSPGenerationForTest(ctx, generation, release, linter.ArtifactDemand{})
+			if err != nil {
+				t.Fatalf("lint document: %v", err)
+			}
+			diags := result.Observation.Native.Diagnostics
+			if tt.ignored {
+				if projectRequests != 0 || len(diags) != 0 {
+					t.Fatalf("ignored file requested projects %d times and produced diagnostics: %+v", projectRequests, diags)
+				}
+				return
+			}
+			if projectRequests != 1 || len(diags) != 1 || diags[0].RuleName != "no-debugger" {
+				t.Fatalf("non-ignored file requested projects %d times and produced diagnostics: %+v", projectRequests, diags)
+			}
+			if tspath.ToPath(diags[0].FilePath, "", caseSensitive) != tspath.ToPath(filePath, "", caseSensitive) {
+				t.Fatalf("diagnostic path = %q, want %q", diags[0].FilePath, filePath)
+			}
+		})
+	}
 }
 
 func TestRunLintWithSession_DefaultExcludedDirectoryShortCircuits(t *testing.T) {

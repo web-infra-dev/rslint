@@ -628,8 +628,13 @@ func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
 		t.Fatal(err)
 	}
 	importingProgram := ls.GetProgram()
-	if importingProgram.Options().ConfigFilePath != tspath.ResolvePath(directory, "tsconfig.json") || importingProgram.GetSourceFile(fileName) == nil {
-		t.Fatal("fixture did not expose an import-containing Session Program")
+	configPath := tspath.ResolvePath(directory, "tsconfig.json")
+	caseSensitive := server.fs.UseCaseSensitiveFileNames()
+	if got := importingProgram.Options().ConfigFilePath; tspath.ToPath(got, "", caseSensitive) != tspath.ToPath(configPath, "", caseSensitive) {
+		t.Fatalf("Session selected config %q, want %q", got, configPath)
+	}
+	if importingProgram.GetSourceFile(fileName) == nil {
+		t.Fatalf("Session Program does not contain imported source %q", fileName)
 	}
 	assertGap()
 }

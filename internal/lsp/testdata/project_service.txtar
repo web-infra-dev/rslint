@@ -130,3 +130,9 @@ export const value = 1;
 export const result: number = globalValue;
 -- javascript-reference/globals.js --
 var globalValue = 42;
+-- ignored-documents/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["lib/util.ts","src/main.ts"]}
+-- ignored-documents/lib/util.ts --
+debugger;
+-- ignored-documents/src/main.ts --
+debugger;
