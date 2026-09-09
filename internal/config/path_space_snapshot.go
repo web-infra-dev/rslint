@@ -129,13 +129,14 @@ func (snapshot *PathSpaceSnapshot) ResolvePath(
 // canonical-file deduplication. Windows drive letters are case-insensitive;
 // directory and file names retain their exact casing.
 func ExactPathID(filePath string) string {
-	return string(tspath.ToPath(normalizeAbsoluteDrive(tspath.NormalizePath(filePath)), "", true))
+	return normalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
 }
 
 func normalizeAbsoluteDrive(filePath string) string {
-	// A drive-relative spelling such as A:leaf can also be a POSIX filename.
-	if len(filePath) >= 3 && filePath[0] >= 'A' && filePath[0] <= 'Z' && filePath[1] == ':' && filePath[2] == '/' {
-		volume, path, _ := tspath.SplitVolumePath(filePath)
+	// SplitVolumePath also accepts drive-relative paths. Keep those spellings
+	// intact, and avoid rebuilding paths whose volume is already canonical.
+	volume, path, ok := tspath.SplitVolumePath(filePath)
+	if ok && tspath.GetRootLength(filePath) > len(volume) && filePath[:len(volume)] != volume {
 		return volume + path
 	}
 	return filePath
