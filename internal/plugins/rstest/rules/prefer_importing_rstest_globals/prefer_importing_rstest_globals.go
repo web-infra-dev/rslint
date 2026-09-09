@@ -414,9 +414,8 @@ var PreferImportingRstestGlobalsRule = rule.Rule{
 				if reportingNode == nil || len(names.order) == 0 {
 					return
 				}
-				collected := slices.Clone(names.order)
 				ctx.ReportNodeWithDeferredFixes(reportingNode, preferMessage(names.joined()), func() []rule.RuleFix {
-					return buildAutofix(ctx, collected, written)
+					return buildAutofix(ctx, names.order, written)
 				})
 			},
 		}

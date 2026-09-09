@@ -45,37 +45,32 @@ var NoFocusedTestsRule = rule.Rule{
 				}
 
 				reportNode := focusedCallReportNode(node, parsed, focusEntries)
-				hasUnsuggestedEntry := false
-				for _, entry := range focusEntries {
-					if entry.Node != nil && !suggested[entry.Node] {
-						hasUnsuggestedEntry = true
-						break
+				ctx.ReportNodeWithDeferredSuggestions(reportNode, buildErrorFocusedTestMessage(), func() []rule.RuleSuggestion {
+					hasUnsuggestedEntry := false
+					for _, entry := range focusEntries {
+						if entry.Node != nil && !suggested[entry.Node] {
+							hasUnsuggestedEntry = true
+							break
+						}
 					}
-				}
-				if !hasUnsuggestedEntry {
-					ctx.ReportNode(reportNode, buildErrorFocusedTestMessage())
-					return
-				}
-
-				fixes, ok := removalFixes(focusEntries, ctx)
-				if !ok {
-					ctx.ReportNode(reportNode, buildErrorFocusedTestMessage())
-					return
-				}
-				for _, entry := range focusEntries {
-					if entry.Node != nil {
-						suggested[entry.Node] = true
+					if !hasUnsuggestedEntry {
+						return nil
 					}
-				}
 
-				ctx.ReportNodeWithSuggestions(
-					reportNode,
-					buildErrorFocusedTestMessage(),
-					rule.RuleSuggestion{
+					fixes, ok := removalFixes(focusEntries, ctx)
+					if !ok {
+						return nil
+					}
+					for _, entry := range focusEntries {
+						if entry.Node != nil {
+							suggested[entry.Node] = true
+						}
+					}
+					return []rule.RuleSuggestion{{
 						Message:  buildErrorSuggestRemoveFocusMessage(),
 						FixesArr: fixes,
-					},
-				)
+					}}
+				})
 			},
 		}
 	},

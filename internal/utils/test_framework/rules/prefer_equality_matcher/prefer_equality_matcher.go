@@ -205,26 +205,25 @@ func NewRule(config Config) rule.Rule {
 						return
 					}
 
-					hasNot := slices.ContainsFunc(expectCall.Modifiers, func(entry testFramework.MemberEntry) bool {
-						return entry.Name == "not"
-					})
-					shouldHaveNot := shouldAddNot(comparisonNegated, matcherValue, hasNot)
-					match := Match{
-						Expect:          expectCall,
-						Comparison:      comparison,
-						Left:            left,
-						Right:           right,
-						MatcherArgument: matcherArgument,
-						ShouldHaveNot:   shouldHaveNot,
-						ModifierText:    modifierText(expectCall.Modifiers, shouldHaveNot),
-					}
-
 					ctx.ReportNodeWithDeferredSuggestions(
 						expectCall.MatcherEntry.Node,
 						buildUseEqualityMatcherMessage(),
 						func() []rule.RuleSuggestion {
-							match.LeftText = operandText(ctx.SourceFile, match.Left)
-							match.RightText = operandText(ctx.SourceFile, match.Right)
+							hasNot := slices.ContainsFunc(expectCall.Modifiers, func(entry testFramework.MemberEntry) bool {
+								return entry.Name == "not"
+							})
+							shouldHaveNot := shouldAddNot(comparisonNegated, matcherValue, hasNot)
+							match := Match{
+								Expect:          expectCall,
+								Comparison:      comparison,
+								Left:            left,
+								Right:           right,
+								LeftText:        operandText(ctx.SourceFile, left),
+								RightText:       operandText(ctx.SourceFile, right),
+								MatcherArgument: matcherArgument,
+								ShouldHaveNot:   shouldHaveNot,
+								ModifierText:    modifierText(expectCall.Modifiers, shouldHaveNot),
+							}
 							suggestions := make([]rule.RuleSuggestion, 0, len(equalityMatchers))
 							for _, equalityMatcher := range equalityMatchers {
 								fixes := config.BuildFixes(ctx, match, equalityMatcher)

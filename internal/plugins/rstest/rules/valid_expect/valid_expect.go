@@ -176,20 +176,17 @@ func reportAsyncDescriptor(
 ) {
 	msg := buildAsyncDescriptorMessage(descriptor, alwaysAwait)
 
-	var fixes []rule.RuleFix
-	if fn := ast.GetContainingFunction(descriptor.node); fn != nil {
-		if !ast.IsAsyncFunction(fn) && !asyncInserted[fn] {
-			fixes = append(fixes, sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn))
-			asyncInserted[fn] = true
+	ctx.ReportNodeWithDeferredFixes(descriptor.node, msg, func() []rule.RuleFix {
+		var fixes []rule.RuleFix
+		if fn := ast.GetContainingFunction(descriptor.node); fn != nil {
+			if !ast.IsAsyncFunction(fn) && !asyncInserted[fn] {
+				fixes = append(fixes, sharedValidExpect.AsyncInsertFix(ctx.SourceFile, fn))
+				asyncInserted[fn] = true
+			}
+			fixes = append(fixes, sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait))
 		}
-		fixes = append(fixes, sharedValidExpect.AwaitFix(ctx.SourceFile, descriptor.node, alwaysAwait))
-	}
-
-	if len(fixes) > 0 {
-		ctx.ReportNodeWithFixes(descriptor.node, msg, fixes...)
-		return
-	}
-	ctx.ReportNode(descriptor.node, msg)
+		return fixes
+	})
 }
 
 // expectFactoryOpenParenRange locates the `(` of the assertion factory call so

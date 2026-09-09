@@ -208,6 +208,7 @@ var NoImportNodeTestRule = rule.Rule{
 	Name:   "rstest/no-import-node-test",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		var replacementModule string
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()
@@ -225,27 +226,26 @@ var NoImportNodeTestRule = rule.Rule{
 					return
 				}
 				message := noImportNodeTestMessage()
-				if specifier != nodeTestModule || !canSafelyReplaceModule(declaration) {
-					ctx.ReportNode(node, message)
-					return
-				}
-				replacement, ok := replacementForModuleSpecifier(
-					ctx.SourceFile,
-					declaration.ModuleSpecifier,
-					replacementModuleForFile(ctx.SourceFile),
-				)
-				if !ok {
-					ctx.ReportNode(node, message)
-					return
-				}
-				ctx.ReportNodeWithFixes(
-					node,
-					message,
-					rule.RuleFixReplaceRange(
+				ctx.ReportNodeWithDeferredFixes(node, message, func() []rule.RuleFix {
+					if specifier != nodeTestModule || !canSafelyReplaceModule(declaration) {
+						return nil
+					}
+					if replacementModule == "" {
+						replacementModule = replacementModuleForFile(ctx.SourceFile)
+					}
+					replacement, ok := replacementForModuleSpecifier(
+						ctx.SourceFile,
+						declaration.ModuleSpecifier,
+						replacementModule,
+					)
+					if !ok {
+						return nil
+					}
+					return []rule.RuleFix{rule.RuleFixReplaceRange(
 						internalUtils.TrimNodeTextRange(ctx.SourceFile, declaration.ModuleSpecifier),
 						replacement,
-					),
-				)
+					)}
+				})
 			},
 			// `import nodeTest = require('node:test')` is a static runner import
 			// too, but TypeScript parses it as its own declaration kind rather
