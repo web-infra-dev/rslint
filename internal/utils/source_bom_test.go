@@ -86,6 +86,7 @@ func TestSourceHasBOMFromOverlay(t *testing.T) {
 	}
 
 	t.Run("Windows realpath alias", func(t *testing.T) {
+		t.Parallel()
 		const alias = "C:/Link/source.ts"
 		const canonical = "c:/Physical/source.ts"
 		base := newMemoryReadFS(nil)
