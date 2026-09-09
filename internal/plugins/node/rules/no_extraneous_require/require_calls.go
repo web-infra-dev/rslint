@@ -1,86 +1,57 @@
-package rule
+package no_extraneous_require
 
 import (
-	"maps"
-	"slices"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// GlobalCallTrace selects calls, constructor calls and named properties of a
-// global value. TrackGlobalCalls follows ESLint ReferenceTracker's aliases,
-// destructuring and value-preserving expressions using the file's RefStore.
-type GlobalCallTrace struct {
-	Call, Construct bool
-	Members         map[string]*GlobalCallTrace
+type requireValue uint8
+
+const (
+	noRequireValue requireValue = iota
+	requireFunction
+	requireResolve
+	requireGlobalObject
+)
+
+func (value requireValue) member(name string) requireValue {
+	if value == requireGlobalObject && name == "require" {
+		return requireFunction
+	}
+	if value == requireFunction && name == "resolve" {
+		return requireResolve
+	}
+	return noRequireValue
 }
 
-type GlobalCallOptions struct {
-	// Deduplicate visits each binding/trace pair once. Use this for rules that
-	// report once per call, avoiding repeated traversal of converging aliases.
-	Deduplicate bool
-}
-
-type globalCallTracker struct {
-	ctx               RuleContext
-	identifiersByName map[string][]*ast.Node
+type requireCallTracker struct {
+	ctx               rule.RuleContext
+	names             *utils.ReferenceIndex
 	propertyEvaluator *utils.StaticStringEvaluator
 	variableStack     map[*ast.Symbol]bool
 	globalStack       map[string]bool
 	calls             []*ast.Node
-	options           GlobalCallOptions
-	variablesSeen     map[globalCallVariable]bool
-	globalsSeen       map[globalCallGlobal]bool
 }
 
-type globalCallVariable struct {
-	symbol *ast.Symbol
-	trace  *GlobalCallTrace
-}
-
-type globalCallGlobal struct {
-	name  string
-	trace *GlobalCallTrace
-}
-
-// TrackGlobalCalls excludes undeclared, shadowed or written global roots.
-// Reaching a call through multiple aliases preserves upstream's duplicates;
-// consumers that report once per call can deduplicate the returned nodes.
-func TrackGlobalCalls(ctx RuleContext, roots map[string]*GlobalCallTrace, options GlobalCallOptions) []*ast.Node {
-	tracker := &globalCallTracker{
-		ctx:               ctx,
-		identifiersByName: make(map[string][]*ast.Node),
-		options:           options,
+// collectRequireCalls follows the require/require.resolve aliases used by
+// upstream's visitRequire. Binding queries use RefStore; name enumeration uses
+// ReferenceIndex. Separate paths may report the same call, as upstream does.
+func collectRequireCalls(ctx rule.RuleContext) []*ast.Node {
+	tracker := requireCallTracker{
+		ctx:           ctx,
+		names:         utils.NewReferenceIndex(ctx.SourceFile, nil),
+		variableStack: make(map[*ast.Symbol]bool),
+		globalStack:   make(map[string]bool),
 	}
-	if options.Deduplicate {
-		tracker.variablesSeen = make(map[globalCallVariable]bool)
-		tracker.globalsSeen = make(map[globalCallGlobal]bool)
-	} else {
-		tracker.variableStack = make(map[*ast.Symbol]bool)
-		tracker.globalStack = make(map[string]bool)
-	}
-	var visit func(*ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindIdentifier && !utils.IsNonReferenceIdentifier(node) {
-			name := node.Text()
-			tracker.identifiersByName[name] = append(tracker.identifiersByName[name], node)
-		}
-		node.ForEachChild(visit)
-		return false
-	}
-	ctx.SourceFile.AsNode().ForEachChild(visit)
-	for _, name := range slices.Sorted(maps.Keys(roots)) {
-		tracker.trackGlobalRoot(name, roots[name])
-	}
-	globalObject := &GlobalCallTrace{Members: roots}
+	tracker.trackGlobalRoot("require", requireFunction)
 	for _, name := range []string{"global", "globalThis", "self", "window"} {
-		tracker.trackGlobalRoot(name, globalObject)
+		tracker.trackGlobalRoot(name, requireGlobalObject)
 	}
 	return tracker.calls
 }
 
-func (tracker *globalCallTracker) trackGlobalRoot(name string, value *GlobalCallTrace) {
+func (tracker *requireCallTracker) trackGlobalRoot(name string, value requireValue) {
 	if !tracker.ctx.Globals.Access(name).IsDeclared() {
 		return
 	}
@@ -95,17 +66,18 @@ func (tracker *globalCallTracker) trackGlobalRoot(name string, value *GlobalCall
 	}
 }
 
-func (tracker *globalCallTracker) globalReferences(name string) []*ast.Node {
+func (tracker *requireCallTracker) globalReferences(name string) []*ast.Node {
 	var references []*ast.Node
-	for _, identifier := range tracker.identifiersByName[name] {
+	tracker.names.ForEachReferenceByName(name, nil, func(identifier *ast.Node) bool {
 		if tracker.isGlobalReference(identifier, name) {
 			references = append(references, identifier)
 		}
-	}
+		return false
+	})
 	return references
 }
 
-func (tracker *globalCallTracker) isGlobalReference(identifier *ast.Node, name string) bool {
+func (tracker *requireCallTracker) isGlobalReference(identifier *ast.Node, name string) bool {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier || utils.IsNonReferenceIdentifier(identifier) {
 		return false
 	}
@@ -115,11 +87,11 @@ func (tracker *globalCallTracker) isGlobalReference(identifier *ast.Node, name s
 	return !utils.IsShadowed(identifier, name)
 }
 
-func (tracker *globalCallTracker) trackExpression(node *ast.Node, value *GlobalCallTrace) {
+func (tracker *requireCallTracker) trackExpression(node *ast.Node, value requireValue) {
 	if node == nil {
 		return
 	}
-	for node.Parent != nil && callValuePassesThrough(node, node.Parent) {
+	for node.Parent != nil && requireValuePassesThrough(node, node.Parent) {
 		node = node.Parent
 	}
 	parent := node.Parent
@@ -129,7 +101,7 @@ func (tracker *globalCallTracker) trackExpression(node *ast.Node, value *GlobalC
 
 	if ast.IsAccessExpression(parent) && utils.AccessExpressionObject(parent) == node {
 		name, ok := tracker.accessExpressionStaticName(parent)
-		if next := value.Members[name]; ok && next != nil {
+		if next := value.member(name); ok && next != noRequireValue {
 			tracker.trackExpression(parent, next)
 		}
 		return
@@ -137,12 +109,8 @@ func (tracker *globalCallTracker) trackExpression(node *ast.Node, value *GlobalC
 
 	switch parent.Kind {
 	case ast.KindCallExpression:
-		if parent.AsCallExpression().Expression == node && value.Call {
-			tracker.addCall(parent)
-		}
-	case ast.KindNewExpression:
-		if parent.AsNewExpression().Expression == node && value.Construct {
-			tracker.addCall(parent)
+		if parent.AsCallExpression().Expression == node && (value == requireFunction || value == requireResolve) {
+			tracker.calls = append(tracker.calls, parent)
 		}
 	case ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
@@ -175,7 +143,7 @@ func (tracker *globalCallTracker) trackExpression(node *ast.Node, value *GlobalC
 	}
 }
 
-func (tracker *globalCallTracker) trackAssignmentTarget(node *ast.Node, value *GlobalCallTrace) {
+func (tracker *requireCallTracker) trackAssignmentTarget(node *ast.Node, value requireValue) {
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return
@@ -184,7 +152,7 @@ func (tracker *globalCallTracker) trackAssignmentTarget(node *ast.Node, value *G
 	case ast.KindIdentifier:
 		tracker.trackIdentifier(node, value)
 	case ast.KindObjectBindingPattern:
-		if len(value.Members) == 0 {
+		if value == requireResolve {
 			return
 		}
 		pattern := node.AsBindingPattern()
@@ -200,25 +168,25 @@ func (tracker *globalCallTracker) trackAssignmentTarget(node *ast.Node, value *G
 			if propertyName == nil {
 				propertyName = element.Name()
 			}
-			if name, ok := tracker.staticPropertyName(propertyName); ok && value.Members[name] != nil {
-				tracker.trackAssignmentTarget(element.Name(), value.Members[name])
+			if name, ok := tracker.staticPropertyName(propertyName); ok && value.member(name) != noRequireValue {
+				tracker.trackAssignmentTarget(element.Name(), value.member(name))
 			}
 		}
 	case ast.KindObjectLiteralExpression:
-		if len(value.Members) == 0 {
+		if value == requireResolve {
 			return
 		}
 		for _, propertyNode := range node.AsObjectLiteralExpression().Properties.Nodes {
 			switch propertyNode.Kind {
 			case ast.KindPropertyAssignment:
 				property := propertyNode.AsPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.Members[name] != nil {
-					tracker.trackAssignmentTarget(property.Initializer, value.Members[name])
+				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.member(name) != noRequireValue {
+					tracker.trackAssignmentTarget(property.Initializer, value.member(name))
 				}
 			case ast.KindShorthandPropertyAssignment:
 				property := propertyNode.AsShorthandPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.Members[name] != nil {
-					tracker.trackAssignmentTarget(property.Name(), value.Members[name])
+				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.member(name) != noRequireValue {
+					tracker.trackAssignmentTarget(property.Name(), value.member(name))
 				}
 			}
 		}
@@ -230,7 +198,7 @@ func (tracker *globalCallTracker) trackAssignmentTarget(node *ast.Node, value *G
 	}
 }
 
-func (tracker *globalCallTracker) trackIdentifier(identifier *ast.Node, value *GlobalCallTrace) {
+func (tracker *requireCallTracker) trackIdentifier(identifier *ast.Node, value requireValue) {
 	if tracker.ctx.Refs != nil {
 		if symbol := tracker.ctx.Refs.Resolve(identifier); utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
@@ -258,23 +226,12 @@ func callBindingSymbol(identifier *ast.Node) *ast.Symbol {
 	return declaration.Symbol()
 }
 
-func (tracker *globalCallTracker) trackVariable(symbol *ast.Symbol, value *GlobalCallTrace) {
-	if tracker.ctx.Refs == nil || symbol == nil {
+func (tracker *requireCallTracker) trackVariable(symbol *ast.Symbol, value requireValue) {
+	if tracker.ctx.Refs == nil || symbol == nil || tracker.variableStack[symbol] {
 		return
 	}
-	if tracker.options.Deduplicate {
-		key := globalCallVariable{symbol, value}
-		if tracker.variablesSeen[key] {
-			return
-		}
-		tracker.variablesSeen[key] = true
-	} else {
-		if tracker.variableStack[symbol] {
-			return
-		}
-		tracker.variableStack[symbol] = true
-		defer delete(tracker.variableStack, symbol)
-	}
+	tracker.variableStack[symbol] = true
+	defer delete(tracker.variableStack, symbol)
 	for _, reference := range tracker.ctx.Refs.References(symbol) {
 		if !ast.IsWriteOnlyAccess(reference) {
 			tracker.trackExpression(reference, value)
@@ -282,32 +239,21 @@ func (tracker *globalCallTracker) trackVariable(symbol *ast.Symbol, value *Globa
 	}
 }
 
-func (tracker *globalCallTracker) trackGlobalVariable(name string, value *GlobalCallTrace) {
-	if tracker.options.Deduplicate {
-		key := globalCallGlobal{name, value}
-		if tracker.globalsSeen[key] {
-			return
-		}
-		tracker.globalsSeen[key] = true
-	} else {
-		if tracker.globalStack[name] {
-			return
-		}
-		tracker.globalStack[name] = true
-		defer delete(tracker.globalStack, name)
+func (tracker *requireCallTracker) trackGlobalVariable(name string, value requireValue) {
+	if tracker.globalStack[name] {
+		return
 	}
-	for _, reference := range tracker.identifiersByName[name] {
+	tracker.globalStack[name] = true
+	defer delete(tracker.globalStack, name)
+	tracker.names.ForEachReferenceByName(name, nil, func(reference *ast.Node) bool {
 		if !ast.IsWriteOnlyAccess(reference) && tracker.isGlobalReference(reference, name) {
 			tracker.trackExpression(reference, value)
 		}
-	}
+		return false
+	})
 }
 
-func (tracker *globalCallTracker) addCall(node *ast.Node) {
-	tracker.calls = append(tracker.calls, node)
-}
-
-func (tracker *globalCallTracker) accessExpressionStaticName(node *ast.Node) (string, bool) {
+func (tracker *requireCallTracker) accessExpressionStaticName(node *ast.Node) (string, bool) {
 	if node.Kind == ast.KindElementAccessExpression {
 		argument := node.AsElementAccessExpression().ArgumentExpression
 		if tracker.propertyEvaluator == nil {
@@ -318,7 +264,7 @@ func (tracker *globalCallTracker) accessExpressionStaticName(node *ast.Node) (st
 	return utils.AccessExpressionStaticName(node)
 }
 
-func (tracker *globalCallTracker) staticPropertyName(node *ast.Node) (string, bool) {
+func (tracker *requireCallTracker) staticPropertyName(node *ast.Node) (string, bool) {
 	if node != nil && node.Kind == ast.KindComputedPropertyName {
 		if tracker.propertyEvaluator == nil {
 			tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithoutScope()
@@ -328,7 +274,7 @@ func (tracker *globalCallTracker) staticPropertyName(node *ast.Node) (string, bo
 	return utils.GetStaticPropertyName(node)
 }
 
-func callValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
+func requireValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
 	if ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments) {
 		return parent.Expression() == node
 	}

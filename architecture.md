@@ -1669,11 +1669,6 @@ repeat it under a second source of truth.
 - **Autofix**: fix rounds advance only pipeline-owned in-memory snapshots. Integrations receive the final in-memory delta for the operation, and optional persistence is one terminal commit rather than a series of intermediate writes
 - **Rules**: `RuleContext` exposes the bound Program and only the checker granted to that file. Shared structures such as module graphs derive from the Program generation rather than becoming a second authority
 
-`rule.TrackGlobalCalls` shares global call and constructor alias propagation
-between native rules. It uses the file's `RefStore` for binding resolution and
-effective globals from `RuleContext`; consumers choose the names and properties
-to track and whether duplicate paths should produce duplicate diagnostics.
-
 Playground inspection is a separate read-only path through `internal/inspector`.
 
 ## 15. Data Flow (Textual Diagram)

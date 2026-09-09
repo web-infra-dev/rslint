@@ -70,23 +70,6 @@ func TestRequireUnicodeRegexpExtras(t *testing.T) {
 			{Code: "RegExp = custom; RegExp('foo')"},
 		},
 		[]rule_tester.InvalidTestCase{
-			// Keep the existing tracker behavior when an alias changes from the
-			// global object to its constructor. Each value is visited once.
-			{
-				Code: "let R = globalThis; R = R.RegExp; R('x')",
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "requireUFlag", Line: 1, Column: 35, EndLine: 1, EndColumn: 41,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `let R = globalThis; R = R.RegExp; R('x', "u")`}},
-				}},
-			},
-			{
-				Code:    "holder = globalThis; holder = holder.RegExp; holder('x')",
-				Globals: map[string]any{"holder": "writable"},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "requireUFlag", Line: 1, Column: 46, EndLine: 1, EndColumn: 57,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "addUFlag", Output: `holder = globalThis; holder = holder.RegExp; holder('x', "u")`}},
-				}},
-			},
 			// A top-level type declaration in a module does not replace the
 			// runtime global, while the same declaration in script mode does.
 			{
