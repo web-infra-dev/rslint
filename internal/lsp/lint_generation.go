@@ -140,9 +140,12 @@ func (p *documentGenerationProvider) AcquireGeneration(
 			selectionFS = resident.overlayFS
 		}
 	}
+	loaders.fallback = request.fallback
 	releasePending = release != nil
 	if selectionFS == nil {
 		selectionFS = request.filesystem()
+	} else if serviceEnabled {
+		request.fs = selectionFS
 	}
 
 	program, sourceFile, hasTypeInfo, err := selectLintProgram(
@@ -151,14 +154,11 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		server.session,
 		ctx,
 		snapshot.typeScriptConfigPaths,
-		snapshot.projectPolicy.ServiceRootDirectory,
+		snapshot.projectPolicy,
 		selectionFS,
 		loaders,
 		server.lintSessionRoots,
 	)
-	if err == nil && serviceEnabled && !hasTypeInfo {
-		program, sourceFile, err = createStandaloneFallbackProgram(snapshot.target, selectionFS)
-	}
 	if err != nil {
 		return linter.Generation{}, nil, err
 	}

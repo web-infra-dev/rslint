@@ -64,9 +64,9 @@ func acquireSpeculativeGeneration(
 
 	request := newStandaloneLintProjectRequestWithFS(target, overlayFS)
 	request.sourceReferences = snapshot.projectPolicy.ServiceRootDirectory != ""
-	selected, found, err := selectConfiguredLintProject(
+	program, sourceFile, hasTypeInfo, err := acquireLintProgram(
 		snapshot.typeScriptConfigPaths,
-		snapshot.projectPolicy.ServiceRootDirectory,
+		snapshot.projectPolicy,
 		target,
 		overlayFS,
 		request.loaders(),
@@ -92,21 +92,10 @@ func acquireSpeculativeGeneration(
 			readText,
 		)
 	}
-	if found {
-		if selected.sourceFile == nil {
-			return emptyLintGeneration(environment.processCwd), nil, nil
-		}
-		return newGeneration(selected.program, selected.sourceFile, true), nil, nil
-	}
-
-	program, sourceFile, err := createStandaloneFallbackProgram(target, overlayFS)
-	if err != nil {
-		return linter.Generation{}, nil, err
-	}
 	if sourceFile == nil {
 		return emptyLintGeneration(environment.processCwd), nil, nil
 	}
-	return newGeneration(program, sourceFile, false), nil, nil
+	return newGeneration(program, sourceFile, hasTypeInfo), nil, nil
 }
 
 type speculativeGenerationAcquire func(

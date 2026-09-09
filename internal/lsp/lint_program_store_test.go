@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/project"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
@@ -78,12 +79,19 @@ func newLintProgramStoreFixture(t *testing.T, source string) *lintProgramStoreFi
 
 func (f *lintProgramStoreFixture) request(
 	uri lsproto.DocumentUri,
-) (lintProgramLoader, lintProjectMetadataLoader, func()) {
-	return f.store.Request(
+) (func(string) (*compiler.Program, *ast.SourceFile, error), lintProjectMetadataLoader, func()) {
+	loader, metadata, finalize := f.store.Request(
 		context.Background(),
 		uri,
 		lspConfigTarget(uriToPath(uri), f.server.cwd, f.server.fs),
 	)
+	return func(path string) (*compiler.Program, *ast.SourceFile, error) {
+		selected, _, err := metadata(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		return loader(selected)
+	}, metadata, finalize
 }
 
 func (f *lintProgramStoreFixture) load(t *testing.T) *compiler.Program {
@@ -201,7 +209,11 @@ func TestLintProgramStoreProjectServiceIgnoresPreviouslyLoadedReferences(t *test
 	}
 	legacyTarget := tspath.ResolvePath(directory, "shared/first.ts")
 	legacyRequest := store.request(context.Background(), documentURIFromPath(legacyTarget), lspConfigTarget(legacyTarget, directory, server.fs), false)
-	if _, _, err := legacyRequest.load(tspath.ResolvePath(directory, "shared/tsconfig.json")); err != nil {
+	legacyMetadata, err := legacyRequest.metadata(tspath.ResolvePath(directory, "shared/tsconfig.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := legacyRequest.load(legacyMetadata); err != nil {
 		t.Fatal(err)
 	}
 	legacyRequest.finalize()
@@ -639,41 +651,103 @@ func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T)
 }
 
 func TestLintProgramStoreDoesNotRetainProgramWithTransientProjectMetadata(t *testing.T) {
-	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
-	metadata, err := parseStandaloneLintProject(
-		fixture.configPath,
-		fixture.server.fs,
-		fixture.server.fs,
-	)
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, transientReference := range []bool{false, true} {
+		name := "root"
+		if transientReference {
+			name = "reference"
+		}
+		t.Run(name, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, "snapshot-references"))
+			configPath := tspath.ResolvePath(directory, "app/tsconfig.json")
+			refPath := tspath.ResolvePath(directory, "lib/tsconfig.json")
+			server := newTestServer()
+			server.cwd = tspath.ResolvePath(directory, "app")
+			server.fs = bundled.WrapFS(osvfs.FS())
+			store := newLintProgramStore(server)
+			store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			metadata, err := parseStandaloneLintProject(configPath, server.fs, server.fs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reference, err := parseStandaloneLintProject(refPath, server.fs, server.fs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := lspConfigTarget(tspath.ResolvePath(directory, "app/target.ts"), server.cwd, server.fs)
+			request := store.request(context.Background(), documentURIFromPath(target.Path), target, true)
+			request.projectMetadata[configPath] = metadata
+			request.projectMetadata[refPath] = reference
+			transientPath := configPath
+			if transientReference {
+				transientPath = refPath
+			}
+			request.transientMetadata[transientPath] = struct{}{}
+			if _, sourceFile, err := request.load(metadata); err != nil || sourceFile == nil {
+				t.Fatalf("transient Program source=%v error=%v", sourceFile, err)
+			}
+			request.finalize()
+			if len(store.programs) != 0 {
+				t.Fatal("Program retained metadata predating stable watcher coverage")
+			}
+		})
+	}
+}
+
+func TestLintProgramStoreProjectServiceTracksMissingReferences(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "snapshot-references"))
+	rootPath := tspath.ResolvePath(directory, "app/tsconfig.json")
+	refPath := tspath.ResolvePath(directory, "lib/tsconfig.json")
+	reference, err := os.ReadFile(refPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	configPath := tspath.NormalizePath(fixture.configPath)
-	request := &lintProgramRequest{
-		store: fixture.store,
-		ctx:   context.Background(),
-		uri:   fixture.sourceURI,
-		target: lspConfigTarget(
-			fixture.sourcePath,
-			fixture.server.cwd,
-			fixture.server.fs,
-		),
-		projectMetadata: map[string]*lintProjectMetadata{
-			configPath: metadata,
-		},
-		transientMetadata: map[string]struct{}{
-			configPath: {},
-		},
-	}
-
-	if _, sourceFile, err := request.load(configPath); err != nil {
+	if err := os.Remove(refPath); err != nil {
 		t.Fatal(err)
-	} else if sourceFile == nil {
-		t.Fatal("transient Program did not contain its direct root")
 	}
-	request.finalize()
-	if len(fixture.store.programs) != 0 {
-		t.Fatal("Program built from metadata predating watcher coverage became resident")
+	server := newTestServer()
+	server.cwd = tspath.ResolvePath(directory, "app")
+	server.fs = bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	target := lspConfigTarget(tspath.ResolvePath(directory, "app/target.ts"), server.cwd, server.fs)
+	uri := documentURIFromPath(target.Path)
+	load := func() (*compiler.Program, *lintProgramState) {
+		t.Helper()
+		request := store.request(context.Background(), uri, target, true)
+		selected, err := selectLintProgramRequestForTest(request, server.cwd)
+		if err != nil || selected.sourceFile == nil {
+			t.Fatalf("selected source=%v error=%v", selected.sourceFile, err)
+		}
+		request.finalize()
+		return selected.program, store.programs[request.key(rootPath)]
+	}
+	first, state := load()
+	if state == nil {
+		t.Fatal("missing reference prevented resident Program creation")
+	}
+	if _, tracked := state.failedLookups[lintProgramLexicalPathID(refPath, server.fs)]; !tracked {
+		t.Fatal("missing external reference bypassed failed-lookup tracking")
+	}
+	if err := os.WriteFile(refPath, reference, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Discovery sees the new reference before its watcher event arrives. Its
+	// snapshot must constrain the resident Program too, with no Session help.
+	second, _ := load()
+	if second == first {
+		t.Fatal("new reference reused the Program from its missing-config generation")
+	}
+	found := false
+	second.RangeResolvedProjectReference(func(_ tspath.Path, parsed, _ *tsoptions.ParsedCommandLine, _ int) bool {
+		if parsed != nil && lintProgramLexicalPathID(parsed.ConfigName(), server.fs) == lintProgramLexicalPathID(refPath, server.fs) {
+			found = true
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("created reference did not enter the rebuilt Program")
 	}
 }
 
@@ -1113,13 +1187,17 @@ func TestLintProgramStoreReusesFrozenTargetForResidentAndRebuild(t *testing.T) {
 
 	load := func() *ast.SourceFile {
 		t.Helper()
-		loader, _, finalize := fixture.store.Request(
+		loader, loadMetadata, finalize := fixture.store.Request(
 			context.Background(),
 			fixture.sourceURI,
 			target,
 		)
 		defer finalize()
-		_, sourceFile, err := loader(fixture.configPath)
+		metadata, _, err := loadMetadata(fixture.configPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, sourceFile, err := loader(metadata)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1212,12 +1290,16 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 		return nil
 	}
 
-	loader, _, finalize := store.Request(
+	loader, loadMetadata, finalize := store.Request(
 		context.Background(),
 		sourceURI,
 		lspConfigTarget(sourcePath, workspace, server.fs),
 	)
-	if _, _, err := loader(configPath); err != nil {
+	metadata, _, err := loadMetadata(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := loader(metadata); err != nil {
 		t.Fatal(err)
 	}
 	finalize()

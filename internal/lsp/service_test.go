@@ -1840,7 +1840,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
-		"",
+		config.ProjectPolicy{},
 		fsys,
 		standaloneLoaders(sourceURI),
 		s.lintSessionRoots,
@@ -1861,7 +1861,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{importConfig, firstConfig},
-		"",
+		config.ProjectPolicy{},
 		fsys,
 		standaloneLoaders(sourceURI),
 		s.lintSessionRoots,
@@ -1911,7 +1911,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		s.session,
 		ctx,
 		[]string{secondConfig, firstConfig},
-		"",
+		config.ProjectPolicy{},
 		fsys,
 		standaloneLoaders(gapURI),
 		s.lintSessionRoots,
@@ -1980,10 +1980,10 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 		s.session,
 		ctx,
 		[]string{configPath},
-		"",
+		config.ProjectPolicy{},
 		fsys,
 		lintProjectLoaders{
-			program: func(string) (*compiler.Program, *ast.SourceFile, error) {
+			program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
 				loaderCalls++
 				return nil, nil, errors.New("standalone loader must not run")
 			},
@@ -2020,7 +2020,7 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 		snapshot: documentLintSnapshotForTest(s, uri, entries, dir, false, nil),
 		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
 			return lintProjectLoaders{
-				program: func(string) (*compiler.Program, *ast.SourceFile, error) {
+				program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
 					loaderCalls++
 					return nil, nil, errors.New("service must reuse the Session Program")
 				},

@@ -66,7 +66,8 @@ func TestSelectConfiguredLintProjectDirectRootOutranksEarlierImport(t *testing.T
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
 			},
-			program: func(configPath string) (*compiler.Program, *ast.SourceFile, error) {
+			program: func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+				configPath := metadata.configPath
 				programCalls = append(programCalls, configPath)
 				return new(compiler.Program), sourceFile, nil
 			},
@@ -114,7 +115,8 @@ func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T
 			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 				return metadata[configPath], true, nil
 			},
-			program: func(configPath string) (*compiler.Program, *ast.SourceFile, error) {
+			program: func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+				configPath := metadata.configPath
 				programCalls = append(programCalls, configPath)
 				return new(compiler.Program), sourceFile, nil
 			},
@@ -184,7 +186,7 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(`{"files":["second.ts"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	program, sourceFile, err := request.program(configPath)
+	program, sourceFile, err := request.program(metadata)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,6 +198,94 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 	}
 	if fs.reads != 1 {
 		t.Fatalf("tsconfig read count = %d, want 1", fs.reads)
+	}
+}
+
+func TestStandaloneLintProjectRequestKeepsReferenceSnapshot(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	directory := tspath.NormalizePath(archive.Materialize(t, "snapshot-references"))
+	rootPath := tspath.ResolvePath(directory, "app/tsconfig.json")
+	refPath := tspath.ResolvePath(directory, "lib/tsconfig.json")
+	initial, err := os.ReadFile(refPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Include a reference cycle: the compiler's root identity must remain its
+	// service clone even though the request also retains the authored root.
+	cyclic := strings.TrimSpace(string(initial))
+	cyclic = strings.TrimSuffix(cyclic, "}") + `,"references":[{"path":"../app"}]}`
+	if err := os.WriteFile(refPath, []byte(cyclic), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fsys := bundled.WrapFS(osvfs.FS())
+	target := lspConfigTarget(tspath.ResolvePath(directory, "app/target.ts"), directory, fsys)
+	request := newStandaloneLintProjectRequestWithFS(target, fsys)
+	request.sourceReferences = true
+	metadata, err := request.metadata(rootPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference, err := request.metadata(refPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(refPath, []byte(strings.ReplaceAll(cyclic, "unsafe.d.ts", "safe.d.ts")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	program, source, err := request.program(metadata)
+	if err != nil || source == nil {
+		t.Fatalf("Program source=%v error=%v", source, err)
+	}
+	found := false
+	program.RangeResolvedProjectReference(func(_ tspath.Path, parsed, _ *tsoptions.ParsedCommandLine, _ int) bool {
+		if parsed != nil && lintProgramLexicalPathID(parsed.ConfigName(), fsys) == lintProgramLexicalPathID(refPath, fsys) {
+			found = true
+			if parsed != reference.commandLine {
+				t.Error("construction reparsed a selected reference snapshot")
+			}
+		}
+		return true
+	})
+	if !found {
+		t.Fatal("Program omitted its selected reference")
+	}
+}
+
+func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	files := make(map[string]string)
+	names, err := archive.FileNames("snapshot-options")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range names {
+		content, err := archive.ReadFile("snapshot-options/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[tspath.ResolvePath("c:/Repo", name)] = string(content)
+	}
+	fsys := utils.NewOverlayVFS(&caseInsensitiveLSPTestFS{}, files)
+	upper, err := parseStandaloneLintProject("C:/Repo/tsconfig.json", fsys, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lower, err := parseStandaloneLintProject("c:/Repo/tsconfig.json", fsys, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if upper.configPath != "C:/Repo/tsconfig.json" {
+		t.Fatal("normalization changed the declared project identity")
+	}
+	if !lintProjectSnapshotsEqual(upper.commandLine, lower.commandLine, fsys) {
+		t.Fatal("Session drive normalization made unchanged roots or path options incompatible")
+	}
+	program, err := createStandaloneLintProgram(lower, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !lintSessionProgramMatchesConfig(program, upper, nil, fsys) {
+		t.Fatal("equivalent Windows configuration could not reuse its Program")
 	}
 }
 
@@ -542,9 +632,10 @@ func TestSelectConfiguredLintProjectServiceDoesNotProbePrograms(t *testing.T) {
 			request.sourceReferences = true
 			loaders := request.loaders()
 			var built []string
-			loaders.program = func(configPath string) (*compiler.Program, *ast.SourceFile, error) {
+			loaders.program = func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+				configPath := metadata.configPath
 				built = append(built, configPath)
-				return request.program(configPath)
+				return request.program(metadata)
 			}
 			selected, found, err := selectConfiguredLintProject(nil, directory, target, fsys, loaders)
 			if err != nil {
@@ -591,7 +682,7 @@ func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
 		server: server, uri: uri, snapshot: snapshot,
 		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
 			return lintProjectLoaders{
-				program: func(string) (*compiler.Program, *ast.SourceFile, error) {
+				program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
 					t.Fatal("gap discovery attempted standalone Program construction")
 					return nil, nil, nil
 				},
@@ -833,6 +924,191 @@ func TestProjectServiceLSPGapKeepsDiagnosticsAndFixes(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		name       string
+		project    string
+		wantCycles int
+		cold       bool
+	}{
+		{name: "false", project: "false"},
+		{name: "null", project: "null"},
+		{name: "cold false", project: "false", cold: true},
+		{name: "cold null", project: "null", cold: true},
+		{name: "empty projects", project: `[]`},
+		{name: "unmatched project", project: `["tsconfig.other.json"]`},
+		{name: "configured control", project: `["tsconfig.json"]`, wantCycles: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := tspath.NormalizePath(archive.Materialize(t, "disabled-binding"))
+			fileName := tspath.ResolvePath(directory, "target.ts")
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = bundled.WrapFS(osvfs.FS())
+			server.backgroundCtx = context.Background()
+			server.defaultLibraryPath = bundled.LibPath()
+			server.initializeParams = &lsproto.InitializeParams{}
+			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer server.session.Close()
+			content, ok := server.fs.ReadFile(fileName)
+			if !ok {
+				t.Fatal("missing target fixture")
+			}
+			uri := documentURIFromPath(fileName)
+			server.documents[uri] = content
+			if !test.cold {
+				server.session.DidOpenFile(context.Background(), uri, 1, content, lsproto.LanguageKindTypeScript)
+			}
+			var entries config.RslintConfig
+			if err := json.Unmarshal([]byte(`[{"plugins":["import"],"languageOptions":{"parserOptions":{"project":`+test.project+`}},"rules":{"import/no-cycle":"error","no-var":"error"}}]`), &entries); err != nil {
+				t.Fatal(err)
+			}
+			snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+			for _, speculative := range []bool{false, true} {
+				var result linter.PipelineResult
+				var err error
+				if speculative {
+					result, err = speculativePipelineResultForTest(server, context.Background(), uri, content, snapshot)
+				} else {
+					result, err = configuredDocumentPipelineResultForTest(server, context.Background(), uri, entries, directory, false, nil)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				cycles, vars := 0, 0
+				for _, diagnostic := range result.Observation.Native.Diagnostics {
+					switch diagnostic.RuleName {
+					case "import/no-cycle":
+						cycles++
+					case "no-var":
+						vars++
+					default:
+						t.Errorf("unexpected diagnostic: %+v", diagnostic)
+					}
+				}
+				if cycles != test.wantCycles || vars != 1 {
+					t.Errorf("speculative=%v: cycles=%d no-var=%d, want %d/1", speculative, cycles, vars, test.wantCycles)
+				}
+			}
+			wantFixed := strings.Replace(content, "var local", "let local", 1)
+			if got := runSpeculativeFixAllForTest(t, server, context.Background(), uri, content, snapshot); got != wantFixed {
+				t.Errorf("fix-all=%q, want %q", got, wantFixed)
+			}
+			if server.documents[uri] != content {
+				t.Fatal("fix-all changed editor text")
+			}
+			if test.cold && len(server.session.Snapshot().ProjectCollection.ConfiguredProjects()) != 0 {
+				t.Fatal("disabled binding requested a Session project")
+			}
+		})
+	}
+}
+
+func TestProjectServiceLSPSessionConfigSnapshot(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		name, fixture, directory, editFile, replacement string
+		extends                                         bool
+	}{
+		{name: "other roots change", fixture: "flat-policy", directory: "pkg[1]", editFile: "tsconfig.json",
+			replacement: `{"compilerOptions":{"noLib":true},"files":["target.ts","safe.d.ts"]}`},
+		{name: "extended config changes", fixture: "flat-policy", directory: "pkg[1]", editFile: "base.json", extends: true,
+			replacement: `{"compilerOptions":{"noLib":true},"files":["target.ts","safe.d.ts"]}`},
+		{name: "paths change", fixture: "snapshot-options", editFile: "tsconfig.json",
+			replacement: `{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","paths":{"payload":["./safe.d.ts"]}},"files":["target.ts"]}`},
+		{name: "second referenced config changes", fixture: "snapshot-references", directory: "app", editFile: "../lib/tsconfig.json",
+			replacement: `{"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","composite":true,"outDir":"dist","paths":{"payload":["./safe.d.ts"]}},"files":["value.ts"]}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := tspath.ResolvePath(tspath.NormalizePath(archive.Materialize(t, test.fixture)), test.directory)
+			fileName := tspath.ResolvePath(directory, "target.ts")
+			configPath := tspath.ResolvePath(directory, "tsconfig.json")
+			if test.extends {
+				initial, err := os.ReadFile(configPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(tspath.ResolvePath(directory, "base.json"), initial, 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(configPath, []byte(`{"extends":"./base.json"}`), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = bundled.WrapFS(osvfs.FS())
+			server.backgroundCtx = context.Background()
+			server.defaultLibraryPath = bundled.LibPath()
+			// No dynamic watched-file registration: Session does not hear the
+			// disk config edit, but lint discovery observes the new snapshot.
+			server.initializeParams = &lsproto.InitializeParams{}
+			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer server.session.Close()
+			content, ok := server.fs.ReadFile(fileName)
+			if !ok {
+				t.Fatal("missing target fixture")
+			}
+			uri := documentURIFromPath(fileName)
+			server.documents[uri] = content
+			server.session.DidOpenFile(context.Background(), uri, 1, content, lsproto.LanguageKindTypeScript)
+			entries := config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}},
+				Rules:           config.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
+			}}
+			for _, phase := range []struct {
+				name       string
+				wantUnsafe int
+			}{
+				{name: "initial", wantUnsafe: 1},
+				{name: "changed"},
+			} {
+				t.Run(phase.name, func(t *testing.T) {
+					if phase.name == "changed" {
+						if err := os.WriteFile(tspath.ResolvePath(directory, test.editFile), []byte(test.replacement), 0o644); err != nil {
+							t.Fatal(err)
+						}
+						content += "// edited after disk config changed\n"
+						server.documents[uri] = content
+						server.session.DidChangeFile(context.Background(), uri, 2, makeDidChangeParams(uri, 2, content).ContentChanges)
+					}
+					snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+					for _, speculative := range []bool{false, false, true} {
+						var result linter.PipelineResult
+						var err error
+						if speculative {
+							result, err = speculativePipelineResultForTest(server, context.Background(), uri, content, snapshot)
+						} else {
+							result, err = configuredDocumentPipelineResultForTest(server, context.Background(), uri, entries, directory, false, nil)
+							if phase.name == "initial" && err == nil {
+								languageService, sessionErr := server.session.GetLanguageService(context.Background(), uri)
+								if sessionErr != nil {
+									t.Fatal(sessionErr)
+								}
+								if got := result.Observation.Native.Diagnostics; len(got) == 1 && got[0].SourceFile != languageService.GetProgram().GetSourceFile(fileName) {
+									t.Error("unchanged configuration rebuilt a Session-owned Program")
+								}
+							}
+						}
+						if err != nil {
+							t.Fatal(err)
+						}
+						if got := len(result.Observation.Native.Diagnostics); got != phase.wantUnsafe {
+							t.Errorf("speculative=%v: unsafe diagnostics=%d, want %d: %+v", speculative, got, phase.wantUnsafe, result.Observation.Native.Diagnostics)
+						}
+					}
+				})
+			}
+		})
 	}
 }
 

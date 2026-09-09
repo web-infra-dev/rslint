@@ -116,7 +116,10 @@ func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys v
 	if r.sourceReferences {
 		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
 			true, metadata.commandLine,
-			utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys),
+			newLintProjectReferenceHost(
+				utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys),
+				r.projectMetadata,
+			),
 		)
 	}
 	return createStandaloneLintProgram(metadata, fsys)
@@ -224,17 +227,17 @@ func (r *lintProgramRequest) parseProjectMetadata(
 }
 
 func (r *lintProgramRequest) load(
-	configFileName string,
+	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
 	r.prepareOverlay()
-	configFileName = tspath.NormalizePath(configFileName)
+	configFileName := metadata.configPath
 	if r.freshOnly || !r.store.Usable() {
-		return r.loadFresh(configFileName)
+		return r.loadFresh(metadata)
 	}
 
 	state := r.store.programs[r.key(configFileName)]
-	if state == nil {
-		return r.rebuild(configFileName, r.projectMetadata[configFileName])
+	if state == nil || !r.matchesMetadata(state, metadata) {
+		return r.rebuild(configFileName, metadata)
 	}
 
 	targetSource := state.sources.SourceFileForTarget(
@@ -291,13 +294,30 @@ func (r *lintProgramRequest) load(
 	return r.result(configFileName, state)
 }
 
-func (r *lintProgramRequest) loadFresh(
-	configFileName string,
-) (*compiler.Program, *ast.SourceFile, error) {
-	metadata, err := r.metadata(configFileName)
-	if err != nil {
-		return nil, nil, err
+// matchesMetadata checks only snapshots this request has already observed.
+// Watchers still own invalidation; a newly observed reference may not be
+// discarded merely because the resident root snapshot is unchanged.
+func (r *lintProgramRequest) matchesMetadata(state *lintProgramState, root *lintProjectMetadata) bool {
+	if state.metadata != root || len(r.transientMetadata) != 0 {
+		return false
 	}
+	rootPath := lintProgramLexicalPathID(root.configPath, r.store.server.fs)
+	for _, metadata := range r.projectMetadata {
+		path := lintProgramLexicalPathID(metadata.configPath, r.store.server.fs)
+		if path == rootPath {
+			continue
+		}
+		if built, referenced := state.program.GetResolvedProjectReferenceFor(path); referenced &&
+			!lintProjectSnapshotsEqual(metadata.commandLine, built, r.store.server.fs) {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *lintProgramRequest) loadFresh(
+	metadata *lintProjectMetadata,
+) (*compiler.Program, *ast.SourceFile, error) {
 	program, err := r.createProgram(metadata, r.overlayFS)
 	if err != nil {
 		return nil, nil, err
@@ -317,8 +337,10 @@ func (r *lintProgramRequest) rebuild(
 			return nil, nil, err
 		}
 	}
-	_, metadataIsTransient := r.transientMetadata[configFileName]
-	if r.freshOnly || !r.store.Usable() || metadataIsTransient {
+	// A selected reference may also predate stable watcher coverage. The host
+	// can retain any successful metadata from this request, so none of those
+	// snapshots may cross the request boundary while coverage is unsettled.
+	if r.freshOnly || !r.store.Usable() || len(r.transientMetadata) != 0 {
 		program, err := r.createProgram(metadata, r.overlayFS)
 		if err != nil {
 			return nil, nil, err
