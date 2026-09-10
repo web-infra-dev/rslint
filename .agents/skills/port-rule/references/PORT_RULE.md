@@ -105,6 +105,7 @@ Use the exact locations in [QUICK_REFERENCE](QUICK_REFERENCE.md#rule-files-and-r
 - Inspect the selected wrapper's types and assertions before copying cases. The core wrapper uses object-shaped options for object rules; other wrappers can accept positional arrays. Prefixing, skip support and snapshot support differ. In particular, the jsx-a11y wrapper does not provide the core wrapper's snapshots, message-ID or position assertions.
 - Unsupported cases cannot be silently discarded. Use a supported skip mechanism or retain an explained case/comment and report the coverage gap when the JS wrapper cannot express it.
 - Keep documentation focused on the rule's behavior, options and correct/incorrect examples. Include official docs when available and a source link pinned to the exact tag. Record requested/established public differences there; reusable AST/API discoveries belong in their reference, not product-facing rule explanations.
+- Use the bare rule name in the documentation H1; do not include a plugin namespace.
 - If the plugin is already enabled in repo-root `rslint.config.ts`, add the new rule at `warn` before verification. Otherwise do not enable a plugin or change the preset as a side effect of porting.
 
 Build prerequisites are listed once in the command reference. A fresh binary does not imply fresh core JS, generated option types or wrapper output.
