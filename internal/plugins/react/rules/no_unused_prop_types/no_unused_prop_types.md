@@ -1,4 +1,4 @@
-# react/no-unused-prop-types
+# no-unused-prop-types
 
 Warns when a React component defines a prop type that it never uses.
 
