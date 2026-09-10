@@ -1,5 +1,7 @@
 package utils_test
 
+// cspell:ignore xtend
+
 import (
 	"fmt"
 	"testing"
@@ -38,6 +40,38 @@ func parsedHookError(kind string, name string) []rule_tester.InvalidTestCaseErro
 		MessageId: "parsedFn",
 		Message:   fmt.Sprintf("kind=%s name=%s", kind, name),
 	}}
+}
+
+func TestParseRstestFnCallFactoryBoundaries(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for _, root := range []string{
+		`test`, `import.meta.rstest.test`,
+		`import { test as check } from '@rstest/core'; check`,
+		`import * as api from 'rstack/test'; api.test`,
+		`const { test: check } = require('@rstest/core'); check`,
+		`import { test } from '@rstest/playwright'; test`,
+	} {
+		for _, factory := range []string{
+			`.extend({})`, `.each([1])`, `.for([1])`, `.runIf(true)`, `.skipIf(false)`,
+			`['extend']({})`, `["\u0065xtend"]({})`, ".each`value\n${1}`",
+			`.extend({}).extend({})`, `?.extend?.({})`,
+		} {
+			valid = append(valid, rule_tester.ValidTestCase{Code: root + factory + `;`})
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code: root + factory + `('case', () => {});`, Errors: parsedHookError("test", "test"),
+			})
+		}
+	}
+	for _, code := range []string{
+		`(test.extend)({})('case', () => {});`,
+		`(0, test.extend({}))('case', () => {});`,
+		`const check = test.extend({}).extend({}); check('case', () => {});`,
+		`test.extend({}).only('case', () => {});`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: parsedHookError("test", "test")})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &hookParseProbe, valid, invalid)
 }
 
 func TestParseRstestFnCallHooks(t *testing.T) {

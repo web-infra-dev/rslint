@@ -39,7 +39,8 @@ var ExpectExpectRule = shared.NewRule(shared.Config{
 			}
 		}
 		return shared.Runtime{
-			IsAssertion: isAssertion,
+			IsAssertion:     isAssertion,
+			FirstIdentifier: analysis.FirstIdentifier,
 			ClassifyTest: func(node *ast.Node) shared.TestClassification {
 				parsed := analysis.ParseTestCall(node)
 				if parsed == nil {

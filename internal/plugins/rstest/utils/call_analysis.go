@@ -8,13 +8,14 @@ import (
 )
 
 type RstestCallAnalysis struct {
-	ctx         rule.RuleContext
-	candidates  map[string]rstestCandidateKind
-	fnCalls     map[*ast.Node]*ParsedRstestFnCall
-	expectCalls map[*ast.Node]*ParsedRstestExpectCall
-	isExpect    map[*ast.Node]bool
-	expectRoots map[*ast.Symbol]rstestExpectRoot
-	calls       []*ast.Node
+	ctx              rule.RuleContext
+	candidates       map[string]rstestCandidateKind
+	fnCalls          map[*ast.Node]*ParsedRstestFnCall
+	expectCalls      map[*ast.Node]*ParsedRstestExpectCall
+	isExpect         map[*ast.Node]bool
+	expectRoots      map[*ast.Symbol]rstestExpectRoot
+	firstIdentifiers map[*ast.Node]*ast.Node
+	calls            []*ast.Node
 	// functions indexes named function declarations by name so a callback
 	// passed by an identifier the checker could not resolve still has a
 	// candidate. The index is file-wide and carries no scope information, so
@@ -71,6 +72,9 @@ func newRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 func (analysis *RstestCallAnalysis) ParseFnCall(node *ast.Node) *ParsedRstestFnCall {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return nil
+	}
+	if parsed, ok := analysis.fnCalls[node]; ok {
+		return parsed
 	}
 	if !analysis.isFnCallCandidate(node) {
 		return nil
@@ -142,11 +146,11 @@ func (analysis *RstestCallAnalysis) IsExpectCall(node *ast.Node) bool {
 	// callbacks must be complete before the candidate gate runs. Reordering
 	// these calls would silently reject ctx.expect and destructured aliases.
 	analysis.Callbacks()
-	if !analysis.isExpectCandidate(node) {
-		return false
-	}
 	if result, ok := analysis.isExpect[node]; ok {
 		return result
+	}
+	if !analysis.isExpectCandidate(node) {
+		return false
 	}
 	result := isRstestExpectCall(node, analysis)
 	analysis.isExpect[node] = result
@@ -161,11 +165,11 @@ func (analysis *RstestCallAnalysis) ParseExpectCall(
 ) *ParsedRstestExpectCall {
 	// See IsExpectCall: callback collection widens the expect candidate set.
 	analysis.Callbacks()
-	if !analysis.isExpectCandidate(node) {
-		return nil
-	}
 	if parsed, ok := analysis.expectCalls[node]; ok {
 		return parsed
+	}
+	if !analysis.isExpectCandidate(node) {
+		return nil
 	}
 	parsed := parseRstestExpectCall(node, analysis)
 	analysis.expectCalls[node] = parsed
@@ -189,13 +193,70 @@ func (analysis *RstestCallAnalysis) callbacksRef() *RstestTestCallbacks {
 	return &analysis.callbacks
 }
 
+func (analysis *RstestCallAnalysis) firstIdentifier(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	// Identifier roots are already their own answer and dominate ordinary
+	// unchained calls. Avoid growing the memo table for this constant-time case;
+	// recursive callers still cache their expression node below.
+	if node.Kind == ast.KindIdentifier {
+		return node
+	}
+	if root, ok := analysis.firstIdentifiers[node]; ok {
+		return root
+	}
+	root := analysis.resolveFirstIdentifier(node)
+	if analysis.firstIdentifiers == nil {
+		analysis.firstIdentifiers = map[*ast.Node]*ast.Node{}
+	}
+	analysis.firstIdentifiers[node] = root
+	return root
+}
+
+func (analysis *RstestCallAnalysis) resolveFirstIdentifier(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	var root *ast.Node
+	switch node.Kind {
+	case ast.KindIdentifier:
+		root = node
+	case ast.KindParenthesizedExpression:
+		root = analysis.resolveFirstIdentifier(node.AsParenthesizedExpression().Expression)
+	case ast.KindCallExpression:
+		// A later CallExpression candidate asks about this exact callee, so cache
+		// it while walking the outer chain. The CallExpression node itself is not
+		// a candidate key and does not need another map entry.
+		root = analysis.firstIdentifier(node.AsCallExpression().Expression)
+	case ast.KindPropertyAccessExpression:
+		root = analysis.resolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
+	case ast.KindElementAccessExpression:
+		root = analysis.resolveFirstIdentifier(node.AsElementAccessExpression().Expression)
+	case ast.KindTaggedTemplateExpression:
+		root = analysis.resolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
+	case ast.KindBinaryExpression:
+		if internalUtils.IsCommaOperator(node) {
+			root = analysis.resolveFirstIdentifier(node.AsBinaryExpression().Right)
+		}
+	}
+	return root
+}
+
+// FirstIdentifier returns the cached first identifier of a call/member chain.
+// Rstest adapters use it when a shared rule needs the same candidate decision
+// as ParseFnCall and ParseExpectCall without starting another chain walk.
+func (analysis *RstestCallAnalysis) FirstIdentifier(node *ast.Node) *ast.Node {
+	return analysis.firstIdentifier(node)
+}
+
 // isFnCallCandidate reports whether syntax and local aliases permit any Rstest
 // registration kind at node.
 func (analysis *RstestCallAnalysis) isFnCallCandidate(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
-	root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
+	root := analysis.firstIdentifier(node.AsCallExpression().Expression)
 	return root == nil ||
 		root.Kind != ast.KindIdentifier ||
 		analysis.candidates[root.AsIdentifier().Text]&rstestCandidateFn != 0
@@ -207,7 +268,7 @@ func (analysis *RstestCallAnalysis) isTestCandidate(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
-	root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
+	root := analysis.firstIdentifier(node.AsCallExpression().Expression)
 	return root == nil ||
 		root.Kind != ast.KindIdentifier ||
 		analysis.candidates[root.AsIdentifier().Text]&rstestCandidateTest != 0
@@ -219,7 +280,7 @@ func (analysis *RstestCallAnalysis) isExpectCandidate(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
-	root := testFramework.ResolveFirstIdentifier(node.AsCallExpression().Expression)
+	root := analysis.firstIdentifier(node.AsCallExpression().Expression)
 	return root == nil ||
 		root.Kind != ast.KindIdentifier ||
 		analysis.candidates[root.AsIdentifier().Text]&rstestCandidateExpect != 0
@@ -395,7 +456,7 @@ func (analysis *RstestCallAnalysis) collectVariableCandidates(
 		analysis.candidates[localName] |= rstestCandidateAll
 		return
 	}
-	root := testFramework.ResolveFirstIdentifier(initializer)
+	root := analysis.firstIdentifier(initializer)
 	if root != nil && root.Kind == ast.KindIdentifier {
 		*aliases = append(*aliases, rstestAliasCandidate{
 			localName: localName,

@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -12,10 +13,21 @@ import (
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func TestParseRstestExpectCallResolvesInSourceOnlyProgram(t *testing.T) {
+func TestParseRstestExpectCallResolvesAcrossProgramModes(t *testing.T) {
+	for _, typed := range []bool{false, true} {
+		for _, identityFirst := range []bool{false, true} {
+			t.Run(fmt.Sprintf("typed=%t/identityFirst=%t", typed, identityFirst), func(t *testing.T) {
+				testRstestExpectCallProgram(t, typed, identityFirst)
+			})
+		}
+	}
+}
+
+func testRstestExpectCallProgram(t *testing.T, typed, identityFirst bool) {
 	code := `
 expect(globalValue).toBe(1);
 
@@ -41,12 +53,24 @@ function localAssertion() {
 `
 
 	probe := rule.Rule{
-		Name: "rstest/source-only-expect-probe",
+		Name: "rstest/expect-cache-probe",
 		Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 			return rule.RuleListeners{
 				ast.KindCallExpression: func(node *ast.Node) {
-					parsed := analysis.ParseExpectCall(node)
+					var parsed *rstestUtils.ParsedRstestExpectCall
+					if identityFirst {
+						isExpect := analysis.IsExpectCall(node)
+						parsed = analysis.ParseExpectCall(node)
+						if isExpect != (parsed != nil) {
+							t.Fatalf("identity/full parse mismatch at %d", node.Pos())
+						}
+					} else {
+						parsed = analysis.ParseExpectCall(node)
+						if analysis.IsExpectCall(node) != (parsed != nil) {
+							t.Fatalf("full parse/identity mismatch at %d", node.Pos())
+						}
+					}
 					if parsed == nil || parsed.MatcherEntry == nil {
 						return
 					}
@@ -61,19 +85,34 @@ function localAssertion() {
 
 	root := fixtures.GetRootDir()
 	fileName := tspath.ResolvePath(root.Dir, "parse-rstest-expect-source-only.ts")
-	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
-	host := utils.CreateCompilerHost(root.Dir, fs)
-	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
-		RootFileNames:   []string{fileName},
-		Host:            host,
-		CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
-		SingleThreaded:  true,
-	})
-	if err != nil {
-		t.Fatalf("NewFromRoots: %v", err)
+	var sourceProgram *lintprogram.Program
+	if typed {
+		rawProgram, sourceFile, err := rule_tester.NewProgramHelper(root).CreateTestProgram(
+			code,
+			"parse-rstest-expect-source-only.ts",
+			"tsconfig.json",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sourceProgram = lintprogram.NewFromCompiler(rawProgram)
+		fileName = sourceFile.FileName()
+	} else {
+		fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+		host := utils.CreateCompilerHost(root.Dir, fs)
+		var err error
+		sourceProgram, err = lintprogram.NewFromRoots(lintprogram.RootOptions{
+			RootFileNames:   []string{fileName},
+			Host:            host,
+			CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+			SingleThreaded:  true,
+		})
+		if err != nil {
+			t.Fatalf("NewFromRoots: %v", err)
+		}
 	}
-	if sourceProgram.CanProvideTypeChecker(sourceProgram.SourceFiles()[0]) {
-		t.Fatal("expected a source-only Program with no TypeChecker")
+	if got := sourceProgram.CanProvideTypeChecker(sourceProgram.GetSourceFile(fileName)); got != typed {
+		t.Fatalf("CanProvideTypeChecker = %t, want %t", got, typed)
 	}
 
 	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
@@ -82,8 +121,9 @@ function localAssertion() {
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			return []rule.ConfiguredRule{{
-				Name:     probe.Name,
-				Severity: rule.SeverityError,
+				Name:             probe.Name,
+				Severity:         rule.SeverityError,
+				RequiresTypeInfo: typed,
 				Run: func(ctx rule.RuleContext) rule.RuleListeners {
 					return probe.Run(ctx, nil)
 				},

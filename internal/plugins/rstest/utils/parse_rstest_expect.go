@@ -136,7 +136,7 @@ func isRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
 ) bool {
-	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
+	if node == nil || node.Kind != ast.KindCallExpression || hasOuterCallOnCallee(node) {
 		return false
 	}
 	if isImportMetaRstestExpectCall(node) {
@@ -231,7 +231,7 @@ func parseRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
 ) *ParsedRstestExpectCall {
-	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
+	if node == nil || node.Kind != ast.KindCallExpression || hasOuterCallOnCallee(node) {
 		return nil
 	}
 	expression := findTopMostRstestExpectExpression(node)
@@ -276,6 +276,27 @@ func ShouldRstestExpectBeAwaited(parsed *ParsedRstestExpectCall, asyncMatchers [
 		}
 	}
 	return slices.Contains(asyncMatchers, parsed.Matcher)
+}
+
+func hasOuterCallOnCallee(node *ast.Node) bool {
+	for parent := node.Parent; parent != nil; node, parent = parent, parent.Parent {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+		case ast.KindCallExpression:
+			return parent.AsCallExpression().Expression == node
+		case ast.KindPropertyAccessExpression:
+			if parent.AsPropertyAccessExpression().Expression != node {
+				return false
+			}
+		case ast.KindElementAccessExpression:
+			if parent.AsElementAccessExpression().Expression != node {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // FindTopMostCallExpression walks up the call/member chain that node is the

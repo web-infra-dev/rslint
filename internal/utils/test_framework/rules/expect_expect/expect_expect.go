@@ -64,6 +64,10 @@ type Runtime struct {
 	// assertFunctionNames is configured without `expect`: the option names extra
 	// asserting calls, it does not hide the framework's own.
 	IsAssertion func(node *ast.Node) bool
+	// FirstIdentifier optionally reuses a framework adapter's file-level chain
+	// cache for the configured assertion-pattern candidate check. Adapters that leave
+	// it nil keep the framework-neutral syntax walk.
+	FirstIdentifier func(node *ast.Node) *ast.Node
 }
 
 type Config struct {
@@ -184,11 +188,19 @@ func (matcher assertMatcher) matches(name string) bool {
 // looking only at its first identifier. It is deliberately conservative: a
 // dynamic root, non-ASCII root, or any non-literal pattern falls back to the
 // full callee-name construction and regexp match.
-func (matcher assertMatcher) mayMatchCallee(expr *ast.Node) bool {
+func (matcher assertMatcher) mayMatchCallee(
+	expr *ast.Node,
+	firstIdentifier func(*ast.Node) *ast.Node,
+) bool {
 	if matcher.hasFallback {
 		return true
 	}
-	root := testFramework.ResolveFirstIdentifier(expr)
+	root := (*ast.Node)(nil)
+	if firstIdentifier != nil {
+		root = firstIdentifier(expr)
+	} else {
+		root = testFramework.ResolveFirstIdentifier(expr)
+	}
 	if root == nil || root.Kind != ast.KindIdentifier {
 		return true
 	}
@@ -424,7 +436,7 @@ func NewRule(config Config) rule.Rule {
 					// whatever the framework can resolve; patterns run first because
 					// they answer the overwhelmingly common bare `expect(...)`
 					// without touching the framework analysis.
-					if calleeName == "" && matcher.mayMatchCallee(callExpr.Expression) {
+					if calleeName == "" && matcher.mayMatchCallee(callExpr.Expression, runtime.FirstIdentifier) {
 						calleeName = testFramework.CalleeChainName(callExpr.Expression)
 					}
 					if !matcher.matches(calleeName) &&

@@ -68,6 +68,9 @@ func parseRstestFnCall(
 	}
 
 	call := node.AsCallExpression()
+	if isRstestFactoryCallee(call.Expression) {
+		return nil
+	}
 	root, parts, rootInvoked, ok := parseRstestChain(call.Expression)
 	var resolved rstestResolvedAPI
 	consumed := 0
@@ -169,6 +172,33 @@ func parseRstestFnCall(
 		parsed.focus = &rstestFocus{entries: resolved.focusEntries}
 	}
 	return parsed
+}
+
+func isRstestFactoryCallee(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	name := ""
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		property := node.AsPropertyAccessExpression().Name()
+		if property != nil && property.Kind == ast.KindIdentifier {
+			name = property.AsIdentifier().Text
+		}
+	case ast.KindElementAccessExpression:
+		property := node.AsElementAccessExpression().ArgumentExpression
+		if property != nil {
+			name, _ = internalUtils.GetStaticStringLiteralValue(ast.SkipParentheses(property))
+		}
+	}
+	// These members require a factory invocation before a registration call.
+	switch name {
+	case "extend", "each", "for", "runIf", "skipIf":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -118,6 +119,42 @@ func TestRstestCallAnalysisCallbacksWidenExpectCandidates(t *testing.T) {
 	analysis.Callbacks()
 	if !analysis.isExpectCandidate(checkCall) {
 		t.Fatal("callbacks did not add the context expect candidate")
+	}
+}
+
+func TestRstestCallAnalysisCachesDoNotFreezeContextCandidates(t *testing.T) {
+	for _, parseFirst := range []bool{false, true} {
+		source := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: "/context.ts", Path: "/context.ts",
+		}, `test("case", ({ expect: check }) => { check(1).toBe(1); ordinary().step(); });`, core.ScriptKindTS)
+		binder.BindSourceFile(source)
+		analysis := newRstestCallAnalysis(rule.RuleContext{
+			SourceFile: source,
+			Refs:       rule.NewRefStore(source, &core.CompilerOptions{}, nil, rule.RefStoreInit{}),
+		})
+		call := analysis.calls[1]
+		if analysis.isExpectCandidate(call) {
+			t.Fatal("context alias unexpectedly indexed before callbacks")
+		}
+		if analysis.ParseFnCall(call) != nil {
+			t.Fatal("assertion parsed as registration")
+		}
+		if parseFirst {
+			if analysis.ParseExpectCall(call) == nil || !analysis.IsExpectCall(call) {
+				t.Fatal("full parse failed after caching the context chain head")
+			}
+		} else if !analysis.IsExpectCall(call) || analysis.ParseExpectCall(call) == nil {
+			t.Fatal("identity failed after caching the context chain head")
+		}
+		ordinary := analysis.calls[3]
+		for range 2 {
+			if analysis.ParseFnCall(ordinary) != nil || analysis.ParseExpectCall(ordinary) != nil || analysis.IsExpectCall(ordinary) {
+				t.Fatal("ordinary call passed candidate gates")
+			}
+		}
+		if _, ok := analysis.firstIdentifiers[ordinary.AsCallExpression().Expression]; !ok {
+			t.Fatal("missing negative candidate chain cache")
+		}
 	}
 }
 
