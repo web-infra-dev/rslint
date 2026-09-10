@@ -33,6 +33,18 @@ func TestNoUnusedPropTypesUpstream(t *testing.T) {
 	assert.Equal(t, suite.Upstream.PluginVersion, "7.37.5")
 	assert.Equal(t, len(suite.Valid), 249)
 	assert.Equal(t, len(suite.Invalid), 143)
+	skipped := 0
+	for _, testCase := range suite.Valid {
+		if testCase.Skip {
+			skipped++
+		}
+	}
+	for _, testCase := range suite.Invalid {
+		if testCase.Skip {
+			skipped++
+		}
+	}
+	assert.Equal(t, skipped, 187)
 
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
