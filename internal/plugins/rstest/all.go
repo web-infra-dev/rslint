@@ -47,6 +47,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_equal"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_falsy"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_truthy"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
@@ -110,6 +111,7 @@ func GetAllRules() []rule.Rule {
 		prefer_rs_mocked.PreferRsMockedRule,
 		prefer_strict_boolean_matchers.PreferStrictBooleanMatchersRule,
 		prefer_strict_equal.PreferStrictEqualRule,
+		prefer_to_be.PreferToBeRule,
 		prefer_to_be_falsy.PreferToBeFalsyRule,
 		prefer_to_be_truthy.PreferToBeTruthyRule,
 		prefer_todo.PreferTodoRule,
