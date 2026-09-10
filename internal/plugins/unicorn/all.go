@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_null"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_object_as_default_parameter"
@@ -69,6 +70,7 @@ func GetAllRules() []rule.Rule {
 		no_invalid_fetch_options.NoInvalidFetchOptionsRule,
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
 		no_magic_array_flat_depth.NoMagicArrayFlatDepthRule,
+		no_new_buffer.NoNewBufferRule,
 		no_nested_ternary.NoNestedTernaryRule,
 		no_null.NoNullRule,
 		no_object_as_default_parameter.NoObjectAsDefaultParameterRule,
