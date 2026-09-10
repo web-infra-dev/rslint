@@ -855,12 +855,6 @@
       "Tsx": true
     },
     {
-      "Code": "\n        type Props = {\n          +foo: number\n        }\n        class MyComponent extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
-    },
-    {
       "Code": "\n        type Props = {\n          'completed?': boolean,\n        };\n        const Hello = (props: Props): React.Element => {\n          return <div>{props['completed?']}</div>;\n        }\n      ",
       "Tsx": true
     },
@@ -869,30 +863,8 @@
       "Tsx": true
     },
     {
-      "Code": "\n        type Person = {\n          firstname: string\n        }\n        class MyComponent extends React.Component<void, Props, void> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Settings": {
-        "react": {
-          "flowVersion": "0.52"
-        }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
-    },
-    {
       "Code": "\n        type Person = {\n          firstname: string\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
       "Tsx": true
-    },
-    {
-      "Code": "\n        type Person = {\n          firstname: string\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Settings": {
-        "react": {
-          "flowVersion": "0.53"
-        }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
     },
     {
       "Code": "\n      class MyComponent extends Component {\n        static propTypes = {\n          validate: PropTypes.bool,\n          options: PropTypes.array,\n          value: ({options, value, validate}) => {\n            if (!validate) return;\n            if (options.indexOf(value) < 0)\n              throw new Errow('oops');\n          }\n        }\n\n        render() {\n          return <ul>\n            {this.props.options.map(option =>\n              <li className={this.props.value == option && \"active\"}>{option}</li>\n            )}\n          </ul>\n        }\n      }\n      ",
@@ -961,12 +933,6 @@
     {
       "Code": "\n        import React from 'react';\n        type Props = string & {\n          fullname: string\n        };\n        class Test extends React.PureComponent<Props> {\n          render() {\n            return <div>Hello {this.props.fullname}</div>\n          }\n        }\n      ",
       "Tsx": true
-    },
-    {
-      "Code": "\n        import type {BasePerson} from './types'\n        type Props = {\n          person: {\n           ...$Exact<BasePerson>,\n           lastname: string\n          }\n        };\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
     },
     {
       "Code": "\n        import BasePerson from './types'\n        class Hello extends React.Component {\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          person: ProTypes.shape({\n            ...BasePerson,\n            lastname: PropTypes.string\n          })\n        };\n      ",
@@ -1097,18 +1063,6 @@
     {
       "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) => ({\n          ...bindActionCreators<ActionCreatorsMapObject<Types.RootAction>>(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          ),\n        })\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
       "Tsx": true
-    },
-    {
-      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) => ({\n          ...bindActionCreators(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          ),\n        })\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
-    },
-    {
-      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) =>\n          bindActionCreators(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          )\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
     },
     {
       "Code": "\n        import React from \"react\";\n\n        interface Props {\n          name: string;\n        }\n\n        const MyComponent: React.FC<Props> = ({ name }) => {\n          return <div>{name}</div>;\n        };\n\n        export default MyComponent;\n      ",
@@ -1684,38 +1638,6 @@
       ]
     },
     {
-      "Code": "\n        type Props = {unused: Object;};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = $ReadOnly<{unused: Object;}>;\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
       "Code": "\n        type PropsA = { a: string }\n        type PropsB = { b: string }\n        type Props = PropsA & PropsB;\n\n        class MyComponent extends React.Component {\n          props: Props;\n\n          render() {\n            return <div>{this.props.a}</div>\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
@@ -1764,147 +1686,6 @@
         {
           "MessageId": "unusedPropType",
           "Message": "'zap' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        class Hello extends React.Component {\n          props: {\n            name: {\n              unused: string;\n            }\n          };\n          render () {\n            return <div>Hello {this.props.name.lastname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'name.unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {name: {unused: string;};};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.name.lastname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'name.unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        class Hello extends React.Component {\n          props: {person: {name: {unused: string;};};};\n          render () {\n            return <div>Hello {this.props.person.name.lastname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'person.name.unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {person: {name: {unused: string;};};};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.person.name.lastname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'person.name.unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Person = {name: {unused: string;}};\n        class Hello extends React.Component {\n          props: {people: Person[];};\n          render () {\n            var names = [];\n            for (var i = 0; i < this.props.people.length; i++) {\n              names.push(this.props.people[i].name.lastname);\n            }\n            return <div>Hello {names.join(', ')}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'people.*.name.unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Person = {name: {unused: string;}};\n        type Props = {people: Person[];};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            var names = [];\n            for (var i = 0; i < this.props.people.length; i++) {\n              names.push(this.props.people[i].name.lastname);\n            }\n            return <div>Hello {names.join(', ')}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'people.*.name.unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {result?: {ok: string | boolean;}|{ok: number | Array}};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.result.notok}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'result.ok' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        },
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'result.ok' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
@@ -2489,75 +2270,6 @@
       ]
     },
     {
-      "Code": "\n        type UsedProps = {|\n          usedProp: number,\n        |};\n\n        type UnusedProps = {|\n          unusedProp: number,\n        |};\n\n        type Props = {| ...UsedProps, ...UnusedProps |};\n\n        function MyComponent({ usedProp, notOne }: Props) {\n          return <div>{usedProp}</div>;\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'unusedProp' PropType is defined but prop is never used",
-          "Line": 7,
-          "Column": 11,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<void, Props, void> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<void, Props, void> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Settings": {
-        "react": {
-          "flowVersion": "0.52"
-        }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
       "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n        MyComponent.propTypes = {\n          firstname: PropTypes.string,\n          lastname: PropTypes.string,\n          foo: PropTypes.string,\n        };\n      ",
       "Tsx": true,
       "Options": {
@@ -2569,69 +2281,6 @@
         {
           "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n          foo: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "ignore": [
-          "foo"
-        ]
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Person = string;\n        class Hello extends React.Component<{ person: Person }> {\n          render () {\n            return <div />;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Settings": {
-        "react": {
-          "flowVersion": "0.53"
-        }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'person' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Person = string;\n        class Hello extends React.Component<void, { person: Person }, void> {\n          render () {\n            return <div />;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Settings": {
-        "react": {
-          "flowVersion": "0.52"
-        }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'person' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
@@ -2660,27 +2309,6 @@
         {
           "MessageId": "unusedPropType",
           "Message": "'doSomething' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Settings": {
-        "react": {
-          "flowVersion": "0.53"
-        }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
@@ -2773,22 +2401,6 @@
       "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
     },
     {
-      "Code": "\n        import React from 'react';\n        type OtherProps = {\n          firstname: string,\n          lastname: string,\n        } | {\n          fullname: string\n        };\n        type Props = OtherProps & {\n          age: number\n        };\n        class Test extends React.PureComponent<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'age' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.shape({\n            })\n          })\n        };\n        Hello.propTypes.a.b.c = PropTypes.number;\n      ",
       "Tsx": true,
       "Options": {
@@ -2822,127 +2434,12 @@
       ]
     },
     {
-      "Code": "\n        type Props = { foo: string }\n        function higherOrderComponent<Props>() {\n          return class extends React.Component<Props> {\n            render() {\n              return <div />;\n            }\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'foo' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Person = {\n          ...data,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Person = {|\n          ...data,\n          lastname: string\n        |};\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        type Person = {\n          ...$Exact<data>,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        import type {Data} from './Data'\n        type Person = {\n          ...Data,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.bar}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        import type {Data} from 'some-libdef-like-flow-typed-provides'\n        type Person = {\n          ...Data,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.bar}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
       "Code": "\n        class Hello extends React.Component {\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          ...BasePerson,\n          lastname: PropTypes.string\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
           "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "\n        import type {BasePerson} from './types'\n        type Props = {\n          person: {\n           ...$Exact<BasePerson>,\n           lastname: string\n          }\n        };\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Options": {
-        "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'person.lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
