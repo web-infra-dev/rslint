@@ -600,23 +600,8 @@ func IsShadowed(node *ast.Node, name string) bool {
 	return isShadowed(node, name, nil)
 }
 
-// fileShadowKey identifies the source-file arm of one walk. It carries the file
-// as well as the name so that a cache handed to isShadowed can never answer for
-// the wrong file.
-type fileShadowKey struct {
-	sourceFile *ast.Node
-	name       string
-}
-
-// isShadowed is IsShadowed with the source-file arm optionally memoized. That
-// arm is the only part of the walk whose cost is proportional to the file — it
-// scans every top-level statement and then the whole file for hoisted `var` and
-// function declarations — while every other arm costs no more than the nesting
-// depth of the node. It also reads nothing but the SourceFile and the name: no
-// prevChild, no crossed-scope state, no parameter-decorator state. So it is
-// exactly the part that can be answered once per (file, name) and shared by
-// every walk in that file, however different their scopes.
-func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool {
+// Local scans can be shared across siblings without caching entry-dependent traversal state.
+func isShadowed(node *ast.Node, name string, scans *shadowScanCache) bool {
 	prevChild := node
 	inParameterDecorator := false
 	crossedScope := false
@@ -627,10 +612,10 @@ func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool 
 		}
 		switch current.Kind {
 		case ast.KindSourceFile:
-			return sourceFileShadows(current, name, files)
+			return scans.check(current, name, shadowScanFile)
 
 		case ast.KindBlock:
-			if HasShadowingDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
+			if scans.check(current, name, shadowScanBlock) {
 				return true
 			}
 
@@ -640,13 +625,7 @@ func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool 
 		// for the whole block, while the block itself still nests lexically
 		// inside its parent scope.
 		case ast.KindModuleBlock:
-			moduleBlock := current.AsModuleBlock()
-			if moduleBlock != nil && moduleBlock.Statements != nil {
-				if HasLocalDeclarationInStatements(moduleBlock.Statements.Nodes, name) {
-					return true
-				}
-			}
-			if HasHoistedVarDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
+			if scans.check(current, name, shadowScanModuleBlock) {
 				return true
 			}
 
@@ -656,12 +635,12 @@ func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool 
 		// function-like declaration, so the arm below never reaches its body.
 		case ast.KindClassStaticBlockDeclaration:
 			if body := current.AsClassStaticBlockDeclaration().Body; body != nil &&
-				HasHoistedVarDeclaration(body, name) {
+				scans.check(body, name, shadowScanHoistedVar) {
 				return true
 			}
 
 		case ast.KindCaseBlock:
-			if HasShadowingDeclarationInCaseBlock(current, name) || hasHoistedFunctionDeclaration(current, name) {
+			if scans.check(current, name, shadowScanCaseBlock) {
 				return true
 			}
 
@@ -714,7 +693,7 @@ func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool 
 				if escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
 					break
 				}
-				if HasShadowingParameter(current, name) {
+				if scans.check(current, name, shadowScanParameters) {
 					return true
 				}
 				// Function declarations and expressions can shadow via their own name.
@@ -728,7 +707,7 @@ func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool 
 				// which is a *parent* of the body's variable environment — so a
 				// `var` declared in the body does not shadow it.
 				if !isDirectParameterOf(current, prevChild) {
-					if body := current.Body(); body != nil && HasHoistedVarDeclaration(body, name) {
+					if body := current.Body(); body != nil && scans.check(body, name, shadowScanHoistedVar) {
 						return true
 					}
 				}
@@ -743,16 +722,7 @@ func isShadowed(node *ast.Node, name string, files map[fileShadowKey]bool) bool 
 	return false
 }
 
-// sourceFileShadows answers the walk's source-file arm, reading only the file
-// and the name. A non-nil cache turns the file-sized scan into one lookup for
-// every later walk asking about the same name in the same file.
-func sourceFileShadows(sourceFile *ast.Node, name string, files map[fileShadowKey]bool) bool {
-	key := fileShadowKey{sourceFile: sourceFile, name: name}
-	if files != nil {
-		if cached, ok := files[key]; ok {
-			return cached
-		}
-	}
+func sourceFileShadows(sourceFile *ast.Node, name string) bool {
 	result := false
 	if sf := sourceFile.AsSourceFile(); sf != nil && sf.Statements != nil {
 		result = HasLocalDeclarationInStatements(sf.Statements.Nodes, name)
@@ -760,9 +730,6 @@ func sourceFileShadows(sourceFile *ast.Node, name string, files map[fileShadowKe
 	if !result {
 		result = HasHoistedVarDeclaration(sourceFile, name) ||
 			hasHoistedFunctionDeclaration(sourceFile, name)
-	}
-	if files != nil {
-		files[key] = result
 	}
 	return result
 }

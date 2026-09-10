@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -97,6 +99,16 @@ Promise;`,
 	// Nested functions, so the walk crosses several scopes before the file.
 	`function a() { function b() { function c() { return Promise; } } var Promise; }`,
 	`function a() { const Promise = 1; return function b() { return function c() { return Promise; }; }; }`,
+	`function unrelated(Promise) {}
+function setup() { const a = () => Promise.resolve(1); const b = () => Promise.resolve(2); }`,
+	`function f(a = (() => Promise)()) { var Promise; const b = () => Promise; const c = () => Promise; }`,
+	`function outer() { { var Promise; } const a = () => Promise; const b = () => Promise; }
+function sibling() { const a = () => Promise; const b = () => Promise; }`,
+	`function outer() { const a = () => Promise; const b = () => Promise; function Promise() {} }`,
+	`function unrelated(Promise) {}
+namespace N { const a = () => Promise; const b = () => Promise; }
+switch (x) { case 0: (() => Promise)(); break; default: (() => Promise)(); }
+class C { static { (() => Promise)(); (() => Promise)(); } }`,
 }
 
 // shadowCacheNames are asked of every file in the corpus.
@@ -189,6 +201,91 @@ func TestShadowCacheDeclaresName(t *testing.T) {
 				t.Errorf("DeclaresName() = %v, want %v", got, test.declares)
 			}
 		})
+	}
+}
+
+func TestShadowCacheReusesOuterDeclarationScans(t *testing.T) {
+	for _, test := range []struct {
+		code string
+		kind shadowScanKind
+	}{
+		{`function outer() { const a = () => Promise; const b = () => Promise; }`, shadowScanBlock},
+		{`function outer() { const a = () => Promise; const b = () => Promise; }`, shadowScanHoistedVar},
+		{`function outer(value) { const a = () => Promise; const b = () => Promise; }`, shadowScanParameters},
+		{`namespace N { const a = () => Promise; const b = () => Promise; }`, shadowScanModuleBlock},
+		{`switch (value) { case 1: const a = () => Promise; break; default: const b = () => Promise; }`, shadowScanCaseBlock},
+		{`class C { static { const a = () => Promise; const b = () => Promise; } }`, shadowScanHoistedVar},
+	} {
+		t.Run(fmt.Sprintf("%d/%s", test.kind, test.code), func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts", Path: "/test.ts",
+			}, "function unrelated(Promise) {}\n"+test.code, core.ScriptKindTS)
+			var references []*ast.Node
+			for _, node := range collectIdentifierNodes(source.AsNode()) {
+				if node.Text() == "Promise" && node.Parent.Kind == ast.KindArrowFunction {
+					references = append(references, node)
+				}
+			}
+			if len(references) != 2 {
+				t.Fatalf("got %d references, want 2", len(references))
+			}
+			cache := NewShadowCache(source)
+			if cache.IsShadowed(references[0], "Promise") {
+				t.Fatal("sibling parameter must not shadow Promise")
+			}
+			for outer := references[0].Parent.Parent; outer != nil; outer = outer.Parent {
+				key := shadowScanKey{node: outer, name: "Promise", kind: test.kind}
+				if result, ok := cache.scans[key]; ok {
+					if result {
+						t.Fatal("outer declaration scan must be negative")
+					}
+					// A sentinel proves the second sibling reads the cache instead of rescanning the AST.
+					cache.scans[key] = true
+					if !cache.IsShadowed(references[1], "Promise") {
+						t.Fatal("second sibling did not reuse the outer declaration scan")
+					}
+					return
+				}
+			}
+			t.Fatal("missing cached outer declaration scan")
+		})
+	}
+}
+
+func BenchmarkShadowCacheSiblingFactories(b *testing.B) {
+	for _, wrapper := range []struct{ name, prefix, suffix string }{
+		{"top-level", "", ""},
+		{"describe", "describe('suite', () => {\n", "});"},
+		{"setup", "function setup() {\n", "}"},
+	} {
+		for _, size := range []int{1000, 2000, 4000} {
+			b.Run(fmt.Sprintf("%s/%d", wrapper.name, size), func(b *testing.B) {
+				code := "function unrelated(Promise) {}\n" + wrapper.prefix +
+					strings.Repeat("rs.doMock('m', () => Promise.resolve({}));\n", size) + wrapper.suffix
+				source := parser.ParseSourceFile(ast.SourceFileParseOptions{
+					FileName: "/bench.ts", Path: "/bench.ts",
+				}, code, core.ScriptKindTS)
+				var references []*ast.Node
+				for _, node := range collectIdentifierNodes(source.AsNode()) {
+					if node.Text() == "Promise" && node.Parent.Kind == ast.KindPropertyAccessExpression {
+						references = append(references, node)
+					}
+				}
+				if len(references) != size {
+					b.Fatalf("got %d references, want %d", len(references), size)
+				}
+				b.ReportAllocs()
+				b.ResetTimer()
+				for range b.N {
+					cache := NewShadowCache(source)
+					for _, reference := range references {
+						if cache.IsShadowed(reference, "Promise") {
+							b.Fatal("unrelated parameter must not shadow Promise")
+						}
+					}
+				}
+			})
+		}
 	}
 }
 

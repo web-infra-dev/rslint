@@ -10,11 +10,33 @@
 package no_async_mock_factory
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestNoAsyncMockFactorySiblingScopes(t *testing.T) {
+	const first = `rs.doMock('./first', () => Promise.resolve({ first: 1 }));`
+	const second = `rs.doMock('./second', () => Promise.resolve({ second: 2 }));`
+	var invalid []rule_tester.InvalidTestCase
+	for _, wrapper := range []struct{ prefix, suffix string }{
+		{"describe('suite', () => {\n", "\n});"},
+		{"function setup() {\n", "\n}"},
+	} {
+		code := "function unrelated(Promise: unknown) {}\n" + wrapper.prefix + first + "\n" + second + wrapper.suffix
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "asyncMockFactory", Line: 3, Column: 22, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+				MessageId: "suggestUnwrapPromiseResolve", Output: strings.Replace(code, "Promise.resolve({ first: 1 })", "({ first: 1 })", 1),
+			}}},
+			{MessageId: "asyncMockFactory", Line: 4, Column: 23, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+				MessageId: "suggestUnwrapPromiseResolve", Output: strings.Replace(code, "Promise.resolve({ second: 2 })", "({ second: 2 })", 1),
+			}}},
+		}})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoAsyncMockFactoryRule, nil, invalid)
+}
 
 func TestNoAsyncMockFactoryExtras(t *testing.T) {
 	rule_tester.RunRuleTester(

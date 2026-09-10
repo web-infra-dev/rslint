@@ -4,34 +4,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
-// ShadowCache answers IsShadowed for one source file without repeating the work
-// that walk performs.
-//
-// IsShadowed walks from a node up to the SourceFile and, at the top, scans every
-// top-level statement plus the hoisted `var` and function declarations of the
-// whole file. That is a file-sized amount of work per call, so a rule that asks
-// about one name at many nodes in the same file is quadratic in the number of
-// those nodes. The cache removes that in three steps, from cheapest to last
-// resort:
-//
-//   - A one-off declaration index rules the walk out entirely for a name the
-//     file never binds, which is the common case for `Promise`, `undefined`,
-//     `test` and the like.
-//   - The source-file arm — the only file-sized part of the walk — is answered
-//     once per name and shared by every node in the file, whatever scope it
-//     sits in. Nodes in scopes of their own, such as one inline callback per
-//     call site, get nothing from a per-scope cache and everything from this.
-//   - What is left is the walk through the scopes between the node and the
-//     file, whose cost is the nesting depth. That is answered once per scope,
-//     so nodes that share one answer it once.
-//
-// A cache belongs to one file and one rule invocation; it holds AST nodes and
-// must not outlive them.
+// ShadowCache reuses name and declaration scans within one source file.
 type ShadowCache struct {
 	sourceFile *ast.SourceFile
 	names      map[string]bool
 	shadowed   map[shadowCacheKey]bool
-	files      map[fileShadowKey]bool
+	scans      shadowScanCache
 }
 
 // shadowCacheKey identifies one scope walk: the nearest enclosing node the walk
@@ -119,7 +97,7 @@ func bindsDeclaredName(name *ast.Node) bool {
 func (cache *ShadowCache) walk(node *ast.Node, name string) bool {
 	scope, entry := shadowScope(node)
 	if scope == nil {
-		return isShadowed(node, name, cache.fileArm())
+		return isShadowed(node, name, &cache.scans)
 	}
 	key := shadowCacheKey{scope: scope, name: name}
 	if shadowScopeReadsEntry(scope) {
@@ -131,7 +109,7 @@ func (cache *ShadowCache) walk(node *ast.Node, name string) bool {
 	// Every node between node and scope is a plain expression: the walk neither
 	// inspects it nor counts it as a crossed scope, so resuming from entry sees
 	// exactly what a walk from node would.
-	result := isShadowed(entry, name, cache.fileArm())
+	result := isShadowed(entry, name, &cache.scans)
 	if cache.shadowed == nil {
 		cache.shadowed = map[shadowCacheKey]bool{}
 	}
@@ -139,11 +117,68 @@ func (cache *ShadowCache) walk(node *ast.Node, name string) bool {
 	return result
 }
 
-func (cache *ShadowCache) fileArm() map[fileShadowKey]bool {
-	if cache.files == nil {
-		cache.files = map[fileShadowKey]bool{}
+type shadowScanKind uint8
+
+const (
+	shadowScanFile shadowScanKind = iota
+	shadowScanBlock
+	shadowScanCaseBlock
+	shadowScanModuleBlock
+	shadowScanHoistedVar
+	shadowScanParameters
+)
+
+type shadowScanKey struct {
+	node *ast.Node
+	name string
+	kind shadowScanKind
+}
+
+type shadowScanCache map[shadowScanKey]bool
+
+// Only local declaration scans are cached; entry-dependent scope decisions stay in the walk.
+func (cache *shadowScanCache) check(node *ast.Node, name string, kind shadowScanKind) bool {
+	if kind == shadowScanParameters && len(node.Parameters()) == 0 {
+		return false
 	}
-	return cache.files
+	if kind == shadowScanHoistedVar && node.Kind != ast.KindBlock {
+		return HasHoistedVarDeclaration(node, name)
+	}
+	key := shadowScanKey{node: node, name: name, kind: kind}
+	if cache != nil {
+		if result, ok := (*cache)[key]; ok {
+			return result
+		}
+	}
+	result := scanShadowDeclarations(node, name, kind)
+	if cache != nil {
+		if *cache == nil {
+			*cache = make(shadowScanCache)
+		}
+		(*cache)[key] = result
+	}
+	return result
+}
+
+func scanShadowDeclarations(node *ast.Node, name string, kind shadowScanKind) bool {
+	switch kind {
+	case shadowScanFile:
+		return sourceFileShadows(node, name)
+	case shadowScanBlock:
+		return HasShadowingDeclaration(node, name) || hasHoistedFunctionDeclaration(node, name)
+	case shadowScanCaseBlock:
+		return HasShadowingDeclarationInCaseBlock(node, name) || hasHoistedFunctionDeclaration(node, name)
+	case shadowScanModuleBlock:
+		block := node.AsModuleBlock()
+		return (block != nil && block.Statements != nil && HasLocalDeclarationInStatements(block.Statements.Nodes, name)) ||
+			HasHoistedVarDeclaration(node, name) || hasHoistedFunctionDeclaration(node, name)
+	case shadowScanHoistedVar:
+		return HasHoistedVarDeclaration(node, name)
+	case shadowScanParameters:
+		return HasShadowingParameter(node, name)
+	default:
+		panic("unknown shadow scan kind")
+	}
 }
 
 // shadowScope returns the nearest ancestor of node that a scope walk inspects,
