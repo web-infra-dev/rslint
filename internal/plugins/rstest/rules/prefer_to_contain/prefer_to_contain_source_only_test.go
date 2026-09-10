@@ -33,6 +33,9 @@ function local() { const expect = createExpect(); expect(localList.includes(item
 const NaN = 1; expect([1].includes(NaN)).toBe(true);
 function shadowNumber(Number: any) { expect([1].includes(Number.NaN)).toBe(true); }
 function shadowGlobalThis(globalThis: any) { expect([1].includes(globalThis.NaN)).toBe(true); }
+Number = { NaN: 1 } as any; expect([1].includes(Number.NaN)).toBe(true);
+type LocalNaN = NaN; expect([NaN].includes(NaN)).toBe(true);
+interface Number {} expect([Number.NaN].includes(Number.NaN)).toBe(true);
 `
 	root := fixtures.GetRootDir()
 	fileName := tspath.ResolvePath(root.Dir, "prefer-to-contain-source-only.ts")
@@ -67,7 +70,7 @@ function shadowGlobalThis(globalThis: any) { expect([1].includes(globalThis.NaN)
 		t.Fatalf("RunLinter: %v", err)
 	}
 	sort.Ints(positions)
-	if len(positions) != 8 {
-		t.Fatalf("reported %d assertions, want 8 at %v", len(positions), positions)
+	if len(positions) != 11 {
+		t.Fatalf("reported %d assertions, want 11 at %v", len(positions), positions)
 	}
 }

@@ -34,6 +34,8 @@ func TestPreferToContainExtras(t *testing.T) {
 			{Code: `expect(values.includes(NaN as number)).toEqual(false);`},
 			{Code: `expect(values.includes(Number.NaN)).toBe(true);`},
 			{Code: `expect(values.includes(globalThis['NaN'])).toBe(false);`},
+			{Code: `type NaN = number; expect([NaN].includes(NaN)).toBe(true);`},
+			{Code: `interface Number {} expect([Number.NaN].includes(Number.NaN)).toBe(true);`},
 			{Code: `expect('abc'.includes(/a/ as any)).toBe(false);`},
 			{Code: "expect(`a${value}`.includes(/a/ as any)).toBe(false);"},
 			{Code: `expect(('a' + suffix).includes(/a/ as any)).toBe(false);`},
@@ -148,6 +150,14 @@ func TestPreferToContainExtras(t *testing.T) {
 			},
 			{
 				Code:   `function f(globalThis: any) { expect([1].includes(globalThis.NaN)).toBe(true); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
+			{
+				Code:   `Number = { NaN: 1 } as any; expect([1].includes(Number.NaN)).toBe(true);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
+			{
+				Code:   `globalThis.Number = { NaN: 1 } as any; expect([1].includes(Number.NaN)).toBe(true);`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
 			},
 			// ---- Rstest source resolution ----

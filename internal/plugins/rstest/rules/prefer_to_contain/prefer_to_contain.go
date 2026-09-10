@@ -9,14 +9,80 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_to_contain"
 )
 
-func isGlobalIdentifier(ctx rule.RuleContext, node *ast.Node, name string) bool {
+func isUnshadowedRuntimeGlobal(ctx rule.RuleContext, node *ast.Node, name string) bool {
 	if node == nil || node.Kind != ast.KindIdentifier || node.AsIdentifier().Text != name {
 		return false
 	}
 	if ctx.Refs != nil {
-		return ctx.Refs.IsGlobalNameReference(node, name, ast.SymbolFlagsValue|ast.SymbolFlagsAlias)
+		return ctx.Refs.ResolveInFileWithMeaning(node, ast.SymbolFlagsValue|ast.SymbolFlagsAlias) == nil &&
+			!ctx.Refs.HasImplicitWrapperBinding(name)
 	}
 	return !utils.IsShadowed(node, name)
+}
+
+type nanGlobalWritesCacheKey struct{}
+
+func nanGlobalWrites(ctx rule.RuleContext) map[string]bool {
+	return rule.CachedByFile(ctx, nanGlobalWritesCacheKey{}, func() map[string]bool {
+		writes := map[string]bool{}
+		if ctx.SourceFile == nil {
+			return writes
+		}
+		var visit func(*ast.Node)
+		visit = func(node *ast.Node) {
+			if node == nil {
+				return
+			}
+			if node.Kind == ast.KindIdentifier {
+				name := node.AsIdentifier().Text
+				if name == "Number" || name == "globalThis" {
+					affected := nanGlobalsWrittenFrom(node)
+					if len(affected) > 0 && isUnshadowedRuntimeGlobal(ctx, node, name) {
+						for _, globalName := range affected {
+							writes[globalName] = true
+						}
+					}
+				}
+			}
+			node.ForEachChild(func(child *ast.Node) bool {
+				visit(child)
+				return false
+			})
+		}
+		visit(ctx.SourceFile.AsNode())
+		return writes
+	})
+}
+
+func nanGlobalsWrittenFrom(node *ast.Node) []string {
+	if utils.IsWriteReference(node) {
+		return []string{node.AsIdentifier().Text}
+	}
+	current := node
+	for current.Parent != nil && ast.IsOuterExpression(current.Parent, ast.OEKAll) {
+		current = current.Parent
+	}
+	path := []string{node.AsIdentifier().Text}
+	for current.Parent != nil && ast.IsAccessExpression(current.Parent) &&
+		utils.AccessExpressionObject(current.Parent) == current {
+		access := current.Parent
+		name, ok := utils.AccessExpressionStaticName(access)
+		if !ok {
+			return nil
+		}
+		path = append(path, name)
+		current = access
+		for current.Parent != nil && ast.IsOuterExpression(current.Parent, ast.OEKAll) {
+			current = current.Parent
+		}
+	}
+	if !ast.IsAssignmentTarget(current) {
+		return nil
+	}
+	if len(path) == 2 && path[0] == "globalThis" && path[1] == "Number" {
+		return []string{"Number"}
+	}
+	return nil
 }
 
 func isExplicitNaN(ctx rule.RuleContext, node *ast.Node) bool {
@@ -25,7 +91,7 @@ func isExplicitNaN(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 	if node.Kind == ast.KindIdentifier {
-		return isGlobalIdentifier(ctx, node, "NaN")
+		return isUnshadowedRuntimeGlobal(ctx, node, "NaN")
 	}
 	var receiver *ast.Node
 	switch node.Kind {
@@ -51,7 +117,8 @@ func isExplicitNaN(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 	name := receiver.AsIdentifier().Text
-	return (name == "Number" || name == "globalThis") && isGlobalIdentifier(ctx, receiver, name)
+	return (name == "Number" || name == "globalThis") &&
+		isUnshadowedRuntimeGlobal(ctx, receiver, name) && !nanGlobalWrites(ctx)[name]
 }
 
 func shouldIgnoreRegexpItem(receiver, item *ast.Node) bool {
