@@ -1,4 +1,4 @@
-# rstest/prefer-called-with
+# prefer-called-with
 
 ## Rule Details
 
