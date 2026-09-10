@@ -8,7 +8,8 @@ import (
 )
 
 // NewExpressionToCallFixes removes new while preserving comments and the
-// parentheses required when a multiline new expression is returned or thrown.
+// parentheses required when a multiline new expression is returned, thrown, or
+// yielded.
 // suffix is inserted after the unparenthesized callee before the expression is
 // called, for example ".from".
 func NewExpressionToCallFixes(
@@ -47,8 +48,8 @@ func NewExpressionToCallFixes(
 	fixes := []rule.RuleFix{
 		rule.RuleFixRemoveRange(core.NewTextRange(nodeRange.Pos(), removeEnd)),
 	}
-	if needsReturnOrThrowParentheses(sourceFile, node, nodeRange.Pos(), expressionRange.Pos()) {
-		if opening, closing, ok := returnOrThrowParenthesesRanges(sourceFile, node.Parent); ok {
+	if needsOperandParentheses(sourceFile, node, nodeRange.Pos(), expressionRange.Pos()) {
+		if opening, closing, ok := operandParenthesesRanges(sourceFile, node.Parent); ok {
 			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(opening, opening), " ("))
 			if closing == expressionRange.End() {
 				if calleeRange.End() == expressionRange.End() {
@@ -71,35 +72,46 @@ func NewExpressionToCallFixes(
 	return fixes
 }
 
-func needsReturnOrThrowParentheses(sourceFile *ast.SourceFile, node *ast.Node, newPos int, expressionPos int) bool {
+func needsOperandParentheses(sourceFile *ast.SourceFile, node *ast.Node, newPos int, expressionPos int) bool {
 	if node.Parent == nil || node.Parent.Kind == ast.KindParenthesizedExpression {
 		return false
 	}
-	if node.Parent.Kind != ast.KindReturnStatement && node.Parent.Kind != ast.KindThrowStatement {
+	switch node.Parent.Kind {
+	case ast.KindReturnStatement, ast.KindThrowStatement, ast.KindYieldExpression:
+	default:
 		return false
 	}
 	return !sameLine(sourceFile, newPos, expressionPos)
 }
 
-func returnOrThrowParenthesesRanges(sourceFile *ast.SourceFile, statement *ast.Node) (int, int, bool) {
+func operandParenthesesRanges(sourceFile *ast.SourceFile, statement *ast.Node) (int, int, bool) {
 	if sourceFile == nil || statement == nil {
 		return 0, 0, false
 	}
 
 	statementRange := utils.TrimNodeTextRange(sourceFile, statement)
 	keywordLength := len("return")
-	if statement.Kind == ast.KindThrowStatement {
+	switch statement.Kind {
+	case ast.KindThrowStatement:
 		keywordLength = len("throw")
+	case ast.KindYieldExpression:
+		keywordLength = len("yield")
 	}
 
 	opening := statementRange.Pos() + keywordLength
+	if statement.Kind == ast.KindYieldExpression {
+		yield := statement.AsYieldExpression()
+		if yield != nil && yield.AsteriskToken != nil {
+			opening = yield.AsteriskToken.End()
+		}
+	}
 	closing := statementRange.End()
 	source := sourceFile.Text()
 	for pos := closing - 1; pos >= statementRange.Pos(); pos-- {
 		if isWhitespace(source[pos]) {
 			continue
 		}
-		if source[pos] == ';' {
+		if statement.Kind != ast.KindYieldExpression && source[pos] == ';' {
 			closing = pos
 		}
 		break
@@ -112,7 +124,7 @@ func sameLine(sourceFile *ast.SourceFile, left, right int) bool {
 		left, right = right, left
 	}
 	for _, char := range sourceFile.Text()[left:right] {
-		if char == '\n' || char == '\r' {
+		if char == '\n' || char == '\r' || char == '\u2028' || char == '\u2029' {
 			return false
 		}
 	}

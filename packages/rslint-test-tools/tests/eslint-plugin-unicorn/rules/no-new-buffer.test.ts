@@ -212,6 +212,61 @@ describe('unicorn/no-new-buffer runtime integration', () => {
     }
   });
 
+  test('preserves multiline generator yield operands after fixing', async () => {
+    const cases = [
+      {
+        name: 'yield',
+        source: 'function* values() {\n\tyield new // yield\n\t\tBuffer(1);\n}',
+        output:
+          'function* values() {\n\tyield ( // yield\n\t\tBuffer.alloc(1));\n}',
+        buffer: { alloc: (size: number) => ({ size }) },
+        evaluate: 'return [...values()];',
+        expected: [{ size: 1 }],
+      },
+      {
+        name: 'yield*',
+        source:
+          'function* values() {\n\tyield* new // yield-star\n\t\tBuffer([1, 2]);\n}',
+        output:
+          'function* values() {\n\tyield* ( // yield-star\n\t\tBuffer.from([1, 2]));\n}',
+        buffer: { from: (values: number[]) => values },
+        evaluate: 'return [...values()];',
+        expected: [1, 2],
+      },
+      {
+        name: 'return with line separator',
+        source: 'function value() {\n\treturn new\u2028\tBuffer(1);\n}',
+        output: 'function value() {\n\treturn ( \u2028\tBuffer.alloc(1));\n}',
+        buffer: { alloc: (size: number) => ({ size }) },
+        evaluate: 'return value();',
+        expected: { size: 1 },
+      },
+      {
+        name: 'throw with paragraph separator',
+        source:
+          'function value() {\n\ttry {\n\t\tthrow new\u2029\tBuffer(1);\n\t} catch (error) {\n\t\treturn error;\n\t}\n}',
+        output:
+          'function value() {\n\ttry {\n\t\tthrow ( \u2029\tBuffer.alloc(1));\n\t} catch (error) {\n\t\treturn error;\n\t}\n}',
+        buffer: { alloc: (size: number) => ({ size }) },
+        evaluate: 'return value();',
+        expected: { size: 1 },
+      },
+    ];
+
+    for (const { name, source, output, buffer, evaluate, expected } of cases) {
+      const fixed = await lintRuntime(source, true);
+      const actual = Object.values(fixed.output ?? {})[0];
+      expect(actual, name).toBe(output);
+      await expect(lintRuntime(actual ?? source), name).resolves.toMatchObject({
+        diagnostics: [],
+      });
+      expect(
+        new Function('Buffer', `${actual ?? source}\n${evaluate}`)(buffer),
+        name,
+      ).toEqual(expected);
+    }
+  });
+
   test('covers numeric helpers, static control flow, and mutable updates', async () => {
     const automaticCases = [
       {

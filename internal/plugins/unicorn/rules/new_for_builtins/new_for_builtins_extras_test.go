@@ -154,6 +154,19 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 			jsValid("const value = String('test');"),
 		},
 		[]rule_tester.InvalidTestCase{
+			// Shared `new`-to-call fixing preserves the operand of a multiline
+			// generator yield for every rule that removes `new`.
+			disallowInvalid(lines(
+				"function* symbols() {",
+				"\tyield new // symbol",
+				"\t\tSymbol('x');",
+				"}",
+			), "new // symbol\n\t\tSymbol('x')", "Symbol", lines(
+				"function* symbols() {",
+				"\tyield ( // symbol",
+				"\t\tSymbol('x'));",
+				"}",
+			)),
 			// ---- Dimension 4: parenthesized receiver and callee wrappers are transparent ----
 			enforceInvalid("const value = (globalThis).Array();", "(globalThis).Array()", "Array"),
 			// ---- Dimension 4: multi-level parenthesized receivers are transparent ----
