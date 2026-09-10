@@ -268,15 +268,11 @@
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props.source.uri }\n          }\n          static propTypes = {\n            source: PropTypes.object\n          };\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-50"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props?.source?.uri }\n          }\n          static propTypes = {\n            source: PropTypes.object\n          };\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-51"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: this.props.source.uri }\n          }\n          static propTypes = {\n            source: PropTypes.object\n          };\n        }\n      ",
@@ -492,195 +488,131 @@
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-105"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-106"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-107"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillReceiveProps ({something}) {\n            doSomething(something);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-108"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps ({something}) {\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-109"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillReceiveProps ({something}) {\n            doSomething(something);\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-110"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          constructor (props) {\n            super(props);\n            const {something} = props;\n            doSomething(something);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-111"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          constructor (props) {\n            super(props);\n            const {something} = props;\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-112"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          constructor ({something}) {\n            super({something});\n            doSomething(something);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-113"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          constructor ({something}) {\n            super({something});\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-114"
+      "Tsx": true
     },
     {
       "Code": "\n        // Destructured props in the `shouldComponentUpdate` method shouldn’t throw errors\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          shouldComponentUpdate(nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-115"
+      "Tsx": true
     },
     {
       "Code": "\n        // Destructured props in the `shouldComponentUpdate` method shouldn’t throw errors\n        class Hello extends Component {\n          shouldComponentUpdate(nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-116"
+      "Tsx": true
     },
     {
       "Code": "\n        // Destructured props in `shouldComponentUpdate` shouldn’t throw errors when used with createReactClass\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          shouldComponentUpdate(nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-117"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          shouldComponentUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-118"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          shouldComponentUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-119"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          shouldComponentUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-120"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          shouldComponentUpdate ({something}, nextState) {\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-121"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-122"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-123"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-124"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-125"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-126"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillUpdate ({something}, nextState) {\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-127"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentDidUpdate (prevProps, prevState) {\n            const {something} = prevProps;\n            return something;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-128"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentDidUpdate (prevProps, prevState) {\n            const {something} = prevProps;\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-129"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate (prevProps, prevState) {\n            const {something} = prevProps;\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-130"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentDidUpdate ({something}, prevState) {\n            return something;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-131"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentDidUpdate ({something}, prevState) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-132"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate ({something}, prevState) {\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-133"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentDidUpdate ({something}, {state1, state2}) {\n            return something;\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-134"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentDidUpdate ({something}, {state1, state2}) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-135"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate ({something}, {state1, state2}) {\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-136"
+      "Tsx": true
     },
     {
       "Code": "\n        var Hello = React.Component({\n          propTypes: {\n            something: PropTypes.bool\n          },\n          componentDidUpdate: function ({something}, {state1, state2}) {\n            return something;\n          }\n        });\n      ",
@@ -688,9 +620,7 @@
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate: function ({something}, {state1, state2}) {\n            return something;\n          }\n        })\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-138"
+      "Tsx": true
     },
     {
       "Code": "\n        const Hello = (props) => {\n          const {...rest} = props;\n          return <div />;\n        };\n      ",
@@ -714,9 +644,7 @@
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps (nextProps) {\n            if (nextProps.foo) {\n              doSomething(this.props.bar);\n            }\n          }\n        }\n\n        Hello.propTypes = {\n          foo: PropTypes.bool,\n          bar: PropTypes.bool\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-144"
+      "Tsx": true
     },
     {
       "Code": "\n        export default function SomeComponent(props) {\n            const callback = () => {\n                props.a(props.b);\n            };\n\n            const anotherCallback = () => {};\n\n            return (\n                <SomeOtherComponent\n                    name={props.c}\n                    callback={callback}\n                />\n            );\n        }\n\n        SomeComponent.propTypes = {\n            a: React.PropTypes.func.isRequired,\n            b: React.PropTypes.string.isRequired,\n            c: React.PropTypes.string.isRequired,\n        };\n      ",
@@ -728,33 +656,23 @@
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          shouldComponentUpdate (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-147"
+      "Tsx": true
     },
     {
       "Code": "\n        class HelloFooBar extends Component {\n          shouldComponentUpdate(props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        HelloFooBar.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-148"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentWillUpdate (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-149"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillUpdate (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-150"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentWillReceiveProps (nextProps) {\n            const {foo} = nextProps;\n            if (foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-151"
+      "Tsx": true
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n          }\n          classProperty = async () => {\n            await this.props.foo();\n          };\n        }\n      ",
@@ -766,15 +684,11 @@
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-154"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          shouldComponentUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-155"
+      "Tsx": true
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n          }\n          classProperty = async () => {\n            const { foo } = this.props;\n            await foo();\n          };\n        }\n      ",
@@ -786,15 +700,11 @@
     },
     {
       "Code": "\n        class Hello extends Component {\n          shouldComponentUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-158"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentWillUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-159"
+      "Tsx": true
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n          }\n          async method() {\n            await this.props.foo();\n          };\n        }\n      ",
@@ -810,15 +720,11 @@
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentWillUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-163"
+      "Tsx": true
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentDidUpdate (prevProps) {\n            if (prevProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-164"
+      "Tsx": true
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          async method() {\n            const { foo, bar, baz } = this.props;\n            await foo();\n            await bar();\n            await baz();\n          };\n        }\n      ",
@@ -834,9 +740,7 @@
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentDidUpdate (prevProps) {\n            if (prevProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-168"
+      "Tsx": true
     },
     {
       "Code": "\n        class Example extends Component {\n          async method() {\n            await this.props.foo();\n            await this.props.bar();\n          };\n        }\n        Example.propTypes = {\n          foo: PropTypes.func,\n          bar: PropTypes.func,\n        }\n      ",
@@ -872,9 +776,7 @@
     },
     {
       "Code": "\n        class Foo extends React.Component {\n         static propTypes = {\n         foo: PropTypes.func.isRequired,\n        }\n\n        constructor(props) {\n          super(props);\n\n          const { foo } = props;\n          this.message = foo(\"blablabla\");\n        }\n\n        render() {\n          return <div>{this.message}</div>;\n        }\n        }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-177"
+      "Tsx": true
     },
     {
       "Code": "\n        class HelloGraphQL extends Component {\n          render() {\n              return <div>Hello</div>;\n          }\n        }\n\n        const HellowQueries = graphql(queryDetails, {\n          options: ownProps => ({\n          variables: ownProps.aProp\n          }),\n        })(HelloGraphQL)\n\n        HellowQueries.propTypes = {\n          aProp: PropTypes.string.isRequired\n        }\n\n        export default connect(mapStateToProps, mapDispatchToProps)(HellowQueries)\n      ",
@@ -907,27 +809,21 @@
       "Tsx": true,
       "Options": {
         "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-183"
+      }
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState((prevState, { doSomething }) => {\n              doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n      ",
       "Tsx": true,
       "Options": {
         "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-184"
+      }
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState((prevState, obj) => {\n              obj.doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n        var tempVar2;\n      ",
       "Tsx": true,
       "Options": {
         "skipShapeProps": false
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-185"
+      }
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState(() => {\n              this.props.doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n        var tempVar;\n      ",
@@ -1000,21 +896,15 @@
     },
     {
       "Code": "\n      class MyComponent extends Component {\n        static propTypes = {\n          validate: PropTypes.bool,\n          options: PropTypes.array,\n          value: ({options, value, validate}) => {\n            if (!validate) return;\n            if (options.indexOf(value) < 0)\n              throw new Errow('oops');\n          }\n        }\n\n        render() {\n          return <ul>\n            {this.props.options.map(option =>\n              <li className={this.props.value == option && \"active\"}>{option}</li>\n            )}\n          </ul>\n        }\n      }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-197"
+      "Tsx": true
     },
     {
       "Code": "\n      class MyComponent extends Component {\n        static propTypes = {\n          validate: PropTypes.bool,\n          options: PropTypes.array,\n          value: function ({options, value, validate}) {\n            if (!validate) return;\n            if (options.indexOf(value) < 0)\n              throw new Errow('oops');\n          }\n        }\n\n        render() {\n          return <ul>\n            {this.props.options.map(option =>\n              <li className={this.props.value == option && \"active\"}>{option}</li>\n            )}\n          </ul>\n        }\n      }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-198"
+      "Tsx": true
     },
     {
       "Code": "\n      class MyComponent extends Component {\n        static propTypes = {\n          validate: PropTypes.bool,\n          options: PropTypes.array,\n          value({options, value, validate}) {\n            if (!validate) return;\n            if (options.indexOf(value) < 0)\n              throw new Errow('oops');\n          }\n        }\n\n        render() {\n          return <ul>\n            {this.props.options.map(option =>\n              <li className={this.props.value == option && \"active\"}>{option}</li>\n            )}\n          </ul>\n        }\n      }\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-199"
+      "Tsx": true
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>{ this.props.other }</div>\n          }\n        }\n        MyComponent.propTypes = { other: () => {} };\n      ",
@@ -1039,9 +929,7 @@
         "react": {
           "version": "16.3.0"
         }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-204"
+      }
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n          UNSAFE_componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
@@ -1050,9 +938,7 @@
         "react": {
           "version": "16.3.0"
         }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-205"
+      }
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: 'bar'\n          };\n          state = {\n            currentValue: null\n          };\n          static getDerivedStateFromProps(nextProps, prevState) {\n            if (prevState.currentValue === null) {\n              return {\n                currentValue: nextProps.defaultValue,\n              }\n            }\n            return null;\n          }\n          render() {\n            return <div>{ this.state.currentValue }</div>\n          }\n        }\n      ",
@@ -1061,9 +947,7 @@
         "react": {
           "version": "16.3.0"
         }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-206"
+      }
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: PropTypes.string\n          };\n          getSnapshotBeforeUpdate(prevProps, prevState) {\n            if (prevProps.defaultValue === null) {\n              return 'snapshot';\n            }\n            return null;\n          }\n          render() {\n            return <div />\n          }\n        }\n      ",
@@ -1072,9 +956,7 @@
         "react": {
           "version": "16.3.0"
         }
-      },
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-207"
+      }
     },
     {
       "Code": "\n        import React from 'react';\n        type Props = string & {\n          fullname: string\n        };\n        class Test extends React.PureComponent<Props> {\n          render() {\n            return <div>Hello {this.props.fullname}</div>\n          }\n        }\n      ",
@@ -1126,9 +1008,7 @@
     },
     {
       "Code": "\n        const Hello = ({a}) => (\n          <div>\n            {a.map(({b}) => (\n              <div>{b}</div>\n            ))}\n          </div>\n        );\n        Hello.propTypes = {\n          a: PropTypes.arrayOf(\n            PropTypes.exact({\n              b: PropTypes.string,\n            })\n          ),\n        };\n      ",
-      "Tsx": true,
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case valid-217"
+      "Tsx": true
     },
     {
       "Code": "\n        const Foo = (props) => {\n          const { foo } = props as unknown;\n          (props as unknown).bar as unknown;\n\n          return <></>;\n        };\n\n        Foo.propTypes = {\n          foo,\n          bar,\n        };\n      ",
@@ -1307,39 +1187,35 @@
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-3"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n        Hello.propTypes = {\n          unused: PropTypes.string\n        };\n        class HelloBis extends React.Component {\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-4"
+      ]
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            unused: PropTypes.string.isRequired,\n            anotherunused: PropTypes.string.isRequired\n          },\n          render: function() {\n            return <div>Hello {this.props.name} and {this.props.propWithoutTypeDefinition}</div>;\n          }\n        });\n        var Hello2 = createReactClass({\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -1347,32 +1223,28 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'anotherunused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-5"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            var { firstname, lastname } = this.props;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-6"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.z\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.string\n          })\n        };\n      ",
@@ -1382,16 +1254,14 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.b' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-7"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.b.z;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.shape({\n              c: PropTypes.string\n            })\n          })\n        };\n      ",
@@ -1401,16 +1271,14 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.b.c' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-8"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.b.c;\n            this.props.a.__.d.length;\n            this.props.a.anything.e[2];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.objectOf(\n            PropTypes.shape({\n              unused: PropTypes.string\n            })\n          )\n        };\n      ",
@@ -1420,16 +1288,14 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.*.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-9"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            var i = 3;\n            this.props.a[2].c;\n            this.props.a[i].d.length;\n            this.props.a[i + 2].e[2];\n            this.props.a.length;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.arrayOf(\n            PropTypes.shape({\n              unused: PropTypes.string\n            })\n          )\n        };\n      ",
@@ -1439,16 +1305,14 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.*.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-10"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.length;\n            this.props.a.b;\n            this.props.a.e.length;\n            this.props.a.e.anyProp;\n            this.props.a.c.toString();\n            this.props.a.c.someThingElse();\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.shape({\n              unused: PropTypes.number,\n              anotherunused: PropTypes.array\n            })\n          ])\n        };\n      ",
@@ -1458,7 +1322,7 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -1466,32 +1330,28 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.anotherunused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-11"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props[\"some.value\"];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"some.unused\": PropTypes.string\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'some.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-12"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props[\"arr\"][1][\"some.value\"];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"arr\": PropTypes.arrayOf(\n            PropTypes.shape({\n              \"some.unused\": PropTypes.string\n        })\n          )\n        };\n      ",
@@ -1501,288 +1361,252 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'arr.*.some.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-13"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          static propTypes = {\n            unused: PropTypes.string\n          }\n          render() {\n            var text;\n            text = 'Hello ';\n            let {props: {firstname}} = this;\n            return <div>{text} {firstname}</div>;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-14"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            if (true) {\n              return <span>{this.props.firstname}</span>\n            } else {\n              return <span>{this.props.lastname}</span>\n            }\n          }\n        }\n        Hello.propTypes = {\n          unused: PropTypes.string\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-15"
+      ]
     },
     {
       "Code": "\n        var Hello = function(props) {\n          return <div>Hello {props.name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-16"
+      ]
     },
     {
       "Code": "\n        function Hello(props) {\n          return <div>Hello {props.name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-17"
+      ]
     },
     {
       "Code": "\n        var Hello = (props) => {\n          return <div>Hello {props.name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-18"
+      ]
     },
     {
       "Code": "\n        var Hello = (props) => {\n          const {name} = props;\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-19"
+      ]
     },
     {
       "Code": "\n        function Hello({ name }) {\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-20"
+      ]
     },
     {
       "Code": "\n        const Hello = function({ name }) {\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-21"
+      ]
     },
     {
       "Code": "\n        const Hello = ({ name }) => {\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-22"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          static propTypes = {unused: PropTypes.string}\n          render() {\n            var props = {firstname: 'John'};\n            return <div>Hello {props.firstname} {this.props.lastname}</div>;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-23"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          static propTypes = {unused: PropTypes.string}\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props.source }\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-24"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          static propTypes = {unused: PropTypes.string}\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props.source.uri }\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-25"
+      ]
     },
     {
       "Code": "\n        function HelloComponent() {\n          var Hello = createReactClass({\n            propTypes: {unused: PropTypes.string},\n            render: function() {\n              return <div>Hello {this.props.name}</div>;\n            }\n          });\n          return Hello;\n        }\n        module.exports = HelloComponent();\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-26"
+      ]
     },
     {
       "Code": "\n        const Hello = (props) => {\n          let team = props.names.map((name) => {\n              return <li>{name}, {props.company}</li>;\n            });\n          return <ul>{team}</ul>;\n        };\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-27"
+      ]
     },
     {
       "Code": "\n        const Annotation = props => (\n          <div>\n            {props.text}\n          </div>\n        )\n        Annotation.prototype.propTypes = {unused: PropTypes.string};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-28"
+      ]
     },
     {
       "Code": "\n        for (var key in foo) {\n          var Hello = createReactClass({\n            propTypes: {unused: PropTypes.string},\n            render: function() {\n              return <div>Hello {this.props.name}</div>;\n            }\n          });\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-29"
+      ]
     },
     {
       "Code": "\n        var propTypes = {\n          unused: PropTypes.string\n        };\n        class Test extends React.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = propTypes;\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-30"
+      ]
     },
     {
       "Code": "\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
@@ -1794,80 +1618,70 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-31"
+      ]
     },
     {
       "Code": "\n        /** @jsx Foo */\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-32"
+      ]
     },
     {
       "Code": "\n        /** @jsx Foo */\n        /** @jsx React */\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-33"
+      ]
     },
     {
       "Code": "\n        /**\n         * Copyright ....\n         * @jsx Foo\n         */\n        /** @jsx React */\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-34"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          props: {\n            unused: string\n          };\n          render () {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-35"
+      ]
     },
     {
       "Code": "\n        type Props = {unused: Object;};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
@@ -1876,7 +1690,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -1892,7 +1706,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -1906,64 +1720,56 @@
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'b' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-38"
+      ]
     },
     {
       "Code": "\n        type PropsA = { foo: string };\n        type PropsB = { bar: string };\n        type PropsC = { zap: string };\n        type Props = PropsA & PropsB;\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar}</div>\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'zap' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-39"
+      ]
     },
     {
       "Code": "\n        type PropsB = { foo: string };\n        type PropsC = { bar: string };\n        type Props = PropsB & {\n          zap: string\n        };\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar}</div>\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'zap' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-40"
+      ]
     },
     {
       "Code": "\n        type PropsB = { foo: string };\n        type PropsC = { bar: string };\n        type Props = {\n          zap: string\n        } & PropsB;\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar}</div>\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'zap' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-41"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          props: {\n            name: {\n              unused: string;\n            }\n          };\n          render () {\n            return <div>Hello {this.props.name.lastname}</div>;\n          }\n        }\n      ",
@@ -1975,7 +1781,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'name.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -1994,7 +1800,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'name.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2013,7 +1819,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'person.name.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2032,7 +1838,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'person.name.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2051,7 +1857,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'people.*.name.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2070,7 +1876,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'people.*.name.unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2089,7 +1895,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'result.ok' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2097,7 +1903,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'result.ok' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2111,64 +1917,56 @@
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-49"
+      ]
     },
     {
       "Code": "\n        const MyComponent = props => (\n          <div onClick={() => props.toggle()}></div>\n        )\n        MyComponent.propTypes = {unused: Object};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-50"
+      ]
     },
     {
       "Code": "\n        const MyComponent = props => props.test ? <div /> : <span />\n        MyComponent.propTypes = {unused: Object};\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-51"
+      ]
     },
     {
       "Code": "\n        type Props = {\n          unused: ?string,\n        };\n        function Hello({firstname, lastname}: Props): React$Element {\n          return <div>Hello {firstname} {lastname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-52"
+      ]
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          constructor (props) {\n            super(props);\n            const {something} = props;\n            doSomething(something);\n          }\n        }\n      ",
@@ -2350,9 +2148,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-65"
+      ]
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          classProperty = async () => {\n            await this.props.foo();\n            await this.props.bar();\n          };\n        }\n      ",
@@ -2380,9 +2176,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-67"
+      ]
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          shouldComponentUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n      ",
@@ -2396,25 +2190,21 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-68"
+      ]
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          classProperty = async () => {\n            const { bar, baz } = this.props;\n            await bar();\n            await baz();\n          };\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'foo' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-69"
+      ]
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          async method() {\n            await this.props.foo();\n            await this.props.baz();\n          };\n        }\n      ",
@@ -2442,9 +2232,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-71"
+      ]
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n      ",
@@ -2458,9 +2246,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-72"
+      ]
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          async method() {\n            const { foo, bar } = this.props;\n            await foo();\n            await bar();\n          };\n        }\n      ",
@@ -2502,9 +2288,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-75"
+      ]
     },
     {
       "Code": "\n        class Hello extends Component {\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n        Hello.propTypes = forbidExtraProps({\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        });\n      ",
@@ -2523,9 +2307,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-76"
+      ]
     },
     {
       "Code": "\n        class Hello extends Component {\n          propTypes = forbidExtraProps({\n            foo: PropTypes.string,\n            bar: PropTypes.string\n          });\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        };\n      ",
@@ -2544,9 +2326,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-77"
+      ]
     },
     {
       "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          factory() {\n            return async function onSubmit() {\n              await this.props.bar();\n              await this.props.baz();\n            };\n          }\n        }\n      ",
@@ -2595,23 +2375,21 @@
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'name' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-81"
+      ]
     },
     {
       "Code": "\n        class Comp1 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp1.propTypes = {\n          prop1: PropTypes.number\n        };\n        class Comp2 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp2.propTypes = {\n          prop2: PropTypes.arrayOf(Comp1.propTypes.prop1)\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop1' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2619,7 +2397,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop2' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2627,23 +2405,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop2.*' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-82"
+      ]
     },
     {
       "Code": "\n        class Comp1 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp1.propTypes = {\n          prop1: PropTypes.number\n        };\n        class Comp2 extends Component {\n          static propTypes = {\n            prop2: PropTypes.arrayOf(Comp1.propTypes.prop1)\n          }\n          render() {\n            return <span />;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop1' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2651,7 +2427,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop2' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2659,23 +2435,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop2.*' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-83"
+      ]
     },
     {
       "Code": "\n        class Comp1 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp1.propTypes = {\n          prop1: PropTypes.number\n        };\n        var Comp2 = createReactClass({\n          propTypes: {\n            prop2: PropTypes.arrayOf(Comp1.propTypes.prop1)\n          },\n          render() {\n            return <span />;\n          }\n        });\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop1' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2683,7 +2457,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop2' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2691,32 +2465,28 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop2.*' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-84"
+      ]
     },
     {
       "Code": "\n        class HelloGraphQL extends Component {\n          render() {\n              return <div>Hello</div>;\n          }\n        }\n        HelloGraphQL.propTypes = {\n          aProp: PropTypes.string.isRequired\n        }\n\n        const HellowQueries = graphql(queryDetails, {\n          options: ownProps => ({\n          variables: ownProps.aProp\n          }),\n        })(HelloGraphQL)\n\n        export default connect(mapStateToProps, mapDispatchToProps)(HellowQueries)\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'aProp' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-85"
+      ]
     },
     {
       "Code": "\n        type UsedProps = {|\n          usedProp: number,\n        |};\n\n        type UnusedProps = {|\n          unusedProp: number,\n        |};\n\n        type Props = {| ...UsedProps, ...UnusedProps |};\n\n        function MyComponent({ usedProp, notOne }: Props) {\n          return <div>{usedProp}</div>;\n        }\n      ",
@@ -2725,7 +2495,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unusedProp' PropType is defined but prop is never used",
           "Line": 7,
           "Column": 11,
@@ -2741,7 +2511,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2762,7 +2532,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2778,7 +2548,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2797,16 +2567,14 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-90"
+      ]
     },
     {
       "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n          foo: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
@@ -2820,7 +2588,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2841,7 +2609,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'person' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2862,7 +2630,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'person' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2876,32 +2644,28 @@
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'doSomething' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-94"
+      ]
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState(prevState => ({\n              doSomething: prevState.doSomething + 1,\n            }));\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'doSomething' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-95"
+      ]
     },
     {
       "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
@@ -2915,7 +2679,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2934,7 +2698,7 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'something' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2943,7 +2707,7 @@
         }
       ],
       "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-97"
+      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n          UNSAFE_componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
@@ -2955,7 +2719,7 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'something' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2964,7 +2728,7 @@
         }
       ],
       "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-98"
+      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: 'bar'\n          };\n          state = {\n            currentValue: null\n          };\n          static getDerivedStateFromProps(nextProps, prevState) {\n            if (prevState.currentValue === null) {\n              return {\n                currentValue: nextProps.defaultValue,\n              }\n            }\n            return null;\n          }\n          render() {\n            return <div>{ this.state.currentValue }</div>\n          }\n        }\n      ",
@@ -2976,7 +2740,7 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'defaultValue' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -2985,7 +2749,7 @@
         }
       ],
       "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-99"
+      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: PropTypes.string\n          };\n          getSnapshotBeforeUpdate(prevProps, prevState) {\n            if (prevProps.defaultValue === null) {\n              return 'snapshot';\n            }\n            return null;\n          }\n          render() {\n            return <div />\n          }\n        }\n      ",
@@ -2997,7 +2761,7 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'defaultValue' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3006,7 +2770,7 @@
         }
       ],
       "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-100"
+      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
     },
     {
       "Code": "\n        import React from 'react';\n        type OtherProps = {\n          firstname: string,\n          lastname: string,\n        } | {\n          fullname: string\n        };\n        type Props = OtherProps & {\n          age: number\n        };\n        class Test extends React.PureComponent<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
@@ -3015,7 +2779,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'age' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3032,7 +2796,7 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3040,7 +2804,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.b' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3048,16 +2812,14 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'a.b.c' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-102"
+      ]
     },
     {
       "Code": "\n        type Props = { foo: string }\n        function higherOrderComponent<Props>() {\n          return class extends React.Component<Props> {\n            render() {\n              return <div />;\n            }\n          }\n        }\n      ",
@@ -3066,7 +2828,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'foo' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3082,7 +2844,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3098,7 +2860,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3114,7 +2876,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3130,7 +2892,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3146,7 +2908,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3160,16 +2922,14 @@
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-109"
+      ]
     },
     {
       "Code": "\n        import type {BasePerson} from './types'\n        type Props = {\n          person: {\n           ...$Exact<BasePerson>,\n           lastname: string\n          }\n        };\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n      ",
@@ -3181,7 +2941,7 @@
       "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'person.lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3198,55 +2958,49 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'person.lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-111"
+      ]
     },
     {
       "Code": "\n        type Props = {notTarget: string, unused: string};\n        class Hello extends React.Component {\n          props: Props;\n          onEvent = ({ target }: { target: Object }) => {};\n          render () {\n            return <div>Hello {this.props.notTarget}</div>;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-112"
+      ]
     },
     {
       "Code": "\n        import PropTypes from 'prop-types';\n        import React from 'react';\n\n        const MyComponent= (props) => {\n          switch (props.usedProp) {\n            case 1:\n              return (<div />);\n            default:\n              return <div />;\n          }\n        };\n\n        MyComponent.propTypes = {\n          usedProp: PropTypes.string,\n          unUsedProp: PropTypes.string,\n        };\n\n        export default MyComponent;\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'unUsedProp' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-113"
+      ]
     },
     {
       "Code": "\n        const Foo = (props) => {\n          const { foo } = props as unknown;\n          (props as unknown).bar as unknown;\n\n          return <></>;\n        };\n\n        Foo.propTypes = {\n          fooUnused,\n          barUnused,\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'fooUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3254,23 +3008,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'barUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-114"
+      ]
     },
     {
       "Code": "\n        class Foo extends React.Component {\n          static propTypes = {\n            prevPropUnused,\n            nextPropUnused,\n            setStatePropUnused,\n            thisPropsAliasDestructPropUnused,\n            thisPropsAliasPropUnused,\n            thisDestructPropsAliasDestructPropUnused,\n            thisDestructPropsAliasPropUnused,\n            thisDestructPropsDestructPropUnused,\n            thisPropsDestructPropUnused,\n            thisPropsPropUnused,\n          };\n\n          componentDidUpdate(prevProps) {\n            (prevProps as unknown).prevProp as unknown;\n          }\n\n          shouldComponentUpdate(nextProps) {\n            (nextProps as unknown).nextProp as unknown;\n          }\n\n          stateProps() {\n            ((this as unknown).setState as unknown)((_, props) => (props as unknown).setStateProp as unknown);\n          }\n\n          thisPropsAlias() {\n            const props = (this as unknown).props as unknown;\n\n            const { thisPropsAliasDestructProp } = props as unknown;\n            (props as unknown).thisPropsAliasProp as unknown;\n          }\n\n          thisDestructPropsAlias() {\n            const { props } = this as unknown;\n\n            const { thisDestructPropsAliasDestructProp } = props as unknown;\n            (props as unknown).thisDestructPropsAliasProp as unknown;\n          }\n\n          render() {\n            const { props: { thisDestructPropsDestructProp } } = this as unknown;\n            const { thisPropsDestructProp } = (this as unknown).props as unknown;\n            ((this as unknown).props as unknown).thisPropsProp as unknown;\n\n            return null;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prevPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3278,7 +3030,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'nextPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3286,7 +3038,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'setStatePropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3294,7 +3046,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'thisPropsAliasDestructPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3302,7 +3054,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'thisPropsAliasPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3310,7 +3062,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'thisDestructPropsAliasDestructPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3318,7 +3070,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'thisDestructPropsAliasPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3326,7 +3078,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'thisDestructPropsDestructPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3334,7 +3086,7 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'thisPropsDestructPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3342,231 +3094,203 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'thisPropsPropUnused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-115"
+      ]
     },
     {
       "Code": "\n        type Person = {\n          lastname: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props.firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-116"
+      ]
     },
     {
       "Code": "\n        type Person = {\n          lastname: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props?.firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-117"
+      ]
     },
     {
       "Code": "\n        type Person = {\n          lastname: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props?.firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-118"
+      ]
     },
     {
       "Code": "\n        type Person = {\n          lastname?: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props.firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-119"
+      ]
     },
     {
       "Code": "\n        type Person = {\n          lastname?: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props?.firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-120"
+      ]
     },
     {
       "Code": "\n        type Person = {\n          firstname: string\n          lastname: string\n        };\n        const Hello = ({firstname}: Person) => {\n            return <div>Hello {firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-121"
+      ]
     },
     {
       "Code": "\n        interface Person {\n          firstname: string\n          lastname: string\n        };\n        const Hello = ({firstname}: Person) => {\n            return <div>Hello {firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-122"
+      ]
     },
     {
       "Code": "\n        interface Foo {\n          foo: string;\n          [blah: string]: number;\n        }\n        const Hello = ({bar}: Foo) => {\n            return <div>Hello {bar}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'foo' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-123"
+      ]
     },
     {
       "Code": "\n        interface Props {\n          'aria-label': string;\n        }\n        export default function Component(props: Props): JSX.Element {\n          return <div />;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'aria-label' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-124"
+      ]
     },
     {
       "Code": "\n        interface Props {\n        [1234]: string;\n        }\n        export default function Component(props: Props): JSX.Element {\n          return <div />;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'1234' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-125"
+      ]
     },
     {
       "Code": "\n        const Hello = ({firstname}: {firstname: string, lastname: string}) => {\n            return <div>Hello {firstname}</div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-126"
+      ]
     },
     {
       "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Foo {\n          z: string;\n        }\n\n        interface Bar extends Foo {\n          y: string;\n        }\n\n        const Baz = ({ x, y }: Bar) => (\n          <span>\n              {x}\n              {y}\n          </span>\n        );\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'z' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-127"
+      ]
     },
     {
       "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Bar extends Foo {\n          y: string;\n        }\n\n        const Baz = ({ x }: Bar) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'y' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-128"
+      ]
     },
     {
       "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Bar {\n          y: string;\n        }\n\n        interface Baz {\n          z:string;\n        }\n\n        const Baz = ({ x }: Bar & Foo & Baz) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'y' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3574,23 +3298,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'z' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-129"
+      ]
     },
     {
       "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Foo {\n          z: string;\n        }\n\n        interface Bar extends Foo {\n          y: string;\n        }\n\n        const Baz = ({ x }: Bar) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'z' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3598,23 +3320,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'y' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-130"
+      ]
     },
     {
       "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Foo {\n          z: string;\n        }\n\n        interface Foo {\n          y: string;\n        }\n\n        const Baz = ({ x }: Foo) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'z' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3622,23 +3342,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'y' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-131"
+      ]
     },
     {
       "Code": "\n        type User = {\n          user: string;\n        }\n\n        type UserProps = {\n          userId: string;\n        }\n\n        type AgeProps = {\n          age: number;\n        }\n\n        type BirthdayProps = {\n          birthday: string;\n        }\n\n        type intersectionUserProps = AgeProps & BirthdayProps;\n\n        type Props = User & UserProps & intersectionUserProps;\n\n        export default (props: Props) => {\n          const { userId, user } = props;\n\n          if (userId === 0) {\n            return <p>userId is 0</p>;\n          }\n\n          return null;\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'age' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3646,39 +3364,35 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'birthday' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-132"
+      ]
     },
     {
       "Code": "\n        const mapStateToProps = state => ({\n          books: state.books\n        });\n\n        interface InfoLibTableProps extends ReturnType<typeof mapStateToProps> {\n        }\n\n        const App = (props: InfoLibTableProps) => {\n          return <div></div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'books' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-133"
+      ]
     },
     {
       "Code": "\n        const mapStateToProps = state => ({\n          books: state.books,\n        });\n\n        interface BooksTable extends ReturnType<typeof mapStateToProps> {\n          username: string;\n        }\n\n        const App = (props: BooksTable) => {\n          return <div />;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'books' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3686,23 +3400,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'username' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-134"
+      ]
     },
     {
       "Code": "\n        interface BooksTable extends ReturnType<() => {books:Array<string>}> {\n          username: string;\n        }\n\n        const App = (props: BooksTable) => {\n          return <div></div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'books' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3710,23 +3422,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'username' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-135"
+      ]
     },
     {
       "Code": "\n        type BooksTable = ReturnType<() => {books:Array<string>}> & {\n          username: string;\n        }\n\n        const App = (props: BooksTable) => {\n          return <div></div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'books' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3734,23 +3444,21 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'username' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-136"
+      ]
     },
     {
       "Code": "\n        type mapStateToProps = ReturnType<() => {books:Array<string>}>;\n\n        type Props = {\n          username: string;\n        }\n\n        type BooksTable = mapStateToProps & Props;\n\n        const App = (props: BooksTable) => {\n          return <div></div>;\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'books' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3758,64 +3466,56 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'username' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-137"
+      ]
     },
     {
       "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) => ({\n          ...bindActionCreators<{prop1: ()=>void,prop2: ()=>string}>(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          ),\n        })\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'prop1' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-138"
+      ]
     },
     {
       "Code": "\n        function Foo(props) {\n          const { bar: { nope } } = props;\n          return <div test={nope} />;\n        }\n        Foo.propTypes = {\n          foo: PropTypes.number,\n          bar: PropTypes.shape({\n            faz: PropTypes.number,\n            qaz: PropTypes.object,\n          }),\n        };\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'foo' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-139"
+      ]
     },
     {
       "Code": "\n        interface Props {\n          readonly firstname: string;\n          readonly lastname: string;\n        }\n\n        class TestComponent extends React.Component<Props> {\n          public render() {\n            return <div>{this.props.firstname}</div>;\n          }\n        }\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'lastname' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-140"
+      ]
     },
     {
       "Code": "\n        import React from \"react\";\n\n        var Hello = React.createClass({\n          propTypes: {\n            name: React.PropTypes.string,\n            foo: React.PropTypes.string,\n            propTypes: React.PropTypes.string\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
@@ -3827,7 +3527,7 @@
       },
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'foo' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
@@ -3835,32 +3535,28 @@
           "EndColumn": 0
         },
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'propTypes' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-141"
+      ]
     },
     {
       "Code": "\n        import React from \"react\";\n\n        type props = {\n          foo: string;\n          bar: string;\n        };\n\n        const Demo: React.FC<props> = ({ foo }) => {\n          return <div {...{}}>{foo}</div>;\n        };\n\n        export default Demo;\n      ",
       "Tsx": true,
       "Errors": [
         {
-          "MessageId": "",
+          "MessageId": "unusedPropType",
           "Message": "'bar' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: rslint behavior does not yet match eslint-plugin-react v7.37.5 upstream case invalid-142"
+      ]
     }
   ]
 }
