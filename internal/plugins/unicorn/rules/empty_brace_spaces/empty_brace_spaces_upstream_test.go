@@ -182,7 +182,7 @@ func TestEmptyBraceSpacesUpstream(t *testing.T) {
 	// table. Its brace pair opens with a whitespace-only line, so the report
 	// covers the whole run of spaces and the fix removes the line outright.
 	invalid = append(invalid, rule_tester.InvalidTestCase{
-		Code:     "try {\n\tfoo();\n} catch (error) {\n" + strings.Repeat(" ", 7) + "\n}",
+		Code:     "try {\n\tfoo();\n} catch (error) {\n\t" + strings.Repeat(" ", 7) + "\n}",
 		FileName: "file.js",
 		Output:   []string{"try {\n\tfoo();\n} catch (error) {}"},
 		Errors: []rule_tester.InvalidTestCaseError{{
