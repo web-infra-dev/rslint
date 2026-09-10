@@ -161,12 +161,11 @@ type chainAssertion struct {
 // interest, which merges with a matching statement elsewhere in the block, or
 // one of each role, which already states both halves and merges with itself.
 type mergeCandidate struct {
-	hits      []chainAssertion
-	statement *ast.Node
-	arguments []*ast.Node
-	// position is the trimmed start offset of statement, used to order the
-	// pair and to bound the mock-reset search between them.
-	position int
+	hits           []chainAssertion
+	statement      *ast.Node
+	statementIndex int
+	arguments      []*ast.Node
+	position       int
 	// pairKey groups the assertions that may merge; see pairKey().
 	pairKey string
 	// fixable is false when the chain asserts more than the rule understands,
@@ -784,20 +783,19 @@ func onlyInertStatementsBetween(
 	statements []*ast.Node,
 	first, second *mergeCandidate,
 ) bool {
-	minPosition, maxPosition := first.position, second.position
-	if minPosition > maxPosition {
-		minPosition, maxPosition = maxPosition, minPosition
+	minIndex, maxIndex := first.statementIndex, second.statementIndex
+	if minIndex > maxIndex {
+		minIndex, maxIndex = maxIndex, minIndex
+	}
+	if maxIndex-minIndex == 1 {
+		return true
 	}
 	scanner := &betweenScanner{ctx: ctx, analysis: analysis, assertionNames: map[string]bool{}}
 	collectIdentifierNames(first.statement, scanner.assertionNames)
 	collectIdentifierNames(second.statement, scanner.assertionNames)
 
-	for _, statement := range statements {
+	for _, statement := range statements[minIndex+1 : maxIndex] {
 		if statement == nil {
-			continue
-		}
-		position := internalUtils.TrimNodeTextRange(ctx.SourceFile, statement).Pos()
-		if position <= minPosition || position >= maxPosition {
 			continue
 		}
 		if !scanner.isInertStatement(statement) && !scanner.isInertDeclaration(statement) {
@@ -951,11 +949,12 @@ func checkBlock(
 	var pending []pendingReport
 	var pairKeys []string
 	byPairKey := map[string][]*mergeCandidate{}
-	for _, statement := range statements {
+	for index, statement := range statements {
 		candidate := mergeCandidateForStatement(analysis, ctx.SourceFile, statement)
 		if candidate == nil {
 			continue
 		}
+		candidate.statementIndex = index
 		// A chain that states both halves needs no partner, and counting it
 		// among the candidates would only suppress it.
 		if candidate.isSelfContained() {
