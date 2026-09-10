@@ -29,6 +29,11 @@ func TestNoUnusedPropTypesExtras(t *testing.T) {
 			{Code: `class Hello extends React.Component { static propTypes = { name: PropTypes.string }; render() { return <div>{this.props?.name}</div>; } }`, Tsx: true},
 			// ---- Real-user: nested helper reads ----
 			{Code: `function Hello(props) { function renderLabel() { return <span>{props.label}</span>; } return <div>{renderLabel()}</div>; } Hello.propTypes = { label: PropTypes.string };`, Tsx: true},
+			// Nested helpers retain eslint-plugin-react's conventional `props` alias.
+			{Code: `function Foo() { function helper(props) { return props.unused; } return <div />; } Foo.propTypes = { unused: PropTypes.string };`, Tsx: true},
+			// Lifecycle class fields receive the same props aliases as methods.
+			{Code: `class Foo extends React.Component { static propTypes = { used: PropTypes.string }; componentDidUpdate = (nextProps) => nextProps.used; render() { return <div />; } }`, Tsx: true},
+			{Code: `class Foo extends React.Component { static propTypes = { used: PropTypes.string }; UNSAFE_componentWillReceiveProps = ({ used }) => used; render() { return <div />; } }`, Settings: map[string]interface{}{"react": map[string]interface{}{"version": "16.3.0"}}, Tsx: true},
 			// ---- Real-user: rest props make the accessed set open ----
 			{Code: `function Hello({ name, ...rest }) { return <div>{rest.other}</div>; } Hello.propTypes = { name: PropTypes.string, other: PropTypes.string };`, Tsx: true},
 			// Locks in upstream reportUnusedPropType()'s `props === true` arm.
@@ -54,6 +59,20 @@ func TestNoUnusedPropTypesExtras(t *testing.T) {
 			{Code: `function Hello(props) { return <div>{props.name}</div>; } Hello.propTypes = { unused: Custom.string };`, Options: map[string]interface{}{"customValidators": []interface{}{"Custom"}}, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
 			// Locks in the direct propTypes member-assignment branch.
 			{Code: `class Hello extends React.Component { render() { return <div />; } } Hello.propTypes = {}; Hello.propTypes.unused = PropTypes.string;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
+			// Only a function component's first parameter is its props object.
+			{Code: `function Foo(props, options) { return <div>{options.used}</div>; } Foo.propTypes = { used: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'used' PropType is defined but prop is never used"}}},
+			// Lifecycle-looking methods on unrelated objects do not receive component props.
+			{Code: `function Foo() { const helper = { componentDidUpdate(nextProps) { return nextProps.used; } }; return <div />; } Foo.propTypes = { used: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'used' PropType is defined but prop is never used"}}},
+			// Only the updater (first) callback of setState receives props as its second argument.
+			{Code: `class Foo extends React.Component { static propTypes = { used: PropTypes.string }; render() { this.setState({}, (state, props) => props.used); return <div />; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'used' PropType is defined but prop is never used"}}},
+			// Validator callback identifiers are not aliases for the component props object.
+			{Code: `class Foo extends React.Component { static propTypes = { a: PropTypes.string, b: (props) => props.b }; render() { return <div>{this.props.a}</div>; } }`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'b' PropType is defined but prop is never used"}}},
+			// Object-literal methods are method-valued propTypes declarations.
+			{Code: `function Foo() { return <div />; } Foo.propTypes = { unused() {} };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
+			// Components assigned to object members retain their full assignment path.
+			{Code: `const obj = { Foo: function(props) { return <div />; } }; obj.Foo.propTypes = { unused: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
+			// bindActionCreators derives ReturnType props from explicit type arguments.
+			{Code: `type DispatchProps = ReturnType<typeof mapDispatchToProps>; const Component = ({ runtimeOnly }: DispatchProps) => <div>{runtimeOnly}</div>; const mapDispatchToProps = () => ({ ...bindActionCreators<{ typedOnly: () => void }>({ runtimeOnly: fn }, dispatch) });`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'typedOnly' PropType is defined but prop is never used"}}},
 		},
 	)
 }
