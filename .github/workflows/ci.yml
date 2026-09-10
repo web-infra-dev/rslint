@@ -159,7 +159,7 @@ jobs:
         run: go test -count=1 ./cmd/... ./internal/...
 
   lint:
-    name: Lint&Check
+    name: Lint
     needs: changes
     runs-on: rspack-ubuntu-22.04-large
     steps:
