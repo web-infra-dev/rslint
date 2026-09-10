@@ -1,4 +1,4 @@
-# rstest/no-async-mock-factory
+# no-async-mock-factory
 
 ## Rule Details
 
