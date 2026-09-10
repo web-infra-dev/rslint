@@ -6,7 +6,7 @@ This rule requires `toContain()` when an equality assertion checks the boolean r
 
 The rule recognizes `toBe()`, `toEqual()` and `toStrictEqual()`, including negated forms, and preserves the assertion's meaning when deciding whether the replacement needs `.not`. It recognizes Rstest globals, imports and aliases, namespace and `require` bindings, `rstack/test`, `import.meta.rstest`, `expect.soft()`, Playwright's ordinary value assertions, and the `expect` supplied by a [test context](https://rstest.rs/api/runtime-api/test-api/test#testcontext).
 
-Polling assertions, promise modifiers, browser-only `expect.element()` assertions, Chai-style assertions, dynamic accessors and explicit `NaN` items are left unchanged. A string literal with a regular-expression item is also excluded. These cases differ at runtime: Rstest's array `toContain()` does not match `Array.prototype.includes()` for `NaN`, while native string `includes()` rejects regular expressions.
+Polling assertions, promise modifiers, browser-only `expect.element()` assertions, Chai-style assertions, dynamic accessors and explicit `NaN` items are left unchanged. A statically known string with a regular-expression item is also excluded. These cases differ at runtime: Rstest's array `toContain()` does not match `Array.prototype.includes()` for `NaN`, while native string `includes()` rejects regular expressions.
 
 ## Incorrect
 

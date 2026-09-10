@@ -48,7 +48,9 @@ func isKnownStringRegexpDifference(receiver, item *ast.Node) bool {
 	receiver = testFramework.FollowTypeAssertionChain(receiver)
 	item = testFramework.FollowTypeAssertionChain(item)
 	return receiver != nil && item != nil &&
-		(receiver.Kind == ast.KindStringLiteral || receiver.Kind == ast.KindNoSubstitutionTemplateLiteral) &&
+		(receiver.Kind == ast.KindStringLiteral ||
+			receiver.Kind == ast.KindNoSubstitutionTemplateLiteral ||
+			receiver.Kind == ast.KindTemplateExpression) &&
 		item.Kind == ast.KindRegularExpressionLiteral
 }
 

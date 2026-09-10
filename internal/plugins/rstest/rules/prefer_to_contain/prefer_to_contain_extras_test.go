@@ -35,6 +35,7 @@ func TestPreferToContainExtras(t *testing.T) {
 			{Code: `expect(values.includes(Number.NaN)).toBe(true);`},
 			{Code: `expect(values.includes(globalThis['NaN'])).toBe(false);`},
 			{Code: `expect('abc'.includes(/a/ as any)).toBe(false);`},
+			{Code: "expect(`a${value}`.includes(/a/ as any)).toBe(false);"},
 			// ---- Rstest provenance: foreign and locally shadowed expect values ----
 			{Code: `import { expect } from 'vitest'; expect(list.includes(item)).toBe(true);`},
 			{Code: `import { expect } from '@jest/globals'; expect(list.includes(item)).toBe(true);`},
