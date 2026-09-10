@@ -153,6 +153,7 @@ Dmts
 dobedo
 Dogfooding
 dont
+dorny
 dotless
 doublestar
 DPUB
