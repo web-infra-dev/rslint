@@ -122,6 +122,12 @@ func TestPreferToContainExtras(t *testing.T) {
 				Code:   `expect(list.includes(item.value)).toBe(true);`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 35}},
 			},
+			// Unary numeric coercion can invoke user code, so moving it past
+			// expect() would change the observable evaluation order.
+			{
+				Code:   `expect(list.includes(+item)).toBe(true);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 30}},
+			},
 			// ---- Rstest source resolution ----
 			{
 				Code: `import { expect as check } from '@rstest/core';

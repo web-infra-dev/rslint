@@ -67,7 +67,7 @@ func isSafeToMove(node *ast.Node) bool {
 		return true
 	case ast.KindPrefixUnaryExpression:
 		unary := node.AsPrefixUnaryExpression()
-		return unary != nil && unary.Operator != ast.KindPlusPlusToken && unary.Operator != ast.KindMinusMinusToken &&
+		return unary != nil && unary.Operator == ast.KindExclamationToken &&
 			isSafeToMove(unary.Operand)
 	case ast.KindArrayLiteralExpression:
 		array := node.AsArrayLiteralExpression()
