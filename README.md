@@ -24,12 +24,12 @@ Powered by [TypeScript's native compiler](https://devblogs.microsoft.com/typescr
 - 🎯 **TypeScript First**: Uses TypeScript Compiler semantics as the single source of truth, ensuring 100% consistency and eliminating edge-case bugs.
 - 🛠️ **Project-Level Analysis**: Performs cross-module analysis by default, enabling more powerful semantic analysis than file-level linting.
 - 🏢 **Monorepo Ready**: First-class support for large-scale monorepos with TypeScript project references and workspace configurations.
-- 📋 **Batteries Included**: Ships with all existing TypeScript-ESLint rules and widely-used ESLint rules out of the box.
+- 📋 **Batteries Included**: Ships with all existing typescript-eslint rules and ESLint rules out of the box.
 - 🔧 **Extensible**: Exposes AST, type information, and global checker data for writing custom rules with complex cross-module analysis.
 
 ## ✅ Current Status
 
-Rslint provides built-in support for 500+ high-performance rules, all implemented natively, including all [typescript-eslint](https://typescript-eslint.io/) rules and nearly all rules from [`@eslint/js`](https://www.npmjs.com/package/@eslint/js). It is also compatible with ESLint flat config and most ESLint plugins, making it easier to adopt in existing ESLint projects.
+Rslint provides built-in support for 600+ high-performance rules, all implemented natively, including all [typescript-eslint](https://typescript-eslint.io/) rules and all rules from [`@eslint/js`](https://www.npmjs.com/package/@eslint/js). It is also compatible with ESLint flat config and most ESLint plugins, making it easier to adopt in existing ESLint projects.
 
 ## 🚀 Getting Started
 
