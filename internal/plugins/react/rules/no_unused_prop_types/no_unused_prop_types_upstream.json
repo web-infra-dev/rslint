@@ -2313,9 +2313,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
+      ]
     },
     {
       "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n          UNSAFE_componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
@@ -2334,9 +2332,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
+      ]
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: 'bar'\n          };\n          state = {\n            currentValue: null\n          };\n          static getDerivedStateFromProps(nextProps, prevState) {\n            if (prevState.currentValue === null) {\n              return {\n                currentValue: nextProps.defaultValue,\n              }\n            }\n            return null;\n          }\n          render() {\n            return <div>{ this.state.currentValue }</div>\n          }\n        }\n      ",
@@ -2355,9 +2351,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
+      ]
     },
     {
       "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: PropTypes.string\n          };\n          getSnapshotBeforeUpdate(prevProps, prevState) {\n            if (prevProps.defaultValue === null) {\n              return 'snapshot';\n            }\n            return null;\n          }\n          render() {\n            return <div />\n          }\n        }\n      ",
@@ -2376,9 +2370,7 @@
           "EndLine": 0,
           "EndColumn": 0
         }
-      ],
-      "Skip": true,
-      "SkipReason": "SKIP: upstream parser matrix contains this source as a valid case with the opposite expectation; tsgo provides one AST semantics"
+      ]
     },
     {
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.shape({\n            })\n          })\n        };\n        Hello.propTypes.a.b.c = PropTypes.number;\n      ",

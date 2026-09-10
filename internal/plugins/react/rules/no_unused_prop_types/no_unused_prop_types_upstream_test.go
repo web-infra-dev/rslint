@@ -43,7 +43,7 @@ func TestNoUnusedPropTypesUpstream(t *testing.T) {
 			skipped++
 		}
 	}
-	assert.Equal(t, skipped, 4)
+	assert.Equal(t, skipped, 0)
 
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
