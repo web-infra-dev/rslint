@@ -24,8 +24,38 @@ const invalidWithoutFix = (code: string, filename = 'file.js') => {
   return { ...js(code), filename, errors: [error] };
 };
 
-// Mirrors eslint-plugin-unicorn v74.0.0's prefer-set-size suite. Go-only
-// representation and fix-safety regressions live beside the native rule.
+// Rslint-specific helper regressions. These cases are deliberately separate
+// from eslint-plugin-unicorn v74.0.0's prefer-set-size test corpus.
+const rslintRegressions = {
+  valid: [
+    {
+      code: 'declare const args: [Set<number>]; Array.from(...args).length',
+      filename: 'file.ts',
+    },
+    {
+      code: 'function size(value: unknown) { return Array.from(value satisfies Set<string>).length; }',
+      filename: 'file.ts',
+    },
+  ],
+  invalid: [
+    invalid(
+      '[...(flag ? new Set() : new Set())].length',
+      '(flag ? new Set() : new Set()).size',
+    ),
+    invalid(
+      '[...(sideEffect(), new Set())].length',
+      '(sideEffect(), new Set()).size',
+    ),
+    invalid(
+      'function size(value: unknown) { return [...(new Set() satisfies Set)].length; }',
+      'function size(value: unknown) { return (new Set() satisfies Set).size; }',
+      'file.ts',
+    ),
+  ],
+};
+
+// Mirrors eslint-plugin-unicorn v74.0.0's prefer-set-size suite. Rslint-only
+// helper and fix-safety regressions are explicitly appended below.
 ruleTester.run('prefer-set-size', null as never, {
   valid: [
     js('new Set(foo).size'),
@@ -61,10 +91,7 @@ ruleTester.run('prefer-set-size', null as never, {
     js('const [foo] = new Set([]);Array.from(foo).length;'),
     js('var foo = new Set(); var foo = new Set(); Array.from(foo).length'),
     js('NotArray.from(new Set(array)).length'),
-    {
-      code: 'function size(value: unknown) { return Array.from(value satisfies Set<string>).length; }',
-      filename: 'file.ts',
-    },
+    ...rslintRegressions.valid,
   ],
   invalid: [
     invalid('[...new Set(array)].length', 'new Set(array).size'),
@@ -77,14 +104,6 @@ ruleTester.run('prefer-set-size', null as never, {
       'function isUnique(array) {\n\treturn new Set(array).size === array.length\n}',
     ),
     invalid('[...new Set(array),].length', 'new Set(array).size'),
-    invalid(
-      '[...(flag ? new Set() : new Set())].length',
-      '(flag ? new Set() : new Set()).size',
-    ),
-    invalid(
-      '[...(sideEffect(), new Set())].length',
-      '(sideEffect(), new Set()).size',
-    ),
     invalid('[...(( new Set(array) ))].length', 'new Set(array).size'),
     invalid('(( [...new Set(array)] )).length', '(( new Set(array) )).size'),
     invalid('foo\n;[...new Set(array)].length', 'foo\n;new Set(array).size'),
@@ -132,11 +151,7 @@ ruleTester.run('prefer-set-size', null as never, {
       'function getSize(set: unknown) { return (set as Set<string>).size; }',
       'file.ts',
     ),
-    invalid(
-      'function size(value: unknown) { return [...(new Set() satisfies Set)].length; }',
-      'function size(value: unknown) { return (new Set() satisfies Set).size; }',
-      'file.ts',
-    ),
+    ...rslintRegressions.invalid,
   ],
 });
 

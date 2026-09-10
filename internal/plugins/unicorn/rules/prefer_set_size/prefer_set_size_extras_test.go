@@ -19,6 +19,9 @@ func TestPreferSetSizeExtras(t *testing.T) {
 			// A TS assertion on the conversion itself is visible to upstream and does
 			// not count as one of its two conversion shapes.
 			{Code: "([...(set as Set<string>)] as string[]).length", FileName: "file.ts"},
+			// Upstream's isMethodCall rejects spread arguments by default: the
+			// source cannot replace the conversion as one member-expression object.
+			{Code: "declare const args: [Set<number>]; Array.from(...args).length", FileName: "file.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Const aliases recurse, while `let` deliberately did not match in the
@@ -27,6 +30,8 @@ func TestPreferSetSizeExtras(t *testing.T) {
 			// A Set construction without constructor parentheses needs a wrapper once
 			// it becomes the object of a member expression.
 			invalid("[...new Set].length", "(new Set).size", "file.js"),
+			// Rslint-specific runtime helper regressions; these are not part of
+			// eslint-plugin-unicorn v74.0.0's prefer-set-size test corpus.
 			invalid("[...(flag ? new Set() : new Set())].length", "(flag ? new Set() : new Set()).size", "file.js"),
 			invalid("[...(sideEffect(), new Set())].length", "(sideEffect(), new Set()).size", "file.js"),
 			invalid("function size(value: unknown) { return [...(new Set() satisfies Set)].length; }", "function size(value: unknown) { return (new Set() satisfies Set).size; }", "file.ts"),

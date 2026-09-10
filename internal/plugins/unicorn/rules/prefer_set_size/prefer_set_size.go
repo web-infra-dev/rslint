@@ -73,6 +73,7 @@ func getSetNode(object *ast.Node) (conversion, set *ast.Node) {
 	fromCall, ok := unicornutil.MatchDotMethodCall(conversion, unicornutil.DotMethodCallOptions{
 		Method:              "from",
 		ArgumentsLength:     &oneArgument,
+		RejectSpreadElement: true,
 		AllowOptionalCall:   zeroOptional,
 		AllowOptionalMember: zeroOptional,
 	})
