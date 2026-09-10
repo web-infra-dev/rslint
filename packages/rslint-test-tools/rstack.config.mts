@@ -744,6 +744,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-this-assignment.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-this-outside-of-class.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-array-flat-depth.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-unreadable-iife.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unreadable-new-expression.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
