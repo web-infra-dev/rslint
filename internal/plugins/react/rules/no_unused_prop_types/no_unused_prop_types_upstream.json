@@ -198,18 +198,14 @@
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            firstname: CustomValidator.string\n          },\n          render: function() {\n            return <div>{this.props.firstname}</div>;\n          }\n        });\n      ",
       "Tsx": true,
       "Options": {
-        "customValidators": [
-          "CustomValidator"
-        ]
+        "customValidators": ["CustomValidator"]
       }
     },
     {
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            outer: CustomValidator.shape({\n              inner: CustomValidator.map\n            })\n          },\n          render: function() {\n            return <div>{this.props.outer.inner}</div>;\n          }\n        });\n      ",
       "Tsx": true,
       "Options": {
-        "customValidators": [
-          "CustomValidator"
-        ],
+        "customValidators": ["CustomValidator"],
         "skipShapeProps": false
       }
     },
@@ -217,9 +213,7 @@
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            outer: PropTypes.shape({\n              inner: CustomValidator.string\n            })\n          },\n          render: function() {\n            return <div>{this.props.outer.inner}</div>;\n          }\n        });\n      ",
       "Tsx": true,
       "Options": {
-        "customValidators": [
-          "CustomValidator"
-        ],
+        "customValidators": ["CustomValidator"],
         "skipShapeProps": false
       }
     },
@@ -227,9 +221,7 @@
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            outer: CustomValidator.shape({\n              inner: PropTypes.string\n            })\n          },\n          render: function() {\n            return <div>{this.props.outer.inner}</div>;\n          }\n        });\n      ",
       "Tsx": true,
       "Options": {
-        "customValidators": [
-          "CustomValidator"
-        ],
+        "customValidators": ["CustomValidator"],
         "skipShapeProps": false
       }
     },
@@ -237,9 +229,7 @@
       "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            name: PropTypes.string\n          },\n          render: function() {\n            return <div>{this.props.name.get(\"test\")}</div>;\n          }\n        });\n      ",
       "Tsx": true,
       "Options": {
-        "customValidators": [
-          "CustomValidator"
-        ]
+        "customValidators": ["CustomValidator"]
       }
     },
     {
@@ -954,18 +944,14 @@
       "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>{this.props.used}</div>;\n          }\n        }\n        Hello.propTypes = {\n          used: PropTypes.string,\n          foo: PropTypes.string\n        };\n      ",
       "Tsx": true,
       "Options": {
-        "ignore": [
-          "foo"
-        ]
+        "ignore": ["foo"]
       }
     },
     {
       "Code": "\n        type Props = {\n          used: string,\n          foo: string,\n        }\n        class Hello extends React.Component<Props> {\n          render() {\n            return <div>{this.props.used}</div>;\n          }\n        }\n      ",
       "Tsx": true,
       "Options": {
-        "ignore": [
-          "foo"
-        ]
+        "ignore": ["foo"]
       }
     },
     {
@@ -2075,9 +2061,7 @@
       "Code": "\n        class Hello extends Component {\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n        Hello.propTypes = forbidExtraProps({\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        });\n      ",
       "Tsx": true,
       "Settings": {
-        "propWrapperFunctions": [
-          "forbidExtraProps"
-        ]
+        "propWrapperFunctions": ["forbidExtraProps"]
       },
       "Errors": [
         {
@@ -2094,9 +2078,7 @@
       "Code": "\n        class Hello extends Component {\n          propTypes = forbidExtraProps({\n            foo: PropTypes.string,\n            bar: PropTypes.string\n          });\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        };\n      ",
       "Tsx": true,
       "Settings": {
-        "propWrapperFunctions": [
-          "forbidExtraProps"
-        ]
+        "propWrapperFunctions": ["forbidExtraProps"]
       },
       "Errors": [
         {
@@ -2273,9 +2255,7 @@
       "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n        MyComponent.propTypes = {\n          firstname: PropTypes.string,\n          lastname: PropTypes.string,\n          foo: PropTypes.string,\n        };\n      ",
       "Tsx": true,
       "Options": {
-        "ignore": [
-          "foo"
-        ]
+        "ignore": ["foo"]
       },
       "Errors": [
         {
