@@ -9,12 +9,16 @@ import {
 
 describe('Playground source dependency types', () => {
   test('detects supported static imports and exports', () => {
-    expect(
-      findSourceTypePackages(`import { expect, test } from '@rstest/core';`),
-    ).toEqual(['@rstest/core']);
-    expect(
-      findSourceTypePackages(`export { expect } from   "@rstest/core";`),
-    ).toEqual(['@rstest/core']);
+    for (const source of [
+      `import { expect, test } from '@rstest/core';`,
+      `import { expect, test } from"@rstest/core";`,
+      `import { expect, test } from   '@rstest/core';`,
+      `import { expect, test } from\t"@rstest/core";`,
+      `import { expect, test } from\n'@rstest/core';`,
+      `export { expect } from   "@rstest/core";`,
+    ]) {
+      expect(findSourceTypePackages(source)).toEqual(['@rstest/core']);
+    }
     expect(findSourceTypePackages(`import('@rstest/core');`)).toEqual([]);
     expect(findSourceTypePackages(`require('@rstest/core');`)).toEqual([]);
     expect(
