@@ -59,5 +59,12 @@ ruleTester.run('empty-brace-spaces', null as never, {
     invalid('class A<T> { }', 'class A<T> {}', 'file.ts'),
     invalid('f({ });', 'f({});'),
     invalid('const f = ({a}) => { }', 'const f = ({a}) => {}', 'file.ts'),
+    // A brace pair in the class header must not be mistaken for the body's.
+    invalid(
+      'class A extends mixin({}) { }',
+      'class A extends mixin({}) {}',
+      'file.ts',
+    ),
+    invalid('class A<T extends {}> { }', 'class A<T extends {}> {}', 'file.ts'),
   ],
 });

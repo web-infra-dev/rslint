@@ -5,7 +5,6 @@ package empty_brace_spaces
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -55,23 +54,33 @@ func hasChildren(node *ast.Node) bool {
 	}
 }
 
-// innerBraceRange returns the span strictly between the node's opening and
-// closing braces. The opening brace is located with a scan bounded by
-// node.End(), because a `static {}` block starts at the `static` keyword and
-// the enclosing class body's brace comes first. The closing brace is always
-// the node's last character for every node kind this rule inspects.
+// innerBraceRange returns the span strictly between the node's own braces. The
+// node's last token is always its closing brace, so the pair is located by
+// walking the node's tokens and remembering the `{` that leaves the nesting
+// depth at zero. Scanning for the first `{` instead would pick up a brace that
+// belongs to the node's header — `class A extends mixin({}) { }` — or to a
+// header type, leaving the real pair unreported.
 func innerBraceRange(node *ast.Node, sourceFile *ast.SourceFile) (core.TextRange, bool) {
-	start := scanner.SkipTrivia(sourceFile.Text(), utils.TrimNodeTextRange(sourceFile, node).Pos())
 	end := node.End()
+	depth := 0
+	opening := -1
 
-	s := scanner.GetScannerForSourceFile(sourceFile, start)
-	for s.TokenStart() < end {
-		if s.Token() == ast.KindOpenBraceToken {
-			return core.NewTextRange(s.TokenEnd(), end-1), true
+	utils.ForEachToken(node, func(token *ast.Node) {
+		switch token.Kind {
+		case ast.KindOpenBraceToken:
+			if depth == 0 {
+				opening = token.End()
+			}
+			depth++
+		case ast.KindCloseBraceToken:
+			depth--
 		}
-		s.Scan()
+	}, sourceFile)
+
+	if opening < 0 {
+		return core.TextRange{}, false
 	}
-	return core.TextRange{}, false
+	return core.NewTextRange(opening, end-1), true
 }
 
 // isWhitespaceOnly reports whether text is made up solely of ECMAScript

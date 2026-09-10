@@ -178,5 +178,24 @@ func TestEmptyBraceSpacesUpstream(t *testing.T) {
 	}
 	invalid = append(invalid, invalidCase("with (foo) {/* */}", strings.Repeat(" ", 5)))
 
+	// Upstream's standalone `test.snapshot` case, kept outside the generated
+	// table. Its brace pair opens with a whitespace-only line, so the report
+	// covers the whole run of spaces and the fix removes the line outright.
+	invalid = append(invalid, rule_tester.InvalidTestCase{
+		Code:     "try {\n\tfoo();\n} catch (error) {\n" + strings.Repeat(" ", 7) + "\n}",
+		FileName: "file.js",
+		Output:   []string{"try {\n\tfoo();\n} catch (error) {}"},
+		Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: messageID,
+			Message:   messageText,
+			// `{` ends on line 3, and the closing `}` begins on line 5; the
+			// reported run therefore crosses the indented blank line.
+			Line:      3,
+			Column:    18,
+			EndLine:   5,
+			EndColumn: 1,
+		}},
+	})
+
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &empty_brace_spaces.EmptyBraceSpacesRule, valid, invalid)
 }

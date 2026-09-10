@@ -44,6 +44,11 @@ left untouched:
 class Unicorn { /* comment */ }
 ```
 
+A brace pair in a class header is not mistaken for the class body: `class Foo
+extends mixin({}) { }` reports the body's space and fixes it to `class Foo
+extends mixin({}) {}`, and a header pair that is itself empty is reported
+separately.
+
 ## Differences from ESLint
 
 None.
