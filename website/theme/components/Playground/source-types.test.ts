@@ -34,7 +34,7 @@ describe('Playground source dependency types', () => {
           specifier: '@rstest/core',
           content: 'export declare const test: unknown;',
           monacoPath: 'file:///node_modules/@rstest/core/index.d.ts',
-          lintPath: '/source-types/rstest-core.d.ts',
+          lintPath: '/rstest-core.d.ts',
         },
       ],
     };
@@ -50,7 +50,7 @@ describe('Playground source dependency types', () => {
         strict: true,
         paths: {
           existing: ['./existing.d.ts'],
-          '@rstest/core': ['/source-types/rstest-core.d.ts'],
+          '@rstest/core': ['/rstest-core.d.ts'],
         },
       },
     });
@@ -80,7 +80,7 @@ describe('Playground source dependency types', () => {
     }
   });
 
-  test('resolves each latest package once and reuses it in the session', async () => {
+  test('loads supported transitive declarations and caches the graph', async () => {
     const originalFetch = globalThis.fetch;
     const requests: string[] = [];
     globalThis.fetch = async (input) => {
@@ -94,7 +94,28 @@ describe('Playground source dependency types', () => {
           },
         });
       }
-      return new Response('export declare const test: unknown;');
+      if (url.includes('@rstest/core@1.2.3')) {
+        return new Response(`
+          import type { assert } from 'https://esm.sh/@types/chai@5.2.3/index.d.ts';
+          import type { RsbuildPlugin } from 'https://esm.sh/@rsbuild/core@2.2.5/dist/index.d.ts';
+          import type { Writable } from 'node:stream';
+          export declare const expect: typeof assert;
+        `);
+      }
+      if (url.includes('@types/chai@5.2.3')) {
+        return new Response(`
+          import deepEqual = require("https://esm.sh/@types/deep-eql@4.0.2/index.d.ts");
+          import { AssertionError } from "https://esm.sh/assertion-error@2.0.1/index.d.ts";
+          export { deepEqual, AssertionError };
+        `);
+      }
+      if (url.includes('@types/deep-eql@4.0.2')) {
+        return new Response('declare function deepEqual(): boolean;');
+      }
+      if (url.includes('assertion-error@2.0.1')) {
+        return new Response('export declare class AssertionError {}');
+      }
+      return new Response('', { status: 404 });
     };
 
     try {
@@ -104,15 +125,40 @@ describe('Playground source dependency types', () => {
         loadSourceTypes(specifiers),
       ]);
       expect(first.key).toBe(sourceTypeKey(specifiers));
-      expect(first.declarations[0].content).toContain('declare const test');
       expect(second.declarations[0]).toBe(first.declarations[0]);
-      expect(requests).toEqual([
-        'https://esm.sh/@rstest/core',
-        'https://esm.sh/@rstest/core@1.2.3/dist/index.d.ts',
-      ]);
+      expect(first.declarations).toHaveLength(4);
+
+      const declarationsByPath = Object.fromEntries(
+        first.declarations.map(({ content, lintPath }) => [lintPath, content]),
+      );
+      expect(declarationsByPath['/rstest-core.d.ts']).toContain(
+        `from './rstest-chai.d.ts'`,
+      );
+      expect(declarationsByPath['/rstest-core.d.ts']).toContain(
+        `from 'https://esm.sh/@rsbuild/core@2.2.5/dist/index.d.ts'`,
+      );
+      expect(declarationsByPath['/rstest-core.d.ts']).toContain(
+        `from 'node:stream'`,
+      );
+      expect(declarationsByPath['/rstest-chai.d.ts']).toContain(
+        `require("./rstest-deep-eql.d.ts")`,
+      );
+      expect(declarationsByPath['/rstest-chai.d.ts']).toContain(
+        `from "./rstest-assertion-error.d.ts"`,
+      );
+
+      expect(requests.sort()).toEqual(
+        [
+          'https://esm.sh/@rstest/core',
+          'https://esm.sh/@rstest/core@1.2.3/dist/index.d.ts',
+          'https://esm.sh/@types/chai@5.2.3/index.d.ts',
+          'https://esm.sh/@types/deep-eql@4.0.2/index.d.ts',
+          'https://esm.sh/assertion-error@2.0.1/index.d.ts',
+        ].sort(),
+      );
 
       await loadSourceTypes(specifiers);
-      expect(requests).toHaveLength(2);
+      expect(requests).toHaveLength(5);
     } finally {
       globalThis.fetch = originalFetch;
     }
