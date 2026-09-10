@@ -40,6 +40,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"
@@ -90,6 +91,7 @@ func GetAllRules() []rule.Rule {
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		prefer_set_has.PreferSetHasRule,
+		prefer_set_size.PreferSetSizeRule,
 		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
 		prefer_then_catch.PreferThenCatchRule,
 		prefer_ternary.PreferTernaryRule,

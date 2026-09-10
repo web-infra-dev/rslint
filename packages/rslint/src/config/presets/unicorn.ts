@@ -299,7 +299,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-scoped-selector': 'error', // not implemented
     'unicorn/prefer-set-has': 'error',
     // 'unicorn/prefer-set-methods': 'error', // not implemented
-    // 'unicorn/prefer-set-size': 'error', // not implemented
+    'unicorn/prefer-set-size': 'error',
     // 'unicorn/prefer-short-arrow-method': 'off', // not implemented
     // 'unicorn/prefer-simple-condition-first': 'error', // not implemented
     // 'unicorn/prefer-simple-sort-comparator': 'error', // not implemented
