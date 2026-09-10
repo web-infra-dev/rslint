@@ -1,0 +1,3554 @@
+{
+  "Upstream": {
+    "Rule": "react/no-unused-prop-types",
+    "PluginVersion": "7.37.5",
+    "Source": "https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/no-unused-prop-types.js"
+  },
+  "Valid": [
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            name: PropTypes.string.isRequired\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            name: PropTypes.object.isRequired\n          },\n          render: function() {\n            return <div>Hello {this.props.name.firstname}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>Hello World</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          render: function() {\n            var props = this.props;\n            return <div>Hello World</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          render: function() {\n            var propName = \"foo\";\n            return <div>Hello World {this.props[propName]}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: externalPropTypes,\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: externalPropTypes.mySharedPropTypes,\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello World</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello {this.props.firstname} {this.props.lastname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          firstname: PropTypes.string\n        };\n        Hello.propTypes.lastname = PropTypes.string;\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            name: PropTypes.object.isRequired\n          },\n          render: function() {\n            var user = {\n              name: this.props.name\n            };\n            return <div>Hello {user.name}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello {\n          render() {\n            return 'Hello' + this.props.name;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello {\n          method;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static get propTypes() {\n            return {\n              name: PropTypes.string\n            };\n          }\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            var { firstname, ...props } = this.props;\n            var { category, icon } = props;\n            return <div>Hello {firstname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          firstname: PropTypes.string,\n          category: PropTypes.string,\n          icon: PropTypes.bool\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            var {firstname, lastname} = this.state, something = this.props;\n            return <div>Hello {firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static propTypes = {\n            name: PropTypes.string\n          };\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static propTypes = {\n            name: PropTypes.string\n          };\n          render() {\n            return <div>Hello {this.props?.name}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          'firstname': PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            if (Object.prototype.hasOwnProperty.call(this.props, 'firstname')) {\n              return <div>Hello {this.props.firstname}</div>;\n            }\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          'firstname': PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.b\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {};\n        Hello.propTypes.a = PropTypes.shape({\n          b: PropTypes.string\n        });\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.b.c;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.shape({\n            })\n          })\n        };\n        Hello.propTypes.a.b.c = PropTypes.number;\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.b.c;\n            this.props.a.__.d.length;\n            this.props.a.anything.e[2];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.objectOf(\n            PropTypes.shape({\n              c: PropTypes.number,\n              d: PropTypes.string,\n              e: PropTypes.array\n            })\n          )\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            var i = 3;\n            this.props.a[2].c;\n            this.props.a[i].d.length;\n            this.props.a[i + 2].e[2];\n            this.props.a.length;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.arrayOf(\n            PropTypes.shape({\n              c: PropTypes.number,\n              d: PropTypes.string,\n              e: PropTypes.array\n            })\n          )\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.length;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.array,\n            PropTypes.string\n          ])\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.c;\n            this.props.a[2] === true;\n            this.props.a.e[2];\n            this.props.a.length;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.shape({\n              c: PropTypes.number,\n              e: PropTypes.array\n            }).isRequired,\n            PropTypes.arrayOf(\n              PropTypes.bool\n            )\n          ])\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.render;\n            this.props.a.c;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.instanceOf(Hello)\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.arr;\n            this.props.arr[3];\n            this.props.arr.length;\n            this.props.arr.push(3);\n            this.props.bo;\n            this.props.bo.toString();\n            this.props.fu;\n            this.props.fu.bind(this);\n            this.props.numb;\n            this.props.numb.toFixed();\n            this.props.stri;\n            this.props.stri.length();\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          arr: PropTypes.array,\n          bo: PropTypes.bool.isRequired,\n          fu: PropTypes.func,\n          numb: PropTypes.number,\n          stri: PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            var {\n              propX,\n              \"aria-controls\": ariaControls,\n              ...props } = this.props;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"propX\": PropTypes.string,\n          \"aria-controls\": PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props[\"some.value\"];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"some.value\": PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props[\"arr\"][1];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"arr\": PropTypes.array\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props[\"arr\"][1][\"some.value\"];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"arr\": PropTypes.arrayOf(\n            PropTypes.shape({\"some.value\": PropTypes.string})\n          )\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        var TestComp1 = createReactClass({\n          propTypes: {\n            size: PropTypes.string\n          },\n          render: function() {\n            var foo = {\n              baz: 'bar'\n            };\n            var icons = foo[this.props.size].salut;\n            return <div>{icons}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            const {firstname, lastname} = this.props.name;\n            return <div>{firstname} {lastname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          name: PropTypes.shape({\n            firstname: PropTypes.string,\n            lastname: PropTypes.string\n          })\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            let {firstname} = this;\n            return <div>{firstname}</div>;\n          }\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function Foo({ a }) {\n          return <>{ a.b }</>\n        }\n        Foo.propTypes = {\n          a: PropTypes.shape({\n            b: PropType.string,\n          })\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        function Foo({ a }) {\n          const { b } = a\n          return <>{ b.c }</>\n        }\n        Foo.propTypes = {\n          a: PropTypes.shape({\n            b: PropType.shape({\n              c: PropTypes.string,\n            }),\n          })\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Thing extends React.Component {\n          static propTypes = {\n            i18n: PropTypes.shape({\n              gettext: PropTypes.func,\n            }),\n          }\n\n          render() {\n            const { i18n } = this.props;\n            return (\n              <p>{i18n.gettext('Some Text')}</p>\n            );\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class Thing extends React.Component {\n          static propTypes = {\n            a: PropTypes.shape({\n              b: PropTypes.string,\n            }),\n          }\n\n          render() {\n            const { a } = this.props;\n            return (\n              <p>{ a.b }</p>\n            );\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            router: PropTypes.func\n          },\n          render: function() {\n            var nextPath = this.props.router.getCurrentQuery().nextPath;\n            return <div>{nextPath}</div>;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            firstname: CustomValidator.string\n          },\n          render: function() {\n            return <div>{this.props.firstname}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Options": {
+        "customValidators": [
+          "CustomValidator"
+        ]
+      }
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            outer: CustomValidator.shape({\n              inner: CustomValidator.map\n            })\n          },\n          render: function() {\n            return <div>{this.props.outer.inner}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Options": {
+        "customValidators": [
+          "CustomValidator"
+        ],
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            outer: PropTypes.shape({\n              inner: CustomValidator.string\n            })\n          },\n          render: function() {\n            return <div>{this.props.outer.inner}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Options": {
+        "customValidators": [
+          "CustomValidator"
+        ],
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            outer: CustomValidator.shape({\n              inner: PropTypes.string\n            })\n          },\n          render: function() {\n            return <div>{this.props.outer.inner}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Options": {
+        "customValidators": [
+          "CustomValidator"
+        ],
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            name: PropTypes.string\n          },\n          render: function() {\n            return <div>{this.props.name.get(\"test\")}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Options": {
+        "customValidators": [
+          "CustomValidator"
+        ]
+      }
+    },
+    {
+      "Code": "\n        const SomeComponent = createReactClass({\n          propTypes: SomeOtherComponent.propTypes\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          render: function() {\n            let { a, ...b } = obj;\n            let c = { ...d };\n            return <div />;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static get propTypes() {}\n          render() {\n            return <div>Hello World</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static get propTypes() {}\n          render() {\n            var users = this.props.users.find(user => user.name === 'John');\n            return <div>Hello you {users.length}</div>;\n          }\n        }\n        Hello.propTypes = {\n          users: PropTypes.arrayOf(PropTypes.object)\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            const {} = this.props;\n            return <div>Hello</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            var foo = 'fullname';\n            var { [foo]: firstname } = this.props;\n            return <div>Hello {firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props.source.uri }\n          }\n          static propTypes = {\n            source: PropTypes.object\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props?.source?.uri }\n          }\n          static propTypes = {\n            source: PropTypes.object\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: this.props.source.uri }\n          }\n          static propTypes = {\n            source: PropTypes.object\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        HelloJohn.prototype.render = function() {\n          return React.createElement(Hello, {\n            name: this.props.firstname\n          });\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        HelloJohn.prototype.render = function() {\n          return React.createElement(Hello, {\n            name: this.props?.firstname\n          });\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function HelloComponent() {\n          class Hello extends React.Component {\n            render() {\n              return <div>Hello {this.props.name}</div>;\n            }\n          }\n          Hello.propTypes = { name: PropTypes.string };\n          return Hello;\n        }\n        module.exports = HelloComponent();\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function HelloComponent() {\n          class Hello extends React.Component {\n            render() {\n              return <div>Hello {this.props?.name}</div>;\n            }\n          }\n          Hello.propTypes = { name: PropTypes.string };\n          return Hello;\n        }\n        module.exports = HelloComponent();\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function HelloComponent() {\n          var Hello = createReactClass({\n            propTypes: { name: PropTypes.string },\n            render: function() {\n              return <div>Hello {this.props.name}</div>;\n            }\n          });\n          return Hello;\n        }\n        module.exports = HelloComponent();\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function HelloComponent() {\n          var Hello = createReactClass({\n            propTypes: { name: PropTypes.string },\n            render: function() {\n              return <div>Hello {this.props?.name}</div>;\n            }\n          });\n          return Hello;\n        }\n        module.exports = HelloComponent();\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class DynamicHello extends Component {\n          render() {\n            const {firstname} = this.props;\n            class Hello extends Component {\n              render() {\n                const {name} = this.props;\n                return <div>Hello {name}</div>;\n              }\n            }\n            Hello.propTypes = {\n              name: PropTypes.string\n            };\n            Hello = connectReduxForm({name: firstname})(Hello);\n            return <Hello />;\n          }\n        }\n        DynamicHello.propTypes = {\n          firstname: PropTypes.string,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props) => {\n          let team = props.names.map((name) => {\n              return <li>{name}, {props.company}</li>;\n            });\n          return <ul>{team}</ul>;\n        };\n        Hello.propTypes = {\n          names: PropTypes.array,\n          company: PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props) => {\n          let team = props?.names.map((name) => {\n              return <li>{name}, {props?.company}</li>;\n            });\n          return <ul>{team}</ul>;\n        };\n        Hello.propTypes = {\n          names: PropTypes.array,\n          company: PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export default {\n          renderHello() {\n            let {name} = this.props;\n            return <div>{name}</div>;\n          }\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Hello extends Component {\n          render() {\n            const props = this.props;\n            return <div>Hello {props.name.firstname} {props['name'].lastname}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export default function FooBar(props) {\n          const bar = props.bar;\n          return (<div bar={bar}><div {...props}/></div>);\n        }\n        if (process.env.NODE_ENV !== 'production') {\n          FooBar.propTypes = {\n            bar: PropTypes.string\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          render: function() {\n            var {...other} = this.props;\n            return (\n              <div {...other} />\n            );\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function notAComponent({ something }) {\n          return something + 1;\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const notAComponent = function({ something }) {\n          return something + 1;\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const notAComponent = ({ something }) => {\n          return something + 1;\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const statelessComponent = (props) => {\n          let newProps = props;\n          return <span>{newProps.someProp}</span>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          props: {\n            name: string;\n          };\n          render () {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          props: {\n            name: Object;\n          };\n          render () {\n            return <div>Hello {this.props.name.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {name: Object;};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.name.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type PropsA = { a: string }\n        type PropsB = { b: string }\n        type Props = PropsA & PropsB;\n\n        class MyComponent extends React.Component {\n          props: Props;\n\n          render() {\n            return <div>{this.props.a} - {this.props.b}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type PropsA = { foo: string };\n        type PropsB = { bar: string };\n        type PropsC = { zap: string };\n        type Props = PropsA & PropsB;\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar} - {this.props.zap}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        import type { PropsA } from \"./myPropsA\";\n        type PropsB = { bar: string };\n        type PropsC = { zap: string };\n        type Props = PropsA & PropsB;\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar} - {this.props.zap}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type PropsB = { foo: string };\n        type PropsC = { bar: string };\n        type Props = PropsB & {\n          zap: string\n        };\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar} - {this.props.zap}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type PropsB = { foo: string };\n        type PropsC = { bar: string };\n        type Props = {\n          zap: string\n        } & PropsB;\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar} - {this.props.zap}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        import type Props from \"fake\";\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.name.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          props: {\n            name: {\n              firstname: string;\n            }\n          };\n          render () {\n            return <div>Hello {this.props.name.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {name: {firstname: string;};};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.name.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Person = {name: {firstname: string;}};\n        class Hello extends React.Component {\n          props: {people: Person[];};\n          render () {\n            var names = [];\n            for (var i = 0; i < this.props.people.length; i++) {\n              names.push(this.props.people[i].name.firstname);\n            }\n            return <div>Hello {names.join(', ')}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Person = {name: {firstname: string;}};\n        type Props = {people: Person[];};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            var names = [];\n            for (var i = 0; i < this.props.people.length; i++) {\n              names.push(this.props.people[i].name.firstname);\n            }\n            return <div>Hello {names.join(', ')}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Person = {name: {firstname: string;}};\n        type Props = {people: Person[]|Person;};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            var names = [];\n            if (Array.isArray(this.props.people)) {\n              for (var i = 0; i < this.props.people.length; i++) {\n                names.push(this.props.people[i].name.firstname);\n              }\n            } else {\n              names.push(this.props.people.name.firstname);\n            }\n            return <div>Hello {names.join(', ')}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {ok: string | boolean;};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.ok}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {result: {ok: string | boolean;}|{ok: number | Array}};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.result.ok}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {result?: {ok?: ?string | boolean;}|{ok?: ?number | Array}};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.result.ok}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {notTarget: string};\n        class Hello extends React.Component {\n          props: Props;\n          onEvent({ target }: { target: Object }) {};\n          render () {\n            return <div>Hello {this.props.notTarget}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {notTarget: string};\n        class Hello extends React.Component {\n          props: Props;\n          onEvent(infos: { target: Object }) {};\n          render () {\n            return <div>Hello {this.props.notTarget}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          props = {a: 123};\n          render () {\n            return <div>Hello</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n            render() {\n                return  <div>Hello {this.props.firstName} {this.props.lastName}</div>;\n            }\n        };\n        const otherPropTypes = {\n            lastName: PropTypes.string\n        };\n        Hello.propTypes = {\n            ...otherPropTypes,\n            firstName: PropTypes.string\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render () {\n            return [\"string\"].map(({length}) => <div>{length}</div>);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string;\n          lastname: string;\n        };\n        function Hello(props: Props): React.Element {\n          const {firstname, lastname} = props;\n          return <div>Hello {firstname} {lastname}</div>\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string;\n          lastname: string;\n        };\n        const Hello = function(props: Props): React.Element {\n          const {firstname, lastname} = props;\n          return <div>Hello {firstname} {lastname}</div>\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string;\n          lastname: string;\n        };\n        const Hello = (props: Props): React.Element => {\n          const {firstname, lastname} = props;\n          return <div>Hello {firstname} {lastname}</div>\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type PropsUnionA = {\n          a: string,\n          b?: void,\n        };\n        type PropsUnionB = {\n          a?: void,\n          b: string,\n        };\n        type Props = {\n          name: string,\n        } & (PropsUnionA | PropsUnionB);\n        class Hello extends React.Component {\n          props: Props;\n          render() {\n            const {name} = this.props;\n            return name;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        import type { FieldProps } from \"redux-form\"\n\n        type Props = {\n        label: string,\n          type: string,\n          options: Array<SelectOption>\n        } & FieldProps\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        Card.propTypes = {\n          title: PropTypes.string.isRequired,\n          children: PropTypes.element.isRequired,\n          footer: PropTypes.node\n        }\n        function Card ({ title, children, footer }) {\n          return (\n            <div/>\n          )\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function JobList(props) {\n          props\n          .jobs\n          .forEach(() => {});\n          return <div></div>;\n        }\n        JobList.propTypes = {\n          jobs: PropTypes.array\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: ?string,\n        };\n        function Hello({firstname}: Props): React$Element {\n          return <div>Hello {firstname}</div>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function Greetings() {\n          return <div>{({name}) => <Hello name={name} />}</div>\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function Greetings() {\n          return <div>{function({name}) { return <Hello name={name} />; }}</div>\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export default (ComposedComponent) => class Something extends SomeOtherComponent {\n          someMethod = ({width}) => {}\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        @asyncConnect([{\n          promise: ({dispatch}) => {}\n        }])\n        class Something extends Component {}\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            params: PropTypes.shape({\n              id: PropTypes.string\n            })\n           }\n          render () {\n            const {params} = this.props\n            const id = (params || {}).id;\n            return <span>{id}</span>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillReceiveProps ({something}) {\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps ({something}) {\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillReceiveProps ({something}) {\n            doSomething(something);\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          constructor (props) {\n            super(props);\n            const {something} = props;\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          constructor (props) {\n            super(props);\n            const {something} = props;\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          constructor ({something}) {\n            super({something});\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          constructor ({something}) {\n            super({something});\n            doSomething(something);\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        // Destructured props in the `shouldComponentUpdate` method shouldn’t throw errors\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          shouldComponentUpdate(nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        // Destructured props in the `shouldComponentUpdate` method shouldn’t throw errors\n        class Hello extends Component {\n          shouldComponentUpdate(nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        // Destructured props in `shouldComponentUpdate` shouldn’t throw errors when used with createReactClass\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          shouldComponentUpdate(nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          shouldComponentUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          shouldComponentUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          shouldComponentUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          shouldComponentUpdate ({something}, nextState) {\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentWillUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentWillUpdate ({something}, nextState) {\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentDidUpdate (prevProps, prevState) {\n            const {something} = prevProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentDidUpdate (prevProps, prevState) {\n            const {something} = prevProps;\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate (prevProps, prevState) {\n            const {something} = prevProps;\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentDidUpdate ({something}, prevState) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentDidUpdate ({something}, prevState) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate ({something}, prevState) {\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentDidUpdate ({something}, {state1, state2}) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentDidUpdate ({something}, {state1, state2}) {\n            return something;\n          }\n        }\n        Hello.propTypes = {\n          something: PropTypes.bool,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate ({something}, {state1, state2}) {\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = React.Component({\n          propTypes: {\n            something: PropTypes.bool\n          },\n          componentDidUpdate: function ({something}, {state1, state2}) {\n            return something;\n          }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool,\n          },\n          componentDidUpdate: function ({something}, {state1, state2}) {\n            return something;\n          }\n        })\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props) => {\n          const {...rest} = props;\n          return <div />;\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function SomeComponent(props) {\n          const {aaa: {bbb}} = props;\n          return <p>{bbb}</p>;\n        }\n\n        SomeComponent.propTypes = {\n          aaa: somePropType,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const PagingBlock = function(props) {\n          return (\n            <span>\n              <a onClick={() => props.previousPage()}/>\n              <a onClick={() => props.nextPage()}/>\n            </span>\n         );\n        };\n\n        PagingBlock.propTypes = {\n          nextPage: PropTypes.func.isRequired,\n          previousPage: PropTypes.func.isRequired,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const PagingBlock = function(props) {\n          return (\n            <SomeChild {...props} />\n         );\n        };\n\n        PagingBlock.propTypes = {\n          nextPage: PropTypes.func.isRequired,\n          previousPage: PropTypes.func.isRequired,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function Foo(props) {\n          useEffect(() => {\n            const { a } = props;\n            document.title = a;\n          });\n\n          return <p/>;\n        }\n\n        Foo.propTypes = {\n          a: PropTypes.string,\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps (nextProps) {\n            if (nextProps.foo) {\n              doSomething(this.props.bar);\n            }\n          }\n        }\n\n        Hello.propTypes = {\n          foo: PropTypes.bool,\n          bar: PropTypes.bool\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export default function SomeComponent(props) {\n            const callback = () => {\n                props.a(props.b);\n            };\n\n            const anotherCallback = () => {};\n\n            return (\n                <SomeOtherComponent\n                    name={props.c}\n                    callback={callback}\n                />\n            );\n        }\n\n        SomeComponent.propTypes = {\n            a: React.PropTypes.func.isRequired,\n            b: React.PropTypes.string.isRequired,\n            c: React.PropTypes.string.isRequired,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export default function SomeComponent(props) {\n            const callback = () => {\n                props.a(props.b);\n            };\n\n            return (\n                <SomeOtherComponent\n                    name={props.c}\n                    callback={callback}\n                />\n            );\n        }\n\n        SomeComponent.propTypes = {\n            a: React.PropTypes.func.isRequired,\n            b: React.PropTypes.string.isRequired,\n            c: React.PropTypes.string.isRequired,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          shouldComponentUpdate (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class HelloFooBar extends Component {\n          shouldComponentUpdate(props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        HelloFooBar.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentWillUpdate (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillUpdate (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentWillReceiveProps (nextProps) {\n            const {foo} = nextProps;\n            if (foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n          }\n          classProperty = async () => {\n            await this.props.foo();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          classProperty = async () => {\n            await this.props.foo();\n            await this.props.bar();\n            await this.props.baz();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillReceiveProps (props) {\n            if (props.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          shouldComponentUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n          }\n          classProperty = async () => {\n            const { foo } = this.props;\n            await foo();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          classProperty = async () => {\n            const { foo, bar, baz } = this.props;\n            await foo();\n            await bar();\n            await baz();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          shouldComponentUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentWillUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n          }\n          async method() {\n            await this.props.foo();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          async method() {\n            await this.props.foo();\n            await this.props.bar();\n            await this.props.baz();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n          }\n          async method() {\n            const { foo } = this.props;\n            await foo();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentDidUpdate (prevProps) {\n            if (prevProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          async method() {\n            const { foo, bar, baz } = this.props;\n            await foo();\n            await bar();\n            await baz();\n          };\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          factory() {\n            return async () => {\n              await this.props.foo();\n              await this.props.bar();\n              await this.props.baz();\n            };\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          factory() {\n            return async function onSubmit() {\n              await this.props.foo();\n              await this.props.bar();\n              await this.props.baz();\n            };\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentDidUpdate (prevProps) {\n            if (prevProps.foo) {\n              return true;\n            }\n          }\n\n          render() {\n            return (<div>{this.props.bar}</div>);\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Example extends Component {\n          async method() {\n            await this.props.foo();\n            await this.props.bar();\n          };\n        }\n        Example.propTypes = {\n          foo: PropTypes.func,\n          bar: PropTypes.func,\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Example extends Component {\n          render() {\n            async function onSubmit() {\n              await this.props.foo();\n              await this.props.bar();\n            }\n            return <Form onSubmit={onSubmit} />\n          };\n        }\n        Example.propTypes = {\n          foo: PropTypes.func,\n          bar: PropTypes.func,\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Example extends Component {\n          render() {\n            const onSubmit = async () => {\n              await this.props.foo();\n              await this.props.bar();\n            }\n            return <Form onSubmit={onSubmit} />\n          };\n        }\n        Example.propTypes = {\n          foo: PropTypes.func,\n          bar: PropTypes.func,\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        export default class NavigationButton extends React.Component {\n         static propTypes = {\n           route: PropTypes.shape({\n            getBarTintColor: PropTypes.func.isRequired,\n          }).isRequired,\n         };\n\n         renderTitle() {\n          const { route } = this.props;\n           return <Title tintColor={route.getBarTintColor()}>TITLE</Title>;\n         }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Component = ({ children: aNode }) => (\n         <div>{aNode}</div>\n        );\n\n        Component.defaultProps = {\n         children: null,\n        };\n\n        Component.propTypes = {\n         children: React.PropTypes.node,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Thing = (props) => (\n            <div>\n              {(() => {\n                    if(props.enabled && props.test){\n                        return (\n                            <span>Enabled!</span>\n                        )\n                    }\n                    return (\n                        <span>Disabled..</span>\n                    )\n                })()}\n            </div>\n        );\n\n        Thing.propTypes = {\n            enabled: React.PropTypes.bool,\n            test: React.PropTypes.bool\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Test = props => <div>\n          {someArray.map(l => <div\n            key={l}>\n              {props.property + props.property2}\n            </div>)}\n        </div>\n\n        Test.propTypes = {\n          property: React.propTypes.string.isRequired,\n          property2: React.propTypes.string.isRequired\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Button = React.createClass({\n        displayName: \"Button\",\n\n        propTypes: {\n            name: React.PropTypes.string.isRequired,\n            isEnabled: React.PropTypes.bool.isRequired\n        },\n\n        render() {\n            const item = this.props;\n            const disabled = !this.props.isEnabled;\n            return (\n                <div>\n                    <button type=\"button\" disabled={disabled}>{item.name}</button>\n                </div>\n            );\n        }\n        });\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Foo extends React.Component {\n         static propTypes = {\n         foo: PropTypes.func.isRequired,\n        }\n\n        constructor(props) {\n          super(props);\n\n          const { foo } = props;\n          this.message = foo(\"blablabla\");\n        }\n\n        render() {\n          return <div>{this.message}</div>;\n        }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class HelloGraphQL extends Component {\n          render() {\n              return <div>Hello</div>;\n          }\n        }\n\n        const HellowQueries = graphql(queryDetails, {\n          options: ownProps => ({\n          variables: ownProps.aProp\n          }),\n        })(HelloGraphQL)\n\n        HellowQueries.propTypes = {\n          aProp: PropTypes.string.isRequired\n        }\n\n        export default connect(mapStateToProps, mapDispatchToProps)(HellowQueries)\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n         foo: {\n          bar: boolean\n         }\n        };\n\n        class DigitalServices extends React.Component {\n         props: Props\n         render() {\n           const { foo } = this.props;\n           return <div>{foo.bar}</div>;\n         }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const foo = {};\n        class Hello extends React.Component {\n          render() {\n            const {firstname, lastname} = this.props.name;\n            return <div>{firstname} {lastname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          name: PropTypes.shape(foo)\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            const {foo: {bar}} = this.props;\n            return <div>{bar}</div>;\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.shape({\n            bar: PropTypes.string,\n          })\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        type Props = {\n         onMouseOver: Function,\n         onClick: Function,\n        };\n\n        const MyComponent = (props: Props) => (\n        <div>\n          <button onMouseOver={() => props.onMouseOver()} />\n          <button onClick={() => props.onClick()} />\n        </div>\n        );\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState((prevState, props) => {\n              props.doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n        var tempVar2;\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState((prevState, { doSomething }) => {\n              doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState((prevState, obj) => {\n              obj.doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n        var tempVar2;\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState(() => {\n              this.props.doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n        var tempVar;\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState((prevState) => {\n              this.props.doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState(({ something }) => {\n              this.props.doSomething();\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      }
+    },
+    {
+      "Code": "\n        import React from 'react';\n        import SharedPropTypes from './SharedPropTypes';\n\n        export default class A extends React.Component {\n          render() {\n            return (\n              <span\n                a={this.props.a}\n                b={this.props.b}\n                c={this.props.c}>\n                {this.props.children}\n              </span>\n            );\n          }\n        }\n\n        A.propTypes = {\n          a: React.PropTypes.string,\n          ...SharedPropTypes // eslint-disable-line object-shorthand\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = $ReadOnly<{foo: number}>;\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          +foo: number\n        }\n        class MyComponent extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
+    },
+    {
+      "Code": "\n        type Props = {\n          'completed?': boolean,\n        };\n        const Hello = (props: Props): React.Element => {\n          return <div>{props['completed?']}</div>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Person = {\n          firstname: string\n        }\n        class MyComponent extends React.Component<void, Props, void> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Person = {\n          firstname: string\n        }\n        class MyComponent extends React.Component<void, Props, void> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "flowVersion": "0.52"
+        }
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
+    },
+    {
+      "Code": "\n        type Person = {\n          firstname: string\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Person = {\n          firstname: string\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "flowVersion": "0.53"
+        }
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
+    },
+    {
+      "Code": "\n      class MyComponent extends Component {\n        static propTypes = {\n          validate: PropTypes.bool,\n          options: PropTypes.array,\n          value: ({options, value, validate}) => {\n            if (!validate) return;\n            if (options.indexOf(value) < 0)\n              throw new Errow('oops');\n          }\n        }\n\n        render() {\n          return <ul>\n            {this.props.options.map(option =>\n              <li className={this.props.value == option && \"active\"}>{option}</li>\n            )}\n          </ul>\n        }\n      }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n      class MyComponent extends Component {\n        static propTypes = {\n          validate: PropTypes.bool,\n          options: PropTypes.array,\n          value: function ({options, value, validate}) {\n            if (!validate) return;\n            if (options.indexOf(value) < 0)\n              throw new Errow('oops');\n          }\n        }\n\n        render() {\n          return <ul>\n            {this.props.options.map(option =>\n              <li className={this.props.value == option && \"active\"}>{option}</li>\n            )}\n          </ul>\n        }\n      }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n      class MyComponent extends Component {\n        static propTypes = {\n          validate: PropTypes.bool,\n          options: PropTypes.array,\n          value({options, value, validate}) {\n            if (!validate) return;\n            if (options.indexOf(value) < 0)\n              throw new Errow('oops');\n          }\n        }\n\n        render() {\n          return <ul>\n            {this.props.options.map(option =>\n              <li className={this.props.value == option && \"active\"}>{option}</li>\n            )}\n          </ul>\n        }\n      }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>{ this.props.other }</div>\n          }\n        }\n        MyComponent.propTypes = { other: () => {} };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>{ this.props.other }</div>\n          }\n        }\n        MyComponent.propTypes = { other() {} };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>{ this.props.other }</div>\n          }\n        }\n        MyComponent.propTypes = { other: function () {} };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>{ this.props.other }</div>\n          }\n        }\n        MyComponent.propTypes = { * other() {} };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n          UNSAFE_componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.3.0"
+        }
+      }
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n          UNSAFE_componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.3.0"
+        }
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: 'bar'\n          };\n          state = {\n            currentValue: null\n          };\n          static getDerivedStateFromProps(nextProps, prevState) {\n            if (prevState.currentValue === null) {\n              return {\n                currentValue: nextProps.defaultValue,\n              }\n            }\n            return null;\n          }\n          render() {\n            return <div>{ this.state.currentValue }</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.3.0"
+        }
+      }
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: PropTypes.string\n          };\n          getSnapshotBeforeUpdate(prevProps, prevState) {\n            if (prevProps.defaultValue === null) {\n              return 'snapshot';\n            }\n            return null;\n          }\n          render() {\n            return <div />\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.3.0"
+        }
+      }
+    },
+    {
+      "Code": "\n        import React from 'react';\n        type Props = string & {\n          fullname: string\n        };\n        class Test extends React.PureComponent<Props> {\n          render() {\n            return <div>Hello {this.props.fullname}</div>\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        import type {BasePerson} from './types'\n        type Props = {\n          person: {\n           ...$Exact<BasePerson>,\n           lastname: string\n          }\n        };\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
+    },
+    {
+      "Code": "\n        import BasePerson from './types'\n        class Hello extends React.Component {\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          person: ProTypes.shape({\n            ...BasePerson,\n            lastname: PropTypes.string\n          })\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          used: string,\n        }\n        class Hello extends React.Component<Props> {\n          renderHelper = ({notAProp}: {notAProp: string}) => {\n            return <div />;\n          }\n          render() {\n            return <div>{this.props.used}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          used: string,\n        }\n        class Hello extends React.Component<Props> {\n          componentDidMount() {\n            foo(\n              ({notAProp}: {notAProp: string}) => (<div />)\n            );\n          }\n          render() {\n            return <div>{this.props.used}</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          used: string,\n        }\n        class Hello extends React.Component<Props> {\n          render() {\n            return <QueryRenderer\n              render={({notAProp}: {notAProp: string}) => <div>{this.props.used}</div>}\n            />;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>{this.props.used}</div>;\n          }\n        }\n        Hello.propTypes = {\n          used: PropTypes.string,\n          foo: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "ignore": [
+          "foo"
+        ]
+      }
+    },
+    {
+      "Code": "\n        type Props = {\n          used: string,\n          foo: string,\n        }\n        class Hello extends React.Component<Props> {\n          render() {\n            return <div>{this.props.used}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "ignore": [
+          "foo"
+        ]
+      }
+    },
+    {
+      "Code": "\n        export default class Foo extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        Foo.defaultProps = Object.assign({});\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = ({a}) => (\n          <div>\n            {a.map(({b}) => (\n              <div>{b}</div>\n            ))}\n          </div>\n        );\n        Hello.propTypes = {\n          a: PropTypes.arrayOf(\n            PropTypes.exact({\n              b: PropTypes.string,\n            })\n          ),\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Foo = (props) => {\n          const { foo } = props as unknown;\n          (props as unknown).bar as unknown;\n\n          return <></>;\n        };\n\n        Foo.propTypes = {\n          foo,\n          bar,\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Foo extends React.Component {\n          static propTypes = {\n            prevProp,\n            nextProp,\n            setStateProp,\n            thisPropsAliasDestructProp,\n            thisPropsAliasProp,\n            thisDestructPropsAliasDestructProp,\n            thisDestructPropsAliasProp,\n            thisDestructPropsDestructProp,\n            thisPropsDestructProp,\n            thisPropsProp,\n          };\n\n          componentDidUpdate(prevProps) {\n            (prevProps as unknown).prevProp as unknown;\n          }\n\n          shouldComponentUpdate(nextProps) {\n            (nextProps as unknown).nextProp as unknown;\n          }\n\n          stateProps() {\n            ((this as unknown).setState as unknown)((_, props) => (props as unknown).setStateProp as unknown);\n          }\n\n          thisPropsAlias() {\n            const props = (this as unknown).props as unknown;\n\n            const { thisPropsAliasDestructProp } = props as unknown;\n            (props as unknown).thisPropsAliasProp as unknown;\n          }\n\n          thisDestructPropsAlias() {\n            const { props } = this as unknown;\n\n            const { thisDestructPropsAliasDestructProp } = props as unknown;\n            (props as unknown).thisDestructPropsAliasProp as unknown;\n          }\n\n          render() {\n            const { props: { thisDestructPropsDestructProp } } = this as unknown;\n            const { thisPropsDestructProp } = (this as unknown).props as unknown;\n            ((this as unknown).props as unknown).thisPropsProp as unknown;\n\n            return null;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        declare class Thing {\n          constructor({ id }: { id: string });\n        }\n        export default Thing;\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props: {firstname: string, lastname: string}) => {\n            return <div {...props}></div>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props: UnfoundProps) => {\n            return <div {...props}></div>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props: Omit<{a: string, b: string, c: string}, \"a\">) => {\n            return <div>{props.b}</div>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props: () => any) => {\n            return <div>{props.firstname}</div>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Hello = (props: () => any) => {\n            return <div>{props?.firstname}</div>;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Props {\n          'aria-label': string;\n        }\n        export default function Component({\n          'aria-label': ariaLabel,\n        }: Props): JSX.Element {\n          return <div aria-label={ariaLabel} />;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Props {\n          ['aria-label']: string;\n        }\n        export default function Component({\n          ['aria-label']: ariaLabel,\n        }: Props): JSX.Element {\n          return <div aria-label={ariaLabel} />;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Props {\n          [1234]: string;\n        }\n        export default function Component(\n          props\n        : Props): JSX.Element {\n          return <div aria-label={props[1234]} />;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Props {\n          ['1234']: string;\n        }\n        export default function Component(\n          props\n        : Props): JSX.Element {\n          return <div aria-label={props[1234]} />;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Props {\n          [1234]: string;\n        }\n        export default function Component(\n          props\n        : Props): JSX.Element {\n          return <div aria-label={props['1234']} />;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Props {\n          [1234]: string;\n        }\n        export default function Component(\n          props\n        : Props): JSX.Element {\n        const handleVerifySubmit = ({\n          otp,\n          }) => {\n          dispatch(\n            verifyOTPPhone({\n              otp,\n            }),\n          );\n        };\n        return <div aria-label={props['1234']} />;\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Props {\n          foo: string;\n        }\n        const Component = (props: Props) => (\n          <div>{(()=> {return props.foo})()}</div>\n        )\n        export default Component\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type User = {\n          user: string;\n        }\n\n        type Props = User;\n\n        export default (props: Props) => {\n          return <div><span>{props.user}</span></div>;\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type User = {\n          user: string;\n        }\n\n        type Props = User & UserProps;\n\n        export default (props: Props) => {\n          return <div><span>{props.user}</span></div>;\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        interface Person {\n          firstname: string\n          lastname?: never\n        };\n\n        const Hello = ({firstname}: Person) => {\n          return <div><span>{firstname}</span></div>;\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class App extends Component {\n          static propTypes = {\n            notifications: PropTypes.array.isRequired\n          };\n          customizeNotifications() {\n            const props = this.props;\n            return props.notifications.map((notification) => notification);\n          }\n          render() {\n            const notifications = this.customizeNotifications();\n            return (\n              <View>\n                {notifications.map((notification) => <Text>{notification}</Text>)}\n              </View>\n            );\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Home = () => {\n          const renderStaticList = ({\n              item,\n          }: {\n              item: IContent;\n          }) => (\n              <Section\n                  icon={<FlashImage />}\n                  title={item.title}\n                  titleFontSize={theme.typography.FONT_SIZE_24}\n              >\n                  <StaticFlatList\n                      data={item.pointsOfSale}\n                      renderItem={renderStaticItem}\n                      keyExtractor={staticItemKeyExtractor}\n                  />\n              </Section>\n          );\n\n          return (\n              <SafeAreaViewWrapper>\n                  <LightStatusBar />\n                  <HomeFlatList\n                      ListHeaderComponent={listHeaderComponent}\n                      data={home?.static}\n                      renderItem={renderStaticList}\n                      keyExtractor={staticListKeyExtractor}\n                  />\n              </SafeAreaViewWrapper>\n          );\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Home = () => {\n          const renderStaticList = function({\n              item,\n          }: {\n              item: IContent;\n          }) {\n            return (\n              <Section\n                  icon={<FlashImage />}\n                  title={item.title}\n                  titleFontSize={theme.typography.FONT_SIZE_24}\n              >\n                  <StaticFlatList\n                      data={item.pointsOfSale}\n                      renderItem={renderStaticItem}\n                      keyExtractor={staticItemKeyExtractor}\n                  />\n              </Section>\n            )\n          };\n\n          return (\n              <SafeAreaViewWrapper>\n                  <LightStatusBar />\n                  <HomeFlatList\n                      ListHeaderComponent={listHeaderComponent}\n                      data={home?.static}\n                      renderItem={renderStaticList}\n                      keyExtractor={staticListKeyExtractor}\n                  />\n              </SafeAreaViewWrapper>\n          );\n        };\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) => ({\n          ...bindActionCreators<ActionCreatorsMapObject<Types.RootAction>>(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          ),\n        })\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) => ({\n          ...bindActionCreators(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          ),\n        })\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
+    },
+    {
+      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) =>\n          bindActionCreators(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          )\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support"
+    },
+    {
+      "Code": "\n        import React from \"react\";\n\n        interface Props {\n          name: string;\n        }\n\n        const MyComponent: React.FC<Props> = ({ name }) => {\n          return <div>{name}</div>;\n        };\n\n        export default MyComponent;\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        type Props = {\n          history: {\n            push: Function,\n          },\n          match?: {\n            params?: {\n              date?: string\n            },\n          },\n        };\n\n        export const Daily = ({ history, match: {\n          params: {\n            date = moment().toISOString(),\n          } = {},\n        } = {} }: Props) => (\n              <div>\n                <div style={{ textAlign: 'right', paddingRight: '25px' }}>\n                  Show <DatePicker\n                    selected={moment(date)}\n                    className=\"datetime\"\n                    onChange={d => history.push(`./${d.toISOString()}`)}\n                  />\n                </div>\n                <WithData url=\"/payments/daily\" body={{ date: moment(date).toISOString() }}>\n                  <Flashcards date={moment(date)} />\n                </WithData>\n              </div>\n        );\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        import React from 'react';\n\n        type Props = {\n          test: string,\n          callback: () => void,\n        };\n\n        export default function Foo(props: Props) {\n          return (\n            <div>\n              {[1, 2, 3].map(e => (\n                <div key={e} onClick={() => props.callback()}>\n                  {props.test}\n                </div>\n              ))}\n            </div>\n          );\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Component extends Component <{}, {updateQueue: Array<string>}> {\n          debouncedUpdate = debounce((cellsetId, options) => {\n            this.setState((prevState, props) => {\n              const {updateQueue} = prevState;\n              const {updateCells} = props;\n              updateCells(cellsetId, updateQueue, options);\n              return {\n                updateQueue: [],\n              };\n            });\n          }, 2000);\n\n          render() {\n            return <div />\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        class Test extends Component<{}, {selectedId: string}> {\n          constructor(props: *) {\n            super(props);\n            this.state = {\n              selectedId: '',\n            };\n          }\n\n          onChange = ({id}: {id: string}) => { // This will say: 'id' PropType is defined but prop is never used (react/no-unused-prop-types)\n            this.setState({\n              selectedId: id,\n            });\n          };\n\n          render() {\n            const {selectedId} = this.state;\n            return (\n              <div>\n                {selectedId}\n                <select onChange={() => this.onChange({id: '1'})}>\n                  <option value='1'>1</option>\n                </select>\n              </div>\n            );\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        function Foo (props) {\n          return <div>{ renderPhoto() }</div>;\n\n          function renderPhoto () {\n            return <div>{ props.renderPhotoTools() }</div>;\n          }\n        }\n      ",
+      "Tsx": true
+    },
+    {
+      "Code": "\n        const Wrapper = featureToggle\n        ? ({ children }: { children: Node }) => (\n          <FeatureToggledComponent\n              featureToggle={featureToggle}\n              defaultValue\n          >\n              {children}\n          </FeatureToggledComponent>\n        )\n        : React.Fragment;\n      ",
+      "Tsx": true
+    }
+  ],
+  "Invalid": [
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            unused: PropTypes.string\n          },\n          render: function() {\n            return React.createElement(\"div\", {}, this.props.value);\n          }\n        });\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            name: PropTypes.string\n          },\n          render: function() {\n            return <div>Hello {this.props.value}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static propTypes = {\n            name: PropTypes.string\n          }\n          render() {\n            return <div>Hello {this.props.value}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello {this.props.firstname} {this.props.lastname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n        Hello.propTypes = {\n          unused: PropTypes.string\n        };\n        class HelloBis extends React.Component {\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            unused: PropTypes.string.isRequired,\n            anotherunused: PropTypes.string.isRequired\n          },\n          render: function() {\n            return <div>Hello {this.props.name} and {this.props.propWithoutTypeDefinition}</div>;\n          }\n        });\n        var Hello2 = createReactClass({\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'anotherunused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            var { firstname, lastname } = this.props;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.z\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.string\n          })\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'a.b' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.b.z;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.shape({\n              c: PropTypes.string\n            })\n          })\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'a.b.c' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.b.c;\n            this.props.a.__.d.length;\n            this.props.a.anything.e[2];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.objectOf(\n            PropTypes.shape({\n              unused: PropTypes.string\n            })\n          )\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'a.*.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            var i = 3;\n            this.props.a[2].c;\n            this.props.a[i].d.length;\n            this.props.a[i + 2].e[2];\n            this.props.a.length;\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.arrayOf(\n            PropTypes.shape({\n              unused: PropTypes.string\n            })\n          )\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'a.*.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props.a.length;\n            this.props.a.b;\n            this.props.a.e.length;\n            this.props.a.e.anyProp;\n            this.props.a.c.toString();\n            this.props.a.c.someThingElse();\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.shape({\n              unused: PropTypes.number,\n              anotherunused: PropTypes.array\n            })\n          ])\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'a.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'a.anotherunused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props[\"some.value\"];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"some.unused\": PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'some.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            this.props[\"arr\"][1][\"some.value\"];\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          \"arr\": PropTypes.arrayOf(\n            PropTypes.shape({\n              \"some.unused\": PropTypes.string\n        })\n          )\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'arr.*.some.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static propTypes = {\n            unused: PropTypes.string\n          }\n          render() {\n            var text;\n            text = 'Hello ';\n            let {props: {firstname}} = this;\n            return <div>{text} {firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            if (true) {\n              return <span>{this.props.firstname}</span>\n            } else {\n              return <span>{this.props.lastname}</span>\n            }\n          }\n        }\n        Hello.propTypes = {\n          unused: PropTypes.string\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        var Hello = function(props) {\n          return <div>Hello {props.name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        function Hello(props) {\n          return <div>Hello {props.name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        var Hello = (props) => {\n          return <div>Hello {props.name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        var Hello = (props) => {\n          const {name} = props;\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        function Hello({ name }) {\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const Hello = function({ name }) {\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const Hello = ({ name }) => {\n          return <div>Hello {name}</div>;\n        }\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static propTypes = {unused: PropTypes.string}\n          render() {\n            var props = {firstname: 'John'};\n            return <div>Hello {props.firstname} {this.props.lastname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static propTypes = {unused: PropTypes.string}\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props.source }\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          static propTypes = {unused: PropTypes.string}\n          constructor(props, context) {\n            super(props, context)\n            this.state = { status: props.source.uri }\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        function HelloComponent() {\n          var Hello = createReactClass({\n            propTypes: {unused: PropTypes.string},\n            render: function() {\n              return <div>Hello {this.props.name}</div>;\n            }\n          });\n          return Hello;\n        }\n        module.exports = HelloComponent();\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const Hello = (props) => {\n          let team = props.names.map((name) => {\n              return <li>{name}, {props.company}</li>;\n            });\n          return <ul>{team}</ul>;\n        };\n        Hello.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const Annotation = props => (\n          <div>\n            {props.text}\n          </div>\n        )\n        Annotation.prototype.propTypes = {unused: PropTypes.string};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        for (var key in foo) {\n          var Hello = createReactClass({\n            propTypes: {unused: PropTypes.string},\n            render: function() {\n              return <div>Hello {this.props.name}</div>;\n            }\n          });\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        var propTypes = {\n          unused: PropTypes.string\n        };\n        class Test extends React.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = propTypes;\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "pragma": "Foo"
+        }
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        /** @jsx Foo */\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        /** @jsx Foo */\n        /** @jsx React */\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        /**\n         * Copyright ....\n         * @jsx Foo\n         */\n        /** @jsx React */\n        class Test extends Foo.Component {\n          render() {\n            return (\n              <div>{this.props.firstname} {this.props.lastname}</div>\n            );\n          }\n        }\n        Test.propTypes = {\n          unused: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          props: {\n            unused: string\n          };\n          render () {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {unused: Object;};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = $ReadOnly<{unused: Object;}>;\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type PropsA = { a: string }\n        type PropsB = { b: string }\n        type Props = PropsA & PropsB;\n\n        class MyComponent extends React.Component {\n          props: Props;\n\n          render() {\n            return <div>{this.props.a}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'b' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type PropsA = { foo: string };\n        type PropsB = { bar: string };\n        type PropsC = { zap: string };\n        type Props = PropsA & PropsB;\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'zap' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type PropsB = { foo: string };\n        type PropsC = { bar: string };\n        type Props = PropsB & {\n          zap: string\n        };\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'zap' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type PropsB = { foo: string };\n        type PropsC = { bar: string };\n        type Props = {\n          zap: string\n        } & PropsB;\n\n        class Bar extends React.Component {\n          props: Props & PropsC;\n\n          render() {\n            return <div>{this.props.foo} - {this.props.bar}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'zap' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          props: {\n            name: {\n              unused: string;\n            }\n          };\n          render () {\n            return <div>Hello {this.props.name.lastname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'name.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {name: {unused: string;};};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.name.lastname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'name.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          props: {person: {name: {unused: string;};};};\n          render () {\n            return <div>Hello {this.props.person.name.lastname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'person.name.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {person: {name: {unused: string;};};};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.person.name.lastname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'person.name.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {name: {unused: string;}};\n        class Hello extends React.Component {\n          props: {people: Person[];};\n          render () {\n            var names = [];\n            for (var i = 0; i < this.props.people.length; i++) {\n              names.push(this.props.people[i].name.lastname);\n            }\n            return <div>Hello {names.join(', ')}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'people.*.name.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {name: {unused: string;}};\n        type Props = {people: Person[];};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            var names = [];\n            for (var i = 0; i < this.props.people.length; i++) {\n              names.push(this.props.people[i].name.lastname);\n            }\n            return <div>Hello {names.join(', ')}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'people.*.name.unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {result?: {ok: string | boolean;}|{ok: number | Array}};\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.result.notok}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'result.ok' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'result.ok' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        function Greetings({names}) {\n          names = names.map(({firstname, lastname}) => <div>{firstname} {lastname}</div>);\n          return <Hello>{names}</Hello>;\n        }\n        Greetings.propTypes = {unused: Object};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const MyComponent = props => (\n          <div onClick={() => props.toggle()}></div>\n        )\n        MyComponent.propTypes = {unused: Object};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const MyComponent = props => props.test ? <div /> : <span />\n        MyComponent.propTypes = {unused: Object};\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {\n          unused: ?string,\n        };\n        function Hello({firstname, lastname}: Props): React$Element {\n          return <div>Hello {firstname} {lastname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          constructor (props) {\n            super(props);\n            const {something} = props;\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          constructor ({something}) {\n            super({something});\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          componentWillReceiveProps (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          componentWillReceiveProps ({something}, nextState) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          shouldComponentUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          shouldComponentUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          componentWillUpdate ({something}, nextState) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          componentDidUpdate (prevProps, prevState) {\n            const {something} = prevProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            unused: PropTypes.bool\n          }\n          componentDidUpdate ({something}, prevState) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          }\n          componentDidUpdate (prevProps, {state1, state2}) {\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        var Hello = createReactClass({\n          propTypes: {\n            something: PropTypes.bool\n          },\n          componentDidUpdate: function (prevProps, {state1, state2}) {\n            return something;\n          }\n        })\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentWillUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 5,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          classProperty = async () => {\n            await this.props.foo();\n            await this.props.bar();\n          };\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 6,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentWillUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 11,
+          "Column": 11,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          shouldComponentUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 5,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          classProperty = async () => {\n            const { bar, baz } = this.props;\n            await bar();\n            await baz();\n          };\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'foo' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          async method() {\n            await this.props.foo();\n            await this.props.baz();\n          };\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 5,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          shouldComponentUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 11,
+          "Column": 11,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            foo: PropTypes.string,\n            bar: PropTypes.string,\n          };\n\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 5,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          async method() {\n            const { foo, bar } = this.props;\n            await foo();\n            await bar();\n          };\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 6,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          factory() {\n            return async () => {\n              await this.props.foo();\n              await this.props.bar();\n            };\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 6,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n        Hello.propTypes = {\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 11,
+          "Column": 11,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        }\n        Hello.propTypes = forbidExtraProps({\n          foo: PropTypes.string,\n          bar: PropTypes.string,\n        });\n      ",
+      "Tsx": true,
+      "Settings": {
+        "propWrapperFunctions": [
+          "forbidExtraProps"
+        ]
+      },
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 11,
+          "Column": 11,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          propTypes = forbidExtraProps({\n            foo: PropTypes.string,\n            bar: PropTypes.string\n          });\n          componentDidUpdate (nextProps) {\n            if (nextProps.foo) {\n              return true;\n            }\n          }\n        };\n      ",
+      "Tsx": true,
+      "Settings": {
+        "propWrapperFunctions": [
+          "forbidExtraProps"
+        ]
+      },
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 5,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        export class Example extends Component {\n          static propTypes = {\n            foo: PropTypes.func,\n            bar: PropTypes.func,\n            baz: PropTypes.func,\n          }\n          factory() {\n            return async function onSubmit() {\n              await this.props.bar();\n              await this.props.baz();\n            };\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 4,
+          "Column": 13,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Example extends Component {\n          render() {\n            async function onSubmit() {\n              await this.props.foo();\n              await this.props.bar();\n            }\n            return <Form onSubmit={onSubmit} />\n          };\n        }\n        Example.propTypes = {\n          foo: PropTypes.func,\n          bar: PropTypes.func,\n          baz: PropTypes.func,\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 14,
+          "Column": 11,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Example extends Component {\n          render() {\n            const onSubmit = async () => {\n              await this.props.bar();\n              await this.props.baz();\n            }\n            return <Form onSubmit={onSubmit} />\n          };\n        }\n        Example.propTypes = {\n          foo: PropTypes.func,\n          bar: PropTypes.func,\n          baz: PropTypes.func,\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "",
+          "Line": 12,
+          "Column": 11,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import React from \"react\";\n        var Hello = React.createReactClass({\n         propTypes: {\n           name: React.PropTypes.string\n         },\n         render: function() {\n           return <div>Hello Bob</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'name' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Comp1 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp1.propTypes = {\n          prop1: PropTypes.number\n        };\n        class Comp2 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp2.propTypes = {\n          prop2: PropTypes.arrayOf(Comp1.propTypes.prop1)\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'prop1' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'prop2' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'prop2.*' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Comp1 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp1.propTypes = {\n          prop1: PropTypes.number\n        };\n        class Comp2 extends Component {\n          static propTypes = {\n            prop2: PropTypes.arrayOf(Comp1.propTypes.prop1)\n          }\n          render() {\n            return <span />;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'prop1' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'prop2' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'prop2.*' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Comp1 extends Component {\n          render() {\n            return <span />;\n          }\n        }\n        Comp1.propTypes = {\n          prop1: PropTypes.number\n        };\n        var Comp2 = createReactClass({\n          propTypes: {\n            prop2: PropTypes.arrayOf(Comp1.propTypes.prop1)\n          },\n          render() {\n            return <span />;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'prop1' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'prop2' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'prop2.*' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class HelloGraphQL extends Component {\n          render() {\n              return <div>Hello</div>;\n          }\n        }\n        HelloGraphQL.propTypes = {\n          aProp: PropTypes.string.isRequired\n        }\n\n        const HellowQueries = graphql(queryDetails, {\n          options: ownProps => ({\n          variables: ownProps.aProp\n          }),\n        })(HelloGraphQL)\n\n        export default connect(mapStateToProps, mapDispatchToProps)(HellowQueries)\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'aProp' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type UsedProps = {|\n          usedProp: number,\n        |};\n\n        type UnusedProps = {|\n          unusedProp: number,\n        |};\n\n        type Props = {| ...UsedProps, ...UnusedProps |};\n\n        function MyComponent({ usedProp, notOne }: Props) {\n          return <div>{usedProp}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unusedProp' PropType is defined but prop is never used",
+          "Line": 7,
+          "Column": 11,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<void, Props, void> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<void, Props, void> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "flowVersion": "0.52"
+        }
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n        MyComponent.propTypes = {\n          firstname: PropTypes.string,\n          lastname: PropTypes.string,\n          foo: PropTypes.string,\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "ignore": [
+          "foo"
+        ]
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n          foo: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "ignore": [
+          "foo"
+        ]
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = string;\n        class Hello extends React.Component<{ person: Person }> {\n          render () {\n            return <div />;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "flowVersion": "0.53"
+        }
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'person' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = string;\n        class Hello extends React.Component<void, { person: Person }, void> {\n          render () {\n            return <div />;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "flowVersion": "0.52"
+        }
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'person' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState(({ doSomething }, props) => {\n              return { doSomething: doSomething + 1 };\n            });\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'doSomething' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          onFoo() {\n            this.setState(prevState => ({\n              doSomething: prevState.doSomething + 1,\n            }));\n          }\n          render() {\n            return (\n               <div onClick={this.onFoo}>Test</div>\n            );\n          }\n        }\n        MyComponent.propTypes = {\n          doSomething: PropTypes.func\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'doSomething' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {\n          firstname: string,\n          lastname: string,\n        }\n        class MyComponent extends React.Component<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "flowVersion": "0.53"
+        }
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n          UNSAFE_componentWillReceiveProps (nextProps) {\n            const {something} = nextProps;\n            doSomething(something);\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.2.0"
+        }
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'something' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n          UNSAFE_componentWillUpdate (nextProps, nextState) {\n            const {something} = nextProps;\n            return something;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.2.0"
+        }
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'something' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: 'bar'\n          };\n          state = {\n            currentValue: null\n          };\n          static getDerivedStateFromProps(nextProps, prevState) {\n            if (prevState.currentValue === null) {\n              return {\n                currentValue: nextProps.defaultValue,\n              }\n            }\n            return null;\n          }\n          render() {\n            return <div>{ this.state.currentValue }</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.2.0"
+        }
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'defaultValue' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            defaultValue: PropTypes.string\n          };\n          getSnapshotBeforeUpdate(prevProps, prevState) {\n            if (prevProps.defaultValue === null) {\n              return 'snapshot';\n            }\n            return null;\n          }\n          render() {\n            return <div />\n          }\n        }\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "version": "16.2.0"
+        }
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'defaultValue' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import React from 'react';\n        type OtherProps = {\n          firstname: string,\n          lastname: string,\n        } | {\n          fullname: string\n        };\n        type Props = OtherProps & {\n          age: number\n        };\n        class Test extends React.PureComponent<Props> {\n          render() {\n            return <div>Hello {this.props.firstname}</div>\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'age' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.shape({\n            })\n          })\n        };\n        Hello.propTypes.a.b.c = PropTypes.number;\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'a' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'a.b' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'a.b.c' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = { foo: string }\n        function higherOrderComponent<Props>() {\n          return class extends React.Component<Props> {\n            render() {\n              return <div />;\n            }\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'foo' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          ...data,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {|\n          ...data,\n          lastname: string\n        |};\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          ...$Exact<data>,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import type {Data} from './Data'\n        type Person = {\n          ...Data,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.bar}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import type {Data} from 'some-libdef-like-flow-typed-provides'\n        type Person = {\n          ...Data,\n          lastname: string\n        };\n        class Hello extends React.Component {\n          props: Person;\n          render () {\n            return <div>Hello {this.props.bar}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Hello extends React.Component {\n          render () {\n            return <div>Hello {this.props.firstname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          ...BasePerson,\n          lastname: PropTypes.string\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import type {BasePerson} from './types'\n        type Props = {\n          person: {\n           ...$Exact<BasePerson>,\n           lastname: string\n          }\n        };\n        class Hello extends React.Component {\n          props: Props;\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Skip": true,
+      "SkipReason": "SKIP: upstream case requires Flow syntax, which rslint does not support",
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'person.lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import BasePerson from './types'\n        class Hello extends React.Component {\n          render () {\n            return <div>Hello {this.props.person.firstname}</div>;\n          }\n        }\n        Hello.propTypes = {\n          person: ProTypes.shape({\n            ...BasePerson,\n            lastname: PropTypes.string\n          })\n        };\n      ",
+      "Tsx": true,
+      "Options": {
+        "skipShapeProps": false
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'person.lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Props = {notTarget: string, unused: string};\n        class Hello extends React.Component {\n          props: Props;\n          onEvent = ({ target }: { target: Object }) => {};\n          render () {\n            return <div>Hello {this.props.notTarget}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import PropTypes from 'prop-types';\n        import React from 'react';\n\n        const MyComponent= (props) => {\n          switch (props.usedProp) {\n            case 1:\n              return (<div />);\n            default:\n              return <div />;\n          }\n        };\n\n        MyComponent.propTypes = {\n          usedProp: PropTypes.string,\n          unUsedProp: PropTypes.string,\n        };\n\n        export default MyComponent;\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'unUsedProp' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const Foo = (props) => {\n          const { foo } = props as unknown;\n          (props as unknown).bar as unknown;\n\n          return <></>;\n        };\n\n        Foo.propTypes = {\n          fooUnused,\n          barUnused,\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'fooUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'barUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        class Foo extends React.Component {\n          static propTypes = {\n            prevPropUnused,\n            nextPropUnused,\n            setStatePropUnused,\n            thisPropsAliasDestructPropUnused,\n            thisPropsAliasPropUnused,\n            thisDestructPropsAliasDestructPropUnused,\n            thisDestructPropsAliasPropUnused,\n            thisDestructPropsDestructPropUnused,\n            thisPropsDestructPropUnused,\n            thisPropsPropUnused,\n          };\n\n          componentDidUpdate(prevProps) {\n            (prevProps as unknown).prevProp as unknown;\n          }\n\n          shouldComponentUpdate(nextProps) {\n            (nextProps as unknown).nextProp as unknown;\n          }\n\n          stateProps() {\n            ((this as unknown).setState as unknown)((_, props) => (props as unknown).setStateProp as unknown);\n          }\n\n          thisPropsAlias() {\n            const props = (this as unknown).props as unknown;\n\n            const { thisPropsAliasDestructProp } = props as unknown;\n            (props as unknown).thisPropsAliasProp as unknown;\n          }\n\n          thisDestructPropsAlias() {\n            const { props } = this as unknown;\n\n            const { thisDestructPropsAliasDestructProp } = props as unknown;\n            (props as unknown).thisDestructPropsAliasProp as unknown;\n          }\n\n          render() {\n            const { props: { thisDestructPropsDestructProp } } = this as unknown;\n            const { thisPropsDestructProp } = (this as unknown).props as unknown;\n            ((this as unknown).props as unknown).thisPropsProp as unknown;\n\n            return null;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'prevPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'nextPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'setStatePropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'thisPropsAliasDestructPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'thisPropsAliasPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'thisDestructPropsAliasDestructPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'thisDestructPropsAliasPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'thisDestructPropsDestructPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'thisPropsDestructPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'thisPropsPropUnused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          lastname: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props.firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          lastname: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props?.firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          lastname: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props?.firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          lastname?: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props.firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          lastname?: string\n        };\n        const Hello = (props: Person) => {\n            return <div>Hello {props?.firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type Person = {\n          firstname: string\n          lastname: string\n        };\n        const Hello = ({firstname}: Person) => {\n            return <div>Hello {firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Person {\n          firstname: string\n          lastname: string\n        };\n        const Hello = ({firstname}: Person) => {\n            return <div>Hello {firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Foo {\n          foo: string;\n          [blah: string]: number;\n        }\n        const Hello = ({bar}: Foo) => {\n            return <div>Hello {bar}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'foo' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Props {\n          'aria-label': string;\n        }\n        export default function Component(props: Props): JSX.Element {\n          return <div />;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'aria-label' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Props {\n        [1234]: string;\n        }\n        export default function Component(props: Props): JSX.Element {\n          return <div />;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'1234' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const Hello = ({firstname}: {firstname: string, lastname: string}) => {\n            return <div>Hello {firstname}</div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Foo {\n          z: string;\n        }\n\n        interface Bar extends Foo {\n          y: string;\n        }\n\n        const Baz = ({ x, y }: Bar) => (\n          <span>\n              {x}\n              {y}\n          </span>\n        );\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'z' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Bar extends Foo {\n          y: string;\n        }\n\n        const Baz = ({ x }: Bar) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'y' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Bar {\n          y: string;\n        }\n\n        interface Baz {\n          z:string;\n        }\n\n        const Baz = ({ x }: Bar & Foo & Baz) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'y' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'z' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Foo {\n          z: string;\n        }\n\n        interface Bar extends Foo {\n          y: string;\n        }\n\n        const Baz = ({ x }: Bar) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'z' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'y' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Foo {\n          x: number;\n        }\n\n        interface Foo {\n          z: string;\n        }\n\n        interface Foo {\n          y: string;\n        }\n\n        const Baz = ({ x }: Foo) => (\n          <span>\n              {x}\n          </span>\n        );\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'z' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'y' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type User = {\n          user: string;\n        }\n\n        type UserProps = {\n          userId: string;\n        }\n\n        type AgeProps = {\n          age: number;\n        }\n\n        type BirthdayProps = {\n          birthday: string;\n        }\n\n        type intersectionUserProps = AgeProps & BirthdayProps;\n\n        type Props = User & UserProps & intersectionUserProps;\n\n        export default (props: Props) => {\n          const { userId, user } = props;\n\n          if (userId === 0) {\n            return <p>userId is 0</p>;\n          }\n\n          return null;\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'age' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'birthday' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const mapStateToProps = state => ({\n          books: state.books\n        });\n\n        interface InfoLibTableProps extends ReturnType<typeof mapStateToProps> {\n        }\n\n        const App = (props: InfoLibTableProps) => {\n          return <div></div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'books' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        const mapStateToProps = state => ({\n          books: state.books,\n        });\n\n        interface BooksTable extends ReturnType<typeof mapStateToProps> {\n          username: string;\n        }\n\n        const App = (props: BooksTable) => {\n          return <div />;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'books' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'username' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface BooksTable extends ReturnType<() => {books:Array<string>}> {\n          username: string;\n        }\n\n        const App = (props: BooksTable) => {\n          return <div></div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'books' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'username' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type BooksTable = ReturnType<() => {books:Array<string>}> & {\n          username: string;\n        }\n\n        const App = (props: BooksTable) => {\n          return <div></div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'books' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'username' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type mapStateToProps = ReturnType<() => {books:Array<string>}>;\n\n        type Props = {\n          username: string;\n        }\n\n        type BooksTable = mapStateToProps & Props;\n\n        const App = (props: BooksTable) => {\n          return <div></div>;\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'books' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'username' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) => ({\n          ...bindActionCreators<{prop1: ()=>void,prop2: ()=>string}>(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          ),\n        })\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'prop1' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        function Foo(props) {\n          const { bar: { nope } } = props;\n          return <div test={nope} />;\n        }\n        Foo.propTypes = {\n          foo: PropTypes.number,\n          bar: PropTypes.shape({\n            faz: PropTypes.number,\n            qaz: PropTypes.object,\n          }),\n        };\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'foo' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        interface Props {\n          readonly firstname: string;\n          readonly lastname: string;\n        }\n\n        class TestComponent extends React.Component<Props> {\n          public render() {\n            return <div>{this.props.firstname}</div>;\n          }\n        }\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'lastname' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import React from \"react\";\n\n        var Hello = React.createClass({\n          propTypes: {\n            name: React.PropTypes.string,\n            foo: React.PropTypes.string,\n            propTypes: React.PropTypes.string\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+      "Tsx": true,
+      "Settings": {
+        "react": {
+          "createClass": "createClass"
+        }
+      },
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'foo' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        },
+        {
+          "MessageId": "",
+          "Message": "'propTypes' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "\n        import React from \"react\";\n\n        type props = {\n          foo: string;\n          bar: string;\n        };\n\n        const Demo: React.FC<props> = ({ foo }) => {\n          return <div {...{}}>{foo}</div>;\n        };\n\n        export default Demo;\n      ",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "",
+          "Message": "'bar' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    }
+  ]
+}
