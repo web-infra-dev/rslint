@@ -171,6 +171,9 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
+      - name: Format
+        run: pnpm format:check
+
       - name: Setup Go
         if: needs.changes.outputs.changed == 'true'
         uses: ./.github/actions/setup-go
@@ -223,9 +226,6 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
         run: pnpm --filter @rslint/native run build
-
-      - name: Format
-        run: pnpm format:check
 
       # Rule options JSON Schema dump for the generate-rule-option-types
       # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
