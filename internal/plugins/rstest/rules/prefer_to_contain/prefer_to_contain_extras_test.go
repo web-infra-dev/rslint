@@ -34,6 +34,8 @@ func TestPreferToContainExtras(t *testing.T) {
 			{Code: `expect(values.includes(NaN as number)).toEqual(false);`},
 			{Code: `expect(values.includes(Number.NaN)).toBe(true);`},
 			{Code: `expect(values.includes(globalThis['NaN'])).toBe(false);`},
+			{Code: "expect(values.includes(Number[`NaN`])).toBe(true);"},
+			{Code: `expect(values.includes(globalThis.Number.NaN)).toBe(false);`},
 			{Code: `type NaN = number; expect([NaN].includes(NaN)).toBe(true);`},
 			{Code: `interface Number {} expect([Number.NaN].includes(Number.NaN)).toBe(true);`},
 			{Code: `Number = { NaN: 1 } as any; expect([1].includes(Number.NaN)).toBe(true);`},

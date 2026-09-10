@@ -29,28 +29,16 @@ func isExplicitNaN(ctx rule.RuleContext, node *ast.Node) bool {
 	if node.Kind == ast.KindIdentifier {
 		return isUnshadowedRuntimeGlobal(ctx, node, "NaN")
 	}
-	var receiver *ast.Node
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		property := node.AsPropertyAccessExpression()
-		name := property.Name()
-		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "NaN" {
-			return false
-		}
-		receiver = property.Expression
-	case ast.KindElementAccessExpression:
-		element := node.AsElementAccessExpression()
-		key := ast.SkipParentheses(element.ArgumentExpression)
-		if key == nil || key.Kind != ast.KindStringLiteral || key.AsStringLiteral().Text != "NaN" {
-			return false
-		}
-		receiver = element.Expression
-	default:
+	if name, ok := utils.AccessExpressionStaticName(node); !ok || name != "NaN" {
 		return false
 	}
-	receiver = ast.SkipParentheses(receiver)
+	receiver := testFramework.FollowTypeAssertionChain(utils.AccessExpressionObject(node))
 	if receiver == nil || receiver.Kind != ast.KindIdentifier {
-		return false
+		if name, ok := utils.AccessExpressionStaticName(receiver); !ok || name != "Number" {
+			return false
+		}
+		receiver = testFramework.FollowTypeAssertionChain(utils.AccessExpressionObject(receiver))
+		return isUnshadowedRuntimeGlobal(ctx, receiver, "globalThis")
 	}
 	name := receiver.AsIdentifier().Text
 	return (name == "Number" || name == "globalThis") &&
