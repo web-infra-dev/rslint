@@ -48,7 +48,17 @@ fix rewrites the assertion to a numeric matcher and fails at runtime:
 expect(myName > theirName).toBe(true);
 ```
 
+Negative expectations use the opposite comparison operator, matching eslint-plugin-jest. This assumes neither operand is `NaN`: for example, `expect(NaN > 1).toBe(false)` passes, but its fix `expect(NaN).toBeLessThanOrEqual(1)` fails. Disable the rule for comparisons that may involve `NaN` and need to retain that behavior.
+
+## Differences from ESLint
+
+- Parentheses around comma-expression operands are preserved, so moving `(read(), value)` does not turn it into multiple arguments.
+- Type assertions on boolean expectations are removed with the boolean, rather than being applied to the replacement operand. For example, `toBe(true as const)` does not become `toBeGreaterThan(limit as const)`.
+- String literals inside TypeScript type assertions are excluded just like unwrapped string literals.
+- Only one diagnostic is emitted for the equality matcher when further calls follow it, such as `expect(a > b).toBe(true).toString()`.
+- Assertions with parentheses around the receiver, such as `(expect(a > b)).toBe(true)`, are reported without an autofix to avoid removing only the closing parentheses.
+
 ## Original Documentation
 
-- [eslint-plugin-jest: prefer-comparison-matcher](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-comparison-matcher.md)
-- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/src/rules/prefer-comparison-matcher.ts)
+- [eslint-plugin-jest: prefer-comparison-matcher](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.1/docs/rules/prefer-comparison-matcher.md)
+- [Source code](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.1/src/rules/prefer-comparison-matcher.ts)

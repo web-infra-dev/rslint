@@ -1,135 +1,49 @@
 package prefer_comparison_matcher
 
 import (
-	"slices"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
+	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_comparison_matcher"
 )
 
-type comparisonMatcher struct {
-	matcher        string
-	negatedMatcher string
-}
-
-var comparisonMatchers = map[ast.Kind]comparisonMatcher{
-	ast.KindGreaterThanToken:       {matcher: "toBeGreaterThan", negatedMatcher: "toBeLessThanOrEqual"},
-	ast.KindLessThanToken:          {matcher: "toBeLessThan", negatedMatcher: "toBeGreaterThanOrEqual"},
-	ast.KindGreaterThanEqualsToken: {matcher: "toBeGreaterThanOrEqual", negatedMatcher: "toBeLessThan"},
-	ast.KindLessThanEqualsToken:    {matcher: "toBeLessThanOrEqual", negatedMatcher: "toBeGreaterThan"},
-}
-
-func buildUseComparisonMatcherMessage(preferredMatcher string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "useToBeComparison",
-		Description: "Prefer using `" + preferredMatcher + "` instead",
-		Data: map[string]string{
-			"preferredMatcher": preferredMatcher,
-		},
-	}
-}
-
-func isStringComparisonOperand(node *ast.Node) bool {
-	return internalUtils.IsStringLiteralOrTemplate(utils.UnwrapBasicTypeAssertions(node))
-}
-
-func parseComparison(node *ast.Node) (left, right *ast.Node, matchers comparisonMatcher, ok bool) {
-	node = ast.SkipParentheses(node)
-	if node == nil || node.Kind != ast.KindBinaryExpression {
-		return nil, nil, comparisonMatcher{}, false
-	}
-
-	bin := node.AsBinaryExpression()
-	matchers, ok = comparisonMatchers[bin.OperatorToken.Kind]
-	if !ok || isStringComparisonOperand(bin.Left) || isStringComparisonOperand(bin.Right) {
-		return nil, nil, comparisonMatcher{}, false
-	}
-
-	return bin.Left, bin.Right, matchers, true
-}
-
-func buildModifierText(jestFnCall *utils.ParsedJestFnCall) string {
-	if len(jestFnCall.ModifierEntries) > 0 && jestFnCall.ModifierEntries[0].Name != "not" {
-		return "." + jestFnCall.ModifierEntries[0].Name
-	}
-	return ""
-}
-
-var PreferComparisonMatcherRule = rule.Rule{
-	Name:   "jest/prefer-comparison-matcher",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil ||
-					jestFnCall.Kind != utils.JestFnTypeExpect ||
-					jestFnCall.MatcherEntry == nil ||
-					!utils.EQUALITY_METHOD_NAMES[jestFnCall.Matcher] {
-					return
-				}
-
-				expectCall := jestFnCall.Head.Local.Node.Parent
-				if expectCall == nil || expectCall.Kind != ast.KindCallExpression {
-					return
-				}
-
-				expectArgs := expectCall.Arguments()
-				if len(expectArgs) == 0 {
-					return
-				}
-
-				left, right, matchers, ok := parseComparison(expectArgs[0])
-				if !ok {
-					return
-				}
-
-				matcherEntry := jestFnCall.MatcherEntry
-				if matcherEntry.Call == nil || node != matcherEntry.Call {
-					return
-				}
-
-				// The accessor, not the entry's direct parent, ends the modifier
-				// range: a parenthesized key such as `[("toBe")]` parents the
-				// literal to the parentheses rather than the element access.
-				_, matcherAccessor := utils.GetAccessorReceiverAndParent(matcherEntry)
-				if matcherAccessor == nil {
-					return
-				}
-
-				matcherArgs := matcherEntry.Call.AsCallExpression().Arguments.Nodes
-				if len(matcherArgs) == 0 {
-					return
-				}
-
-				matcherArg := matcherArgs[0]
-				matcherValue, ok := utils.IsBooleanLiteral(matcherArg)
-				if !ok {
-					return
-				}
-
-				preferredMatcher := matchers.matcher
-				if matcherValue == slices.Contains(jestFnCall.Modifiers, "not") {
-					preferredMatcher = matchers.negatedMatcher
-				}
-
-				comparison := ast.SkipParentheses(expectArgs[0])
-				leftText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, left, false)
-				rightText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, right, false)
-				modifierRange := core.NewTextRange(expectCall.End(), matcherAccessor.End())
-
-				ctx.ReportNodeWithFixes(
-					matcherEntry.Node,
-					buildUseComparisonMatcherMessage(preferredMatcher),
-					rule.RuleFixReplace(ctx.SourceFile, comparison, leftText),
-					rule.RuleFixReplaceRange(modifierRange, buildModifierText(jestFnCall)+"."+preferredMatcher),
-					rule.RuleFixReplace(ctx.SourceFile, matcherArg, rightText),
-				)
-			},
+var PreferComparisonMatcherRule = shared.NewRule(shared.Config{
+	Name: "jest/prefer-comparison-matcher",
+	Prepare: func(ctx rule.RuleContext) func(*ast.Node) *shared.ExpectCall {
+		return func(node *ast.Node) *shared.ExpectCall {
+			parsed := jestUtils.ParseJestFnCall(node, ctx)
+			if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect || parsed.MatcherEntry == nil || parsed.MatcherEntry.Call != node {
+				return nil
+			}
+			head := ast.WalkUpParenthesizedExpressions(parsed.Head.Local.Node.Parent)
+			if head == nil || head.Kind != ast.KindCallExpression {
+				return nil
+			}
+			return &shared.ExpectCall{
+				HeadCall: head, MatcherCall: node, MatcherEntry: *parsed.MatcherEntry,
+				Matcher: parsed.Matcher, Modifiers: parsed.ModifierEntries,
+			}
 		}
 	},
-}
+	BuildFixes: func(ctx rule.RuleContext, match shared.Match) []rule.RuleFix {
+		_, accessor := testFramework.AccessorReceiverAndParent(&match.Expect.MatcherEntry)
+		if accessor == nil {
+			return nil
+		}
+		// Replacing across receiver parentheses would leave unmatched opening parentheses.
+		for receiver := accessor.Expression(); receiver != match.Expect.HeadCall; receiver = receiver.Expression() {
+			if receiver == nil || receiver.Kind == ast.KindParenthesizedExpression {
+				return nil
+			}
+		}
+		modifier := ""
+		if entries := match.Expect.Modifiers; len(entries) > 0 && entries[0].Name != "not" {
+			modifier = "." + entries[0].Name
+		}
+		return append(shared.OperandFixes(ctx, match), rule.RuleFixReplaceRange(
+			core.NewTextRange(match.Expect.HeadCall.End(), accessor.End()), modifier+"."+match.Matcher,
+		))
+	},
+})

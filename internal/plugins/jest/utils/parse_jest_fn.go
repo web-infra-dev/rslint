@@ -230,11 +230,17 @@ func ResolveFunctionReferenceForModule(
 	ctx rule.RuleContext,
 	importModule string,
 ) (string, *ast.Node, JestImportMode) {
-	return testFramework.ResolveFunctionReferenceForModule(
-		node,
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return localName, localNode, JEST_GLOBAL_MODE
+	}
+	identifier := ResolveFirstIdentifier(node.AsCallExpression().Expression)
+	if identifier == nil {
+		return localName, localNode, JEST_GLOBAL_MODE
+	}
+	return testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
 		localName,
-		localNode,
-		ctx.TypeChecker,
+		identifier,
+		ctx.Refs.Resolve(identifier),
 		ctx.SourceFile,
 		importModule,
 	)
