@@ -54,14 +54,17 @@ func isExplicitNaN(ctx rule.RuleContext, node *ast.Node) bool {
 	return (name == "Number" || name == "globalThis") && isGlobalIdentifier(ctx, receiver, name)
 }
 
-func isKnownStringRegexpDifference(receiver, item *ast.Node) bool {
+func shouldIgnoreRegexpItem(receiver, item *ast.Node) bool {
 	receiver = testFramework.FollowTypeAssertionChain(receiver)
 	item = testFramework.FollowTypeAssertionChain(item)
-	return receiver != nil && item != nil &&
-		(receiver.Kind == ast.KindStringLiteral ||
-			receiver.Kind == ast.KindNoSubstitutionTemplateLiteral ||
-			receiver.Kind == ast.KindTemplateExpression) &&
-		item.Kind == ast.KindRegularExpressionLiteral
+	if receiver == nil || item == nil || item.Kind != ast.KindRegularExpressionLiteral {
+		return false
+	}
+	// A RegExp is a valid array item, but String.prototype.includes throws for
+	// one while Rstest's matcher delegates to Chai's string indexOf path. In a
+	// source-only rule an arbitrary receiver cannot be proven non-string, so
+	// only the syntactically certain array case is safe to recommend and fix.
+	return receiver.Kind != ast.KindArrayLiteralExpression
 }
 
 func isSafeToMove(node *ast.Node) bool {
@@ -164,7 +167,7 @@ var PreferToContainRule = shared.NewRule(shared.Config{
 		// Array.prototype.includes uses SameValueZero, while Rstest's current
 		// Vitest matcher layer delegates array containment to indexOf. Rewriting
 		// an explicit NaN would therefore reverse a passing assertion.
-		return isExplicitNaN(ctx, matched.Item) || isKnownStringRegexpDifference(matched.Receiver, matched.Item)
+		return isExplicitNaN(ctx, matched.Item) || shouldIgnoreRegexpItem(matched.Receiver, matched.Item)
 	},
 	BuildFixes: func(ctx rule.RuleContext, matched shared.Match) []rule.RuleFix {
 		if !isSafeToMove(matched.Item) {

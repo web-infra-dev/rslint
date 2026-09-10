@@ -36,6 +36,8 @@ func TestPreferToContainExtras(t *testing.T) {
 			{Code: `expect(values.includes(globalThis['NaN'])).toBe(false);`},
 			{Code: `expect('abc'.includes(/a/ as any)).toBe(false);`},
 			{Code: "expect(`a${value}`.includes(/a/ as any)).toBe(false);"},
+			{Code: `expect(('a' + suffix).includes(/a/ as any)).toBe(false);`},
+			{Code: `expect(value.includes(/a/ as any)).toBe(false);`},
 			// ---- Rstest provenance: foreign and locally shadowed expect values ----
 			{Code: `import { expect } from 'vitest'; expect(list.includes(item)).toBe(true);`},
 			{Code: `import { expect } from '@jest/globals'; expect(list.includes(item)).toBe(true);`},
@@ -63,6 +65,11 @@ func TestPreferToContainExtras(t *testing.T) {
 			// patterns are not nodes inspected by this assertion-call rule.
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `expect([/a/].includes(/a/)).toBe(true);`,
+				Output: []string{`expect([/a/]).toContain(/a/);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
 			// ---- Dimension 4: parentheses and assertion wrappers ----
 			{
 				Code:   `expect(((list.includes(item)))).toEqual((true as boolean));`,
