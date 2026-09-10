@@ -20,6 +20,14 @@ import {
 } from './wasm';
 import { readShareState } from './share-url';
 import { sourceFileNeedsJsChecking, type SourceFileName } from './source-file';
+import {
+  addSourceTypeResolutions,
+  cancelUnusedSourceTypeLoads,
+  findSourceTypePackages,
+  loadSourceTypes,
+  sourceTypeKey,
+  type SourceTypeEnvironment,
+} from './source-types';
 
 function compilerOptionsForSourceFile(
   sourceFileName: SourceFileName,
@@ -68,6 +76,7 @@ const Playground: React.FC = () => {
     selectedVersion,
     sourceFileName,
   );
+  const activeSourceTypeKeyRef = useRef('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -113,6 +122,33 @@ const Playground: React.FC = () => {
       const code = editorRef.current?.getValue() ?? '';
       const sourceFileName =
         editorRef.current?.getSourceFileName() ?? 'index.ts';
+      const sourceTypePackages = findSourceTypePackages(code);
+      let sourceTypes: SourceTypeEnvironment | undefined;
+      if (sourceTypePackages.length > 0) {
+        try {
+          sourceTypes = await loadSourceTypes(sourceTypePackages);
+        } catch (typeError) {
+          if (
+            !isCurrentLintRun(runId, version) ||
+            sourceTypeKey(
+              findSourceTypePackages(editorRef.current?.getValue() ?? ''),
+            ) !== sourceTypeKey(sourceTypePackages)
+          ) {
+            return;
+          }
+          console.warn('Failed to load source dependency types:', typeError);
+        }
+        if (
+          !isCurrentLintRun(runId, version) ||
+          sourceTypeKey(
+            findSourceTypePackages(editorRef.current?.getValue() ?? ''),
+          ) !== sourceTypeKey(sourceTypePackages)
+        ) {
+          return;
+        }
+        editorRef.current?.setSourceTypeEnvironment(sourceTypes);
+        activeSourceTypeKeyRef.current = sourceTypes?.key ?? '';
+      }
       const rslintConfig = await editorRef.current?.getRslintConfig(version);
       if (!isCurrentLintRun(runId, version)) return;
       const tsConfig = editorRef.current?.getTsConfig();
@@ -121,11 +157,20 @@ const Playground: React.FC = () => {
       const fileContents: Record<string, string> = {
         [`/${sourceFileName}`]: code,
       };
+      for (const declaration of sourceTypes?.declarations ?? []) {
+        fileContents[declaration.lintPath] = declaration.content;
+      }
 
       // Add tsconfig.json if we have a valid config
       if (tsConfig) {
+        const sourceFileTsConfig = compilerOptionsForSourceFile(
+          sourceFileName,
+          tsConfig,
+        );
         fileContents['/tsconfig.json'] = JSON.stringify(
-          compilerOptionsForSourceFile(sourceFileName, tsConfig),
+          sourceTypes
+            ? addSourceTypeResolutions(sourceFileTsConfig, sourceTypes)
+            : sourceFileTsConfig,
         );
       }
 
@@ -135,6 +180,7 @@ const Playground: React.FC = () => {
       // rules (with their options) travel inside the config entries; there is
       // no separate ruleOptions surface.
       const result = await service.lint({
+        files: sourceTypes ? [`/${sourceFileName}`] : undefined,
         includeEncodedSourceFiles: true,
         fileContents,
         config: rslintConfig,
@@ -243,6 +289,7 @@ const Playground: React.FC = () => {
   useEffect(() => {
     return () => {
       latestLintRunIdRef.current++;
+      cancelUnusedSourceTypeLoads([]);
       if (lintTimer.current) {
         window.clearTimeout(lintTimer.current);
         lintTimer.current = null;
@@ -410,7 +457,18 @@ const Playground: React.FC = () => {
           <div className="editor-panel">
             <EditorTabs
               ref={editorRef}
-              onChange={() => scheduleRunLint()}
+              onChange={(code) => {
+                const sourceTypePackages = findSourceTypePackages(code);
+                cancelUnusedSourceTypeLoads(sourceTypePackages);
+                if (
+                  sourceTypeKey(sourceTypePackages) !==
+                  activeSourceTypeKeyRef.current
+                ) {
+                  editorRef.current?.setSourceTypeEnvironment(undefined);
+                  activeSourceTypeKeyRef.current = '';
+                }
+                scheduleRunLint();
+              }}
               onSourceFileNameChange={setSourceFileName}
               onSelectionChange={(start: number, end: number) =>
                 setSelectedAstRange((prev) => {
