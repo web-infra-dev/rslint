@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed jsx_fragments.schema.json
@@ -22,7 +21,7 @@ var JsxFragmentsRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		mode := parseMode(options)
-		reactPragma := reactutil.GetReactPragma(ctx.Settings)
+		reactPragma := reactutil.GetReactPragmaFromContext(ctx)
 		fragmentPragma := reactutil.GetReactFragmentPragma(ctx.Settings)
 		openFragLong := "<" + reactPragma + "." + fragmentPragma + ">"
 		closeFragLong := "</" + reactPragma + "." + fragmentPragma + ">"
@@ -186,7 +185,7 @@ func (m fragmentMatcher) isReactFragment(opening *ast.Node) bool {
 	if tagName == nil || tagName.Kind != ast.KindIdentifier {
 		return false
 	}
-	return m.refersToReactFragment(tagName, tagName.AsIdentifier().Text)
+	return m.refersToReactFragment(tagName)
 }
 
 func (m fragmentMatcher) collectImportFragmentNames(root *ast.Node) {
@@ -238,19 +237,12 @@ func (m fragmentMatcher) collectImportDeclaration(node *ast.Node) {
 	}
 }
 
-func (m fragmentMatcher) refersToReactFragment(ident *ast.Node, name string) bool {
-	if ident == nil || name == "" {
+func (m fragmentMatcher) refersToReactFragment(ident *ast.Node) bool {
+	if ident == nil {
 		return false
 	}
-	if m.ctx.TypeChecker != nil {
-		if decl := declarationForIdentifier(utils.GetReferenceSymbol(ident, m.ctx.TypeChecker)); decl != nil {
-			return m.declarationRefersToReactFragment(decl)
-		}
-	}
-	if m.ctx.SourceFile == nil {
-		return false
-	}
-	return m.syntaxDeclarationRefersToReactFragment(m.ctx.SourceFile.AsNode(), name)
+	decl := declarationForIdentifier(m.ctx.Refs.Resolve(ident))
+	return decl != nil && m.declarationRefersToReactFragment(decl)
 }
 
 func declarationForIdentifier(symbol *ast.Symbol) *ast.Node {
@@ -279,42 +271,6 @@ func (m fragmentMatcher) declarationRefersToReactFragment(decl *ast.Node) bool {
 	default:
 		return false
 	}
-}
-
-func (m fragmentMatcher) syntaxDeclarationRefersToReactFragment(root *ast.Node, name string) bool {
-	var found bool
-	var visit func(*ast.Node)
-	visit = func(node *ast.Node) {
-		if found || node == nil {
-			return
-		}
-		if node.Kind == ast.KindVariableDeclaration && variableDeclarationBindsName(node, name) {
-			found = m.initializerRefersToReactFragment(node.AsVariableDeclaration().Initializer)
-			if found {
-				return
-			}
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return found
-		})
-	}
-	visit(root)
-	return found
-}
-
-func variableDeclarationBindsName(node *ast.Node, name string) bool {
-	declName := node.AsVariableDeclaration().Name()
-	if declName == nil {
-		return false
-	}
-	found := false
-	utils.CollectBindingNames(declName, func(_ *ast.Node, bindingName string) {
-		if bindingName == name {
-			found = true
-		}
-	})
-	return found
 }
 
 func (m fragmentMatcher) initializerRefersToReactFragment(init *ast.Node) bool {

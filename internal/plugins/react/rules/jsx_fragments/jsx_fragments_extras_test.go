@@ -37,6 +37,10 @@ func TestJsxFragmentsExtras(t *testing.T) {
 			Code: "const Frag = Act.Frag;\nfunction render(Frag) { return <Frag><Foo /></Frag>; }",
 			Tsx:  true, Settings: settings,
 		},
+		{
+			Code: "function f(){const F=Act.Frag;} const F=Widget; <F/>;",
+			Tsx:  true, Settings: settings,
+		},
 
 		// ---- Dimension 4: TS-only expression wrappers stay opaque ----
 		{Code: "const Frag = Other.Frag as any;\n<Frag><Foo /></Frag>;", Tsx: true, Settings: settings},
@@ -62,6 +66,29 @@ func TestJsxFragmentsExtras(t *testing.T) {
 		// N/A: Function/class container forms are not target nodes for this rule.
 		// N/A: Autofix side-effect suppression is not needed; fixes only replace tag tokens.
 	}, []rule_tester.InvalidTestCase{
+		// ---- File pragma: @jsx overrides settings pragma in syntax mode ----
+		{
+			Code:     `/** @jsx Preact.h */ <Preact.Frag/>`,
+			Output:   []string{`/** @jsx Preact.h */ <></>`},
+			Tsx:      true,
+			Settings: settings,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferFragment", Message: preferFragmentDescription("Preact", "Frag"), Line: 1, Column: 22},
+			},
+		},
+
+		// ---- File pragma: @jsx overrides settings pragma in element mode ----
+		{
+			Code:     `/** @jsx Preact.h */ <></>`,
+			Output:   []string{`/** @jsx Preact.h */ <Preact.Frag></Preact.Frag>`},
+			Tsx:      true,
+			Options:  modeElement,
+			Settings: settings,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferPragma", Message: preferPragmaDescription("Preact", "Frag"), Line: 1, Column: 22},
+			},
+		},
+
 		// ---- Config: bare string option shape ----
 		{
 			Code:     `<><Foo /></>`,

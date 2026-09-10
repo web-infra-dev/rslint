@@ -56,6 +56,11 @@ Examples of **correct** code for this rule with `"element"`:
 Support for fragments was added in React v16.2, so the rule reports either form
 when an older React version is specified in shared settings.
 
+A file-level `@jsx` annotation selects the JSX factory for that file and takes
+precedence over `settings.react.pragma`. For example, `/** @jsx Preact.h */`
+makes the long fragment form `Preact.Fragment`. The fragment member name can
+still be configured separately with `settings.react.fragment`.
+
 ## Original Documentation
 
 - [eslint-plugin-react: jsx-fragments](https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/docs/rules/jsx-fragments.md)
