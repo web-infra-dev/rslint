@@ -158,6 +158,70 @@ fn test_tsgo_integration_simple_project() {
 }
 
 #[test]
+fn test_type_literal_symbol_has_symbol_data() {
+    let tsgo_path = get_tsgo_path().expect("Could not find tsgo executable");
+    let fixture_dir = get_fixtures_dir().join("simple-project");
+    let config_file = fixture_dir.join("tsconfig.json");
+    let options = Options {
+        cwd: Some(fixture_dir),
+        log_file: None,
+        config_file: config_file.to_string_lossy().to_string(),
+    };
+    let client = Client::builder(OsStr::new(&tsgo_path), options)
+        .build()
+        .expect("Failed to build client");
+    let api = Api::with_uninitialized_client(client).expect("Failed to initialize API");
+    let mut buffer = Vec::new();
+    let project = api
+        .load_project(&mut buffer)
+        .expect("Failed to load project");
+    let semantic = &project.semantic;
+
+    let index_sourcefile_id = project
+        .module_list
+        .iter()
+        .position(|path| path.ends_with("/src/index.ts"))
+        .expect("Expected index.ts module") as u32;
+    let parameter_symbol_id = semantic
+        .symtab
+        .iter()
+        .find(|(_, data)| {
+            data.name == b"o"
+                && data
+                    .decl
+                    .as_ref()
+                    .is_some_and(|decl| decl.sourcefile_id == index_sourcefile_id)
+        })
+        .map(|(id, _)| *id)
+        .expect("Expected symbol data for parameter o");
+    let type_id = semantic
+        .sym2type
+        .iter()
+        .find(|(symbol_id, _)| *symbol_id == parameter_symbol_id)
+        .map(|(_, type_id)| *type_id)
+        .expect("Expected type for parameter o");
+    let type_symbol_id = semantic
+        .typetab
+        .iter()
+        .find(|(id, _)| *id == type_id)
+        .and_then(|(_, data)| data.symbol)
+        .expect("Expected the type literal to have a symbol");
+    let type_symbol_data = semantic
+        .symtab
+        .iter()
+        .find(|(id, _)| *id == type_symbol_id)
+        .map(|(_, data)| data)
+        .expect("Expected type literal symbol data in symtab");
+
+    assert_eq!(type_symbol_data.name, b"__type");
+    assert!(
+        SymbolFlags::from_bits_truncate(type_symbol_data.flags).contains(SymbolFlags::TYPE_LITERAL),
+        "Expected a type literal symbol, got flags {}",
+        type_symbol_data.flags
+    );
+}
+
+#[test]
 fn test_runtime_module_exports() {
     let tsgo_path = get_tsgo_path().expect("Could not find tsgo executable");
     let fixture_dir = get_fixtures_dir().join("module-exports");
