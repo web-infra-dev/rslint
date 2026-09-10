@@ -1,5 +1,5 @@
 export interface SourceTypeDeclaration {
-  specifier: string;
+  specifier?: string;
   content: string;
   monacoPath: string;
   lintPath: string;
@@ -18,6 +18,11 @@ interface SourceTypePackage {
   importPattern: RegExp;
 }
 
+interface TransitiveTypeDependency {
+  urlPattern: RegExp;
+  virtualPath: string;
+}
+
 // Add another descriptor here when the Playground supports types for another
 // source dependency. Packages are loaded only when their pattern matches.
 const SOURCE_TYPE_PACKAGES: SourceTypePackage[] = [
@@ -25,15 +30,39 @@ const SOURCE_TYPE_PACKAGES: SourceTypePackage[] = [
     specifier: '@rstest/core',
     packageUrl: 'https://esm.sh/@rstest/core',
     monacoPath: 'file:///node_modules/@rstest/core/index.d.ts',
-    lintPath: '/source-types/rstest-core.d.ts',
+    lintPath: '/rstest-core.d.ts',
     importPattern: /\bfrom\s*(['"])@rstest\/core\1/,
   },
 ];
 
-const cachedDeclarations = new Map<string, SourceTypeDeclaration>();
+const TRANSITIVE_TYPE_DEPENDENCIES: TransitiveTypeDependency[] = [
+  {
+    urlPattern: new RegExp(
+      '^https://esm\\.sh/@types/chai@[^/]+/index\\.d\\.ts$',
+    ),
+    virtualPath: 'rstest-chai.d.ts',
+  },
+  {
+    urlPattern: new RegExp(
+      '^https://esm\\.sh/@types/deep-eql@[^/]+/index\\.d\\.ts$',
+    ),
+    virtualPath: 'rstest-deep-eql.d.ts',
+  },
+  {
+    urlPattern: new RegExp(
+      '^https://esm\\.sh/assertion-error@[^/]+/index\\.d\\.ts$',
+    ),
+    virtualPath: 'rstest-assertion-error.d.ts',
+  },
+];
+
+const TYPE_IMPORT =
+  /(?:from\s+|import\(\s*|require\(\s*)(['"])([^'"]+\.d\.ts)\1/g;
+
+const cachedDeclarations = new Map<string, SourceTypeDeclaration[]>();
 const pendingDeclarations = new Map<
   string,
-  { controller: AbortController; promise: Promise<SourceTypeDeclaration> }
+  { controller: AbortController; promise: Promise<SourceTypeDeclaration[]> }
 >();
 
 export function findSourceTypePackages(source: string): string[] {
@@ -46,10 +75,94 @@ export function sourceTypeKey(specifiers: string[]): string {
   return specifiers.join('\0');
 }
 
-async function fetchLatestDeclaration(
+function relativeSpecifier(fromPath: string, toPath: string): string {
+  const from = fromPath.split('/').slice(0, -1);
+  const to = toPath.split('/');
+  while (from.length > 0 && to.length > 0 && from[0] === to[0]) {
+    from.shift();
+    to.shift();
+  }
+  const relative = `${'../'.repeat(from.length)}${to.join('/')}`;
+  return relative.startsWith('../') ? relative : `./${relative}`;
+}
+
+async function fetchDeclarationGraph(
+  dependency: SourceTypePackage,
+  entryUrl: URL,
+  signal: AbortSignal,
+): Promise<SourceTypeDeclaration[]> {
+  const declarations: SourceTypeDeclaration[] = [];
+  const loaded = new Map<string, Promise<void>>();
+  const monacoRoot = new URL('.', dependency.monacoPath);
+  const lintRoot = new URL('.', `file://${dependency.lintPath}`);
+
+  function load(
+    url: URL,
+    monacoPath: string,
+    lintPath: string,
+    specifier?: string,
+  ): Promise<void> {
+    const existing = loaded.get(url.href);
+    if (existing) return existing;
+
+    const request = (async () => {
+      const response = await fetch(url, { signal });
+      if (!response.ok) {
+        throw new Error(
+          `unable to load ${dependency.specifier} declarations: ${response.status}`,
+        );
+      }
+
+      let content = await response.text();
+      const imports = [...content.matchAll(TYPE_IMPORT)].map(
+        (match) => match[2],
+      );
+      await Promise.all(
+        imports.map(async (imported) => {
+          const importedUrl = new URL(imported, url);
+          let importedMonacoPath: string;
+          let importedLintPath: string;
+
+          if (imported.startsWith('./') || imported.startsWith('../')) {
+            importedMonacoPath = new URL(imported, monacoPath).href;
+            importedLintPath = new URL(imported, `file://${lintPath}`).pathname;
+          } else {
+            const transitive = TRANSITIVE_TYPE_DEPENDENCIES.find(
+              ({ urlPattern }) => urlPattern.test(importedUrl.href),
+            );
+            if (!transitive) return;
+            importedMonacoPath = new URL(transitive.virtualPath, monacoRoot)
+              .href;
+            importedLintPath = new URL(transitive.virtualPath, lintRoot)
+              .pathname;
+          }
+
+          content = content.replaceAll(
+            imported,
+            relativeSpecifier(lintPath, importedLintPath),
+          );
+          await load(importedUrl, importedMonacoPath, importedLintPath);
+        }),
+      );
+      declarations.push({ specifier, content, monacoPath, lintPath });
+    })();
+    loaded.set(url.href, request);
+    return request;
+  }
+
+  await load(
+    entryUrl,
+    dependency.monacoPath,
+    dependency.lintPath,
+    dependency.specifier,
+  );
+  return declarations;
+}
+
+async function fetchLatestDeclarations(
   dependency: SourceTypePackage,
   signal: AbortSignal,
-): Promise<SourceTypeDeclaration> {
+): Promise<SourceTypeDeclaration[]> {
   const packageResponse = await fetch(dependency.packageUrl, {
     cache: 'no-cache',
     signal,
@@ -66,27 +179,16 @@ async function fetchLatestDeclaration(
       `esm.sh did not provide ${dependency.specifier} declarations.`,
     );
   }
-
-  const typesResponse = await fetch(new URL(typesUrl, dependency.packageUrl), {
+  return fetchDeclarationGraph(
+    dependency,
+    new URL(typesUrl, dependency.packageUrl),
     signal,
-  });
-  if (!typesResponse.ok) {
-    throw new Error(
-      `unable to load ${dependency.specifier} declarations: ${typesResponse.status}`,
-    );
-  }
-
-  return {
-    specifier: dependency.specifier,
-    content: await typesResponse.text(),
-    monacoPath: dependency.monacoPath,
-    lintPath: dependency.lintPath,
-  };
+  );
 }
 
 function loadDeclaration(
   dependency: SourceTypePackage,
-): Promise<SourceTypeDeclaration> {
+): Promise<SourceTypeDeclaration[]> {
   const cached = cachedDeclarations.get(dependency.specifier);
   if (cached) return Promise.resolve(cached);
 
@@ -94,10 +196,10 @@ function loadDeclaration(
   if (pending) return pending.promise;
 
   const controller = new AbortController();
-  const promise = fetchLatestDeclaration(dependency, controller.signal)
-    .then((declaration) => {
-      cachedDeclarations.set(dependency.specifier, declaration);
-      return declaration;
+  const promise = fetchLatestDeclarations(dependency, controller.signal)
+    .then((declarations) => {
+      cachedDeclarations.set(dependency.specifier, declarations);
+      return declarations;
     })
     .finally(() => {
       if (pendingDeclarations.get(dependency.specifier)?.promise === promise) {
@@ -117,7 +219,7 @@ export async function loadSourceTypes(
   );
   return {
     key: sourceTypeKey(specifiers),
-    declarations: await Promise.all(dependencies.map(loadDeclaration)),
+    declarations: (await Promise.all(dependencies.map(loadDeclaration))).flat(),
   };
 }
 
@@ -153,10 +255,15 @@ export function addSourceTypeResolutions(
       paths: {
         ...paths,
         ...Object.fromEntries(
-          environment.declarations.map(({ specifier, lintPath }) => [
-            specifier,
-            [lintPath],
-          ]),
+          environment.declarations
+            .filter(
+              (
+                declaration,
+              ): declaration is SourceTypeDeclaration & {
+                specifier: string;
+              } => declaration.specifier !== undefined,
+            )
+            .map(({ specifier, lintPath }) => [specifier, [lintPath]]),
         ),
       },
     },
