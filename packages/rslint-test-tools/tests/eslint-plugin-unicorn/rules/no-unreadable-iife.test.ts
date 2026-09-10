@@ -1,5 +1,5 @@
 // Upstream tests and documentation from eslint-plugin-unicorn v74.0.0 (MIT).
-// License: internal/plugins/unicorn/rules/no_unreadable_iife/LICENSE
+// License: https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v74.0.0/license
 import path from 'node:path';
 import { lint } from '@rslint/core/internal';
 
