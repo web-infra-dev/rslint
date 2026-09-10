@@ -10,7 +10,8 @@ import (
 )
 
 func isUnshadowedRuntimeGlobal(ctx rule.RuleContext, node *ast.Node, name string) bool {
-	if node == nil || node.Kind != ast.KindIdentifier || node.AsIdentifier().Text != name {
+	if node == nil || node.Kind != ast.KindIdentifier || node.AsIdentifier().Text != name ||
+		!ctx.Globals.Access(name).IsDeclared() {
 		return false
 	}
 	if ctx.Refs != nil {

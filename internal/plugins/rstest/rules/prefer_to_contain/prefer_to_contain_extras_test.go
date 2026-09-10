@@ -164,6 +164,17 @@ func TestPreferToContainExtras(t *testing.T) {
 				Code:   `globalThis.Number = { NaN: 1 } as any; expect([1].includes(Number.NaN)).toBe(true);`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
 			},
+			{
+				Code:    `expect([NaN].includes(NaN)).toBe(true);`,
+				Globals: map[string]any{"NaN": "off"},
+				Output:  []string{`expect([NaN]).toContain(NaN);`},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
+			{
+				Code:    `expect([Number.NaN].includes(Number.NaN)).toBe(true);`,
+				Globals: map[string]any{"Number": "off"},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
 			// ---- Rstest source resolution ----
 			{
 				Code: `import { expect as check } from '@rstest/core';
