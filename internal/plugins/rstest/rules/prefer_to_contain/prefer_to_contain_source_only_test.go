@@ -30,6 +30,9 @@ rstestTest('context', ({ expect: localExpect }) => { localExpect(contextList.inc
 import { expect as vitestExpect } from 'vitest';
 vitestExpect(foreignList.includes(item)).toBe(true);
 function local() { const expect = createExpect(); expect(localList.includes(item)).toBe(true); }
+const NaN = 1; expect([1].includes(NaN)).toBe(true);
+function shadowNumber(Number: any) { expect([1].includes(Number.NaN)).toBe(true); }
+function shadowGlobalThis(globalThis: any) { expect([1].includes(globalThis.NaN)).toBe(true); }
 `
 	root := fixtures.GetRootDir()
 	fileName := tspath.ResolvePath(root.Dir, "prefer-to-contain-source-only.ts")
@@ -64,7 +67,7 @@ function local() { const expect = createExpect(); expect(localList.includes(item
 		t.Fatalf("RunLinter: %v", err)
 	}
 	sort.Ints(positions)
-	if len(positions) != 5 {
-		t.Fatalf("reported %d assertions, want 5 at %v", len(positions), positions)
+	if len(positions) != 8 {
+		t.Fatalf("reported %d assertions, want 8 at %v", len(positions), positions)
 	}
 }

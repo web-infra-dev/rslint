@@ -9,13 +9,23 @@ import (
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_to_contain"
 )
 
-func isExplicitNaN(node *ast.Node) bool {
+func isGlobalIdentifier(ctx rule.RuleContext, node *ast.Node, name string) bool {
+	if node == nil || node.Kind != ast.KindIdentifier || node.AsIdentifier().Text != name {
+		return false
+	}
+	if ctx.Refs != nil {
+		return ctx.Refs.IsGlobalNameReference(node, name, ast.SymbolFlagsValue|ast.SymbolFlagsAlias)
+	}
+	return !utils.IsShadowed(node, name)
+}
+
+func isExplicitNaN(ctx rule.RuleContext, node *ast.Node) bool {
 	node = testFramework.FollowTypeAssertionChain(node)
 	if node == nil {
 		return false
 	}
 	if node.Kind == ast.KindIdentifier {
-		return node.AsIdentifier().Text == "NaN"
+		return isGlobalIdentifier(ctx, node, "NaN")
 	}
 	var receiver *ast.Node
 	switch node.Kind {
@@ -41,7 +51,7 @@ func isExplicitNaN(node *ast.Node) bool {
 		return false
 	}
 	name := receiver.AsIdentifier().Text
-	return name == "Number" || name == "globalThis"
+	return (name == "Number" || name == "globalThis") && isGlobalIdentifier(ctx, receiver, name)
 }
 
 func isKnownStringRegexpDifference(receiver, item *ast.Node) bool {
@@ -150,11 +160,11 @@ var PreferToContainRule = shared.NewRule(shared.Config{
 			}
 		}}
 	},
-	IgnoreMatch: func(_ rule.RuleContext, matched shared.Match) bool {
+	IgnoreMatch: func(ctx rule.RuleContext, matched shared.Match) bool {
 		// Array.prototype.includes uses SameValueZero, while Rstest's current
 		// Vitest matcher layer delegates array containment to indexOf. Rewriting
 		// an explicit NaN would therefore reverse a passing assertion.
-		return isExplicitNaN(matched.Item) || isKnownStringRegexpDifference(matched.Receiver, matched.Item)
+		return isExplicitNaN(ctx, matched.Item) || isKnownStringRegexpDifference(matched.Receiver, matched.Item)
 	},
 	BuildFixes: func(ctx rule.RuleContext, matched shared.Match) []rule.RuleFix {
 		if !isSafeToMove(matched.Item) {

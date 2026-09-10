@@ -128,6 +128,21 @@ func TestPreferToContainExtras(t *testing.T) {
 				Code:   `expect(list.includes(+item)).toBe(true);`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 30}},
 			},
+			// A locally shadowed NaN spelling is an ordinary value, so the
+			// built-in NaN semantic exclusion must not suppress the rule.
+			{
+				Code:   `const NaN = 1; expect([1].includes(NaN)).toBe(true);`,
+				Output: []string{`const NaN = 1; expect([1]).toContain(NaN);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
+			{
+				Code:   `function f(Number: any) { expect([1].includes(Number.NaN)).toBe(true); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
+			{
+				Code:   `function f(globalThis: any) { expect([1].includes(globalThis.NaN)).toBe(true); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
 			// ---- Rstest source resolution ----
 			{
 				Code: `import { expect as check } from '@rstest/core';
