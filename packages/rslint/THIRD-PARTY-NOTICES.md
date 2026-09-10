@@ -1,12 +1,7 @@
 # Third-party notices
 
-This distribution includes software and data from:
-
-- [`globals` 17.11.0](https://github.com/sindresorhus/globals)
-- [`eslint-plugin-unicorn` v74.0.0](https://github.com/sindresorhus/eslint-plugin-unicorn/tree/v74.0.0),
-  for the native `unicorn/no-unreadable-iife` rule.
-
-Both are distributed under the following license:
+This distribution includes software and data from `globals` 17.11.0:
+https://github.com/sindresorhus/globals
 
 MIT License
 

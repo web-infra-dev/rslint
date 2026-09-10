@@ -1,4 +1,4 @@
-// Ported from eslint-plugin-unicorn v74.0.0 (MIT); see LICENSE.
+// Ported from eslint-plugin-unicorn v74.0.0.
 package no_unreadable_iife
 
 import (
