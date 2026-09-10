@@ -14,6 +14,7 @@ import {
   ModuleKind,
   ModuleResolutionKind,
   ScriptTarget,
+  typescriptDefaults,
 } from 'monaco-editor/languages/features/typescript/register';
 import { type Diagnostic } from '@rslint/core/service';
 import { useDark } from '@rspress/core/runtime';
@@ -25,6 +26,7 @@ import {
   writeShareState,
 } from './share-url';
 import { installRslintCoreTypes } from './config-types';
+import type { SourceTypeEnvironment } from './source-types';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
 
@@ -59,6 +61,9 @@ export interface EditorTabsRef {
   highlightRange: (start: number, end: number) => void;
   /** Clear the temporary highlight decoration */
   clearHighlight: () => void;
+  setSourceTypeEnvironment: (
+    environment: SourceTypeEnvironment | undefined,
+  ) => void;
   /**
    * Write the pending URL update now instead of when its debounce expires, so
    * that a reader who edits and immediately shares copies what is on screen.
@@ -126,6 +131,13 @@ export const EditorTabs = ({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onConfigChangeRef = useRef(onConfigChange);
   const wasmVersionRef = useRef(wasmVersion);
+  const sourceTypeLibrariesRef = useRef<monaco.IDisposable[]>([]);
+  const activeSourceTypeEnvironmentRef = useRef<
+    SourceTypeEnvironment | undefined
+  >(undefined);
+  const codeCompilerOptionsRef = useRef<
+    ReturnType<typeof typescriptDefaults.getCompilerOptions> | undefined
+  >(undefined);
 
   const lastValidTsConfig = useRef<any>(null);
 
@@ -171,6 +183,37 @@ export const EditorTabs = ({
   }, []);
 
   useImperativeHandle(ref, () => ({
+    setSourceTypeEnvironment: (environment) => {
+      if (activeSourceTypeEnvironmentRef.current?.key === environment?.key) {
+        return;
+      }
+      for (const library of sourceTypeLibrariesRef.current) library.dispose();
+      sourceTypeLibrariesRef.current = [];
+      activeSourceTypeEnvironmentRef.current = environment;
+      if (!environment) {
+        if (codeCompilerOptionsRef.current) {
+          typescriptDefaults.setCompilerOptions(codeCompilerOptionsRef.current);
+          codeCompilerOptionsRef.current = undefined;
+        }
+        return;
+      }
+
+      if (!codeCompilerOptionsRef.current) {
+        codeCompilerOptionsRef.current =
+          typescriptDefaults.getCompilerOptions();
+        typescriptDefaults.setCompilerOptions({
+          ...codeCompilerOptionsRef.current,
+          module: ModuleKind.ESNext,
+          moduleResolution: ModuleResolutionKind.NodeJs,
+          target: ScriptTarget.ESNext,
+          skipLibCheck: true,
+        });
+      }
+      sourceTypeLibrariesRef.current = environment.declarations.map(
+        ({ content, monacoPath }) =>
+          typescriptDefaults.addExtraLib(content, monacoPath),
+      );
+    },
     flushShareUrl: () => {
       if (typeof window === 'undefined') return;
       cancelPendingSerialize();
@@ -310,9 +353,13 @@ export const EditorTabs = ({
   useEffect(() => {
     if (!codeContainerRef.current) return;
 
+    const model = monaco.editor.createModel(
+      initialState.code,
+      'typescript',
+      monaco.Uri.parse('file:///index.ts'),
+    );
     const editor = monaco.editor.create(codeContainerRef.current, {
-      value: initialState.code,
-      language: 'typescript',
+      model,
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
@@ -375,6 +422,14 @@ export const EditorTabs = ({
     return () => {
       selDisposable.dispose();
       editor.dispose();
+      model.dispose();
+      for (const library of sourceTypeLibrariesRef.current) library.dispose();
+      sourceTypeLibrariesRef.current = [];
+      activeSourceTypeEnvironmentRef.current = undefined;
+      if (codeCompilerOptionsRef.current) {
+        typescriptDefaults.setCompilerOptions(codeCompilerOptionsRef.current);
+        codeCompilerOptionsRef.current = undefined;
+      }
       if (editingTimer.current) {
         window.clearTimeout(editingTimer.current);
       }
