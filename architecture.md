@@ -31,7 +31,7 @@ Rslint is a high-performance JavaScript and TypeScript linter, designed as a dro
 - **TypeScript First**: Uses TypeScript Compiler semantics as single source of truth for 100% consistency
 - **Project-Level Analysis**: Cross-module analysis by default for powerful semantic linting
 - **Monorepo Ready**: First-class support for large-scale monorepos with TypeScript project references
-- **Batteries Included**: Ships with all existing TypeScript-ESLint rules and widely-used ESLint rules
+- **Batteries Included**: Ships with all existing typescript-eslint rules and ESLint rules
 
 ### Non-Goals
 
