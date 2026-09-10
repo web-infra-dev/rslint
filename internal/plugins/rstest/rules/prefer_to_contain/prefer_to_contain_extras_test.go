@@ -137,6 +137,10 @@ func TestPreferToContainExtras(t *testing.T) {
 				Code:   `expect(list.includes(+item)).toBe(true);`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 30}},
 			},
+			{
+				Code:   `expect(list.includes({ [item]: 1 })).toBe(true);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
 			// A locally shadowed NaN spelling is an ordinary value, so the
 			// built-in NaN semantic exclusion must not suppress the rule.
 			{

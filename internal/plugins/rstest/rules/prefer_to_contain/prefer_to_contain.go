@@ -188,13 +188,7 @@ func isSafeToMove(node *ast.Node) bool {
 }
 
 func isSafePropertyName(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	if node.Kind != ast.KindComputedPropertyName {
-		return true
-	}
-	return isSafeToMove(node.AsComputedPropertyName().Expression)
+	return node != nil && node.Kind != ast.KindComputedPropertyName
 }
 
 var PreferToContainRule = shared.NewRule(shared.Config{
