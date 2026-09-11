@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forward_ref_uses_ref"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/function_component_definition"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/hook_use_state"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/iframe_missing_sandbox"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_bracket_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
@@ -109,6 +110,7 @@ func GetAllRules() []rule.Rule {
 		forward_ref_uses_ref.ForwardRefUsesRefRule,
 		function_component_definition.FunctionComponentDefinitionRule,
 		hook_use_state.HookUseStateRule,
+		iframe_missing_sandbox.IframeMissingSandboxRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_bracket_location.JsxClosingBracketLocationRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
