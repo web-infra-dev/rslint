@@ -38,6 +38,7 @@
     "migrate:tests": "sg scan -r ast-grep-rule.yml ./packages/rslint-test-tools/tests/typescript-eslint/rules/**/*.test.ts --update-all"
   },
   "devDependencies": {
+    "@microsoft/api-extractor": "catalog:",
     "@rslint/core": "workspace:*",
     "@types/react": "catalog:",
     "ajv": "catalog:",

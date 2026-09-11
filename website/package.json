@@ -9,18 +9,13 @@
     "preview": "rs doc preview"
   },
   "dependencies": {
-    "@radix-ui/react-label": "catalog:",
     "@radix-ui/react-select": "catalog:",
     "@radix-ui/react-slot": "catalog:",
-    "@radix-ui/react-toggle": "catalog:",
-    "@radix-ui/react-toggle-group": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "dagre": "catalog:",
     "fflate": "catalog:",
-    "input-otp": "catalog:",
     "lucide-react": "catalog:",
-    "swr": "catalog:",
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:"
   },
