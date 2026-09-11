@@ -45,16 +45,6 @@ type ExternalSymbol struct {
 	Namespace CString      `json:"namespace"`
 	Name      CString      `json:"name"`
 }
-type TypeExtra struct {
-	Name map[int]CString      `json:"name"`
-	Func map[int]FunctionData `json:"func"`
-}
-type FunctionData struct {
-	Signatures []FuncSignature `json:"signatures"`
-}
-type FuncSignature struct {
-	Result checker.TypeId `json:"result"`
-}
 type TypeInfo struct {
 	Id          checker.TypeId `json:"id"`
 	Flags       int            `json:"flags"`
@@ -157,8 +147,6 @@ type Semantic struct {
 	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
 	NodeFlags    map[NodeReference]uint32         `json:"node_flags"`
 	Primtypes    PrimTypes                        `json:"primtypes"`
-	TypeExtra    TypeExtra                        `json:"type_extra"`
-	FuncData     FunctionData                     `json:"func_data"`
 	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
 	// (node -> value_symbol_id)
 	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
@@ -185,13 +173,6 @@ func NewSemantic() Semantic {
 		ParameterPropertySymbols: make(map[NodeReference]ast.SymbolId),
 		ExternalSymbols:          []ExternalSymbol{},
 		Primtypes:                PrimTypes{},
-		TypeExtra: TypeExtra{
-			Name: make(map[int]CString),
-			Func: make(map[int]FunctionData),
-		},
-		FuncData: FunctionData{
-			Signatures: []FuncSignature{},
-		},
 	}
 }
 func initPrimitiveTypes(tc *checker.Checker, semantic *Semantic) {
@@ -293,21 +274,6 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				Symbol:      symbolID,
 			}
 			semantic.Typetab[typeID] = typeInfo
-			semantic.TypeExtra.Name[int(typeID)] = []byte(tc.TypeToString(ty))
-			callSignatures := tc.GetCallSignatures(ty)
-			if len(callSignatures) > 0 {
-				signatures := []FuncSignature{}
-				for _, sig := range callSignatures {
-					returnType := checker.Checker_getReturnTypeOfSignature(tc, sig)
-					signatures = append(signatures, FuncSignature{
-						Result: returnType.Id(),
-					})
-
-				}
-				semantic.TypeExtra.Func[int(typeID)] = FunctionData{
-					Signatures: signatures,
-				}
-			}
 		} else if symbolID != 0 {
 			typeInfo := semantic.Typetab[typeID]
 			if typeInfo.Symbol == 0 {

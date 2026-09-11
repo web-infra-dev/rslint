@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Deserializer};
 use serde_bytes::Bytes;
-type TypeId = u32;
 #[derive(Debug, Clone, Deserialize)]
 #[non_exhaustive]
 pub struct ProjectResponse<'base> {
@@ -47,7 +44,6 @@ pub struct Semantic {
     pub node2type: Vec<(NodeReference, u32)>,
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub node_flags: Vec<(NodeReference, u32)>,
-    pub type_extra: TypeExtra,
     pub primtypes: PrimTypes,
     // (aliasSymbolId, targetSymbolId)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
@@ -114,20 +110,6 @@ pub struct PrimTypes {
     pub null: u32,
     pub void: u32,
     pub bool: u32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct TypeExtra {
-    pub name: HashMap<TypeId, serde_bytes::ByteBuf>,
-    pub func: HashMap<TypeId, FunctionData>,
-}
-#[derive(Debug, Clone, Deserialize)]
-pub struct FunctionData {
-    pub signatures: Vec<Signature>,
-}
-#[derive(Debug, Clone, Deserialize)]
-pub struct Signature {
-    pub result: TypeId,
 }
 
 fn vecmap<'de, K, V, D>(deserializer: D) -> Result<Vec<(K, V)>, D::Error>
