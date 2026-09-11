@@ -73,13 +73,15 @@ func main() {
 func getDiagnostics(diagnostics []*ast.Diagnostic, fileMap *map[string]int32) []Diagnostics {
 	diags := []Diagnostics{}
 	for _, diag := range diagnostics {
+		// Match the UTF-16 positions used by encoded AST nodes and semantic data.
+		positionMap := diag.File().GetPositionMap()
 		diags = append(diags, Diagnostics{
 			Message:  diag.String(),
 			Category: int32(diag.Category()),
 			File:     (*fileMap)[diag.File().FileName()],
 			Loc: Location{
-				Start: int32(diag.Pos()),
-				End:   int32(diag.End()),
+				Start: int32(positionMap.UTF8ToUTF16(diag.Pos())),
+				End:   int32(positionMap.UTF8ToUTF16(diag.End())),
 			},
 		})
 	}
