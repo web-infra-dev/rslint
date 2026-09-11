@@ -1,4 +1,4 @@
-# react/function-component-definition
+# function-component-definition
 
 ## Rule Details
 

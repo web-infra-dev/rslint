@@ -253,20 +253,44 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		}
 	}
 
+	// Type symbols such as anonymous type literals are not necessarily returned by
+	// GetSymbolAtLocation while walking the AST. Record them when they are reached
+	// through a type so every non-zero TypeInfo.Symbol has a Symtab entry.
+	recordSymbolInfo := func(symbol *ast.Symbol) ast.SymbolId {
+		if symbol == nil {
+			return 0
+		}
+
+		symbolID := ast.GetSymbolId(symbol)
+		if _, exists := semantic.Symtab[symbolID]; !exists {
+			semantic.Symtab[symbolID] = SymbolInfo{
+				Id:         symbolID,
+				Name:       sanitizeSymbolName(symbol.Name),
+				Flags:      int(symbol.Flags),
+				CheckFlags: int(symbol.CheckFlags),
+				Decl:       nodeReference(symbol.ValueDeclaration),
+			}
+		}
+		return symbolID
+	}
+
 	recordType := func(ty *checker.Type) checker.TypeId {
 		if ty == nil {
 			return 0
 		}
 
 		typeID := ty.Id()
+		var symbolID ast.SymbolId
+		if symbol := ty.Symbol(); symbol != nil {
+			symbolID = recordSymbolInfo(symbol)
+		}
+
 		if _, exists := semantic.Typetab[typeID]; !exists {
 			typeInfo := TypeInfo{
 				Id:          typeID,
 				Flags:       int(ty.Flags()),
 				ObjectFlags: int(ty.ObjectFlags()),
-			}
-			if symbol := ty.Symbol(); symbol != nil {
-				typeInfo.Symbol = ast.GetSymbolId(symbol)
+				Symbol:      symbolID,
 			}
 			semantic.Typetab[typeID] = typeInfo
 			semantic.TypeExtra.Name[int(typeID)] = []byte(tc.TypeToString(ty))
@@ -284,28 +308,15 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					Signatures: signatures,
 				}
 			}
+		} else if symbolID != 0 {
+			typeInfo := semantic.Typetab[typeID]
+			if typeInfo.Symbol == 0 {
+				typeInfo.Symbol = symbolID
+				semantic.Typetab[typeID] = typeInfo
+			}
 		}
 
 		return typeID
-	}
-	// A symbol can be reached from multiple AST nodes and alias edges. Record each
-	// Symtab entry once, then reuse it on subsequent visits.
-	recordSymbolInfo := func(symbol *ast.Symbol) ast.SymbolId {
-		if symbol == nil {
-			return 0
-		}
-
-		symbolID := ast.GetSymbolId(symbol)
-		if _, exists := semantic.Symtab[symbolID]; !exists {
-			semantic.Symtab[symbolID] = SymbolInfo{
-				Id:         symbolID,
-				Name:       sanitizeSymbolName(symbol.Name),
-				Flags:      int(symbol.Flags),
-				CheckFlags: int(symbol.CheckFlags),
-				Decl:       nodeReference(symbol.ValueDeclaration),
-			}
-		}
-		return symbolID
 	}
 	recordSymbol := func(symbol *ast.Symbol) (ast.SymbolId, checker.TypeId, bool) {
 		if symbol == nil {

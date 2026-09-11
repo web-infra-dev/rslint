@@ -1,4 +1,4 @@
-# node/no-extraneous-import
+# no-extraneous-import
 
 Disallow imports of installed packages that are not declared in `package.json`.
 
