@@ -18,6 +18,14 @@ import {
 import { type Diagnostic } from '@rslint/core/service';
 import { useDark } from '@rspress/core/runtime';
 import { Button } from '@components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@components/ui/select';
 import { evaluateConfig, type PlaygroundConfig } from './config';
 import {
   DEFAULT_RSLINT_CONFIG,
@@ -25,6 +33,12 @@ import {
   writeShareState,
 } from './share-url';
 import { installRslintCoreTypes } from './config-types';
+import {
+  isSourceFileName,
+  sourceFileLanguage,
+  SOURCE_FILE_NAMES,
+  type SourceFileName,
+} from './source-file';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
 
@@ -51,6 +65,7 @@ export type EditorTabType = 'code' | 'rslint' | 'tsconfig';
 export interface EditorTabsRef {
   getValue: () => string | undefined;
   getCodeValue: () => string | undefined;
+  getSourceFileName: () => SourceFileName;
   getRslintConfig: (wasmVersion: string) => Promise<PlaygroundConfig>;
   getTsConfig: () => any | null;
   attachDiag: (diags: Diagnostic[]) => void;
@@ -100,6 +115,9 @@ export const EditorTabs = ({
 }: EditorTabsProps) => {
   const [activeTab, setActiveTab] = useState<EditorTabType>('code');
   const [initialState] = useState(readShareState);
+  const [sourceFileName, setSourceFileName] = useState(
+    initialState.sourceFileName,
+  );
   const isDark = useDark();
   const editorTheme = isDark ? 'vs-dark' : 'vs';
 
@@ -126,6 +144,7 @@ export const EditorTabs = ({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onConfigChangeRef = useRef(onConfigChange);
   const wasmVersionRef = useRef(wasmVersion);
+  const sourceFileNameRef = useRef(initialState.sourceFileName);
 
   const lastValidTsConfig = useRef<any>(null);
 
@@ -140,6 +159,7 @@ export const EditorTabs = ({
   function serializeToUrl() {
     writeShareState({
       code: codeEditorRef.current?.getValue() ?? initialState.code,
+      sourceFileName: sourceFileNameRef.current,
       rslintConfig:
         rslintEditorRef.current?.getValue() ?? initialState.rslintConfig,
       tsconfig: tsconfigEditorRef.current?.getValue() ?? initialState.tsconfig,
@@ -178,6 +198,7 @@ export const EditorTabs = ({
     },
     getValue: () => codeEditorRef.current?.getValue(),
     getCodeValue: () => codeEditorRef.current?.getValue(),
+    getSourceFileName: () => sourceFileNameRef.current,
     getRslintConfig: async (wasmVersion) => {
       await installRslintCoreTypes(wasmVersion);
       return evaluateConfig(
@@ -310,9 +331,13 @@ export const EditorTabs = ({
   useEffect(() => {
     if (!codeContainerRef.current) return;
 
+    const model = monaco.editor.createModel(
+      initialState.code,
+      sourceFileLanguage(initialState.sourceFileName),
+      monaco.Uri.parse(`file:///${initialState.sourceFileName}`),
+    );
     const editor = monaco.editor.create(codeContainerRef.current, {
-      value: initialState.code,
-      language: 'typescript',
+      model,
       theme: editorTheme,
       automaticLayout: true,
       scrollBeyondLastLine: false,
@@ -374,12 +399,35 @@ export const EditorTabs = ({
 
     return () => {
       selDisposable.dispose();
+      editor.getModel()?.dispose();
       editor.dispose();
       if (editingTimer.current) {
         window.clearTimeout(editingTimer.current);
       }
     };
   }, []);
+
+  function selectSourceFile(value: string) {
+    if (!isSourceFileName(value) || value === sourceFileNameRef.current) return;
+    setActiveTab('code');
+
+    const editor = codeEditorRef.current;
+    const previousModel = editor?.getModel();
+    if (!editor || !previousModel) return;
+
+    const nextModel = monaco.editor.createModel(
+      previousModel.getValue(),
+      sourceFileLanguage(value),
+      monaco.Uri.parse(`file:///${value}`),
+    );
+    editor.setModel(nextModel);
+    previousModel.dispose();
+
+    sourceFileNameRef.current = value;
+    setSourceFileName(value);
+    onChangeRef.current(nextModel.getValue());
+    scheduleSerializeToUrl();
+  }
 
   // Configure Monaco JSON to allow comments and trailing commas (JSONC)
   useEffect(() => {
@@ -459,8 +507,7 @@ export const EditorTabs = ({
     monaco.editor.setTheme(editorTheme);
   }, [editorTheme]);
 
-  const tabs: { key: EditorTabType; label: string }[] = [
-    { key: 'code', label: 'Code' },
+  const tabs: { key: Exclude<EditorTabType, 'code'>; label: string }[] = [
     { key: 'rslint', label: 'rslint.config.js' },
     { key: 'tsconfig', label: 'tsconfig.json' },
   ];
@@ -469,6 +516,34 @@ export const EditorTabs = ({
     <div className="flex flex-col h-full w-full">
       <div className="flex items-center justify-between gap-2 bg-[var(--rp-c-bg-soft)] p-2 flex-shrink-0">
         <div className="flex items-center gap-2">
+          <Select
+            value={sourceFileName}
+            onValueChange={selectSourceFile}
+            onOpenChange={(open) => {
+              if (open) setActiveTab('code');
+            }}
+          >
+            <SelectTrigger
+              size="sm"
+              aria-label="Select source file type"
+              className={
+                activeTab === 'code'
+                  ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 [&_svg]:text-primary-foreground'
+                  : undefined
+              }
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {SOURCE_FILE_NAMES.map((fileName) => (
+                  <SelectItem key={fileName} value={fileName}>
+                    {fileName}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           {tabs.map((tab) => (
             <Button
               key={tab.key}
