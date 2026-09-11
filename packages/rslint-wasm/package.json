@@ -24,15 +24,11 @@
   },
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
-    "@rslint/core": "workspace:*",
-    "@microsoft/api-extractor": "catalog:",
-    "@wasmer/wasmfs": "catalog:",
     "esbuild": "catalog:",
     "buffer": "catalog:",
     "cross-env": "catalog:",
     "esbuild-plugin-polyfill-node": "catalog:",
     "memfs": "catalog:",
-    "prebundle": "catalog:",
     "@typescript/native-preview": "catalog:"
   },
   "dependencies": {
