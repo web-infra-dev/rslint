@@ -20,7 +20,6 @@ var JsxPropsNoMultiSpacesRule = rule.Rule{
 		lineStarts := ctx.SourceFile.ECMALineMap()
 
 		check := func(node *ast.Node) {
-			comments := ctx.Comments.All()
 			var props []*ast.Node
 			var tagNameEnd int
 			var tagName *ast.Node
@@ -51,13 +50,13 @@ var JsxPropsNoMultiSpacesRule = rule.Rule{
 			// Check between tag name and first attribute
 			firstTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, props[0])
 			tagDisplayName := getTagDisplayName(ctx, tagName)
-			checkGap(ctx, text, lineStarts, comments, tagNameEnd, firstTrimmed.Pos(), firstTrimmed.End(), props[0], tagDisplayName, getDisplayName(ctx, props[0]))
+			checkGap(ctx, text, lineStarts, tagNameEnd, firstTrimmed.Pos(), firstTrimmed.End(), props[0], tagDisplayName, getDisplayName(ctx, props[0]))
 
 			// Check between consecutive attributes
 			for i := 1; i < len(props); i++ {
 				prevTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, props[i-1])
 				currTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, props[i])
-				checkGap(ctx, text, lineStarts, comments, prevTrimmed.End(), currTrimmed.Pos(), currTrimmed.End(), props[i], getDisplayName(ctx, props[i-1]), getDisplayName(ctx, props[i]))
+				checkGap(ctx, text, lineStarts, prevTrimmed.End(), currTrimmed.Pos(), currTrimmed.End(), props[i], getDisplayName(ctx, props[i-1]), getDisplayName(ctx, props[i]))
 			}
 		}
 
@@ -120,7 +119,7 @@ func hasEmptyLines(lineStarts []core.TextPos, comments []*ast.CommentRange, star
 	return scanner.ComputeLineOfPosition(lineStarts, endPos)-scanner.ComputeLineOfPosition(lineStarts, previousEnd) >= 2
 }
 
-func checkGap(ctx rule.RuleContext, text string, lineStarts []core.TextPos, comments []*ast.CommentRange, prevEnd, currStart, currEnd int, reportNode *ast.Node, prevName, currName string) {
+func checkGap(ctx rule.RuleContext, text string, lineStarts []core.TextPos, prevEnd, currStart, currEnd int, reportNode *ast.Node, prevName, currName string) {
 	prevEndLine := scanner.ComputeLineOfPosition(lineStarts, prevEnd)
 	currEndLine := scanner.ComputeLineOfPosition(lineStarts, currEnd)
 
@@ -138,7 +137,7 @@ func checkGap(ctx rule.RuleContext, text string, lineStarts []core.TextPos, comm
 		}
 	} else {
 		// Different lines - comments bridge gaps, but empty lines around them do not.
-		if hasEmptyLines(lineStarts, comments, prevEnd, currStart) {
+		if hasEmptyLines(lineStarts, ctx.Comments.All(), prevEnd, currStart) {
 			ctx.ReportNode(reportNode, rule.RuleMessage{
 				Id:          "noLineGap",
 				Description: fmt.Sprintf("Expected no line gap between \"%s\" and \"%s\"", prevName, currName),

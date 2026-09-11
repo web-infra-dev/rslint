@@ -3,9 +3,16 @@ package jsx_props_no_multi_spaces
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
+
+func TestCheckGapDoesNotCollectCommentsForSingleLine(t *testing.T) {
+	t.Helper()
+	checkGap(rule.RuleContext{}, " ", []core.TextPos{0}, 0, 1, 1, nil, "a", "b")
+}
 
 func TestJsxPropsNoMultiSpacesRuleExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &JsxPropsNoMultiSpacesRule, []rule_tester.ValidTestCase{
