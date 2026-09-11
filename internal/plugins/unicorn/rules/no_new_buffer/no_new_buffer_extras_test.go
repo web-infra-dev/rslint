@@ -24,14 +24,26 @@ func TestNoNewBufferExtras(t *testing.T) {
 			{Code: `new BufferFactory(1)`, FileName: "file.js"},
 		},
 		[]rule_tester.InvalidTestCase{
+			withFileName(fixedNewBufferCase(`new Buffer<string>`, `new Buffer<string>`, "from", `Buffer.from<string>()`), "file.ts"),
+			fixedNewBufferCase("new\vBuffer(1)", "new\vBuffer(1)", "alloc", "Buffer.alloc(1)"),
+			fixedNewBufferCase("new\fBuffer(1)", "new\fBuffer(1)", "alloc", "Buffer.alloc(1)"),
+			fixedNewBufferCase("new\u00a0Buffer(1)", "new\u00a0Buffer(1)", "alloc", "Buffer.alloc(1)"),
+			fixedNewBufferCase(`const number = 1; new Buffer(number)`, `new Buffer(number)`, "alloc", `const number = 1; Buffer.alloc(number)`),
+			fixedNewBufferCase(`const string = "x"; new Buffer(string)`, `new Buffer(string)`, "from", `const string = "x"; Buffer.from(string)`),
+			fixedNewBufferCase(`const bytes = [1]; new Buffer(bytes)`, `new Buffer(bytes)`, "from", `const bytes = [1]; Buffer.from(bytes)`),
+			suggestedNewBufferCase(`let number = 1; new Buffer(number)`, `new Buffer(number)`),
+			suggestedNewBufferCase(`var string = "x"; new Buffer(string)`, `new Buffer(string)`),
+			fixedNewBufferCase(`new Buffer((1 === 1) ? 1 : value)`, `new Buffer((1 === 1) ? 1 : value)`, "alloc", `Buffer.alloc((1 === 1) ? 1 : value)`),
+			fixedNewBufferCase(`new Buffer(undefined ?? 1)`, `new Buffer(undefined ?? 1)`, "alloc", `Buffer.alloc(undefined ?? 1)`),
+			fixedNewBufferCase(`new Buffer({} && 1)`, `new Buffer({} && 1)`, "alloc", `Buffer.alloc({} && 1)`),
 			// A line terminator between `new` and the callee would turn this
 			// into a bare yield if the fixer only removed `new`.
 			fixedNewBufferCase("function* values() {\n\tyield new // yield\n\t\tBuffer(1);\n}", "new // yield\n\t\tBuffer(1)", "alloc", "function* values() {\n\tyield ( // yield\n\t\tBuffer.alloc(1));\n}"),
 			// Delegating yields need the same operand grouping after `yield*`.
 			fixedNewBufferCase("function* values() {\n\tyield* new // yield-star\n\t\tBuffer([1]);\n}", "new // yield-star\n\t\tBuffer([1])", "from", "function* values() {\n\tyield* ( // yield-star\n\t\tBuffer.from([1]));\n}"),
 			// ECMAScript line and paragraph separators also trigger ASI.
-			fixedNewBufferCase("() => {\n\treturn new\u2028\tBuffer(1);\n}", "new\u2028\tBuffer(1)", "alloc", "() => {\n\treturn ( \u2028\tBuffer.alloc(1));\n}"),
-			fixedNewBufferCase("() => {\n\tthrow new\u2029\tBuffer(1);\n}", "new\u2029\tBuffer(1)", "alloc", "() => {\n\tthrow ( \u2029\tBuffer.alloc(1));\n}"),
+			fixedNewBufferCase("() => {\n\treturn new\u2028\tBuffer(1);\n}", "new\u2028\tBuffer(1)", "alloc", "() => {\n\treturn ( Buffer.alloc(1));\n}"),
+			fixedNewBufferCase("() => {\n\tthrow new\u2029\tBuffer(1);\n}", "new\u2029\tBuffer(1)", "alloc", "() => {\n\tthrow ( Buffer.alloc(1));\n}"),
 			fixedNewBufferCase(`new Buffer((1))`, `new Buffer((1))`, "alloc", `Buffer.alloc((1))`),
 			fixedNewBufferCase(`new Buffer(([1]))`, `new Buffer(([1]))`, "from", `Buffer.from(([1]))`),
 			fixedNewBufferCase(`const Buffer = factory; new Buffer(1)`, `new Buffer(1)`, "alloc", `const Buffer = factory; Buffer.alloc(1)`),

@@ -6,6 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	no_new_buffer "github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -20,12 +24,8 @@ func newBufferError(code, expression, messageID, message string, suggestions ...
 	if offset < 0 {
 		panic("expression not found: " + expression)
 	}
-	prefix := code[:offset]
-	line := strings.Count(prefix, "\n") + 1
-	column := offset - strings.LastIndex(prefix, "\n")
-	endPrefix := code[:offset+len(expression)]
-	endLine := strings.Count(endPrefix, "\n") + 1
-	endColumn := len(endPrefix) - strings.LastIndex(endPrefix, "\n")
+	line, column := ecmaLineColumnForOffset(code, offset)
+	endLine, endColumn := ecmaLineColumnForOffset(code, offset+len(expression))
 	return rule_tester.InvalidTestCaseError{
 		MessageId:   messageID,
 		Message:     message,
@@ -34,6 +34,32 @@ func newBufferError(code, expression, messageID, message string, suggestions ...
 		EndLine:     endLine,
 		EndColumn:   endColumn,
 		Suggestions: suggestions,
+	}
+}
+
+func ecmaLineColumnForOffset(code string, offset int) (line int, column int) {
+	sourceFile := parser.ParseSourceFile(
+		ast.SourceFileParseOptions{FileName: "/fixture.js"},
+		code,
+		core.ScriptKindJS,
+	)
+	lineIndex, columnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, offset)
+	return lineIndex + 1, int(columnIndex) + 1
+}
+
+func TestNewBufferErrorUsesECMACharacterLocations(t *testing.T) {
+	for _, test := range []struct {
+		code            string
+		line, col       int
+		endLine, endCol int
+	}{
+		{`"😀"; new Buffer(1)`, 1, 7, 1, 20},
+		{"const value = 1;\r\nnew Buffer(1)", 2, 1, 2, 14},
+	} {
+		error := newBufferError(test.code, "new Buffer(1)", "error", "error")
+		if error.Line != test.line || error.Column != test.col || error.EndLine != test.endLine || error.EndColumn != test.endCol {
+			t.Errorf("%q: location = %d:%d-%d:%d, want %d:%d-%d:%d", test.code, error.Line, error.Column, error.EndLine, error.EndColumn, test.line, test.col, test.endLine, test.endCol)
+		}
 	}
 }
 

@@ -154,6 +154,7 @@ func TestNewForBuiltinsExtras(t *testing.T) {
 			jsValid("const value = String('test');"),
 		},
 		[]rule_tester.InvalidTestCase{
+			tsDisallowInvalid(`const symbol = new Symbol<string>;`, `new Symbol<string>`, "Symbol", `const symbol = Symbol<string>();`),
 			// Shared `new`-to-call fixing preserves the operand of a multiline
 			// generator yield for every rule that removes `new`.
 			disallowInvalid(lines(

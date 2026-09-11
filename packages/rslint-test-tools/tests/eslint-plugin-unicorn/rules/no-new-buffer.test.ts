@@ -236,7 +236,7 @@ describe('unicorn/no-new-buffer runtime integration', () => {
       {
         name: 'return with line separator',
         source: 'function value() {\n\treturn new\u2028\tBuffer(1);\n}',
-        output: 'function value() {\n\treturn ( \u2028\tBuffer.alloc(1));\n}',
+        output: 'function value() {\n\treturn ( Buffer.alloc(1));\n}',
         buffer: { alloc: (size: number) => ({ size }) },
         evaluate: 'return value();',
         expected: { size: 1 },
@@ -246,7 +246,7 @@ describe('unicorn/no-new-buffer runtime integration', () => {
         source:
           'function value() {\n\ttry {\n\t\tthrow new\u2029\tBuffer(1);\n\t} catch (error) {\n\t\treturn error;\n\t}\n}',
         output:
-          'function value() {\n\ttry {\n\t\tthrow ( \u2029\tBuffer.alloc(1));\n\t} catch (error) {\n\t\treturn error;\n\t}\n}',
+          'function value() {\n\ttry {\n\t\tthrow ( Buffer.alloc(1));\n\t} catch (error) {\n\t\treturn error;\n\t}\n}',
         buffer: { alloc: (size: number) => ({ size }) },
         evaluate: 'return value();',
         expected: { size: 1 },
@@ -309,9 +309,41 @@ describe('unicorn/no-new-buffer runtime integration', () => {
         source: 'new Buffer(1 || value);',
         output: 'Buffer.alloc(1 || value);',
       },
+      {
+        name: 'const number binding',
+        source: 'const value = 1; new Buffer(value);',
+        output: 'const value = 1; Buffer.alloc(value);',
+      },
+      {
+        name: 'const string binding',
+        source: 'const value = "x"; new Buffer(value);',
+        output: 'const value = "x"; Buffer.from(value);',
+        message: from,
+      },
+      {
+        name: 'const array binding',
+        source: 'const value = [1]; new Buffer(value);',
+        output: 'const value = [1]; Buffer.from(value);',
+        message: from,
+      },
+      {
+        name: 'static equality conditional',
+        source: 'new Buffer((1 === 1) ? 1 : value);',
+        output: 'Buffer.alloc((1 === 1) ? 1 : value);',
+      },
+      {
+        name: 'undefined nullish expression',
+        source: 'new Buffer(undefined ?? 1);',
+        output: 'Buffer.alloc(undefined ?? 1);',
+      },
+      {
+        name: 'object logical expression',
+        source: 'new Buffer({} && 1);',
+        output: 'Buffer.alloc({} && 1);',
+      },
     ];
 
-    for (const { name, source, output } of automaticCases) {
+    for (const { name, source, output, message = alloc } of automaticCases) {
       const context = `${name}: ${source}`;
       const before = await lintRuntime(source);
       expect(
@@ -325,7 +357,7 @@ describe('unicorn/no-new-buffer runtime integration', () => {
         {
           ruleName: 'unicorn/no-new-buffer',
           messageId: 'error',
-          message: alloc,
+          message,
         },
       ]);
       const fixed = await lintRuntime(source, true);
@@ -336,17 +368,23 @@ describe('unicorn/no-new-buffer runtime integration', () => {
     }
 
     const mutable = 'let value = 1; new Buffer(value++);';
-    const result = await lintRuntime(mutable);
-    expect(result.diagnostics[0]).toMatchObject({
-      ruleName: 'unicorn/no-new-buffer',
-      messageId: 'error-unknown',
-      message: unknown,
-    });
-    for (const suggestion of result.diagnostics[0]?.suggestions ?? []) {
-      const output = applySuggestion(mutable, suggestion.fixes ?? []);
-      await expect(lintRuntime(output)).resolves.toMatchObject({
-        diagnostics: [],
+    for (const source of [
+      mutable,
+      'let value = 1; new Buffer(value);',
+      'var value = "x"; new Buffer(value);',
+    ]) {
+      const result = await lintRuntime(source);
+      expect(result.diagnostics[0]).toMatchObject({
+        ruleName: 'unicorn/no-new-buffer',
+        messageId: 'error-unknown',
+        message: unknown,
       });
+      for (const suggestion of result.diagnostics[0]?.suggestions ?? []) {
+        const output = applySuggestion(source, suggestion.fixes ?? []);
+        await expect(lintRuntime(output)).resolves.toMatchObject({
+          diagnostics: [],
+        });
+      }
     }
   });
 });

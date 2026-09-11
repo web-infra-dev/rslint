@@ -114,6 +114,16 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const letUse = letValue;\n" +
 		"const numeric = 1 + 2;\n" +
 		"const unknownUse = unknownValue;\n" +
+		"const controlConst = 1;\n" +
+		"let controlLet = 1;\n" +
+		"var controlVar = \"x\";\n" +
+		"const controlArray = [1];\n" +
+		"const controlObject = {value: true};\n" +
+		"const controlConstUse = controlConst;\n" +
+		"const controlLetUse = controlLet;\n" +
+		"const controlVarUse = controlVar;\n" +
+		"const controlArrayUse = controlArray;\n" +
+		"const controlObjectUse = controlObject.value;\n" +
 		"const stableArray = [\"\", \"message\"];\n" +
 		"const stableObject = {message: \"value\"};\n" +
 		"const stableArrayUse = stableArray[0];\n" +
@@ -323,6 +333,18 @@ func TestStaticStringEvaluator(t *testing.T) {
 	}
 	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "unknownUse")); known || isArray {
 		t.Fatalf("EvalArrayValue(unknownUse) = (%v, %v), want (false, false)", isArray, known)
+	}
+
+	if _, ok := staticEvaluator.EvalControlFlowValue(findVariableInitializer(t, sourceFile, "controlConstUse")); !ok {
+		t.Fatal("EvalControlFlowValue(const) did not resolve")
+	}
+	for _, name := range []string{"controlLetUse", "controlVarUse", "controlObjectUse"} {
+		if _, ok := staticEvaluator.EvalControlFlowValue(findVariableInitializer(t, sourceFile, name)); ok {
+			t.Fatalf("EvalControlFlowValue(%s) unexpectedly resolved", name)
+		}
+	}
+	if isArray, known := staticEvaluator.EvalControlFlowArrayValue(findVariableInitializer(t, sourceFile, "controlArrayUse")); !known || !isArray {
+		t.Fatalf("EvalControlFlowArrayValue(controlArrayUse) = (%v, %v), want (true, true)", isArray, known)
 	}
 }
 

@@ -2,7 +2,6 @@ package no_new_buffer
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
@@ -20,7 +19,7 @@ var NoNewBufferRule = rule.Rule{
 	Name:   "unicorn/no-new-buffer",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		staticEvaluator := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
+		staticEvaluator := utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				newExpression := node.AsNewExpression()
@@ -73,7 +72,7 @@ func inferMethod(arguments *ast.NodeList, staticEvaluator *utils.StaticStringEva
 		return "alloc"
 	}
 
-	if value, ok := getStaticValueForControlFlow(argument, staticEvaluator, ctx); ok {
+	if value, ok := staticEvaluator.EvalControlFlowValue(argument); ok {
 		if _, isNumber := value.(interface{ IsNaN() bool }); isNumber {
 			return "alloc"
 		}
@@ -81,7 +80,7 @@ func inferMethod(arguments *ast.NodeList, staticEvaluator *utils.StaticStringEva
 			return "from"
 		}
 	}
-	if isArray, known := staticEvaluator.EvalArrayValue(argument); known && isArray {
+	if isArray, known := staticEvaluator.EvalControlFlowArrayValue(argument); known && isArray {
 		return "from"
 	}
 	return ""
@@ -179,7 +178,7 @@ func isNumber(node *ast.Node, staticEvaluator *utils.StaticStringEvaluator, ctx 
 		}
 	}
 
-	value, ok := getStaticValueForControlFlow(node, staticEvaluator, ctx)
+	value, ok := staticEvaluator.EvalControlFlowValue(node)
 	if !ok {
 		return false
 	}
@@ -352,7 +351,7 @@ func isString(node *ast.Node, staticEvaluator *utils.StaticStringEvaluator, ctx 
 			}
 		}
 	}
-	value, ok := getStaticValueForControlFlow(node, staticEvaluator, ctx)
+	value, ok := staticEvaluator.EvalControlFlowValue(node)
 	if !ok {
 		return false
 	}
@@ -397,140 +396,6 @@ func isStringTypeNode(node *ast.Node) bool {
 
 func isStringType(typeNode *ast.TypeNode) bool {
 	return typeNode != nil && isStringTypeNode(typeNode.AsNode())
-}
-
-// getStaticValueForControlFlow matches Unicorn's conservative control-flow
-// evaluation for branch expressions. The shared evaluator handles normal
-// expressions; branches only evaluate a selected path when their condition is
-// an immutable primitive, avoiding mutable alias and getter over-resolution.
-func getStaticValueForControlFlow(node *ast.Node, staticEvaluator *utils.StaticStringEvaluator, ctx rule.RuleContext) (any, bool) {
-	node = skipParentheses(node)
-	if node == nil {
-		return nil, false
-	}
-	switch node.Kind {
-	case ast.KindAsExpression:
-		return getStaticValueForControlFlow(node.AsAsExpression().Expression, staticEvaluator, ctx)
-	case ast.KindSatisfiesExpression:
-		return getStaticValueForControlFlow(node.AsSatisfiesExpression().Expression, staticEvaluator, ctx)
-	case ast.KindTypeAssertionExpression:
-		return getStaticValueForControlFlow(node.AsTypeAssertion().Expression, staticEvaluator, ctx)
-	case ast.KindNonNullExpression:
-		return getStaticValueForControlFlow(node.AsNonNullExpression().Expression, staticEvaluator, ctx)
-	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
-		truthy, known := knownTruthy(conditional.Condition, ctx)
-		if !known {
-			return nil, false
-		}
-		if truthy {
-			return getStaticValueForControlFlow(conditional.WhenTrue, staticEvaluator, ctx)
-		}
-		return getStaticValueForControlFlow(conditional.WhenFalse, staticEvaluator, ctx)
-	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
-		if binary.OperatorToken == nil {
-			return nil, false
-		}
-		switch binary.OperatorToken.Kind {
-		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return staticLogicalValue(binary, staticEvaluator, ctx)
-		}
-	}
-	return staticEvaluator.EvalValue(node)
-}
-
-func staticLogicalValue(binary *ast.BinaryExpression, staticEvaluator *utils.StaticStringEvaluator, ctx rule.RuleContext) (any, bool) {
-	if binary == nil || binary.OperatorToken == nil {
-		return nil, false
-	}
-	left := binary.Left
-	if binary.OperatorToken.Kind == ast.KindQuestionQuestionToken {
-		if isKnownNullish(left, ctx) {
-			return getStaticValueForControlFlow(binary.Right, staticEvaluator, ctx)
-		}
-		if isKnownNonNullish(left, ctx) {
-			return getStaticValueForControlFlow(left, staticEvaluator, ctx)
-		}
-		return nil, false
-	}
-	truthy, known := knownTruthy(left, ctx)
-	if !known {
-		return nil, false
-	}
-	if (binary.OperatorToken.Kind == ast.KindAmpersandAmpersandToken && !truthy) ||
-		(binary.OperatorToken.Kind == ast.KindBarBarToken && truthy) {
-		return getStaticValueForControlFlow(left, staticEvaluator, ctx)
-	}
-	return getStaticValueForControlFlow(binary.Right, staticEvaluator, ctx)
-}
-
-func constPrimitiveInitializer(ctx rule.RuleContext, node *ast.Node) (*ast.Node, bool) {
-	if node == nil || !ast.IsIdentifier(node) {
-		return nil, false
-	}
-	symbol := node.Symbol()
-	if ctx.Refs != nil {
-		symbol = ctx.Refs.ResolveInFile(node)
-	}
-	if symbol == nil || len(symbol.Declarations) != 1 {
-		return nil, false
-	}
-	declarationNode := symbol.Declarations[0]
-	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration {
-		return nil, false
-	}
-	declaration := declarationNode.AsVariableDeclaration()
-	if declaration.Initializer == nil || declarationNode.Parent == nil || !ast.IsVarConst(declarationNode.Parent) {
-		return nil, false
-	}
-	initializer := skipParentheses(declaration.Initializer)
-	if initializer == nil {
-		return nil, false
-	}
-	switch initializer.Kind {
-	case ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
-		ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return initializer, true
-	}
-	return nil, false
-}
-
-func knownTruthy(node *ast.Node, ctx rule.RuleContext) (bool, bool) {
-	node = skipParentheses(node)
-	if node == nil {
-		return false, false
-	}
-	if initializer, ok := constPrimitiveInitializer(ctx, node); ok {
-		return knownTruthy(initializer, ctx)
-	}
-	switch node.Kind {
-	case ast.KindTrueKeyword:
-		return true, true
-	case ast.KindFalseKeyword, ast.KindNullKeyword:
-		return false, true
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text != "", true
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text != "", true
-	case ast.KindNumericLiteral:
-		value, err := strconv.ParseFloat(utils.NormalizeNumericLiteral(node.AsNumericLiteral().Text), 64)
-		return err == nil && value != 0, err == nil
-	}
-	return false, false
-}
-
-func isKnownNullish(node *ast.Node, ctx rule.RuleContext) bool {
-	node = skipParentheses(node)
-	if initializer, ok := constPrimitiveInitializer(ctx, node); ok {
-		return isKnownNullish(initializer, ctx)
-	}
-	return node != nil && node.Kind == ast.KindNullKeyword
-}
-
-func isKnownNonNullish(node *ast.Node, ctx rule.RuleContext) bool {
-	_, known := knownTruthy(node, ctx)
-	return known && !isKnownNullish(node, ctx)
 }
 
 func skipParentheses(node *ast.Node) *ast.Node {

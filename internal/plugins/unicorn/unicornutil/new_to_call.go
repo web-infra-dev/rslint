@@ -3,8 +3,10 @@ package unicornutil
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // NewExpressionToCallFixes removes new while preserving comments and the
@@ -32,15 +34,22 @@ func NewExpressionToCallFixes(
 
 	source := sourceFile.Text()
 	removeEnd := nodeRange.Pos() + len("new")
-	for removeEnd < expressionRange.Pos() && isWhitespace(source[removeEnd]) {
-		removeEnd++
-	}
+	removeEnd = ecmascript.SkipLeadingWhitespace(source, removeEnd, expressionRange.Pos())
 
 	insertAfterExpression := ""
 	if newExpression.Arguments == nil {
 		insertAfterExpression = "()"
 	}
-	if calleeRange.End() == expressionRange.End() {
+	callEnd := expressionRange.End()
+	if typeArguments := newExpression.TypeArguments; typeArguments != nil && len(typeArguments.Nodes) > 0 {
+		closeAngle := scanner.GetRangeOfTokenAtPosition(sourceFile, typeArguments.End())
+		if closeAngle.Pos() < len(source) && source[closeAngle.Pos()] == '>' {
+			callEnd = closeAngle.End()
+		} else {
+			return nil
+		}
+	}
+	if calleeRange.End() == expressionRange.End() && callEnd == expressionRange.End() {
 		suffix += insertAfterExpression
 		insertAfterExpression = ""
 	}
@@ -51,8 +60,8 @@ func NewExpressionToCallFixes(
 	if needsOperandParentheses(sourceFile, node, nodeRange.Pos(), expressionRange.Pos()) {
 		if opening, closing, ok := operandParenthesesRanges(sourceFile, node.Parent); ok {
 			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(opening, opening), " ("))
-			if closing == expressionRange.End() {
-				if calleeRange.End() == expressionRange.End() {
+			if closing == callEnd {
+				if calleeRange.End() == expressionRange.End() && callEnd == expressionRange.End() {
 					suffix += ")"
 				} else {
 					insertAfterExpression += ")"
@@ -67,7 +76,7 @@ func NewExpressionToCallFixes(
 		fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(calleeRange.End(), calleeRange.End()), suffix))
 	}
 	if insertAfterExpression != "" {
-		fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(expressionRange.End(), expressionRange.End()), insertAfterExpression))
+		fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(callEnd, callEnd), insertAfterExpression))
 	}
 	return fixes
 }
@@ -107,14 +116,9 @@ func operandParenthesesRanges(sourceFile *ast.SourceFile, statement *ast.Node) (
 	}
 	closing := statementRange.End()
 	source := sourceFile.Text()
-	for pos := closing - 1; pos >= statementRange.Pos(); pos-- {
-		if isWhitespace(source[pos]) {
-			continue
-		}
-		if statement.Kind != ast.KindYieldExpression && source[pos] == ';' {
-			closing = pos
-		}
-		break
+	closing = ecmascript.SkipTrailingWhitespace(source, statementRange.Pos(), closing)
+	if statement.Kind != ast.KindYieldExpression && closing > statementRange.Pos() && source[closing-1] == ';' {
+		closing--
 	}
 	return opening, closing, true
 }
@@ -123,14 +127,5 @@ func sameLine(sourceFile *ast.SourceFile, left, right int) bool {
 	if left > right {
 		left, right = right, left
 	}
-	for _, char := range sourceFile.Text()[left:right] {
-		if char == '\n' || char == '\r' || char == '\u2028' || char == '\u2029' {
-			return false
-		}
-	}
-	return true
-}
-
-func isWhitespace(char byte) bool {
-	return char == ' ' || char == '\t' || char == '\n' || char == '\r'
+	return !ecmascript.ContainsLineTerminator(sourceFile.Text(), left, right)
 }

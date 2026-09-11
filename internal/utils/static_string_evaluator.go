@@ -22,6 +22,7 @@ type StaticStringEvaluator struct {
 	referenceResolver      StaticReferenceResolver
 	evaluator              evaluator.Evaluator
 	resolveIdentifiers     bool
+	controlFlowOnly        bool
 	resolving              map[*ast.Symbol]bool
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
@@ -190,6 +191,65 @@ func (staticEvaluator *StaticStringEvaluator) EvalValue(node *ast.Node) (any, bo
 		return value, true
 	}
 	return result.value, true
+}
+
+// EvalControlFlowValue evaluates a value only when every identifier reached by
+// the expression has a const initializer. This is suitable for choosing a
+// conditional or logical branch in an autofix: unlike EvalValue it never
+// treats an unwritten let or var binding as immutable.
+func (staticEvaluator *StaticStringEvaluator) EvalControlFlowValue(node *ast.Node) (any, bool) {
+	if staticEvaluator == nil || node == nil {
+		return nil, false
+	}
+	if hasUnsafeControlFlowMemberAccess(node) {
+		return nil, false
+	}
+	previous := staticEvaluator.controlFlowOnly
+	staticEvaluator.controlFlowOnly = true
+	defer func() { staticEvaluator.controlFlowOnly = previous }()
+	result := staticEvaluator.evalValue(node)
+	if !result.ok {
+		return nil, false
+	}
+	if value, ok := staticValueAsString(result.value); ok {
+		return value, true
+	}
+	return result.value, true
+}
+
+func hasUnsafeControlFlowMemberAccess(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindPropertyAccessExpression || node.Kind == ast.KindElementAccessExpression {
+		return true
+	}
+	unsafe := false
+	node.ForEachChild(func(child *ast.Node) bool {
+		if hasUnsafeControlFlowMemberAccess(child) {
+			unsafe = true
+			return true
+		}
+		return false
+	})
+	return unsafe
+}
+
+// EvalControlFlowArrayValue reports whether a conservatively evaluated value
+// is an array. It is the aggregate counterpart to EvalControlFlowValue.
+func (staticEvaluator *StaticStringEvaluator) EvalControlFlowArrayValue(node *ast.Node) (isArray bool, known bool) {
+	if staticEvaluator == nil || node == nil {
+		return false, false
+	}
+	previous := staticEvaluator.controlFlowOnly
+	staticEvaluator.controlFlowOnly = true
+	defer func() { staticEvaluator.controlFlowOnly = previous }()
+	result := staticEvaluator.evalValue(node)
+	if !result.ok {
+		return false, false
+	}
+	_, isArray = result.value.(*staticArrayValue)
+	return isArray, true
 }
 
 // EvalArrayValue classifies a statically known value by whether it is an
@@ -391,6 +451,9 @@ func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node 
 		return nil, nil, false
 	}
 	if ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) {
+		return nil, nil, false
+	}
+	if staticEvaluator.controlFlowOnly && !ast.IsVarConst(declarationList) {
 		return nil, nil, false
 	}
 	if !ast.IsVarConst(declarationList) && staticEvaluator.hasWrites(symbol) {
