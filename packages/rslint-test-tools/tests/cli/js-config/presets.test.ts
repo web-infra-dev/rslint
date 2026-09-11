@@ -179,6 +179,7 @@ describe('defineConfig and config presets', () => {
     expect(rec.rules?.['unicorn/no-array-fill-with-reference-type']).toBe(
       'error',
     );
+    expect(rec.rules?.['unicorn/empty-brace-spaces']).toBe('error');
     expect(rec.rules?.['unicorn/no-exports-in-scripts']).toBe('error');
     expect(rec.rules?.['unicorn/no-await-expression-member']).toBe('error');
     expect(rec.rules?.['unicorn/prefer-date-now']).toBe('error');

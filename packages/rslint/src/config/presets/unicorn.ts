@@ -40,7 +40,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/custom-error-definition': 'off', // not implemented
     // 'unicorn/default-export-style': 'error', // not implemented
     // 'unicorn/dom-node-dataset': 'error', // not implemented
-    // 'unicorn/empty-brace-spaces': 'error', // not implemented
+    'unicorn/empty-brace-spaces': 'error',
     'unicorn/error-message': 'error',
     // 'unicorn/escape-case': 'error', // not implemented
     // 'unicorn/expiring-todo-comments': 'error', // not implemented
