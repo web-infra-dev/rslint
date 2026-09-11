@@ -90,6 +90,35 @@ func TestNoNewBufferExtras(t *testing.T) {
 	)
 }
 
+func TestNoNewBufferUnsafeMemberReads(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, value := range []string{`[1]`, `1`, `"x"`} {
+		setup := `const object = {value: ` + value + `}; Object.defineProperty(object, "value", {get() { return unknown; }}); `
+		for _, test := range []struct {
+			declarations string
+			argument     string
+		}{
+			{argument: `object.value`},
+			{argument: `object["value"]`},
+			{declarations: `const alias = object.value; `, argument: `alias`},
+			{declarations: `const first = object["value"]; const alias = first; `, argument: `alias`},
+		} {
+			expression := `new Buffer(` + test.argument + `)`
+			invalid = append(invalid, suggestedNewBufferCase(setup+test.declarations+expression+`;`, expression))
+		}
+	}
+	// An aliased getter must not select an array branch or hide inside an array initializer.
+	setup := `const object = {value: true}; Object.defineProperty(object, "value", {get() { return unknown; }}); `
+	invalid = append(invalid,
+		suggestedNewBufferCase(setup+`const enabled = object.value; new Buffer(enabled ? [1] : 1);`, `new Buffer(enabled ? [1] : 1)`),
+		suggestedNewBufferCase(setup+`const values = [object.value]; new Buffer(values);`, `new Buffer(values)`),
+		fixedNewBufferCase(`const bytes = [1]; const alias = bytes; new Buffer(alias);`, `new Buffer(alias)`, "from", `const bytes = [1]; const alias = bytes; Buffer.from(alias);`),
+		fixedNewBufferCase(`const size = 1; const alias = size; new Buffer(alias);`, `new Buffer(alias)`, "alloc", `const size = 1; const alias = size; Buffer.alloc(alias);`),
+		fixedNewBufferCase(`const text = "x"; const alias = text; new Buffer(alias);`, `new Buffer(alias)`, "from", `const text = "x"; const alias = text; Buffer.from(alias);`),
+	)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_new_buffer.NoNewBufferRule, nil, invalid)
+}
+
 func TestNoNewBufferEditDemand(t *testing.T) {
 	const source = "new Buffer(unknown);\n"
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())

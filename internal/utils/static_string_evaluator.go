@@ -224,31 +224,17 @@ func hasUnsafeControlFlowMemberAccess(node *ast.Node) bool {
 	if node.Kind == ast.KindPropertyAccessExpression || node.Kind == ast.KindElementAccessExpression {
 		return true
 	}
-	unsafe := false
-	node.ForEachChild(func(child *ast.Node) bool {
-		if hasUnsafeControlFlowMemberAccess(child) {
-			unsafe = true
-			return true
-		}
-		return false
-	})
-	return unsafe
+	return node.ForEachChild(hasUnsafeControlFlowMemberAccess)
 }
 
 // EvalControlFlowArrayValue reports whether a conservatively evaluated value
-// is an array. It is the aggregate counterpart to EvalControlFlowValue.
+// is an array. It shares the value evaluator's member-access and binding checks.
 func (staticEvaluator *StaticStringEvaluator) EvalControlFlowArrayValue(node *ast.Node) (isArray bool, known bool) {
-	if staticEvaluator == nil || node == nil {
+	value, ok := staticEvaluator.EvalControlFlowValue(node)
+	if !ok {
 		return false, false
 	}
-	previous := staticEvaluator.controlFlowOnly
-	staticEvaluator.controlFlowOnly = true
-	defer func() { staticEvaluator.controlFlowOnly = previous }()
-	result := staticEvaluator.evalValue(node)
-	if !result.ok {
-		return false, false
-	}
-	_, isArray = result.value.(*staticArrayValue)
+	_, isArray = value.(*staticArrayValue)
 	return isArray, true
 }
 
@@ -453,7 +439,8 @@ func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node 
 	if ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) {
 		return nil, nil, false
 	}
-	if staticEvaluator.controlFlowOnly && !ast.IsVarConst(declarationList) {
+	if staticEvaluator.controlFlowOnly &&
+		(!ast.IsVarConst(declarationList) || hasUnsafeControlFlowMemberAccess(declaration.Initializer)) {
 		return nil, nil, false
 	}
 	if !ast.IsVarConst(declarationList) && staticEvaluator.hasWrites(symbol) {
