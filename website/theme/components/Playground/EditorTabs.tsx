@@ -84,6 +84,7 @@ export interface EditorTabsRef {
 interface EditorTabsProps {
   ref: Ref<EditorTabsRef>;
   onChange: (value: string) => void;
+  onSourceFileNameChange?: (fileName: SourceFileName) => void;
   onSelectionChange?: (start: number, end: number) => void;
   onConfigChange?: () => void;
   /** The `@rslint/wasm` version to pin in the link, once one is selected. */
@@ -108,6 +109,7 @@ function parseJsonc(content: string): any | null {
 export const EditorTabs = ({
   ref,
   onChange,
+  onSourceFileNameChange,
   onSelectionChange,
   onConfigChange,
   wasmVersion,
@@ -141,6 +143,7 @@ export const EditorTabs = ({
   const isEditingRef = useRef<boolean>(false);
   const editingTimer = useRef<number | null>(null);
   const onChangeRef = useRef(onChange);
+  const onSourceFileNameChangeRef = useRef(onSourceFileNameChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onConfigChangeRef = useRef(onConfigChange);
   const wasmVersionRef = useRef(wasmVersion);
@@ -152,9 +155,10 @@ export const EditorTabs = ({
   // through refs instead of retaining callbacks from the initial render.
   useLayoutEffect(() => {
     onChangeRef.current = onChange;
+    onSourceFileNameChangeRef.current = onSourceFileNameChange;
     onSelectionChangeRef.current = onSelectionChange;
     onConfigChangeRef.current = onConfigChange;
-  }, [onChange, onSelectionChange, onConfigChange]);
+  }, [onChange, onSourceFileNameChange, onSelectionChange, onConfigChange]);
 
   function serializeToUrl() {
     writeShareState({
@@ -425,6 +429,7 @@ export const EditorTabs = ({
 
     sourceFileNameRef.current = value;
     setSourceFileName(value);
+    onSourceFileNameChangeRef.current?.(value);
     onChangeRef.current(nextModel.getValue());
     scheduleSerializeToUrl();
   }

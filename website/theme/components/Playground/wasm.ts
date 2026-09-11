@@ -1,6 +1,8 @@
 import type { RSLintService } from '@rslint/core/service';
+import { DEFAULT_SOURCE_FILE_NAME, type SourceFileName } from './source-file';
 
 const MINIMUM_WASM_VERSION = '0.8.0';
+const MINIMUM_FILENAME_AWARE_AST_INSPECTOR_VERSION = '0.9.2';
 
 const NPM_REGISTRY_URL = 'https://registry.npmjs.org/@rslint%2Fwasm';
 const UNPKG_BASE_URL = 'https://unpkg.com/@rslint/wasm';
@@ -30,6 +32,18 @@ function compareVersions(left: string, right: string): number {
     if (difference !== 0) return difference;
   }
   return 0;
+}
+
+export function supportsAstInspector(
+  version: string | undefined,
+  sourceFileName: SourceFileName,
+): boolean {
+  return (
+    sourceFileName === DEFAULT_SOURCE_FILE_NAME ||
+    (version !== undefined &&
+      compareVersions(version, MINIMUM_FILENAME_AWARE_AST_INSPECTOR_VERSION) >
+        0)
+  );
 }
 
 export async function fetchWasmVersions(

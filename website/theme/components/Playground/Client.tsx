@@ -13,7 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/theme/components/ui/select';
-import { ensureWasmService, fetchWasmVersions } from './wasm';
+import {
+  ensureWasmService,
+  fetchWasmVersions,
+  supportsAstInspector,
+} from './wasm';
 import { readShareState } from './share-url';
 import type { SourceFileName } from './source-file';
 
@@ -38,9 +42,16 @@ const Playground: React.FC = () => {
   const [astInfoLoading, setAstInfoLoading] = useState(false);
   const [wasmVersions, setWasmVersions] = useState<string[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<string>();
+  const [sourceFileName, setSourceFileName] = useState<SourceFileName>(
+    () => readShareState().sourceFileName,
+  );
   // Captured before the editors get a chance to rewrite the URL.
   const [pinnedVersion] = useState(() => readShareState().wasmVersion);
   const selectedVersionRef = useRef<string | undefined>(undefined);
+  const astInspectorEnabled = supportsAstInspector(
+    selectedVersion,
+    sourceFileName,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -247,7 +258,7 @@ const Playground: React.FC = () => {
       kind?: number,
       fileName?: string,
     ): Promise<GetAstInfoResponse | null> => {
-      if (!initialized) return null;
+      if (!initialized || !astInspectorEnabled) return null;
 
       try {
         setAstInfoLoading(true);
@@ -275,7 +286,7 @@ const Playground: React.FC = () => {
         setAstInfoLoading(false);
       }
     },
-    [initialized, selectedVersion],
+    [astInspectorEnabled, initialized, selectedVersion],
   );
 
   // Fetch AST info for lazy loading - does NOT update global state
@@ -286,7 +297,7 @@ const Playground: React.FC = () => {
       kind?: number,
       fileName?: string,
     ): Promise<GetAstInfoResponse | null> => {
-      if (!initialized) return null;
+      if (!initialized || !astInspectorEnabled) return null;
 
       try {
         const service = await ensureWasmService(selectedVersion!);
@@ -309,7 +320,7 @@ const Playground: React.FC = () => {
         return null;
       }
     },
-    [initialized, selectedVersion],
+    [astInspectorEnabled, initialized, selectedVersion],
   );
 
   function scriptKindForFile(
@@ -382,6 +393,7 @@ const Playground: React.FC = () => {
             <EditorTabs
               ref={editorRef}
               onChange={() => scheduleRunLint()}
+              onSourceFileNameChange={setSourceFileName}
               onSelectionChange={(start: number, end: number) =>
                 setSelectedAstRange((prev) => {
                   // Preserve kind if position is the same (e.g., from revealRangeByOffset)
@@ -463,6 +475,7 @@ const Playground: React.FC = () => {
             }}
             astInfo={astInfo}
             astInfoLoading={astInfoLoading}
+            astInfoEnabled={astInspectorEnabled}
             onRequestAstInfo={handleRequestAstInfo}
             onFetchAstInfoForLazy={fetchAstInfoForLazy}
             onHighlightRange={(pos, end) =>
