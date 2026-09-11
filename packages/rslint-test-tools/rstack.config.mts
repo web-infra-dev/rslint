@@ -265,6 +265,7 @@ define.test({
     './tests/eslint-plugin-react/rules/no-typos.test.ts',
     './tests/eslint-plugin-react/rules/no-unescaped-entities.test.ts',
     './tests/eslint-plugin-react/rules/no-unused-class-component-methods.test.ts',
+    './tests/eslint-plugin-react/rules/no-unused-prop-types.test.ts',
     './tests/eslint-plugin-react/rules/no-unused-state.test.ts',
     './tests/eslint-plugin-react/rules/no-unknown-property.test.ts',
     './tests/eslint-plugin-react/rules/no-unsafe.test.ts',
