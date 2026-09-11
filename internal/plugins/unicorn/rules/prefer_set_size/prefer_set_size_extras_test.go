@@ -1,7 +1,9 @@
 package prefer_set_size_test
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -32,6 +34,8 @@ func TestPreferSetSizeExtras(t *testing.T) {
 			// Upstream's isMethodCall rejects spread arguments by default: the
 			// source cannot replace the conversion as one member-expression object.
 			{Code: "declare const args: [Set<number>]; Array.from(...args).length", FileName: "file.ts"},
+			{Code: "const set = set; [...set].length", FileName: "file.js"},
+			{Code: "class Values extends Array<string> {} const set = new Values(); Array.from(set).length", FileName: "file.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Const aliases recurse, while `let` deliberately did not match in the
@@ -56,15 +60,23 @@ func TestPreferSetSizeExtras(t *testing.T) {
 			// A project-backed non-null assertion narrows the nullable Set before
 			// `isSet` unwraps it.
 			invalid("declare const set: Set<string> | null; [...set!].length", "declare const set: Set<string> | null; (set!).size", "file.ts"),
+			// Checker-backed expressions retain Set inheritance, including calls
+			// that cannot be classified through a binding annotation.
+			invalid("class StringSet extends Set<string> {} const set = new StringSet(); [...set].length", "class StringSet extends Set<string> {} const set = new StringSet(); set.size", "file.ts"),
+			invalid("interface StringSet extends ReadonlySet<string> {} declare function getSet(): StringSet; Array.from(getSet()).length", "interface StringSet extends ReadonlySet<string> {} declare function getSet(): StringSet; getSet().size", "file.ts"),
+			// Memoization must not reuse flow-sensitive checker results between
+			// references to the same mutable binding.
+			invalid("function size(value: Set<string> | string[]) { if (value instanceof Set) return Array.from(value).length; return Array.from(value).length; }", "function size(value: Set<string> | string[]) { if (value instanceof Set) return value.size; return Array.from(value).length; }", "file.ts"),
 		},
 	)
 }
 
 func TestPreferSetSizeProjectFalseTypeSyntax(t *testing.T) {
 	tests := []struct {
-		name   string
-		code   string
-		output string
+		name         string
+		code         string
+		output       string
+		noDiagnostic bool
 	}{
 		{
 			name:   "parameter Set annotation",
@@ -91,11 +103,57 @@ func TestPreferSetSizeProjectFalseTypeSyntax(t *testing.T) {
 			code:   "type SetAlias = Set<string>; function getSize(set: SetAlias) { return Array.from(set).length; }",
 			output: "type SetAlias = Set<string>; function getSize(set: SetAlias) { return set.size; }",
 		},
+		{
+			name:   "all Set union",
+			code:   "function getSize(set: Set<string> | ReadonlySet<string>) { return Array.from(set).length; }",
+			output: "function getSize(set: Set<string> | ReadonlySet<string>) { return set.size; }",
+		},
+		{
+			name:   "Set intersection assertion",
+			code:   "function getSize(set: unknown) { return [...(set as Set<string> & { tag: string })].length; }",
+			output: "function getSize(set: unknown) { return (set as Set<string> & { tag: string }).size; }",
+		},
+		{
+			name:   "interface heritage",
+			code:   "interface StringSet extends ReadonlySet<string> {} function getSize(set: StringSet) { return Array.from(set).length; }",
+			output: "interface StringSet extends ReadonlySet<string> {} function getSize(set: StringSet) { return set.size; }",
+		},
+		{
+			name:   "class heritage",
+			code:   "class StringSet extends Set<string> {} function getSize(set: StringSet) { return Array.from(set).length; }",
+			output: "class StringSet extends Set<string> {} function getSize(set: StringSet) { return set.size; }",
+		},
+		{
+			name:         "mixed union is not known Set",
+			code:         "function getSize(set: Set<string> | string[]) { return Array.from(set).length; }",
+			noDiagnostic: true,
+		},
+		{
+			name:         "nullable union is not known Set",
+			code:         "function getSize(set: Set<string> | null) { return Array.from(set).length; }",
+			noDiagnostic: true,
+		},
+		{
+			name:         "cyclic type alias",
+			code:         "type Recursive = Recursive; function getSize(set: Recursive) { return Array.from(set).length; }",
+			noDiagnostic: true,
+		},
+		{
+			name:         "implements is not inheritance",
+			code:         "class Box implements ReadonlySet<string> {} function getSize(set: Box) { return Array.from(set).length; }",
+			noDiagnostic: true,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			diagnostics := lintPreferSetSizeProjectFalse(t, test.code)
+			if test.noDiagnostic {
+				if len(diagnostics) != 0 {
+					t.Fatalf("diagnostics = %+v, want none", diagnostics)
+				}
+				return
+			}
 			if len(diagnostics) != 1 {
 				t.Fatalf("diagnostic count = %d, want 1: %+v", len(diagnostics), diagnostics)
 			}
@@ -105,6 +163,41 @@ func TestPreferSetSizeProjectFalseTypeSyntax(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A cycle guard alone still expands these small shared graphs exponentially.
+// Keep the generated cases small in source but deep enough to expose re-walking.
+func TestPreferSetSizeSharedAliasGraphs(t *testing.T) {
+	const depth = 30
+	t.Run("const bindings", func(t *testing.T) {
+		var source strings.Builder
+		source.WriteString("const flag = true;\nconst set0 = new Set();\n")
+		for i := 1; i <= depth; i++ {
+			fmt.Fprintf(&source, "const set%d = flag ? set%d : set%d;\n", i, i-1, i-1)
+		}
+		code := source.String() + fmt.Sprintf("[...set%d].length", depth)
+		output := source.String() + fmt.Sprintf("set%d.size", depth)
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_set_size.PreferSetSizeRule,
+			nil, []rule_tester.InvalidTestCase{invalid(code, output, "file.js")},
+		)
+	})
+	t.Run("type aliases", func(t *testing.T) {
+		var source strings.Builder
+		source.WriteString("type Set0 = Set<string>;\n")
+		for i := 1; i <= depth; i++ {
+			fmt.Fprintf(&source, "type Set%d = Set%d | Set%d;\n", i, i-1, i-1)
+		}
+		prefix := source.String() + fmt.Sprintf("function getSize(set: Set%d) { return ", depth)
+		code := prefix + "Array.from(set).length; }"
+		diagnostics := lintPreferSetSizeProjectFalse(t, code)
+		if len(diagnostics) != 1 {
+			t.Fatalf("diagnostic count = %d, want 1: %+v", len(diagnostics), diagnostics)
+		}
+		output, unapplied, fixed := linter.ApplyRuleFixes(code, diagnostics)
+		if !fixed || len(unapplied) != 0 || output != prefix+"set.size; }" {
+			t.Fatalf("output = %q, fixed=%t, unapplied=%+v", output, fixed, unapplied)
+		}
+	})
 }
 
 func lintPreferSetSizeProjectFalse(t *testing.T, code string) []rule.RuleDiagnostic {

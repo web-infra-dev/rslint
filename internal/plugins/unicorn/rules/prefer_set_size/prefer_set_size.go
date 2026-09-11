@@ -87,7 +87,35 @@ func getSetNode(object *ast.Node) (conversion, set *ast.Node) {
 	return conversion, fromCall.Call.Arguments()[0]
 }
 
-func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) bool {
+// Memoize declaration-based facts, not use-site checker results: mutable
+// bindings can narrow differently at each reference.
+type setWalkState struct {
+	visiting map[*ast.Symbol]bool
+	memo     map[*ast.Symbol]bool
+}
+
+func newSetWalkState() *setWalkState {
+	return &setWalkState{
+		visiting: make(map[*ast.Symbol]bool),
+		memo:     make(map[*ast.Symbol]bool),
+	}
+}
+
+func resolveSetSymbol(state *setWalkState, symbol *ast.Symbol, classify func() bool) bool {
+	if symbol == nil || state.visiting[symbol] {
+		return false
+	}
+	if result, ok := state.memo[symbol]; ok {
+		return result
+	}
+	state.visiting[symbol] = true
+	result := classify()
+	delete(state.visiting, symbol)
+	state.memo[symbol] = result
+	return result
+}
+
+func isSet(ctx rule.RuleContext, node *ast.Node, state *setWalkState) bool {
 	if node == nil {
 		return false
 	}
@@ -95,8 +123,8 @@ func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) 
 	if runtime == nil {
 		return false
 	}
-	if runtime != node {
-		return isSet(ctx, runtime, visiting)
+	if state == nil {
+		state = newSetWalkState()
 	}
 
 	// Unicorn resolves the runtime expression before consulting type information.
@@ -107,13 +135,13 @@ func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) 
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
 		// An informative assertion classifies the runtime expression even when
 		// the source-only Program has no TypeChecker.
-		if isSetTypeAnnotation(ctx, runtime.Type(), map[*ast.Symbol]bool{}) {
+		if isSetTypeAnnotation(ctx, runtime.Type(), nil) {
 			return true
 		}
-		return isSet(ctx, runtime.Expression(), visiting)
+		return isSet(ctx, runtime.Expression(), state)
 	case ast.KindSatisfiesExpression:
 		satisfies := runtime.AsSatisfiesExpression()
-		return satisfies != nil && isSet(ctx, satisfies.Expression, visiting)
+		return satisfies != nil && isSet(ctx, satisfies.Expression, state)
 	case ast.KindNonNullExpression:
 		// `set!` can narrow `Set | null` to Set. Its inner identifier retains
 		// the nullable declared type, so inspect the wrapper before unwrapping.
@@ -121,48 +149,23 @@ func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) 
 			return true
 		}
 		nonNull := runtime.AsNonNullExpression()
-		return nonNull != nil && isSet(ctx, nonNull.Expression, visiting)
+		return nonNull != nil && isSet(ctx, nonNull.Expression, state)
 	case ast.KindConditionalExpression:
 		conditional := runtime.AsConditionalExpression()
 		return conditional != nil &&
-			isSet(ctx, conditional.WhenTrue, visiting) &&
-			isSet(ctx, conditional.WhenFalse, visiting)
+			isSet(ctx, conditional.WhenTrue, state) &&
+			isSet(ctx, conditional.WhenFalse, state)
 	case ast.KindBinaryExpression:
 		binary := runtime.AsBinaryExpression()
 		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken {
-			return isSet(ctx, binary.Right, visiting)
+			return isSet(ctx, binary.Right, state)
 		}
 	}
 
 	// Like Unicorn's type helper, direct Set construction and const aliases work
 	// in plain JavaScript without a TypeScript program.
-	if isSetConstruction(runtime) {
+	if isSetConstruction(runtime) || ast.IsIdentifier(runtime) && isSetBinding(ctx, runtime, state) {
 		return true
-	}
-	if ast.IsIdentifier(runtime) {
-		if visiting == nil {
-			visiting = make(map[*ast.Symbol]bool)
-		}
-		if symbol := ctx.Refs.ResolveInFile(runtime); symbol != nil && !visiting[symbol] && len(symbol.Declarations) == 1 {
-			declaration := symbol.Declarations[0]
-			if isSetTypeAnnotation(ctx, setBindingTypeAnnotation(declaration), map[*ast.Symbol]bool{}) {
-				return true
-			}
-			if declaration != nil && declaration.Kind == ast.KindVariableDeclaration {
-				list := declaration.Parent
-				variable := declaration.AsVariableDeclaration()
-				if list != nil && list.Kind == ast.KindVariableDeclarationList &&
-					list.Flags&ast.NodeFlagsConst != 0 && variable != nil &&
-					ast.IsIdentifier(variable.Name()) && variable.Initializer != nil {
-					visiting[symbol] = true
-					result := isSet(ctx, variable.Initializer, visiting)
-					delete(visiting, symbol)
-					if result {
-						return true
-					}
-				}
-			}
-		}
 	}
 
 	// eslint-plugin-unicorn uses parser type information after its syntax and
@@ -172,12 +175,40 @@ func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) 
 	return isSetWithChecker(ctx, runtime)
 }
 
+func isSetBinding(ctx rule.RuleContext, node *ast.Node, state *setWalkState) bool {
+	if ctx.Refs == nil {
+		return false
+	}
+	symbol := ctx.Refs.ResolveInFile(node)
+	if symbol == nil || len(symbol.Declarations) != 1 {
+		return false
+	}
+	return resolveSetSymbol(state, symbol, func() bool {
+		declaration := symbol.Declarations[0]
+		if isSetTypeAnnotation(ctx, setBindingTypeAnnotation(declaration), nil) {
+			return true
+		}
+		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
+			return false
+		}
+		list := declaration.Parent
+		variable := declaration.AsVariableDeclaration()
+		if list == nil || list.Kind != ast.KindVariableDeclarationList ||
+			list.Flags&ast.NodeFlagsConst == 0 || variable == nil ||
+			!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
+			return false
+		}
+		return isSet(ctx, variable.Initializer, state)
+	})
+}
+
 func isSetWithChecker(ctx rule.RuleContext, node *ast.Node) bool {
 	if node == nil || ctx.TypeChecker == nil || ast.IsInJSFile(node) {
 		return false
 	}
 	return unicornutil.ClassifyType(ctx, ctx.TypeChecker.GetTypeAtLocation(node), unicornutil.TypeClassifierOptions{
-		TargetTypeNames: setTypeNames,
+		TargetTypeNames:     setTypeNames,
+		HeritageSymbolFlags: ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
 	}) == unicornutil.TypeTarget
 }
 
@@ -194,11 +225,14 @@ func setBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
 }
 
 // isSetTypeAnnotation recognizes the source-level annotations that Unicorn's
-// type helper can use before a TypeScript Program is available. Type aliases
-// and constraints are resolved through the rule's binder, not the checker.
-func isSetTypeAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) bool {
+// type helper can use before a TypeScript Program is available. Compound types,
+// aliases, constraints, and heritage are resolved without requiring the checker.
+func isSetTypeAnnotation(ctx rule.RuleContext, node *ast.Node, state *setWalkState) bool {
 	if node == nil || utils.IsJSDocSyntaxNode(node) {
 		return false
+	}
+	if state == nil {
+		state = newSetWalkState()
 	}
 	for node.Kind == ast.KindParenthesizedType {
 		node = node.AsParenthesizedTypeNode().Type
@@ -206,13 +240,36 @@ func isSetTypeAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast
 			return false
 		}
 	}
-	if node.Kind != ast.KindTypeReference {
+	switch node.Kind {
+	case ast.KindUnionType:
+		types := node.AsUnionTypeNode().Types
+		if types == nil || len(types.Nodes) == 0 {
+			return false
+		}
+		for _, part := range types.Nodes {
+			if !isSetTypeAnnotation(ctx, part, state) {
+				return false
+			}
+		}
+		return true
+	case ast.KindIntersectionType:
+		types := node.AsIntersectionTypeNode().Types
+		if types != nil {
+			for _, part := range types.Nodes {
+				if isSetTypeAnnotation(ctx, part, state) {
+					return true
+				}
+			}
+		}
+		return false
+	case ast.KindTypeReference:
+		return isSetTypeReference(ctx, node.AsTypeReferenceNode().TypeName, state)
+	default:
 		return false
 	}
-	return isSetTypeReference(ctx, node.AsTypeReferenceNode().TypeName, visiting)
 }
 
-func isSetTypeReference(ctx rule.RuleContext, typeName *ast.Node, visiting map[*ast.Symbol]bool) bool {
+func isSetTypeReference(ctx rule.RuleContext, typeName *ast.Node, state *setWalkState) bool {
 	if typeName == nil || !ast.IsIdentifier(typeName) {
 		return false
 	}
@@ -226,21 +283,45 @@ func isSetTypeReference(ctx rule.RuleContext, typeName *ast.Node, visiting map[*
 	symbol := ctx.Refs.ResolveInFileWithMeaning(
 		typeName, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
 	)
-	if symbol == nil || visiting[symbol] {
+	return resolveSetSymbol(state, symbol, func() bool {
+		for _, declaration := range symbol.Declarations {
+			if declaration == nil {
+				continue
+			}
+			switch declaration.Kind {
+			case ast.KindTypeAliasDeclaration:
+				return isSetTypeAnnotation(ctx, declaration.AsTypeAliasDeclaration().Type, state)
+			case ast.KindTypeParameter:
+				return isSetTypeAnnotation(ctx, declaration.AsTypeParameterDeclaration().Constraint, state)
+			case ast.KindInterfaceDeclaration, ast.KindClassDeclaration, ast.KindClassExpression:
+				return isSetHeritage(ctx, declaration, state)
+			}
+		}
+		return false
+	})
+}
+
+func isSetHeritage(ctx rule.RuleContext, declaration *ast.Node, state *setWalkState) bool {
+	clauses := utils.GetHeritageClauses(declaration)
+	if clauses == nil {
 		return false
 	}
-	visiting[symbol] = true
-	defer delete(visiting, symbol)
-
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil {
+	for _, node := range clauses.Nodes {
+		clause := node.AsHeritageClause()
+		if clause == nil || clause.Token != ast.KindExtendsKeyword || clause.Types == nil {
 			continue
 		}
-		switch declaration.Kind {
-		case ast.KindTypeAliasDeclaration:
-			return isSetTypeAnnotation(ctx, declaration.AsTypeAliasDeclaration().Type, visiting)
-		case ast.KindTypeParameter:
-			return isSetTypeAnnotation(ctx, declaration.AsTypeParameterDeclaration().Constraint, visiting)
+		for _, node := range clause.Types.Nodes {
+			var typeName *ast.Node
+			switch node.Kind {
+			case ast.KindTypeReference:
+				typeName = node.AsTypeReferenceNode().TypeName
+			case ast.KindExpressionWithTypeArguments:
+				typeName = node.AsExpressionWithTypeArguments().Expression
+			}
+			if isSetTypeReference(ctx, typeName, state) {
+				return true
+			}
 		}
 	}
 	return false
