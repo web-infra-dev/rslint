@@ -312,13 +312,13 @@ func mergeProps(left, right []*prop) []*prop {
 	return left
 }
 
-func typeProps(node *ast.Node, aliases map[string][]*ast.Node, seen map[string]bool, prefix string) []*prop {
+func typeProps(node *ast.Node, aliases map[string][]*ast.Node, resolve func(*ast.Node) *ast.Symbol, seen map[string]bool, prefix string) []*prop {
 	if node == nil {
 		return nil
 	}
 	switch node.Kind {
 	case ast.KindParenthesizedType:
-		return typeProps(node.AsParenthesizedTypeNode().Type, aliases, seen, prefix)
+		return typeProps(node.AsParenthesizedTypeNode().Type, aliases, resolve, seen, prefix)
 	case ast.KindTypeLiteral:
 		var result []*prop
 		members := node.AsTypeLiteralNode().Members
@@ -367,9 +367,9 @@ func typeProps(node *ast.Node, aliases map[string][]*ast.Node, seen map[string]b
 				}
 				for _, typ := range clause.AsHeritageClause().Types.Nodes {
 					if typ != nil && typ.Kind == ast.KindExpressionWithTypeArguments {
-						result = mergeProps(result, typeProps(typ.AsExpressionWithTypeArguments().Expression, aliases, seen, prefix))
+						result = mergeProps(result, typeProps(typ.AsExpressionWithTypeArguments().Expression, aliases, resolve, seen, prefix))
 					} else if typ != nil && typ.Kind == ast.KindTypeReference {
-						result = mergeProps(result, typeProps(typ, aliases, seen, prefix))
+						result = mergeProps(result, typeProps(typ, aliases, resolve, seen, prefix))
 					}
 				}
 			}
@@ -407,8 +407,8 @@ func typeProps(node *ast.Node, aliases map[string][]*ast.Node, seen map[string]b
 		}
 		return result
 	case ast.KindTypeReference:
-		if argument := reactGenericArgument(node.AsTypeReferenceNode().TypeName, node.AsTypeReferenceNode().TypeArguments); argument != nil {
-			return typeProps(argument, aliases, seen, prefix)
+		if argument := reactGenericArgument(node.AsTypeReferenceNode().TypeName, node.AsTypeReferenceNode().TypeArguments, resolve); argument != nil {
+			return typeProps(argument, aliases, resolve, seen, prefix)
 		}
 		name := reactutil.EntityNameRightmost(node.AsTypeReferenceNode().TypeName)
 		if name == nil || name.Kind != ast.KindIdentifier || seen[name.AsIdentifier().Text] {
@@ -419,7 +419,7 @@ func typeProps(node *ast.Node, aliases map[string][]*ast.Node, seen map[string]b
 			if args != nil && len(args.Nodes) > 0 {
 				argument := args.Nodes[0]
 				if argument.Kind == ast.KindFunctionType {
-					return typeProps(argument.AsFunctionTypeNode().Type, aliases, seen, prefix)
+					return typeProps(argument.AsFunctionTypeNode().Type, aliases, resolve, seen, prefix)
 				}
 				if argument.Kind == ast.KindTypeQuery {
 					query := argument.AsTypeQueryNode()
@@ -427,7 +427,7 @@ func typeProps(node *ast.Node, aliases map[string][]*ast.Node, seen map[string]b
 						if initializer := reactutil.ResolveIdentifierInitializer(query.ExprName.AsNode(), nil); initializer != nil {
 							initializer = unwrap(initializer)
 							if isFunctionLike(initializer) {
-								return typePropsFromFunctionBody(initializer.Body(), aliases, seen, prefix)
+								return typePropsFromFunctionBody(initializer.Body(), aliases, resolve, seen, prefix)
 							}
 						}
 					}
@@ -438,13 +438,13 @@ func typeProps(node *ast.Node, aliases map[string][]*ast.Node, seen map[string]b
 		seen[name.AsIdentifier().Text] = true
 		var result []*prop
 		for _, declaration := range visibleTypeAliases(node, aliases[name.AsIdentifier().Text]) {
-			result = mergeProps(result, typeProps(declaration, aliases, seen, prefix))
+			result = mergeProps(result, typeProps(declaration, aliases, resolve, seen, prefix))
 		}
 		return result
 	case ast.KindIntersectionType:
 		var result []*prop
 		for _, part := range node.AsIntersectionTypeNode().Types.Nodes {
-			result = mergeProps(result, typeProps(part, aliases, seen, prefix))
+			result = mergeProps(result, typeProps(part, aliases, resolve, seen, prefix))
 		}
 		return result
 	}
@@ -487,7 +487,7 @@ func typeDeclarationScope(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func typePropsFromFunctionBody(body *ast.Node, aliases map[string][]*ast.Node, seen map[string]bool, prefix string) []*prop {
+func typePropsFromFunctionBody(body *ast.Node, aliases map[string][]*ast.Node, resolve func(*ast.Node) *ast.Symbol, seen map[string]bool, prefix string) []*prop {
 	body = unwrap(body)
 	if body == nil {
 		return nil
@@ -507,13 +507,13 @@ func typePropsFromFunctionBody(body *ast.Node, aliases map[string][]*ast.Node, s
 			return false
 		}
 		body.ForEachChild(visit)
-		return typePropsFromFunctionBody(returned, aliases, seen, prefix)
+		return typePropsFromFunctionBody(returned, aliases, resolve, seen, prefix)
 	}
 	if body.Kind == ast.KindCallExpression {
 		var result []*prop
 		if arguments := body.AsCallExpression().TypeArguments; arguments != nil {
 			for _, argument := range arguments.Nodes {
-				result = mergeProps(result, typeProps(argument, aliases, seen, prefix))
+				result = mergeProps(result, typeProps(argument, aliases, resolve, seen, prefix))
 			}
 		}
 		return result
@@ -522,7 +522,7 @@ func typePropsFromFunctionBody(body *ast.Node, aliases map[string][]*ast.Node, s
 		var result []*prop
 		for _, member := range body.AsObjectLiteralExpression().Properties.Nodes {
 			if member != nil && member.Kind == ast.KindSpreadAssignment {
-				result = mergeProps(result, typePropsFromFunctionBody(member.AsSpreadAssignment().Expression, aliases, seen, prefix))
+				result = mergeProps(result, typePropsFromFunctionBody(member.AsSpreadAssignment().Expression, aliases, resolve, seen, prefix))
 				continue
 			}
 			if member == nil || (member.Kind != ast.KindPropertyAssignment && member.Kind != ast.KindShorthandPropertyAssignment && member.Kind != ast.KindMethodDeclaration) {
@@ -581,17 +581,28 @@ func classType(node *ast.Node) *ast.Node {
 	return types.Nodes[0]
 }
 
-func reactGenericArgument(name *ast.Node, arguments *ast.NodeList) *ast.Node {
-	if name == nil || arguments == nil {
+func reactGenericArgument(name *ast.Node, arguments *ast.NodeList, resolve func(*ast.Node) *ast.Symbol) *ast.Node {
+	if name == nil || arguments == nil || resolve == nil {
 		return nil
 	}
 	root, member := name, ""
-	if name.Kind == ast.KindQualifiedName {
+	switch name.Kind {
+	case ast.KindQualifiedName:
 		root = name.AsQualifiedName().Left
 		member = propertyName(name.AsQualifiedName().Right)
+	case ast.KindPropertyAccessExpression:
+		root = name.AsPropertyAccessExpression().Expression
+		member = propertyName(name.AsPropertyAccessExpression().Name())
 	}
 	if root.Kind != ast.KindIdentifier {
 		return nil
+	}
+	binding := resolve(root)
+	if binding == nil {
+		if member == "" || root.Text() != "React" {
+			return nil
+		}
+		return reactGenericArgumentAtIndex(member, arguments)
 	}
 	imported := ""
 	for _, statement := range ast.GetSourceFileOfNode(name).Statements.Nodes {
@@ -604,16 +615,16 @@ func reactGenericArgument(name *ast.Node, arguments *ast.NodeList) *ast.Node {
 		}
 		clause := declaration.ImportClause.AsImportClause()
 		if member != "" {
-			if clause.Name() != nil && clause.Name().Text() == root.Text() {
+			if clause.Name() != nil && utils.BindingNameSymbol(clause.Name()) == binding {
 				imported = member
 			}
-			if bindings := clause.NamedBindings; bindings != nil && bindings.Kind == ast.KindNamespaceImport && bindings.Name().Text() == root.Text() {
+			if bindings := clause.NamedBindings; bindings != nil && bindings.Kind == ast.KindNamespaceImport && utils.BindingNameSymbol(bindings.Name()) == binding {
 				imported = member
 			}
 		} else if bindings := clause.NamedBindings; bindings != nil && bindings.Kind == ast.KindNamedImports {
 			for _, element := range bindings.AsNamedImports().Elements.Nodes {
 				specifier := element.AsImportSpecifier()
-				if specifier.Name().Text() == root.Text() {
+				if utils.BindingNameSymbol(specifier.Name()) == binding {
 					imported = root.Text()
 					if specifier.PropertyName != nil {
 						imported = specifier.PropertyName.Text()
@@ -622,6 +633,10 @@ func reactGenericArgument(name *ast.Node, arguments *ast.NodeList) *ast.Node {
 			}
 		}
 	}
+	return reactGenericArgumentAtIndex(imported, arguments)
+}
+
+func reactGenericArgumentAtIndex(imported string, arguments *ast.NodeList) *ast.Node {
 	index := 0
 	switch imported {
 	case "forwardRef", "ForwardRefRenderFunction":
@@ -636,7 +651,7 @@ func reactGenericArgument(name *ast.Node, arguments *ast.NodeList) *ast.Node {
 	return arguments.Nodes[index]
 }
 
-func functionComponentType(node *ast.Node) *ast.Node {
+func functionComponentType(node *ast.Node, resolve func(*ast.Node) *ast.Symbol) *ast.Node {
 	for current := node; current != nil && current.Parent != nil; current = current.Parent {
 		parent := current.Parent
 		switch parent.Kind {
@@ -646,11 +661,9 @@ func functionComponentType(node *ast.Node) *ast.Node {
 			call := parent.AsCallExpression()
 			callee := unwrap(call.Expression)
 			if callee != nil && call.TypeArguments != nil {
-				if callee.Kind == ast.KindIdentifier && callee.Text() == "forwardRef" {
-					return reactGenericArgument(callee, call.TypeArguments)
-				}
-				if callee.Kind == ast.KindPropertyAccessExpression && propertyName(callee.AsPropertyAccessExpression().Name()) == "forwardRef" && len(call.TypeArguments.Nodes) >= 2 {
-					return call.TypeArguments.Nodes[1]
+				if (callee.Kind == ast.KindIdentifier && callee.Text() == "forwardRef") ||
+					(callee.Kind == ast.KindPropertyAccessExpression && propertyName(callee.AsPropertyAccessExpression().Name()) == "forwardRef") {
+					return reactGenericArgument(callee, call.TypeArguments, resolve)
 				}
 			}
 			continue
@@ -660,7 +673,7 @@ func functionComponentType(node *ast.Node) *ast.Node {
 			}
 			typ := parent.AsVariableDeclaration().Type
 			if typ.Kind == ast.KindTypeReference {
-				return reactGenericArgument(typ.AsTypeReferenceNode().TypeName, typ.AsTypeReferenceNode().TypeArguments)
+				return reactGenericArgument(typ.AsTypeReferenceNode().TypeName, typ.AsTypeReferenceNode().TypeArguments, resolve)
 			}
 			return nil
 		default:
@@ -688,6 +701,18 @@ func declaredContains(props []*prop, fullName string) bool {
 		}
 	}
 	return false
+}
+
+func findDeclared(props []*prop, fullName string) *prop {
+	for _, p := range props {
+		if p.fullName == fullName {
+			return p
+		}
+		if nested := findDeclared(p.children, fullName); nested != nil {
+			return nested
+		}
+	}
+	return nil
 }
 
 func declaredProps(node *ast.Node, customValidators []string, wrappers []reactutil.PropWrapperEntry, resolve func(*ast.Node) *ast.Symbol) []*prop {
@@ -910,16 +935,12 @@ func addAssignmentDeclarations(root *ast.Node, components []*component, customVa
 						if propTypesIndex == len(parts)-1 {
 							appendDeclared(c, declaredProps(bin.Right, customValidators, wrappers, resolve))
 						} else {
-							parentExists := true
-							for i := propTypesIndex + 1; i < len(parts)-1; i++ {
-								if !declaredContains(c.declared, strings.Join(parts[propTypesIndex+1:i+1], ".")) {
-									parentExists = false
-									break
-								}
-							}
-							if parentExists {
-								name := strings.Join(parts[propTypesIndex+1:], ".")
-								appendDeclared(c, []*prop{newProp(parts[len(parts)-1], name, node)})
+							path := parts[propTypesIndex+1:]
+							declared := newProp(path[len(path)-1], strings.Join(path, "."), node)
+							if len(path) == 1 {
+								appendDeclared(c, []*prop{declared})
+							} else if parent := findDeclared(c.declared, strings.Join(path[:len(path)-1], ".")); parent != nil {
+								parent.children = mergeProps(parent.children, []*prop{declared})
 							}
 						}
 					}
@@ -1368,7 +1389,7 @@ func NoUnusedPropTypesRuleRun(ctx rule.RuleContext, optionsRaw []any) rule.RuleL
 				switch c.node.Kind {
 				case ast.KindClassDeclaration, ast.KindClassExpression:
 					if typ := classType(c.node); typ != nil {
-						appendDeclared(c, typeProps(typ, aliases, map[string]bool{}, ""))
+						appendDeclared(c, typeProps(typ, aliases, resolveSymbol, map[string]bool{}, ""))
 					}
 					for _, member := range c.node.Members() {
 						if member.Kind == ast.KindPropertyDeclaration {
@@ -1378,7 +1399,7 @@ func NoUnusedPropTypesRuleRun(ctx rule.RuleContext, optionsRaw []any) rule.RuleL
 								appendDeclared(c, declaredProps(pd.Initializer, opts.customValidators, propWrappers, resolveSymbol))
 							}
 							if name == "props" && pd.Type != nil {
-								appendDeclared(c, typeProps(pd.Type, aliases, map[string]bool{}, ""))
+								appendDeclared(c, typeProps(pd.Type, aliases, resolveSymbol, map[string]bool{}, ""))
 							}
 						} else if (member.Kind == ast.KindGetAccessor || member.Kind == ast.KindMethodDeclaration) && ast.IsStatic(member) && propertyName(member.Name()) == "propTypes" {
 							body := member.Body()
@@ -1402,7 +1423,7 @@ func NoUnusedPropTypesRuleRun(ctx rule.RuleContext, optionsRaw []any) rule.RuleL
 				{
 					// Function parameters are the root aliases for SFCs.
 					if isFunctionLike(c.node) {
-						componentType := functionComponentType(c.node)
+						componentType := functionComponentType(c.node, resolveSymbol)
 						parameters := reactutil.FunctionParameters(c.node)
 						if len(parameters) > 0 && parameters[0].Kind == ast.KindParameter {
 							decl := parameters[0].AsParameterDeclaration()
@@ -1414,7 +1435,7 @@ func NoUnusedPropTypesRuleRun(ctx rule.RuleContext, optionsRaw []any) rule.RuleL
 							}
 						}
 						if componentType != nil {
-							appendDeclared(c, typeProps(componentType, aliases, map[string]bool{}, ""))
+							appendDeclared(c, typeProps(componentType, aliases, resolveSymbol, map[string]bool{}, ""))
 						}
 					}
 					c.walkUsage(c.node, nested, checkAsyncSafe)

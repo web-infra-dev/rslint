@@ -13,6 +13,11 @@ import (
 func TestNoUnusedPropTypesExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedPropTypesRule,
 		[]rule_tester.ValidTestCase{
+			{Code: `import type { FC } from 'react'; function scope() { type FC<T> = (props: T) => unknown; type Props = { phantom: string }; const Foo: FC<Props> = () => <div />; return Foo; }`, Tsx: true},
+			{Code: `import React from 'react'; namespace scope { namespace React { export type FC<T> = (props: T) => unknown; } type Props = { phantom: string }; const Foo: React.FC<Props> = () => <div />; }`, Tsx: true},
+			{Code: `import * as React from 'react'; namespace scope { namespace React { export type FC<T> = (props: T) => unknown; } type Props = { phantom: string }; const Foo: React.FC<Props> = () => <div />; }`, Tsx: true},
+			{Code: `import React from 'react'; function scope() { const React = { forwardRef<T, P>(render: () => unknown) { return render; } }; type Props = { phantom: string }; const Foo = React.forwardRef<HTMLDivElement, Props>(() => <div />); return Foo; }`, Tsx: true},
+			{Code: `function Foo() { return <div />; } Foo.propTypes = { a: PropTypes.shape({ b: PropTypes.shape({}) }) }; Foo.propTypes.a.b.c = PropTypes.number;`, Tsx: true},
 			{Code: `type Param = { param: string }; type Generic = { generic: string }; const Foo = React.forwardRef<HTMLDivElement, Generic>((props: Param, ref) => <div>{props.generic}</div>);`, Tsx: true},
 			{Code: `function Foo(props) { return <div>{props.outer}</div>; } Foo.propTypes = { outer: PropTypes.arrayOf(Custom.shape({ unused: Custom.string }).isRequired) };`, Options: map[string]any{"customValidators": []any{"Custom"}, "skipShapeProps": false}, Tsx: true},
 			{Code: `const Foo = React.memo(React.forwardRef((props, ref) => <div>{props.name}</div>)); Foo.propTypes = { name: PropTypes.string };`, Tsx: true},
@@ -70,6 +75,7 @@ func TestNoUnusedPropTypesExtras(t *testing.T) {
 			// Locks in upstream reportUnusedPropType()'s `props === true` arm.
 			{Code: `class Hello extends React.Component { render() { return <div>{this.props.name}</div>; } } Hello.propTypes = { name: PropTypes.string, ...external };`, Tsx: true},
 		}, []rule_tester.InvalidTestCase{
+			{Code: `import type { FC } from 'react'; type Props = { phantom: string }; const Foo: FC<Props> = () => <div />;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'phantom' PropType is defined but prop is never used"}}},
 			{Code: `class Foo extends React.Component { static get propTypes() { return shared; } render() { return <div />; } } const shared = { unused: PropTypes.string };`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
 			{Code: `import { forwardRef } from 'react'; type Props = { used: string; unused: string }; const Foo = forwardRef<HTMLDivElement, Props>(({ used }, ref) => <div>{used}</div>);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
 			{Code: `type P = { unused: string }; const makeProps = () => { if (flag) return factory<P>(); return factory<P>(); }; type Props = ReturnType<typeof makeProps>; const Foo = (props: Props) => <div />;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedPropType", Message: "'unused' PropType is defined but prop is never used"}}},
