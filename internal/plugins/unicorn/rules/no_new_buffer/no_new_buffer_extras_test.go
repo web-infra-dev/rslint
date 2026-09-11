@@ -36,6 +36,26 @@ func TestNoNewBufferExtras(t *testing.T) {
 			fixedNewBufferCase(`new Buffer((1 === 1) ? 1 : value)`, `new Buffer((1 === 1) ? 1 : value)`, "alloc", `Buffer.alloc((1 === 1) ? 1 : value)`),
 			fixedNewBufferCase(`new Buffer(undefined ?? 1)`, `new Buffer(undefined ?? 1)`, "alloc", `Buffer.alloc(undefined ?? 1)`),
 			fixedNewBufferCase(`new Buffer({} && 1)`, `new Buffer({} && 1)`, "alloc", `Buffer.alloc({} && 1)`),
+			// A known condition can select a numeric expression whose value is
+			// unknown. Do not require the selected branch itself to fold.
+			fixedNewBufferCase(`new Buffer(true ? Math.min(size, 8) : value)`, `new Buffer(true ? Math.min(size, 8) : value)`, "alloc", `Buffer.alloc(true ? Math.min(size, 8) : value)`),
+			fixedNewBufferCase(`new Buffer(false ? value : bytes.length)`, `new Buffer(false ? value : bytes.length)`, "alloc", `Buffer.alloc(false ? value : bytes.length)`),
+			fixedNewBufferCase(`const enabled = true; new Buffer(enabled ? Number(value) : unknown)`, `new Buffer(enabled ? Number(value) : unknown)`, "alloc", `const enabled = true; Buffer.alloc(enabled ? Number(value) : unknown)`),
+			fixedNewBufferCase(`new Buffer("x" ? parseInt(value) : unknown)`, `new Buffer("x" ? parseInt(value) : unknown)`, "alloc", `Buffer.alloc("x" ? parseInt(value) : unknown)`),
+			fixedNewBufferCase(`new Buffer(0 ? unknown : bytes.length)`, `new Buffer(0 ? unknown : bytes.length)`, "alloc", `Buffer.alloc(0 ? unknown : bytes.length)`),
+			fixedNewBufferCase(`new Buffer(null ? unknown : bytes.length)`, `new Buffer(null ? unknown : bytes.length)`, "alloc", `Buffer.alloc(null ? unknown : bytes.length)`),
+			fixedNewBufferCase(`new Buffer({} ? bytes.length : unknown)`, `new Buffer({} ? bytes.length : unknown)`, "alloc", `Buffer.alloc({} ? bytes.length : unknown)`),
+			withFileName(fixedNewBufferCase(`function f(size: number) { new Buffer(true ? size : unknown) }`, `new Buffer(true ? size : unknown)`, "alloc", `function f(size: number) { Buffer.alloc(true ? size : unknown) }`), "file.ts"),
+			fixedNewBufferCase(`new Buffer(enabled ? bytes.length : Number(value))`, `new Buffer(enabled ? bytes.length : Number(value))`, "alloc", `Buffer.alloc(enabled ? bytes.length : Number(value))`),
+			suggestedNewBufferCase(`new Buffer(enabled ? bytes.length : unknown)`, `new Buffer(enabled ? bytes.length : unknown)`),
+			suggestedNewBufferCase(`let enabled = true; new Buffer(enabled ? bytes.length : unknown)`, `new Buffer(enabled ? bytes.length : unknown)`),
+			suggestedNewBufferCase(`new Buffer(false ? bytes.length : unknown)`, `new Buffer(false ? bytes.length : unknown)`),
+			// The restricted operand can contain member access, calls, or other
+			// expressions above the constructor in the AST.
+			fixedNewBufferCase("function f() { return new // bytes\nBuffer([42]).length; }", "new // bytes\nBuffer([42])", "from", "function f() { return ( // bytes\nBuffer.from([42]).length); }"),
+			fixedNewBufferCase("function f() { throw new // bytes\nBuffer([42]).toString(); }", "new // bytes\nBuffer([42])", "from", "function f() { throw ( // bytes\nBuffer.from([42]).toString()); }"),
+			fixedNewBufferCase("function* f() { yield new // bytes\nBuffer([42]).length + 1; }", "new // bytes\nBuffer([42])", "from", "function* f() { yield ( // bytes\nBuffer.from([42]).length + 1); }"),
+			withFileName(fixedNewBufferCase("function f() { return new // bytes\nBuffer([42])!; }", "new // bytes\nBuffer([42])", "from", "function f() { return ( // bytes\nBuffer.from([42])!); }"), "file.ts"),
 			// A line terminator between `new` and the callee would turn this
 			// into a bare yield if the fixer only removed `new`.
 			fixedNewBufferCase("function* values() {\n\tyield new // yield\n\t\tBuffer(1);\n}", "new // yield\n\t\tBuffer(1)", "alloc", "function* values() {\n\tyield ( // yield\n\t\tBuffer.alloc(1));\n}"),

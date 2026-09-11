@@ -57,18 +57,16 @@ func NewExpressionToCallFixes(
 	fixes := []rule.RuleFix{
 		rule.RuleFixRemoveRange(core.NewTextRange(nodeRange.Pos(), removeEnd)),
 	}
-	if needsOperandParentheses(sourceFile, node, nodeRange.Pos(), expressionRange.Pos()) {
-		if opening, closing, ok := operandParenthesesRanges(sourceFile, node.Parent); ok {
-			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(opening, opening), " ("))
-			if closing == callEnd {
-				if calleeRange.End() == expressionRange.End() && callEnd == expressionRange.End() {
-					suffix += ")"
-				} else {
-					insertAfterExpression += ")"
-				}
+	if opening, closing, ok := operandParenthesesRanges(sourceFile, node, nodeRange.Pos(), expressionRange.Pos()); ok {
+		fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(opening, opening), " ("))
+		if closing == callEnd {
+			if calleeRange.End() == expressionRange.End() && callEnd == expressionRange.End() {
+				suffix += ")"
 			} else {
-				fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(closing, closing), ")"))
+				insertAfterExpression += ")"
 			}
+		} else {
+			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(closing, closing), ")"))
 		}
 	}
 
@@ -81,20 +79,24 @@ func NewExpressionToCallFixes(
 	return fixes
 }
 
-func needsOperandParentheses(sourceFile *ast.SourceFile, node *ast.Node, newPos int, expressionPos int) bool {
-	if node.Parent == nil || node.Parent.Kind == ast.KindParenthesizedExpression {
-		return false
+func operandParenthesesRanges(sourceFile *ast.SourceFile, node *ast.Node, newPos, expressionPos int) (int, int, bool) {
+	if !ecmascript.ContainsLineTerminator(sourceFile.Text(), newPos, expressionPos) {
+		return 0, 0, false
 	}
-	switch node.Parent.Kind {
+
+	// A constructor can lead a larger operand, such as `return new Buffer().length`.
+	// Follow only ancestors with the same first token: parentheses, a unary
+	// operator, or another preceding token already protect against ASI.
+	for node.Parent != nil && utils.TrimNodeTextRange(sourceFile, node.Parent).Pos() == newPos {
+		node = node.Parent
+	}
+	statement := node.Parent
+	if statement == nil {
+		return 0, 0, false
+	}
+	switch statement.Kind {
 	case ast.KindReturnStatement, ast.KindThrowStatement, ast.KindYieldExpression:
 	default:
-		return false
-	}
-	return !sameLine(sourceFile, newPos, expressionPos)
-}
-
-func operandParenthesesRanges(sourceFile *ast.SourceFile, statement *ast.Node) (int, int, bool) {
-	if sourceFile == nil || statement == nil {
 		return 0, 0, false
 	}
 
@@ -121,11 +123,4 @@ func operandParenthesesRanges(sourceFile *ast.SourceFile, statement *ast.Node) (
 		closing--
 	}
 	return opening, closing, true
-}
-
-func sameLine(sourceFile *ast.SourceFile, left, right int) bool {
-	if left > right {
-		left, right = right, left
-	}
-	return !ecmascript.ContainsLineTerminator(sourceFile.Text(), left, right)
 }

@@ -153,8 +153,13 @@ func isNumber(node *ast.Node, staticEvaluator *utils.StaticStringEvaluator, ctx 
 		}
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		if isNumber(conditional.WhenTrue, staticEvaluator, ctx) && isNumber(conditional.WhenFalse, staticEvaluator, ctx) {
+		trueIsNumber := isNumber(conditional.WhenTrue, staticEvaluator, ctx)
+		falseIsNumber := isNumber(conditional.WhenFalse, staticEvaluator, ctx)
+		if trueIsNumber && falseIsNumber {
 			return true
+		}
+		if truthy, known := staticEvaluator.EvalControlFlowTruthiness(conditional.Condition); known {
+			return (truthy && trueIsNumber) || (!truthy && falseIsNumber)
 		}
 	case ast.KindAsExpression:
 		if isNumberType(node.AsAsExpression().Type) {
