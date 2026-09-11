@@ -56,9 +56,9 @@ func TestNewBufferErrorUsesECMACharacterLocations(t *testing.T) {
 		{`"😀"; new Buffer(1)`, 1, 7, 1, 20},
 		{"const value = 1;\r\nnew Buffer(1)", 2, 1, 2, 14},
 	} {
-		error := newBufferError(test.code, "new Buffer(1)", "error", "error")
-		if error.Line != test.line || error.Column != test.col || error.EndLine != test.endLine || error.EndColumn != test.endCol {
-			t.Errorf("%q: location = %d:%d-%d:%d, want %d:%d-%d:%d", test.code, error.Line, error.Column, error.EndLine, error.EndColumn, test.line, test.col, test.endLine, test.endCol)
+		diagnostic := newBufferError(test.code, "new Buffer(1)", "error", "error")
+		if diagnostic.Line != test.line || diagnostic.Column != test.col || diagnostic.EndLine != test.endLine || diagnostic.EndColumn != test.endCol {
+			t.Errorf("%q: location = %d:%d-%d:%d, want %d:%d-%d:%d", test.code, diagnostic.Line, diagnostic.Column, diagnostic.EndLine, diagnostic.EndColumn, test.line, test.col, test.endLine, test.endCol)
 		}
 	}
 }

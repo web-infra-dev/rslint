@@ -1212,13 +1212,3 @@ func appendPath(path []string, parts ...string) []string {
 func trimmedNodeRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	return core.NewTextRange(scanner.SkipTrivia(sourceFile.Text(), node.Pos()), node.End())
 }
-
-func sameLine(sourceFile *ast.SourceFile, a int, b int) bool {
-	lineStarts := sourceFile.ECMALineMap()
-	return scanner.ComputeLineOfPosition(lineStarts, a) ==
-		scanner.ComputeLineOfPosition(lineStarts, b)
-}
-
-func isWhitespace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f' || ch == '\v'
-}
