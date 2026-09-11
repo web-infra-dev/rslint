@@ -39,7 +39,7 @@ Hello.propTypes = {
 ## Options
 
 `ignore` accepts prop names that should not be checked. `customValidators`
-lists validator namespaces that should be treated like `PropTypes`. Set
+lists custom validator namespaces whose arguments remain opaque. Set
 `skipShapeProps` to `false` to check nested `shape` and `exact` members.
 
 ```json
@@ -50,6 +50,16 @@ lists validator namespaces that should be treated like `PropTypes`. Set
 
 - TypeScript prop annotations are reported on the property name rather than
   including the trailing type annotation in the diagnostic range.
+- Aliases follow lexical bindings. For example, a `shared` variable inside a
+  component does not replace the outer `shared` in `Foo.propTypes = shared`,
+  and an unrelated local variable named `props` does not consume component props.
+- Explicitly declared props named `toString`, `constructor`, or other
+  `Object.prototype` members count as used when accessed.
+- Static computed keys such as `static ['propTypes']` and `{ ['Foo']: component }`
+  are recognized like their non-computed equivalents.
+- React generic annotations are checked even when the component has no props
+  parameter, for example `const Foo: React.FC<Props> = () => <div />`.
+- Configured custom validators remain opaque with or without `.isRequired`.
 
 ## Original Documentation
 

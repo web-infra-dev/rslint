@@ -1079,19 +1079,11 @@
       "Tsx": true
     },
     {
-      "Code": "const Foo = React.memo(React.forwardRef((props, ref) => <div>{props.name}</div>)); Foo.propTypes = { name: PropTypes.string };",
+      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) => ({\n          ...bindActionCreators(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          ),\n        })\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
       "Tsx": true
     },
     {
-      "Code": "type Props = { name: string }; const Foo = React.memo(React.forwardRef<HTMLDivElement, Props>(({ name }, ref) => <div>{name}</div>));",
-      "Tsx": true
-    },
-    {
-      "Code": "const Foo = React.memo(React.forwardRef(function(props, ref) { return <div>{props.name}</div>; })); Foo.propTypes = { name: PropTypes.string };",
-      "Tsx": true
-    },
-    {
-      "Code": "type Props = { name: string }; const Foo = React.memo(React.forwardRef<HTMLDivElement, Props>(function({ name }, ref) { return <div>{name}</div>; }));",
+      "Code": "\n        type ConnectedProps = DispatchProps &\n          StateProps\n\n        const Component = ({ prop1, prop2, prop3 }: ConnectedProps) => {\n          // Do stuff\n          return (\n            <StyledComponent>...</StyledComponent>\n          )\n        }\n\n        const mapDispatchToProps = (dispatch: ThunkDispatch<State, null, Action>) =>\n          bindActionCreators(\n            { prop1: importedAction, prop2: anotherImportedAction },\n            dispatch,\n          )\n\n        const mapStateToProps = (state: State) => ({\n          prop3: Selector.value(state),\n        })\n\n        type StateProps = ReturnType<typeof mapStateToProps>\n        type DispatchProps = ReturnType<typeof mapDispatchToProps>\n      ",
       "Tsx": true
     }
   ],
@@ -1102,7 +1094,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1116,7 +1108,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'name' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1130,7 +1122,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'name' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1757,7 +1749,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1771,7 +1763,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1785,7 +1777,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1799,7 +1791,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1813,7 +1805,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1827,7 +1819,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1841,7 +1833,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1855,7 +1847,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1869,7 +1861,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1883,7 +1875,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1897,7 +1889,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'something' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1911,7 +1903,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'something' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -1925,7 +1917,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 5,
           "Column": 13,
           "EndLine": 0,
@@ -1939,7 +1931,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'baz' PropType is defined but prop is never used",
           "Line": 6,
           "Column": 13,
           "EndLine": 0,
@@ -1953,7 +1945,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 11,
           "Column": 11,
           "EndLine": 0,
@@ -1967,7 +1959,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 5,
           "Column": 13,
           "EndLine": 0,
@@ -1995,7 +1987,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 5,
           "Column": 13,
           "EndLine": 0,
@@ -2009,7 +2001,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 11,
           "Column": 11,
           "EndLine": 0,
@@ -2023,7 +2015,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 5,
           "Column": 13,
           "EndLine": 0,
@@ -2037,7 +2029,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'baz' PropType is defined but prop is never used",
           "Line": 6,
           "Column": 13,
           "EndLine": 0,
@@ -2051,7 +2043,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'baz' PropType is defined but prop is never used",
           "Line": 6,
           "Column": 13,
           "EndLine": 0,
@@ -2065,7 +2057,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 11,
           "Column": 11,
           "EndLine": 0,
@@ -2082,7 +2074,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 11,
           "Column": 11,
           "EndLine": 0,
@@ -2099,7 +2091,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'bar' PropType is defined but prop is never used",
           "Line": 5,
           "Column": 13,
           "EndLine": 0,
@@ -2113,7 +2105,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'foo' PropType is defined but prop is never used",
           "Line": 4,
           "Column": 13,
           "EndLine": 0,
@@ -2127,7 +2119,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'baz' PropType is defined but prop is never used",
           "Line": 14,
           "Column": 11,
           "EndLine": 0,
@@ -2141,7 +2133,7 @@
       "Errors": [
         {
           "MessageId": "unusedPropType",
-          "Message": "",
+          "Message": "'foo' PropType is defined but prop is never used",
           "Line": 12,
           "Column": 11,
           "EndLine": 0,
@@ -3036,34 +3028,6 @@
         {
           "MessageId": "unusedPropType",
           "Message": "'bar' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "const Foo = React.memo(React.forwardRef((props, ref) => <div>{props.name}</div>)); Foo.propTypes = { name: PropTypes.string, unused: PropTypes.string };",
-      "Tsx": true,
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'unused' PropType is defined but prop is never used",
-          "Line": 0,
-          "Column": 0,
-          "EndLine": 0,
-          "EndColumn": 0
-        }
-      ]
-    },
-    {
-      "Code": "type Props = { used: string; unused: string }; const Foo = React.memo(React.forwardRef<HTMLDivElement, Props>(({ used }, ref) => <div>{used}</div>));",
-      "Tsx": true,
-      "Errors": [
-        {
-          "MessageId": "unusedPropType",
-          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,
