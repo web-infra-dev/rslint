@@ -1077,6 +1077,22 @@
     {
       "Code": "\n        const Wrapper = featureToggle\n        ? ({ children }: { children: Node }) => (\n          <FeatureToggledComponent\n              featureToggle={featureToggle}\n              defaultValue\n          >\n              {children}\n          </FeatureToggledComponent>\n        )\n        : React.Fragment;\n      ",
       "Tsx": true
+    },
+    {
+      "Code": "const Foo = React.memo(React.forwardRef((props, ref) => <div>{props.name}</div>)); Foo.propTypes = { name: PropTypes.string };",
+      "Tsx": true
+    },
+    {
+      "Code": "type Props = { name: string }; const Foo = React.memo(React.forwardRef<HTMLDivElement, Props>(({ name }, ref) => <div>{name}</div>));",
+      "Tsx": true
+    },
+    {
+      "Code": "const Foo = React.memo(React.forwardRef(function(props, ref) { return <div>{props.name}</div>; })); Foo.propTypes = { name: PropTypes.string };",
+      "Tsx": true
+    },
+    {
+      "Code": "type Props = { name: string }; const Foo = React.memo(React.forwardRef<HTMLDivElement, Props>(function({ name }, ref) { return <div>{name}</div>; }));",
+      "Tsx": true
     }
   ],
   "Invalid": [
@@ -3020,6 +3036,34 @@
         {
           "MessageId": "unusedPropType",
           "Message": "'bar' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "const Foo = React.memo(React.forwardRef((props, ref) => <div>{props.name}</div>)); Foo.propTypes = { name: PropTypes.string, unused: PropTypes.string };",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "'unused' PropType is defined but prop is never used",
+          "Line": 0,
+          "Column": 0,
+          "EndLine": 0,
+          "EndColumn": 0
+        }
+      ]
+    },
+    {
+      "Code": "type Props = { used: string; unused: string }; const Foo = React.memo(React.forwardRef<HTMLDivElement, Props>(({ used }, ref) => <div>{used}</div>));",
+      "Tsx": true,
+      "Errors": [
+        {
+          "MessageId": "unusedPropType",
+          "Message": "'unused' PropType is defined but prop is never used",
           "Line": 0,
           "Column": 0,
           "EndLine": 0,

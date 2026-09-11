@@ -30,8 +30,8 @@ func TestNoUnusedPropTypesUpstream(t *testing.T) {
 	assert.NilError(t, json.Unmarshal(upstreamSuiteJSON, &suite))
 	assert.Equal(t, suite.Upstream.Rule, "react/no-unused-prop-types")
 	assert.Equal(t, suite.Upstream.PluginVersion, "7.37.5")
-	assert.Equal(t, len(suite.Valid), 243)
-	assert.Equal(t, len(suite.Invalid), 118)
+	assert.Equal(t, len(suite.Valid), 247)
+	assert.Equal(t, len(suite.Invalid), 120)
 	skipped := 0
 	for _, testCase := range suite.Valid {
 		if testCase.Skip {

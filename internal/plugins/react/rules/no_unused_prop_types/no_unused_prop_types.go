@@ -87,6 +87,9 @@ func componentName(node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
+	if node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindGetAccessor || node.Kind == ast.KindSetAccessor {
+		return propertyName(node.Name())
+	}
 	if name := reactutil.BindingIdentifierName(node); name != "" {
 		return name
 	}
@@ -109,6 +112,9 @@ func componentName(node *ast.Node) string {
 				if left != nil && left.Kind == ast.KindIdentifier {
 					return left.AsIdentifier().Text
 				}
+				if parts := propertyAccessParts(left); len(parts) > 0 {
+					return parts[len(parts)-1]
+				}
 			}
 		case ast.KindPropertyAssignment:
 			if parent.AsPropertyAssignment().Initializer == current {
@@ -128,7 +134,8 @@ func isFunctionLike(node *ast.Node) bool {
 		return false
 	}
 	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		return true
 	default:
 		return false
@@ -140,11 +147,18 @@ func propKey(node *ast.Node) (string, *ast.Node) {
 		return "", nil
 	}
 	name, ok := staticName(node)
-	if !ok {
+	if node.Kind == ast.KindComputedPropertyName {
+		expression := unwrap(node.AsComputedPropertyName().Expression)
+		if ok {
+			return name, expression
+		}
+		if expression != nil && expression.Kind == ast.KindIdentifier {
+			return expression.AsIdentifier().Text, expression
+		}
 		return "", nil
 	}
-	if node.Kind == ast.KindComputedPropertyName {
-		return name, unwrap(node.AsComputedPropertyName().Expression)
+	if !ok {
+		return "", nil
 	}
 	return name, node
 }
@@ -392,8 +406,8 @@ func typeProps(node *ast.Node, aliases map[string][]*ast.Node, seen map[string]b
 					if query.ExprName != nil && query.ExprName.Kind == ast.KindIdentifier {
 						if initializer := reactutil.ResolveIdentifierInitializer(query.ExprName.AsNode(), nil); initializer != nil {
 							initializer = unwrap(initializer)
-							if initializer.Kind == ast.KindArrowFunction {
-								return typePropsFromFunctionBody(initializer.AsArrowFunction().Body, aliases, seen, prefix)
+							if isFunctionLike(initializer) {
+								return typePropsFromFunctionBody(initializer.Body(), aliases, seen, prefix)
 							}
 						}
 					}
@@ -457,6 +471,18 @@ func typePropsFromFunctionBody(body *ast.Node, aliases map[string][]*ast.Node, s
 	body = unwrap(body)
 	if body == nil {
 		return nil
+	}
+	if body.Kind == ast.KindBlock {
+		var result []*prop
+		body.ForEachChild(func(statement *ast.Node) bool {
+			if statement != nil && statement.Kind == ast.KindReturnStatement {
+				if expression := statement.AsReturnStatement().Expression; expression != nil {
+					result = mergeProps(result, typePropsFromFunctionBody(expression, aliases, seen, prefix))
+				}
+			}
+			return false
+		})
+		return result
 	}
 	if body.Kind == ast.KindObjectLiteralExpression {
 		var result []*prop
@@ -537,6 +563,14 @@ func functionComponentType(node *ast.Node) *ast.Node {
 		parent := current.Parent
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression, ast.KindTypeAssertionExpression:
+			continue
+		case ast.KindCallExpression:
+			call := parent.AsCallExpression()
+			callee := unwrap(call.Expression)
+			if callee != nil && callee.Kind == ast.KindPropertyAccessExpression && propertyName(callee.AsPropertyAccessExpression().Name()) == "forwardRef" &&
+				call.TypeArguments != nil && len(call.TypeArguments.Nodes) >= 2 {
+				return call.TypeArguments.Nodes[1]
+			}
 			continue
 		case ast.KindVariableDeclaration:
 			if parent.AsVariableDeclaration().Initializer != current || parent.AsVariableDeclaration().Type == nil {
@@ -633,6 +667,14 @@ func componentBinding(node *ast.Node, resolve func(*ast.Node) *ast.Symbol) *ast.
 			ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression:
 			current = parent
 			continue
+		case ast.KindPropertyAssignment:
+			if parent.AsPropertyAssignment().Initializer == current && parent.Parent != nil {
+				current = parent.Parent
+				continue
+			}
+		case ast.KindObjectLiteralExpression:
+			current = parent
+			continue
 		case ast.KindVariableDeclaration:
 			if parent.AsVariableDeclaration().Initializer == current {
 				name := parent.AsVariableDeclaration().Name()
@@ -658,24 +700,50 @@ func componentTarget(node *ast.Node) []string {
 	if name == "" {
 		return nil
 	}
-	for current := node; current != nil && current.Parent != nil; current = current.Parent {
+	target := []string{name}
+	for current := node; current != nil && current.Parent != nil; {
 		parent := current.Parent
-		if parent.Kind != ast.KindPropertyAssignment || parent.AsPropertyAssignment().Initializer != current {
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression,
+			ast.KindNonNullExpression, ast.KindTypeAssertionExpression, ast.KindCallExpression:
+			current = parent
 			continue
-		}
-		member := propertyName(parent.AsPropertyAssignment().Name())
-		if member == "" || parent.Parent == nil || parent.Parent.Kind != ast.KindObjectLiteralExpression {
-			break
-		}
-		object := parent.Parent
-		if object.Parent != nil && object.Parent.Kind == ast.KindVariableDeclaration && object.Parent.AsVariableDeclaration().Initializer == object {
-			if objectName := object.Parent.AsVariableDeclaration().Name(); objectName != nil && objectName.Kind == ast.KindIdentifier {
-				return []string{objectName.AsIdentifier().Text, member}
+		case ast.KindPropertyAssignment:
+			if parent.AsPropertyAssignment().Initializer != current || parent.Parent == nil {
+				return target
+			}
+			member := propertyName(parent.AsPropertyAssignment().Name())
+			if member == "" {
+				return target
+			}
+			if len(target) == 0 || target[0] != member {
+				target = append([]string{member}, target...)
+			}
+			current = parent.Parent
+			continue
+		case ast.KindObjectLiteralExpression:
+			current = parent
+			continue
+		case ast.KindVariableDeclaration:
+			if parent.AsVariableDeclaration().Initializer == current {
+				if objectName := parent.AsVariableDeclaration().Name(); objectName != nil && objectName.Kind == ast.KindIdentifier {
+					if len(target) == 1 && target[0] == objectName.AsIdentifier().Text {
+						return target
+					}
+					return append([]string{objectName.AsIdentifier().Text}, target...)
+				}
+			}
+		case ast.KindBinaryExpression:
+			assignment := parent.AsBinaryExpression()
+			if assignment.OperatorToken != nil && assignment.OperatorToken.Kind == ast.KindEqualsToken && assignment.Right == current {
+				if parts := propertyAccessParts(assignment.Left); len(parts) > 0 {
+					return parts
+				}
 			}
 		}
-		break
+		return target
 	}
-	return []string{name}
+	return target
 }
 
 func componentScope(node *ast.Node) *ast.Node {
@@ -703,10 +771,10 @@ func assignmentComponent(target []string, root *ast.Node, components []*componen
 	if len(target) == 0 {
 		return nil
 	}
-	if len(target) == 1 && root != nil && root.Kind == ast.KindIdentifier && resolve != nil {
+	if root != nil && root.Kind == ast.KindIdentifier && resolve != nil {
 		if binding := resolve(root); binding != nil {
 			for _, c := range components {
-				if c.binding == binding {
+				if c.binding == binding && slices.Equal(c.target, target) {
 					return c
 				}
 			}
@@ -716,7 +784,7 @@ func assignmentComponent(target []string, root *ast.Node, components []*componen
 	// fallback confined to the same lexical scope so sibling shadowed bindings
 	// cannot be associated by text alone.
 	for _, c := range components {
-		if slices.Equal(c.target, target) && (len(target) > 1 || (root != nil && componentScope(c.node) == componentScope(root))) {
+		if slices.Equal(c.target, target) && root != nil && componentScope(c.node) == componentScope(root) {
 			return c
 		}
 	}
@@ -941,11 +1009,16 @@ func isSetStateCallback(node *ast.Node) bool {
 		return false
 	}
 	call := node.Parent.AsCallExpression()
-	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 || call.Arguments.Nodes[0] != node {
-		return false
-	}
 	callee := unwrap(call.Expression)
 	return callee != nil && callee.Kind == ast.KindPropertyAccessExpression && propertyName(callee.AsPropertyAccessExpression().Name()) == "setState"
+}
+
+func isSetStateUpdater(node *ast.Node) bool {
+	if !isSetStateCallback(node) {
+		return false
+	}
+	arguments := node.Parent.AsCallExpression().Arguments
+	return arguments != nil && len(arguments.Nodes) > 0 && arguments.Nodes[0] == node
 }
 
 func isPropTypesValidatorCallback(node *ast.Node) bool {
@@ -993,13 +1066,14 @@ func (c *component) walkUsage(node *ast.Node, nested map[*ast.Node]bool, checkAs
 				continue
 			}
 			setStateCallback := isSetStateCallback(node)
-			if setStateCallback && parameterIndex == 0 {
+			setStateUpdater := isSetStateUpdater(node)
+			if setStateUpdater && parameterIndex == 0 {
 				continue
 			}
 			isRootComponentParameter := node == c.node && parameterIndex == 0
 			isLifecycleParameter := parameterIndex == 0 && isLifecycleFunction(node, c, checkAsyncSafe)
 			isValidatorParameter := parameterIndex == 0 && isPropTypesValidatorCallback(node)
-			bindsProps := isRootComponentParameter || isLifecycleParameter || isValidatorParameter || (setStateCallback && parameterIndex == 1)
+			bindsProps := isRootComponentParameter || isLifecycleParameter || isValidatorParameter || (setStateUpdater && parameterIndex == 1)
 			switch name.Kind {
 			case ast.KindObjectBindingPattern:
 				var prefix []string
@@ -1021,7 +1095,7 @@ func (c *component) walkUsage(node *ast.Node, nested map[*ast.Node]bool, checkAs
 			case ast.KindIdentifier:
 				// Validator callbacks only contribute destructured paths. Other nested
 				// parameters named `props` retain eslint-plugin-react's scoped alias.
-				if !isValidatorParameter && (bindsProps || (name.AsIdentifier().Text == "props" && !isCallArgument(node))) {
+				if !isValidatorParameter && ((bindsProps && (!isRootComponentParameter || name.AsIdentifier().Text == "props")) || (name.AsIdentifier().Text == "props" && !setStateCallback)) {
 					c.aliases[name.AsIdentifier().Text] = nil
 				}
 			}
@@ -1079,10 +1153,6 @@ func (c *component) walkUsage(node *ast.Node, nested map[*ast.Node]bool, checkAs
 		c.walkUsage(child, nested, checkAsyncSafe)
 		return false
 	})
-}
-
-func isCallArgument(node *ast.Node) bool {
-	return node != nil && node.Parent != nil && node.Parent.Kind == ast.KindCallExpression
 }
 
 func matches(pattern, used string) bool {
@@ -1240,7 +1310,9 @@ func NoUnusedPropTypesRuleRun(ctx rule.RuleContext, optionsRaw []any) rule.RuleL
 						parameters := reactutil.FunctionParameters(c.node)
 						if len(parameters) > 0 && parameters[0].Kind == ast.KindParameter {
 							decl := parameters[0].AsParameterDeclaration()
-							bindingPath(decl.Name(), nil, c)
+							if decl.Name().Kind != ast.KindIdentifier || decl.Name().AsIdentifier().Text == "props" {
+								bindingPath(decl.Name(), nil, c)
+							}
 							if decl.Type != nil {
 								appendDeclared(c, typeProps(decl.Type, aliases, map[string]bool{}, ""))
 							}
