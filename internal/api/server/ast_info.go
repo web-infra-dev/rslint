@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
@@ -36,8 +37,8 @@ func (h *Handler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoRe
 	userFileName := req.SourceFileName
 	if userFileName == "" {
 		userFileName = "/index.ts"
-	} else if userFileName[0] != '/' {
-		userFileName = "/" + userFileName
+	} else {
+		userFileName = tspath.ResolvePath("/", userFileName)
 	}
 
 	// Serialize compiler options for comparison

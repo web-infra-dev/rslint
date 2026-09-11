@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	api "github.com/web-infra-dev/rslint/internal/api"
 )
 
@@ -107,6 +108,9 @@ func TestHandleGetAstInfoUsesRequestedSourceFileName(t *testing.T) {
 		{name: "JavaScript", fileName: "index.js", content: "const value = 1\n"},
 		{name: "TypeScript JSX", fileName: "index.tsx", content: "const value = <div />\n"},
 		{name: "JavaScript JSX", fileName: "index.jsx", content: "const value = <div />\n"},
+		{name: "dot segment", fileName: "./index.ts", content: "const value = 1\n"},
+		{name: "parent segment", fileName: "src/../index.ts", content: "const value = 1\n"},
+		{name: "absolute", fileName: "/index.ts", content: "const value = 1\n"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			response, err := handler.HandleGetAstInfo(api.GetAstInfoRequest{
@@ -125,8 +129,9 @@ func TestHandleGetAstInfoUsesRequestedSourceFileName(t *testing.T) {
 			if wantFileName == "" {
 				wantFileName = "index.ts"
 			}
-			if astInfoProgramCache.sourceFile == nil || astInfoProgramCache.sourceFile.FileName() != "/"+wantFileName {
-				t.Fatalf("source file = %v, want /%s", astInfoProgramCache.sourceFile, wantFileName)
+			wantFileName = tspath.ResolvePath("/", wantFileName)
+			if astInfoProgramCache.sourceFile == nil || astInfoProgramCache.sourceFile.FileName() != wantFileName {
+				t.Fatalf("source file = %v, want %s", astInfoProgramCache.sourceFile, wantFileName)
 			}
 		})
 	}
