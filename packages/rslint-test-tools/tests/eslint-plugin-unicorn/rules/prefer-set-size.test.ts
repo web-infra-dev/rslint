@@ -38,6 +38,7 @@ const rslintRegressions = {
     },
   ],
   invalid: [
+    invalid('[...new (Set)].length', '(new (Set)).size'),
     invalid(
       '[...(flag ? new Set() : new Set())].length',
       '(flag ? new Set() : new Set()).size',
@@ -49,6 +50,11 @@ const rslintRegressions = {
     invalid(
       'function size(value: unknown) { return [...(new Set() satisfies Set)].length; }',
       'function size(value: unknown) { return (new Set() satisfies Set).size; }',
+      'file.ts',
+    ),
+    invalid(
+      'declare const set: Set<string> | null; [...set!].length',
+      'declare const set: Set<string> | null; (set!).size',
       'file.ts',
     ),
   ],
@@ -157,13 +163,21 @@ ruleTester.run('prefer-set-size', null as never, {
 
 const directory = path.resolve(import.meta.dirname, '..');
 const config = path.resolve(directory, 'rslint.config.mjs');
-const run = async (code: string, filename: string, fix = false) => {
+const run = async (
+  code: string,
+  filename: string,
+  fix = false,
+  projectFalse = false,
+) => {
   const absoluteFilename = path.join(directory, filename);
   const { config: resolvedConfig, configDirectory } =
     await buildConfigForSettings(config, undefined);
   return lint({
     config: [
       ...resolvedConfig,
+      ...(projectFalse
+        ? [{ languageOptions: { parserOptions: { project: false } } }]
+        : []),
       {
         rules: { 'unicorn/prefer-set-size': 'error' },
       },
@@ -174,6 +188,27 @@ const run = async (code: string, filename: string, fix = false) => {
     fix,
   });
 };
+
+const projectFalseTypeSyntaxCases = [
+  {
+    code: 'function getSize(set: Set<string>) { return Array.from(set).length; }',
+    output: 'function getSize(set: Set<string>) { return set.size; }',
+  },
+  {
+    code: 'function getSize(set: ReadonlySet<string>) { return Array.from(set).length; }',
+    output: 'function getSize(set: ReadonlySet<string>) { return set.size; }',
+  },
+  {
+    code: 'function getSize(set: unknown) { return [...(set as Set<string>)].length; }',
+    output:
+      'function getSize(set: unknown) { return (set as Set<string>).size; }',
+  },
+  {
+    code: 'function getSize(set: unknown) { return Array.from(set as Set<string>).length; }',
+    output:
+      'function getSize(set: unknown) { return (set as Set<string>).size; }',
+  },
+];
 
 const lengthRange = (code: string) => {
   const offset = code.indexOf('length');
@@ -210,6 +245,20 @@ describe('unicorn/prefer-set-size exact diagnostics and fixes', () => {
       expect(Object.values(fixed.output ?? {})).toEqual([item.output]);
       expect(fixed.fixableErrorCount).toBe(0);
       expect((await run(item.output, item.filename)).diagnostics).toEqual([]);
+    }
+  });
+});
+
+describe('unicorn/prefer-set-size project:false type syntax', () => {
+  test('retains upstream TypeScript behavior without a TypeChecker', async () => {
+    for (const item of projectFalseTypeSyntaxCases) {
+      const result = await run(item.code, 'file.ts', false, true);
+      expect(result.diagnostics, item.code).toHaveLength(1);
+      const fixed = await run(item.code, 'file.ts', true, true);
+      expect(Object.values(fixed.output ?? {})).toEqual([item.output]);
+      expect(
+        (await run(item.output, 'file.ts', false, true)).diagnostics,
+      ).toEqual([]);
     }
   });
 });

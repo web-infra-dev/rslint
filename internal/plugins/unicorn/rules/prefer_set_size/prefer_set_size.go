@@ -104,10 +104,22 @@ func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) 
 	// `satisfies` or a non-null assertion, and recognizes compound expressions
 	// only when every possible result is a Set.
 	switch runtime.Kind {
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		// An informative assertion classifies the runtime expression even when
+		// the source-only Program has no TypeChecker.
+		if isSetTypeAnnotation(ctx, runtime.Type(), map[*ast.Symbol]bool{}) {
+			return true
+		}
+		return isSet(ctx, runtime.Expression(), visiting)
 	case ast.KindSatisfiesExpression:
 		satisfies := runtime.AsSatisfiesExpression()
 		return satisfies != nil && isSet(ctx, satisfies.Expression, visiting)
 	case ast.KindNonNullExpression:
+		// `set!` can narrow `Set | null` to Set. Its inner identifier retains
+		// the nullable declared type, so inspect the wrapper before unwrapping.
+		if isSetWithChecker(ctx, runtime) {
+			return true
+		}
 		nonNull := runtime.AsNonNullExpression()
 		return nonNull != nil && isSet(ctx, nonNull.Expression, visiting)
 	case ast.KindConditionalExpression:
@@ -133,6 +145,9 @@ func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) 
 		}
 		if symbol := ctx.Refs.ResolveInFile(runtime); symbol != nil && !visiting[symbol] && len(symbol.Declarations) == 1 {
 			declaration := symbol.Declarations[0]
+			if isSetTypeAnnotation(ctx, setBindingTypeAnnotation(declaration), map[*ast.Symbol]bool{}) {
+				return true
+			}
 			if declaration != nil && declaration.Kind == ast.KindVariableDeclaration {
 				list := declaration.Parent
 				variable := declaration.AsVariableDeclaration()
@@ -154,12 +169,81 @@ func isSet(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) 
 	// scope checks. Restrict this fallback to TypeScript inputs: JavaScript's
 	// upstream parser has no TypeScript Program, so mutable JS bindings must not
 	// become matches merely because tsgo can infer their type.
-	if ctx.TypeChecker == nil || ast.IsInJSFile(node) {
+	return isSetWithChecker(ctx, runtime)
+}
+
+func isSetWithChecker(ctx rule.RuleContext, node *ast.Node) bool {
+	if node == nil || ctx.TypeChecker == nil || ast.IsInJSFile(node) {
 		return false
 	}
 	return unicornutil.ClassifyType(ctx, ctx.TypeChecker.GetTypeAtLocation(node), unicornutil.TypeClassifierOptions{
 		TargetTypeNames: setTypeNames,
 	}) == unicornutil.TypeTarget
+}
+
+func setBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
+	if declaration == nil {
+		return nil
+	}
+	switch declaration.Kind {
+	case ast.KindVariableDeclaration, ast.KindParameter:
+		return declaration.Type()
+	default:
+		return nil
+	}
+}
+
+// isSetTypeAnnotation recognizes the source-level annotations that Unicorn's
+// type helper can use before a TypeScript Program is available. Type aliases
+// and constraints are resolved through the rule's binder, not the checker.
+func isSetTypeAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) bool {
+	if node == nil || utils.IsJSDocSyntaxNode(node) {
+		return false
+	}
+	for node.Kind == ast.KindParenthesizedType {
+		node = node.AsParenthesizedTypeNode().Type
+		if node == nil {
+			return false
+		}
+	}
+	if node.Kind != ast.KindTypeReference {
+		return false
+	}
+	return isSetTypeReference(ctx, node.AsTypeReferenceNode().TypeName, visiting)
+}
+
+func isSetTypeReference(ctx rule.RuleContext, typeName *ast.Node, visiting map[*ast.Symbol]bool) bool {
+	if typeName == nil || !ast.IsIdentifier(typeName) {
+		return false
+	}
+	name := typeName.AsIdentifier().Text
+	if setTypeNames.Has(name) {
+		return true
+	}
+	if ctx.Refs == nil {
+		return false
+	}
+	symbol := ctx.Refs.ResolveInFileWithMeaning(
+		typeName, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
+	)
+	if symbol == nil || visiting[symbol] {
+		return false
+	}
+	visiting[symbol] = true
+	defer delete(visiting, symbol)
+
+	for _, declaration := range symbol.Declarations {
+		if declaration == nil {
+			continue
+		}
+		switch declaration.Kind {
+		case ast.KindTypeAliasDeclaration:
+			return isSetTypeAnnotation(ctx, declaration.AsTypeAliasDeclaration().Type, visiting)
+		case ast.KindTypeParameter:
+			return isSetTypeAnnotation(ctx, declaration.AsTypeParameterDeclaration().Constraint, visiting)
+		}
+	}
+	return false
 }
 
 func isSetConstruction(node *ast.Node) bool {
@@ -190,7 +274,7 @@ func createFixes(ctx rule.RuleContext, member, conversion, set, property *ast.No
 	}
 
 	setText := ctx.SourceFile.Text()[setRange.Pos():setRange.End()]
-	if shouldParenthesizeMemberObject(ctx, setForFix) {
+	if unicornutil.ShouldAddParenthesesToMemberExpressionObject(ctx.SourceFile, setForFix) {
 		setText = "(" + setText + ")"
 	}
 	if conversion.Kind == ast.KindArrayLiteralExpression &&
@@ -214,26 +298,4 @@ func hasCommentOutsideSet(ctx rule.RuleContext, conversion, set core.TextRange) 
 		}
 	}
 	return false
-}
-
-// shouldParenthesizeMemberObject follows Unicorn's
-// shouldAddParenthesesToMemberExpressionObject. In particular, TypeScript
-// assertions are preserved as an authored expression and wrapped before they
-// become the object of `.size`.
-func shouldParenthesizeMemberObject(ctx rule.RuleContext, node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindIdentifier, ast.KindPropertyAccessExpression, ast.KindCallExpression,
-		ast.KindTemplateExpression, ast.KindThisKeyword, ast.KindArrayLiteralExpression,
-		ast.KindFunctionExpression:
-		return false
-	case ast.KindNewExpression:
-		range_ := utils.TrimNodeTextRange(ctx.SourceFile, node)
-		text := ctx.SourceFile.Text()
-		return range_.End() <= range_.Pos() || range_.End() > len(text) || text[range_.End()-1] != ')'
-	default:
-		return true
-	}
 }
