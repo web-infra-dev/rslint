@@ -39,3 +39,7 @@ export class ParameterPropertyExample {
 
 const message = greet('World');
 console.log(message);
+
+export function f(o: { x: number }) {
+  o.x = 1;
+}
