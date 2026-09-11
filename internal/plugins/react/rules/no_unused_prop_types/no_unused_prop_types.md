@@ -2,9 +2,7 @@
 
 Warns when a React component defines a prop type that it never uses.
 
-The rule checks runtime `propTypes` declarations and TypeScript object-shaped
-props. Nested `shape` and `exact` declarations are skipped by default because
-static analysis cannot always determine whether their members are used.
+The rule checks runtime `propTypes` declarations and TypeScript object-shaped props. Nested `shape` and `exact` declarations are skipped by default because static analysis cannot always determine whether their members are used.
 
 ## Rule Details
 
@@ -38,9 +36,7 @@ Hello.propTypes = {
 
 ## Options
 
-`ignore` accepts prop names that should not be checked. `customValidators`
-lists custom validator namespaces whose arguments remain opaque. Set
-`skipShapeProps` to `false` to check nested `shape` and `exact` members.
+`ignore` accepts prop names that should not be checked. `customValidators` lists custom validator namespaces whose arguments remain opaque. Set `skipShapeProps` to `false` to check nested `shape` and `exact` members.
 
 ```json
 { "react/no-unused-prop-types": ["error", { "skipShapeProps": false }] }
@@ -48,17 +44,11 @@ lists custom validator namespaces whose arguments remain opaque. Set
 
 ## Differences from ESLint
 
-- TypeScript prop annotations are reported on the property name rather than
-  including the trailing type annotation in the diagnostic range.
-- Aliases follow lexical bindings. For example, a `shared` variable inside a
-  component does not replace the outer `shared` in `Foo.propTypes = shared`,
-  and an unrelated local variable named `props` does not consume component props.
-- Explicitly declared props named `toString`, `constructor`, or other
-  `Object.prototype` members count as used when accessed.
-- Static computed keys such as `static ['propTypes']` and `{ ['Foo']: component }`
-  are recognized like their non-computed equivalents.
-- React generic annotations are checked even when the component has no props
-  parameter, for example `const Foo: React.FC<Props> = () => <div />`.
+- TypeScript prop annotations are reported on the property name rather than including the trailing type annotation in the diagnostic range.
+- Aliases follow lexical bindings. For example, a `shared` variable inside a component does not replace the outer `shared` in `Foo.propTypes = shared`, and an unrelated local variable named `props` does not consume component props.
+- Explicitly declared props named `toString`, `constructor`, or other `Object.prototype` members count as used when accessed.
+- Static computed keys such as `static ['propTypes']` and `{ ['Foo']: component }` are recognized like their non-computed equivalents.
+- React generic annotations are checked even when the component has no props parameter, for example `const Foo: React.FC<Props> = () => <div />`.
 - Configured custom validators remain opaque with or without `.isRequired`.
 
 ## Original Documentation
