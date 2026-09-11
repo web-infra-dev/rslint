@@ -67,6 +67,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unsafe"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unstable_nested_components"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_class_component_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
@@ -153,6 +154,7 @@ func GetAllRules() []rule.Rule {
 		no_namespace.NoNamespaceRule,
 		no_unstable_nested_components.NoUnstableNestedComponentsRule,
 		no_unused_class_component_methods.NoUnusedClassComponentMethodsRule,
+		no_unused_prop_types.NoUnusedPropTypesRule,
 		no_unused_state.NoUnusedStateRule,
 		no_redundant_should_component_update.NoRedundantShouldComponentUpdateRule,
 		no_render_return_value.NoRenderReturnValueRule,
