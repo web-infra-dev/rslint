@@ -210,7 +210,10 @@ describe('defineConfig and config presets', () => {
     // Check a positive control and that an explicit setting after the preset
     // can still enable the rule.
     for (const config of [[enabled], [preset, enabled]]) {
-      const result = await lint({ ...options, config });
+      const result = await lint({
+        ...options,
+        config: normalizeConfig(config),
+      });
       expect(result.fileCount).toBe(1);
       expect(result.diagnostics).toHaveLength(1);
       expect(result.diagnostics[0]).toMatchObject({
@@ -219,7 +222,10 @@ describe('defineConfig and config presets', () => {
       });
     }
 
-    const result = await lint({ ...options, config: [enabled, preset] });
+    const result = await lint({
+      ...options,
+      config: normalizeConfig([enabled, preset]),
+    });
     expect(result.fileCount).toBe(1);
     expect(result.diagnostics).toEqual([]);
   });
