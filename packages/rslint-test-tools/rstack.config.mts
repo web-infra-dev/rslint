@@ -238,6 +238,7 @@ define.test({
     './tests/eslint-plugin-react/rules/jsx-closing-bracket-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-curly-brace-presence.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-curly-newline.test.ts',
     './tests/eslint-plugin-react/rules/jsx-curly-spacing.test.ts',
     './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
     './tests/eslint-plugin-react/rules/no-access-state-in-setstate.test.ts',
