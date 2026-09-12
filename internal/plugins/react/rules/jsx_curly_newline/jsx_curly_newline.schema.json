@@ -1,0 +1,20 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        { "enum": ["consistent", "never"] },
+        {
+          "type": "object",
+          "properties": {
+            "singleline": { "enum": ["consistent", "require", "forbid"] },
+            "multiline": { "enum": ["consistent", "require", "forbid"] }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
