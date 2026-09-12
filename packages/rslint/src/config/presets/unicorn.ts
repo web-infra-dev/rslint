@@ -344,7 +344,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/require-module-specifiers': 'error', // not implemented
     'unicorn/require-number-to-fixed-digits-argument': 'error',
     // 'unicorn/require-passive-events': 'error', // not implemented
-    // 'unicorn/require-post-message-target-origin': 'off', // not implemented
+    'unicorn/require-post-message-target-origin': 'off',
     // 'unicorn/require-proxy-trap-boolean-return': 'error', // not implemented
     // 'unicorn/single-line-block-comment-style': 'error', // not implemented
     // 'unicorn/string-content': 'off', // not implemented
