@@ -76,6 +76,10 @@ ruleTester.run('jsx-fragments', {} as never, {
       options: ['syntax'],
       settings,
     },
+    {
+      code: 'function f(){const F=Act.Frag;} const F=Widget; <F/>;',
+      settings,
+    },
   ],
   invalid: [
     {
@@ -108,6 +112,12 @@ ruleTester.run('jsx-fragments', {} as never, {
     {
       code: '<Act.Frag />',
       options: ['syntax'],
+      settings,
+      errors: [{ messageId: 'preferFragment' }],
+    },
+    {
+      code: '/** @jsx Preact.h */ <Preact.Frag/>',
+      output: '/** @jsx Preact.h */ <></>',
       settings,
       errors: [{ messageId: 'preferFragment' }],
     },
