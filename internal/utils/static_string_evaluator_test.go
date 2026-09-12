@@ -114,6 +114,16 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const letUse = letValue;\n" +
 		"const numeric = 1 + 2;\n" +
 		"const unknownUse = unknownValue;\n" +
+		"const controlConst = 1;\n" +
+		"let controlLet = 1;\n" +
+		"var controlVar = \"x\";\n" +
+		"const controlArray = [1];\n" +
+		"const controlObject = {value: true};\n" +
+		"const controlConstUse = controlConst;\n" +
+		"const controlLetUse = controlLet;\n" +
+		"const controlVarUse = controlVar;\n" +
+		"const controlArrayUse = controlArray;\n" +
+		"const controlObjectUse = controlObject.value;\n" +
 		"const stableArray = [\"\", \"message\"];\n" +
 		"const stableObject = {message: \"value\"};\n" +
 		"const stableArrayUse = stableArray[0];\n" +
@@ -324,6 +334,18 @@ func TestStaticStringEvaluator(t *testing.T) {
 	if isArray, known := staticEvaluator.EvalArrayValue(findVariableInitializer(t, sourceFile, "unknownUse")); known || isArray {
 		t.Fatalf("EvalArrayValue(unknownUse) = (%v, %v), want (false, false)", isArray, known)
 	}
+
+	if _, ok := staticEvaluator.EvalControlFlowValue(findVariableInitializer(t, sourceFile, "controlConstUse")); !ok {
+		t.Fatal("EvalControlFlowValue(const) did not resolve")
+	}
+	for _, name := range []string{"controlLetUse", "controlVarUse", "controlObjectUse"} {
+		if _, ok := staticEvaluator.EvalControlFlowValue(findVariableInitializer(t, sourceFile, name)); ok {
+			t.Fatalf("EvalControlFlowValue(%s) unexpectedly resolved", name)
+		}
+	}
+	if isArray, known := staticEvaluator.EvalControlFlowArrayValue(findVariableInitializer(t, sourceFile, "controlArrayUse")); !known || !isArray {
+		t.Fatalf("EvalControlFlowArrayValue(controlArrayUse) = (%v, %v), want (true, true)", isArray, known)
+	}
 }
 
 func TestIsMutatingArrayMethod(t *testing.T) {
@@ -488,4 +510,118 @@ func findVariableInitializer(t testing.TB, sourceFile *ast.SourceFile, bindingNa
 		t.Fatalf("missing initializer for %q", bindingName)
 	}
 	return initializer
+}
+
+func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
+	rootDir := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(rootDir.Dir, "control-flow.ts")
+	code := `
+		let loose = 1;
+		let flag;
+		const scalar = 1;
+		const array = [1];
+		const literalMember = ({value: "x"}).value;
+		const arrayIndex = [1][0];
+		const arrayLength = [1]["length"];
+		const globalNumber = Math["PI"];
+		const frozen = Object.freeze([1]);
+		const frozenAlias = frozen;
+		const safeAlias = array;
+		const skippedMutable = true ? array : loose;
+		const reachedMutable = loose;
+		const voidMutable = void loose ?? array;
+		const assignment = flag = true;
+		const assignmentAlias = assignment;
+		const assignmentCondition = (flag = true) ? 1 : unknown;
+		const object = {value: [1]};
+		Object.defineProperty(object, "value", {get() { return unknown; }});
+		const getter = object.value;
+		const getterAlias = getter;
+		const call = String("x");
+		const skippedSideEffect = true ? "x" : call;
+		const cycle = cycle;
+		const unknownValue = unknown;
+		let mutationMethod = "fill";
+		const mutated = [""];
+		mutated[mutationMethod]("changed");
+		const mutationUse = mutated[0];
+	`
+	fs := NewOverlayVFS(rootDir.FS, map[string]string{filePath: code})
+	program, err := CreateProgram(true, fs, rootDir.Dir, "tsconfig.json", CreateCompilerHost(rootDir.Dir, fs))
+	assert.NilError(t, err)
+	sourceFile := program.GetSourceFile(filePath)
+	assert.Assert(t, sourceFile != nil)
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+
+	staticEvaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+	for _, test := range []struct {
+		name    string
+		known   bool
+		isArray bool
+	}{
+		{name: "scalar", known: true},
+		{name: "array", known: true, isArray: true},
+		{name: "literalMember", known: true},
+		{name: "arrayIndex", known: true},
+		{name: "arrayLength", known: true},
+		{name: "globalNumber", known: true},
+		{name: "frozen", known: true, isArray: true},
+		{name: "frozenAlias", known: true, isArray: true},
+		{name: "safeAlias", known: true, isArray: true},
+		{name: "skippedMutable", known: true, isArray: true},
+		{name: "reachedMutable"},
+		{name: "voidMutable"},
+		{name: "assignment"},
+		{name: "assignmentAlias"},
+		{name: "assignmentCondition"},
+		{name: "getter"},
+		{name: "getterAlias"},
+		{name: "call"},
+		{name: "skippedSideEffect"},
+		{name: "cycle"},
+		{name: "unknownValue"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			node := findVariableInitializer(t, sourceFile, test.name)
+			_, known := staticEvaluator.EvalControlFlowValue(node)
+			assert.Equal(t, known, test.known)
+			isArray, known := staticEvaluator.EvalControlFlowArrayValue(node)
+			assert.Equal(t, known, test.known)
+			assert.Equal(t, isArray, test.isArray)
+			_, known = staticEvaluator.EvalControlFlowTruthiness(node)
+			assert.Equal(t, known, test.known)
+		})
+	}
+
+	// Scope-free callers must not gain built-in global resolution.
+	withoutScope := NewStaticStringEvaluatorWithoutScope()
+	global := findVariableInitializer(t, sourceFile, "globalNumber")
+	_, known := withoutScope.EvalValue(global)
+	assert.Assert(t, !known, "scope-free evaluation resolved a global constant")
+	_, known = withoutScope.EvalControlFlowValue(global)
+	assert.Assert(t, !known, "scope-free control-flow evaluation resolved a global constant")
+
+	// A rejected conservative evaluation must not change ordinary evaluation,
+	// including its stable let resolution and scalar assignment semantics.
+	for _, name := range []string{"reachedMutable", "assignment", "assignmentAlias", "call"} {
+		_, known := staticEvaluator.EvalValue(findVariableInitializer(t, sourceFile, name))
+		assert.Assert(t, known, "ordinary evaluation changed for %s", name)
+	}
+
+	// Computing the mutation cache during conservative evaluation must still
+	// resolve a stable let binding used as a computed mutating method name.
+	freshEvaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
+	freshEvaluator.EvalControlFlowValue(findVariableInitializer(t, sourceFile, "safeAlias"))
+	_, known = freshEvaluator.Eval(findVariableInitializer(t, sourceFile, "mutationUse"))
+	assert.Assert(t, !known, "conservative evaluation hid a computed property mutation")
+
+	for _, evaluator := range []*StaticStringEvaluator{nil, staticEvaluator} {
+		_, known := evaluator.EvalControlFlowValue(nil)
+		assert.Assert(t, !known)
+		isArray, known := evaluator.EvalControlFlowArrayValue(nil)
+		assert.Assert(t, !known && !isArray)
+		truthy, known := evaluator.EvalControlFlowTruthiness(nil)
+		assert.Assert(t, !known && !truthy)
+	}
 }

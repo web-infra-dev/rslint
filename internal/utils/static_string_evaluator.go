@@ -817,6 +817,11 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 	if !ok {
 		return staticEvalResult{}
 	}
+	if staticEvaluator.resolveIdentifiers {
+		if number, ok := staticGlobalNumber(objectNode, key); ok {
+			return staticEvalResult{value: staticNumberValue(number), ok: true}
+		}
+	}
 	if literal := SkipAssertionsAndParens(objectNode); literal != nil && literal.Kind == ast.KindObjectLiteralExpression {
 		return staticEvaluator.evalObjectLiteralMember(literal, key)
 	}
@@ -849,9 +854,8 @@ func (staticEvaluator *StaticStringEvaluator) evalAccessExpressionKey(node *ast.
 
 // staticMemberValue reads key off a folded object, array, or string literal.
 // Reading a key that isn't there yields `undefined`, as it would at runtime. A
-// key an array inherits — `length`, `join` — stays unresolved, because folding
-// it would need a numeric or callable value representation this evaluator
-// doesn't carry; string indexing is narrower (a canonical index only) and
+// callable key such as `join` stays unresolved; string indexing is narrower
+// (a canonical index only) and
 // returns the UTF-16 code unit at that index, matching how JavaScript indexes
 // a string.
 func staticMemberValue(object any, key string) staticEvalResult {
@@ -875,6 +879,9 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		}
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	case *staticArrayValue:
+		if key == "length" {
+			return staticEvalResult{value: staticNumberValue(object.length), ok: true}
+		}
 		index, ok := staticArrayIndex(key)
 		if !ok {
 			if staticNumberShapedKey(key) {
