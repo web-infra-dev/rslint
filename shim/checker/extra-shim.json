@@ -29,6 +29,7 @@
       "isTypeStrictSubtypeOf",
       "getIndexInfosOfType",
       "getIterationTypeOfIterable",
+      "getMinArgumentCount",
       "getTypeParameterFromMappedType",
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",

@@ -116,7 +116,15 @@ func subjectCanBeDesiredType(
 	if len(signatures) == 0 {
 		return false, false
 	}
+	checkedZeroArgumentSignature := false
 	for _, signature := range signatures {
+		// Rstest invokes the poll callback as fn(). Overloads that require an
+		// argument cannot participate in that runtime call and must not widen the
+		// possible polled value.
+		if checker.Checker_getMinArgumentCount(typeChecker, signature) != 0 {
+			continue
+		}
+		checkedZeroArgumentSignature = true
 		returnType := checker.Checker_getReturnTypeOfSignature(typeChecker, signature)
 		awaitedType := checker.Checker_getAwaitedType(typeChecker, returnType)
 		if awaitedType == nil {
@@ -126,7 +134,7 @@ func subjectCanBeDesiredType(
 			return true, true
 		}
 	}
-	return true, false
+	return checkedZeroArgumentSignature, false
 }
 
 func typeCanBeDesiredType(
