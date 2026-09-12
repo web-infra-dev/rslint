@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -65,7 +66,6 @@ func parseOptions(options []any) curlyBraceOptions {
 
 var (
 	htmlEntityRegex     = regexp.MustCompile(`&[A-Za-z\d#]+;`)
-	leadingTrailingWS   = regexp.MustCompile(`^\s|\s$`)
 	disallowedJSXChars  = regexp.MustCompile(`[{<>}]`)
 	quoteCharsRegex     = regexp.MustCompile(`['"]`)
 	multilineCommentSeq = regexp.MustCompile(`/\*`)
@@ -104,7 +104,7 @@ func isAllWhitespace(s string) bool {
 }
 
 func isStringWithTrailingWhitespaces(s string) bool {
-	return leadingTrailingWS.MatchString(s)
+	return s != ecmascript.StringTrim(s)
 }
 
 // jsStringify mirrors `JSON.stringify(s)` for the limited subset of strings
@@ -314,7 +314,7 @@ func jsxExpressionHasComments(text string, je *ast.Node) bool {
 }
 
 func stringLiteralRawText(text string, node *ast.Node) string {
-	return text[node.Pos():node.End()]
+	return text[scanner.SkipTrivia(text, node.Pos()):node.End()]
 }
 
 func jsxTextRawText(text string, node *ast.Node) string {
@@ -449,70 +449,72 @@ func makeRun() func(rule.RuleContext, []any) rule.RuleListeners {
 			if je == nil {
 				return
 			}
-			// Skip ParenthesizedExpression so `{('foo')}` and `{(<Foo />)}`
-			// classify (and emit replacement text) based on their inner
-			// content, matching upstream's ESTree-flattened view.
-			expr := ast.SkipParentheses(je.Expression)
-			parent := jsxExpr.Parent
-			parentIsAttribute := parent != nil && parent.Kind == ast.KindJsxAttribute
+			ctx.ReportNodeWithDeferredFixes(jsxExpr, unnecessaryMsg, func() []rule.RuleFix {
+				// Skip ParenthesizedExpression so `{('foo')}` and `{(<Foo />)}`
+				// classify (and emit replacement text) based on their inner
+				// content, matching upstream's ESTree-flattened view.
+				expr := ast.SkipParentheses(je.Expression)
+				parent := jsxExpr.Parent
+				parentIsAttribute := parent != nil && parent.Kind == ast.KindJsxAttribute
 
-			var replacement string
-			switch {
-			case isJSXLike(expr):
-				replacement = utils.TrimmedNodeText(ctx.SourceFile, expr)
-			case parentIsAttribute:
-				switch expr.Kind {
-				case ast.KindNoSubstitutionTemplateLiteral:
-					ntl := expr.AsNoSubstitutionTemplateLiteral()
-					rawText := ntl.RawText
-					if rawText == "" {
-						// tsgo may not populate RawText for substitution-free
-						// templates; fall back to source-text slicing.
-						src := utils.TrimmedNodeText(ctx.SourceFile, expr)
-						if len(src) >= 2 && src[0] == '`' && src[len(src)-1] == '`' {
-							rawText = src[1 : len(src)-1]
-						} else {
-							rawText = ntl.Text
+				var replacement string
+				switch {
+				case isJSXLike(expr):
+					replacement = utils.TrimmedNodeText(ctx.SourceFile, expr)
+				case parentIsAttribute:
+					switch expr.Kind {
+					case ast.KindNoSubstitutionTemplateLiteral:
+						ntl := expr.AsNoSubstitutionTemplateLiteral()
+						rawText := ntl.RawText
+						if rawText == "" {
+							// tsgo may not populate RawText for substitution-free
+							// templates; fall back to source-text slicing.
+							src := utils.TrimmedNodeText(ctx.SourceFile, expr)
+							if len(src) >= 2 && src[0] == '`' && src[len(src)-1] == '`' {
+								rawText = src[1 : len(src)-1]
+							} else {
+								rawText = ntl.Text
+							}
 						}
-					}
-					replacement = `"` + rawText + `"`
-				case ast.KindStringLiteral:
-					rawWithQuotes := stringLiteralRawText(text, expr)
-					inner := trimQuotes(rawWithQuotes)
-					// Preserve the original quoting when the inner text holds a
-					// double quote; otherwise re-wrap in double quotes.
-					if strings.Contains(inner, `"`) {
-						replacement = rawWithQuotes
-					} else {
-						replacement = `"` + inner + `"`
+						replacement = `"` + rawText + `"`
+					case ast.KindStringLiteral:
+						rawWithQuotes := stringLiteralRawText(text, expr)
+						inner := trimQuotes(rawWithQuotes)
+						// Preserve the original quoting when the inner text holds a
+						// double quote; otherwise re-wrap in double quotes.
+						if strings.Contains(inner, `"`) {
+							replacement = rawWithQuotes
+						} else {
+							replacement = `"` + inner + `"`
+						}
+					default:
+						replacement = utils.TrimmedNodeText(ctx.SourceFile, expr)
 					}
 				default:
-					replacement = utils.TrimmedNodeText(ctx.SourceFile, expr)
+					switch expr.Kind {
+					case ast.KindNoSubstitutionTemplateLiteral:
+						// Use cooked text (matches upstream's
+						// `quasis[0].value.cooked`).
+						replacement = expr.AsNoSubstitutionTemplateLiteral().Text
+					case ast.KindStringLiteral:
+						replacement = expr.AsStringLiteral().Text
+					default:
+						replacement = utils.TrimmedNodeText(ctx.SourceFile, expr)
+					}
 				}
-			default:
-				switch expr.Kind {
-				case ast.KindNoSubstitutionTemplateLiteral:
-					// Use cooked text (matches upstream's
-					// `quasis[0].value.cooked`).
-					replacement = expr.AsNoSubstitutionTemplateLiteral().Text
-				case ast.KindStringLiteral:
-					replacement = expr.AsStringLiteral().Text
-				default:
-					replacement = utils.TrimmedNodeText(ctx.SourceFile, expr)
-				}
-			}
 
-			ctx.ReportNodeWithFixes(jsxExpr, unnecessaryMsg,
-				rule.RuleFixReplace(ctx.SourceFile, jsxExpr, replacement))
+				return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, jsxExpr, replacement)}
+			})
 		}
 
 		// reportMissingCurlyOnLiteral — wraps the literal in `{"…"}` for
 		// attribute initializers and uses line-aware wrapping for JsxText.
 		reportMissingCurlyOnLiteral := func(literal *ast.Node) {
 			if isJSXLike(literal) {
-				inner := utils.TrimmedNodeText(ctx.SourceFile, literal)
-				ctx.ReportNodeWithFixes(literal, missingMsg,
-					rule.RuleFixReplace(ctx.SourceFile, literal, "{"+inner+"}"))
+				ctx.ReportNodeWithDeferredFixes(literal, missingMsg, func() []rule.RuleFix {
+					inner := utils.TrimmedNodeText(ctx.SourceFile, literal)
+					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, literal, "{"+inner+"}")}
+				})
 				return
 			}
 
@@ -540,24 +542,25 @@ func makeRun() func(rule.RuleContext, []any) rule.RuleListeners {
 				return
 			}
 
-			var replacement string
 			if parentIsAttribute {
-				inner := trimQuotes(rawWithDelimiters)
-				escaped := escapeDoubleQuotes(escapeBackslashes(inner))
-				replacement = `{"` + escaped + `"}`
-				ctx.ReportNodeWithFixes(literal, missingMsg,
-					rule.RuleFixReplace(ctx.SourceFile, literal, replacement))
+				ctx.ReportNodeWithDeferredFixes(literal, missingMsg, func() []rule.RuleFix {
+					inner := trimQuotes(rawWithDelimiters)
+					escaped := escapeDoubleQuotes(escapeBackslashes(inner))
+					replacement := `{"` + escaped + `"}`
+					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, literal, replacement)}
+				})
 				return
 			}
-			replacement = wrapJsxTextWithCurlyBraces(rawWithDelimiters)
 			// JsxText leading whitespace/newlines are trivia for the TS
 			// scanner, so the default `TrimNodeTextRange` skips them — both
 			// the report range and the fix range need to span the raw
 			// `[Pos, End)` to match upstream (which uses the JSXText node's
 			// own range, not a trivia-skipped one).
 			rawRange := core.NewTextRange(literal.Pos(), literal.End())
-			ctx.ReportRangeWithFixes(rawRange, missingMsg,
-				rule.RuleFixReplaceRange(rawRange, replacement))
+			ctx.ReportRangeWithDeferredFixes(rawRange, missingMsg, func() []rule.RuleFix {
+				replacement := wrapJsxTextWithCurlyBraces(rawWithDelimiters)
+				return []rule.RuleFix{rule.RuleFixReplaceRange(rawRange, replacement)}
+			})
 		}
 
 		areRuleConditionsSatisfied := func(parent *ast.Node, condition string) bool {
