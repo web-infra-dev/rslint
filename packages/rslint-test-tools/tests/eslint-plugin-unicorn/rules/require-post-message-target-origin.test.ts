@@ -31,11 +31,13 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `window.location.origin`.',
+          data: { code: 'window.location.origin' },
           output: 'window.postMessage(message, window.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "window.postMessage(message, '*')",
         },
       ],
@@ -50,11 +52,13 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'self.postMessage(message, self.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "self.postMessage(message, '*')",
         },
       ],
@@ -69,11 +73,13 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `globalThis.location.origin`.',
+          data: { code: 'globalThis.location.origin' },
           output: 'globalThis.postMessage(message, globalThis.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "globalThis.postMessage(message, '*')",
         },
       ],
@@ -88,16 +94,19 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `foo.location.origin`.',
+          data: { code: 'foo.location.origin' },
           output: 'foo.postMessage(message , foo.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'foo.postMessage(message , self.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "foo.postMessage(message , '*')",
         },
       ],
@@ -112,16 +121,19 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `foo.location.origin`.',
+          data: { code: 'foo.location.origin' },
           output: 'foo?.postMessage(message , foo.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'foo?.postMessage(message , self.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "foo?.postMessage(message , '*')",
         },
       ],
@@ -136,16 +148,19 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `foo.location.origin`.',
+          data: { code: 'foo.location.origin' },
           output: 'foo.postMessage( ((message)) , foo.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'foo.postMessage( ((message)) , self.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "foo.postMessage( ((message)) , '*')",
         },
       ],
@@ -160,16 +175,19 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `foo.location.origin`.',
+          data: { code: 'foo.location.origin' },
           output: 'foo.postMessage(message, foo.location.origin,)',
         },
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'foo.postMessage(message, self.location.origin,)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "foo.postMessage(message, '*',)",
         },
       ],
@@ -184,16 +202,19 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `foo.location.origin`.',
+          data: { code: 'foo.location.origin' },
           output: 'foo.postMessage(message ,  foo.location.origin,)',
         },
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'foo.postMessage(message ,  self.location.origin,)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "foo.postMessage(message ,  '*',)",
         },
       ],
@@ -208,11 +229,13 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'foo.window.postMessage(message, self.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "foo.window.postMessage(message, '*')",
         },
       ],
@@ -227,12 +250,14 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output:
             'document.defaultView.postMessage(message, self.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "document.defaultView.postMessage(message, '*')",
         },
       ],
@@ -247,11 +272,13 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output: 'getWindow().postMessage(message, self.location.origin)',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "getWindow().postMessage(message, '*')",
         },
       ],
@@ -266,11 +293,13 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `window.location.origin`.',
+          data: { code: 'window.location.origin' },
           output: 'window.postMessage(sensitiveData, window.location.origin);',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "window.postMessage(sensitiveData, '*');",
         },
       ],
@@ -285,12 +314,14 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `window.location.origin`.',
+          data: { code: 'window.location.origin' },
           output:
             'window.postMessage({token: authToken}, window.location.origin);',
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output: "window.postMessage({token: authToken}, '*');",
         },
       ],
@@ -305,12 +336,14 @@ const cases = {
         {
           messageId: 'suggestion',
           message: 'Use `self.location.origin`.',
+          data: { code: 'self.location.origin' },
           output:
             "const iframe = document.querySelector('iframe');\niframe.contentWindow.postMessage(data, self.location.origin);",
         },
         {
           messageId: 'suggestion',
           message: "Use `'*'`.",
+          data: { code: "'*'" },
           output:
             "const iframe = document.querySelector('iframe');\niframe.contentWindow.postMessage(data, '*');",
         },
@@ -362,6 +395,7 @@ describe(ruleName, () => {
         const suggestion = suggestions[index];
         expect(suggestion.messageId).toBe(expected.messageId);
         expect(suggestion.message).toBe(expected.message);
+        expect(suggestion.data).toEqual(expected.data);
         expect(suggestion.fixes).toHaveLength(1);
         const [edit] = suggestion.fixes ?? [];
         const output =

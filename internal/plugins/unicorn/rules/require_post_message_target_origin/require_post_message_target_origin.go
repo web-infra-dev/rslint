@@ -65,7 +65,11 @@ var RequirePostMessageTargetOriginRule = rule.Rule{
 							text = " " + replacement + ","
 						}
 						suggestions = append(suggestions, rule.RuleSuggestion{
-							Message: rule.RuleMessage{Id: "suggestion", Description: "Use `" + replacement + "`."},
+							Message: rule.RuleMessage{
+								Id:          "suggestion",
+								Description: "Use `" + replacement + "`.",
+								Data:        map[string]string{"code": replacement},
+							},
 							FixesArr: []rule.RuleFix{
 								rule.RuleFixReplaceRange(core.NewTextRange(closing.Pos(), closing.Pos()), text),
 							},

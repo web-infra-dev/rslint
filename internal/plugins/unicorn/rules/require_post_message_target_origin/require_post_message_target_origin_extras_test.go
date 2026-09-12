@@ -154,6 +154,9 @@ func TestRequirePostMessageTargetOriginEditDemand(t *testing.T) {
 		if suggestion.Message.Id != "suggestion" || suggestion.Message.Description != "Use `"+origin+"`." {
 			t.Errorf("suggestion %d: unexpected message %+v", i, suggestion.Message)
 		}
+		if !reflect.DeepEqual(suggestion.Message.Data, map[string]string{"code": origin}) {
+			t.Errorf("suggestion %d: unexpected data %#v", i, suggestion.Message.Data)
+		}
 		output, _, fixed := linter.ApplyRuleFixes(source, []rule.RuleSuggestion{suggestion})
 		if !fixed || output != "foo.postMessage(message, "+origin+")" {
 			t.Errorf("suggestion %d: unexpected output %q", i, output)

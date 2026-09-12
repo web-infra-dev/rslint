@@ -1,6 +1,9 @@
+import path from 'node:path';
 import { describe, test, expect } from 'rstack/test';
 import { normalizeConfig } from '@rslint/core/config-loader';
+import { lint } from '@rslint/core/internal';
 import {
+  type RslintConfigEntry,
   defineConfig,
   globals,
   ts,
@@ -182,5 +185,42 @@ describe('defineConfig and config presets', () => {
     expect(rec.rules?.['unicorn/no-exports-in-scripts']).toBe('error');
     expect(rec.rules?.['unicorn/no-await-expression-member']).toBe('error');
     expect(rec.rules?.['unicorn/prefer-date-now']).toBe('error');
+    expect(rec.rules?.['unicorn/require-post-message-target-origin']).toBe(
+      'off',
+    );
+  });
+
+  test('unicornPlugin.configs.recommended disables an earlier require-post-message-target-origin setting', async () => {
+    const ruleName = 'unicorn/require-post-message-target-origin';
+    const enabled: RslintConfigEntry = {
+      plugins: ['unicorn'],
+      rules: { [ruleName]: 'error' },
+    };
+    const preset = unicornPlugin.configs.recommended;
+    const directory = import.meta.dirname;
+    const options = {
+      configDirectory: directory,
+      workingDirectory: directory,
+      fileContents: {
+        [path.join(directory, 'post-message-preset.js')]:
+          'window.postMessage(message);',
+      },
+    };
+
+    // Check a positive control and that an explicit setting after the preset
+    // can still enable the rule.
+    for (const config of [[enabled], [preset, enabled]]) {
+      const result = await lint({ ...options, config });
+      expect(result.fileCount).toBe(1);
+      expect(result.diagnostics).toHaveLength(1);
+      expect(result.diagnostics[0]).toMatchObject({
+        ruleName,
+        messageId: 'error',
+      });
+    }
+
+    const result = await lint({ ...options, config: [enabled, preset] });
+    expect(result.fileCount).toBe(1);
+    expect(result.diagnostics).toEqual([]);
   });
 });

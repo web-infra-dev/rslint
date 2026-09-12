@@ -38,7 +38,8 @@ This rule has no options.
 Like upstream, this rule cannot distinguish a window from a `Worker`,
 `MessagePort`, `Client`, or `BroadcastChannel`. Those APIs do not accept a
 `targetOrigin` argument, so enable this rule only where it is appropriate.
-The rule is not included in upstream's recommended configuration.
+The recommended preset explicitly disables this rule, matching upstream. If
+you want to enable it, place your rule configuration after the preset.
 
 Computed property access, spread arguments, and optional calls are ignored.
 Optional member access, such as `window?.postMessage(message)`, is checked.
