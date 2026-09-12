@@ -15,6 +15,14 @@ import {
 } from '@/theme/components/ui/select';
 import { ensureWasmService, fetchWasmVersions } from './wasm';
 import { readShareState } from './share-url';
+import {
+  addSourceTypeResolutions,
+  cancelUnusedSourceTypeLoads,
+  findSourceTypePackages,
+  loadSourceTypes,
+  sourceTypeKey,
+  type SourceTypeEnvironment,
+} from './source-types';
 
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorTabsRef | null>(null);
@@ -40,6 +48,7 @@ const Playground: React.FC = () => {
   // Captured before the editors get a chance to rewrite the URL.
   const [pinnedVersion] = useState(() => readShareState().wasmVersion);
   const selectedVersionRef = useRef<string | undefined>(undefined);
+  const activeSourceTypeKeyRef = useRef('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,6 +92,33 @@ const Playground: React.FC = () => {
       const service = await ensureWasmService(version);
       if (!isCurrentLintRun(runId, version)) return;
       const code = editorRef.current?.getValue() ?? '';
+      const sourceTypePackages = findSourceTypePackages(code);
+      let sourceTypes: SourceTypeEnvironment | undefined;
+      if (sourceTypePackages.length > 0) {
+        try {
+          sourceTypes = await loadSourceTypes(sourceTypePackages);
+        } catch (typeError) {
+          if (
+            !isCurrentLintRun(runId, version) ||
+            sourceTypeKey(
+              findSourceTypePackages(editorRef.current?.getValue() ?? ''),
+            ) !== sourceTypeKey(sourceTypePackages)
+          ) {
+            return;
+          }
+          console.warn('Failed to load source dependency types:', typeError);
+        }
+        if (
+          !isCurrentLintRun(runId, version) ||
+          sourceTypeKey(
+            findSourceTypePackages(editorRef.current?.getValue() ?? ''),
+          ) !== sourceTypeKey(sourceTypePackages)
+        ) {
+          return;
+        }
+        editorRef.current?.setSourceTypeEnvironment(sourceTypes);
+        activeSourceTypeKeyRef.current = sourceTypes?.key ?? '';
+      }
       const rslintConfig = await editorRef.current?.getRslintConfig(version);
       if (!isCurrentLintRun(runId, version)) return;
       const tsConfig = editorRef.current?.getTsConfig();
@@ -91,10 +127,17 @@ const Playground: React.FC = () => {
       const fileContents: Record<string, string> = {
         '/index.ts': code,
       };
+      for (const declaration of sourceTypes?.declarations ?? []) {
+        fileContents[declaration.lintPath] = declaration.content;
+      }
 
       // Add tsconfig.json if we have a valid config
       if (tsConfig) {
-        fileContents['/tsconfig.json'] = JSON.stringify(tsConfig);
+        fileContents['/tsconfig.json'] = JSON.stringify(
+          sourceTypes
+            ? addSourceTypeResolutions(tsConfig, sourceTypes)
+            : tsConfig,
+        );
       }
 
       // The JavaScript API takes the config object directly (Go no longer reads
@@ -103,6 +146,7 @@ const Playground: React.FC = () => {
       // rules (with their options) travel inside the config entries; there is
       // no separate ruleOptions surface.
       const result = await service.lint({
+        files: sourceTypes ? ['/index.ts'] : undefined,
         includeEncodedSourceFiles: true,
         fileContents,
         config: rslintConfig,
@@ -211,6 +255,7 @@ const Playground: React.FC = () => {
   useEffect(() => {
     return () => {
       latestLintRunIdRef.current++;
+      cancelUnusedSourceTypeLoads([]);
       if (lintTimer.current) {
         window.clearTimeout(lintTimer.current);
         lintTimer.current = null;
@@ -359,7 +404,18 @@ const Playground: React.FC = () => {
           <div className="editor-panel">
             <EditorTabs
               ref={editorRef}
-              onChange={() => scheduleRunLint()}
+              onChange={(code) => {
+                const sourceTypePackages = findSourceTypePackages(code);
+                cancelUnusedSourceTypeLoads(sourceTypePackages);
+                if (
+                  sourceTypeKey(sourceTypePackages) !==
+                  activeSourceTypeKeyRef.current
+                ) {
+                  editorRef.current?.setSourceTypeEnvironment(undefined);
+                  activeSourceTypeKeyRef.current = '';
+                }
+                scheduleRunLint();
+              }}
               onSelectionChange={(start: number, end: number) =>
                 setSelectedAstRange((prev) => {
                   // Preserve kind if position is the same (e.g., from revealRangeByOffset)

@@ -1801,6 +1801,11 @@ Playground inspection is a separate read-only path through `internal/inspector`.
 │                                                                              │
 │  website Playground                                                          │
 │     │                                                                        │
+│     ├──── supported source import ────► esm.sh declaration graph             │
+│     │                                      │                                 │
+│     │                                      ├────► Monaco TypeScript libs     │
+│     │                                      └────► lint fileContents + paths  │
+│     │                                                                        │
 │     ▼                                                                        │
 │  packages/rslint-wasm worker                                                 │
 │     │                                                                        │
@@ -1814,6 +1819,8 @@ Playground inspection is a separate read-only path through `internal/inspector`.
 ```
 
 Playground JavaScript configs are imported as modules in a Blob worker created inside an iframe with an opaque origin and `sandbox="allow-scripts"`. The iframe only relays messages; the worker inherits a Content Security Policy that limits scripts and connections to package CDNs and has no DOM or navigation APIs. The page validates the serialized config before linting and removes the iframe on completion or timeout.
+
+Playground source dependency types are allowlisted by package and fetched from esm.sh only after a matching static import or export appears. The resolved declaration graph is cached for the page session, mounted into Monaco, and copied into the lint request's `fileContents`; request-local `compilerOptions.paths` entries resolve package specifiers to those virtual declarations without modifying the visible tsconfig. When declarations are present, `files` keeps `/index.ts` as the only lint target, so dependency declarations contribute types but are not linted themselves.
 
 ## 16. Glossary
 
