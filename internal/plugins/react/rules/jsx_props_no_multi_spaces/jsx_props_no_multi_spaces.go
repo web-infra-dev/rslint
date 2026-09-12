@@ -50,13 +50,13 @@ var JsxPropsNoMultiSpacesRule = rule.Rule{
 			// Check between tag name and first attribute
 			firstTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, props[0])
 			tagDisplayName := getTagDisplayName(ctx, tagName)
-			checkGap(ctx, text, lineStarts, tagNameEnd, firstTrimmed.Pos(), firstTrimmed.End(), props[0], tagDisplayName, getDisplayName(props[0]))
+			checkGap(ctx, text, lineStarts, tagNameEnd, firstTrimmed.Pos(), firstTrimmed.End(), props[0], tagDisplayName, getDisplayName(ctx, props[0]))
 
 			// Check between consecutive attributes
 			for i := 1; i < len(props); i++ {
 				prevTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, props[i-1])
 				currTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, props[i])
-				checkGap(ctx, text, lineStarts, prevTrimmed.End(), currTrimmed.Pos(), currTrimmed.End(), props[i], getDisplayName(props[i-1]), getDisplayName(props[i]))
+				checkGap(ctx, text, lineStarts, prevTrimmed.End(), currTrimmed.Pos(), currTrimmed.End(), props[i], getDisplayName(ctx, props[i-1]), getDisplayName(ctx, props[i]))
 			}
 		}
 
@@ -71,16 +71,13 @@ var JsxPropsNoMultiSpacesRule = rule.Rule{
 // including TypeArguments if present (e.g., `<App<T>` -> end of `>`).
 func getTagNameEnd(ctx rule.RuleContext, tagName *ast.Node, typeArgs *ast.NodeList) int {
 	if typeArgs != nil && len(typeArgs.Nodes) > 0 {
-		// Use the end of the type arguments list (includes the closing `>`)
-		trimmed := utils.TrimNodeTextRange(ctx.SourceFile, typeArgs.Nodes[len(typeArgs.Nodes)-1])
-		// The closing `>` of type arguments is after the last type arg node.
+		// NodeList.End points at the parsed closing angle token. Looking the
+		// token up from that parser-owned boundary avoids mistaking a `>` in
+		// trailing trivia (notably a block comment) for the delimiter.
+		closeAngle := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, typeArgs.End())
 		text := ctx.SourceFile.Text()
-		pos := trimmed.End()
-		for pos < len(text) && text[pos] != '>' {
-			pos++
-		}
-		if pos < len(text) {
-			return pos + 1 // past the `>`
+		if closeAngle.Pos() < len(text) && text[closeAngle.Pos()] == '>' {
+			return closeAngle.End()
 		}
 	}
 	trimmed := utils.TrimNodeTextRange(ctx.SourceFile, tagName)
@@ -95,38 +92,31 @@ func getTagDisplayName(ctx rule.RuleContext, tagName *ast.Node) string {
 	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()]
 }
 
-func getDisplayName(node *ast.Node) string {
+func getDisplayName(ctx rule.RuleContext, node *ast.Node) string {
+	if ast.IsJsxSpreadAttribute(node) {
+		return utils.TrimmedNodeText(ctx.SourceFile, node.AsJsxSpreadAttribute().Expression)
+	}
 	if name := reactutil.GetJsxPropName(node); name != "" {
 		return name
 	}
 	return "element"
 }
 
-// hasBlankLineBetween checks if there is a truly blank line (only whitespace, no comments)
-// between two positions in the source text.
-func hasBlankLineBetween(text string, lineStarts []core.TextPos, startPos, endPos int) bool {
-	startLine := scanner.ComputeLineOfPosition(lineStarts, startPos)
-	endLine := scanner.ComputeLineOfPosition(lineStarts, endPos)
-
-	for line := startLine + 1; line < endLine; line++ {
-		lineStart := int(lineStarts[line])
-		lineEnd := len(text)
-		if line+1 < len(lineStarts) {
-			lineEnd = int(lineStarts[line+1])
-		}
-		isBlank := true
-		for i := lineStart; i < lineEnd; i++ {
-			ch := text[i]
-			if ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n' {
-				isBlank = false
-				break
-			}
-		}
-		if isBlank {
+// hasEmptyLines mirrors upstream's comparison of the previous JSX node, every
+// comment before the current attribute, and the current attribute. A comment is
+// one item regardless of newlines inside it, while any ECMAScript whitespace on
+// an otherwise empty intervening line still contributes to the location gap.
+func hasEmptyLines(lineStarts []core.TextPos, comments []*ast.CommentRange, startPos, endPos int) bool {
+	previousEnd := startPos
+	for _, comment := range utils.CommentsInSpan(comments, startPos, endPos) {
+		if scanner.ComputeLineOfPosition(lineStarts, comment.Pos())-scanner.ComputeLineOfPosition(lineStarts, previousEnd) >= 2 {
 			return true
 		}
+		if comment.End() > previousEnd {
+			previousEnd = comment.End()
+		}
 	}
-	return false
+	return scanner.ComputeLineOfPosition(lineStarts, endPos)-scanner.ComputeLineOfPosition(lineStarts, previousEnd) >= 2
 }
 
 func checkGap(ctx rule.RuleContext, text string, lineStarts []core.TextPos, prevEnd, currStart, currEnd int, reportNode *ast.Node, prevName, currName string) {
@@ -146,8 +136,8 @@ func checkGap(ctx rule.RuleContext, text string, lineStarts []core.TextPos, prev
 			})
 		}
 	} else {
-		// Different lines - check for truly blank lines between them (comments bridge gaps)
-		if hasBlankLineBetween(text, lineStarts, prevEnd, currStart) {
+		// Different lines - comments bridge gaps, but empty lines around them do not.
+		if hasEmptyLines(lineStarts, ctx.Comments.All(), prevEnd, currStart) {
 			ctx.ReportNode(reportNode, rule.RuleMessage{
 				Id:          "noLineGap",
 				Description: fmt.Sprintf("Expected no line gap between \"%s\" and \"%s\"", prevName, currName),
