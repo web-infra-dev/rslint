@@ -104,6 +104,10 @@ var NoAsyncMockFactoryRule = rule.Rule{
 	Name:   "rstest/no-async-mock-factory",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		if !sourceMayContainMockFactory(ctx.SourceFile) {
+			return rule.RuleListeners{}
+		}
+		scan := &fileScan{ctx: ctx, shadowed: utils.NewShadowCache(ctx.SourceFile)}
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				argument, member := mockFactoryArgument(node)
@@ -116,7 +120,7 @@ var NoAsyncMockFactoryRule = rule.Rule{
 					return
 				}
 
-				switch classify(ctx, factory) {
+				switch scan.classify(factory) {
 				case verdictSync, verdictUnknown:
 					return
 				}
@@ -124,11 +128,66 @@ var NoAsyncMockFactoryRule = rule.Rule{
 				ctx.ReportNodeWithDeferredSuggestions(
 					argument,
 					buildAsyncMockFactoryMessage(member),
-					func() []rule.RuleSuggestion { return suggestions(ctx, factory) },
+					func() []rule.RuleSuggestion { return scan.suggestions(factory) },
 				)
 			},
 		}
 	},
+}
+
+// sourceMayContainMockFactory rejects, from the source file's shared identifier
+// index, every file that cannot hold a call this rule reports.
+//
+// mockFactoryArgument matches only `rs.<member>(…)` and `rstest.<member>(…)`
+// with member one of the four mock APIs, all written out: none of those four
+// carries PluginManagedAPI.ReadsComputedMember, and the receiver has to be an
+// identifier spelled `rs` or `rstest` because that is how the build matches it.
+// So both names appear verbatim in any file with a reportable call, and the
+// index — which the compiler builds once per file and shares with every rule —
+// settles it without an AST walk of this rule's own.
+func sourceMayContainMockFactory(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
+		return true
+	}
+	hasNamespace := false
+	for _, namespace := range rstestUtils.UtilityNamespaceNames {
+		if sourceFile.HasIdentifier(namespace) {
+			hasNamespace = true
+			break
+		}
+	}
+	if !hasNamespace {
+		return false
+	}
+	for member := range mockAPIs {
+		if sourceFile.HasIdentifier(member) {
+			return true
+		}
+	}
+	return false
+}
+
+// fileScan carries the per-file memoization the three classification layers
+// share. Every entry is keyed by a node or a symbol of the file being linted and
+// dies with it.
+//
+// What is cached is only what a fixed piece of syntax settles: the verdict of a
+// function node, the verdict a symbol's single declaration gives, whether a
+// symbol is ever written to, and whether a name is shadowed at a scope. The type
+// layer is deliberately not memoized — checker.GetTypeAtLocation narrows per use
+// site, so two identifiers naming the same symbol can legitimately disagree.
+type fileScan struct {
+	ctx      rule.RuleContext
+	shadowed *utils.ShadowCache
+	// functions maps a function expression, arrow or declaration onto what
+	// classifyFunction concluded about it. A factory shared by many mock calls
+	// is therefore classified once.
+	functions map[*ast.Node]verdict
+	// declarations maps a symbol onto what classifyThroughDeclaration concluded
+	// for an identifier naming it.
+	declarations map[*ast.Symbol]verdict
+	// written maps a symbol onto whether anything in the file assigns to it.
+	written map[*ast.Symbol]bool
 }
 
 // mockFactoryArgument returns the factory argument of a module mock call the
@@ -165,19 +224,19 @@ func mockFactoryArgument(node *ast.Node) (*ast.Node, string) {
 // classify walks the three layers in order: what the syntax settles on its own,
 // what a declaration in this file settles, and — only for what is left — what
 // the types say.
-func classify(ctx rule.RuleContext, factory *ast.Node) verdict {
-	if v := classifySyntactically(ctx, factory); v != verdictUnknown {
+func (scan *fileScan) classify(factory *ast.Node) verdict {
+	if v := scan.classifySyntactically(factory); v != verdictUnknown {
 		return v
 	}
-	if v := classifyThroughDeclaration(ctx, factory); v != verdictUnknown {
+	if v := scan.classifyThroughDeclaration(factory); v != verdictUnknown {
 		return v
 	}
-	return classifyByType(ctx, factory)
+	return scan.classifyByType(factory)
 }
 
 // classifySyntactically answers from the argument alone, without resolving a
 // binding and without types.
-func classifySyntactically(ctx rule.RuleContext, factory *ast.Node) verdict {
+func (scan *fileScan) classifySyntactically(factory *ast.Node) verdict {
 	// An object literal in this position is the mock options bag, not a
 	// factory.
 	if factory.Kind == ast.KindObjectLiteralExpression {
@@ -186,10 +245,22 @@ func classifySyntactically(ctx rule.RuleContext, factory *ast.Node) verdict {
 	if !isFunctionExpressionLike(factory) {
 		return verdictUnknown
 	}
-	return classifyFunction(ctx, factory)
+	return scan.classifyFunction(factory)
 }
 
-func classifyFunction(ctx rule.RuleContext, fn *ast.Node) verdict {
+func (scan *fileScan) classifyFunction(fn *ast.Node) verdict {
+	if cached, ok := scan.functions[fn]; ok {
+		return cached
+	}
+	result := scan.computeFunctionVerdict(fn)
+	if scan.functions == nil {
+		scan.functions = map[*ast.Node]verdict{}
+	}
+	scan.functions[fn] = result
+	return result
+}
+
+func (scan *fileScan) computeFunctionVerdict(fn *ast.Node) verdict {
 	flags := ast.GetFunctionFlags(fn)
 	// A generator hands back a Generator and an async generator an
 	// AsyncGenerator. Neither is a promise, so neither trips the runtime gate.
@@ -215,7 +286,7 @@ func classifyFunction(ctx rule.RuleContext, fn *ast.Node) verdict {
 		return verdictUnknown
 	}
 	for _, expression := range returned {
-		if !isPromiseProducingExpression(ctx, expression) {
+		if !scan.isPromiseProducingExpression(expression) {
 			return verdictUnknown
 		}
 	}
@@ -227,16 +298,33 @@ func classifyFunction(ctx rule.RuleContext, fn *ast.Node) verdict {
 // anything but a `const` function or a function declaration, or to a function
 // declaration that is written to, is left to the type layer, where a
 // reassignment or a re-export is accounted for.
-func classifyThroughDeclaration(ctx rule.RuleContext, factory *ast.Node) verdict {
-	if factory.Kind != ast.KindIdentifier || ctx.Refs == nil {
+func (scan *fileScan) classifyThroughDeclaration(factory *ast.Node) verdict {
+	if factory.Kind != ast.KindIdentifier || scan.ctx.Refs == nil {
 		return verdictUnknown
 	}
-	symbol := ctx.Refs.Resolve(factory)
-	if symbol == nil || len(symbol.Declarations) != 1 {
+	symbol := scan.ctx.Refs.Resolve(factory)
+	if symbol == nil {
+		return verdictUnknown
+	}
+	// Everything below reads the symbol and its single declaration, so two
+	// identifiers naming the same shared factory reach the same answer.
+	if cached, ok := scan.declarations[symbol]; ok {
+		return cached
+	}
+	result := scan.computeDeclarationVerdict(symbol)
+	if scan.declarations == nil {
+		scan.declarations = map[*ast.Symbol]verdict{}
+	}
+	scan.declarations[symbol] = result
+	return result
+}
+
+func (scan *fileScan) computeDeclarationVerdict(symbol *ast.Symbol) verdict {
+	if len(symbol.Declarations) != 1 {
 		return verdictUnknown
 	}
 	declaration := symbol.Declarations[0]
-	if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
+	if declaration == nil || ast.GetSourceFileOfNode(declaration) != scan.ctx.SourceFile {
 		return verdictUnknown
 	}
 
@@ -245,10 +333,10 @@ func classifyThroughDeclaration(ctx rule.RuleContext, factory *ast.Node) verdict
 		// A function declaration's name is a writable binding, and an
 		// assignment to it adds no declaration of its own: the body below is
 		// the installed factory only while nothing writes to the name.
-		if isWrittenTo(ctx, symbol) {
+		if scan.isWrittenTo(symbol) {
 			return verdictUnknown
 		}
-		return classifyFunction(ctx, declaration)
+		return scan.classifyFunction(declaration)
 	case ast.KindVariableDeclaration:
 		if !ast.IsVarConst(declaration) {
 			return verdictUnknown
@@ -257,20 +345,29 @@ func classifyThroughDeclaration(ctx rule.RuleContext, factory *ast.Node) verdict
 		if initializer == nil || !isFunctionExpressionLike(initializer) {
 			return verdictUnknown
 		}
-		return classifyFunction(ctx, initializer)
+		return scan.classifyFunction(initializer)
 	}
 	return verdictUnknown
 }
 
 // isWrittenTo reports whether anything in this file assigns to the symbol,
 // which would replace the value its declaration describes.
-func isWrittenTo(ctx rule.RuleContext, symbol *ast.Symbol) bool {
-	for _, reference := range ctx.Refs.References(symbol) {
+func (scan *fileScan) isWrittenTo(symbol *ast.Symbol) bool {
+	if cached, ok := scan.written[symbol]; ok {
+		return cached
+	}
+	result := false
+	for _, reference := range scan.ctx.Refs.References(symbol) {
 		if utils.IsWriteReference(reference) {
-			return true
+			result = true
+			break
 		}
 	}
-	return false
+	if scan.written == nil {
+		scan.written = map[*ast.Symbol]bool{}
+	}
+	scan.written[symbol] = result
+	return result
 }
 
 // classifyByType asks the TypeChecker, and only ever answers verdictPromise or
@@ -279,7 +376,8 @@ func isWrittenTo(ctx rule.RuleContext, symbol *ast.Symbol) bool {
 //
 // A source-only program has no TypeChecker, and the rule then reports what the
 // first two layers found and nothing more.
-func classifyByType(ctx rule.RuleContext, factory *ast.Node) verdict {
+func (scan *fileScan) classifyByType(factory *ast.Node) verdict {
+	ctx := scan.ctx
 	if ctx.TypeChecker == nil {
 		return verdictUnknown
 	}
@@ -386,7 +484,7 @@ func isPromiseInstanceType(sourceProgram *lintprogram.Program, typeChecker *chec
 
 // isPromiseProducingExpression reports whether the expression can only evaluate
 // to a promise, judged by how it is written.
-func isPromiseProducingExpression(ctx rule.RuleContext, node *ast.Node) bool {
+func (scan *fileScan) isPromiseProducingExpression(node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
@@ -395,7 +493,7 @@ func isPromiseProducingExpression(ctx rule.RuleContext, node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindNewExpression:
 		callee := utils.SkipAssertionsAndParens(node.AsNewExpression().Expression)
-		return isUnshadowedPromiseIdentifier(callee)
+		return scan.isUnshadowedPromiseIdentifier(callee)
 	case ast.KindCallExpression:
 	default:
 		return false
@@ -419,7 +517,7 @@ func isPromiseProducingExpression(ctx rule.RuleContext, node *ast.Node) bool {
 			return false
 		}
 		return !utility.API.ResolvesReceiver ||
-			!rstestUtils.ReceiverIsLocallyDeclared(ctx, utility.NamespaceNode)
+			!rstestUtils.ReceiverIsLocallyDeclared(scan.ctx, utility.NamespaceNode)
 	}
 
 	callee := utils.SkipAssertionsAndParens(call.Expression)
@@ -434,15 +532,15 @@ func isPromiseProducingExpression(ctx rule.RuleContext, node *ast.Node) bool {
 	if name == nil || name.Kind != ast.KindIdentifier || !promiseStatics[name.AsIdentifier().Text] {
 		return false
 	}
-	return isUnshadowedPromiseIdentifier(utils.SkipAssertionsAndParens(access.Expression))
+	return scan.isUnshadowedPromiseIdentifier(utils.SkipAssertionsAndParens(access.Expression))
 }
 
 // isUnshadowedPromiseIdentifier reports whether node is the global `Promise`.
 // A file that declares its own `Promise` is left to the type layer.
-func isUnshadowedPromiseIdentifier(node *ast.Node) bool {
+func (scan *fileScan) isUnshadowedPromiseIdentifier(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindIdentifier &&
 		node.AsIdentifier().Text == "Promise" &&
-		!utils.IsShadowed(node, "Promise")
+		!scan.shadowed.IsShadowed(node, "Promise")
 }
 
 func isFunctionExpressionLike(node *ast.Node) bool {
@@ -492,7 +590,7 @@ func returnedExpressions(fn *ast.Node) ([]*ast.Node, bool) {
 // own. Neither is offered as a fix: the common shape awaits the real module
 // inside the factory, and turning that into a top-level
 // `import … with { rstest: 'importActual' }` moves code across statements.
-func suggestions(ctx rule.RuleContext, factory *ast.Node) []rule.RuleSuggestion {
+func (scan *fileScan) suggestions(factory *ast.Node) []rule.RuleSuggestion {
 	if !isFunctionExpressionLike(factory) {
 		return nil
 	}
@@ -511,16 +609,17 @@ func suggestions(ctx rule.RuleContext, factory *ast.Node) []rule.RuleSuggestion 
 	}
 
 	if ast.GetFunctionFlags(factory)&ast.FunctionFlagsAsync != 0 {
-		return removeAsyncSuggestion(ctx, factory, returned)
+		return scan.removeAsyncSuggestion(factory, returned)
 	}
-	return unwrapPromiseResolveSuggestion(ctx, factory, returned)
+	return scan.unwrapPromiseResolveSuggestion(factory, returned)
 }
 
 // removeAsyncSuggestion drops the `async` keyword, which is equivalent only
 // when the body neither awaits nor already hands back a promise of its own.
-func removeAsyncSuggestion(ctx rule.RuleContext, factory *ast.Node, returned []*ast.Node) []rule.RuleSuggestion {
+func (scan *fileScan) removeAsyncSuggestion(factory *ast.Node, returned []*ast.Node) []rule.RuleSuggestion {
+	ctx := scan.ctx
 	for _, expression := range returned {
-		if !isDefinitelyNotPromise(expression) {
+		if !scan.isDefinitelyNotPromise(expression) {
 			return nil
 		}
 	}
@@ -554,7 +653,8 @@ func removeAsyncSuggestion(ctx rule.RuleContext, factory *ast.Node, returned []*
 }
 
 // unwrapPromiseResolveSuggestion replaces a lone `Promise.resolve(x)` with `x`.
-func unwrapPromiseResolveSuggestion(ctx rule.RuleContext, factory *ast.Node, returned []*ast.Node) []rule.RuleSuggestion {
+func (scan *fileScan) unwrapPromiseResolveSuggestion(factory *ast.Node, returned []*ast.Node) []rule.RuleSuggestion {
+	ctx := scan.ctx
 	if len(returned) != 1 {
 		return nil
 	}
@@ -570,14 +670,14 @@ func unwrapPromiseResolveSuggestion(ctx rule.RuleContext, factory *ast.Node, ret
 	access := callee.AsPropertyAccessExpression()
 	name := access.Name()
 	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "resolve" ||
-		!isUnshadowedPromiseIdentifier(utils.SkipAssertionsAndParens(access.Expression)) {
+		!scan.isUnshadowedPromiseIdentifier(utils.SkipAssertionsAndParens(access.Expression)) {
 		return nil
 	}
 	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
 		return nil
 	}
 	resolved := call.Arguments.Nodes[0]
-	if resolved == nil || resolved.Kind == ast.KindSpreadElement || !isDefinitelyNotPromise(resolved) {
+	if resolved == nil || resolved.Kind == ast.KindSpreadElement || !scan.isDefinitelyNotPromise(resolved) {
 		return nil
 	}
 
@@ -606,7 +706,7 @@ func unwrapPromiseResolveSuggestion(ctx rule.RuleContext, factory *ast.Node, ret
 // isDefinitelyNotPromise reports whether the expression's value can be read off
 // the syntax and is certainly not a promise. It gates the suggestions, so
 // anything it cannot vouch for is a "no".
-func isDefinitelyNotPromise(node *ast.Node) bool {
+func (scan *fileScan) isDefinitelyNotPromise(node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
@@ -628,7 +728,7 @@ func isDefinitelyNotPromise(node *ast.Node) bool {
 		ast.KindClassExpression:
 		return true
 	case ast.KindIdentifier:
-		return node.AsIdentifier().Text == "undefined" && !utils.IsShadowed(node, "undefined")
+		return node.AsIdentifier().Text == "undefined" && !scan.shadowed.IsShadowed(node, "undefined")
 	}
 	return false
 }

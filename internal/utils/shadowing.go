@@ -597,6 +597,11 @@ func hasFunctionScopeDeclaration(body *ast.Node, name string) bool {
 // declarations, namespace bodies, function parameters, catch variables, and
 // hoisted var and function declarations.
 func IsShadowed(node *ast.Node, name string) bool {
+	return isShadowed(node, name, nil)
+}
+
+// Local scans can be shared across siblings without caching entry-dependent traversal state.
+func isShadowed(node *ast.Node, name string, scans *shadowScanCache) bool {
 	prevChild := node
 	inParameterDecorator := false
 	crossedScope := false
@@ -607,19 +612,10 @@ func IsShadowed(node *ast.Node, name string) bool {
 		}
 		switch current.Kind {
 		case ast.KindSourceFile:
-			sf := current.AsSourceFile()
-			if sf != nil && sf.Statements != nil {
-				if HasLocalDeclarationInStatements(sf.Statements.Nodes, name) {
-					return true
-				}
-			}
-			if HasHoistedVarDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
-				return true
-			}
-			return false
+			return scans.check(current, name, shadowScanFile)
 
 		case ast.KindBlock:
-			if HasShadowingDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
+			if scans.check(current, name, shadowScanBlock) {
 				return true
 			}
 
@@ -629,13 +625,7 @@ func IsShadowed(node *ast.Node, name string) bool {
 		// for the whole block, while the block itself still nests lexically
 		// inside its parent scope.
 		case ast.KindModuleBlock:
-			moduleBlock := current.AsModuleBlock()
-			if moduleBlock != nil && moduleBlock.Statements != nil {
-				if HasLocalDeclarationInStatements(moduleBlock.Statements.Nodes, name) {
-					return true
-				}
-			}
-			if HasHoistedVarDeclaration(current, name) || hasHoistedFunctionDeclaration(current, name) {
+			if scans.check(current, name, shadowScanModuleBlock) {
 				return true
 			}
 
@@ -645,12 +635,12 @@ func IsShadowed(node *ast.Node, name string) bool {
 		// function-like declaration, so the arm below never reaches its body.
 		case ast.KindClassStaticBlockDeclaration:
 			if body := current.AsClassStaticBlockDeclaration().Body; body != nil &&
-				HasHoistedVarDeclaration(body, name) {
+				scans.check(body, name, shadowScanHoistedVar) {
 				return true
 			}
 
 		case ast.KindCaseBlock:
-			if HasShadowingDeclarationInCaseBlock(current, name) || hasHoistedFunctionDeclaration(current, name) {
+			if scans.check(current, name, shadowScanCaseBlock) {
 				return true
 			}
 
@@ -703,7 +693,7 @@ func IsShadowed(node *ast.Node, name string) bool {
 				if escapesFunctionScope(current, prevChild, inParameterDecorator, crossedScope) {
 					break
 				}
-				if HasShadowingParameter(current, name) {
+				if scans.check(current, name, shadowScanParameters) {
 					return true
 				}
 				// Function declarations and expressions can shadow via their own name.
@@ -717,7 +707,7 @@ func IsShadowed(node *ast.Node, name string) bool {
 				// which is a *parent* of the body's variable environment — so a
 				// `var` declared in the body does not shadow it.
 				if !isDirectParameterOf(current, prevChild) {
-					if body := current.Body(); body != nil && HasHoistedVarDeclaration(body, name) {
+					if body := current.Body(); body != nil && scans.check(body, name, shadowScanHoistedVar) {
 						return true
 					}
 				}
@@ -730,6 +720,18 @@ func IsShadowed(node *ast.Node, name string) bool {
 		current = current.Parent
 	}
 	return false
+}
+
+func sourceFileShadows(sourceFile *ast.Node, name string) bool {
+	result := false
+	if sf := sourceFile.AsSourceFile(); sf != nil && sf.Statements != nil {
+		result = HasLocalDeclarationInStatements(sf.Statements.Nodes, name)
+	}
+	if !result {
+		result = HasHoistedVarDeclaration(sourceFile, name) ||
+			hasHoistedFunctionDeclaration(sourceFile, name)
+	}
+	return result
 }
 
 // IsQualifiedNamespaceSegment reports whether a module declaration is one
