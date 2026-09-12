@@ -22,7 +22,6 @@ type StaticStringEvaluator struct {
 	referenceResolver      StaticReferenceResolver
 	evaluator              evaluator.Evaluator
 	resolveIdentifiers     bool
-	controlFlowOnly        bool
 	resolving              map[*ast.Symbol]bool
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
@@ -191,51 +190,6 @@ func (staticEvaluator *StaticStringEvaluator) EvalValue(node *ast.Node) (any, bo
 		return value, true
 	}
 	return result.value, true
-}
-
-// EvalControlFlowValue evaluates a value only when every identifier reached by
-// the expression has a const initializer. This is suitable for choosing a
-// conditional or logical branch in an autofix: unlike EvalValue it never
-// treats an unwritten let or var binding as immutable.
-func (staticEvaluator *StaticStringEvaluator) EvalControlFlowValue(node *ast.Node) (any, bool) {
-	if staticEvaluator == nil || node == nil {
-		return nil, false
-	}
-	if hasUnsafeControlFlowMemberAccess(node) {
-		return nil, false
-	}
-	previous := staticEvaluator.controlFlowOnly
-	staticEvaluator.controlFlowOnly = true
-	defer func() { staticEvaluator.controlFlowOnly = previous }()
-	result := staticEvaluator.evalValue(node)
-	if !result.ok {
-		return nil, false
-	}
-	if value, ok := staticValueAsString(result.value); ok {
-		return value, true
-	}
-	return result.value, true
-}
-
-func hasUnsafeControlFlowMemberAccess(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	if node.Kind == ast.KindPropertyAccessExpression || node.Kind == ast.KindElementAccessExpression {
-		return true
-	}
-	return node.ForEachChild(hasUnsafeControlFlowMemberAccess)
-}
-
-// EvalControlFlowArrayValue reports whether a conservatively evaluated value
-// is an array. It shares the value evaluator's member-access and binding checks.
-func (staticEvaluator *StaticStringEvaluator) EvalControlFlowArrayValue(node *ast.Node) (isArray bool, known bool) {
-	value, ok := staticEvaluator.EvalControlFlowValue(node)
-	if !ok {
-		return false, false
-	}
-	_, isArray = value.(*staticArrayValue)
-	return isArray, true
 }
 
 // EvalArrayValue classifies a statically known value by whether it is an
@@ -437,10 +391,6 @@ func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node 
 		return nil, nil, false
 	}
 	if ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) {
-		return nil, nil, false
-	}
-	if staticEvaluator.controlFlowOnly &&
-		(!ast.IsVarConst(declarationList) || hasUnsafeControlFlowMemberAccess(declaration.Initializer)) {
 		return nil, nil, false
 	}
 	if !ast.IsVarConst(declarationList) && staticEvaluator.hasWrites(symbol) {
@@ -867,6 +817,11 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 	if !ok {
 		return staticEvalResult{}
 	}
+	if staticEvaluator.resolveIdentifiers {
+		if number, ok := staticGlobalNumber(objectNode, key); ok {
+			return staticEvalResult{value: staticNumberValue(number), ok: true}
+		}
+	}
 	if literal := SkipAssertionsAndParens(objectNode); literal != nil && literal.Kind == ast.KindObjectLiteralExpression {
 		return staticEvaluator.evalObjectLiteralMember(literal, key)
 	}
@@ -899,9 +854,8 @@ func (staticEvaluator *StaticStringEvaluator) evalAccessExpressionKey(node *ast.
 
 // staticMemberValue reads key off a folded object, array, or string literal.
 // Reading a key that isn't there yields `undefined`, as it would at runtime. A
-// key an array inherits — `length`, `join` — stays unresolved, because folding
-// it would need a numeric or callable value representation this evaluator
-// doesn't carry; string indexing is narrower (a canonical index only) and
+// callable key such as `join` stays unresolved; string indexing is narrower
+// (a canonical index only) and
 // returns the UTF-16 code unit at that index, matching how JavaScript indexes
 // a string.
 func staticMemberValue(object any, key string) staticEvalResult {
@@ -925,6 +879,9 @@ func staticMemberValue(object any, key string) staticEvalResult {
 		}
 		return staticEvalResult{value: staticUndefinedValue{}, ok: true}
 	case *staticArrayValue:
+		if key == "length" {
+			return staticEvalResult{value: staticNumberValue(object.length), ok: true}
+		}
 		index, ok := staticArrayIndex(key)
 		if !ok {
 			if staticNumberShapedKey(key) {
