@@ -84,6 +84,39 @@ func firstVariableInitializer(t *testing.T, program *compiler.Program, fileName 
 	return nil
 }
 
+func TestPromiseInstanceAndConstructorTypes(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+	for _, test := range []struct {
+		name, subject         string
+		instance, constructor bool
+	}{
+		{"native instance", "Promise<number>", true, false},
+		{"native constructor", "typeof Promise", false, true},
+		{"derived instance", "Derived<number>", true, false},
+		{"derived constructor", "typeof Derived", false, true},
+		{"indirect constructor", "typeof Child", false, true},
+		{"instance union", "Promise<number> | Child", true, false},
+		{"constructor union", "typeof Promise | typeof Child", false, true},
+		{"mixed union", "Promise<number> | typeof Child", false, false},
+		{"tagged instance", "Derived<number> & {tag: string}", true, false},
+		{"tagged constructor", "typeof Derived & {tag: string}", false, true},
+		{"constructable instance", "Promise<number> & (new () => object)", true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			file := resolve("file.ts")
+			fs := NewOverlayVFS(baseFS, map[string]string{file: "class Derived<T> extends Promise<T> {} class Child extends Derived<number> {} type Test = " + test.subject + ";"})
+			program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+			assert.NilError(t, err)
+			c, done := program.GetTypeChecker(t.Context())
+			defer done()
+			typ := typeOfLastAlias(t, program, c, file)
+			facade := lintprogram.NewFromCompiler(program)
+			assert.Equal(t, IsPromiseLike(facade, c, typ), test.instance)
+			assert.Equal(t, IsPromiseConstructorLike(facade, c, typ), test.constructor)
+		})
+	}
+}
+
 func TestTypeMatchesSomeSpecifierFromPackage(t *testing.T) {
 	rootDir, resolve, baseFS := fixtureRoot()
 

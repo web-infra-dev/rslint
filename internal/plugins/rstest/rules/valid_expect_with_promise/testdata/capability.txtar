@@ -1,0 +1,54 @@
+-- tsconfig.json --
+{"compilerOptions":{"strict":true,"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022"],"types":[]},"include":["*.ts"]}
+-- loose.json --
+{"extends":"./tsconfig.json","compilerOptions":{"strictNullChecks":false}}
+-- values.ts --
+export function overloaded(): number;
+export function overloaded(value: string): Promise<never>;
+export function overloaded(value?: string): number | Promise<never> { return value ? Promise.reject(new Error()) : 1; }
+export class DerivedPromise extends Promise<number> {}
+export const externalPromise = Promise.resolve(42);
+export const derivedPromise = new DerivedPromise(resolve => resolve(42));
+export function externalFunction(): Promise<string> { return Promise.resolve('ok'); }
+-- ambient.d.ts --
+declare function expect(value?: unknown): any;
+declare const ambientPromise: Promise<string>;
+declare const nullablePromise: Promise<number> | undefined;
+declare const thenable: { then(onFulfilled?: (value: number) => unknown, onRejected?: (reason: unknown) => unknown): unknown };
+declare const chainable: { then(onFulfilled: (value: number) => unknown): unknown };
+declare function ambientOverloaded(): number;
+declare function ambientOverloaded(value: string): Promise<never>;
+declare function probe(name: string, value: unknown): void;
+-- entry.ts --
+import { externalPromise, derivedPromise, externalFunction, DerivedPromise, overloaded } from './values';
+probe('constructor', DerivedPromise);
+probe('overload', overloaded);
+probe('ambientOverload', ambientOverloaded);
+probe('external', externalPromise);
+probe('derived', derivedPromise);
+probe('ambient', ambientPromise);
+probe('thenable', thenable);
+probe('chainable', chainable);
+probe('nullable', nullablePromise);
+if (nullablePromise) probe('narrowed', nullablePromise);
+function generic<T extends Promise<number>>(value: T) { probe('constraint', value); }
+async function awaited() { probe('awaited', await externalPromise); }
+expect(externalPromise).toBe(42);
+expect(ambientPromise).toBe('ok');
+expect(derivedPromise).toBe(42);
+expect(externalFunction).rejects.toThrow();
+expect(thenable).toBe(42);
+expect(chainable).toBe(42);
+expect(nullablePromise).resolves.toBe(42);
+if (nullablePromise) expect(nullablePromise).resolves.toBe(42);
+-- no-lib/tsconfig.json --
+{"compilerOptions":{"strict":true,"noLib":true,"types":[]},"files":["entry.ts","globals.d.ts"]}
+-- no-lib/entry.ts --
+declare class Promise<T> {
+  then(onFulfilled?: (value: T) => unknown, onRejected?: (reason: unknown) => unknown): Promise<unknown>;
+}
+declare const value: Promise<number>;
+expect(value).toBe(1);
+expect(value).resolves.toBe(1);
+-- no-lib/globals.d.ts --
+declare function expect(value: unknown): any;

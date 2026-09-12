@@ -58,19 +58,17 @@ func addDefaultLibraryGlobalNames(dst map[string]bool, program *program.Program,
 	}
 }
 
-/**
- * @example
- * ```ts
- * class DerivedClass extends Promise<number> {}
- * DerivedClass.reject
- * // ^ PromiseLike
- * ```
- */
+// IsPromiseLike recognizes Promise instances, not their constructors.
 func IsPromiseLike(
 	program *program.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type) bool {
-	return IsBuiltinSymbolLike(program, typeChecker, t, "Promise")
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(part *checker.Type) builtinPredicateMatches {
+		if !isClassConstructorType(part) && IsBuiltinSymbolLike(program, typeChecker, part, "Promise") {
+			return builtinPredicateMatches_True
+		}
+		return builtinPredicateMatches_False
+	})
 }
 
 /**
@@ -86,7 +84,19 @@ func IsPromiseConstructorLike(
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
-	return IsBuiltinSymbolLike(program, typeChecker, t, "PromiseConstructor")
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(part *checker.Type) builtinPredicateMatches {
+		if IsBuiltinSymbolLike(program, typeChecker, part, "PromiseConstructor") ||
+			(isClassConstructorType(part) && IsBuiltinSymbolLike(program, typeChecker, part, "Promise")) {
+			return builtinPredicateMatches_True
+		}
+		return builtinPredicateMatches_False
+	})
+}
+
+func isClassConstructorType(t *checker.Type) bool {
+	symbol := checker.Type_symbol(t)
+	return IsObjectType(t) && checker.Type_objectFlags(t)&checker.ObjectFlagsAnonymous != 0 &&
+		symbol != nil && symbol.Flags&ast.SymbolFlagsClass != 0
 }
 
 /**
