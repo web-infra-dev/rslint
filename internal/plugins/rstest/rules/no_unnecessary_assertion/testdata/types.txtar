@@ -1,0 +1,52 @@
+-- tsconfig.json --
+{"compilerOptions":{"strict":true,"target":"esnext","module":"nodenext"},"include":["**/*.ts"]}
+-- tsconfig.unstrict.json --
+{"extends":"./tsconfig.json","compilerOptions":{"strict":false}}
+-- tsconfig.override.json --
+{"extends":"./tsconfig.json","compilerOptions":{"strictNullChecks":false}}
+-- tsconfig.strict-null.json --
+{"extends":"./tsconfig.json","compilerOptions":{"strict":false,"strictNullChecks":true}}
+-- tsconfig.default.json --
+{"compilerOptions":{"target":"esnext","module":"nodenext"},"include":["**/*.ts"]}
+-- values.ts --
+export function definite(): string { return 'value'; }
+export function nullable(): string | null { return null; }
+export function optional(): string | undefined { return undefined; }
+export function numeric(): string | number { return 1; }
+export function promised(): Promise<string | undefined> { return Promise.resolve('value'); }
+export function conditional<T>(value: T): T extends string ? null : T { return value as any; }
+-- globals.d.ts --
+declare function ambient(): string;
+declare function ambientNullable(): string | null;
+declare function ambientUnknown(): unknown;
+-- probe.ts --
+import { definite, nullable, optional, numeric, promised, conditional } from './values';
+declare function inspect(value: unknown): void;
+inspect(definite());
+inspect(nullable());
+inspect(optional());
+inspect(numeric());
+inspect(ambient());
+inspect(ambientNullable());
+inspect(ambientUnknown());
+inspect(Promise.resolve(1));
+inspect(NaN);
+inspect(conditional('value'));
+inspect(conditional(1));
+inspect(promised());
+function constrained<T extends string | null>(value: T) { inspect(value); }
+function narrowed(value: string | null) { if (value !== null) inspect(value); }
+inspect(async () => promised());
+-- entry.ts --
+import { definite, nullable, optional, numeric, conditional } from './values';
+expect(definite()).toBeNull();
+expect(nullable()).toBeNull();
+expect(optional()).toBeDefined();
+expect(numeric()).toBeNaN();
+expect(ambient()).not.toBeUndefined();
+expect(ambientNullable()).toBeNull();
+expect(ambientUnknown()).toBeNaN();
+expect(conditional('value')).toBeNull();
+expect(conditional(1)).toBeNull();
+expect(NaN).toBeNaN();
+expect(Promise.resolve(1)).toBeNaN();
