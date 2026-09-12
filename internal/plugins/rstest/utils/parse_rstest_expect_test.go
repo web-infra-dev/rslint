@@ -566,6 +566,33 @@ func TestParseRstestExpectCallChaiPromiseModifiers(t *testing.T) {
 	)
 }
 
+func TestRstestExpectPromiseModifierEntry(t *testing.T) {
+	probe := rule.Rule{Name: "promise-modifier-probe", Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) {
+			parsed := analysis.ParseExpectCall(node)
+			if parsed == nil || parsed.Head == nil || parsed.Reason != rstestUtils.RstestExpectParseReasonNone {
+				return
+			}
+			if modifier := parsed.PromiseModifierEntry(); modifier != nil {
+				ctx.ReportNode(modifier.Node, probeMessage("modifier", modifier.Name))
+			}
+		}}
+	}}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &probe,
+		[]rule_tester.ValidTestCase{
+			{Code: `expect(x).toBe(1).result.resolves.toBe(1);`},
+			{Code: `expect(x).toBe(1)[key].rejects.toBe(1);`},
+			{Code: `expect(x).toBe(1).then(() => {}).resolves.toBe(1);`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: `expect(x).resolves.toBe(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "modifier", Message: "resolves"}}},
+			{Code: `expect(x).to.be.a('number').and.resolves.toBe(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "modifier", Message: "resolves"}}},
+			{Code: `expect.soft(x).to.be.a('number').and['rejects'].toBe(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "modifier", Message: "rejects"}}},
+		},
+	)
+}
+
 func TestParseRstestExpectCallChaiInvalidChains(t *testing.T) {
 	invalid := "entry=expect head=true expression=call members=[%s] modifiers=[] matcher= matchers=[] reason=modifier-unknown static=false"
 	propertyInvalid := "entry=expect head=true expression=property members=[%s] modifiers=[] matcher= matchers=[] reason=modifier-unknown static=false"

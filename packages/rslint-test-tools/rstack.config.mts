@@ -694,6 +694,7 @@ define.test({
     './tests/rstest/rules/require-mock-type-parameters.test.ts',
     './tests/rstest/rules/require-test-timeout.test.ts',
     './tests/rstest/rules/valid-expect-in-promise.test.ts',
+    './tests/rstest/rules/valid-expect-with-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
     './tests/rstest/rules/warn-todo.test.ts',

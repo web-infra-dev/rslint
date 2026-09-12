@@ -58,6 +58,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_to_throw_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_in_promise"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_with_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/warn_todo"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -122,6 +123,7 @@ func GetAllRules() []rule.Rule {
 		require_to_throw_message.RequireToThrowMessageRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
+		valid_expect_with_promise.ValidExpectWithPromiseRule,
 		valid_title.ValidTitleRule,
 		warn_todo.WarnTodoRule,
 	}

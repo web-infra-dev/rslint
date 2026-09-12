@@ -132,6 +132,30 @@ type ParsedRstestExpectCall struct {
 	trailingMembers int
 }
 
+// PromiseModifierEntry includes Chai modifiers after matchers, but not members of an assertion's result.
+func (parsed *ParsedRstestExpectCall) PromiseModifierEntry() *ParsedRstestFnMemberEntry {
+	for i := range parsed.MemberEntries {
+		entry := &parsed.MemberEntries[i]
+		if entry.Call == parsed.Head {
+			continue
+		}
+		if entry.Node == nil || isComputedDynamicMemberName(entry.Node) {
+			return nil
+		}
+		if entry.Name == "then" || entry.Name == "catch" || entry.Name == "finally" {
+			return nil
+		}
+		chain := classifyRstestExpectChainEntry(*entry, false)
+		if chain.Kind == rstestExpectChainUnknown {
+			return nil
+		}
+		if chain.Kind == rstestExpectChainModifier && (entry.Name == "resolves" || entry.Name == "rejects") {
+			return entry
+		}
+	}
+	return nil
+}
+
 func isRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
