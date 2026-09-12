@@ -233,6 +233,7 @@ export interface GetAstInfoResponse {
 
 export interface GetAstInfoRequest {
   fileContent: string;
+  sourceFileName?: string; // User source filename (defaults to /index.ts)
   position: number;
   end?: number; // Optional: end position for exact node matching
   kind?: number; // Optional: filter by node kind (when multiple nodes at same position)

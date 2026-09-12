@@ -13,8 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/theme/components/ui/select';
-import { ensureWasmService, fetchWasmVersions } from './wasm';
+import {
+  ensureWasmService,
+  fetchWasmVersions,
+  supportsAstInspector,
+} from './wasm';
 import { readShareState } from './share-url';
+import type { SourceFileName } from './source-file';
 
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorTabsRef | null>(null);
@@ -37,9 +42,16 @@ const Playground: React.FC = () => {
   const [astInfoLoading, setAstInfoLoading] = useState(false);
   const [wasmVersions, setWasmVersions] = useState<string[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<string>();
+  const [sourceFileName, setSourceFileName] = useState<SourceFileName>(
+    () => readShareState().sourceFileName,
+  );
   // Captured before the editors get a chance to rewrite the URL.
   const [pinnedVersion] = useState(() => readShareState().wasmVersion);
   const selectedVersionRef = useRef<string | undefined>(undefined);
+  const astInspectorEnabled = supportsAstInspector(
+    selectedVersion,
+    sourceFileName,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,13 +95,15 @@ const Playground: React.FC = () => {
       const service = await ensureWasmService(version);
       if (!isCurrentLintRun(runId, version)) return;
       const code = editorRef.current?.getValue() ?? '';
+      const sourceFileName =
+        editorRef.current?.getSourceFileName() ?? 'index.ts';
       const rslintConfig = await editorRef.current?.getRslintConfig(version);
       if (!isCurrentLintRun(runId, version)) return;
       const tsConfig = editorRef.current?.getTsConfig();
 
       // Build fileContents with code and config files
       const fileContents: Record<string, string> = {
-        '/index.ts': code,
+        [`/${sourceFileName}`]: code,
       };
 
       // Add tsconfig.json if we have a valid config
@@ -141,7 +155,7 @@ const Playground: React.FC = () => {
       // Generate AST (tsgo)
       let sourceTextForTs: string | undefined;
       try {
-        const astBuffer = result.encodedSourceFiles!['index.ts'];
+        const astBuffer = result.encodedSourceFiles![sourceFileName];
         const buffer = Uint8Array.from(atob(astBuffer), (c) => c.charCodeAt(0));
         const source = new RemoteSourceFile(buffer, new TextDecoder());
         // capture the exact source text from encoded source file
@@ -244,7 +258,7 @@ const Playground: React.FC = () => {
       kind?: number,
       fileName?: string,
     ): Promise<GetAstInfoResponse | null> => {
-      if (!initialized) return null;
+      if (!initialized || !astInspectorEnabled) return null;
 
       try {
         setAstInfoLoading(true);
@@ -254,6 +268,7 @@ const Playground: React.FC = () => {
 
         const result = await service.getAstInfo({
           fileContent: code,
+          sourceFileName: editorRef.current?.getSourceFileName(),
           position,
           end,
           kind,
@@ -271,7 +286,7 @@ const Playground: React.FC = () => {
         setAstInfoLoading(false);
       }
     },
-    [initialized, selectedVersion],
+    [astInspectorEnabled, initialized, selectedVersion],
   );
 
   // Fetch AST info for lazy loading - does NOT update global state
@@ -282,7 +297,7 @@ const Playground: React.FC = () => {
       kind?: number,
       fileName?: string,
     ): Promise<GetAstInfoResponse | null> => {
-      if (!initialized) return null;
+      if (!initialized || !astInspectorEnabled) return null;
 
       try {
         const service = await ensureWasmService(selectedVersion!);
@@ -291,6 +306,7 @@ const Playground: React.FC = () => {
 
         const result = await service.getAstInfo({
           fileContent: code,
+          sourceFileName: editorRef.current?.getSourceFileName(),
           position,
           end,
           kind,
@@ -304,18 +320,35 @@ const Playground: React.FC = () => {
         return null;
       }
     },
-    [initialized, selectedVersion],
+    [astInspectorEnabled, initialized, selectedVersion],
   );
+
+  function scriptKindForFile(
+    ts: typeof import('typescript'),
+    fileName: SourceFileName,
+  ) {
+    switch (fileName) {
+      case 'index.js':
+        return ts.ScriptKind.JS;
+      case 'index.jsx':
+        return ts.ScriptKind.JSX;
+      case 'index.tsx':
+        return ts.ScriptKind.TSX;
+      default:
+        return ts.ScriptKind.TS;
+    }
+  }
 
   async function buildTypeScriptAst(text: string) {
     const ts = tsModuleRef.current!;
+    const sourceFileName = editorRef.current?.getSourceFileName() ?? 'index.ts';
     try {
       const sf = ts.createSourceFile(
-        'index.ts',
+        sourceFileName,
         text,
         ts.ScriptTarget.Latest,
         /*setParentNodes*/ true,
-        ts.ScriptKind.TS,
+        scriptKindForFile(ts, sourceFileName),
       );
 
       interface TSAstNode {
@@ -360,6 +393,7 @@ const Playground: React.FC = () => {
             <EditorTabs
               ref={editorRef}
               onChange={() => scheduleRunLint()}
+              onSourceFileNameChange={setSourceFileName}
               onSelectionChange={(start: number, end: number) =>
                 setSelectedAstRange((prev) => {
                   // Preserve kind if position is the same (e.g., from revealRangeByOffset)
@@ -441,6 +475,7 @@ const Playground: React.FC = () => {
             }}
             astInfo={astInfo}
             astInfoLoading={astInfoLoading}
+            astInfoEnabled={astInspectorEnabled}
             onRequestAstInfo={handleRequestAstInfo}
             onFetchAstInfoForLazy={fetchAstInfoForLazy}
             onHighlightRange={(pos, end) =>

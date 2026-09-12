@@ -130,6 +130,7 @@ export class RSLintService {
   ): Promise<GetAstInfoResponse> {
     const {
       fileContent,
+      sourceFileName,
       position,
       end,
       kind,
@@ -143,6 +144,7 @@ export class RSLintService {
     // Send getAstInfo request
     return this.service.sendMessage('getAstInfo', {
       fileContent,
+      sourceFileName,
       position,
       end,
       kind,

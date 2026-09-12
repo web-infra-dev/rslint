@@ -36,6 +36,7 @@ interface ResultPanelProps {
   onRequestTsAst?: () => void;
   astInfo?: GetAstInfoResponse | null;
   astInfoLoading?: boolean;
+  astInfoEnabled?: boolean;
   onRequestAstInfo?: (
     position: number,
     end?: number,
@@ -88,6 +89,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
     onRequestTsAst,
     astInfo,
     astInfoLoading,
+    astInfoEnabled,
     onRequestAstInfo,
     onFetchAstInfoForLazy,
     onHighlightRange,
@@ -534,6 +536,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
                   <AstInfoPanel
                     info={astInfo ?? undefined}
                     loading={astInfoLoading}
+                    enabled={astInfoEnabled}
                     onRequestAstInfo={onRequestAstInfo}
                     onFetchAstInfoForLazy={onFetchAstInfoForLazy}
                     onHighlightRange={onHighlightRange}
