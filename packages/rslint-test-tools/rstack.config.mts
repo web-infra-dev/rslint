@@ -759,6 +759,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-set-size.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-string-trim-start-end.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-then-catch.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-ternary.test.ts',
