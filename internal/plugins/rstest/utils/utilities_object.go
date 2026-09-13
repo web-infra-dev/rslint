@@ -47,11 +47,11 @@ func IsUtilitiesObject(ctx rule.RuleContext, receiver *ast.Node) bool {
 	// itself (packages/core/importMeta.d.ts types it as
 	// `typeof import('@rstest/core')`), so the utilities object is the `rs` or
 	// `rstest` on it rather than the property itself.
-	member, namespace := CalledPlainMember(receiver)
-	if member == nil || (member.Text() != "rs" && member.Text() != "rstest") {
+	member, ok := internalUtils.AccessExpressionStaticName(receiver)
+	if !ok || (member != "rs" && member != "rstest") {
 		return false
 	}
-	namespace = internalUtils.SkipAssertionsAndParens(namespace)
+	namespace := internalUtils.SkipAssertionsAndParens(receiver.Expression())
 	if namespace == nil {
 		return false
 	}

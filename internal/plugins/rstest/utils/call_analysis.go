@@ -29,6 +29,8 @@ type RstestCallAnalysis struct {
 	allExpectMatchersOverridden bool
 	hasCustomEqualityTesters    bool
 	expectCustomizationOK       bool
+	expectConfigAliases         map[*ast.Symbol]string
+	hasImportMetaRstestWrites   bool
 	// functions indexes named function declarations by name so a callback
 	// passed by an identifier the checker could not resolve still has a
 	// candidate. The index is file-wide and carries no scope information, so
@@ -234,7 +236,7 @@ func (analysis *RstestCallAnalysis) collectExpectCustomization() {
 		if parsed != nil && parsed.Entry == RstestExpectEntryStatic {
 			matcher = parsed.Matcher
 		} else {
-			matcher = analysis.aliasedExpectConfigMember(call)
+			matcher = analysis.expectConfigMember(call.Expression())
 		}
 		switch matcher {
 		case "addEqualityTesters":
@@ -277,47 +279,74 @@ func (analysis *RstestCallAnalysis) collectExpectCustomization() {
 	}
 }
 
-func (analysis *RstestCallAnalysis) aliasedExpectConfigMember(call *ast.Node) string {
-	callee := internalUtils.SkipAssertionsAndParens(call.Expression())
-	if callee == nil || callee.Kind != ast.KindIdentifier {
+func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) string {
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil {
 		return ""
 	}
-	symbol := analysis.ctx.Refs.Resolve(callee)
-	if symbol == nil || analysis.expectConfigAliasIsReassigned(symbol) {
+	if ast.IsAccessExpression(node) {
+		member, ok := internalUtils.AccessExpressionStaticName(node)
+		if !ok {
+			return ""
+		}
+		if member == "extend" || member == "addEqualityTesters" {
+			if analysis.expectConfigMember(node.Expression()) == "expect" {
+				return member
+			}
+			return ""
+		}
+	}
+	if _, parts, rootInvoked, ok := parseImportMetaRstestChain(node); ok {
+		if !rootInvoked && len(parts) == 1 && parts[0].name == "expect" && parts[0].invocation == rstestNotInvoked {
+			return "expect"
+		}
+		return ""
+	}
+	entries := testFramework.GetMemberEntries(node)
+	if len(entries) == 0 || entries[0].Node == nil || !ast.IsIdentifier(entries[0].Node) {
+		return ""
+	}
+	for _, entry := range entries {
+		if entry.Call != nil || isComputedDynamicMemberName(entry.Node) {
+			return ""
+		}
+	}
+	secondName := ""
+	if len(entries) > 1 {
+		secondName = entries[1].Name
+	}
+	match := rstestExpectRootMatch(entries[0].Node, secondName, len(entries) > 1, analysis)
+	if match.ok && match.index == len(entries)-1 {
+		return "expect"
+	}
+	if !ast.IsIdentifier(node) {
+		return ""
+	}
+	symbol := analysis.ctx.Refs.Resolve(node)
+	if symbol == nil {
+		return ""
+	}
+	if member, ok := analysis.expectConfigAliases[symbol]; ok {
+		return member
+	}
+	if analysis.expectConfigAliases == nil {
+		analysis.expectConfigAliases = map[*ast.Symbol]string{}
+	}
+	// Cache misses before following initializers to break cyclic aliases.
+	analysis.expectConfigAliases[symbol] = ""
+	if analysis.expectConfigAliasIsReassigned(symbol) {
 		return ""
 	}
 	for _, declaration := range symbol.Declarations {
+		member := ""
 		if declaration != nil && declaration.Kind == ast.KindBindingElement {
-			if member := analysis.destructuredExpectConfigMember(declaration); member != "" {
-				return member
-			}
-			continue
+			member = analysis.destructuredExpectConfigMember(declaration)
+		} else if declaration != nil && declaration.Kind == ast.KindVariableDeclaration {
+			member = analysis.expectConfigMember(declaration.AsVariableDeclaration().Initializer)
 		}
-		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration || declaration.AsVariableDeclaration().Initializer == nil {
-			continue
-		}
-		initializer := internalUtils.SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
-		entries := testFramework.GetMemberEntries(initializer)
-		if len(entries) < 2 {
-			continue
-		}
-		if _, parts, rootInvoked, ok := parseImportMetaRstestChain(initializer); ok {
-			if !rootInvoked && len(parts) == 2 && parts[0].name == "expect" {
-				return parts[1].name
-			}
-			continue
-		}
-		if entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
-			continue
-		}
-		secondName := ""
-		if len(entries) > 1 {
-			secondName = entries[1].Name
-		}
-		match := rstestExpectRootMatch(entries[0].Node, secondName, len(entries) > 1, analysis)
-		memberIndex := match.index + 1
-		if match.ok && memberIndex == len(entries)-1 && entries[memberIndex].Call == nil {
-			return entries[memberIndex].Name
+		if member != "" {
+			analysis.expectConfigAliases[symbol] = member
+			return member
 		}
 	}
 	return ""
@@ -345,29 +374,14 @@ func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *
 	if variable == nil || variable.Kind != ast.KindVariableDeclaration || variable.AsVariableDeclaration().Initializer == nil {
 		return ""
 	}
-	initializer := internalUtils.SkipAssertionsAndParens(variable.AsVariableDeclaration().Initializer)
-	entries := testFramework.GetMemberEntries(initializer)
-	if len(entries) == 0 {
-		return ""
-	}
-	if _, parts, rootInvoked, ok := parseImportMetaRstestChain(initializer); ok {
-		if !rootInvoked && len(parts) == 1 && parts[0].name == "expect" {
-			return member
-		}
-		return ""
-	}
-	if entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
-		return ""
-	}
-	secondName := ""
-	if len(entries) > 1 {
-		secondName = entries[1].Name
-	}
-	match := rstestExpectRootMatch(entries[0].Node, secondName, len(entries) > 1, analysis)
-	if match.ok && match.index == len(entries)-1 {
+	if analysis.expectConfigMember(variable.AsVariableDeclaration().Initializer) == "expect" {
 		return member
 	}
 	return ""
+}
+
+func (analysis *RstestCallAnalysis) HasImportMetaRstestWrites() bool {
+	return analysis.hasImportMetaRstestWrites
 }
 
 func (analysis *RstestCallAnalysis) Callbacks() RstestTestCallbacks {
@@ -494,6 +508,26 @@ func (analysis *RstestCallAnalysis) indexSourceFile() {
 			analysis.recordFunction(node)
 		case ast.KindCallExpression:
 			analysis.calls = append(analysis.calls, node)
+		case ast.KindMetaProperty:
+			if !analysis.hasImportMetaRstestWrites && isImportMeta(node) {
+				reference := node
+				for reference.Parent != nil && internalUtils.SkipAssertionsAndParens(reference.Parent) == node {
+					reference = reference.Parent
+				}
+				access := reference.Parent
+				if access != nil && ast.IsAccessExpression(access) && access.Expression() == reference {
+					name, known := internalUtils.AccessExpressionStaticName(access)
+					if !known || name == "rstest" {
+						reference = access
+						for reference.Parent != nil && (internalUtils.SkipAssertionsAndParens(reference.Parent) == internalUtils.SkipAssertionsAndParens(reference) ||
+							(ast.IsAccessExpression(reference.Parent) && reference.Parent.Expression() == reference)) {
+							reference = reference.Parent
+						}
+						analysis.hasImportMetaRstestWrites = internalUtils.IsWriteReference(reference) ||
+							(reference.Parent != nil && reference.Parent.Kind == ast.KindDeleteExpression)
+					}
+				}
+			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
 			visit(child)

@@ -12,7 +12,6 @@ ruleTester.run('unbound-method', {} as never, {
     { code: declaration + 'expect(service.method).toHaveBeenCalledTimes(1);' },
     { code: declaration + 'expect(service.method).not.toHaveBeenCalled();' },
     { code: declaration + 'expect(service.method).toStrictEqual(other);' },
-    { code: declaration + 'expect(service.method).toMatchSnapshot();' },
     { code: declaration + 'expect(service.method).resolves.toBeDefined();' },
     {
       code: declaration + "expect(service.method).to.have.property('name');",
@@ -30,6 +29,18 @@ ruleTester.run('unbound-method', {} as never, {
     { code: 'expect(console.log).toThrow();' },
   ].map((testCase) => ({ ...testCase, filename })),
   invalid: [
+    {
+      code: declaration + 'expect(service.method).toMatchSnapshot();',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 22,
+        },
+      ],
+    },
     ...[
       'toThrow',
       'toThrowError',
