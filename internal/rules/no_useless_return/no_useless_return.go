@@ -59,7 +59,7 @@ var NoUselessReturnRule = rule.Rule{
 func reportUselessReturns(ctx *rule.RuleContext, rootOrder []*ast.Node) {
 	var reports []*ast.Node
 	for _, root := range rootOrder {
-		reports = append(reports, uselessReturns(root)...)
+		reports = append(reports, uselessReturns(root, ctx.CallThrows)...)
 	}
 	slices.SortFunc(reports, func(a, b *ast.Node) int { return a.Pos() - b.Pos() })
 	for _, returnStatement := range reports {
@@ -101,8 +101,9 @@ type block = cfg.Block[event]
 // created, which is the path the code would take without it. The same question
 // over a control-flow graph is whether any clearing statement stands in a block
 // the return's block leads to.
-func uselessReturns(root *ast.Node) []*ast.Node {
+func uselessReturns(root *ast.Node, callThrows func(*ast.Node) bool) []*ast.Node {
 	graph := cfg.Build(root, cfg.Hooks[event]{
+		CallThrows: callThrows,
 		Statement: func(b *cfg.Builder[event], node *ast.Node) {
 			if node.Kind != ast.KindReturnStatement {
 				if clears(node) {

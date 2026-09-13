@@ -283,7 +283,11 @@ func (b *Builder[E]) accessOrCall(node *ast.Node) {
 		b.expr(tagged.Template)
 	}
 
-	b.firstThrowableFork()
+	if node.Kind == ast.KindCallExpression && b.hooks.CallThrows != nil && b.hooks.CallThrows(node) {
+		b.makeThrow()
+	} else {
+		b.firstThrowableFork()
+	}
 
 	if outermost {
 		join := b.chainJoins[len(b.chainJoins)-1]

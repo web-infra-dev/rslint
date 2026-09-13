@@ -97,6 +97,10 @@ type RuleListeners map[ast.Kind](func(node *ast.Node))
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
+	// CallThrows classifies calls that complete like throw in native code paths.
+	// The linter shares enabled predicates before running any rule; the AST and
+	// TypeScript binder remain unchanged.
+	CallThrows func(*ast.Node) bool
 	// IsEslintPluginRule marks a placeholder rule whose actual execution
 	// happens in a Node worker — an ESLint-plugin rule mounted via the
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
@@ -118,6 +122,7 @@ func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
+		CallThrows:       r.CallThrows,
 		Schema:           r.Schema,
 		Run:              r.Run,
 	}

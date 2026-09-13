@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_extraneous_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_extraneous_require"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_process_exit"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/process_exit_as_throw"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -16,5 +17,6 @@ func GetAllRules() []rule.Rule {
 		no_extraneous_import.NoExtraneousImportRule,
 		no_extraneous_require.NoExtraneousRequireRule,
 		no_process_exit.NoProcessExitRule,
+		process_exit_as_throw.ProcessExitAsThrowRule,
 	}
 }

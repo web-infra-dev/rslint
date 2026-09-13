@@ -42,7 +42,10 @@ type RuleContext struct {
 	// LanguageOptions is the normalized, effective per-file language config.
 	// Rules should use its Effective methods when they need ESLint defaults.
 	LanguageOptions LanguageOptions
-	fileCache       *FileCache
+	// CallThrows is the combined predicate of enabled native rules, or nil.
+	// CFG consumers pass it to cfg.Hooks.CallThrows.
+	CallThrows func(*ast.Node) bool
+	fileCache  *FileCache
 	// Globals owns the file's complete global-variable view: the selected
 	// ECMAScript edition, languageOptions.globals, inline /* global */ comments,
 	// their effective access, and inline declaration metadata. Rules should use

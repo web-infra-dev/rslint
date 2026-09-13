@@ -103,11 +103,16 @@ type Graph[E any] struct {
 // Statement runs as each statement is reached, before it is laid out. Loop runs
 // where control flows back into a loop for another iteration of it.
 type Hooks[E any] struct {
+	// CallThrows runs after evaluating a call's callee and arguments. A match
+	// takes the existing throw path, including catch/finally and optional chains.
+	CallThrows func(node *ast.Node) bool
 	Expression func(b *Builder[E], node *ast.Node)
 	Read       func(b *Builder[E], node *ast.Node)
 	Write      func(b *Builder[E], node *ast.Node)
 	Statement  func(b *Builder[E], node *ast.Node)
 	Loop       func(b *Builder[E], loop *ast.Node)
+	// CaseEnd observes completion of a switch clause before falling through.
+	CaseEnd func(b *Builder[E], clause *ast.Node)
 }
 
 // tryPosition is where in a `try` statement construction currently is.

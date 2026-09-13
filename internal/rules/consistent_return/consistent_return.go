@@ -150,7 +150,7 @@ func report(ctx *rule.RuleContext, returns []*ast.Node, opts options) {
 		if !infos[root].hasReturnValue || allowsImplicitReturn(root) {
 			continue
 		}
-		if !cfg.Build(root, cfg.Hooks[struct{}]{}).EndReachable {
+		if !cfg.Build(root, cfg.Hooks[struct{}]{CallThrows: ctx.CallThrows}).EndReachable {
 			continue
 		}
 		diagnostics = append(diagnostics, diagnostic{

@@ -606,7 +606,7 @@ var RulesOfHooksRule = rule.Rule{
 			}
 			codePath := codePaths[root]
 			if codePath == nil {
-				codePath = buildHookCodePath(root)
+				codePath = buildHookCodePath(root, ctx.CallThrows)
 				codePaths[root] = codePath
 			}
 			return codePath.state(node), root

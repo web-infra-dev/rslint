@@ -184,10 +184,23 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
+		var callThrows func(*ast.Node) bool
+		for _, r := range rules {
+			if r.CallThrows == nil {
+				continue
+			}
+			if callThrows == nil {
+				callThrows = r.CallThrows
+			} else {
+				previous, next := callThrows, r.CallThrows
+				callThrows = func(node *ast.Node) bool { return previous(node) || next(node) }
+			}
+		}
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
 			Settings:        environment.Settings,
 			LanguageOptions: languageOptions,
+			CallThrows:      callThrows,
 			Globals:         rule.NewGlobals(languageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
 			Exported:        rule.NewExported(inlineExported, inlineExportedDeclarations),
 			Comments:        comments,

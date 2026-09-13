@@ -15,6 +15,55 @@ func TestLintSingleFileWithoutRuleHandlerIsNoOp(t *testing.T) {
 	LintSingleFile(LintSingleFileOptions{})
 }
 
+func TestLintSingleFileCallThrowsPrecedesRulesAndDoesNotLeak(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
+		"input.ts": "first(); second(); other();",
+	})
+	sourceProgram := lintprogram.NewFromCompiler(raw)
+	for _, enabled := range []bool{true, false, true} {
+		checked := false
+		LintSingleFile(LintSingleFileOptions{
+			Program: sourceProgram,
+			File:    paths["input.ts"],
+			GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+				configured := []rule.ConfiguredRule{{
+					Name: "consumer-before-providers",
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						checked = true
+						if (ctx.CallThrows != nil) != enabled {
+							t.Fatalf("predicate present = %v, enabled = %v", ctx.CallThrows != nil, enabled)
+						}
+						if enabled {
+							for i, statement := range ctx.SourceFile.Statements.Nodes {
+								call := statement.AsExpressionStatement().Expression
+								if got := ctx.CallThrows(call); got != (i < 2) {
+									t.Errorf("call %d throws = %v, want %v", i, got, i < 2)
+								}
+							}
+						}
+						return nil
+					},
+				}}
+				if enabled {
+					for _, name := range []string{"first", "second"} {
+						configured = append(configured, rule.ConfiguredRule{
+							Name: name,
+							CallThrows: func(node *ast.Node) bool {
+								return node.AsCallExpression().Expression.Text() == name
+							},
+							Run: func(rule.RuleContext) rule.RuleListeners { return nil },
+						})
+					}
+				}
+				return configured
+			},
+		})
+		if !checked {
+			t.Fatal("consumer did not run")
+		}
+	}
+}
+
 func TestLintSingleFileLeavesSyntaxGateToCaller(t *testing.T) {
 	directory := t.TempDir()
 	writeTestFiles(t, directory, map[string]string{"broken.ts": "const value = ;\n"})

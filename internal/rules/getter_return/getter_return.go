@@ -61,7 +61,7 @@ func reportEmptyReturns(ctx rule.RuleContext, funcNode *ast.Node, body *ast.Node
 	return name, message
 }
 
-func eslintEndReachable(funcNode *ast.Node, body *ast.Node) bool {
+func eslintEndReachable(ctx rule.RuleContext, funcNode *ast.Node, body *ast.Node) bool {
 	statements := body.Statements()
 	if len(statements) == 0 {
 		return true
@@ -70,7 +70,7 @@ func eslintEndReachable(funcNode *ast.Node, body *ast.Node) bool {
 	case ast.KindReturnStatement, ast.KindThrowStatement:
 		return false
 	}
-	return cfg.Build(funcNode, cfg.Hooks[struct{}]{}).EndReachable
+	return cfg.Build(funcNode, cfg.Hooks[struct{}]{CallThrows: ctx.CallThrows}).EndReachable
 }
 
 // reportGetterReturn mirrors ESLint's code-path checks for one getter. A bare
@@ -93,7 +93,7 @@ func reportGetterReturn(ctx rule.RuleContext, funcNode *ast.Node, opts Options) 
 	analysis := utils.AnalyzeFunctionReturns(funcNode)
 	// The binder supplies the return kinds cheaply, while ESLint's code-path
 	// shape is authoritative for whether the getter can reach its end.
-	analysis.EndReachable = eslintEndReachable(funcNode, body)
+	analysis.EndReachable = eslintEndReachable(ctx, funcNode, body)
 	if !opts.AllowImplicit && analysis.HasEmptyReturn {
 		name, expected = reportEmptyReturns(ctx, funcNode, body)
 		hasExpected = true

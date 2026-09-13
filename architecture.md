@@ -149,6 +149,14 @@ bundled standard libraries through the upstream `lib` build task.
 See [the compiler dependency guide](./CONTRIBUTING.md#typescript-compiler-dependency)
 for the pinned revision, migration rationale, and update workflow.
 
+`internal/utils/cfg` owns native code-path construction. An enabled rule may
+provide a `CallThrows` predicate; `internal/config` preserves it when resolving
+rules, and `internal/linter` combines the enabled predicates for each file before
+any rule runs. CFG consumers pass `RuleContext.CallThrows` into their graph
+hooks. The Node rule owns the `process.exit()` match; the CFG owns throw routing,
+including catch/finally and optional-chain continuations. This does not mutate
+the source AST, binder flow, or another file's configuration.
+
 Rule-facing string and matching helpers belong under `internal/utils/`:
 `ecmascript` owns JavaScript string values and UTF-16 conversion,
 `ecmascript/regexp` owns RegExp rewriting, capture numbering and replacement

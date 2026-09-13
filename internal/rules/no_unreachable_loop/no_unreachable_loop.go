@@ -103,7 +103,7 @@ func (collector *loopRootCollector) collectLoop(node *ast.Node) {
 func reportLoops(ctx *rule.RuleContext, rootOrder []*ast.Node, opts ruleOptions) {
 	var reports []*ast.Node
 	for _, root := range rootOrder {
-		rootReports := singleIterationLoops(root, opts)
+		rootReports := singleIterationLoops(root, opts, ctx.CallThrows)
 		if reports == nil {
 			reports = rootReports
 		} else {
@@ -135,14 +135,15 @@ func reportLoops(ctx *rule.RuleContext, rootOrder []*ast.Node, opts ruleOptions)
 // return; } finally { continue; } }` really does start a second iteration.
 // ESLint 10.8.0 still reports some of these shapes depending on the surrounding
 // code path; internal/utils/cfg keeps the edge consistently.
-func singleIterationLoops(root *ast.Node, opts ruleOptions) []*ast.Node {
+func singleIterationLoops(root *ast.Node, opts ruleOptions, callThrows func(*ast.Node) bool) []*ast.Node {
 	if opts.ignored == 0 {
-		return singleIterationLoopsDefault(root)
+		return singleIterationLoopsDefault(root, callThrows)
 	}
 
 	var candidates []*ast.Node
 	repeats := make(map[*ast.Node]bool)
 	cfg.Build(root, cfg.Hooks[struct{}]{
+		CallThrows: callThrows,
 		Statement: func(b *cfg.Builder[struct{}], node *ast.Node) {
 			if !b.Current().Reachable {
 				return
@@ -170,10 +171,11 @@ func singleIterationLoops(root *ast.Node, opts ruleOptions) []*ast.Node {
 	return slices.DeleteFunc(candidates, func(loop *ast.Node) bool { return repeats[loop] })
 }
 
-func singleIterationLoopsDefault(root *ast.Node) []*ast.Node {
+func singleIterationLoopsDefault(root *ast.Node, callThrows func(*ast.Node) bool) []*ast.Node {
 	var candidates []*ast.Node
 	repeats := make(map[*ast.Node]bool)
 	cfg.Build(root, cfg.Hooks[struct{}]{
+		CallThrows: callThrows,
 		Statement: func(b *cfg.Builder[struct{}], node *ast.Node) {
 			if !b.Current().Reachable || !isLoop(node) {
 				return

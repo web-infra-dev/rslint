@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/cfg"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -62,6 +63,8 @@ var NoFallthroughRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		var caseEndReachable map[*ast.Node]bool
+		var analyzedRoots map[*ast.Node]bool
 
 		return rule.RuleListeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
@@ -77,6 +80,22 @@ var NoFallthroughRule = rule.Rule{
 
 				clauses := caseBlock.Clauses.Nodes
 				sourceText := ctx.SourceFile.Text()
+				if ctx.CallThrows != nil {
+					root := cfg.RootOf(node)
+					if !analyzedRoots[root] {
+						if analyzedRoots == nil {
+							analyzedRoots = make(map[*ast.Node]bool)
+							caseEndReachable = make(map[*ast.Node]bool)
+						}
+						analyzedRoots[root] = true
+						cfg.Build(root, cfg.Hooks[struct{}]{
+							CallThrows: ctx.CallThrows,
+							CaseEnd: func(b *cfg.Builder[struct{}], clause *ast.Node) {
+								caseEndReachable[clause] = caseEndReachable[clause] || b.Current().Reachable
+							},
+						})
+					}
+				}
 
 				for i := range len(clauses) - 1 {
 					currentClause := clauses[i].AsCaseOrDefaultClause()
@@ -107,7 +126,9 @@ var NoFallthroughRule = rule.Rule{
 					// When FallthroughFlowNode is set, apply targeted AST checks for
 					// these patterns.
 					isFallthrough := currentClause.FallthroughFlowNode != nil
-					if isFallthrough && hasASTTerminal(statements.Nodes) {
+					if ctx.CallThrows != nil {
+						isFallthrough = caseEndReachable[clauses[i]]
+					} else if isFallthrough && hasASTTerminal(statements.Nodes) {
 						isFallthrough = false
 					}
 

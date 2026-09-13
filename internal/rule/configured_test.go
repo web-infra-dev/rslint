@@ -1,6 +1,10 @@
 package rule
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+)
 
 func TestFilterNonTypeAwareRules(t *testing.T) {
 	tests := []struct {
@@ -51,6 +55,7 @@ func TestCreateRulePreservesRequiresTypeInfo(t *testing.T) {
 	configured := CreateRule(Rule{
 		Name:             "test-rule",
 		RequiresTypeInfo: true,
+		CallThrows:       func(*ast.Node) bool { return true },
 		Run:              func(RuleContext, []any) RuleListeners { return nil },
 	})
 
@@ -59,5 +64,8 @@ func TestCreateRulePreservesRequiresTypeInfo(t *testing.T) {
 	}
 	if !configured.RequiresTypeInfo {
 		t.Fatal("RequiresTypeInfo should survive CreateRule")
+	}
+	if configured.CallThrows == nil || !configured.CallThrows(nil) {
+		t.Fatal("CallThrows should survive CreateRule")
 	}
 }

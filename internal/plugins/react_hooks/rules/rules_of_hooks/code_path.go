@@ -22,9 +22,10 @@ type hookPathState struct {
 	possiblyEarlyReturn bool
 }
 
-func buildHookCodePath(root *ast.Node) *hookCodePath {
+func buildHookCodePath(root *ast.Node, callThrows func(*ast.Node) bool) *hookCodePath {
 	locations := make(map[*ast.Node]*cfg.Block[struct{}])
 	graph := cfg.Build(root, cfg.Hooks[struct{}]{
+		CallThrows: callThrows,
 		Expression: func(builder *cfg.Builder[struct{}], node *ast.Node) {
 			if node.Kind != ast.KindCallExpression {
 				return

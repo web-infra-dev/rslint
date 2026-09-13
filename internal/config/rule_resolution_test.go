@@ -8,6 +8,39 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+func TestResolveEnabledRules_CallThrowsFollowsPluginAndSeverity(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		plugins  []string
+		severity string
+		want     bool
+	}{
+		{"undeclared", nil, "error", false},
+		{"off", []string{"node"}, "off", false},
+		{"warning", []string{"node"}, "warn", true},
+		{"error", []string{"node"}, "error", true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			config := RslintConfig{{Plugins: testCase.plugins, Rules: Rules{
+				"no-unreachable": "error", "node/process-exit-as-throw": testCase.severity,
+			}}}
+			configured, _ := ResolveEnabledRules(baseRuleCatalog(), config, "input.js", "")
+			found := false
+			for _, r := range configured {
+				if r.CallThrows != nil {
+					if r.Name != "node/process-exit-as-throw" {
+						t.Fatalf("unexpected predicate on %s", r.Name)
+					}
+					found = true
+				}
+			}
+			if found != testCase.want {
+				t.Fatalf("throw predicate enabled = %v, want %v", found, testCase.want)
+			}
+		})
+	}
+}
+
 func TestResolveEnabledRules_FiltersByEnabledState(t *testing.T) {
 
 	config := RslintConfig{

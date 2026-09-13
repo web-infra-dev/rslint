@@ -375,6 +375,9 @@ func (b *Builder[E]) switchStatement(node *ast.Node) {
 		b.linkWithCycleBarrier(fallthroughFrom, bodies[i], barrier)
 		b.enter(bodies[i])
 		b.statements(clause.AsCaseOrDefaultClause().Statements)
+		if b.hooks.CaseEnd != nil {
+			b.hooks.CaseEnd(b, clause)
+		}
 		fallthroughFrom = b.cur
 		if i >= firstCaseIndex && firstCaseIndex != -1 {
 			hadSwitchBreak = b.jumps[switchJump].broken

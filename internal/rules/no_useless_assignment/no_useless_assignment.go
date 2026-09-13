@@ -257,7 +257,9 @@ func analyzeRoot(
 		return nil
 	}
 
-	graph := cfg.Build(root, hooks(readNodes, assignByIdent))
+	flowHooks := hooks(readNodes, assignByIdent)
+	flowHooks.CallThrows = ctx.CallThrows
+	graph := cfg.Build(root, flowHooks)
 
 	markDeadWrites(graph, assignments)
 	var reports []*ast.Node

@@ -3,6 +3,7 @@ package no_unreachable
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/cfg"
@@ -220,6 +221,7 @@ func compoundStatementContainsBooleanIf(node *ast.Node) bool {
 type reachabilityState struct {
 	eslintReachable map[*ast.Node]bool
 	cfgRoots        map[*ast.Node]bool
+	callThrows      func(*ast.Node) bool
 }
 
 func (s *reachabilityState) ensureCFG(root *ast.Node) {
@@ -231,20 +233,87 @@ func (s *reachabilityState) ensureCFG(root *ast.Node) {
 	}
 	s.cfgRoots[root] = true
 	cfg.Build(root, cfg.Hooks[struct{}]{
+		CallThrows: s.callThrows,
 		Statement: func(builder *cfg.Builder[struct{}], statement *ast.Node) {
-			if !builder.Current().Reachable {
+			if s.callThrows == nil && !builder.Current().Reachable {
 				return
 			}
 			if s.eslintReachable == nil {
 				s.eslintReachable = make(map[*ast.Node]bool)
 			}
-			s.eslintReachable[statement] = true
+			s.eslintReachable[statement] = s.eslintReachable[statement] || builder.Current().Reachable
 		},
 	})
 }
 
 func (s *reachabilityState) isUnreachable(node *ast.Node) bool {
+	if reachable, checked := s.eslintReachable[node]; s.callThrows != nil && checked {
+		return !reachable
+	}
 	return isUnreachable(node) && !s.eslintReachable[node]
+}
+
+// Calls that throw require the shared CFG instead of binder reachability.
+// Report in traversal order so consecutive ranges can span a control-flow body
+// and the following statement, just as they can span siblings in a block.
+func runWithCallThrows(ctx rule.RuleContext, msg rule.RuleMessage) rule.RuleListeners {
+	state := reachabilityState{callThrows: ctx.CallThrows}
+	rangeStart, rangeEnd := -1, 0
+	flush := func() {
+		if rangeStart >= 0 {
+			ctx.ReportRange(core.NewTextRange(rangeStart, rangeEnd), msg)
+			rangeStart = -1
+		}
+	}
+	report := func(node *ast.Node) {
+		if isHoistedOrEmpty(node) {
+			return
+		}
+		// Building a root already records all of its statements, so most
+		// visits can reuse that result without walking the parents again.
+		if _, checked := state.eslintReachable[node]; !checked {
+			state.ensureCFG(cfg.RootOf(node))
+		}
+		if !state.isUnreachable(node) {
+			flush()
+			return
+		}
+		start := utils.TrimNodeTextRange(ctx.SourceFile, node).Pos()
+		if rangeStart >= 0 {
+			if start >= rangeStart && node.End() <= rangeEnd {
+				return
+			}
+			if scanner.SkipTrivia(ctx.SourceFile.Text(), rangeEnd) == start {
+				rangeEnd = node.End()
+				return
+			}
+			flush()
+		}
+		rangeStart, rangeEnd = start, node.End()
+	}
+	listeners := rule.RuleListeners{}
+	for _, kind := range []ast.Kind{
+		ast.KindBlock, ast.KindBreakStatement, ast.KindClassDeclaration,
+		ast.KindContinueStatement, ast.KindDebuggerStatement, ast.KindDoStatement,
+		ast.KindExpressionStatement, ast.KindForInStatement, ast.KindForOfStatement,
+		ast.KindForStatement, ast.KindIfStatement, ast.KindImportDeclaration,
+		ast.KindLabeledStatement, ast.KindReturnStatement, ast.KindSwitchStatement,
+		ast.KindThrowStatement, ast.KindTryStatement, ast.KindVariableStatement,
+		ast.KindWhileStatement, ast.KindWithStatement, ast.KindExportDeclaration,
+		ast.KindExportAssignment, ast.KindEnumDeclaration, ast.KindModuleDeclaration,
+		ast.KindModuleBlock,
+	} {
+		listeners[kind] = report
+	}
+	if statements := ctx.SourceFile.Statements; statements != nil && len(statements.Nodes) > 0 {
+		last := statements.Nodes[len(statements.Nodes)-1]
+		listeners[rule.ListenerOnExit(last.Kind)] = func(node *ast.Node) {
+			if node == last {
+				flush()
+			}
+		}
+	}
+	return listeners
 }
 
 // NoUnreachableRule disallows unreachable code after return, throw, break, and continue statements.
@@ -255,6 +324,9 @@ var NoUnreachableRule = rule.Rule{
 		msg := rule.RuleMessage{
 			Id:          "unreachableCode",
 			Description: "Unreachable code.",
+		}
+		if ctx.CallThrows != nil {
+			return runWithCallThrows(ctx, msg)
 		}
 		state := reachabilityState{}
 

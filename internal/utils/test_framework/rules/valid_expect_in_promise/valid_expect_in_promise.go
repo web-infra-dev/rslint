@@ -327,6 +327,7 @@ func (a *analyzer) resolveFunctionConsumption(
 	}
 
 	graph := cfg.Build(function.function, cfg.Hooks[flowEvent]{
+		CallThrows: a.ctx.CallThrows,
 		Expression: func(builder *cfg.Builder[flowEvent], node *ast.Node) {
 			if builder.Current().Reachable {
 				for _, group := range groupsByRoot[node] {

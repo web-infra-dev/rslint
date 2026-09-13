@@ -1,6 +1,9 @@
 package rule
 
-import "github.com/web-infra-dev/rslint/internal/utils"
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
 
 // ConfiguredRule is one enabled rule after configuration resolution. It is a
 // rule-framework value: config produces it and linter consumes it.
@@ -9,6 +12,7 @@ type ConfiguredRule struct {
 	Environment      *RuleEnvironment
 	Severity         DiagnosticSeverity
 	RequiresTypeInfo bool
+	CallThrows       func(*ast.Node) bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
 	// worker rather than natively in Go. Run remains a no-op placeholder for
 	// those entries.
