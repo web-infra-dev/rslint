@@ -172,6 +172,7 @@ define.test({
     './tests/eslint-plugin-node/rules/no-exports-assign.test.ts',
     './tests/eslint-plugin-node/rules/no-extraneous-import.test.ts',
     './tests/eslint-plugin-node/rules/no-extraneous-require.test.ts',
+    './tests/eslint-plugin-node/rules/no-missing-import.test.ts',
     './tests/eslint-plugin-node/rules/no-process-exit.test.ts',
 
     // eslint-plugin-import
