@@ -13,6 +13,7 @@ ruleTester.run('unbound-method', {} as never, {
     { code: declaration + 'expect(service.method).not.toHaveBeenCalled();' },
     { code: declaration + 'expect(service.method).toStrictEqual(other);' },
     { code: declaration + 'expect(service.method).toMatchSnapshot();' },
+    { code: declaration + 'expect(service.method).resolves.toBeDefined();' },
     {
       code: declaration + "expect(service.method).to.have.property('name');",
     },
@@ -57,6 +58,34 @@ ruleTester.run('unbound-method', {} as never, {
           column: 8,
           endLine: 4,
           endColumn: 22,
+        },
+      ],
+    },
+    {
+      code:
+        declaration +
+        'expect.extend({ toBe(received) { received(); return { pass: true, message: () => "" }; } }); expect(service.method).toBe(1);',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          line: 4,
+          column: 101,
+          endLine: 4,
+          endColumn: 115,
+        },
+      ],
+    },
+    {
+      code:
+        declaration +
+        'expect.addEqualityTesters([(received) => { if (typeof received === "function") received(); return true; }]); expect(service.method).toEqual(1);',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          line: 4,
+          column: 116,
+          endLine: 4,
+          endColumn: 130,
         },
       ],
     },

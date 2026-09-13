@@ -203,15 +203,10 @@ func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool
 		if init == nil || !ast.IsFunctionExpression(init) {
 			return false, false
 		}
-		// For static class fields like `static foo = function() {}`, the static modifier
-		// is on the PropertyDeclaration, not the FunctionExpression. We need to check
-		// the PropertyDeclaration's modifiers to make ignoreStatic work correctly.
-		// Unlike MethodDeclaration, we don't check function parameters here - upstream
-		// typescript-eslint also skips parameter checking for PropertyDeclaration.
-		dangerous := !ignoreStatic || !utils.IncludesModifier(valueDeclaration, ast.KindStaticKeyword)
-		// PropertyDeclaration function expressions always have `this` typed by the class context,
-		// so we return true for firstParamIsThis (matching upstream's undefined behavior)
-		return dangerous, true
+		// TypeScript-ESLint treats a function-valued property as dangerous without
+		// consulting ignoreStatic or the function's parameters. The option applies
+		// to method declarations, not to class fields.
+		return true, true
 	case ast.KindPropertyAssignment:
 		assignee := valueDeclaration.Initializer()
 		if !ast.IsFunctionExpression(assignee) {
@@ -318,21 +313,40 @@ func CreateListeners(ctx rule.RuleContext, options []any, exempt func(*ast.Node)
 		}
 		objectType := ctx.TypeChecker.GetTypeAtLocation(object)
 		checkProperty := func(name string) bool {
-			return utils.TypeRecurser(objectType, func(part *checker.Type) bool {
-				return checkIfMethodAndReport(node, checker.Checker_getPropertyOfType(ctx.TypeChecker, part, name))
-			})
+			unionParts := []*checker.Type{objectType}
+			if objectType.Flags()&checker.TypeFlagsUnion != 0 {
+				unionParts = objectType.Types()
+			}
+			for _, unionPart := range unionParts {
+				intersectionParts := []*checker.Type{unionPart}
+				if unionPart.Flags()&checker.TypeFlagsIntersection != 0 {
+					intersectionParts = unionPart.Types()
+				}
+				for _, intersectionPart := range intersectionParts {
+					if checkIfMethodAndReport(node, checker.Checker_getPropertyOfType(ctx.TypeChecker, intersectionPart, name)) {
+						return true
+					}
+				}
+			}
+			return false
 		}
 		if node.Kind == ast.KindElementAccessExpression {
-			utils.TypeRecurser(ctx.TypeChecker.GetTypeAtLocation(property), func(keyType *checker.Type) bool {
-				if keyType.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral) == 0 {
-					return false
+			keyType := ctx.TypeChecker.GetTypeAtLocation(property)
+			keyParts := []*checker.Type{keyType}
+			if keyType.Flags()&checker.TypeFlagsUnion != 0 {
+				keyParts = keyType.Types()
+			}
+			for _, keyPart := range keyParts {
+				if keyPart.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral) == 0 {
+					continue
 				}
-				name := checker.GetPropertyNameFromType(keyType)
-				return checkProperty(name)
-			})
+				if checkProperty(checker.GetPropertyNameFromType(keyPart)) {
+					break
+				}
+			}
 			return
 		}
-		if ast.IsIdentifier(property) && objectType.Flags()&checker.TypeFlagsUnion != 0 {
+		if ast.IsIdentifier(property) {
 			checkProperty(property.Text())
 			return
 		}

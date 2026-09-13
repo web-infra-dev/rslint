@@ -33,6 +33,10 @@ func TestUnboundMethodComputedMembers(t *testing.T) {
 		"const service = { method() {} }; let method;\n({ method } = service);",
 		"class A { method() {} } class B { method = 1; } declare const value: A | B;\nvalue.method;",
 		"class A { method() {} } class B { method = 1; } declare const value: A | B;\nvalue['method'];",
+		"class A { method() {} } class B { method: () => void; } declare const value: A & B;\nvalue.method;",
+		"class A { method() {} } class B { method: () => void; } declare const value: A & B;\nvalue['method'];",
+		"declare const value: Window;\nvalue.blur;",
+		"declare const value: Window;\nvalue['blur'];",
 	} {
 		invalid = append(invalid, rule_tester.InvalidTestCase{
 			Code:   "export {};\n" + code,
@@ -41,8 +45,6 @@ func TestUnboundMethodComputedMembers(t *testing.T) {
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UnboundMethodRule,
 		[]rule_tester.ValidTestCase{
-			// Preserve the existing intersection boundary rather than changing default-lib overload handling.
-			{Code: `class A { method() {} } class B { method: () => void; } declare const value: A & B; value.method;`},
 			{Code: declaration + `service['method']();`},
 			{Code: declaration + `service?.['method']?.();`},
 			{Code: declaration + `if (service['method']) {}`},
@@ -50,6 +52,7 @@ func TestUnboundMethodComputedMembers(t *testing.T) {
 			{Code: declaration + `service['method'].bind(service);`},
 			{Code: declaration + `Service['method'];`, Options: map[string]any{"ignoreStatic": true}},
 			{Code: declaration + `declare const key: string; service[key];`},
+			{Code: `const service = { method() {} }; declare const key: 'method' & { readonly brand: unique symbol }; service[key];`},
 			{Code: `const method = Math.floor; const { parseInt } = Number;`},
 			{Code: `const service = { method() {} }; let method; ({ ['method']: method } = service);`},
 			{Code: `const service = { method() {} }; let method; ({ 'method': method } = service);`},
@@ -68,5 +71,15 @@ func TestUnboundMethodExemptionKeepsDestructuring(t *testing.T) {
 		[]rule_tester.InvalidTestCase{{
 			Code:   "const service = { method() {} };\nconst { method } = service;",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unboundWithoutThisAnnotation", Line: 2, Column: 9, EndLine: 2, EndColumn: 15}},
+		}})
+}
+
+func TestUnboundMethodIgnoreStaticDoesNotIgnoreFunctionFields(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UnboundMethodRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{{
+			Code:    `class Service { static method = function () {} } Service.method;`,
+			Options: map[string]any{"ignoreStatic": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unbound"}},
 		}})
 }

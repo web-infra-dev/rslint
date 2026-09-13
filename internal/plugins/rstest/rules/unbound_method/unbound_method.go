@@ -73,18 +73,29 @@ var UnboundMethodRule = rule.Rule{
 				}
 			}
 			for _, modifier := range parsed.Modifiers {
-				if modifier != "not" {
+				if modifier != "not" && modifier != "resolves" {
 					return false
 				}
 			}
 			for _, matcher := range parsed.Matchers {
-				if !isNonInvokingMatcher(matcher.Name) {
+				if analysis.IsExpectMatcherOverridden(matcher.Name) ||
+					(analysis.HasCustomEqualityTesters() && usesCustomEqualityTesters(matcher.Name)) ||
+					!isNonInvokingMatcher(matcher.Name) {
 					return false
 				}
 			}
 			return true
 		})
 	},
+}
+
+func usesCustomEqualityTesters(name string) bool {
+	switch name {
+	case "toBe", "toEqual", "toStrictEqual", "toMatchObject", "toBeOneOf":
+		return true
+	default:
+		return false
+	}
 }
 
 // Unknown/custom matchers may call the subject, so a throwing-matcher denylist is insufficient.
