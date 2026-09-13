@@ -100,6 +100,9 @@ func TestNoRestrictedRstestMethods(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			{Code: `rs.fn();`, Options: noFn, Errors: disallowed("fn", 1, 4, 6)},
 			{Code: `rstest.fn();`, Options: noFn, Errors: disallowed("fn", 1, 8, 10)},
+			{Code: `import * as core from '@rstest/core'; core['rs'].fn();`, Options: noFn, Errors: disallowed("fn", 1, 50, 52)},
+			{Code: `const core = require('@rstest/core'); core['rs'].fn();`, Options: noFn, Errors: disallowed("fn", 1, 50, 52)},
+			{Code: `import.meta.rstest['rs'].fn();`, Options: noFn, Errors: disallowed("fn", 1, 26, 28)},
 			{
 				Code:    `rs.fn();`,
 				Options: fnWithMessage,

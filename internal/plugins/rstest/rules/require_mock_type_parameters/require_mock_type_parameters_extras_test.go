@@ -162,6 +162,9 @@ func TestRequireMockTypeParametersExtras(t *testing.T) {
 			// `import = require` binds the module namespace the same way a
 			// namespace import does, so the utilities object is the `rs` on it.
 			{Code: `import core = require('@rstest/core'); core.rs.fn();`, Errors: missing("fn", 1, 48, 50)},
+			{Code: `import * as core from '@rstest/core'; core['rs'].fn();`, Errors: missing("fn", 1, 50, 52)},
+			{Code: `const core = require('@rstest/core'); core['rs'].fn();`, Errors: missing("fn", 1, 50, 52)},
+			{Code: `import.meta.rstest['rs'].fn();`, Errors: missing("fn", 1, 26, 28)},
 			{Code: `(rs.fn)()`, Errors: missing("fn", 1, 5, 7)},
 			{Code: `(rs.fn as any)()`, Errors: missing("fn", 1, 5, 7)},
 			// An optional chain still reaches the same function, so the mock it

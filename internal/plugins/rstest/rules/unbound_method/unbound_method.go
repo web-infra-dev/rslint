@@ -49,6 +49,13 @@ var UnboundMethodRule = rule.Rule{
 				if !stable {
 					return false
 				}
+			} else {
+				if analysis == nil {
+					analysis = rstestUtils.GetRstestCallAnalysis(ctx)
+				}
+				if analysis.HasImportMetaRstestWrites() {
+					return false
+				}
 			}
 			if member, ok := utils.AccessExpressionStaticName(callee); ok && member == "mocked" && rstestUtils.IsUtilitiesObject(ctx, callee.Expression()) {
 				return true
@@ -100,9 +107,6 @@ func usesCustomEqualityTesters(name string) bool {
 
 // Unknown/custom matchers may call the subject, so a throwing-matcher denylist is insufficient.
 func isNonInvokingMatcher(name string) bool {
-	if rstestUtils.RSTEST_SNAPSHOT_MATCHERS[name] {
-		return name != "toThrowErrorMatchingSnapshot" && name != "toThrowErrorMatchingInlineSnapshot"
-	}
 	switch name {
 	case "toBe", "toEqual", "toStrictEqual", "toMatchObject", "toMatch", "toContain", "toContainEqual", "toBeOneOf",
 		"toBeTruthy", "toBeFalsy", "toBeNaN", "toBeUndefined", "toBeNull", "toBeNullable", "toBeDefined",

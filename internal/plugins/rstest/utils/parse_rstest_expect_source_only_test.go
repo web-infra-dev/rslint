@@ -129,8 +129,12 @@ func TestRstestExpectCustomizationResolvesInSourceOnlyProgram(t *testing.T) {
 import { expect as check } from '@rstest/core';
 import * as core from 'rstack/test';
 
-check.extend({ toBe() {} });
-core.expect.addEqualityTesters([tester]);
+const verify = check;
+const again = verify;
+again.extend({ toBe() {} });
+const checkEquality = core.expect;
+const { addEqualityTesters: add } = checkEquality;
+add([tester]);
 probe();
 `
 
