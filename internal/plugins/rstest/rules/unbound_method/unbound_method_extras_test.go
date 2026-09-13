@@ -1,0 +1,120 @@
+package unbound_method
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestUnboundMethodExtras(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	for _, code := range []string{
+		`expect(service['method']).toHaveBeenCalled();`,
+		"expect(service[`method`]).not.toHaveBeenCalled();",
+		`expect((service.method)).toBeDefined();`,
+		`expect(service.method as unknown).toBeDefined();`,
+		`expect(service.method!).toBeDefined();`,
+		`expect.soft(service.method).toHaveBeenCalled();`,
+		`expect(service.method).toMatchSnapshot();`,
+		`expect(service.method).matchSnapshot();`,
+		`expect(service.method).toMatchInlineSnapshot();`,
+		`expect(service.method).toMatchFileSnapshot('service.snap');`,
+		`expect(service.method).toBeOneOf([service.method.bind(service)]);`,
+		`expect(service.method).to.have.property('name');`,
+		`expect(service.method).to.respondTo('apply');`,
+		`expect(service.method).to.be.a('function').and.have.length(0);`,
+		`expect(service.method).to.be.oneOf([service.method.bind(service)]);`,
+		`expect(service.method).to.be.a('function').and.equal(service.method.bind(service));`,
+		`expect(service.method).to.be.ok;`,
+		`expect(service.method)['toBeDefined']();`,
+		`import { expect as check } from '@rstest/core'; check(service.method).toBeDefined();`,
+		`import * as core from '@rstest/core'; core.expect(service.method).toBeDefined();`,
+		`const { expect: check } = require('@rstest/core'); check(service.method).toBeDefined();`,
+		`import.meta.rstest.expect(service.method).toBeDefined();`,
+		`test('case', ({ expect: check }) => { check(service.method).toBeDefined(); });`,
+		`test('case', ctx => { ctx.expect(service.method).toBeDefined(); });`,
+		`rs.mocked(service['method']);`,
+		`rs['mocked'](service.method);`,
+		"rs[`mocked`](service.method);",
+		`import type { rs as mocker } from '@rstest/core'; const rs = undefined;`,
+		`rstest.mocked((service.method));`,
+		`rs.mocked(service.method as unknown);`,
+		`import { rs as mocker } from '@rstest/core'; mocker.mocked(service.method);`,
+		`import { rstest as mocker } from '@rstest/core'; mocker.mocked(service.method);`,
+		`import * as core from '@rstest/core'; core.rs.mocked(service.method);`,
+		`import * as core from '@rstest/core'; core.rstest.mocked(service.method);`,
+		`import core = require('@rstest/core'); core.rs.mocked(service.method);`,
+		`const { rs: mocker } = require('@rstest/core'); mocker.mocked(service.method);`,
+		`const core = require('@rstest/core'); core.rstest.mocked(service.method);`,
+		`import.meta.rstest.rs.mocked(service.method);`,
+		`import.meta.rstest!.rstest.mocked(service.method);`,
+		`rs?.mocked(service.method);`,
+		`rs.mocked?.(service.method);`,
+		`(rs.mocked)(service.method);`,
+	} {
+		valid = append(valid, rule_tester.ValidTestCase{Code: serviceDeclaration + code})
+		if strings.Contains(code, "@rstest/core") {
+			valid = append(valid, rule_tester.ValidTestCase{Code: serviceDeclaration + strings.ReplaceAll(code, "@rstest/core", "rstack/test")})
+		}
+	}
+	valid = append(valid,
+		rule_tester.ValidTestCase{Code: `const service = { method(this: void) {} }; expect(service.method).toThrow();`},
+		rule_tester.ValidTestCase{Code: `class Service { static method() {} } expect(Service.method).toThrow();`, Options: map[string]any{"ignoreStatic": true}},
+		rule_tester.ValidTestCase{Code: `class Service { bound = () => {} } expect(new Service().bound).toThrow();`},
+	)
+	var invalid []rule_tester.InvalidTestCase
+	for _, code := range []string{
+		`expect(service.method).toThrow();`,
+		`expect(service.method).toThrowError();`,
+		`expect(service.method).throw();`,
+		`expect(service.method).throws();`,
+		`expect(service.method).not.throw();`,
+		`expect(service.method).not.throws();`,
+		`expect(service.method).to.be.a('function').and.throw();`,
+		`expect.soft(service.method).not.toThrow();`,
+		`expect.poll(service.method).toBeDefined();`,
+		`expect.element(service.method).toBeVisible();`,
+		`expect(service.method).rejects.toBeDefined();`,
+		`expect(service.method).not.rejects.toBeDefined();`,
+		`expect(service.method).resolves.toBeDefined();`,
+		`expect(service.method).customMatcher();`,
+		`expect(service.method).toSatisfy(fn => fn());`,
+		`const toBeDefined = 'toThrow'; expect(service.method)[toBeDefined]();`,
+		`const toBeDefined = 'toThrow'; expect(service.method)[(toBeDefined)]();`,
+		`expect(1).toBe(service.method);`,
+		`expect(() => other(service.method)).not.toThrow();`,
+		`function run(expect: any) { expect(service.method).toHaveBeenCalled(); }`,
+		`import { expect } from 'other'; expect(service.method).toBeDefined();`,
+		`const rs = { mocked: (fn: any) => fn() }; rs.mocked(service.method);`,
+		`function run(rstest: any) { rstest.mocked(service.method); }`,
+		`import { rs } from 'other'; rs.mocked(service.method);`,
+		`import * as core from 'other'; core.rs.mocked(service.method);`,
+		`import { rs } from '@rstest/core'; function run(rs: any) { rs.mocked(service.method); }`,
+		`vi.mocked(service.method);`,
+		`mocked(service.method);`,
+		`import.meta.rstest.mocked(service.method);`,
+		`rs.mocked(other(service.method));`,
+		`rs.mocked(1, service.method);`,
+		`let { rs } = require('@rstest/core'); rs = other; rs.mocked(service.method);`,
+		`let core = require('@rstest/core'); core = other; core.rs.mocked(service.method);`,
+		`import { rs } from '@rstest/core'; rs.mocked = fn => fn(); rs.mocked(service.method);`,
+		`import type { rs as mocker } from '@rstest/core'; mocker.mocked(service.method);`,
+		`const mocked = 'invoke'; rs[mocked](service.method);`,
+		`let { expect } = require('@rstest/core'); expect = other; expect(service.method).toBeDefined();`,
+		`expect(service.method satisfies Function).toThrow();`,
+	} {
+		column := strings.Index(code, "service.method") + 1
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: serviceDeclaration + code, Errors: unboundError(4, column, 14)})
+	}
+	for _, expression := range []string{`service['method']`, "service[`method`]", `service?.['method']`} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: serviceDeclaration + "expect(" + expression + ").not.toThrow();", Errors: unboundError(4, 8, len(expression))})
+	}
+	invalid = append(invalid,
+		rule_tester.InvalidTestCase{Code: serviceDeclaration + `const { method } = service;`, Errors: unboundError(4, 9, 6)},
+		rule_tester.InvalidTestCase{Code: `class Service { method(this: Service) {} } const service = new Service(); expect(service.method).toThrow();`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unbound"}}},
+		rule_tester.InvalidTestCase{Code: `class Service { static method() {} } expect(Service.method).toThrow();`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unboundWithoutThisAnnotation"}}},
+	)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UnboundMethodRule, valid, invalid)
+}
