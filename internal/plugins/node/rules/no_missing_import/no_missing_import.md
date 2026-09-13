@@ -94,12 +94,15 @@ substituted. Type-only imports also activate the `types` export condition.
 
 ## Differences from upstream
 
-Only `resolverConfig.modules` affects module lookup. Other `resolverConfig`
-options, including `alias`, are ignored. For example, mapping `virtual` to
-`./local.js` through `resolverConfig.alias` lets upstream accept
+The [upstream documentation](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/shared-settings.md#resolverconfig)
+lists `modules` as the only supported `resolverConfig` field. Rslint supports
+that field. Upstream also accepts additional fields in practice, outside its
+documented support; rslint ignores those extra fields. For example, mapping
+`virtual` to `./local.js` through `resolverConfig.alias` lets upstream accept
 `import 'virtual'` when that file exists; rslint reports it as missing.
-Use TypeScript `compilerOptions.paths` for local aliases, or `allowModules`
-for intentionally unresolved modules.
+Use TypeScript `compilerOptions.paths` when checking local aliases.
+`allowModules` can exempt an intentionally unresolved module, but does not
+check that an alias target exists.
 
 Some failures in `package.json#imports` have different wording. If `#redirect`
 maps to a private package export, rslint reports `Can't resolve '#redirect'`
