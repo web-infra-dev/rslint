@@ -59,7 +59,11 @@ func TestValidExpectWithPromiseTypeCapability(t *testing.T) {
 							}
 						}
 						if name == "overload" || name == "ambientOverload" {
-							returned := callableReturnType(ctx.TypeChecker, subject, typ)
+							returned, ok := callableReturnType(ctx.TypeChecker, subject, typ)
+							if !ok {
+								t.Errorf("%s has no zero-argument return", name)
+								return
+							}
 							if returned.Flags()&checker.TypeFlagsNumber == 0 {
 								t.Errorf("%s no-argument return is not number", name)
 							}

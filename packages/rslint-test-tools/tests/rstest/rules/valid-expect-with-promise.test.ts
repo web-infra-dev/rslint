@@ -12,6 +12,12 @@ ruleTester.run('valid-expect-with-promise', {} as never, {
       code: 'declare const value: PromiseLike<number>; expect(value).resolves.toBe(1)',
       options: [{ checkThenables: true }],
     },
+    {
+      code: `declare const subject: { value: Promise<number> }; expect(subject).to.have.property('value').and.resolves.toBe(1)`,
+    },
+    {
+      code: `declare const subject: { value: Promise<number> }; (expect(subject) as any).to.have.property('value').and.resolves.toBe(1)`,
+    },
   ],
   invalid: [
     {
@@ -51,6 +57,18 @@ ruleTester.run('valid-expect-with-promise', {} as never, {
       code: 'declare const value: PromiseLike<number>; expect(value).toBe(1)',
       options: [{ checkThenables: true }],
       errors: [{ messageId: 'poorlyExpectedPromise' }],
+    },
+    {
+      code: `class PromiseWithValue extends Promise<number> { value = 1 } declare const subject: PromiseWithValue; expect(subject).to.have.property('value').and.resolves.toBe(1)`,
+      errors: [{ messageId: 'unneededRejectResolve' }],
+    },
+    {
+      code: `class PromiseWithValue extends Promise<number> { value = 1 } declare const subject: PromiseWithValue; (expect(subject) as any).to.have.property('value').and.resolves.toBe(1)`,
+      errors: [{ messageId: 'unneededRejectResolve' }],
+    },
+    {
+      code: `function required(value: string): Promise<never> { return Promise.reject(new Error(value)); } expect(required).rejects.toThrow()`,
+      errors: [{ messageId: 'unneededRejectResolve' }],
     },
   ],
 });
