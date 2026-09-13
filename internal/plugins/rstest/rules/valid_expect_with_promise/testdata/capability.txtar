@@ -18,6 +18,8 @@ declare const thenable: { then(onFulfilled?: (value: number) => unknown, onRejec
 declare const chainable: { then(onFulfilled: (value: number) => unknown): unknown };
 declare function ambientOverloaded(): number;
 declare function ambientOverloaded(value: string): Promise<never>;
+declare function needsThis(this: { value: number }): Promise<never>;
+declare function noReceiver(this: void): Promise<never>;
 declare function probe(name: string, value: unknown): void;
 -- entry.ts --
 import { externalPromise, derivedPromise, externalFunction, DerivedPromise, overloaded } from './values';
@@ -37,6 +39,8 @@ expect(externalPromise).toBe(42);
 expect(ambientPromise).toBe('ok');
 expect(derivedPromise).toBe(42);
 expect(externalFunction).rejects.toThrow();
+expect(needsThis).rejects.toThrow();
+expect(noReceiver).rejects.toThrow();
 expect(thenable).toBe(42);
 expect(chainable).toBe(42);
 expect(nullablePromise).resolves.toBe(42);

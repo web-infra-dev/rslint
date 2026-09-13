@@ -136,6 +136,12 @@ func callableReturnType(typeChecker *checker.Checker, subject *ast.Node, typ *ch
 	if signature == nil || signature.Flags()&checker.SignatureFlagsIsSignatureCandidateForOverloadFailure != 0 {
 		return nil, false
 	}
+	if thisParameter := signature.ThisParameter(); thisParameter != nil {
+		thisType := typeChecker.GetTypeOfSymbol(thisParameter)
+		if !checker.Checker_isTypeAssignableTo(typeChecker, typeChecker.GetVoidType(), thisType) {
+			return nil, false
+		}
+	}
 	return checker.Checker_getReturnTypeOfSignature(typeChecker, signature), true
 }
 
