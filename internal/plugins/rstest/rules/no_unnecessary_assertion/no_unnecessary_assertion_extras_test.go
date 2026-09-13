@@ -2,6 +2,7 @@ package no_unnecessary_assertion
 
 import (
 	_ "embed"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -128,6 +129,86 @@ func TestNoUnnecessaryAssertionTypesAndNarrowing(t *testing.T) {
 			{Code: "function check(value: string | null) { if (value !== null) { expect(value).toBeNull(); } }", Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 1)}},
 			{Code: "declare const value: bigint; expect(value).toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 1)}},
 		},
+	)
+}
+
+func TestNoUnnecessaryAssertionStructuralNumberTypes(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "function check(value: {}) { expect(value).toBeNaN(); } check(NaN);"},
+			{Code: "declare const value: Number; expect(value).toBeNaN();"},
+			{Code: "declare const value: { toFixed(): string }; expect(value).toBeNaN();"},
+			{Code: "function check<T extends {}>(value: T) { expect(value).toBeNaN(); }"},
+			{Code: "declare const value: {} | string; expect(value).toBeNaN();"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: "declare const value: object; expect(value).toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 1)}},
+			{Code: "declare const value: { foo: string }; expect(value).toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 1)}},
+			{Code: "declare const value: string; expect(value).toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 1)}},
+		},
+	)
+}
+
+func TestNoUnnecessaryAssertionRuntimeSubjectSpread(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "const prefix: [] = []; expect(...prefix, null).toBeNull();"},
+			{Code: "const prefix: [] = []; expect.soft(...prefix, undefined).toBeUndefined();"},
+			{Code: "const prefix: [] = []; expect(...prefix, NaN).toBeNaN();"},
+			{Code: "const prefix: [null] = [null]; expect(...prefix, 'later').toBeNull();"},
+			{Code: "const prefix: [string?] = []; expect(...prefix, null).toBeNull();"},
+			{Code: "declare const prefix: string[]; expect(...prefix, null).toBeNull();"},
+			{Code: "declare const prefix: number[]; expect(...prefix, 'later').toBeNaN();"},
+			{Code: "function check<T extends unknown[]>(prefix: T) { expect(...prefix, null).toBeNull(); }"},
+			{Code: "declare const prefix: [] | [null]; expect(...prefix, 'later').toBeNull();"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: "const prefix: [] = []; expect(...prefix, 'value').toBeNull();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 1)}},
+			{Code: "const prefix: [string] = ['first']; expect(...prefix, null).toBeNull();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 1)}},
+			{Code: "const prefix: [string?] = []; expect(...prefix, 1n).toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 1)}},
+			{Code: "declare const prefix: [] | [string]; expect(...prefix, 'later').toBeNull();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 1)}},
+		},
+	)
+}
+
+func TestNoUnnecessaryAssertionSharedTypeGraph(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "type A = number & { a: true }; type B = string & { b: true }; declare const value: A | B; expect(value).toBeNaN();"},
+		},
+		[]rule_tester.InvalidTestCase{
+			{Code: "type A = string & { a: true }; type B = string & { b: true }; declare const value: A | B; expect(value).toBeNull();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 1)}},
+			{Code: "function check<T extends string, U extends string>(value: T | U) { expect(value).toBeNull(); }", Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 1)}},
+			{Code: "type Shared = string & { shared: true }; type A = Shared & { a: true }; type B = Shared & { b: true }; type C = A | B; type D = C | (Shared & { d: true }); declare const value: D; expect(value).toBeNull();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 1)}},
+		},
+	)
+}
+
+func TestNoUnnecessaryAssertionSharedTypeGraphScales(t *testing.T) {
+	var source strings.Builder
+	source.WriteString("type Shared = string & { shared: true };\n")
+	for index := range 128 {
+		fmt.Fprintf(&source, "type Branch%d = Shared & { p%d: true };\n", index, index)
+	}
+	source.WriteString("type Value = ")
+	for index := range 128 {
+		if index > 0 {
+			source.WriteString(" | ")
+		}
+		fmt.Fprintf(&source, "Branch%d", index)
+	}
+	source.WriteString(";\ndeclare const value: Value;\nexpect(value).toBeNull();\n")
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryAssertionRule,
+		nil,
+		[]rule_tester.InvalidTestCase{{
+			Code:   source.String(),
+			Errors: []rule_tester.InvalidTestCaseError{diagnostic("null", 132)},
+		}},
 	)
 }
 

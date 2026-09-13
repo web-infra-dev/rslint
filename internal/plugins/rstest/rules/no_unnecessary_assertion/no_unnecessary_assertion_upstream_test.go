@@ -125,6 +125,7 @@ func TestNoUnnecessaryAssertionNaNUpstream(t *testing.T) {
 		{Code: "const add = (a: number, b: number): string | number => a + b; expect(add(1, 1)).not.toBeNaN();"},
 		{Code: "declare function mx(): string | number; expect(mx()).toBeNaN(); expect(mx()).not.toBeNaN();"},
 		{Code: "declare function mx<T>(p: T): T | number; expect(mx(42)).toBeNaN(); expect(mx(4.2)).toBeNaN(); expect(mx(Infinity)).not.toBeNaN(); expect(mx('hello')).toBeNaN(); expect(mx('world')).not.toBeNaN();"},
+		{Code: "declare function mx<T>(p: T): T extends string ? number : T; expect(mx('hello')).toBeNaN(); expect(mx('world')).not.toBeNaN(); expect(mx({})).toBeNaN(); expect(mx({})).not.toBeNaN();"},
 		{Code: "expect('hello' as number).toBeNaN();"},
 	}
 	invalid := []rule_tester.InvalidTestCase{
@@ -139,7 +140,6 @@ func TestNoUnnecessaryAssertionNaNUpstream(t *testing.T) {
 		{Code: "const result = 'hello world'.match('sunshine') || [];\nexpect(result).not.toBeNaN();\nexpect(result).toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 2), diagnostic("a number", 3)}},
 		{Code: "declare function mx(): string | null;\nexpect(mx()).toBeNaN();\nexpect(mx()).not.toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 2), diagnostic("a number", 3)}},
 		{Code: "declare function mx<T>(p: T): T;\nexpect(mx(0)).toBeNaN();\nexpect(mx(1)).not.toBeNaN();\nexpect(mx(NaN)).not.toBeNaN();\nexpect(mx('hello')).toBeNaN();\nexpect(mx('world')).not.toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 5), diagnostic("a number", 6)}},
-		{Code: "declare function mx<T>(p: T): T extends string ? number : T;\nexpect(mx('hello')).toBeNaN();\nexpect(mx('world')).not.toBeNaN();\nexpect(mx({})).toBeNaN();\nexpect(mx({})).not.toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 4), diagnostic("a number", 5)}},
 		{Code: "declare function mx(): string | number;\nexpect(mx() as string).toBeNaN();\nexpect(mx() as string).not.toBeNaN();\nexpect(mx() as number).toBeNaN();\nexpect(mx() as number).not.toBeNaN();", Errors: []rule_tester.InvalidTestCaseError{diagnostic("a number", 2), diagnostic("a number", 3)}},
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryAssertionRule, valid, invalid)
