@@ -1,0 +1,40 @@
+-- tsconfig.json --
+{"compilerOptions":{"strict":true,"target":"esnext","module":"esnext","moduleResolution":"bundler","lib":["esnext","dom"]},"files":["input.ts","service.ts","ambient.d.ts"]}
+-- service.ts --
+export class Service {
+  method() { return this; }
+  safe(this: void) {}
+  static method() {}
+  bound = () => this;
+}
+export function getService(): Service { return new Service(); }
+-- ambient.d.ts --
+declare const ambient: { method(): void; safe(this: void): void };
+declare const expect: any;
+declare const rs: any;
+-- input.ts --
+import { Service, getService } from './service';
+const service = getService();
+const detached = service.method;
+const external = ambient.method;
+const native = Math.floor;
+const promiseMethod = Promise.all;
+function constrained<T extends Service>(value: T) {
+  const method = value.method;
+}
+function narrowed(value: Service | null) {
+  if (value !== null) {
+    const method = value.method;
+  }
+}
+expect(service.method).toHaveBeenCalled();
+expect(service.method).not.toThrow();
+rs.mocked(service.method);
+const safe = service.safe;
+const bound = service.bound;
+const ambientSafe = ambient.safe;
+const computed = service['method'];
+const staticMethod = Service.method;
+const promise = Promise.resolve(service);
+const thenable = { then(resolve: (value: Service) => void, reject: (error: unknown) => void) { resolve(service); } };
+async function awaited() { const result = await promise; return result; }

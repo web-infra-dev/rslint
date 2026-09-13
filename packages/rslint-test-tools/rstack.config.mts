@@ -693,6 +693,7 @@ define.test({
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
     './tests/rstest/rules/require-mock-type-parameters.test.ts',
     './tests/rstest/rules/require-test-timeout.test.ts',
+    './tests/rstest/rules/unbound-method.test.ts',
     './tests/rstest/rules/valid-expect-in-promise.test.ts',
     './tests/rstest/rules/valid-expect.test.ts',
     './tests/rstest/rules/valid-title.test.ts',
