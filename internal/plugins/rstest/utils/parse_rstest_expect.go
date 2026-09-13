@@ -359,14 +359,6 @@ func findTopMostCallExpression(node *ast.Node, throughTypeAssertions bool) *ast.
 	return top
 }
 
-// findTopMostRstestExpectExpression extends the outermost call through a
-// trailing static member chain. This lets the CallExpression-only parser see
-// property-style Chai assertions such as expect(value).to.be.ok without
-// requiring rules to listen for member-access nodes.
-func findTopMostRstestExpectExpression(node *ast.Node) *ast.Node {
-	return findTopMostRstestExpectExpressionOptions(node, false)
-}
-
 func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTypeAssertions bool) *ast.Node {
 	top := node
 	current := node
