@@ -15,6 +15,14 @@ type RstestCallAnalysis struct {
 	isExpect    map[*ast.Node]bool
 	expectRoots map[*ast.Symbol]rstestExpectRoot
 	calls       []*ast.Node
+	// Expect customization is computed lazily from calls because only rules
+	// whose safety depends on the built-in matcher implementations need it. The
+	// source-file call index is already shared by every Rstest rule, so this never
+	// adds another AST walk.
+	overriddenExpectMatchers    map[string]bool
+	allExpectMatchersOverridden bool
+	hasCustomEqualityTesters    bool
+	expectCustomizationOK       bool
 	// functions indexes named function declarations by name so a callback
 	// passed by an identifier the checker could not resolve still has a
 	// candidate. The index is file-wide and carries no scope information, so
@@ -171,6 +179,173 @@ func (analysis *RstestCallAnalysis) ParseExpectCall(
 	analysis.expectCalls[node] = parsed
 	analysis.isExpect[node] = parsed != nil
 	return parsed
+}
+
+// IsExpectMatcherOverridden reports whether an Rstest expect.extend call in
+// this file may replace matcher. A dynamic matcher object or spread may replace
+// any name, so it conservatively answers true for every matcher.
+func (analysis *RstestCallAnalysis) IsExpectMatcherOverridden(matcher string) bool {
+	analysis.collectExpectCustomization()
+	return analysis.allExpectMatchersOverridden || analysis.overriddenExpectMatchers[matcher]
+}
+
+// HasCustomEqualityTesters reports whether this file installs Rstest equality
+// testers, which may execute user code from equality-based built-in matchers.
+func (analysis *RstestCallAnalysis) HasCustomEqualityTesters() bool {
+	analysis.collectExpectCustomization()
+	return analysis.hasCustomEqualityTesters
+}
+
+func (analysis *RstestCallAnalysis) collectExpectCustomization() {
+	if analysis.expectCustomizationOK {
+		return
+	}
+	analysis.expectCustomizationOK = true
+	if analysis.ctx.SourceFile == nil ||
+		(!analysis.ctx.SourceFile.HasIdentifier("extend") &&
+			!analysis.ctx.SourceFile.HasIdentifier("addEqualityTesters")) {
+		return
+	}
+	for _, call := range analysis.calls {
+		parsed := analysis.ParseExpectCall(call)
+		matcher := ""
+		if parsed != nil && parsed.Entry == RstestExpectEntryStatic {
+			matcher = parsed.Matcher
+		} else {
+			matcher = analysis.aliasedExpectConfigMember(call)
+		}
+		switch matcher {
+		case "addEqualityTesters":
+			arguments := call.Arguments()
+			if len(arguments) == 0 {
+				continue
+			}
+			testers := internalUtils.SkipAssertionsAndParens(arguments[0])
+			if testers != nil && testers.Kind == ast.KindArrayLiteralExpression && len(testers.AsArrayLiteralExpression().Elements.Nodes) == 0 {
+				continue
+			}
+			analysis.hasCustomEqualityTesters = true
+		case "extend":
+			arguments := call.Arguments()
+			if len(arguments) == 0 {
+				continue
+			}
+			matchers := internalUtils.SkipAssertionsAndParens(arguments[0])
+			if matchers == nil || matchers.Kind != ast.KindObjectLiteralExpression {
+				analysis.allExpectMatchersOverridden = true
+				continue
+			}
+			for _, property := range matchers.AsObjectLiteralExpression().Properties.Nodes {
+				name := property.Name()
+				if name == nil {
+					analysis.allExpectMatchersOverridden = true
+					continue
+				}
+				matcher, ok := internalUtils.GetStaticPropertyName(name)
+				if !ok {
+					analysis.allExpectMatchersOverridden = true
+					continue
+				}
+				if analysis.overriddenExpectMatchers == nil {
+					analysis.overriddenExpectMatchers = map[string]bool{}
+				}
+				analysis.overriddenExpectMatchers[matcher] = true
+			}
+		}
+	}
+}
+
+func (analysis *RstestCallAnalysis) aliasedExpectConfigMember(call *ast.Node) string {
+	callee := internalUtils.SkipAssertionsAndParens(call.Expression())
+	if callee == nil || callee.Kind != ast.KindIdentifier {
+		return ""
+	}
+	symbol := analysis.ctx.Refs.Resolve(callee)
+	if symbol == nil || analysis.expectConfigAliasIsReassigned(symbol) {
+		return ""
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration != nil && declaration.Kind == ast.KindBindingElement {
+			if member := analysis.destructuredExpectConfigMember(declaration); member != "" {
+				return member
+			}
+			continue
+		}
+		if declaration == nil || declaration.Kind != ast.KindVariableDeclaration || declaration.AsVariableDeclaration().Initializer == nil {
+			continue
+		}
+		initializer := internalUtils.SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
+		entries := testFramework.GetMemberEntries(initializer)
+		if len(entries) < 2 {
+			continue
+		}
+		if _, parts, rootInvoked, ok := parseImportMetaRstestChain(initializer); ok {
+			if !rootInvoked && len(parts) == 2 && parts[0].name == "expect" {
+				return parts[1].name
+			}
+			continue
+		}
+		if entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
+			continue
+		}
+		secondName := ""
+		if len(entries) > 1 {
+			secondName = entries[1].Name
+		}
+		match := rstestExpectRootMatch(entries[0].Node, secondName, len(entries) > 1, analysis)
+		memberIndex := match.index + 1
+		if match.ok && memberIndex == len(entries)-1 && entries[memberIndex].Call == nil {
+			return entries[memberIndex].Name
+		}
+	}
+	return ""
+}
+
+func (analysis *RstestCallAnalysis) expectConfigAliasIsReassigned(symbol *ast.Symbol) bool {
+	for _, reference := range analysis.ctx.Refs.References(symbol) {
+		if internalUtils.IsWriteReference(reference) {
+			return true
+		}
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *ast.Node) string {
+	binding := declaration.AsBindingElement()
+	if binding == nil || binding.Name() == nil || binding.Name().Kind != ast.KindIdentifier || binding.DotDotDotToken != nil {
+		return ""
+	}
+	member := RequireBindingImportedName(declaration)
+	if member != "extend" && member != "addEqualityTesters" {
+		return ""
+	}
+	variable := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
+	if variable == nil || variable.Kind != ast.KindVariableDeclaration || variable.AsVariableDeclaration().Initializer == nil {
+		return ""
+	}
+	initializer := internalUtils.SkipAssertionsAndParens(variable.AsVariableDeclaration().Initializer)
+	entries := testFramework.GetMemberEntries(initializer)
+	if len(entries) == 0 {
+		return ""
+	}
+	if _, parts, rootInvoked, ok := parseImportMetaRstestChain(initializer); ok {
+		if !rootInvoked && len(parts) == 1 && parts[0].name == "expect" {
+			return member
+		}
+		return ""
+	}
+	if entries[0].Node == nil || entries[0].Node.Kind != ast.KindIdentifier {
+		return ""
+	}
+	secondName := ""
+	if len(entries) > 1 {
+		secondName = entries[1].Name
+	}
+	match := rstestExpectRootMatch(entries[0].Node, secondName, len(entries) > 1, analysis)
+	if match.ok && match.index == len(entries)-1 {
+		return member
+	}
+	return ""
 }
 
 func (analysis *RstestCallAnalysis) Callbacks() RstestTestCallbacks {
