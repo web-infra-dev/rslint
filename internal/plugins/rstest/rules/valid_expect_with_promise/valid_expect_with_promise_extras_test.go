@@ -160,6 +160,50 @@ func TestValidExpectWithPromiseExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ValidExpectWithPromiseRule, valid, invalid)
 }
 
+func TestValidExpectWithPromiseThisReceiver(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: `function f(this: void): Promise<never> { return Promise.reject(new Error()); } expect(f).rejects.toThrow();`},
+		{Code: `declare function f(this: any): Promise<never>; expect(f).rejects.toThrow();`},
+		{Code: `declare function f(this: unknown): Promise<never>; expect(f).rejects.toThrow();`},
+		{Code: `declare function f(this: void | { value: number }): Promise<never>; expect(f).rejects.toThrow();`},
+		{Code: `declare function f<T extends void>(this: T): Promise<never>; expect(f).rejects.toThrow();`},
+		{Code: `declare function f<T>(this: T): Promise<T>; expect(f).rejects.toThrow();`},
+		{Code: `function f(this: { value: number }): Promise<never> { return Promise.reject(new Error(String(this.value))); } expect(f.bind({ value: 1 })).rejects.toThrow();`},
+		{Code: `declare const subject: { f(this: void): Promise<never> }; expect(subject.f).rejects.toThrow();`},
+		{Code: `declare function f(this: { value: number }): number; declare function f(this: void): Promise<never>; expect(f).rejects.toThrow();`},
+		{Code: `declare function f(this: void): Promise<never>; declare function f(this: { value: number }): number; expect(f).rejects.toThrow();`},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, code := range []string{
+		`function needsThis(this: { value: number }): Promise<never> { return Promise.reject(new Error(String(this.value))); }
+expect(needsThis).rejects.toThrow();`,
+		`declare function needsThis(this: { value: number }): Promise<never>;
+expect(needsThis).rejects.toThrow();`,
+		`declare function needsThis<T extends { value: number }>(this: T): Promise<T>;
+expect(needsThis).rejects.toThrow();`,
+		`declare const needsThis: (this: { value: number }) => Promise<never>;
+expect(needsThis).rejects.toThrow();`,
+		`declare const needsThis: ((this: { value: number }) => Promise<never>) | (() => Promise<never>);
+expect(needsThis).rejects.toThrow();`,
+		`declare const needsThis: ((this: { value: number }) => Promise<never>) & Promise<never>;
+expect(needsThis).rejects.toThrow();`,
+		`declare function needsThis(this: { value: number }): Promise<never>; declare function needsThis(this: void): number;
+expect(needsThis).rejects.toThrow();`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "unneededRejectResolve", Message: "Subject is not a promise so rejects is not needed",
+			Line: 2, Column: 19, EndLine: 2, EndColumn: 26,
+		}}})
+	}
+	invalid = append(invalid,
+		rule_tester.InvalidTestCase{Code: `declare const subject: { value: number; f(this: { value: number }): Promise<never> }; expect(subject.f).rejects.toThrow();`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
+		rule_tester.InvalidTestCase{Code: `declare function f(this: { value: number }): Promise<never>; expect.soft(f).rejects.toThrow();`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
+		rule_tester.InvalidTestCase{Code: `declare const subject: { f(this: { value: number }): Promise<never> }; expect(subject).to.have.property('f').and.rejects.toThrow();`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
+		rule_tester.InvalidTestCase{Code: `declare function f(this: { value: number }): PromiseLike<never>; expect(f).rejects.toThrow();`, Options: map[string]any{"checkThenables": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
+	)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ValidExpectWithPromiseRule, valid, invalid)
+}
+
 func TestValidExpectWithPromiseSchema(t *testing.T) {
 	for _, options := range [][]any{[]any{}, []any{map[string]any{}}, []any{map[string]any{"checkThenables": false}}, []any{map[string]any{"checkThenables": true}}} {
 		if err := ValidExpectWithPromiseRule.Schema.Validate(options); err != nil {

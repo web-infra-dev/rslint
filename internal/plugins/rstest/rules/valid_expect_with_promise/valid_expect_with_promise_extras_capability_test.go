@@ -123,7 +123,7 @@ func TestValidExpectWithPromiseTypeCapability(t *testing.T) {
 				},
 			}
 			result, diagnostics := runCapabilityRules(t, program, file, []rule.ConfiguredRule{configured})
-			want := 4
+			want := 5
 			if strict {
 				want++
 			}
