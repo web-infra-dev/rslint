@@ -168,6 +168,7 @@ define.test({
     './tests/eslint/rules/no-useless-concat.test.ts',
     './tests/eslint/rules/no-warning-comments.test.ts',
     // eslint-plugin-node
+    './tests/eslint-plugin-node/rules/callback-return.test.ts',
     './tests/eslint-plugin-node/rules/hashbang.test.ts',
     './tests/eslint-plugin-node/rules/no-exports-assign.test.ts',
     './tests/eslint-plugin-node/rules/no-extraneous-import.test.ts',
