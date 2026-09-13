@@ -80,6 +80,22 @@ ruleTester.run('jsx-fragments', {} as never, {
       code: 'function f(){const F=Act.Frag;} const F=Widget; <F/>;',
       settings,
     },
+    {
+      code: 'const F=Act.Frag; for (const F of widgets) { <F/>; }',
+      settings,
+    },
+    {
+      code: 'const F=Act.Frag; try {} catch (F) { <F/>; }',
+      settings,
+    },
+    {
+      code: 'function render(){ function F(){} var F=Act.Frag; return <F/>; }',
+      settings,
+    },
+    {
+      code: 'function render(){ var F=Widget; var F=Act.Frag; return <F/>; }',
+      settings,
+    },
   ],
   invalid: [
     {
@@ -172,6 +188,20 @@ ruleTester.run('jsx-fragments', {} as never, {
         <Frag><Foo /></Frag>;
       `,
       options: ['syntax'],
+      settings,
+      errors: [{ messageId: 'preferFragment' }],
+    },
+    {
+      code: 'function render(){ var F=Act.Frag; function F(){} return <F/>; }',
+      output:
+        'function render(){ var F=Act.Frag; function F(){} return <></>; }',
+      settings,
+      errors: [{ messageId: 'preferFragment' }],
+    },
+    {
+      code: 'function render(){ var F=Act.Frag; var F=Widget; return <F/>; }',
+      output:
+        'function render(){ var F=Act.Frag; var F=Widget; return <></>; }',
       settings,
       errors: [{ messageId: 'preferFragment' }],
     },
