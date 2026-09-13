@@ -35,7 +35,7 @@ var JsxKeyRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-		reactPragma := reactutil.GetReactPragma(ctx.Settings)
+		reactPragma := reactutil.GetReactPragmaFromContext(ctx)
 		fragmentPragma := reactutil.GetReactFragmentPragma(ctx.Settings)
 
 		missingIterKeyUsePragDesc := `Missing "key" prop for element in iterator. Shorthand fragment syntax does not support providing keys. Use ` + reactPragma + `.` + fragmentPragma + ` instead`
@@ -212,6 +212,9 @@ var JsxKeyRule = rule.Rule{
 			}
 			var jsxEls []*ast.Node
 			for _, el := range elements {
+				// ESTree omits parentheses; inspect the JSX itself while keeping
+				// the array/parent as the key-before-spread diagnostic target.
+				el = ast.SkipParentheses(el)
 				if isJsxElementLike(el) {
 					jsxEls = append(jsxEls, el)
 				}
