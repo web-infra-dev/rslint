@@ -690,6 +690,7 @@ define.test({
     './tests/rstest/rules/prefer-to-be-falsy.test.ts',
     './tests/rstest/rules/prefer-to-be-truthy.test.ts',
     './tests/rstest/rules/prefer-to-contain.test.ts',
+    './tests/rstest/rules/prefer-to-have-been-called.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
     './tests/rstest/rules/require-awaited-expect-poll.test.ts',
     './tests/rstest/rules/require-to-throw-message.test.ts',
