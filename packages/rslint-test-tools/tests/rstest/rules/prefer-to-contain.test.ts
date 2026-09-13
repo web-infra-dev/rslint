@@ -30,6 +30,12 @@ ruleTester.run('prefer-to-contain', {} as never, {
     { code: 'expect(a.includes(b)).toBe(...true)' },
     { code: 'expect(a);' },
     { code: 'expect(a).to.be.a("string");' },
+    {
+      code: 'expect([{ a: 1 }].includes({ a: 1 })).deep.toBe(false);',
+    },
+    { code: 'expect(a.includes(b)).toBe(true).toBe(true);' },
+    { code: 'expect(a.includes(b)).toBe(true).to.be.ok;' },
+    { code: 'expect(a.includes(b)).toBe(true).then(done);' },
   ],
   invalid: [
     {
@@ -101,6 +107,21 @@ ruleTester.run('prefer-to-contain', {} as never, {
       code: 'expect(a.includes(b)).not.toBe(true);',
       output: 'expect(a).not.toContain(b);',
       errors: [{ messageId: 'useToContain', column: 27, line: 1 }],
+    },
+    {
+      code: 'expect<boolean>(a.includes(b)).toBe(true);',
+      output: 'expect(a).toContain(b);',
+      errors: [{ messageId: 'useToContain', column: 38, line: 1 }],
+    },
+    {
+      code: 'expect.soft<boolean>(a.includes(b)).toBe<boolean>(true);',
+      output: 'expect.soft(a).toContain(b);',
+      errors: [{ messageId: 'useToContain', column: 43, line: 1 }],
+    },
+    {
+      code: 'expect<boolean>(a.includes(b)).ordered.toBe(true);',
+      output: 'expect(a).ordered.toContain(b);',
+      errors: [{ messageId: 'useToContain' }],
     },
     {
       code: 'expect(a.includes(b)).toStrictEqual(true);',

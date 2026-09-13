@@ -6,7 +6,7 @@ This rule requires `toContain()` when an equality assertion checks the boolean r
 
 The rule recognizes `toBe()`, `toEqual()` and `toStrictEqual()`, including negated forms, and preserves the assertion's meaning when deciding whether the replacement needs `.not`. It recognizes Rstest globals, imports and aliases, namespace and `require` bindings, `rstack/test`, `import.meta.rstest`, `expect.soft()`, Playwright's ordinary value assertions, and the `expect` supplied by a [test context](https://rstest.rs/api/runtime-api/test-api/test#testcontext).
 
-Polling assertions, promise modifiers, browser-only `expect.element()` assertions, Chai-style assertions, dynamic accessors and explicit `NaN` items are left unchanged. A regular-expression item is also excluded unless the receiver is visibly an array literal. This avoids suggesting a non-equivalent matcher for a possibly string-valued receiver because native string `includes()` rejects regular expressions. Rstest's array `toContain()` also does not match `Array.prototype.includes()` for `NaN`.
+Polling assertions, promise modifiers, browser-only `expect.element()` assertions, Chai-style equality assertions with `.deep`, assertion chains that continue after the equality matcher, dynamic accessors and explicit `NaN` items are left unchanged. A regular-expression item is also excluded unless the receiver is visibly an array literal. This avoids suggesting a non-equivalent matcher for a possibly string-valued receiver because native string `includes()` rejects regular expressions. Rstest's array `toContain()` also does not match `Array.prototype.includes()` for `NaN`.
 
 ## Incorrect
 
@@ -26,4 +26,4 @@ expect(tags).not.toContain('deprecated');
 
 ## Autofix
 
-The autofix moves the `includes()` receiver and item into `expect(receiver).toContain(item)`, removes equality-matcher type arguments, then adds or removes `.not` to preserve the boolean assertion. Quoted and template-literal matcher accessors retain their delimiters. If the moved item may have side effects, `expect()` has a custom message argument, or an edited expression contains a comment, the rule reports the assertion without a fix.
+The autofix moves the `includes()` receiver and item into `expect(receiver).toContain(item)`, removes explicit type arguments from the `expect()` factory and equality matcher, then adds or removes `.not` to preserve the boolean assertion. Quoted and template-literal matcher accessors retain their delimiters. If the moved item may have side effects, `expect()` has a custom message argument, or an edited expression or removed type argument list contains a comment, the rule reports the assertion without a fix.

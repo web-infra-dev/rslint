@@ -115,6 +115,24 @@ func isSafePropertyName(node *ast.Node) bool {
 	return node != nil && node.Kind != ast.KindComputedPropertyName
 }
 
+func hasContainmentChangingChaiFlag(parsed *rstestUtils.ParsedRstestExpectCall) bool {
+	for _, entry := range parsed.MemberEntries {
+		if entry.Node == parsed.MatcherEntry.Node {
+			return false
+		}
+		if entry.Name == "deep" {
+			return true
+		}
+	}
+	return false
+}
+
+func endsAtOnlyMatcher(parsed *rstestUtils.ParsedRstestExpectCall) bool {
+	return len(parsed.Matchers) == 1 &&
+		len(parsed.MemberEntries) > 0 &&
+		parsed.MemberEntries[len(parsed.MemberEntries)-1].Node == parsed.MatcherEntry.Node
+}
+
 var PreferToContainRule = shared.NewRule(shared.Config{
 	Name: "rstest/prefer-to-contain",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
@@ -126,9 +144,10 @@ var PreferToContainRule = shared.NewRule(shared.Config{
 				parsed.Head == nil ||
 				(parsed.Entry != rstestUtils.RstestExpectEntryCall && parsed.Entry != rstestUtils.RstestExpectEntrySoft) ||
 				parsed.MatcherEntry == nil ||
-				len(parsed.Matchers) == 0 ||
+				!endsAtOnlyMatcher(parsed) ||
 				parsed.Matchers[0].Kind != rstestUtils.RstestExpectMatcherCall ||
-				testFramework.IsComputedIdentifierAccessor(parsed.MatcherEntry.Node) {
+				testFramework.IsComputedIdentifierAccessor(parsed.MatcherEntry.Node) ||
+				hasContainmentChangingChaiFlag(parsed) {
 				return nil
 			}
 
@@ -162,11 +181,13 @@ var PreferToContainRule = shared.NewRule(shared.Config{
 		if len(fixes) == 0 {
 			return nil
 		}
-		if typeArguments, ok := testFramework.CallTypeArgumentListRange(ctx.SourceFile, matched.Expect.MatcherCall); ok {
-			if utils.HasCommentInSpan(ctx.Comments.All(), typeArguments.Pos(), typeArguments.End()) {
-				return nil
+		for _, call := range []*ast.Node{matched.Expect.HeadCall, matched.Expect.MatcherCall} {
+			if typeArguments, ok := testFramework.CallTypeArgumentListRange(ctx.SourceFile, call); ok {
+				if utils.HasCommentInSpan(ctx.Comments.All(), typeArguments.Pos(), typeArguments.End()) {
+					return nil
+				}
+				fixes = append(fixes, rule.RuleFixRemoveRange(typeArguments))
 			}
-			fixes = append(fixes, rule.RuleFixRemoveRange(typeArguments))
 		}
 		return fixes
 	},

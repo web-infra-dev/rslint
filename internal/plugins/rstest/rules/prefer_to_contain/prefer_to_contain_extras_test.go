@@ -67,6 +67,16 @@ func TestPreferToContainExtras(t *testing.T) {
 			{Code: `expect(list.includes(item)).to.equal(true);`},
 			{Code: `(expect(list.includes(item)) as any).toBe(true);`},
 			{Code: `expect(list.includes(item))!.toBe(true);`},
+			// Chai's deep flag changes toContain from identity to deep equality,
+			// so recommending the matcher would not preserve the assertion.
+			{Code: `expect([{ a: 1 }].includes({ a: 1 })).deep.toBe(false);`},
+			{Code: `expect([{ a: 1 }].includes({ a: 1 })).not["deep"].toBe(true);`},
+			// Replacing the assertion subject would also change every matcher or
+			// unknown member after the equality matcher.
+			{Code: `expect(list.includes(item)).toBe(true).toBe(true);`},
+			{Code: `expect(list.includes(item)).toBe(true).to.be.ok;`},
+			{Code: `expect(list.includes(item)).toBe(true).then(done);`},
+			{Code: `expect(list.includes(item)).toBe(true).result;`},
 			// N/A: declarations, functions, class members, object keys and binding
 			// patterns are not nodes inspected by this assertion-call rule.
 		},
@@ -97,6 +107,29 @@ func TestPreferToContainExtras(t *testing.T) {
 				Code:   `expect(list.includes(item)).toEqual<boolean>(true);`,
 				Output: []string{`expect(list).toContain(item);`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 29}},
+			},
+			{
+				Code:   `expect<boolean>(list.includes(item)).toBe(true);`,
+				Output: []string{`expect(list).toContain(item);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 38}},
+			},
+			{
+				Code:   `expect.soft<boolean>(list.includes(item)).toBe<boolean>(true);`,
+				Output: []string{`expect.soft(list).toContain(item);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 43}},
+			},
+			{
+				Code:   `expect<boolean>(list.includes(item)).ordered.toBe(true);`,
+				Output: []string{`expect(list).ordered.toContain(item);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
+			},
+			{
+				Code:   `expect</* keep */ boolean>(list.includes(item)).toBe(true);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 49}},
+			},
+			{
+				Code:   `expect<boolean>(list.includes(item)).toBe</* keep */ boolean>(true);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain"}},
 			},
 			{
 				Code:   `expect(list.includes(item)).toEqual</* keep */ boolean>(true);`,
@@ -252,12 +285,6 @@ expect(list).toContain(item);`},
 				Code:   `expect(list.includes(item,),).toBe(false,);`,
 				Output: []string{`expect(list,).not.toContain(item,);`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 31}},
-			},
-			// A trailing call reaches the matcher through two call nodes but reports once.
-			{
-				Code:   `expect(list.includes(item)).toBe(true).then(done);`,
-				Output: []string{`expect(list).toContain(item).then(done);`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useToContain", Line: 1, Column: 29}},
 			},
 		},
 	)
