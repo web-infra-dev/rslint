@@ -2,7 +2,6 @@ package jsx_curly_newline
 
 import (
 	_ "embed"
-	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -45,11 +44,8 @@ func parseOptions(raw []any) options {
 	return result
 }
 
-func requiresNewlines(option options, expression *ast.Node, lineMap []core.TextPos, hasLeftNewline bool) bool {
-	multiline := false
-	if expression != nil {
-		multiline = expression.Pos() != expression.End() && scanner.ComputeLineOfPosition(lineMap, expression.Pos()) != scanner.ComputeLineOfPosition(lineMap, expression.End())
-	}
+func requiresNewlines(option options, start, end int, lineMap []core.TextPos, hasLeftNewline bool) bool {
+	multiline := start != end && scanner.ComputeLineOfPosition(lineMap, start) != scanner.ComputeLineOfPosition(lineMap, end)
 	mode := option.singleline
 	if multiline {
 		mode = option.multiline
@@ -74,6 +70,7 @@ var JsxCurlyNewlineRule = rule.Rule{
 		option := parseOptions(rawOptions)
 		text := ctx.SourceFile.Text()
 		lineMap := ctx.SourceFile.ECMALineMap()
+		comments := ctx.Comments.All()
 
 		return rule.RuleListeners{
 			ast.KindJsxExpression: func(node *ast.Node) {
@@ -88,15 +85,16 @@ var JsxCurlyNewlineRule = rule.Rule{
 				}
 
 				innerLow, innerHigh := openPos+1, closePos
-				firstToken := ecmascript.SkipLeadingWhitespace(text, innerLow, innerHigh)
-				lastTokenEnd := ecmascript.SkipTrailingWhitespace(text, innerLow, innerHigh)
-				// The upstream token APIs skip comments. scan to the first/last
-				// non-comment token so comments participate in newline detection.
-				firstCode := skipLeadingComments(text, firstToken, innerHigh)
-				lastCodeEnd := skipTrailingComments(text, lastTokenEnd, innerLow)
+				// ESLint's token APIs exclude comments. Use the parser-backed comment
+				// ranges rather than scanning text, which would mistake comment-like
+				// content in strings, regexps, and templates for trivia.
+				firstCode := skipLeadingComments(text, innerLow, innerHigh, comments)
+				lastCodeEnd := skipTrailingComments(text, innerLow, innerHigh, comments)
 				hasLeftNewline := ecmascript.ContainsLineTerminator(text, innerLow, firstCode)
 				hasRightNewline := ecmascript.ContainsLineTerminator(text, lastCodeEnd, innerHigh)
-				needsNewlines := requiresNewlines(option, expression.Expression, lineMap, hasLeftNewline)
+				// ESTree expression ranges exclude brace-adjacent trivia and tsgo-only
+				// wrapper spans. Empty JSX expressions use their authored interior.
+				needsNewlines := requiresNewlines(option, firstCode, lastCodeEnd, lineMap, hasLeftNewline)
 
 				report := func(position int, id, description string, fix *rule.RuleFix) {
 					range_ := core.NewTextRange(position, position+1)
@@ -136,51 +134,31 @@ var JsxCurlyNewlineRule = rule.Rule{
 	},
 }
 
-func skipLeadingComments(text string, position, end int) int {
-	for position+1 < end && text[position] == '/' {
-		switch text[position+1] {
-		case '*':
-			position += 2
-			for position+1 < end && (text[position] != '*' || text[position+1] != '/') {
-				position++
-			}
-			if position+1 >= end {
-				return end
-			}
-			position += 2
-		case '/':
-			position += 2
-			for position < end && text[position] != '\n' && text[position] != '\r' {
-				position++
-			}
-		default:
-			return position
-		}
-		position = ecmascript.SkipLeadingWhitespace(text, position, end)
-	}
-	return position
-}
-
-func skipTrailingComments(text string, position, start int) int {
-	for position > start {
-		lineStart := strings.LastIndexByte(text[start:position], '\n') + start + 1
-		if comment := strings.LastIndex(text[lineStart:position], "//"); comment >= 0 {
-			position = lineStart + comment
-			position = ecmascript.SkipTrailingWhitespace(text, start, position)
+func skipLeadingComments(text string, start, end int, comments []*ast.CommentRange) int {
+	position := start
+	for _, comment := range comments {
+		if comment.Pos() < position {
 			continue
 		}
-		if position-2 < start || text[position-2] != '*' || text[position-1] != '/' {
+		if comment.End() > end || !ecmascript.IsBlank(text[position:comment.Pos()]) {
 			break
 		}
-		position -= 2
-		for position-2 >= start && (text[position-2] != '/' || text[position-1] != '*') {
-			position--
-		}
-		if position-2 < start {
-			return start
-		}
-		position -= 2
-		position = ecmascript.SkipTrailingWhitespace(text, start, position)
+		position = comment.End()
 	}
-	return position
+	return ecmascript.SkipLeadingWhitespace(text, position, end)
+}
+
+func skipTrailingComments(text string, start, end int, comments []*ast.CommentRange) int {
+	position := end
+	for index := len(comments) - 1; index >= 0; index-- {
+		comment := comments[index]
+		if comment.End() > position {
+			continue
+		}
+		if comment.Pos() < start || !ecmascript.IsBlank(text[comment.End():position]) {
+			break
+		}
+		position = comment.Pos()
+	}
+	return ecmascript.SkipTrailingWhitespace(text, start, position)
 }
