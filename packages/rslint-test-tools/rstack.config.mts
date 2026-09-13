@@ -203,6 +203,7 @@ define.test({
     './tests/eslint-plugin-react/rules/forward-ref-uses-ref.test.ts',
     './tests/eslint-plugin-react/rules/function-component-definition.test.ts',
     './tests/eslint-plugin-react/rules/hook-use-state.test.ts',
+    './tests/eslint-plugin-react/rules/iframe-missing-sandbox.test.ts',
     './tests/eslint-plugin-react/rules/jsx-child-element-spacing.test.ts',
     './tests/eslint-plugin-react/rules/no-adjacent-inline-elements.test.ts',
     './tests/eslint-plugin-react/rules/self-closing-comp.test.ts',

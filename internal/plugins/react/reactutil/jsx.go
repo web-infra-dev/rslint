@@ -1,6 +1,34 @@
 package reactutil
 
-import "github.com/microsoft/TypeScript/tsc/shim/ast"
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+)
+
+// GetJsxStringLiteralValue returns a direct JSX attribute string literal as
+// an ESTree parser exposes it. JSX parsers decode HTML character references in
+// direct attributes, but tsgo retains them in StringLiteral.Text; reading the
+// raw token restores the ESTree value. Expressions inside `{...}` must not use
+// this helper because they are JavaScript strings, not JSX text.
+//
+// When sourceFile is unavailable, the tsgo string text is returned as a safe
+// fallback. The bool is false for every non-StringLiteral input.
+func GetJsxStringLiteralValue(sourceFile *ast.SourceFile, value *ast.Node) (string, bool) {
+	if value == nil || value.Kind != ast.KindStringLiteral {
+		return "", false
+	}
+	text := value.AsStringLiteral().Text
+	if sourceFile == nil {
+		return text, true
+	}
+	rawRange := utils.TrimNodeTextRange(sourceFile, value)
+	raw := sourceFile.Text()[rawRange.Pos():rawRange.End()]
+	if len(raw) >= 2 && ((raw[0] == '"' && raw[len(raw)-1] == '"') || (raw[0] == '\'' && raw[len(raw)-1] == '\'')) {
+		return ecmascript.DecodeJSXEntities(raw[1 : len(raw)-1]), true
+	}
+	return text, true
+}
 
 // GetJsxTagBaseIdentifier returns the leftmost Identifier of a JSX tag-name
 // node — i.e. the symbol a rule must resolve to classify the tag. Pass the
