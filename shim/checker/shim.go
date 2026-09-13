@@ -139,6 +139,8 @@ func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName
 func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 //go:linkname Checker_isTypeStrictSubtypeOf github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeStrictSubtypeOf
 func Checker_isTypeStrictSubtypeOf(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
+//go:linkname Checker_getMinArgumentCount github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getMinArgumentCount
+func Checker_getMinArgumentCount(recv *checker.Checker, signature *checker.Signature) int
 type extra_Checker struct {
   id uint32
   program checker.Program

@@ -32,7 +32,7 @@ var ValidExpectWithPromiseRule = rule.Rule{
 				(checkThenables && isStrictThenable(ctx.TypeChecker, node, typ))
 		}
 		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) {
-			parsed := analysis.ParseExpectCall(node)
+			parsed := analysis.ParseExpectCallThroughTypeAssertions(node)
 			if parsed == nil || parsed.Reason != rstestUtils.RstestExpectParseReasonNone ||
 				(parsed.Entry != rstestUtils.RstestExpectEntryCall && parsed.Entry != rstestUtils.RstestExpectEntrySoft) {
 				return
@@ -44,6 +44,13 @@ var ValidExpectWithPromiseRule = rule.Rule{
 			subject := arguments[0]
 			modifier := parsed.PromiseModifierEntry()
 			typ := ctx.TypeChecker.GetTypeAtLocation(subject)
+			if modifier != nil {
+				var known bool
+				typ, known = promiseSubjectTypeAtModifier(ctx.TypeChecker, parsed, modifier, typ)
+				if !known {
+					return
+				}
+			}
 			promise := false
 			if modifier != nil && modifier.Name == "rejects" {
 				// Rstest invokes callable subjects before testing their returned value.
@@ -52,7 +59,8 @@ var ValidExpectWithPromiseRule = rule.Rule{
 					if len(signatures) == 0 {
 						return isPromise(subject, part)
 					}
-					return isPromise(subject, callableReturnType(ctx.TypeChecker, subject, part))
+					returned, ok := callableReturnType(ctx.TypeChecker, subject, part)
+					return ok && isPromise(subject, returned)
 				})
 			} else {
 				promise = isPromise(subject, typ)
@@ -66,7 +74,53 @@ var ValidExpectWithPromiseRule = rule.Rule{
 	},
 }
 
-func callableReturnType(typeChecker *checker.Checker, subject *ast.Node, typ *checker.Type) *checker.Type {
+func promiseSubjectTypeAtModifier(
+	typeChecker *checker.Checker,
+	parsed *rstestUtils.ParsedRstestExpectCall,
+	modifier *rstestUtils.ParsedRstestFnMemberEntry,
+	typ *checker.Type,
+) (*checker.Type, bool) {
+	nested := false
+	for i := range parsed.MemberEntries {
+		entry := &parsed.MemberEntries[i]
+		if entry.Node == modifier.Node {
+			return typ, true
+		}
+		switch entry.Name {
+		case "nested":
+			if rstestUtils.MatcherCall(entry) == nil {
+				nested = true
+			}
+		case "property", "ownProperty", "haveOwnProperty":
+			call := rstestUtils.MatcherCall(entry)
+			if call == nil || nested || len(call.AsCallExpression().Arguments.Nodes) == 0 {
+				return nil, false
+			}
+			name, ok := utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(call.AsCallExpression().Arguments.Nodes[0]))
+			if !ok {
+				return nil, false
+			}
+			typ = typeChecker.GetTypeOfPropertyOfType(typ, name)
+			if typ == nil {
+				return nil, false
+			}
+		case "ownPropertyDescriptor", "haveOwnPropertyDescriptor",
+			"throw", "throws", "Throw", "toThrow", "toThrowError", "toContain":
+			if rstestUtils.MatcherCall(entry) != nil {
+				return nil, false
+			}
+		}
+	}
+	return nil, false
+}
+
+func callableReturnType(typeChecker *checker.Checker, subject *ast.Node, typ *checker.Type) (*checker.Type, bool) {
+	signatures := checker.Checker_getSignaturesOfType(typeChecker, typ, checker.SignatureKindCall)
+	if !slices.ContainsFunc(signatures, func(signature *checker.Signature) bool {
+		return checker.Checker_getMinArgumentCount(typeChecker, signature) == 0
+	}) {
+		return nil, false
+	}
 	factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 	expression := factory.NewSyntheticExpression(typ, false, nil)
 	expression.Loc = subject.Loc
@@ -79,7 +133,10 @@ func callableReturnType(typeChecker *checker.Checker, subject *ast.Node, typ *ch
 	// Candidate collection suppresses diagnostics for the synthetic zero-argument call.
 	var candidates []*checker.Signature
 	signature := checker.Checker_getResolvedSignature(typeChecker, call, &candidates, checker.CheckModeNormal)
-	return checker.Checker_getReturnTypeOfSignature(typeChecker, signature)
+	if signature == nil || signature.Flags()&checker.SignatureFlagsIsSignatureCandidateForOverloadFailure != 0 {
+		return nil, false
+	}
+	return checker.Checker_getReturnTypeOfSignature(typeChecker, signature), true
 }
 
 // A single-callback chainable is deliberately excluded, unlike utils.IsThenableType.

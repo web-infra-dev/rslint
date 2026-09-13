@@ -255,11 +255,29 @@ func parseRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
 ) *ParsedRstestExpectCall {
-	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
+	return parseRstestExpectCallOptions(node, analysis, false)
+}
+
+func parseRstestExpectCallWithTypeAssertions(
+	node *ast.Node,
+	analysis *RstestCallAnalysis,
+) *ParsedRstestExpectCall {
+	return parseRstestExpectCallOptions(node, analysis, true)
+}
+
+func parseRstestExpectCallOptions(
+	node *ast.Node,
+	analysis *RstestCallAnalysis,
+	throughTypeAssertions bool,
+) *ParsedRstestExpectCall {
+	if node == nil || node.Kind != ast.KindCallExpression || findTopMostCallExpression(node, throughTypeAssertions) != node {
 		return nil
 	}
-	expression := findTopMostRstestExpectExpression(node)
+	expression := findTopMostRstestExpectExpressionOptions(node, throughTypeAssertions)
 	entries := testFramework.GetMemberEntries(expression)
+	if throughTypeAssertions {
+		entries = testFramework.GetMemberEntriesThroughTypeAssertions(expression)
+	}
 	match := rstestExpectMemberMatch(node, entries, analysis)
 	if !match.ok {
 		return nil
@@ -306,11 +324,19 @@ func ShouldRstestExpectBeAwaited(parsed *ParsedRstestExpectCall, asyncMatchers [
 // head of. Ascending only continues while node stays on the callee side of its
 // parent: a call in argument or computed-key position heads its own chain.
 func FindTopMostCallExpression(node *ast.Node) *ast.Node {
+	return findTopMostCallExpression(node, false)
+}
+
+func findTopMostCallExpression(node *ast.Node, throughTypeAssertions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression:
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+			if !throughTypeAssertions || parent.Expression() != current {
+				return top
+			}
 		case ast.KindCallExpression:
 			if parent.AsCallExpression().Expression != current {
 				return top
@@ -337,11 +363,19 @@ func FindTopMostCallExpression(node *ast.Node) *ast.Node {
 // property-style Chai assertions such as expect(value).to.be.ok without
 // requiring rules to listen for member-access nodes.
 func findTopMostRstestExpectExpression(node *ast.Node) *ast.Node {
+	return findTopMostRstestExpectExpressionOptions(node, false)
+}
+
+func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTypeAssertions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression:
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+			if !throughTypeAssertions || parent.Expression() != current {
+				return top
+			}
 		case ast.KindPropertyAccessExpression:
 			if parent.AsPropertyAccessExpression().Expression != current {
 				return top
