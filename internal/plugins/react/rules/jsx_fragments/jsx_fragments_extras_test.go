@@ -41,6 +41,22 @@ func TestJsxFragmentsExtras(t *testing.T) {
 			Code: "function f(){const F=Act.Frag;} const F=Widget; <F/>;",
 			Tsx:  true, Settings: settings,
 		},
+		{
+			Code: "const F=Act.Frag; for (const F of widgets) { <F/>; }",
+			Tsx:  true, Settings: settings,
+		},
+		{
+			Code: "const F=Act.Frag; try {} catch (F) { <F/>; }",
+			Tsx:  true, Settings: settings,
+		},
+		{
+			Code: "function render(){ function F(){} var F=Act.Frag; return <F/>; }",
+			Tsx:  true, Settings: settings,
+		},
+		{
+			Code: "function render(){ var F=Widget; var F=Act.Frag; return <F/>; }",
+			Tsx:  true, Settings: settings,
+		},
 
 		// ---- Dimension 4: TS-only expression wrappers stay opaque ----
 		{Code: "const Frag = Other.Frag as any;\n<Frag><Foo /></Frag>;", Tsx: true, Settings: settings},
@@ -66,6 +82,26 @@ func TestJsxFragmentsExtras(t *testing.T) {
 		// N/A: Function/class container forms are not target nodes for this rule.
 		// N/A: Autofix side-effect suppression is not needed; fixes only replace tag tokens.
 	}, []rule_tester.InvalidTestCase{
+		// ---- Definition order: eslint-plugin-react reads variable.defs[0] ----
+		{
+			Code:     "function render(){ var F=Act.Frag; function F(){} return <F/>; }",
+			Output:   []string{"function render(){ var F=Act.Frag; function F(){} return <></>; }"},
+			Tsx:      true,
+			Settings: settings,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferFragment", Line: 1, Column: 58},
+			},
+		},
+		{
+			Code:     "function render(){ var F=Act.Frag; var F=Widget; return <F/>; }",
+			Output:   []string{"function render(){ var F=Act.Frag; var F=Widget; return <></>; }"},
+			Tsx:      true,
+			Settings: settings,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferFragment", Line: 1, Column: 57},
+			},
+		},
+
 		// ---- File pragma: @jsx overrides settings pragma in syntax mode ----
 		{
 			Code:     `/** @jsx Preact.h */ <Preact.Frag/>`,

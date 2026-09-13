@@ -151,18 +151,18 @@ func fixesToShort(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
 }
 
 type fragmentMatcher struct {
-	ctx            rule.RuleContext
 	reactPragma    string
 	fragmentPragma string
 	fragmentNames  map[string]bool
+	definitions    *reactutil.VariableDefinitionLookup
 }
 
-func newFragmentMatcher(ctx rule.RuleContext, reactPragma, fragmentPragma string) fragmentMatcher {
-	m := fragmentMatcher{
-		ctx:            ctx,
+func newFragmentMatcher(ctx rule.RuleContext, reactPragma, fragmentPragma string) *fragmentMatcher {
+	m := &fragmentMatcher{
 		reactPragma:    reactPragma,
 		fragmentPragma: fragmentPragma,
 		fragmentNames:  map[string]bool{reactPragma + "." + fragmentPragma: true},
+		definitions:    reactutil.NewVariableDefinitionLookup(ctx),
 	}
 	// Mirrors upstream's file-level `fragmentNames` set. It deliberately
 	// tracks import aliases by text and not by scope, so a later shadowing
@@ -173,7 +173,7 @@ func newFragmentMatcher(ctx rule.RuleContext, reactPragma, fragmentPragma string
 	return m
 }
 
-func (m fragmentMatcher) isReactFragment(opening *ast.Node) bool {
+func (m *fragmentMatcher) isReactFragment(opening *ast.Node) bool {
 	elementName := reactutil.GetJsxElementTypeString(opening)
 	if m.fragmentNames[elementName] {
 		return true
@@ -188,7 +188,7 @@ func (m fragmentMatcher) isReactFragment(opening *ast.Node) bool {
 	return m.refersToReactFragment(tagName)
 }
 
-func (m fragmentMatcher) collectImportFragmentNames(root *ast.Node) {
+func (m *fragmentMatcher) collectImportFragmentNames(root *ast.Node) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
 		if node == nil {
@@ -205,7 +205,7 @@ func (m fragmentMatcher) collectImportFragmentNames(root *ast.Node) {
 	visit(root)
 }
 
-func (m fragmentMatcher) collectImportDeclaration(node *ast.Node) {
+func (m *fragmentMatcher) collectImportDeclaration(node *ast.Node) {
 	decl := node.AsImportDeclaration()
 	if decl.ModuleSpecifier == nil ||
 		decl.ModuleSpecifier.Kind != ast.KindStringLiteral ||
@@ -237,28 +237,21 @@ func (m fragmentMatcher) collectImportDeclaration(node *ast.Node) {
 	}
 }
 
-func (m fragmentMatcher) refersToReactFragment(ident *ast.Node) bool {
+func (m *fragmentMatcher) refersToReactFragment(ident *ast.Node) bool {
 	if ident == nil {
 		return false
 	}
-	decl := declarationForIdentifier(m.ctx.Refs.Resolve(ident))
-	return decl != nil && m.declarationRefersToReactFragment(decl)
+	definition := m.definitions.First(ident, ident.Text())
+	if definition == nil {
+		return false
+	}
+	return m.declarationRefersToReactFragment(definition)
 }
 
-func declarationForIdentifier(symbol *ast.Symbol) *ast.Node {
-	if symbol == nil {
-		return nil
+func (m *fragmentMatcher) declarationRefersToReactFragment(decl *ast.Node) bool {
+	if decl == nil {
+		return false
 	}
-	if symbol.ValueDeclaration != nil {
-		return symbol.ValueDeclaration
-	}
-	if len(symbol.Declarations) > 0 {
-		return symbol.Declarations[0]
-	}
-	return nil
-}
-
-func (m fragmentMatcher) declarationRefersToReactFragment(decl *ast.Node) bool {
 	switch decl.Kind {
 	case ast.KindVariableDeclaration:
 		return m.initializerRefersToReactFragment(decl.AsVariableDeclaration().Initializer)
@@ -273,7 +266,10 @@ func (m fragmentMatcher) declarationRefersToReactFragment(decl *ast.Node) bool {
 	}
 }
 
-func (m fragmentMatcher) initializerRefersToReactFragment(init *ast.Node) bool {
+func (m *fragmentMatcher) initializerRefersToReactFragment(init *ast.Node) bool {
+	if init == nil {
+		return false
+	}
 	init = ast.SkipParentheses(init)
 	if init == nil {
 		return false
@@ -308,6 +304,9 @@ func (m fragmentMatcher) initializerRefersToReactFragment(init *ast.Node) bool {
 }
 
 func isRequireReactCall(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
 	node = ast.SkipParentheses(node)
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
