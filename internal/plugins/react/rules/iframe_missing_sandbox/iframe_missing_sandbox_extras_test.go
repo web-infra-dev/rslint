@@ -18,6 +18,12 @@ func TestIframeMissingSandboxExtras(t *testing.T) {
 		// Upstream validates only direct Literal values; expressions remain dynamic.
 		{Code: `<iframe sandbox={"__unknown__"} />`, Tsx: true},
 		{Code: `React.createElement("iframe", {sandbox: value})`, Tsx: true},
+		// Property forms without a literal value are dynamic, but still count as
+		// defining sandbox. They must not be unwrapped as nil values.
+		{Code: `React.createElement("iframe", {sandbox})`, Tsx: true},
+		{Code: `React.createElement("iframe", {sandbox() {}})`, Tsx: true},
+		{Code: `React.createElement("iframe", {get sandbox() {}})`, Tsx: true},
+		{Code: `React.createElement("iframe", {set sandbox(value) {}})`, Tsx: true},
 		// The first matching property wins, matching Array.prototype.find upstream.
 		{Code: `React.createElement("iframe", {sandbox: "allow-forms", sandbox: "__unknown__"})`, Tsx: true},
 		// A destructured React factory is supported by upstream's isCreateElement.

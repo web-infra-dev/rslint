@@ -166,6 +166,9 @@ var IframeMissingSandboxRule = rule.Rule{
 								continue
 							}
 							found = true
+							if value == nil {
+								break
+							}
 							value = ast.SkipParentheses(value)
 							if value != nil && value.Kind == ast.KindStringLiteral {
 								text := value.AsStringLiteral().Text
