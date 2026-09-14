@@ -2,6 +2,7 @@ package jsx_curly_newline
 
 import (
 	_ "embed"
+	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -93,8 +94,15 @@ var JsxCurlyNewlineRule = rule.Rule{
 				hasLeftNewline := ecmascript.ContainsLineTerminator(text, innerLow, firstCode)
 				hasRightNewline := ecmascript.ContainsLineTerminator(text, lastCodeEnd, innerHigh)
 				// ESTree expression ranges exclude brace-adjacent trivia and tsgo-only
-				// wrapper spans. Empty JSX expressions use their authored interior.
-				needsNewlines := requiresNewlines(option, firstCode, lastCodeEnd, lineMap, hasLeftNewline)
+				// ParenthesizedExpression wrappers. Empty JSX expressions use their
+				// authored interior.
+				spanStart, spanEnd := firstCode, lastCodeEnd
+				if expression.Expression != nil {
+					estreeExpression := ast.SkipParentheses(expression.Expression)
+					estreeRange := utils.TrimNodeTextRange(ctx.SourceFile, estreeExpression)
+					spanStart, spanEnd = estreeRange.Pos(), estreeRange.End()
+				}
+				needsNewlines := requiresNewlines(option, spanStart, spanEnd, lineMap, hasLeftNewline)
 
 				report := func(position int, id, description string, fix *rule.RuleFix) {
 					range_ := core.NewTextRange(position, position+1)
@@ -136,10 +144,11 @@ var JsxCurlyNewlineRule = rule.Rule{
 
 func skipLeadingComments(text string, start, end int, comments []*ast.CommentRange) int {
 	position := start
-	for _, comment := range comments {
-		if comment.Pos() < position {
-			continue
-		}
+	index := sort.Search(len(comments), func(index int) bool {
+		return comments[index].Pos() >= position
+	})
+	for ; index < len(comments); index++ {
+		comment := comments[index]
 		if comment.End() > end || !ecmascript.IsBlank(text[position:comment.Pos()]) {
 			break
 		}
@@ -150,11 +159,11 @@ func skipLeadingComments(text string, start, end int, comments []*ast.CommentRan
 
 func skipTrailingComments(text string, start, end int, comments []*ast.CommentRange) int {
 	position := end
-	for index := len(comments) - 1; index >= 0; index-- {
+	index := sort.Search(len(comments), func(index int) bool {
+		return comments[index].End() > position
+	}) - 1
+	for ; index >= 0; index-- {
 		comment := comments[index]
-		if comment.End() > position {
-			continue
-		}
 		if comment.Pos() < start || !ecmascript.IsBlank(text[comment.End():position]) {
 			break
 		}

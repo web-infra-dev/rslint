@@ -44,6 +44,13 @@ func TestJsxCurlyNewlineExtras(t *testing.T) {
 		{Code: "<App>{\n(value)}</App>", Tsx: true, Options: []any{map[string]any{"singleline": "forbid", "multiline": "require"}}, Output: []string{"<App>{(value)}</App>"}, Errors: []rule_tester.InvalidTestCaseError{
 			errorAt("unexpectedAfter", "Unexpected newline after '{'.", 1, 6),
 		}},
+		// ParenthesizedExpression is transparent in ESTree, so newlines inside
+		// the parentheses do not make the expression multiline.
+		{Code: "<App>{(\nvalue\n)}</App>", Tsx: true, Options: []any{map[string]any{"singleline": "require", "multiline": "consistent"}}, Output: []string{"<App>{\n(\nvalue\n)\n}</App>"}, Errors: []rule_tester.InvalidTestCaseError{
+			errorAt("expectedAfter", "Expected newline after '{'.", 1, 6),
+			errorAt("expectedBefore", "Expected newline before '}'.", 3, 2),
+		}},
+		{Code: "<App>{(\nvalue\n)}</App>", Tsx: true, Options: []any{map[string]any{"singleline": "consistent", "multiline": "require"}}},
 		{Code: "<App>{\nvalue as string}</App>", Tsx: true, Options: []any{map[string]any{"singleline": "forbid", "multiline": "require"}}, Output: []string{"<App>{value as string}</App>"}, Errors: []rule_tester.InvalidTestCaseError{
 			errorAt("unexpectedAfter", "Unexpected newline after '{'.", 1, 6),
 		}},
