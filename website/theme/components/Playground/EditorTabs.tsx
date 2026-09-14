@@ -62,6 +62,9 @@ window.MonacoEnvironment = {
 
 export type EditorTabType = 'code' | 'rslint' | 'tsconfig';
 
+const sourceFileTriggerClassName =
+  'h-8 px-3 py-0 font-medium leading-none';
+
 export interface EditorTabsRef {
   getValue: () => string | undefined;
   getCodeValue: () => string | undefined;
@@ -531,11 +534,16 @@ export const EditorTabs = ({
             <SelectTrigger
               size="sm"
               aria-label="Select source file type"
-              className={
+              iconClassName={
                 activeTab === 'code'
-                  ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 [&_svg]:text-primary-foreground'
-                  : undefined
+                  ? 'translate-y-px text-primary-foreground/60'
+                  : 'translate-y-px text-foreground'
               }
+              className={`${sourceFileTriggerClassName} ${
+                activeTab === 'code'
+                  ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
+                  : ''
+              }`}
             >
               <SelectValue />
             </SelectTrigger>
