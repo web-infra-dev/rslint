@@ -413,7 +413,9 @@ func buildRelFix(sf *ast.SourceFile, attrs []*ast.Node, targetIdx, spreadIdx int
 		var text bytes.Buffer
 		encoder := json.NewEncoder(&text)
 		encoder.SetEscapeHTML(false)
-		_ = encoder.Encode(strings.Join(append(parts, relValue), " "))
+		if err := encoder.Encode(strings.Join(append(parts, relValue), " ")); err != nil {
+			return nil
+		}
 		fix := rule.RuleFixReplace(sf, expr, strings.TrimSuffix(text.String(), "\n"))
 		return &fix
 	}
