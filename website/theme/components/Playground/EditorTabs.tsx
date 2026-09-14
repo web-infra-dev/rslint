@@ -11,6 +11,8 @@ import * as monaco from 'monaco-editor';
 import { jsonDefaults } from 'monaco-editor/languages/features/json/register';
 import {
   javascriptDefaults,
+  typescriptDefaults,
+  JsxEmit,
   ModuleKind,
   ModuleResolutionKind,
   ScriptTarget,
@@ -64,6 +66,28 @@ export type EditorTabType = 'code' | 'rslint' | 'tsconfig';
 
 const sourceFileTriggerClassName =
   'h-8 px-3 py-0 font-medium leading-none';
+
+function configureMonacoTypeScriptDefaults() {
+  const compilerOptions = {
+    allowJs: true,
+    checkJs: true,
+    jsx: JsxEmit.Preserve,
+    module: ModuleKind.ESNext,
+    moduleResolution: ModuleResolutionKind.NodeJs,
+    target: ScriptTarget.ESNext,
+  };
+
+  javascriptDefaults.setCompilerOptions(compilerOptions);
+  typescriptDefaults.setCompilerOptions(compilerOptions);
+  javascriptDefaults.setDiagnosticsOptions({
+    noSemanticValidation: false,
+    noSyntaxValidation: false,
+  });
+  typescriptDefaults.setDiagnosticsOptions({
+    noSemanticValidation: false,
+    noSyntaxValidation: false,
+  });
+}
 
 export interface EditorTabsRef {
   getValue: () => string | undefined;
@@ -338,6 +362,8 @@ export const EditorTabs = ({
   useEffect(() => {
     if (!codeContainerRef.current) return;
 
+    configureMonacoTypeScriptDefaults();
+
     const model = monaco.editor.createModel(
       initialState.code,
       sourceFileLanguage(initialState.sourceFileName),
@@ -451,17 +477,6 @@ export const EditorTabs = ({
   useEffect(() => {
     if (!rslintContainerRef.current) return;
 
-    javascriptDefaults.setCompilerOptions({
-      allowJs: true,
-      checkJs: true,
-      module: ModuleKind.ESNext,
-      moduleResolution: ModuleResolutionKind.NodeJs,
-      target: ScriptTarget.ESNext,
-    });
-    javascriptDefaults.setDiagnosticsOptions({
-      noSemanticValidation: false,
-      noSyntaxValidation: false,
-    });
     const model = monaco.editor.createModel(
       initialState.rslintConfig,
       'javascript',
