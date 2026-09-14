@@ -5,6 +5,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -14,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/tailscale/hujson"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // ResolutionOptions selects runtime files independently of the compiler's
@@ -83,7 +86,7 @@ func ResolveModuleWithError(p *program.Program, name, containingFile string, opt
 					request: name,
 				}
 				if options.NoDirectory {
-					view.blockedDirectory = tspath.ResolvePath(base, name)
+					view.blockedDirectory = view.physical(tspath.ResolvePath(base, name))
 				}
 				resolver := view.newResolver(p.CurrentDirectory())
 				result, _ := resolver.ResolveModuleName(name, tspath.ResolvePath(base, "__import__.js"), core.ResolutionModeCommonJS, nil)
@@ -165,9 +168,15 @@ func (f *nodeResolutionFS) physical(name string) string {
 	if index := strings.LastIndex(name, "/node_modules"); index >= 0 && (len(name) == index+13 || name[index+13] == '/') {
 		rest := strings.TrimPrefix(name[index+13:], "/")
 		if tspath.IsRootedDiskPath(f.folder) {
-			return tspath.ResolvePath(f.folder, rest)
+			name = tspath.ResolvePath(f.folder, rest)
+		} else {
+			name = tspath.ResolvePath(name[:index+1], f.folder, rest)
 		}
-		return tspath.ResolvePath(name[:index+1], f.folder, rest)
+	}
+	// Node encodes filesystem paths as UTF-8, replacing each unpaired UTF-16
+	// surrogate. Keep the original JavaScript value for matching and messages.
+	if !utf8.ValidString(name) {
+		name = string(utf16.Decode(ecmascript.StringCodeUnits(name)))
 	}
 	return name
 }

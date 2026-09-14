@@ -31,6 +31,8 @@ func TestNoMissingImportExtras(t *testing.T) {
 			{Code: "import('missing' as string); import('missing'!); type T = import('missing').T; import x = require('missing');", FileName: "src/input.ts", Options: []any{}, Settings: map[string]any{}},
 			// parenthesized dynamic import and escaped resource
 			{Code: "import((('./present.js'))); import('./pr\\u0065sent.js?raw#part'); import('./present.js!loader?raw');", FileName: "src/input.js"},
+			// Node replaces unpaired surrogates only when accessing the filesystem.
+			{Code: `import './\ud800.js'; export * from './\udc00.js'; import('./\ud83d\ude00.js'); import 'unicode-target/\ud800';`, FileName: "src/input.js"},
 			// default option objects
 			{Code: "import 'pkg'; import '@scope/pkg';", FileName: "src/input.js", Options: []any{map[string]any{}}},
 			// allow package roots and virtual modules
@@ -89,6 +91,8 @@ func TestNoMissingImportExtras(t *testing.T) {
 			{Code: "import(import(\"missing\")); import((\"missing\"));", FileName: "src/input.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve 'missing' in '{{root}}/src'"), Line: 1, Column: 15, EndLine: 1, EndColumn: 24}, {MessageId: "notFound", Message: message("Can't resolve 'missing' in '{{root}}/src'"), Line: 1, Column: 36, EndLine: 1, EndColumn: 45}}},
 			// Documented difference: surrogates
 			{Code: "import(\"\\ud800\"); import(\"\\udc00\"); import(\"\\u{1f600}\");", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '\xed\xa0\x80' in '{{root}}/src'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 16}, {MessageId: "notFound", Message: message("Can't resolve '\xed\xb0\x80' in '{{root}}/src'"), Line: 1, Column: 26, EndLine: 1, EndColumn: 34}, {MessageId: "notFound", Message: message("Can't resolve '😀' in '{{root}}/src'"), Line: 1, Column: 44, EndLine: 1, EndColumn: 55}}},
+			// Normalizing a filesystem path must not enable directory fallback.
+			{Code: `import './dir-\ud800';`, FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve './dir-\xed\xa0\x80' in '{{root}}/src'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 22}}},
 			// self reference private and missing
 			{Code: "import 'self/private'; import 'self/missing';", FileName: "maps/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/maps (see exports field in {{root}}/maps/package.json)"), Line: 1, Column: 8, EndLine: 1, EndColumn: 22}, {MessageId: "notFound", Message: message("Package path ./missing is exported from package {{root}}/maps, but no valid target file was found (see exports field in {{root}}/maps/package.json)"), Line: 1, Column: 31, EndLine: 1, EndColumn: 45}}},
 			// imports #null

@@ -2,6 +2,16 @@
 {"compilerOptions":{"allowJs":true,"noEmit":true,"module":"nodenext","target":"esnext","jsx":"preserve","paths":{"@local/*":["./src/*"],"@multi/*":["./absent/*","./src/*"],"@exact":["./src/present.ts"]}},"include":["**/*"]}
 -- src/present.js --
 export const value = 1;
+-- src/�.js --
+export {};
+-- src/😀.js --
+export {};
+-- src/dir-�/index.js --
+export {};
+-- node_modules/unicode-target/package.json --
+{"exports":{"./*":"./*.js"}}
+-- node_modules/unicode-target/�.js --
+export {};
 -- src/present.ts --
 export const value = 1;
 -- src/view.tsx --

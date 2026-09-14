@@ -113,7 +113,8 @@ Both cases are reported by both linters.
 
 Module names containing an unpaired Unicode surrogate, such as
 `import('\uD800')`, may display replacement characters in rslint's message.
-Use well-formed Unicode module names for consistent resolution and diagnostics.
+File lookup replaces each unpaired surrogate with `�`, matching Node.js. For
+example, `import './\uD800.js'` resolves an existing file named `�.js`.
 
 ## References
 
