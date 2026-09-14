@@ -1,4 +1,4 @@
-# rstest/prefer-to-have-been-called
+# prefer-to-have-been-called
 
 ## Rule Details
 
