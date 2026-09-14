@@ -19,7 +19,23 @@ import {
   supportsAstInspector,
 } from './wasm';
 import { readShareState } from './share-url';
-import type { SourceFileName } from './source-file';
+import { sourceFileNeedsJsChecking, type SourceFileName } from './source-file';
+
+function compilerOptionsForSourceFile(
+  sourceFileName: SourceFileName,
+  tsConfig: any,
+) {
+  if (!sourceFileNeedsJsChecking(sourceFileName)) return tsConfig;
+
+  return {
+    ...tsConfig,
+    compilerOptions: {
+      allowJs: true,
+      checkJs: true,
+      ...(tsConfig?.compilerOptions ?? {}),
+    },
+  };
+}
 
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorTabsRef | null>(null);
@@ -108,7 +124,9 @@ const Playground: React.FC = () => {
 
       // Add tsconfig.json if we have a valid config
       if (tsConfig) {
-        fileContents['/tsconfig.json'] = JSON.stringify(tsConfig);
+        fileContents['/tsconfig.json'] = JSON.stringify(
+          compilerOptionsForSourceFile(sourceFileName, tsConfig),
+        );
       }
 
       // The JavaScript API takes the config object directly (Go no longer reads

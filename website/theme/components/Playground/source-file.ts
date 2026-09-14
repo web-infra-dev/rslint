@@ -18,3 +18,7 @@ export function sourceFileLanguage(fileName: SourceFileName) {
     ? 'javascript'
     : 'typescript';
 }
+
+export function sourceFileNeedsJsChecking(fileName: SourceFileName) {
+  return fileName.endsWith('.js') || fileName.endsWith('.jsx');
+}
