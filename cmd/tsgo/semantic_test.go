@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -61,7 +62,9 @@ func buildSemanticFixture(t *testing.T, source string) semanticFixture {
 	}
 }
 
-func snapshotSemantic(semantic Semantic, file *ast.SourceFile, fileID int) []string {
+func snapshotSemantic(semantic Semantic, file *ast.SourceFile, fileID int, program *compiler.Program) []string {
+	tc, done := program.GetTypeChecker(context.Background())
+	defer done()
 	sourceText := file.Text()
 	positionMap := file.GetPositionMap()
 	lines := []string{}
@@ -83,8 +86,17 @@ func snapshotSemantic(semantic Semantic, file *ast.SourceFile, fileID int) []str
 			if typeID, ok := semantic.Node2type[key]; ok && typeID != 0 {
 				typeInfo := semantic.Typetab[typeID]
 				name := fmt.Sprintf("type#%d", typeID)
-				if n, exists := semantic.TypeExtra.Name[int(typeID)]; exists {
-					name = string(n)
+				// Resolve display names only in the test helper; production exports IDs and flags.
+				if !ast.IsTypeDeclaration(node) {
+					ty := tc.GetTypeAtLocation(node)
+					if symbol := tc.GetSymbolAtLocation(node); symbol != nil {
+						if symbolType := tc.GetTypeOfSymbol(symbol); symbolType != nil {
+							ty = symbolType
+						}
+					}
+					if ty != nil {
+						name = tc.TypeToString(ty)
+					}
 				}
 				typeStr = fmt.Sprintf("%s(flags=%d)", name, typeInfo.Flags)
 			}
@@ -117,7 +129,7 @@ func snapshotSemantic(semantic Semantic, file *ast.SourceFile, fileID int) []str
 
 func TestSemanticSnapshot_PrimitiveTypes(t *testing.T) {
 	fixture := buildSemanticFixture(t, "let a:number = 1;\nlet b: number = 2;")
-	snapshot := strings.Join(snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID), "\n")
+	snapshot := strings.Join(snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID, fixture.program), "\n")
 
 	expected := strings.Join([]string{
 		`  KindVariableStatement [0,17] "let a:number = 1;" type=any(flags=1) sym=<none>`,
@@ -141,7 +153,7 @@ func TestSemanticSnapshot_PrimitiveTypes(t *testing.T) {
 
 func TestSemanticSnapshot_ElementAccess(t *testing.T) {
 	fixture := buildSemanticFixture(t, `const obj = {a:1}; const aa = obj["a"]`)
-	snapshot := strings.Join(snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID), "\n")
+	snapshot := strings.Join(snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID, fixture.program), "\n")
 
 	expected := strings.Join([]string{
 		`  KindVariableStatement [0,18] "const obj = {a:1};" type=any(flags=1) sym=<none>`,
@@ -266,7 +278,7 @@ func TestSemanticSnapshot_NonBMPCharPositions(t *testing.T) {
 	// After the emoji, UTF-8 and UTF-16 offsets diverge.
 	// This test verifies that semantic data uses UTF-16 positions (matching the AST encoder).
 	fixture := buildSemanticFixture(t, "let a = `💀`;\nlet b = 1;")
-	snapshot := snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID)
+	snapshot := snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID, fixture.program)
 
 	// Verify that identifier 'b' has a matching type and symbol in the snapshot.
 	// If positions were still in UTF-8, the lookup would miss 'b' due to the offset shift.
