@@ -64,8 +64,7 @@ window.MonacoEnvironment = {
 
 export type EditorTabType = 'code' | 'rslint' | 'tsconfig';
 
-const sourceFileTriggerClassName =
-  'h-8 px-3 py-0 font-medium leading-none';
+const sourceFileTriggerClassName = 'h-8 px-3 py-0 font-medium leading-none';
 
 function configureMonacoTypeScriptDefaults() {
   const compilerOptions = {
