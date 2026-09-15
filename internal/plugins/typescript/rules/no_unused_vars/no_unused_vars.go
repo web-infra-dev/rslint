@@ -1693,6 +1693,11 @@ func collectLocalExportTargets(ctx rule.RuleContext, node *ast.Node, ac *analysi
 		// latter two cover the checker-backed paths used for global, merged,
 		// and namespace declarations.
 		ac.localExportTargets[target] = true
+		// The merged and alias targets only exist with a checker. A file linted
+		// without one keeps the binder identity recorded above.
+		if ctx.TypeChecker == nil {
+			continue
+		}
 		if merged := ctx.TypeChecker.GetMergedSymbol(target); merged != nil {
 			target = merged
 			ac.localExportTargets[target] = true
@@ -1710,6 +1715,9 @@ func collectIdentifierUsage(ctx rule.RuleContext, node *ast.Node, collector *che
 	// symbol; ESLint reports an unused `a` at its declaration rather than at
 	// this property-shaped write.
 	if assignmentKind == assignmentReferenceWriteOnly {
+		if ctx.TypeChecker == nil {
+			return
+		}
 		if sym := ctx.TypeChecker.GetSymbolAtLocation(node); sym != nil {
 			collector.writeRefs[sym] = append(collector.writeRefs[sym], node)
 		}
@@ -1812,6 +1820,11 @@ func symbolForVariable(
 	rawSym *ast.Symbol,
 	globalSourceFile bool,
 ) *ast.Symbol {
+	// Without a checker there is nothing to merge or look up, and the binder
+	// symbol answers every same-file question this rule asks.
+	if ctx.TypeChecker == nil {
+		return rawSym
+	}
 	if rawSym == nil {
 		return ctx.TypeChecker.GetSymbolAtLocation(nameNode)
 	}
@@ -1908,7 +1921,7 @@ func collectCheckerReferenceInfo(
 		usages:    collector.allUsages[checkerSym],
 		writeRefs: collector.writeRefs[checkerSym],
 	}
-	if !isImportDefinition(definition) && checkerSym != nil {
+	if !isImportDefinition(definition) && checkerSym != nil && ctx.TypeChecker != nil {
 		resolved := ctx.TypeChecker.SkipAlias(checkerSym)
 		if len(info.usages) == 0 && resolved != checkerSym {
 			info.usages = collector.allUsages[resolved]
@@ -2369,9 +2382,15 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					if isInsideAmbientModuleBlock(node, ac) || isInDtsWithoutExplicitExports(node, ac) {
 						return
 					}
-					sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
-					if sym != nil {
-						resolved := ctx.TypeChecker.SkipAlias(sym)
+					// Overload signatures share one symbol, and without a checker
+					// to resolve it the declaration's binder symbol is that symbol.
+					var resolved *ast.Symbol
+					if ctx.TypeChecker == nil {
+						resolved = node.Symbol()
+					} else if sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode); sym != nil {
+						resolved = ctx.TypeChecker.SkipAlias(sym)
+					}
+					if resolved != nil {
 						if seenWithoutBodyFuncSymbols[resolved] {
 							return
 						}
@@ -2431,7 +2450,12 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				// Skip namespace augmentations — if the namespace symbol has
 				// declarations outside this file, it's augmenting an existing
 				// namespace (e.g., `declare namespace NodeJS { ... }`).
-				sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+				// Without a checker only this file's declarations are known,
+				// which is still enough to see a namespace merged within it.
+				sym := node.Symbol()
+				if ctx.TypeChecker != nil {
+					sym = ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+				}
 				if sym != nil && len(sym.Declarations) > 1 {
 					for _, decl := range sym.Declarations {
 						if decl != node {
