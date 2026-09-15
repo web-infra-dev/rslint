@@ -106,7 +106,7 @@ func IsWriteReference(node *ast.Node) bool {
 	case ast.KindParenthesizedExpression:
 		return IsWriteReference(parent)
 
-	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression:
 		return IsWriteReference(parent)
 
 	case ast.KindNonNullExpression:

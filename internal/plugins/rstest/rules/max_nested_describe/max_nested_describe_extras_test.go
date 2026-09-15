@@ -35,6 +35,16 @@ func TestMaxNestedDescribeExtras(t *testing.T) {
 			// ---- Dimension 4: computed dynamic key and malformed chains ----
 			{Code: `const method = 'describe'; import.meta.rstest[method]('one', () => {});`, Options: maxOption(0)},
 			{Code: `describe.unknown('one', () => {});`, Options: maxOption(0)},
+
+			// ---- Callback ownership: mutable or reassigned bindings are not stable ----
+			{Code: `let body = () => { describe('stale inner', () => {}); }; body = () => {}; describe('outer', body);`, Options: maxOption(1)},
+			{Code: `var body = () => { describe('mutable inner', () => {}); }; describe('outer', body);`, Options: maxOption(1)},
+			{Code: `function body() { describe('stale inner', () => {}); } body = () => {}; describe('outer', body);`, Options: maxOption(1)},
+			{Code: `function body() { describe('captured inner', () => {}); } describe('outer', body); body = () => {};`, Options: maxOption(1)},
+			{Code: `function body() { describe('stale inner', () => {}); } body ||= () => {}; describe('outer', body);`, Options: maxOption(1)},
+			{Code: `function body() { describe('stale inner', () => {}); } (body satisfies (() => void)) = () => {}; describe('outer', body);`, Options: maxOption(1)},
+			{Code: `const holder = { body: () => {} }; let body = () => { describe('stale inner', () => {}); }; ({ body } = holder); describe('outer', body);`, Options: maxOption(1)},
+			{Code: `const holder = { body: () => {} }; function body() { describe('stale inner', () => {}); } ({ body } = holder); describe('outer', body);`, Options: maxOption(1)},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: optional call still invokes the defined Rstest global ----
@@ -44,6 +54,9 @@ func TestMaxNestedDescribeExtras(t *testing.T) {
 			{Code: `const suiteBody = () => { describe('two', () => {}); }; describe('one', suiteBody);`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 27)}},
 			{Code: `function shared() { describe('child', () => {}); } describe('one', shared); describe('other', () => { describe('inner', shared); });`, Options: maxOption(2), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(3, 2, 1, 21)}},
 			{Code: `describe('one', wrap(() => { describe('two', () => {}); }));`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 30)}},
+			{Code: `function register() { const body = () => { describe('inner', () => {}); }; describe('outer', body); } register();`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 44)}},
+			{Code: `{ const body = () => { describe('inner', () => {}); }; describe('outer', body); }`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 24)}},
+			{Code: `class C { static { const body = () => { describe('inner', () => {}); }; describe('outer', body); } }`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 41)}},
 
 			// ---- Dimension 1: named, renamed, namespace, CommonJS, and re-export imports ----
 			{Code: `import { describe as suite } from '@rstest/core'; suite('one', () => {});`, Options: maxOption(0), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(1, 0, 1, 51)}},

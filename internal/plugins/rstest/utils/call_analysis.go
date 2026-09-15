@@ -25,11 +25,15 @@ type RstestCallAnalysis struct {
 	// costs a symbol lookup per registration and is asked for by both the test
 	// context collector and the callback ownership index.
 	callbackInfos map[*ast.Node]rstestCallbackInfo
-	callbacks     RstestTestCallbacks
-	callbacksOK   bool
-	ownership     map[*ast.Node][]rstestCallbackRegistration
-	ownershipOK   bool
-	hasTests      bool
+	// callbackBindings memoizes the function a same-file callback binding
+	// denotes. Negative results are cached too: checking whether a binding is
+	// written requires asking the per-file reference index for every use.
+	callbackBindings map[*ast.Symbol]rstestCallbackInfo
+	callbacks        RstestTestCallbacks
+	callbacksOK      bool
+	ownership        map[*ast.Node][]rstestCallbackRegistration
+	ownershipOK      bool
+	hasTests         bool
 }
 
 type rstestCallAnalysisFileCacheKey struct{}
@@ -55,14 +59,15 @@ func GetRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 
 func newRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 	analysis := &RstestCallAnalysis{
-		ctx:           ctx,
-		candidates:    cloneRstestCandidateSeeds(),
-		fnCalls:       map[*ast.Node]*ParsedRstestFnCall{},
-		expectCalls:   map[*ast.Node]*ParsedRstestExpectCall{},
-		isExpect:      map[*ast.Node]bool{},
-		expectRoots:   map[*ast.Symbol]rstestExpectRoot{},
-		functions:     map[string]rstestFunctionEntry{},
-		callbackInfos: map[*ast.Node]rstestCallbackInfo{},
+		ctx:              ctx,
+		candidates:       cloneRstestCandidateSeeds(),
+		fnCalls:          map[*ast.Node]*ParsedRstestFnCall{},
+		expectCalls:      map[*ast.Node]*ParsedRstestExpectCall{},
+		isExpect:         map[*ast.Node]bool{},
+		expectRoots:      map[*ast.Symbol]rstestExpectRoot{},
+		functions:        map[string]rstestFunctionEntry{},
+		callbackInfos:    map[*ast.Node]rstestCallbackInfo{},
+		callbackBindings: map[*ast.Symbol]rstestCallbackInfo{},
 	}
 	analysis.indexSourceFile()
 	return analysis
@@ -121,7 +126,7 @@ func (analysis *RstestCallAnalysis) callbackInfo(node *ast.Node) rstestCallbackI
 	if info, ok := analysis.callbackInfos[node]; ok {
 		return info
 	}
-	info := resolveRstestTestCallback(analysis.ctx, node.AsCallExpression())
+	info := resolveRstestTestCallback(analysis, node.AsCallExpression())
 	analysis.callbackInfos[node] = info
 	return info
 }

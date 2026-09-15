@@ -2,7 +2,6 @@ package utils
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
@@ -163,7 +162,7 @@ func isModuleTopLevelFunction(function *ast.Node) bool {
 }
 
 func resolveRstestTestCallback(
-	ctx rule.RuleContext,
+	analysis *RstestCallAnalysis,
 	call *ast.CallExpression,
 ) rstestCallbackInfo {
 	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) < 2 {
@@ -175,23 +174,23 @@ func resolveRstestTestCallback(
 	// In `(name, fn, timeout)` it is a timeout, and an unresolvable identifier
 	// there must not shadow the real callback in the second position.
 	if len(arguments) >= 3 {
-		if info := resolveRstestCallbackArgument(ctx, arguments[2]); info.functionNode != nil {
+		if info := resolveRstestCallbackArgument(analysis, arguments[2]); info.functionNode != nil {
 			return info
 		}
 	}
 
-	info := resolveRstestCallbackArgument(ctx, arguments[1])
+	info := resolveRstestCallbackArgument(analysis, arguments[1])
 	if info.functionNode == nil && info.name == "" && len(arguments) >= 3 {
 		// The second argument is not a callback at all, so an unresolved name in
 		// the third position is still worth deferring to the pending walk.
-		if third := resolveRstestCallbackArgument(ctx, arguments[2]); third.name != "" {
+		if third := resolveRstestCallbackArgument(analysis, arguments[2]); third.name != "" {
 			return third
 		}
 	}
 	return info
 }
 
-func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rstestCallbackInfo {
+func resolveRstestCallbackArgument(analysis *RstestCallAnalysis, argument *ast.Node) rstestCallbackInfo {
 	if argument == nil {
 		return rstestCallbackInfo{}
 	}
@@ -207,14 +206,48 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 	}
 
 	name := argument.AsIdentifier().Text
-	declaration := internalUtils.GetDeclaration(ctx.TypeChecker, argument)
-	if declaration == nil {
+	ctx := analysis.ctx
+	if ctx.Refs == nil {
+		// Standalone parser tests can construct a context without the linter's
+		// RefStore. Keep the scope-blind top-level fallback for those contexts;
+		// every real lint run resolves callback bindings through RefStore below.
 		return rstestCallbackInfo{name: name}
+	}
+	symbol := ctx.Refs.Resolve(argument)
+	if symbol == nil {
+		return rstestCallbackInfo{}
+	}
+	if info, ok := analysis.callbackBindings[symbol]; ok {
+		return info
+	}
+	info := resolveRstestCallbackBinding(analysis, symbol, name)
+	analysis.callbackBindings[symbol] = info
+	return info
+}
+
+func resolveRstestCallbackBinding(
+	analysis *RstestCallAnalysis,
+	symbol *ast.Symbol,
+	name string,
+) rstestCallbackInfo {
+	if symbol == nil || len(symbol.Declarations) != 1 {
+		return rstestCallbackInfo{}
+	}
+	declaration := symbol.Declarations[0]
+	if declaration == nil || ast.GetSourceFileOfNode(declaration) != analysis.ctx.SourceFile ||
+		rstestCallbackBindingIsWritten(analysis, symbol) {
+		return rstestCallbackInfo{}
 	}
 	switch declaration.Kind {
 	case ast.KindFunctionDeclaration:
 		return rstestCallbackInfo{functionNode: declaration, name: name}
 	case ast.KindVariableDeclaration:
+		// Const is the only variable declaration whose initializer is guaranteed
+		// to remain the value observed by every registration. Mutable bindings
+		// would require registration-point dataflow to resolve safely.
+		if !ast.IsVarConst(declaration) {
+			return rstestCallbackInfo{}
+		}
 		initializer := declaration.AsVariableDeclaration().Initializer
 		if initializer == nil {
 			return rstestCallbackInfo{}
@@ -225,6 +258,18 @@ func resolveRstestCallbackArgument(ctx rule.RuleContext, argument *ast.Node) rst
 		}
 	}
 	return rstestCallbackInfo{}
+}
+
+func rstestCallbackBindingIsWritten(
+	analysis *RstestCallAnalysis,
+	symbol *ast.Symbol,
+) bool {
+	for _, reference := range analysis.ctx.Refs.References(symbol) {
+		if internalUtils.IsWriteReference(reference) {
+			return true
+		}
+	}
+	return false
 }
 
 func recordRstestTestCallback(
