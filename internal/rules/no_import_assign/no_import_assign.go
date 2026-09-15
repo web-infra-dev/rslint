@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // importedBinding holds information about a single imported binding.
@@ -87,9 +88,8 @@ type importedBindingReferenceMatcher struct {
 	sourceFile             *ast.SourceFile
 	resolveReferenceSymbol func(*ast.Node) *ast.Symbol
 	authoredScopes         *scope.Manager
+	fileContext            rule.RuleContext
 }
-
-type authoredJavaScriptScopeCacheKey struct{}
 
 func isOnlySynthesizedJSDocSymbol(symbol *ast.Symbol) bool {
 	if symbol == nil || len(symbol.Declarations) == 0 ||
@@ -181,7 +181,7 @@ func (m *importedBindingReferenceMatcher) matchesAuthoredScope(
 	// declarations from the function body. Build the authored ESLint-like scope
 	// model only for those two rare mismatches.
 	if m.authoredScopes == nil {
-		m.authoredScopes = scope.Build(m.sourceFile, scope.Options{CollectReferences: true})
+		m.authoredScopes = scopeAnalysis.Get(m.fileContext, scope.Options{CollectReferences: true})
 	}
 	for _, reference := range m.authoredScopes.References {
 		if reference.Identifier != node {
@@ -656,6 +656,7 @@ func walkImportedBindingGroups(
 	matcher := importedBindingReferenceMatcher{
 		sourceFile:             ctx.SourceFile,
 		resolveReferenceSymbol: resolveReferenceSymbol,
+		fileContext:            *ctx,
 	}
 
 	var walk func(*ast.Node)
@@ -731,6 +732,7 @@ func walkImportedBindingReferences(
 	matcher := importedBindingReferenceMatcher{
 		sourceFile:             ctx.SourceFile,
 		resolveReferenceSymbol: resolveReferenceSymbol,
+		fileContext:            *ctx,
 	}
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
@@ -989,13 +991,7 @@ func collectImportedBindingViolation(
 					!resolvesToFunctionBodyFromParameter(node, referenceSymbol)) {
 				continue
 			}
-			authoredScopes := rule.CachedByFile(
-				*ctx,
-				authoredJavaScriptScopeCacheKey{},
-				func() *scope.Manager {
-					return scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true})
-				},
-			)
+			authoredScopes := scopeAnalysis.Get(*ctx, scope.Options{CollectReferences: true})
 			matcher := importedBindingReferenceMatcher{
 				sourceFile:     ctx.SourceFile,
 				authoredScopes: authoredScopes,

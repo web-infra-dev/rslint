@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_shadow.schema.json
@@ -165,8 +166,6 @@ func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.Rule
 			return rule.RuleListeners{}
 		}
 
-		manager := scope.Build(ctx.SourceFile, scope.Options{})
-
 		c := &checker{
 			sourceFile:                          ctx.SourceFile,
 			includeDefaultTypeScriptTypeGlobals: variant.includeDefaultTypeScriptTypeGlobals,
@@ -192,39 +191,29 @@ func runWithVariant(variant ruleVariant) func(rule.RuleContext, []any) rule.Rule
 		}
 		c.builtinGlobals = builtinGlobals
 
-		// Walk scopes top-down and check each variable. The global scope is
-		// included so that `builtinGlobals: true` can flag a module-level
-		// declaration shadowing an ECMAScript global (ESLint's module scope
-		// sits between the file and the global scope; we collapse them and
-		// compensate by letting checkVariable consult the globals table).
-		for _, s := range manager.Scopes {
-			if s.GlobalAugmentation {
-				continue
-			}
-			for _, v := range s.Vars {
-				if v.Anonymous {
-					continue
+		return rule.RuleListeners{
+			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
+				manager := scopeAnalysis.Declarations(ctx)
+				// Walk scopes top-down and check each variable. The global scope is
+				// included so that `builtinGlobals: true` can flag a module-level
+				// declaration shadowing an ECMAScript global (ESLint's module scope
+				// sits between the file and the global scope; we collapse them and
+				// compensate by letting checkVariable consult the globals table).
+				for _, s := range manager.Scopes {
+					if s.GlobalAugmentation {
+						continue
+					}
+					for _, v := range s.Vars {
+						if v.Anonymous || isLaterFunctionDefinition(v) || opts.allow[v.Name] ||
+							v.Name == "this" || isDuplicatedClassNameInClassScope(v) ||
+							isDeclFile && v.DeclareModifier {
+							continue
+						}
+						c.checkVariable(ctx, s, v, opts)
+					}
 				}
-				if isLaterFunctionDefinition(v) {
-					continue
-				}
-				if opts.allow[v.Name] {
-					continue
-				}
-				if v.Name == "this" {
-					continue
-				}
-				if isDuplicatedClassNameInClassScope(v) {
-					continue
-				}
-				if isDeclFile && v.DeclareModifier {
-					continue
-				}
-				c.checkVariable(ctx, s, v, opts)
-			}
+			},
 		}
-
-		return rule.RuleListeners{}
 	}
 }
 

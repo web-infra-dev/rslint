@@ -559,6 +559,7 @@ samp
 santhosh
 schlueter
 scopemanager
+scopeanalysis
 sectionhead
 Seeked
 segs

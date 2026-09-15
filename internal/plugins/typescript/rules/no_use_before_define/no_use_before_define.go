@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_use_before_define.schema.json
@@ -93,7 +94,7 @@ var NoUseBeforeDefineRule = rule.CreateRule(rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		manager := scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true})
+		manager := scopeAnalysis.Get(ctx, scope.Options{CollectReferences: true})
 
 		// Upstream walks the scope tree depth-first; ordering the flat
 		// reference list by source position gives the same sequence for every

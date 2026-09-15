@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed static_property_placement.schema.json
@@ -224,7 +225,7 @@ func (r *componentResolver) variable(node *ast.Node, name string) []*scope.Varia
 		}
 	}
 	if r.scopes == nil {
-		r.scopes = scope.Build(r.ctx.SourceFile, scope.Options{})
+		r.scopes = scopeAnalysis.Declarations(r.ctx)
 		r.firstChild = make(map[*scope.Scope]*scope.Scope)
 		for _, s := range r.scopes.Scopes {
 			if s.Parent != nil && r.firstChild[s.Parent] == nil {

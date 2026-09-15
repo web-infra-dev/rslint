@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // https://eslint.org/docs/latest/rules/no-new-func
@@ -34,10 +34,7 @@ var NoNewFuncRule = rule.Rule{
 			}
 			if !analysisReady {
 				analysisReady = true
-				manager := scope.Build(ctx.SourceFile, scope.Options{
-					CollectReferences: true,
-					ReferenceNames:    map[string]struct{}{"Function": {}},
-				})
+				manager := scopeAnalysis.References(ctx, map[string]struct{}{"Function": {}})
 				globalFunctionHasDefinitions = len(manager.Global.Declarations("Function")) != 0
 				for _, reference := range manager.References {
 					if reference.Resolved() != nil {
