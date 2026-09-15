@@ -33,12 +33,17 @@ type variableScopeAnalysisFileCacheKey struct{}
 // eslint-scope's source order rather than TypeScript's merged-symbol order.
 type VariableDefinitionLookup struct {
 	ctx      rule.RuleContext
+	scopes   *scopeAnalysis.Provider
 	analysis *variableScopeAnalysis
 	cache    map[variableDefinitionLookupKey]*scope.Variable
 }
 
-func NewVariableDefinitionLookup(ctx rule.RuleContext) *VariableDefinitionLookup {
-	return &VariableDefinitionLookup{ctx: ctx}
+func NewVariableDefinitionLookup(ctx rule.RuleContext, scopes ...scopeAnalysis.Provider) *VariableDefinitionLookup {
+	lookup := &VariableDefinitionLookup{ctx: ctx}
+	if len(scopes) != 0 {
+		lookup.scopes = &scopes[0]
+	}
+	return lookup
 }
 
 // First returns eslint-plugin-react's variable.defs[0].node for name at ident.
@@ -79,6 +84,9 @@ func (l *VariableDefinitionLookup) getAnalysis() *variableScopeAnalysis {
 	}
 	l.analysis = rule.CachedByFile(l.ctx, variableScopeAnalysisFileCacheKey{}, func() *variableScopeAnalysis {
 		manager := scopeAnalysis.Declarations(l.ctx)
+		if l.scopes != nil {
+			manager = l.scopes.Declarations()
+		}
 		firstChild := make(map[*scope.Scope]*scope.Scope)
 		for _, current := range manager.Scopes {
 			if current.Parent != nil && firstChild[current.Parent] == nil {

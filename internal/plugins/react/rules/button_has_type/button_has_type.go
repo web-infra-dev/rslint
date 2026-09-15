@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed button_has_type.schema.json
@@ -41,6 +42,7 @@ var ButtonHasTypeRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		cfg := parseOptions(options)
+		scopes := scopeAnalysis.For(ctx)
 
 		reportMissing := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -146,7 +148,7 @@ var ButtonHasTypeRule = rule.Rule{
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings)) {
+				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings), scopes) {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) < 1 {

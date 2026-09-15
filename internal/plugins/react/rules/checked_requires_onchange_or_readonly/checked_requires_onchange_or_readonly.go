@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed checked_requires_onchange_or_readonly.schema.json
@@ -50,6 +51,7 @@ var CheckedRequiresOnchangeOrReadonlyRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		o := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
+		scopes := scopeAnalysis.For(ctx)
 
 		// checkAndReport mirrors upstream's `checkAttributesAndReport`: report
 		// only when `checked` is present, then emit the exclusive-attribute and
@@ -93,7 +95,7 @@ var CheckedRequiresOnchangeOrReadonlyRule = rule.Rule{
 			ast.KindJsxSelfClosingElement: checkJsxElement,
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCall(call.Expression, pragma) {
+				if !reactutil.IsCreateElementCall(call.Expression, pragma, scopes) {
 					return
 				}
 				// Upstream requires `arguments[0]` to be a string Literal "input"

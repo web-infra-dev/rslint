@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // newPragmaImportMatcher mirrors isDestructuredFromPragmaImport's name lookup.
@@ -11,7 +12,7 @@ import (
 // child before moving to the parent. It reads the last definition regardless
 // of whether that definition declares a value. Reference resolution alone
 // therefore cannot answer this particular React question.
-func newPragmaImportMatcher(ctx rule.RuleContext, pragma, name string) func(*ast.Node) bool {
+func newPragmaImportMatcher(ctx rule.RuleContext, scopes scopeAnalysis.Provider, pragma, name string) func(*ast.Node) bool {
 	sourceFile := ctx.SourceFile
 	if pragma == "" {
 		pragma = DefaultReactPragma
@@ -24,7 +25,7 @@ func newPragmaImportMatcher(ctx rule.RuleContext, pragma, name string) func(*ast
 		}
 		if definitions == nil {
 			pragmaLower = ecmascript.StringToLowerCase(pragma)
-			definitions = NewVariableDefinitionLookup(ctx)
+			definitions = NewVariableDefinitionLookup(ctx, scopes)
 		}
 		definition := definitions.Last(ident, name)
 		return isDestructuredFromPragmaDeclaration(definition, pragma, pragmaLower)

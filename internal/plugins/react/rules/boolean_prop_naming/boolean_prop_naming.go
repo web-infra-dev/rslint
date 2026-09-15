@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed boolean_prop_naming.schema.json
@@ -123,6 +124,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	createClass := reactutil.GetReactCreateClass(ctx.Settings)
 	propWrappers := reactutil.GetPropWrapperFunctions(ctx.Settings)
 	componentWrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
+	scopes := scopeAnalysis.For(ctx)
 
 	// reportedSet protects against a single PropertySignature / property
 	// being reported twice when both `static propTypes = {...}` and `props:
@@ -211,7 +213,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				}
 			}
 		case ast.KindFunctionDeclaration:
-			if reactutil.IsStatelessReactComponent(n, pragma) {
+			if reactutil.IsStatelessReactComponent(n, pragma, scopes) {
 				if name := reactutil.BindingIdentifierName(n); name != "" {
 					componentsByName[name] = true
 				}
@@ -248,7 +250,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			// reactutil helper. We unwrap the chain and validate the
 			// innermost function's first param type annotation.
 			if init.Kind == ast.KindCallExpression {
-				inner := unwrapComponentWrapperChain(init, componentWrappers)
+				inner := unwrapComponentWrapperChain(init, componentWrappers, scopes)
 				if inner != nil {
 					componentsByName[nameNode.AsIdentifier().Text] = true
 					if pt := reactutil.FirstParamType(inner); pt != nil {
@@ -266,7 +268,7 @@ func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				break
 			}
 			isComp := false
-			if reactutil.IsStatelessReactComponent(init, pragma) {
+			if reactutil.IsStatelessReactComponent(init, pragma, scopes) {
 				isComp = true
 			} else if fcArg != nil {
 				// Trust an explicit `React.FC<Props>` / `<Props>`
@@ -749,7 +751,11 @@ func firstTypeArgumentOfType(typeNode *ast.Node) *ast.Node {
 //
 // The chain depth is implicitly bounded by the source file's nesting
 // depth, but we cap at 16 hops as a defensive guard.
-func unwrapComponentWrapperChain(call *ast.Node, wrappers []reactutil.ComponentWrapperEntry) *ast.Node {
+func unwrapComponentWrapperChain(
+	call *ast.Node,
+	wrappers []reactutil.ComponentWrapperEntry,
+	scopes scopeAnalysis.Provider,
+) *ast.Node {
 	for range 16 {
 		if call == nil || call.Kind != ast.KindCallExpression {
 			return nil
@@ -761,7 +767,7 @@ func unwrapComponentWrapperChain(call *ast.Node, wrappers []reactutil.ComponentW
 		first := reactutil.SkipExpressionWrappers(args.Nodes[0])
 		// `MatchesAnyComponentWrapper` requires the inner `fn` for its
 		// first-arg sanity check; we already have it as `first`.
-		if !reactutil.MatchesAnyComponentWrapper(call, first, wrappers) {
+		if !reactutil.MatchesAnyComponentWrapper(call, first, wrappers, scopes) {
 			return nil
 		}
 		switch first.Kind {

@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // inConstructorExemption mirrors eslint-plugin-react's
@@ -87,6 +88,7 @@ var NoDirectMutationStateRule = rule.Rule{
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
+		scopes := scopeAnalysis.For(ctx)
 
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -127,7 +129,7 @@ var NoDirectMutationStateRule = rule.Rule{
 			// detection returns null, the listener early-returns via
 			// `shouldIgnoreComponent`. Mirror with the scope-based
 			// helper.
-			component := reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers)
+			component := reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers, scopes)
 			if component == nil {
 				return
 			}

@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed require_optimization.schema.json
@@ -278,6 +279,7 @@ var RequireOptimizationRule = rule.Rule{
 	Name:   "react/require-optimization",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		scopes := scopeAnalysis.For(ctx)
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
@@ -323,7 +325,7 @@ var RequireOptimizationRule = rule.Rule{
 				ast.KindFunctionExpression,
 				ast.KindArrowFunction:
 				if isInClassDeclarationMethodBody(node) {
-					return reactutil.IsStatelessReactComponentWithChecker(node, pragma, ctx.TypeChecker)
+					return reactutil.IsStatelessReactComponentWithChecker(node, pragma, ctx.TypeChecker, scopes)
 				}
 			}
 			return false

@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed prop_types.schema.json
@@ -1684,6 +1685,7 @@ var PropTypesRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, raw []any) rule.RuleListeners {
 		o := parseOptions(raw)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
+		scopes := scopeAnalysis.For(ctx)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		checkAsyncSafe := !reactutil.ReactVersionLessThan(ctx.Settings, 16, 3, 0)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
@@ -1830,7 +1832,7 @@ var PropTypesRule = rule.Rule{
 				}
 			case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
 				isAccessor := n.Kind == ast.KindGetAccessor || n.Kind == ast.KindSetAccessor
-				if !isAccessor && !isGeneratorFunction(n) && reactutil.IsStatelessReactComponentWithWrappers(n, pragma, ctx.TypeChecker, wrappers) {
+				if !isAccessor && !isGeneratorFunction(n) && reactutil.IsStatelessReactComponentWithWrappers(n, pragma, ctx.TypeChecker, wrappers, scopes) {
 					c := newComponent(n)
 					ps := n.Parameters()
 					if len(ps) > 0 && ps[0].Kind == ast.KindParameter {

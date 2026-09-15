@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // inlineNames mirrors eslint-plugin-react's list of HTML inline elements.
@@ -131,6 +132,7 @@ var NoAdjacentInlineElementsRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragmaFromContext(ctx)
+		scopes := scopeAnalysis.For(ctx)
 		return rule.RuleListeners{
 			ast.KindJsxElement: func(node *ast.Node) {
 				jsx := node.AsJsxElement()
@@ -147,7 +149,7 @@ var NoAdjacentInlineElementsRule = rule.Rule{
 					// createElement binding from a same-named local shadow.
 					return
 				}
-				if !reactutil.IsCreateElementCallWithChecker(call.Expression, pragma, ctx.TypeChecker) {
+				if !reactutil.IsCreateElementCallWithChecker(call.Expression, pragma, ctx.TypeChecker, scopes) {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) < 3 {

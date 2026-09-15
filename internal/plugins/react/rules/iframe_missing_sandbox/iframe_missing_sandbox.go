@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 const (
@@ -145,7 +146,7 @@ var IframeMissingSandboxRule = rule.Rule{
 			}
 		}
 
-		isCreateElement := reactutil.NewCreateElementCallMatcher(ctx)
+		isCreateElement := reactutil.NewCreateElementCallMatcher(ctx, scopeAnalysis.For(ctx))
 		return rule.RuleListeners{
 			ast.KindJsxOpeningElement:     checkJSX,
 			ast.KindJsxSelfClosingElement: checkJSX,
