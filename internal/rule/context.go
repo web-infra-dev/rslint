@@ -70,6 +70,11 @@ type RuleContext struct {
 	// order mark. Rules read it through [RuleContext.HasBOM]; nil answers
 	// false, which is what a context with no Program can say.
 	BOM *SourceBOM
+	// Component lazily provides the Vue single file component behind this file,
+	// which the parsed text cannot describe because it is a projection of the
+	// component's script blocks. nil reports that the file is not a component,
+	// which is what a manually assembled context says.
+	Component *Component
 	// program is the sole source authority for this context. Parser, filesystem,
 	// package, module-resolution, syntax, and optional type services all derive
 	// from this one immutable generation.

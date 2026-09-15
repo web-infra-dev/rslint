@@ -2109,8 +2109,9 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// An `/* exported */` global is consumed by a separately loaded file, so
 	// upstream counts the directive itself as a use. reportUsedIgnorePattern
 	// still sees it as used, which is what turns a directive on an ignored name
-	// into a usedIgnoredVar report.
-	if !varInfo.Used && ctx.IsExportedGlobalBinding(sym, name) {
+	// into a usedIgnoredVar report. A Vue component's template consumes the
+	// top-level bindings of its script setup in the same way.
+	if !varInfo.Used && (ctx.IsExportedGlobalBinding(sym, name) || ctx.IsExposedToTemplate(sym, name)) {
 		varInfo.Used = true
 	}
 	// A used binding cannot produce a diagnostic unless the caller asks to

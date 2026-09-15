@@ -290,6 +290,13 @@ func isTrackable(
 			}
 		}
 	}
+	// A Vue component's template reads its script setup bindings at render
+	// time, which no path through this file's code shows.
+	for _, decl := range sym.Declarations {
+		if ctx.IsExposedToTemplate(decl.Symbol(), sym.Name) {
+			return false
+		}
+	}
 	declaredHere := false
 	for _, decl := range sym.Declarations {
 		name := decl.Name()

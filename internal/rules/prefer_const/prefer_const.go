@@ -329,6 +329,11 @@ func (s *preferConstState) shouldReport(candidate *candidateInfo) bool {
 	if s.ctx.IsExportedGlobalBinding(candidate.symbol, candidate.nameNode.Text()) {
 		return false
 	}
+	// A Vue component's template may assign to a script setup `let`, so
+	// declaring it const would break the component rather than tidy it.
+	if s.ctx.IsExposedToTemplate(candidate.symbol, candidate.nameNode.Text()) {
+		return false
+	}
 	info := s.symbols[candidate.symbol]
 	if candidate.hasInitializer {
 		return info.writeCount == 0

@@ -93,6 +93,12 @@ func (ctx *RuleContext) IsGlobalScopeBinding(symbol *ast.Symbol, name string) bo
 			return false
 		}
 	}
+	return ctx.isSourceFileBinding(symbol, name)
+}
+
+// isSourceFileBinding reports whether the raw binder symbol is bound directly in
+// the source file's own scope, whichever kind of scope that is.
+func (ctx *RuleContext) isSourceFileBinding(symbol *ast.Symbol, name string) bool {
 	source := ctx.SourceFile.AsNode()
 	// The overwhelmingly common case is a source-file local. Avoid walking
 	// outward from its declaration; the fallback also covers declarations
