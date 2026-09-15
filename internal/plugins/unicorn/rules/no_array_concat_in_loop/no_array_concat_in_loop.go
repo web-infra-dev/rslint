@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 const messageID = "no-array-concat-in-loop"
@@ -77,7 +78,7 @@ func checkAssignment(ctx rule.RuleContext, node *ast.Node, variables **scopeVari
 	}
 
 	if *variables == nil {
-		*variables = newScopeVariableFinder(ctx.SourceFile)
+		*variables = newScopeVariableFinder(ctx)
 	}
 	variable := (*variables).find(left)
 	if !variable.sameBinding((*variables).find(receiver)) ||
@@ -108,8 +109,8 @@ type scopeVariableFinder struct {
 	manager *scope.Manager
 }
 
-func newScopeVariableFinder(sourceFile *ast.SourceFile) *scopeVariableFinder {
-	return &scopeVariableFinder{manager: scope.Build(sourceFile, scope.Options{})}
+func newScopeVariableFinder(ctx rule.RuleContext) *scopeVariableFinder {
+	return &scopeVariableFinder{manager: scopeAnalysis.Declarations(ctx)}
 }
 
 func (finder *scopeVariableFinder) find(identifier *ast.Node) scopeVariable {

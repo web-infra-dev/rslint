@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // newPragmaImportMatcher mirrors isDestructuredFromPragmaImport's name lookup.
@@ -30,7 +31,7 @@ func newPragmaImportMatcher(ctx rule.RuleContext, pragma, name string) func(*ast
 		}
 		if manager == nil {
 			pragmaLower = ecmascript.StringToLowerCase(pragma)
-			manager = scope.Build(sourceFile, scope.Options{})
+			manager = scopeAnalysis.Declarations(ctx)
 			firstChild = make(map[*scope.Scope]*scope.Scope)
 			for _, current := range manager.Scopes {
 				if current.Parent != nil && firstChild[current.Parent] == nil {
