@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/vue/vuesfc"
 )
 
 // ErrDeferredPluginRunAlreadyInvoked reports an executor contract violation.
@@ -152,6 +153,20 @@ func materializePluginTask(
 			if err != nil {
 				return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
 			}
+			input.Text = &text
+		}
+		// A Vue single file component's own text is markup, which the worker's
+		// JavaScript parser cannot read. Send it the same projection of the
+		// <script> blocks the native pass parsed, and never let the worker
+		// read the component off disk instead. The projection preserves every
+		// byte offset, so a diagnostic or fix range the worker computes still
+		// lands in the right place in the component.
+		if vuesfc.IsFile(targetPaths[index]) {
+			if input.SourceFile == nil {
+				return pluginTask{}, fmt.Errorf(
+					"linter pipeline: Vue component %q needs a parsed source frame", input.Path)
+			}
+			text := input.SourceFile.Text()
 			input.Text = &text
 		}
 		if detached {

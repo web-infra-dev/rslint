@@ -2444,3 +2444,87 @@ export default { data() { return { msg: 'hi' } } };
 		t.Errorf("fixed component differs beyond the keyword.\n got:\n%s\nwant:\n%s", fixed, want)
 	}
 }
+
+// TestCLIPluginReceivesVueProjectionNotMarkup checks what a third-party ESLint
+// plugin rule is handed for a Vue single file component.
+//
+// The worker parses with a JavaScript parser, and a component's own text is
+// markup: handed that, the worker would parse the template as if it were code.
+// It must receive the projection of the <script> blocks instead, the same text
+// the native pass parsed, and must never be left to read the component off
+// disk, which is what the initial CLI generation otherwise does to avoid
+// shipping a whole repository over the wire.
+func TestCLIPluginReceivesVueProjectionNotMarkup(t *testing.T) {
+	const component = `<template>
+  <div v-for="x in xs">{{ x }}</div>
+</template>
+
+<script>
+const xs = [1, 2];
+</script>
+`
+
+	dir := t.TempDir()
+	componentPath := tspath.NormalizePath(filepath.Join(dir, "App.vue"))
+	if err := os.WriteFile(componentPath, []byte(component), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDirectory := tspath.NormalizePath(dir)
+
+	var request linter.EslintPluginLintRequest
+	code, stdout, stderr := runLintCommandWithDispatcherForTest(
+		t,
+		dir,
+		lintArgs{
+			ConfigCatalog: &discovery.ConfigCatalog{
+				Configs: map[string]rslintconfig.RslintConfig{
+					configDirectory: {{
+						Files:   []string{"**/*.vue"},
+						Plugins: []string{"external"},
+						Rules:   rslintconfig.Rules{"external/check": "error"},
+					}},
+				},
+				EslintPlugins: []rslintconfig.EslintPluginEntry{{
+					Prefix:    "external",
+					RuleNames: []string{"check"},
+				}},
+				Explicit: true,
+			},
+			AllowFiles:     []string{componentPath},
+			Format:         "jsonline",
+			NoColor:        true,
+			SingleThreaded: true,
+		},
+		func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			request = got
+			results := make([]linter.EslintPluginFileResult, len(got.Files))
+			for index, file := range got.Files {
+				results[index].FilePath = file.Path
+			}
+			return &linter.EslintPluginLintResult{Results: results}, nil
+		},
+	)
+	if code != 0 || len(request.Files) != 1 {
+		t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q",
+			code, request, stdout, stderr)
+	}
+
+	text := request.Files[0].Text
+	if text == nil {
+		t.Fatal("the worker was left to read the component off disk, where it is markup")
+	}
+	if strings.Contains(*text, "<template>") || strings.Contains(*text, "v-for") {
+		t.Errorf("the worker received markup:\n%s", *text)
+	}
+	if !strings.Contains(*text, "const xs = [1, 2];") {
+		t.Errorf("the worker did not receive the script:\n%s", *text)
+	}
+	// Offsets are preserved, so a range the worker computes indexes the
+	// component identically.
+	if len(*text) != len(component) {
+		t.Errorf("projection length = %d, want the component's %d", len(*text), len(component))
+	}
+	if got, want := strings.Index(*text, "const xs"), strings.Index(component, "const xs"); got != want {
+		t.Errorf("script at offset %d on the wire, want %d", got, want)
+	}
+}
