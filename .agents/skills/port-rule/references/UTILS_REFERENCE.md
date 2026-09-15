@@ -445,12 +445,14 @@ See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_
 
 ---
 
-## `internal/utils/scope/` - ESLint Scope Model
+## `internal/utils/scopeanalysis/` - ESLint Scope Analysis
 
 An AST-derived reconstruction of ESLint's lexical scope tree — rslint's stand-in for `sourceCode.getScope()` / eslint-scope. Use it only when a rule's semantics are stated in terms of **scopes** (which scope owns a binding, what an inner scope shadows, whether two positions share a variable scope). For "which symbol is this identifier" and "where else is this symbol used", reach for `ctx.Refs` above instead — it is backed by the binder and understands globals, ambient, and cross-file declarations, which this package deliberately does not.
 
+Rules must obtain scope managers through `internal/utils/scopeanalysis`; do not call `scope.Build` from rule or helper code. The lower-level `internal/utils/scope` package is the data model and builder implementation, while `scopeanalysis` owns file-level caching and safe graph reuse.
+
 ```go
-manager := scope.Build(ctx.SourceFile)
+manager := scopeanalysis.Get(ctx, scope.Options{CollectReferences: true})
 
 for _, s := range manager.Scopes { // creation order == pre-order walk of the tree
     for _, v := range s.Vars {     // declaration order within the scope
@@ -464,6 +466,10 @@ for s := start; s != nil; s = s.Parent {
 }
 ```
 
+- Use `scopeanalysis.Get(ctx, options)` when the exact reference/declaration option shape matters.
+- Use `scopeanalysis.References(ctx, names)` when a filtered reference query can reuse a complete reference graph that another rule already built.
+- Use `scopeanalysis.Declarations(ctx)` when only the scope tree and declarations are inspected and references must not be read.
+- Helpers that cannot hold a real `rule.RuleContext` must accept a `scopeanalysis.Provider` created by the rule's `Run` function and pass it through. Do not synthesize a `RuleContext` just to build scope analysis.
 - Scope kinds (`scope.Kind*`): `Global`, `Function`, `FunctionExprName`, `Block`, `Catch`, `Class`, `Module`, `Type`. ESLint's module scope is collapsed into `Global`.
 - `Scope.VariableScope()` is eslint-scope's `Scope#variableScope`: the nearest enclosing function / namespace / global scope, i.e. the `var` hoist target.
 - Definition kinds (`scope.Def*`) map to eslint-scope's `Definition#type`, including the TypeScript ones (`DefType`, `DefEnumName`, `DefNamespaceName`, `DefTypeParameter`, `DefImport`).
