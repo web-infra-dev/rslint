@@ -2,19 +2,22 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/microsoft/typescript-go/shim/api/encoder"
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -70,13 +73,15 @@ func main() {
 func getDiagnostics(diagnostics []*ast.Diagnostic, fileMap *map[string]int32) []Diagnostics {
 	diags := []Diagnostics{}
 	for _, diag := range diagnostics {
+		// Match the UTF-16 positions used by encoded AST nodes and semantic data.
+		positionMap := diag.File().GetPositionMap()
 		diags = append(diags, Diagnostics{
 			Message:  diag.String(),
 			Category: int32(diag.Category()),
 			File:     (*fileMap)[diag.File().FileName()],
 			Loc: Location{
-				Start: int32(diag.Pos()),
-				End:   int32(diag.End()),
+				Start: int32(positionMap.UTF8ToUTF16(diag.Pos())),
+				End:   int32(positionMap.UTF8ToUTF16(diag.End())),
 			},
 		})
 	}
@@ -147,19 +152,60 @@ func printDiagnostics(diagnostics []Diagnostics, fileMap map[string]int32) {
 	log.Println()
 }
 func runMain() int {
-	var (
-		config   string
-		help     bool
-		api_mode bool
-	)
-	flag.StringVar(&config, "config", "", "path to tsconfig.json")
-	flag.BoolVar(&help, "help", false, "show help")
-	flag.BoolVar(&api_mode, "api", false, "api mode")
-	flag.Parse()
-	if help {
-		flag.Usage()
+	return run(os.Args[1:], os.Stdout, os.Stderr)
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	usage := func() {
+		fmt.Fprintln(stderr, "Usage: tsgo <project|config> [options]")
+		fmt.Fprintln(stderr, "  project  Load AST, types, symbols, and diagnostics (--api emits CBOR)")
+		fmt.Fprintln(stderr, "  config   Resolve final compiler options as JSON without type checking")
+	}
+	if len(args) == 0 {
+		usage()
 		return 0
 	}
+	switch args[0] {
+	case "project":
+		return runProject(args[1:], stdout, stderr)
+	case "config":
+		return runConfig(args[1:], stdout, stderr)
+	case "--help", "-help", "-h":
+		usage()
+		return 0
+	default:
+		// Flag-only invocations remain compatible with existing tsgo clients.
+		if strings.HasPrefix(args[0], "-") {
+			return runProject(args, stdout, stderr)
+		}
+		fmt.Fprintf(stderr, "unknown command %q\n", args[0])
+		usage()
+		return 2
+	}
+}
+
+func runProject(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("project", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	var config string
+	var apiMode bool
+	flags.StringVar(&config, "config", "tsconfig.json", "path to tsconfig.json, relative to the working directory")
+	flags.BoolVar(&apiMode, "api", false, "emit project information as CBOR")
+	flags.Usage = func() {
+		fmt.Fprintln(stderr, "Usage: tsgo project [options]")
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if flags.NArg() != 0 {
+		fmt.Fprintln(stderr, "unexpected positional arguments:", strings.Join(flags.Args(), " "))
+		return 2
+	}
+
 	program, err := CreateProgram(config)
 	if err != nil {
 		log.Printf("error creating program: %v", err)
@@ -232,7 +278,7 @@ func runMain() int {
 	}
 	checkResult.Diagnostics = getDiagnostics(diagnostics, &fileMap)
 
-	if !api_mode {
+	if !apiMode {
 		// Print diagnostics in human-readable format
 		printDiagnostics(checkResult.Diagnostics, fileMap)
 		if len(checkResult.Diagnostics) > 0 {
@@ -246,7 +292,7 @@ func runMain() int {
 		log.Printf("error marshaling checkResult: %v", err)
 		return 1
 	}
-	_, err = os.Stdout.Write(result)
+	_, err = stdout.Write(result)
 	if err != nil {
 		log.Printf("error writing result to stdout: %v", err)
 		return 1

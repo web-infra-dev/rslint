@@ -1,7 +1,7 @@
 package no_wrapper_object_types
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -36,9 +36,8 @@ var NoWrapperObjectTypesRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// checkBannedTypes mirrors upstream's local `checkBannedTypes` —
-		// `node` is the inner Identifier the rule visits (TypeReference's
-		// TypeName, or ExpressionWithTypeArguments's Expression). `includeFix`
-		// is true only for TSTypeReference, matching upstream's listener wiring.
+		// `node` is the inner TypeName identifier. The compiler also uses
+		// TypeReference for heritage entries, which must not receive the fix.
 		checkBannedTypes := func(node *ast.Node, includeFix bool) {
 			if node == nil || node.Kind != ast.KindIdentifier {
 				return
@@ -65,17 +64,7 @@ var NoWrapperObjectTypesRule = rule.CreateRule(rule.Rule{
 				if ref == nil {
 					return
 				}
-				checkBannedTypes(ref.TypeName, true)
-			},
-			ast.KindExpressionWithTypeArguments: func(node *ast.Node) {
-				if !typescriptutil.IsClassImplementsOrInterfaceExtends(node) {
-					return
-				}
-				expr := node.AsExpressionWithTypeArguments()
-				if expr == nil {
-					return
-				}
-				checkBannedTypes(expr.Expression, false)
+				checkBannedTypes(ref.TypeName, !typescriptutil.IsClassImplementsOrInterfaceExtends(node))
 			},
 		}
 	},

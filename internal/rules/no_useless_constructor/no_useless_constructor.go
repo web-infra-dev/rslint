@@ -1,8 +1,8 @@
 package no_useless_constructor
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -237,7 +237,7 @@ var NoUselessConstructorRule = rule.Rule{
 					return
 				}
 
-				hasSuper := ast.GetExtendsHeritageClauseElement(classNode) != nil
+				hasSuper := ast.GetClassExtendsHeritageElement(classNode) != nil
 
 				if !checkAccessibility(node, hasSuper) {
 					return

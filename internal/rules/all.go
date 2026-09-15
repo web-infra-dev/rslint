@@ -6,6 +6,7 @@ import (
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
 	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
+	nodePlugin "github.com/web-infra-dev/rslint/internal/plugins/node"
 	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
@@ -229,6 +230,7 @@ func allRules() []rule.Rule {
 	implementedRules = append(implementedRules, jestPlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, rstestPlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, jsxA11yPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, nodePlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, promisePlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, unicornPlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, coreRules()...)

@@ -1,7 +1,7 @@
 package rule
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // Exported is the file's complete `/* exported */` view: the names an inline

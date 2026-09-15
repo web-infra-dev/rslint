@@ -9,8 +9,8 @@ package jsxa11yutil
 
 import (
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	jsxtx "github.com/microsoft/TypeScript/tsc/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"

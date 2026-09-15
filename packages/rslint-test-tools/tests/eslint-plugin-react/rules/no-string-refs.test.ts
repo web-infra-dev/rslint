@@ -2,11 +2,6 @@ import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
 
-// NOTE: `this.refs` detection depends on `settings.react.version`, which the
-// shared JS rule-tester does not thread through to `lint()`. Those cases are
-// covered by the Go unit tests (`no_string_refs_test.go`). The JS suite here
-// focuses on the JSX `ref={...}` detection, which is version-independent.
-
 ruleTester.run('no-string-refs', {} as never, {
   valid: [
     // Callback ref is fine.
@@ -51,8 +46,79 @@ ruleTester.run('no-string-refs', {} as never, {
     { code: `<div ref={'hello'!} />;` },
     { code: `<div ref={('hello' as string)} />;` },
     { code: `<div ref={'hello' satisfies string} />;` },
+    // Intentional divergences from upstream: computed identifier and private
+    // names do not necessarily refer to React's public `refs` property.
+    {
+      code: `class App extends React.Component { method() { const refs = 'not-react-refs'; return this[refs]; } }`,
+      settings: { react: { version: '18.2.0' } },
+    },
+    {
+      code: `class App extends React.Component { #refs; method() { return this.#refs; } }`,
+      settings: { react: { version: '18.2.0' } },
+    },
+    {
+      code: `/** @jsx Preact.h */ class App extends Other.Component { method() { return this.refs; } }`,
+      settings: { react: { version: '18.2.0', pragma: 'Other' } },
+    },
   ],
   invalid: [
+    // Custom JSX components have the same string-ref semantics as intrinsic
+    // elements, including member-expression component names.
+    {
+      code: `<Widget ref="instance" />;`,
+      errors: [
+        { message: 'Using string literals in ref attributes is deprecated.' },
+      ],
+    },
+    {
+      code: `<UI.Widget ref={'instance'} />;`,
+      errors: [
+        { message: 'Using string literals in ref attributes is deprecated.' },
+      ],
+    },
+    {
+      code: `/** @jsx Preact.h */ class App extends Preact.Component { method() { return this.refs; } }`,
+      settings: { react: { version: '18.2.0', pragma: 'Other' } },
+      errors: [{ message: 'Using this.refs is deprecated.' }],
+    },
+    {
+      code: `/** @jsx Preact.h */ var App = Preact.createClass({ method() { return this.refs; } });`,
+      settings: {
+        react: {
+          version: '18.2.0',
+          pragma: 'Other',
+          createClass: 'createClass',
+        },
+      },
+      errors: [{ message: 'Using this.refs is deprecated.' }],
+    },
+    {
+      code: `class App extends React.Component { method() { return this.refs; } }`,
+      settings: { react: { defaultVersion: '18.2.0' } },
+      errors: [{ message: 'Using this.refs is deprecated.' }],
+    },
+    {
+      code: `class App extends React.Component { method() { return this.refs; } }`,
+      settings: {
+        react: { version: 'detect', defaultVersion: '18.2.0' },
+      },
+      errors: [{ message: 'Using this.refs is deprecated.' }],
+    },
+    {
+      code: `class App extends React.Component { method() { return this.refs; } }`,
+      settings: { react: { version: 17 } },
+      errors: [{ message: 'Using this.refs is deprecated.' }],
+    },
+    {
+      code: `var App = createReactClass({ method: (function() { return this.refs; }) });`,
+      settings: { react: { version: '18.2.0' } },
+      errors: [{ message: 'Using this.refs is deprecated.' }],
+    },
+    {
+      code: `var App = new createReactClass({ method() { return this.refs; } });`,
+      settings: { react: { version: '18.2.0' } },
+      errors: [{ message: 'Using this.refs is deprecated.' }],
+    },
     // String literal directly.
     {
       code: `

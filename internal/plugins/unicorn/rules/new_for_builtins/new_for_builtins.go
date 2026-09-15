@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -505,80 +505,14 @@ func (state *ruleState) dateFix(nodeRange core.TextRange) rule.RuleFix {
 }
 
 func (state *ruleState) newToCallFixes(node *ast.Node, nodeRange core.TextRange, newExpression *ast.NewExpression) []rule.RuleFix {
-	expressionRange := trimmedNodeRange(state.ctx.SourceFile, newExpression.Expression)
-	if nodeRange.Pos() >= expressionRange.Pos() {
-		return nil
-	}
-
-	source := state.ctx.SourceFile.Text()
-	removeEnd := nodeRange.Pos() + len("new")
-	for removeEnd < expressionRange.Pos() && isWhitespace(source[removeEnd]) {
-		removeEnd++
-	}
-
-	fixes := []rule.RuleFix{
-		rule.RuleFixRemoveRange(core.NewTextRange(nodeRange.Pos(), removeEnd)),
-	}
-
-	insertAfterExpression := ""
-	if newExpression.Arguments == nil {
-		insertAfterExpression = "()"
-	}
-
-	if state.needsReturnOrThrowParentheses(node, nodeRange.Pos(), expressionRange.Pos()) {
-		if opening, closing, ok := returnOrThrowParenthesesRanges(state.ctx.SourceFile, node.Parent); ok {
-			fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(opening, opening), " ("))
-			if closing == expressionRange.End() {
-				insertAfterExpression += ")"
-			} else {
-				fixes = append(fixes, rule.RuleFixReplaceRange(core.NewTextRange(closing, closing), ")"))
-			}
-		}
-	}
-
-	if insertAfterExpression != "" {
-		fixes = append(fixes, rule.RuleFixReplaceRange(
-			core.NewTextRange(expressionRange.End(), expressionRange.End()),
-			insertAfterExpression,
-		))
-	}
-	return fixes
-}
-
-func (state *ruleState) needsReturnOrThrowParentheses(node *ast.Node, newPos int, expressionPos int) bool {
-	if node.Parent == nil || node.Parent.Kind == ast.KindParenthesizedExpression {
-		return false
-	}
-	if node.Parent.Kind != ast.KindReturnStatement && node.Parent.Kind != ast.KindThrowStatement {
-		return false
-	}
-	return !sameLine(state.ctx.SourceFile, newPos, expressionPos)
-}
-
-func returnOrThrowParenthesesRanges(sourceFile *ast.SourceFile, statement *ast.Node) (int, int, bool) {
-	if sourceFile == nil || statement == nil {
-		return 0, 0, false
-	}
-
-	statementRange := trimmedNodeRange(sourceFile, statement)
-	keywordLength := len("return")
-	if statement.Kind == ast.KindThrowStatement {
-		keywordLength = len("throw")
-	}
-
-	opening := statementRange.Pos() + keywordLength
-	closing := statementRange.End()
-	source := sourceFile.Text()
-	for pos := closing - 1; pos >= statementRange.Pos(); pos-- {
-		if isWhitespace(source[pos]) {
-			continue
-		}
-		if source[pos] == ';' {
-			closing = pos
-		}
-		break
-	}
-	return opening, closing, true
+	return unicornutil.NewExpressionToCallFixes(
+		state.ctx.SourceFile,
+		node,
+		nodeRange,
+		newExpression,
+		newExpression.Expression,
+		"",
+	)
 }
 
 func (state *ruleState) enforceNewFix(nodeRange core.TextRange) rule.RuleFix {
@@ -1242,15 +1176,29 @@ func watchedBuiltinName(path []string) (string, bool) {
 }
 
 func sourceHasPotentialReference(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
+	mayHaveReference := false
 	for root := range potentialReferenceRoots {
-		if _, ok := sourceFile.Identifiers[root]; ok {
-			return true
+		if sourceFile.HasIdentifier(root) {
+			mayHaveReference = true
+			break
 		}
 	}
-	return false
+	if !mayHaveReference {
+		return false
+	}
+	// The compiler's identifier cache also includes ordinary string literals.
+	// Only an identifier can be the root of a reference followed by this rule.
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && potentialReferenceRoots[node.Text()] {
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	return visit(sourceFile.AsNode())
 }
 
 func pathKey(path []string) string {
@@ -1263,14 +1211,4 @@ func appendPath(path []string, parts ...string) []string {
 
 func trimmedNodeRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	return core.NewTextRange(scanner.SkipTrivia(sourceFile.Text(), node.Pos()), node.End())
-}
-
-func sameLine(sourceFile *ast.SourceFile, a int, b int) bool {
-	lineStarts := sourceFile.ECMALineMap()
-	return scanner.ComputeLineOfPosition(lineStarts, a) ==
-		scanner.ComputeLineOfPosition(lineStarts, b)
-}
-
-func isWhitespace(ch byte) bool {
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f' || ch == '\v'
 }

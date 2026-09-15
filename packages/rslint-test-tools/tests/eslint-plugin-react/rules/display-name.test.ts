@@ -372,6 +372,22 @@ ruleTester.run('display-name', {} as never, {
   ],
 
   invalid: [
+    {
+      code: `
+        /** @jsx Foo */
+        var Hello = Foo.createClass({
+          _renderHello: function() {
+            return <span>Hello {this.props.name}</span>;
+          },
+          render: function() {
+            return <div>{this._renderHello()}</div>;
+          }
+        });
+      `,
+      options: [{ ignoreTranspilerName: true }],
+      settings: { react: { createClass: 'createClass' } },
+      errors: [{ messageId: 'noDisplayName' }],
+    },
     // ---- Shadowed-but-only-some-paths shadowed ----
     {
       code: `

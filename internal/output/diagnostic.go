@@ -5,7 +5,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 type location struct {

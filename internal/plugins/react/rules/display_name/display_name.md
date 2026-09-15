@@ -6,6 +6,8 @@ Disallow missing `displayName` in a React component definition.
 
 `displayName` allows you to name your component. This name is used by React in debugging messages.
 
+Component detection uses the first `@jsx` comment in the file, then `settings.react.pragma`, and defaults to `React`. For example, `/** @jsx Foo */` makes the rule recognize `Foo.createClass` when `settings.react.createClass` is `"createClass"`, even if a different pragma is configured in settings.
+
 Examples of **incorrect** code for this rule:
 
 ```jsx

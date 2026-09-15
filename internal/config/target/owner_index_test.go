@@ -3,7 +3,7 @@ package target
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rules"
 )
@@ -84,6 +84,34 @@ func TestOwnerIndexUsesVerifiedNativeCaseAliasBeforeFileRealpath(t *testing.T) {
 	dir, cfg := resolveConfigOwnerWithFS("/repo/project/link.ts", configMap, fs)
 	if dir != "/repo/Project" || cfg == nil {
 		t.Fatalf("native case alias did not retain config owner: dir=%q cfg=%v", dir, cfg)
+	}
+}
+
+func TestOwnerIndexWindowsDrivePreservesCatalogKeys(t *testing.T) {
+	index := NewOwnerIndex(map[string]rslintconfig.RslintConfig{
+		"C:/Repo":             nil,
+		"c:/Repo/Unavailable": nil,
+		"C:/Physical":         nil,
+	}, nil)
+	for _, test := range []struct {
+		name, path, canonical, owner string
+	}{
+		{"missing file", "c:/Repo/new/file.ts", "", "C:/Repo"},
+		{"unavailable boundary", "C:/Repo/Unavailable/new.ts", "", "c:/Repo/Unavailable"},
+		{"directory symlink", "c:/Repo/workspace/link/src/a.ts", "C:/Physical/a.ts", "C:/Repo"},
+		{"physical fallback", "d:/Outside/a.ts", "c:/Physical/a.ts", "C:/Physical"},
+		{"different drive", "d:/Repo/a.ts", "", ""},
+		{"different directory casing", "c:/repo/a.ts", "", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			owner, ok := index.Resolve(rslintconfig.PathIdentity{Path: test.path, CanonicalPath: test.canonical})
+			if owner != test.owner || ok != (test.owner != "") {
+				t.Fatalf("owner = (%q, %v), want original catalog key %q", owner, ok, test.owner)
+			}
+		})
+	}
+	if children := index.ChildOwnerDirectories("C:/Repo"); len(children) != 1 || children[0] != "c:/Repo/Unavailable" {
+		t.Fatalf("drive spelling lost lexical handoff boundary: %v", children)
 	}
 }
 

@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -249,7 +249,7 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, module
 	mode := r.normalMode
 	hasOverride := false
 	if importDecl.ImportClause != nil && importDecl.ImportClause.AsImportClause().IsTypeOnly() && importDecl.Attributes != nil {
-		mode, hasOverride = importDecl.Attributes.GetResolutionModeOverride()
+		mode, hasOverride = importDecl.Attributes.GetResolutionModeOverride(nil)
 	}
 	if !hasOverride && !r.hasNormalMode {
 		mode = r.ctx.Program().GetModeForUsageLocation(r.ctx.SourceFile, moduleSpecifier)

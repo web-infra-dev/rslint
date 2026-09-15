@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"regexp"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -529,16 +529,15 @@ func validateTypeNode(typeNode *ast.Node, typeAliasMap map[string][]*ast.Node, o
 					continue
 				}
 				for _, t := range clause.Types.Nodes {
-					// Each entry is ExpressionWithTypeArguments;
-					// resolve via its expression as a type-name lookup.
-					if t.Kind != ast.KindExpressionWithTypeArguments {
+					// Interface heritage entries are type references.
+					if t.Kind != ast.KindTypeReference {
 						continue
 					}
-					expr := t.AsExpressionWithTypeArguments()
-					if expr == nil {
+					ref := t.AsTypeReferenceNode()
+					if ref == nil {
 						continue
 					}
-					name := reactutil.EntityNameRightmost(expr.Expression)
+					name := reactutil.EntityNameRightmost(ref.TypeName)
 					if name == nil {
 						continue
 					}

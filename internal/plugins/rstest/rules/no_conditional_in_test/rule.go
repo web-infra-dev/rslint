@@ -1,7 +1,7 @@
 package no_conditional_in
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_conditional_in_test"

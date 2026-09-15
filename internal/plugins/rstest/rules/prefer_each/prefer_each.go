@@ -1,7 +1,7 @@
 package prefer_each
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"

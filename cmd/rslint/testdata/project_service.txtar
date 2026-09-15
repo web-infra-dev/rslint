@@ -1,0 +1,24 @@
+-- tsconfig.json --
+{"files":["unrelated.ts"]}
+-- unrelated.ts --
+export const unrelated: number = "wrong";
+-- pkg/tsconfig.json --
+{"compilerOptions":{"strict":true},"include":["*.ts"]}
+-- pkg/file.ts --
+debugger;
+-- pkg/sibling.ts --
+export const sibling: number = "wrong";
+-- gaps/tsconfig.json --
+{"files":["covered.ts"]}
+-- gaps/covered.ts --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;
+-- gaps/loose.ts --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;
+-- gaps/loose.js --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;

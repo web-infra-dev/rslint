@@ -1,7 +1,7 @@
 package cfg
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // patternReads emits what an identifier or member assignment target evaluates

@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Deserializer};
 use serde_bytes::Bytes;
-type TypeId = u32;
 #[derive(Debug, Clone, Deserialize)]
 #[non_exhaustive]
 pub struct ProjectResponse<'base> {
@@ -47,7 +44,6 @@ pub struct Semantic {
     pub node2type: Vec<(NodeReference, u32)>,
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub node_flags: Vec<(NodeReference, u32)>,
-    pub type_extra: TypeExtra,
     pub primtypes: PrimTypes,
     // (aliasSymbolId, targetSymbolId)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
@@ -55,6 +51,9 @@ pub struct Semantic {
     // Shorthand property assignment value symbols (node -> value_symbol_id)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub shorthand_symbols: Vec<(NodeReference, u32)>,
+    // Shorthand object binding symbols (local_symbol_id -> property_symbol_id).
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub shorthand_binding_symbols: Vec<(u32, u32)>,
     // Parameter property declarations create another symbol at the same name node; node2sym keeps the primary symbol.
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub parameter_property_symbols: Vec<(NodeReference, u32)>,
@@ -111,20 +110,6 @@ pub struct PrimTypes {
     pub null: u32,
     pub void: u32,
     pub bool: u32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct TypeExtra {
-    pub name: HashMap<TypeId, serde_bytes::ByteBuf>,
-    pub func: HashMap<TypeId, FunctionData>,
-}
-#[derive(Debug, Clone, Deserialize)]
-pub struct FunctionData {
-    pub signatures: Vec<Signature>,
-}
-#[derive(Debug, Clone, Deserialize)]
-pub struct Signature {
-    pub result: TypeId,
 }
 
 fn vecmap<'de, K, V, D>(deserializer: D) -> Result<Vec<(K, V)>, D::Error>
@@ -255,6 +240,17 @@ impl Semantic {
                     && node_ref.start == location.start
                     && node_ref.end == location.end
             })
+            .map(|(_, sym_id)| *sym_id)
+    }
+
+    /// Returns the source property symbol of a shorthand object binding name.
+    ///
+    /// In `const { x } = value`, this maps the newly declared local `x` symbol
+    /// to the property symbol equivalent to `x` in `value.x`.
+    pub fn get_shorthand_binding_property_symbol(&self, local_symbol: u32) -> Option<u32> {
+        self.shorthand_binding_symbols
+            .iter()
+            .find(|(symbol, _)| *symbol == local_symbol)
             .map(|(_, sym_id)| *sym_id)
     }
 

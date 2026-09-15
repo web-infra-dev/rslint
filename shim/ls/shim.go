@@ -4,29 +4,30 @@
 package ls
 
 import "context"
-import "github.com/microsoft/typescript-go/internal/ast"
-import "github.com/microsoft/typescript-go/internal/compiler"
-import "github.com/microsoft/typescript-go/internal/core"
-import "github.com/microsoft/typescript-go/internal/ls"
-import "github.com/microsoft/typescript-go/internal/ls/lsconv"
-import "github.com/microsoft/typescript-go/internal/ls/lsutil"
-import "github.com/microsoft/typescript-go/internal/lsp/lsproto"
-import "github.com/microsoft/typescript-go/internal/tspath"
+import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/microsoft/TypeScript/tsc/internal/checker"
+import "github.com/microsoft/TypeScript/tsc/internal/compiler"
+import "github.com/microsoft/TypeScript/tsc/internal/core"
+import "github.com/microsoft/TypeScript/tsc/internal/ls"
+import "github.com/microsoft/TypeScript/tsc/internal/ls/lsconv"
+import "github.com/microsoft/TypeScript/tsc/internal/ls/lsutil"
+import "github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+import "github.com/microsoft/TypeScript/tsc/internal/tspath"
 import _ "unsafe"
 
 type CallHierarchyDeclaration = ls.CallHierarchyDeclaration
 type CandidateOrTypeInfo = ls.CandidateOrTypeInfo
-//go:linkname ClientSupportsDocumentChanges github.com/microsoft/typescript-go/internal/ls.ClientSupportsDocumentChanges
+//go:linkname ClientSupportsDocumentChanges github.com/microsoft/TypeScript/tsc/internal/ls.ClientSupportsDocumentChanges
 func ClientSupportsDocumentChanges(ctx context.Context) bool
-//go:linkname ClientSupportsRenameResourceOperations github.com/microsoft/typescript-go/internal/ls.ClientSupportsRenameResourceOperations
+//go:linkname ClientSupportsRenameResourceOperations github.com/microsoft/TypeScript/tsc/internal/ls.ClientSupportsRenameResourceOperations
 func ClientSupportsRenameResourceOperations(ctx context.Context) bool
-//go:linkname ClientSupportsWillRenameFiles github.com/microsoft/typescript-go/internal/ls.ClientSupportsWillRenameFiles
+//go:linkname ClientSupportsWillRenameFiles github.com/microsoft/TypeScript/tsc/internal/ls.ClientSupportsWillRenameFiles
 func ClientSupportsWillRenameFiles(ctx context.Context) bool
 type CodeAction = ls.CodeAction
 type CodeFixContext = ls.CodeFixContext
 type CodeFixProvider = ls.CodeFixProvider
 type CombinedCodeActions = ls.CombinedCodeActions
-//go:linkname CompareCompletionEntries github.com/microsoft/typescript-go/internal/ls.CompareCompletionEntries
+//go:linkname CompareCompletionEntries github.com/microsoft/TypeScript/tsc/internal/ls.CompareCompletionEntries
 func CompareCompletionEntries(a *lsproto.CompletionItem, b *lsproto.CompletionItem) int
 type CompletionItem = ls.CompletionItem
 type CompletionKind = ls.CompletionKind
@@ -37,6 +38,7 @@ const CompletionKindObjectPropertyDeclaration = ls.CompletionKindObjectPropertyD
 const CompletionKindPropertyAccess = ls.CompletionKindPropertyAccess
 const CompletionKindString = ls.CompletionKindString
 type CompletionList = ls.CompletionList
+var CompletionTriggerCharacters = ls.CompletionTriggerCharacters
 type CompletionsTriggerCharacter = ls.CompletionsTriggerCharacter
 type CrossProjectOrchestrator = ls.CrossProjectOrchestrator
 type DeclarationInfo = ls.DeclarationInfo
@@ -53,6 +55,10 @@ const ExportKindModule = ls.ExportKindModule
 const ExportKindNamed = ls.ExportKindNamed
 const ExportKindUMD = ls.ExportKindUMD
 var FixClassIncorrectlyImplementsInterfaceProvider = ls.FixClassIncorrectlyImplementsInterfaceProvider
+//go:linkname GetSymbolDocumentationComment github.com/microsoft/TypeScript/tsc/internal/ls.GetSymbolDocumentationComment
+func GetSymbolDocumentationComment(c *checker.Checker, symbol *ast.Symbol) string
+//go:linkname GetSymbolJSDocTags github.com/microsoft/TypeScript/tsc/internal/ls.GetSymbolJSDocTags
+func GetSymbolJSDocTags(symbol *ast.Symbol) []ls.JSDocTagInfo
 type Host = ls.Host
 type ImpExpKind = ls.ImpExpKind
 const ImpExpKindExport = ls.ImpExpKindExport
@@ -62,7 +68,7 @@ type ImportExportSymbol = ls.ImportExportSymbol
 var ImportFixProvider = ls.ImportFixProvider
 type ImportTracker = ls.ImportTracker
 type ImportsResult = ls.ImportsResult
-//go:linkname IsInString github.com/microsoft/typescript-go/internal/ls.IsInString
+//go:linkname IsInString github.com/microsoft/TypeScript/tsc/internal/ls.IsInString
 func IsInString(sourceFile *ast.SourceFile, position int, previousToken *ast.Node) bool
 var IsolatedDeclarationsFixProvider = ls.IsolatedDeclarationsFixProvider
 type JSDocTagInfo = ls.JSDocTagInfo
@@ -84,19 +90,25 @@ type ModuleReferenceKind = ls.ModuleReferenceKind
 const ModuleReferenceKindImplicit = ls.ModuleReferenceKindImplicit
 const ModuleReferenceKindImport = ls.ModuleReferenceKindImport
 const ModuleReferenceKindReference = ls.ModuleReferenceKindReference
-//go:linkname NewLanguageService github.com/microsoft/typescript-go/internal/ls.NewLanguageService
+//go:linkname NewLanguageService github.com/microsoft/TypeScript/tsc/internal/ls.NewLanguageService
 func NewLanguageService(projectPath tspath.Path, program *compiler.Program, host ls.Host, activeFile string) *ls.LanguageService
+//go:linkname ObjectLiteralPropertySortText github.com/microsoft/TypeScript/tsc/internal/ls.ObjectLiteralPropertySortText
+func ObjectLiteralPropertySortText(presetSortText ls.SortText, symbolDisplayName string) ls.SortText
 type PossibleTypeArgumentInfo = ls.PossibleTypeArgumentInfo
 type Project = ls.Project
-//go:linkname ProvideWorkspaceSymbols github.com/microsoft/typescript-go/internal/ls.ProvideWorkspaceSymbols
+//go:linkname ProvideWorkspaceSymbols github.com/microsoft/TypeScript/tsc/internal/ls.ProvideWorkspaceSymbols
 func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, converters *lsconv.Converters, preferences lsutil.UserPreferences, query string) (lsproto.WorkspaceSymbolResponse, error)
-//go:linkname RangeContainsRange github.com/microsoft/typescript-go/internal/ls.RangeContainsRange
+//go:linkname RangeContainsRange github.com/microsoft/TypeScript/tsc/internal/ls.RangeContainsRange
 func RangeContainsRange(r1 core.TextRange, r2 core.TextRange) bool
 type ReferenceEntry = ls.ReferenceEntry
 type RenameInfo = ls.RenameInfo
-//go:linkname SemanticTokensLegend github.com/microsoft/typescript-go/internal/ls.SemanticTokensLegend
+//go:linkname SemanticTokensLegend github.com/microsoft/TypeScript/tsc/internal/ls.SemanticTokensLegend
 func SemanticTokensLegend(clientCapabilities lsproto.ResolvedSemanticTokensClientCapabilities) *lsproto.SemanticTokensLegend
+var SignatureHelpRetriggerCharacters = ls.SignatureHelpRetriggerCharacters
+var SignatureHelpTriggerCharacters = ls.SignatureHelpTriggerCharacters
 type SignatureUsage = ls.SignatureUsage
+//go:linkname SortBelow github.com/microsoft/TypeScript/tsc/internal/ls.SortBelow
+func SortBelow(original ls.SortText) ls.SortText
 type SortText = ls.SortText
 const SortTextAutoImportSuggestions = ls.SortTextAutoImportSuggestions
 const SortTextClassMemberSnippets = ls.SortTextClassMemberSnippets
@@ -115,4 +127,3 @@ const SourceThisProperty = ls.SourceThisProperty
 const SourceTypeOnlyAlias = ls.SourceTypeOnlyAlias
 type SymbolAndEntries = ls.SymbolAndEntries
 type SymbolAndEntriesData = ls.SymbolAndEntriesData
-var TriggerCharacters = ls.TriggerCharacters

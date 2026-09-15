@@ -25,6 +25,30 @@ func StringCodeUnits(s string) []uint16 {
 	return units
 }
 
+// StringCodeUnitRunes reads the same units as StringCodeUnits into rune slots,
+// for matching engines whose input is []rune. Supplementary characters occupy
+// two slots. These are UTF-16 units, not Unicode code points: converting the
+// result with string would lose surrogates; use StringFromCodeUnits instead.
+func StringCodeUnitRunes(s string) []rune {
+	units := make([]rune, StringCodeUnitCount(s))
+	for i, n := 0, 0; i < len(s); n++ {
+		if s[i] < utf8.RuneSelf {
+			units[n] = rune(s[i])
+			i++
+			continue
+		}
+		r, size := decodeStringRune(s[i:])
+		if r > 0xFFFF {
+			units[n], units[n+1] = utf16.EncodeRune(r)
+			n++
+		} else {
+			units[n] = r
+		}
+		i += size
+	}
+	return units
+}
+
 // DecodeStringRune reads the first code point from a JavaScript string value.
 // It differs from utf8.DecodeRuneInString only for the WTF-8 spelling the
 // compiler uses to preserve an unpaired UTF-16 surrogate.
@@ -91,6 +115,11 @@ func CombineSurrogatePairs(s string) string {
 func StringCodeUnitCount(s string) int {
 	count := 0
 	for i := 0; i < len(s); {
+		if s[i] < utf8.RuneSelf {
+			count++
+			i++
+			continue
+		}
 		r, size := decodeStringRune(s[i:])
 		if r > 0xFFFF {
 			count += 2

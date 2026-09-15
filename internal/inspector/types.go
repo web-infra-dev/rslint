@@ -8,6 +8,7 @@ package inspector
 // GetAstInfoRequest represents a request for AST info at a specific position
 type GetAstInfoRequest struct {
 	FileContent     string         `json:"fileContent"`               // Source code content
+	SourceFileName  string         `json:"sourceFileName,omitempty"`  // User source filename (defaults to /index.ts)
 	Position        int            `json:"position"`                  // Start position (pos)
 	End             int            `json:"end,omitempty"`             // End position (optional, for exact node matching)
 	Kind            int            `json:"kind,omitempty"`            // Optional: filter by node kind (when multiple nodes at same position)

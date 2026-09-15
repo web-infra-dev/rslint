@@ -16,7 +16,7 @@ import (
 	"strings"
 )
 
-const tsgoInternalPrefix = "github.com/microsoft/typescript-go/internal/"
+const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
 type ExtraShim struct {
 	ExtraFunctions  []string              `json:"ExtraFunctions"`
@@ -69,6 +69,7 @@ func main() {
 		"collections",
 		"lsp/lsproto",
 		"ls",
+		"locale",
 		"module",
 		"project",
 		"project/logging",
@@ -81,7 +82,7 @@ func main() {
 		packagesToShimFullNames[i] = tsgoInternalPrefix + pkg
 	}
 
-	packages, err := packages.Load(&packages.Config{
+	loadedPackages, err := packages.Load(&packages.Config{
 		// TODO: path relative to repo root
 		Dir:  "./shim/compiler",
 		Mode: packages.LoadSyntax,
@@ -89,12 +90,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading package: %v", err)
 	}
+	if packages.PrintErrors(loadedPackages) > 0 {
+		log.Fatal("Cannot generate shims: fix the pinned compiler's package errors first")
+	}
 
 	var shimHeaderBuilder strings.Builder
 	var shimBuilder strings.Builder
 	var tempBuffer bytes.Buffer
 
-	for _, pkg := range packages {
+	for _, pkg := range loadedPackages {
 		shimDirPath := path.Join("./shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
 		var extraShim ExtraShim
 		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
@@ -355,6 +359,16 @@ func main() {
 							if !field.Embedded() {
 								shimBuilder.WriteString(field.Name())
 								shimBuilder.WriteByte(' ')
+							}
+
+							// Private struct values (including instantiated generic stores)
+							// need an anonymous mirror with the same layout. Their names
+							// cannot be referenced from this shim's package.
+							if named, ok := field.Type().(*types.Named); ok && !named.Obj().Exported() {
+								if structType, ok := named.Underlying().(*types.Struct); ok {
+									shimBuilder.WriteString(types.TypeString(structType, qualifierOnlyPackageName))
+									continue
+								}
 							}
 
 							ptrType, ok := field.Type().(*types.Pointer)

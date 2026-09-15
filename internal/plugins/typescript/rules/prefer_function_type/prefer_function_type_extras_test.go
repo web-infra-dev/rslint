@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -1332,4 +1332,14 @@ interface ThisCallable { (): this; }`,
 			}
 		}
 	}
+}
+
+func TestPreferFunctionTypeRecoveryHeritage(t *testing.T) {
+	// The compiler retains expression-shaped heritage for invalid type syntax.
+	// Such input can reach the linter while editing and must not panic.
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferFunctionTypeRule, []rule_tester.ValidTestCase{
+		{Code: `interface I extends Base() { (): void; }`},
+		{Code: `interface I extends (Base) { (): void; }`},
+		{Code: `interface I extends Base['Type'] { (): void; }`},
+	}, nil)
 }

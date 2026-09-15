@@ -5,10 +5,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
@@ -47,27 +47,23 @@ const (
 )
 
 // sourceMayContainMergePair cheaply rejects files that cannot contain both
-// halves of a merge. The parser interns property names and the cooked text of
-// string/template element-access keys, so the identifier table covers normal,
-// bracket and escaped spellings without scanning the AST.
-//
-// A key hidden behind parentheses is the one accepted form the table does not
-// intern, because GetMemberEntries reaches through them with SkipParentheses.
-// Only files containing such a bracket need the exact fallback walk.
+// halves of a merge. The compiler's lazy cache includes normalized identifiers
+// and literal keys. Conservatively check parenthesized accesses if the cache
+// cannot establish both matcher roles.
 func sourceMayContainMergePair(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
 
 	roles := mergeMatcherRoles(0)
 	for name := range onceMatchers {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			roles |= mergeMatcherRoleOnce
 			break
 		}
 	}
 	for name := range combinedMatchers {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			roles |= mergeMatcherRoleWith
 			break
 		}
@@ -165,11 +161,11 @@ type chainAssertion struct {
 // interest, which merges with a matching statement elsewhere in the block, or
 // one of each role, which already states both halves and merges with itself.
 type mergeCandidate struct {
-	hits      []chainAssertion
-	statement *ast.Node
-	// position is the trimmed start offset of statement, used to order the
-	// pair and to bound the mock-reset search between them.
-	position int
+	hits           []chainAssertion
+	statement      *ast.Node
+	statementIndex int
+	arguments      []*ast.Node
+	position       int
 	// pairKey groups the assertions that may merge; see pairKey().
 	pairKey string
 	// fixable is false when the chain asserts more than the rule understands,
@@ -345,20 +341,7 @@ func mergeCandidateForStatement(
 	if len(arguments) == 0 {
 		return nil
 	}
-	// The fix keeps one `expect(...)` call and deletes the other, so every
-	// argument of the surviving call is evaluated once instead of twice. Equal
-	// source text does not make that safe: `expect(getMock())` may return a
-	// different mock each time, and dropping an evaluation drops whatever the
-	// expression did. Such a pair is still worth reporting, but the merge is
-	// the author's to make.
-	fixable := len(parsed.Matchers) == 1
-	for _, argument := range arguments {
-		if !isStableExpression(argument) {
-			fixable = false
-			break
-		}
-	}
-	candidate := &mergeCandidate{hits: hits, fixable: fixable}
+	candidate := &mergeCandidate{hits: hits, arguments: arguments, fixable: len(parsed.Matchers) == 1}
 
 	candidate.statement = statement
 	candidate.position = internalUtils.TrimNodeTextRange(sourceFile, statement).Pos()
@@ -800,20 +783,19 @@ func onlyInertStatementsBetween(
 	statements []*ast.Node,
 	first, second *mergeCandidate,
 ) bool {
-	minPosition, maxPosition := first.position, second.position
-	if minPosition > maxPosition {
-		minPosition, maxPosition = maxPosition, minPosition
+	minIndex, maxIndex := first.statementIndex, second.statementIndex
+	if minIndex > maxIndex {
+		minIndex, maxIndex = maxIndex, minIndex
+	}
+	if maxIndex-minIndex == 1 {
+		return true
 	}
 	scanner := &betweenScanner{ctx: ctx, analysis: analysis, assertionNames: map[string]bool{}}
 	collectIdentifierNames(first.statement, scanner.assertionNames)
 	collectIdentifierNames(second.statement, scanner.assertionNames)
 
-	for _, statement := range statements {
+	for _, statement := range statements[minIndex+1 : maxIndex] {
 		if statement == nil {
-			continue
-		}
-		position := internalUtils.TrimNodeTextRange(ctx.SourceFile, statement).Pos()
-		if position <= minPosition || position >= maxPosition {
 			continue
 		}
 		if !scanner.isInertStatement(statement) && !scanner.isInertDeclaration(statement) {
@@ -913,30 +895,35 @@ func reportPair(
 	// The later assertion carries the report, as upstream does; the earlier one
 	// alone would point at code that reads fine until the second one shows up.
 	reportNode := second.hits[0].node
-	if !first.fixable || !second.fixable {
-		ctx.ReportNode(reportNode, message)
-		return
-	}
-	matcherRange, replacement, ok := test_framework.AccessorReplacement(
-		ctx.SourceFile,
-		with.node,
-		with.combined,
-	)
-	if !ok {
-		ctx.ReportNode(reportNode, message)
-		return
-	}
-	removeRange := statementRemovalRange(ctx.SourceFile, once.statement)
-	if removeRange.Overlaps(matcherRange) {
-		ctx.ReportNode(reportNode, message)
-		return
-	}
-	ctx.ReportNodeWithFixes(
-		reportNode,
-		message,
-		rule.RuleFixReplaceRange(matcherRange, replacement),
-		rule.RuleFixRemoveRange(removeRange),
-	)
+	ctx.ReportNodeWithDeferredFixes(reportNode, message, func() []rule.RuleFix {
+		if !first.fixable || !second.fixable {
+			return nil
+		}
+		// Merging removes an evaluation of every expect argument, not just the mock.
+		for _, candidate := range candidates {
+			for _, argument := range candidate.arguments {
+				if !isStableExpression(argument) {
+					return nil
+				}
+			}
+		}
+		matcherRange, replacement, ok := test_framework.AccessorReplacement(
+			ctx.SourceFile,
+			with.node,
+			with.combined,
+		)
+		if !ok {
+			return nil
+		}
+		removeRange := statementRemovalRange(ctx.SourceFile, once.statement)
+		if removeRange.Overlaps(matcherRange) {
+			return nil
+		}
+		return []rule.RuleFix{
+			rule.RuleFixReplaceRange(matcherRange, replacement),
+			rule.RuleFixRemoveRange(removeRange),
+		}
+	})
 }
 
 // pendingReport is one resolved merge, held until the whole block is analysed
@@ -962,11 +949,12 @@ func checkBlock(
 	var pending []pendingReport
 	var pairKeys []string
 	byPairKey := map[string][]*mergeCandidate{}
-	for _, statement := range statements {
+	for index, statement := range statements {
 		candidate := mergeCandidateForStatement(analysis, ctx.SourceFile, statement)
 		if candidate == nil {
 			continue
 		}
+		candidate.statementIndex = index
 		// A chain that states both halves needs no partner, and counting it
 		// among the candidates would only suppress it.
 		if candidate.isSelfContained() {

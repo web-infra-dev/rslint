@@ -1,0 +1,19 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "enum": ["none", "literal", "single-child", "non-jsx"]
+        }
+      },
+      "default": {
+        "allow": "none"
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -1,0 +1,29 @@
+The same tsconfig has different reference contexts in explicit and service modes.
+Legacy loading uses declaration outputs; service loading follows current sources.
+
+-- tsconfig.json --
+{"compilerOptions":{"strict":true,"target":"ES2022","module":"CommonJS","types":[]},"files":["a.ts","b.ts","c.ts"],"references":[{"path":"./lib"}]}
+-- lib/tsconfig.json --
+{"compilerOptions":{"composite":true,"strict":true,"target":"ES2022","module":"CommonJS","rootDir":".","outDir":"../dist","types":[]},"files":["value.ts"]}
+-- lib/value.ts --
+export const value = Promise.resolve();
+-- dist/value.d.ts --
+export declare const value: number;
+-- a.ts --
+import { value } from './lib/value';
+export const expected: number = value;
+-- b.ts --
+import { value } from './lib/value';
+export const expected: number = value;
+-- c.ts --
+export const contextOnly = 1;
+-- outside.ts --
+export const outside = 1;
+-- disabled-source-redirect/tsconfig.json --
+{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["target.ts"],"references":[{"path":"./leaf.json"}]}
+-- disabled-source-redirect/leaf.json --
+{"compilerOptions":{"noLib":true,"composite":true,"outDir":"dist"},"files":["target.ts"]}
+-- disabled-source-redirect/target.ts --
+export const value = 1;
+-- no-config/target.ts --
+export const value = 1;

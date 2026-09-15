@@ -3,8 +3,8 @@ package rule
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // inlineExportedKeywords lists the directive keyword that introduces an

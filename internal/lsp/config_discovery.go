@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
@@ -629,12 +629,14 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			)
 		}
 		seenConfigDirs[configID] = configDir
-		paths, err := resolveTsConfigPathsWithFS(entries, configDir, fsys)
-		if err != nil {
-			return nil, fmt.Errorf("resolve tsconfig paths for %q: %w", configDir, err)
+		if !config.HasProjectOptions(entries) {
+			paths, err := resolveTsConfigPathsWithFS(entries, configDir, fsys)
+			if err != nil {
+				return nil, fmt.Errorf("resolve tsconfig paths for %q: %w", configDir, err)
+			}
+			snapshot.tsConfigPaths[configDir] = paths
 		}
 		snapshot.configs[configDir] = append(config.RslintConfig(nil), entries...)
-		snapshot.tsConfigPaths[configDir] = paths
 	}
 
 	// A failed candidate still blocks the workspace fallback when no usable

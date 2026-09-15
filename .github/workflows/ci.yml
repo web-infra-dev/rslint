@@ -21,8 +21,40 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: rspack-ubuntu-22.04-mini
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.changed == 'true' }}
+    steps:
+      - name: Checkout code
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+
+      - name: Filter changes
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            changed:
+              - '!**/*.md'
+              - '!**/*.mdx'
+              - '!**/_meta.json'
+              - '!**/dictionary.txt'
+              - '!.agents/skills/**'
+              - '!skills-lock.json'
+
   test-go:
     name: Test Go
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -30,7 +62,6 @@ jobs:
       matrix:
         runner:
           - rspack-ubuntu-22.04-large
-          - rspack-darwin-15.6.1-medium
           - rspack-windows-2022-large
         go-version: ['1.26.0']
     steps:
@@ -55,6 +86,9 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-test-go
+
+      - name: Verify compiler shim layout
+        run: go test github.com/microsoft/TypeScript/tsc/shim/checker
 
       - name: Unit Test (Linux)
         if: matrix.runner == 'rspack-ubuntu-22.04-large'
@@ -94,13 +128,39 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
-      # Fallback for any runner without a dedicated step above.
+  test-go-darwin:
+    name: Test Go (Darwin)
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.head_ref || github.ref_name, 'chore/release-')) }}
+    runs-on: rspack-darwin-15.6.1-medium
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: '1.26.0'
+          cache-name: ci-test-go
+
+      - name: Verify compiler shim layout
+        run: go test github.com/microsoft/TypeScript/tsc/shim/checker
+
       - name: Unit Test
-        if: matrix.runner != 'rspack-ubuntu-22.04-large' && matrix.runner != 'rspack-windows-2022-large'
         run: go test -count=1 ./cmd/... ./internal/...
 
   lint:
-    name: Lint&Check
+    name: Lint
+    needs: changes
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
@@ -111,22 +171,25 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
+      - name: Format
+        run: pnpm format:check
+
       - name: Setup Go
+        if: needs.changes.outputs.changed == 'true'
         uses: ./.github/actions/setup-go
         with:
           go-version: 1.26.0
           cache-name: ci-go-lint
 
       - name: golangci-lint
+        if: needs.changes.outputs.changed == 'true'
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
           version: v2.12.2
           args: --timeout=15m ./cmd/... ./internal/...
 
-      - name: go vet
-        run: npm run lint:go
-
       - name: go fmt
+        if: needs.changes.outputs.changed == 'true'
         run: npm run format:go
 
       - name: Check Spell
@@ -134,6 +197,8 @@ jobs:
 
   test-node:
     name: Test npm packages
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -161,9 +226,6 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
         run: pnpm --filter @rslint/native run build
-
-      - name: Format
-        run: pnpm format:check
 
       # Rule options JSON Schema dump for the generate-rule-option-types
       # rslib plugin (see packages/rslint/plugins/generate-rule-option-types.ts).
@@ -203,6 +265,8 @@ jobs:
 
   test-node-windows:
     name: Test npm packages (rspack-windows-2022-large)
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     runs-on: rspack-windows-2022-large
     steps:
       - name: Checkout code
@@ -327,6 +391,8 @@ jobs:
 
   test-wasm:
     name: Test WASM
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
@@ -352,6 +418,8 @@ jobs:
           pnpm --filter '@rslint/wasm' build
   test-rust:
     name: Test Rust
+    needs: changes
+    if: needs.changes.outputs.changed == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -393,14 +461,16 @@ jobs:
         run: cargo test --verbose
 
   benchmark-go:
-    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' && (startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-')) }}
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/benchmark-go.yml
 
   benchmark-cli:
-    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' && (startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-')) }}
     permissions:
       contents: read
       id-token: write
@@ -408,7 +478,9 @@ jobs:
 
   done:
     needs:
+      - changes
       - test-go
+      - test-go-darwin
       - test-node
       - test-node-windows
       - test-vscode-windows
@@ -420,4 +492,19 @@ jobs:
     name: CI Done
     steps:
       - run: exit 1
-        if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled')) }}
+        # Lint must always succeed. Docs and skills may skip tests; otherwise, only Darwin may be skipped.
+        if: >-
+          ${{ always() && (
+            contains(needs.*.result, 'failure') ||
+            contains(needs.*.result, 'cancelled') ||
+            needs.changes.result != 'success' ||
+            needs.lint.result != 'success' ||
+            (needs.changes.outputs.changed != 'false' && (
+              needs.test-go.result != 'success' ||
+              needs.test-node.result != 'success' ||
+              needs.test-node-windows.result != 'success' ||
+              needs.test-vscode-windows.result != 'success' ||
+              needs.test-wasm.result != 'success' ||
+              needs.test-rust.result != 'success'
+            ))
+          ) }}

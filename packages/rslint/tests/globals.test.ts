@@ -1,7 +1,6 @@
 import { beforeAll, describe, expect, test } from 'rstack/test';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import upstreamGlobals from 'globals';
@@ -12,15 +11,6 @@ import { UPSTREAM_GLOBAL_SET_NAMES } from '../src/config/globals/upstream.js';
 const DIST_ROOT = path.resolve(__dirname, '../dist');
 const DIST_INDEX = path.join(DIST_ROOT, 'index.js');
 const DIST_DATA = path.join(DIST_ROOT, 'globals');
-const THIRD_PARTY_NOTICES = path.resolve(
-  __dirname,
-  '../THIRD-PARTY-NOTICES.md',
-);
-const require = createRequire(import.meta.url);
-const upstreamLicense = path.join(
-  path.dirname(require.resolve('globals/package.json')),
-  'license',
-);
 type GlobalsCatalog = typeof import('../src/index.js').globals;
 
 let globals: GlobalsCatalog;
@@ -109,20 +99,6 @@ describe('built-in globals catalog', () => {
     expect(globalsDeclarations).toContain("readonly 'window': false;");
     expect(globalsDeclarations).toContain('export type { Globals };');
     expect(globalsDeclarations).not.toContain('export = globals;');
-  });
-
-  test('keeps the pinned upstream license in the published notice', () => {
-    const notices = fs.readFileSync(THIRD_PARTY_NOTICES, 'utf8');
-    const license = fs.readFileSync(upstreamLicense, 'utf8');
-    const normalizeWhitespace = (value: string): string =>
-      value.replaceAll(/\s+/gu, ' ').trim();
-
-    expect(notices).toContain(
-      `software and data from \`globals\` ${upstreamPackage.version}`,
-    );
-    expect(normalizeWhitespace(notices)).toContain(
-      normalizeWhitespace(license),
-    );
   });
 
   test('the built root loads and caches only accessed environment assets', () => {

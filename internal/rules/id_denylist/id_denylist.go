@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
@@ -227,6 +227,9 @@ func shouldCheck(ctx rule.RuleContext, node *ast.Node) bool {
 	if parent.Kind == ast.KindPropertyAccessExpression &&
 		parent.AsPropertyAccessExpression().Name() == node {
 		return isAssignmentTarget(parent)
+	}
+	if utils.IsHeritageQualifiedName(parent) && parent.AsQualifiedName().Right == node {
+		return false
 	}
 
 	// A callee or an argument of a call or a `new` is never checked. tsgo

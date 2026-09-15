@@ -3,7 +3,7 @@ package program
 import (
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // The key identifies syntax-only data stored by ts-go on each SourceFile. It

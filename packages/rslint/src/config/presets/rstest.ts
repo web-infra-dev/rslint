@@ -4,6 +4,7 @@ const recommended: RslintConfigEntry = {
   plugins: ['rstest'],
   rules: {
     'rstest/expect-expect': 'warn',
+    'rstest/no-async-mock-factory': 'error',
     'rstest/no-commented-out-tests': 'warn',
     'rstest/no-conditional-expect': 'error',
     'rstest/no-disabled-tests': 'warn',

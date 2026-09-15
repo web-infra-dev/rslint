@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 

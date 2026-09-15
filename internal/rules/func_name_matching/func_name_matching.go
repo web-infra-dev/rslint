@@ -4,8 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -379,7 +379,7 @@ var es6ReservedWords = map[string]bool{
 // treats it as reserved.
 //
 // Divergence: character-shape validity is answered by tsgo's own scanner
-// tables (github.com/microsoft/typescript-go/shim/scanner.IsValidIdentifier),
+// tables (github.com/microsoft/TypeScript/tsc/shim/scanner.IsValidIdentifier),
 // which track a current Unicode identifier snapshot rather than the frozen
 // tables esutils ships for both its ES5 and ES6 paths. Code points absent from
 // those tables (e.g. U+1885 in the ES5 path or post-Unicode-9 U+10570 in the

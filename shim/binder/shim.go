@@ -3,13 +3,13 @@
 
 package binder
 
-import "github.com/microsoft/typescript-go/internal/ast"
-import "github.com/microsoft/typescript-go/internal/binder"
-import "github.com/microsoft/typescript-go/internal/core"
+import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/microsoft/TypeScript/tsc/internal/binder"
+import "github.com/microsoft/TypeScript/tsc/internal/core"
 import _ "unsafe"
 
 type ActiveLabel = binder.ActiveLabel
-//go:linkname BindSourceFile github.com/microsoft/typescript-go/internal/binder.BindSourceFile
+//go:linkname BindSourceFile github.com/microsoft/TypeScript/tsc/internal/binder.BindSourceFile
 func BindSourceFile(file *ast.SourceFile)
 type Binder = binder.Binder
 type ContainerFlags = binder.ContainerFlags
@@ -25,18 +25,18 @@ const ContainerFlagsIsThisContainer = binder.ContainerFlagsIsThisContainer
 const ContainerFlagsNone = binder.ContainerFlagsNone
 const ContainerFlagsPropagatesThisKeyword = binder.ContainerFlagsPropagatesThisKeyword
 type ExpandoAssignmentInfo = binder.ExpandoAssignmentInfo
-//go:linkname FindUseStrictPrologue github.com/microsoft/typescript-go/internal/binder.FindUseStrictPrologue
+//go:linkname FindUseStrictPrologue github.com/microsoft/TypeScript/tsc/internal/binder.FindUseStrictPrologue
 func FindUseStrictPrologue(sourceFile *ast.SourceFile, statements []*ast.Node) *ast.Node
-//go:linkname GetContainerFlags github.com/microsoft/typescript-go/internal/binder.GetContainerFlags
+//go:linkname GetContainerFlags github.com/microsoft/TypeScript/tsc/internal/binder.GetContainerFlags
 func GetContainerFlags(node *ast.Node) binder.ContainerFlags
-//go:linkname GetLocalSymbolForExportDefault github.com/microsoft/typescript-go/internal/binder.GetLocalSymbolForExportDefault
+//go:linkname GetLocalSymbolForExportDefault github.com/microsoft/TypeScript/tsc/internal/binder.GetLocalSymbolForExportDefault
 func GetLocalSymbolForExportDefault(symbol *ast.Symbol) *ast.Symbol
-//go:linkname GetSymbolNameForPrivateIdentifier github.com/microsoft/typescript-go/internal/binder.GetSymbolNameForPrivateIdentifier
+//go:linkname GetSymbolNameForPrivateIdentifier github.com/microsoft/TypeScript/tsc/internal/binder.GetSymbolNameForPrivateIdentifier
 func GetSymbolNameForPrivateIdentifier(containingClassSymbol *ast.Symbol, description string) string
 type NameResolver = binder.NameResolver
-//go:linkname NewReferenceResolver github.com/microsoft/typescript-go/internal/binder.NewReferenceResolver
+//go:linkname NewReferenceResolver github.com/microsoft/TypeScript/tsc/internal/binder.NewReferenceResolver
 func NewReferenceResolver(options *core.CompilerOptions, hooks binder.ReferenceResolverHooks) binder.ReferenceResolver
 type ReferenceResolver = binder.ReferenceResolver
 type ReferenceResolverHooks = binder.ReferenceResolverHooks
-//go:linkname SetValueDeclaration github.com/microsoft/typescript-go/internal/binder.SetValueDeclaration
+//go:linkname SetValueDeclaration github.com/microsoft/TypeScript/tsc/internal/binder.SetValueDeclaration
 func SetValueDeclaration(symbol *ast.Symbol, node *ast.Node)

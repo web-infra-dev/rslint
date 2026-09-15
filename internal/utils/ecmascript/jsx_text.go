@@ -5,7 +5,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
+	jsxtx "github.com/microsoft/TypeScript/tsc/shim/transformers/jsxtransforms"
 )
 
 // DecodeJSXEntities decodes the character references that JSX parsers expose

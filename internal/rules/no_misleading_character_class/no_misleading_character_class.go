@@ -19,8 +19,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -75,14 +75,14 @@ var regexpGlobalObjectNames = [...]string{
 }
 
 func sourceMayUseRegExp(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["RegExp"]; ok {
+	if sourceFile.HasIdentifier("RegExp") {
 		return true
 	}
 	for _, name := range regexpGlobalObjectNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

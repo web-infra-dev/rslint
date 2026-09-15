@@ -5,10 +5,10 @@ import (
 	"strings"
 	_ "unsafe"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
 // sanitizeSymbolName replaces the internal symbol name prefix (\xFE) with "__"
@@ -20,7 +20,7 @@ func sanitizeSymbolName(name string) []byte {
 	return []byte(name)
 }
 
-//go:linkname getAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetAliasedSymbol
+//go:linkname getAliasedSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).GetAliasedSymbol
 func getAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
 type CString = []byte
@@ -44,16 +44,6 @@ type ExternalSymbol struct {
 	SymbolId  ast.SymbolId `json:"symbol_id"`
 	Namespace CString      `json:"namespace"`
 	Name      CString      `json:"name"`
-}
-type TypeExtra struct {
-	Name map[int]CString      `json:"name"`
-	Func map[int]FunctionData `json:"func"`
-}
-type FunctionData struct {
-	Signatures []FuncSignature `json:"signatures"`
-}
-type FuncSignature struct {
-	Result checker.TypeId `json:"result"`
 }
 type TypeInfo struct {
 	Id          checker.TypeId `json:"id"`
@@ -157,11 +147,11 @@ type Semantic struct {
 	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
 	NodeFlags    map[NodeReference]uint32         `json:"node_flags"`
 	Primtypes    PrimTypes                        `json:"primtypes"`
-	TypeExtra    TypeExtra                        `json:"type_extra"`
-	FuncData     FunctionData                     `json:"func_data"`
 	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
 	// (node -> value_symbol_id)
 	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
+	// ShorthandBindingSymbols maps local shorthand object binding symbols to the property symbols they read.
+	ShorthandBindingSymbols map[ast.SymbolId]ast.SymbolId `json:"shorthand_binding_symbols"`
 	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
 	// The primary symbol remains recorded in Node2sym.
 	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
@@ -179,16 +169,10 @@ func NewSemantic() Semantic {
 		Node2type:                make(map[NodeReference]checker.TypeId),
 		NodeFlags:                make(map[NodeReference]uint32),
 		ShorthandSymbols:         make(map[NodeReference]ast.SymbolId),
+		ShorthandBindingSymbols:  make(map[ast.SymbolId]ast.SymbolId),
 		ParameterPropertySymbols: make(map[NodeReference]ast.SymbolId),
 		ExternalSymbols:          []ExternalSymbol{},
 		Primtypes:                PrimTypes{},
-		TypeExtra: TypeExtra{
-			Name: make(map[int]CString),
-			Func: make(map[int]FunctionData),
-		},
-		FuncData: FunctionData{
-			Signatures: []FuncSignature{},
-		},
 	}
 }
 func initPrimitiveTypes(tc *checker.Checker, semantic *Semantic) {
@@ -250,43 +234,9 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		}
 	}
 
-	recordType := func(ty *checker.Type) checker.TypeId {
-		if ty == nil {
-			return 0
-		}
-
-		typeID := ty.Id()
-		if _, exists := semantic.Typetab[typeID]; !exists {
-			typeInfo := TypeInfo{
-				Id:          typeID,
-				Flags:       int(ty.Flags()),
-				ObjectFlags: int(ty.ObjectFlags()),
-			}
-			if symbol := ty.Symbol(); symbol != nil {
-				typeInfo.Symbol = ast.GetSymbolId(symbol)
-			}
-			semantic.Typetab[typeID] = typeInfo
-			semantic.TypeExtra.Name[int(typeID)] = []byte(tc.TypeToString(ty))
-			callSignatures := tc.GetCallSignatures(ty)
-			if len(callSignatures) > 0 {
-				signatures := []FuncSignature{}
-				for _, sig := range callSignatures {
-					returnType := checker.Checker_getReturnTypeOfSignature(tc, sig)
-					signatures = append(signatures, FuncSignature{
-						Result: returnType.Id(),
-					})
-
-				}
-				semantic.TypeExtra.Func[int(typeID)] = FunctionData{
-					Signatures: signatures,
-				}
-			}
-		}
-
-		return typeID
-	}
-	// A symbol can be reached from multiple AST nodes and alias edges. Record each
-	// Symtab entry once, then reuse it on subsequent visits.
+	// Type symbols such as anonymous type literals are not necessarily returned by
+	// GetSymbolAtLocation while walking the AST. Record them when they are reached
+	// through a type so every non-zero TypeInfo.Symbol has a Symtab entry.
 	recordSymbolInfo := func(symbol *ast.Symbol) ast.SymbolId {
 		if symbol == nil {
 			return 0
@@ -303,6 +253,36 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			}
 		}
 		return symbolID
+	}
+
+	recordType := func(ty *checker.Type) checker.TypeId {
+		if ty == nil {
+			return 0
+		}
+
+		typeID := ty.Id()
+		var symbolID ast.SymbolId
+		if symbol := ty.Symbol(); symbol != nil {
+			symbolID = recordSymbolInfo(symbol)
+		}
+
+		if _, exists := semantic.Typetab[typeID]; !exists {
+			typeInfo := TypeInfo{
+				Id:          typeID,
+				Flags:       int(ty.Flags()),
+				ObjectFlags: int(ty.ObjectFlags()),
+				Symbol:      symbolID,
+			}
+			semantic.Typetab[typeID] = typeInfo
+		} else if symbolID != 0 {
+			typeInfo := semantic.Typetab[typeID]
+			if typeInfo.Symbol == 0 {
+				typeInfo.Symbol = symbolID
+				semantic.Typetab[typeID] = typeInfo
+			}
+		}
+
+		return typeID
 	}
 	recordSymbol := func(symbol *ast.Symbol) (ast.SymbolId, checker.TypeId, bool) {
 		if symbol == nil {
@@ -378,6 +358,26 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				value_sym_id := ast.GetSymbolId(valueSymbol)
 				semantic.ShorthandSymbols[key] = value_sym_id
 				recordSymbol(valueSymbol)
+			}
+
+			// In an object binding shorthand such as `const { y } = x`, the identifier's
+			// primary symbol is the new local binding. Record the source property symbol
+			// separately, matching the symbol returned for `y` in `x.y`.
+			if ast.IsIdentifier(node) && node.Parent != nil && ast.IsBindingElement(node.Parent) {
+				binding := node.Parent.AsBindingElement()
+				pattern := node.Parent.Parent
+				if binding.PropertyName == nil && binding.DotDotDotToken == nil &&
+					node.Parent.Name() == node && ast.IsObjectBindingPattern(pattern) {
+					if patternType := tc.GetTypeAtLocation(pattern); patternType != nil {
+						if propertySymbol := tc.GetPropertyOfType(patternType, node.Text()); propertySymbol != nil {
+							propertySymbolID := ast.GetSymbolId(propertySymbol)
+							if localSymbolID, ok := semantic.Node2sym[key]; ok {
+								semantic.ShorthandBindingSymbols[localSymbolID] = propertySymbolID
+							}
+							recordSymbol(propertySymbol)
+						}
+					}
+				}
 			}
 
 			if ast.IsParameterPropertyDeclaration(node, node.Parent) {

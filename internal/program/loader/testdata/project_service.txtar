@@ -1,0 +1,72 @@
+-- tsconfig.json --
+{"files":["unrelated.ts"]}
+-- unrelated.ts --
+export const unrelated: number = "wrong";
+-- a/tsconfig.json --
+{"compilerOptions":{"strict":true},"include":["src/**/*.ts"]}
+-- a/src/file.ts --
+export const selected = 1;
+-- a/src/sibling.ts --
+export const sibling: number = "wrong";
+-- a/src/disabled.ts --
+export const disabled: number = "wrong";
+-- b/tsconfig.json --
+{"compilerOptions":{"strict":false},"include":["src/**/*.ts"]}
+-- b/custom.json --
+{"compilerOptions":{"strict":true},"files":["src/file.ts"]}
+-- b/src/file.ts --
+export const selected: string = undefined;
+-- outside/file.ts --
+export const outside = 1;
+-- outside/file.tsx --
+export const outside = 1;
+-- outside/file.mts --
+export const outside = 1;
+-- outside/file.cts --
+export const outside = 1;
+-- outside/file.js --
+export const outside = 1;
+-- outside/file.jsx --
+export const outside = 1;
+-- outside/file.mjs --
+export const outside = 1;
+-- outside/file.cjs --
+exports.outside = 1;
+-- gap-overlap.json --
+{"compilerOptions":{"allowJs":true},"files":["b/src/file.ts","outside/file.ts","outside/file.tsx","outside/file.mts","outside/file.cts","outside/file.js","outside/file.jsx","outside/file.mjs","outside/file.cjs"]}
+-- shared.json --
+{"files":["a/src/file.ts","b/src/file.ts"]}
+-- service/tsconfig.json --
+{"files":["file.ts"]}
+-- service/file.ts --
+export const service = 1;
+-- legacy-policy/pkg[1]/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- legacy-policy/pkg[1]/tsconfig.unsafe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","unsafe.d.ts"]}
+-- legacy-policy/pkg[1]/tsconfig.safe.json --
+{"compilerOptions":{"noLib":true},"files":["target.ts","safe.d.ts"]}
+-- legacy-policy/pkg[1]/tsconfig.other.json --
+{"compilerOptions":{"noLib":true},"files":["other.ts"]}
+-- legacy-policy/pkg[1]/target.ts --
+export const result: string = value.member;
+-- legacy-policy/pkg[1]/other.ts --
+export const other = 1;
+-- legacy-policy/pkg[1]/unsafe.d.ts --
+declare const value: any;
+-- legacy-policy/pkg[1]/safe.d.ts --
+declare const value: { member: number };
+-- root-contexts/owner/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["x.ts","y.ts"]}
+-- root-contexts/owner/x.ts --
+export const x = 1;
+-- root-contexts/owner/y.ts --
+export const result: string = value.member;
+-- root-contexts/a[1]/config.json --
+{"compilerOptions":{"noLib":true},"files":["../owner/x.ts","../owner/y.ts","unsafe.d.ts"]}
+-- root-contexts/a[1]/unsafe.d.ts --
+declare const value: any;
+-- root-contexts/b/config.json --
+{"compilerOptions":{"noLib":true},"files":["../owner/y.ts","safe.d.ts"]}
+-- root-contexts/b/safe.d.ts --
+declare const value: { member: number };

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -77,6 +77,11 @@ var PreferNumberPropertiesRule = rule.Rule{
 				}
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
+				if ref, ok := globalMemberReference(&ctx, node, opts); ok {
+					report(ref)
+				}
+			},
+			ast.KindQualifiedName: func(node *ast.Node) {
 				if ref, ok := globalMemberReference(&ctx, node, opts); ok {
 					report(ref)
 				}
@@ -170,11 +175,15 @@ func referenceFromNode(node *ast.Node, name string) globalReference {
 
 func globalMemberReference(ctx *rule.RuleContext, node *ast.Node, opts preferNumberPropertiesOptions) (globalReference, bool) {
 	propertyName, ok := utils.AccessExpressionStaticName(node)
+	object, property := utils.MemberExpressionParts(node)
+	if node.Kind == ast.KindQualifiedName && property != nil {
+		propertyName, ok = property.AsIdentifier().Text, true
+	}
 	if !ok || !isTrackedGlobalName(propertyName) || !enabled(propertyName, opts) {
 		return globalReference{}, false
 	}
 
-	object := utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
+	object = utils.SkipAssertionsAndParens(object)
 	if object == nil || !ast.IsIdentifier(object) {
 		return globalReference{}, false
 	}

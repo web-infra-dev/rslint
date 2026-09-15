@@ -1,0 +1,2562 @@
+[
+  {
+    "rule": "no-restricted-properties",
+    "name": "value",
+    "code": "Foo.bar;",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedObjectProperty",
+        "message": "'Foo.bar' is restricted from being used.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "class-extends",
+    "code": "class good extends Foo.bar {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedObjectProperty",
+        "message": "'Foo.bar' is restricted from being used.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "interface-extends",
+    "code": "interface good extends Foo.bar {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedObjectProperty",
+        "message": "'Foo.bar' is restricted from being used.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "class-implements",
+    "code": "class good implements Foo.bar {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedObjectProperty",
+        "message": "'Foo.bar' is restricted from being used.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "type-reference",
+    "code": "type good = Foo.bar;",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "type-query",
+    "code": "type good = typeof Foo.bar;",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "type-argument",
+    "code": "interface good extends Box<Foo.bar> {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "value",
+    "code": "Foo._bar;",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_bar'.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 9
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "class-extends",
+    "code": "class good extends Foo._bar {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_bar'.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 28
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "interface-extends",
+    "code": "interface good extends Foo._bar {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_bar'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 32
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "class-implements",
+    "code": "class good implements Foo._bar {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_bar'.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "type-reference",
+    "code": "type good = Foo._bar;",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "type-query",
+    "code": "type good = typeof Foo._bar;",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "type-argument",
+    "code": "interface good extends Box<Foo._bar> {}",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "value",
+    "code": "Foo.bar;",
+    "options": ["MemberExpression[property.name='bar']"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "class-extends",
+    "code": "class good extends Foo.bar {}",
+    "options": ["MemberExpression[property.name='bar']"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "interface-extends",
+    "code": "interface good extends Foo.bar {}",
+    "options": ["MemberExpression[property.name='bar']"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "class-implements",
+    "code": "class good implements Foo.bar {}",
+    "options": ["MemberExpression[property.name='bar']"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "type-reference",
+    "code": "type good = Foo.bar;",
+    "options": ["MemberExpression[property.name='bar']"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "type-query",
+    "code": "type good = typeof Foo.bar;",
+    "options": ["MemberExpression[property.name='bar']"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "type-argument",
+    "code": "interface good extends Box<Foo.bar> {}",
+    "options": ["MemberExpression[property.name='bar']"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "value",
+    "code": "console.warn;",
+    "options": [],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Unexpected console statement.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 13
+      }
+    ]
+  },
+  {
+    "rule": "no-console",
+    "name": "class-extends",
+    "code": "class good extends console.warn {}",
+    "options": [],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Unexpected console statement.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 32
+      }
+    ]
+  },
+  {
+    "rule": "no-console",
+    "name": "interface-extends",
+    "code": "interface good extends console.warn {}",
+    "options": [],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Unexpected console statement.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 36
+      }
+    ]
+  },
+  {
+    "rule": "no-console",
+    "name": "class-implements",
+    "code": "class good implements console.warn {}",
+    "options": [],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Unexpected console statement.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 35
+      }
+    ]
+  },
+  {
+    "rule": "no-console",
+    "name": "type-reference",
+    "code": "type good = console.warn;",
+    "options": [],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "type-query",
+    "code": "type good = typeof console.warn;",
+    "options": [],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "type-argument",
+    "code": "interface good extends Box<console.warn> {}",
+    "options": [],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "value",
+    "code": "window.eval;",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 8,
+        "endLine": 1,
+        "endColumn": 12
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "class-extends",
+    "code": "class good extends window.eval {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 27,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "interface-extends",
+    "code": "interface good extends window.eval {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 31,
+        "endLine": 1,
+        "endColumn": 35
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "class-implements",
+    "code": "class good implements window.eval {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 30,
+        "endLine": 1,
+        "endColumn": 34
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "type-reference",
+    "code": "type good = window.eval;",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "type-query",
+    "code": "type good = typeof window.eval;",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "type-argument",
+    "code": "interface good extends Box<window.eval> {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "value",
+    "code": "Foo.bar;",
+    "options": ["Foo"],
+    "globals": {
+      "Foo": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'Foo'.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 4
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "class-extends",
+    "code": "class good extends Foo.bar {}",
+    "options": ["Foo"],
+    "globals": {
+      "Foo": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'Foo'.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 23
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "interface-extends",
+    "code": "interface good extends Foo.bar {}",
+    "options": ["Foo"],
+    "globals": {
+      "Foo": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'Foo'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "class-implements",
+    "code": "class good implements Foo.bar {}",
+    "options": ["Foo"],
+    "globals": {
+      "Foo": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'Foo'.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 26
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "type-reference",
+    "code": "type good = Foo.bar;",
+    "options": ["Foo"],
+    "globals": {
+      "Foo": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "type-query",
+    "code": "type good = typeof Foo.bar;",
+    "options": ["Foo"],
+    "globals": {
+      "Foo": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "type-argument",
+    "code": "interface good extends Box<Foo.bar> {}",
+    "options": ["Foo"],
+    "globals": {
+      "Foo": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-caller",
+    "name": "value",
+    "code": "function f() { arguments.callee; }",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Avoid arguments.callee.",
+        "line": 1,
+        "column": 16,
+        "endLine": 1,
+        "endColumn": 32
+      }
+    ]
+  },
+  {
+    "rule": "no-caller",
+    "name": "class-extends",
+    "code": "function f() { class good extends arguments.callee {} }",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Avoid arguments.callee.",
+        "line": 1,
+        "column": 35,
+        "endLine": 1,
+        "endColumn": 51
+      }
+    ]
+  },
+  {
+    "rule": "no-caller",
+    "name": "interface-extends",
+    "code": "function f() { interface good extends arguments.callee {} }",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Avoid arguments.callee.",
+        "line": 1,
+        "column": 39,
+        "endLine": 1,
+        "endColumn": 55
+      }
+    ]
+  },
+  {
+    "rule": "no-caller",
+    "name": "class-implements",
+    "code": "function f() { class good implements arguments.callee {} }",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "Avoid arguments.callee.",
+        "line": 1,
+        "column": 38,
+        "endLine": 1,
+        "endColumn": 54
+      }
+    ]
+  },
+  {
+    "rule": "no-caller",
+    "name": "type-reference",
+    "code": "function f() { type good = arguments.callee; }",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-caller",
+    "name": "type-query",
+    "code": "function f() { type good = typeof arguments.callee; }",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-caller",
+    "name": "type-argument",
+    "code": "function f() { interface good extends Box<arguments.callee> {} }",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-proto",
+    "name": "value",
+    "code": "Foo.__proto__;",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedProto",
+        "message": "The '__proto__' property is deprecated.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 14
+      }
+    ]
+  },
+  {
+    "rule": "no-proto",
+    "name": "class-extends",
+    "code": "class good extends Foo.__proto__ {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedProto",
+        "message": "The '__proto__' property is deprecated.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 33
+      }
+    ]
+  },
+  {
+    "rule": "no-proto",
+    "name": "interface-extends",
+    "code": "interface good extends Foo.__proto__ {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedProto",
+        "message": "The '__proto__' property is deprecated.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 37
+      }
+    ]
+  },
+  {
+    "rule": "no-proto",
+    "name": "class-implements",
+    "code": "class good implements Foo.__proto__ {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedProto",
+        "message": "The '__proto__' property is deprecated.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 36
+      }
+    ]
+  },
+  {
+    "rule": "no-proto",
+    "name": "type-reference",
+    "code": "type good = Foo.__proto__;",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-proto",
+    "name": "type-query",
+    "code": "type good = typeof Foo.__proto__;",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-proto",
+    "name": "type-argument",
+    "code": "interface good extends Box<Foo.__proto__> {}",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-iterator",
+    "name": "value",
+    "code": "Foo.__iterator__;",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "noIterator",
+        "message": "Reserved name '__iterator__'.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 17
+      }
+    ]
+  },
+  {
+    "rule": "no-iterator",
+    "name": "class-extends",
+    "code": "class good extends Foo.__iterator__ {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "noIterator",
+        "message": "Reserved name '__iterator__'.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 36
+      }
+    ]
+  },
+  {
+    "rule": "no-iterator",
+    "name": "interface-extends",
+    "code": "interface good extends Foo.__iterator__ {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "noIterator",
+        "message": "Reserved name '__iterator__'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 40
+      }
+    ]
+  },
+  {
+    "rule": "no-iterator",
+    "name": "class-implements",
+    "code": "class good implements Foo.__iterator__ {}",
+    "options": [],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "noIterator",
+        "message": "Reserved name '__iterator__'.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 39
+      }
+    ]
+  },
+  {
+    "rule": "no-iterator",
+    "name": "type-reference",
+    "code": "type good = Foo.__iterator__;",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-iterator",
+    "name": "type-query",
+    "code": "type good = typeof Foo.__iterator__;",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-iterator",
+    "name": "type-argument",
+    "code": "interface good extends Box<Foo.__iterator__> {}",
+    "options": [],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "value",
+    "code": "Foo.bar;",
+    "options": ["bar"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "class-extends",
+    "code": "class good extends Foo.bar {}",
+    "options": ["bar"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "interface-extends",
+    "code": "interface good extends Foo.bar {}",
+    "options": ["bar"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "class-implements",
+    "code": "class good implements Foo.bar {}",
+    "options": ["bar"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "type-reference",
+    "code": "type good = Foo.bar;",
+    "options": ["bar"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'bar' is restricted.",
+        "line": 1,
+        "column": 17,
+        "endLine": 1,
+        "endColumn": 20
+      }
+    ]
+  },
+  {
+    "rule": "id-denylist",
+    "name": "type-query",
+    "code": "type good = typeof Foo.bar;",
+    "options": ["bar"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'bar' is restricted.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "id-denylist",
+    "name": "type-argument",
+    "code": "interface good extends Box<Foo.bar> {}",
+    "options": ["bar"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'bar' is restricted.",
+        "line": 1,
+        "column": 32,
+        "endLine": 1,
+        "endColumn": 35
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "value",
+    "code": "foo.BAD;",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": false
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-match",
+    "name": "class-extends",
+    "code": "class good extends foo.BAD {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": false
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-match",
+    "name": "interface-extends",
+    "code": "interface good extends foo.BAD {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": false
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-match",
+    "name": "class-implements",
+    "code": "class good implements foo.BAD {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": false
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-match",
+    "name": "type-reference",
+    "code": "type good = foo.BAD;",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": false
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 17,
+        "endLine": 1,
+        "endColumn": 20
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "type-query",
+    "code": "type good = typeof foo.BAD;",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": false
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "type-argument",
+    "code": "interface good extends Box<foo.BAD> {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": false
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'Box' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      },
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 32,
+        "endLine": 1,
+        "endColumn": 35
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "fields/value",
+    "code": "Foo.bar;",
+    "options": [
+      "MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']"
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "fields/class-extends",
+    "code": "class good extends Foo.bar {}",
+    "options": [
+      "MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']"
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "fields/interface-extends",
+    "code": "interface good extends Foo.bar {}",
+    "options": [
+      "MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']"
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "fields/class-implements",
+    "code": "class good implements Foo.bar {}",
+    "options": [
+      "MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']"
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']' is not allowed.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "fields/type-reference",
+    "code": "type good = Foo.bar;",
+    "options": [
+      "MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']"
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "fields/type-query",
+    "code": "type good = typeof Foo.bar;",
+    "options": [
+      "MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']"
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "fields/type-argument",
+    "code": "interface good extends Box<Foo.bar> {}",
+    "options": [
+      "MemberExpression[computed=false][optional=false][object.name='Foo'][property.name='bar']"
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "property-selector/value",
+    "code": "Foo.bar;",
+    "options": ["MemberExpression > Identifier.property"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > Identifier.property' is not allowed.",
+        "line": 1,
+        "column": 5,
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "property-selector/class-extends",
+    "code": "class good extends Foo.bar {}",
+    "options": ["MemberExpression > Identifier.property"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > Identifier.property' is not allowed.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "property-selector/interface-extends",
+    "code": "interface good extends Foo.bar {}",
+    "options": ["MemberExpression > Identifier.property"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > Identifier.property' is not allowed.",
+        "line": 1,
+        "column": 28,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "property-selector/class-implements",
+    "code": "class good implements Foo.bar {}",
+    "options": ["MemberExpression > Identifier.property"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > Identifier.property' is not allowed.",
+        "line": 1,
+        "column": 27,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "property-selector/type-reference",
+    "code": "type good = Foo.bar;",
+    "options": ["MemberExpression > Identifier.property"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "property-selector/type-query",
+    "code": "type good = typeof Foo.bar;",
+    "options": ["MemberExpression > Identifier.property"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "property-selector/type-argument",
+    "code": "interface good extends Box<Foo.bar> {}",
+    "options": ["MemberExpression > Identifier.property"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "has-selector/value",
+    "code": "Foo.bar;",
+    "options": ["MemberExpression:has(> Identifier[name='bar'])"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression:has(> Identifier[name='bar'])' is not allowed.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "has-selector/class-extends",
+    "code": "class good extends Foo.bar {}",
+    "options": ["MemberExpression:has(> Identifier[name='bar'])"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression:has(> Identifier[name='bar'])' is not allowed.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "has-selector/interface-extends",
+    "code": "interface good extends Foo.bar {}",
+    "options": ["MemberExpression:has(> Identifier[name='bar'])"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression:has(> Identifier[name='bar'])' is not allowed.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "has-selector/class-implements",
+    "code": "class good implements Foo.bar {}",
+    "options": ["MemberExpression:has(> Identifier[name='bar'])"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression:has(> Identifier[name='bar'])' is not allowed.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "has-selector/type-reference",
+    "code": "type good = Foo.bar;",
+    "options": ["MemberExpression:has(> Identifier[name='bar'])"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "has-selector/type-query",
+    "code": "type good = typeof Foo.bar;",
+    "options": ["MemberExpression:has(> Identifier[name='bar'])"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "has-selector/type-argument",
+    "code": "interface good extends Box<Foo.bar> {}",
+    "options": ["MemberExpression:has(> Identifier[name='bar'])"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "nested-selector/value",
+    "code": "Foo.bar.baz;",
+    "options": ["MemberExpression > MemberExpression"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > MemberExpression' is not allowed.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "nested-selector/class-extends",
+    "code": "class good extends Foo.bar.baz {}",
+    "options": ["MemberExpression > MemberExpression"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > MemberExpression' is not allowed.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "nested-selector/interface-extends",
+    "code": "interface good extends Foo.bar.baz {}",
+    "options": ["MemberExpression > MemberExpression"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > MemberExpression' is not allowed.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "nested-selector/class-implements",
+    "code": "class good implements Foo.bar.baz {}",
+    "options": ["MemberExpression > MemberExpression"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedSyntax",
+        "message": "Using 'MemberExpression > MemberExpression' is not allowed.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "nested-selector/type-reference",
+    "code": "type good = Foo.bar.baz;",
+    "options": ["MemberExpression > MemberExpression"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "nested-selector/type-query",
+    "code": "type good = typeof Foo.bar.baz;",
+    "options": ["MemberExpression > MemberExpression"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-syntax",
+    "name": "nested-selector/type-argument",
+    "code": "interface good extends Box<Foo.bar.baz> {}",
+    "options": ["MemberExpression > MemberExpression"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "nested-property/value",
+    "code": "NS.Foo.bar;",
+    "options": [
+      {
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedProperty",
+        "message": "'bar' is restricted from being used.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 11
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "nested-property/class-extends",
+    "code": "class good extends NS.Foo.bar {}",
+    "options": [
+      {
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedProperty",
+        "message": "'bar' is restricted from being used.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "nested-property/interface-extends",
+    "code": "interface good extends NS.Foo.bar {}",
+    "options": [
+      {
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedProperty",
+        "message": "'bar' is restricted from being used.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 34
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "nested-property/class-implements",
+    "code": "class good implements NS.Foo.bar {}",
+    "options": [
+      {
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restrictedProperty",
+        "message": "'bar' is restricted from being used.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 33
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "nested-property/type-reference",
+    "code": "type good = NS.Foo.bar;",
+    "options": [
+      {
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "nested-property/type-query",
+    "code": "type good = typeof NS.Foo.bar;",
+    "options": [
+      {
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "nested-property/type-argument",
+    "code": "interface good extends Box<NS.Foo.bar> {}",
+    "options": [
+      {
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "qualified-receiver/value",
+    "code": "NS.Foo.bar;",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "qualified-receiver/class-extends",
+    "code": "class good extends NS.Foo.bar {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "qualified-receiver/interface-extends",
+    "code": "interface good extends NS.Foo.bar {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "qualified-receiver/class-implements",
+    "code": "class good implements NS.Foo.bar {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "qualified-receiver/type-reference",
+    "code": "type good = NS.Foo.bar;",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "qualified-receiver/type-query",
+    "code": "type good = typeof NS.Foo.bar;",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-properties",
+    "name": "qualified-receiver/type-argument",
+    "code": "interface good extends Box<NS.Foo.bar> {}",
+    "options": [
+      {
+        "object": "Foo",
+        "property": "bar"
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "allowed-nested-property/value",
+    "code": "NS._foo._bar;",
+    "options": [
+      {
+        "allow": ["_bar"]
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_foo'.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 8
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "allowed-nested-property/class-extends",
+    "code": "class good extends NS._foo._bar {}",
+    "options": [
+      {
+        "allow": ["_bar"]
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_foo'.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "allowed-nested-property/interface-extends",
+    "code": "interface good extends NS._foo._bar {}",
+    "options": [
+      {
+        "allow": ["_bar"]
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_foo'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "allowed-nested-property/class-implements",
+    "code": "class good implements NS._foo._bar {}",
+    "options": [
+      {
+        "allow": ["_bar"]
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "unexpectedUnderscore",
+        "message": "Unexpected dangling '_' in '_foo'.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 30
+      }
+    ]
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "allowed-nested-property/type-reference",
+    "code": "type good = NS._foo._bar;",
+    "options": [
+      {
+        "allow": ["_bar"]
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "allowed-nested-property/type-query",
+    "code": "type good = typeof NS._foo._bar;",
+    "options": [
+      {
+        "allow": ["_bar"]
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-underscore-dangle",
+    "name": "allowed-nested-property/type-argument",
+    "code": "interface good extends Box<NS._foo._bar> {}",
+    "options": [
+      {
+        "allow": ["_bar"]
+      }
+    ],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "allowed-property/value",
+    "code": "console.warn;",
+    "options": [
+      {
+        "allow": ["warn"]
+      }
+    ],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "allowed-property/class-extends",
+    "code": "class good extends console.warn {}",
+    "options": [
+      {
+        "allow": ["warn"]
+      }
+    ],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "allowed-property/interface-extends",
+    "code": "interface good extends console.warn {}",
+    "options": [
+      {
+        "allow": ["warn"]
+      }
+    ],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "allowed-property/class-implements",
+    "code": "class good implements console.warn {}",
+    "options": [
+      {
+        "allow": ["warn"]
+      }
+    ],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "allowed-property/type-reference",
+    "code": "type good = console.warn;",
+    "options": [
+      {
+        "allow": ["warn"]
+      }
+    ],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "allowed-property/type-query",
+    "code": "type good = typeof console.warn;",
+    "options": [
+      {
+        "allow": ["warn"]
+      }
+    ],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-console",
+    "name": "allowed-property/type-argument",
+    "code": "interface good extends Box<console.warn> {}",
+    "options": [
+      {
+        "allow": ["warn"]
+      }
+    ],
+    "globals": {
+      "console": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "nested-global/value",
+    "code": "window.window.eval;",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 15,
+        "endLine": 1,
+        "endColumn": 19
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "nested-global/class-extends",
+    "code": "class good extends window.window.eval {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 34,
+        "endLine": 1,
+        "endColumn": 38
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "nested-global/interface-extends",
+    "code": "interface good extends window.window.eval {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 38,
+        "endLine": 1,
+        "endColumn": 42
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "nested-global/class-implements",
+    "code": "class good implements window.window.eval {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "unexpected",
+        "message": "`eval` can be harmful.",
+        "line": 1,
+        "column": 37,
+        "endLine": 1,
+        "endColumn": 41
+      }
+    ]
+  },
+  {
+    "rule": "no-eval",
+    "name": "nested-global/type-reference",
+    "code": "type good = window.window.eval;",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "nested-global/type-query",
+    "code": "type good = typeof window.window.eval;",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "nested-global/type-argument",
+    "code": "interface good extends Box<window.window.eval> {}",
+    "options": [],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "allowed-indirect/value",
+    "code": "window.eval;",
+    "options": [
+      {
+        "allowIndirect": true
+      }
+    ],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "allowed-indirect/class-extends",
+    "code": "class good extends window.eval {}",
+    "options": [
+      {
+        "allowIndirect": true
+      }
+    ],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "allowed-indirect/interface-extends",
+    "code": "interface good extends window.eval {}",
+    "options": [
+      {
+        "allowIndirect": true
+      }
+    ],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "allowed-indirect/class-implements",
+    "code": "class good implements window.eval {}",
+    "options": [
+      {
+        "allowIndirect": true
+      }
+    ],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "allowed-indirect/type-reference",
+    "code": "type good = window.eval;",
+    "options": [
+      {
+        "allowIndirect": true
+      }
+    ],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "allowed-indirect/type-query",
+    "code": "type good = typeof window.eval;",
+    "options": [
+      {
+        "allowIndirect": true
+      }
+    ],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-eval",
+    "name": "allowed-indirect/type-argument",
+    "code": "interface good extends Box<window.eval> {}",
+    "options": [
+      {
+        "allowIndirect": true
+      }
+    ],
+    "globals": {
+      "window": "readonly",
+      "eval": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "global-object/value",
+    "code": "window.window.bad;",
+    "options": [
+      {
+        "globals": ["bad"],
+        "checkGlobalObject": true
+      }
+    ],
+    "globals": {
+      "window": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'bad'.",
+        "line": 1,
+        "column": 15,
+        "endLine": 1,
+        "endColumn": 18
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "global-object/class-extends",
+    "code": "class good extends window.window.bad {}",
+    "options": [
+      {
+        "globals": ["bad"],
+        "checkGlobalObject": true
+      }
+    ],
+    "globals": {
+      "window": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'bad'.",
+        "line": 1,
+        "column": 34,
+        "endLine": 1,
+        "endColumn": 37
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "global-object/interface-extends",
+    "code": "interface good extends window.window.bad {}",
+    "options": [
+      {
+        "globals": ["bad"],
+        "checkGlobalObject": true
+      }
+    ],
+    "globals": {
+      "window": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'bad'.",
+        "line": 1,
+        "column": 38,
+        "endLine": 1,
+        "endColumn": 41
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "global-object/class-implements",
+    "code": "class good implements window.window.bad {}",
+    "options": [
+      {
+        "globals": ["bad"],
+        "checkGlobalObject": true
+      }
+    ],
+    "globals": {
+      "window": "readonly"
+    },
+    "errors": [
+      {
+        "messageId": "defaultMessage",
+        "message": "Unexpected use of 'bad'.",
+        "line": 1,
+        "column": 37,
+        "endLine": 1,
+        "endColumn": 40
+      }
+    ]
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "global-object/type-reference",
+    "code": "type good = window.window.bad;",
+    "options": [
+      {
+        "globals": ["bad"],
+        "checkGlobalObject": true
+      }
+    ],
+    "globals": {
+      "window": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "global-object/type-query",
+    "code": "type good = typeof window.window.bad;",
+    "options": [
+      {
+        "globals": ["bad"],
+        "checkGlobalObject": true
+      }
+    ],
+    "globals": {
+      "window": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "no-restricted-globals",
+    "name": "global-object/type-argument",
+    "code": "interface good extends Box<window.window.bad> {}",
+    "options": [
+      {
+        "globals": ["bad"],
+        "checkGlobalObject": true
+      }
+    ],
+    "globals": {
+      "window": "readonly"
+    },
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "nested-properties/value",
+    "code": "Foo.bar.baz;",
+    "options": ["bar", "baz"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "nested-properties/class-extends",
+    "code": "class good extends Foo.bar.baz {}",
+    "options": ["bar", "baz"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "nested-properties/interface-extends",
+    "code": "interface good extends Foo.bar.baz {}",
+    "options": ["bar", "baz"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "nested-properties/class-implements",
+    "code": "class good implements Foo.bar.baz {}",
+    "options": ["bar", "baz"],
+    "globals": {},
+    "errors": []
+  },
+  {
+    "rule": "id-denylist",
+    "name": "nested-properties/type-reference",
+    "code": "type good = Foo.bar.baz;",
+    "options": ["bar", "baz"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'bar' is restricted.",
+        "line": 1,
+        "column": 17,
+        "endLine": 1,
+        "endColumn": 20
+      },
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'baz' is restricted.",
+        "line": 1,
+        "column": 21,
+        "endLine": 1,
+        "endColumn": 24
+      }
+    ]
+  },
+  {
+    "rule": "id-denylist",
+    "name": "nested-properties/type-query",
+    "code": "type good = typeof Foo.bar.baz;",
+    "options": ["bar", "baz"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'bar' is restricted.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      },
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'baz' is restricted.",
+        "line": 1,
+        "column": 28,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  },
+  {
+    "rule": "id-denylist",
+    "name": "nested-properties/type-argument",
+    "code": "interface good extends Box<Foo.bar.baz> {}",
+    "options": ["bar", "baz"],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'bar' is restricted.",
+        "line": 1,
+        "column": 32,
+        "endLine": 1,
+        "endColumn": 35
+      },
+      {
+        "messageId": "restricted",
+        "message": "Identifier 'baz' is restricted.",
+        "line": 1,
+        "column": 36,
+        "endLine": 1,
+        "endColumn": 39
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "restricted-object/value",
+    "code": "BAD.foo;",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": true
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 4
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "restricted-object/class-extends",
+    "code": "class good extends BAD.foo {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": true
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 23
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "restricted-object/interface-extends",
+    "code": "interface good extends BAD.foo {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": true
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "restricted-object/class-implements",
+    "code": "class good implements BAD.foo {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": true
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 26
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "restricted-object/type-reference",
+    "code": "type good = BAD.foo;",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": true
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 16
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "restricted-object/type-query",
+    "code": "type good = typeof BAD.foo;",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": true
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 23
+      }
+    ]
+  },
+  {
+    "rule": "id-match",
+    "name": "restricted-object/type-argument",
+    "code": "interface good extends Box<BAD.foo> {}",
+    "options": [
+      "^[a-z]+$",
+      {
+        "properties": true
+      }
+    ],
+    "globals": {},
+    "errors": [
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'Box' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 27
+      },
+      {
+        "messageId": "notMatch",
+        "message": "Identifier 'BAD' does not match the pattern '^[a-z]+$'.",
+        "line": 1,
+        "column": 28,
+        "endLine": 1,
+        "endColumn": 31
+      }
+    ]
+  }
+]

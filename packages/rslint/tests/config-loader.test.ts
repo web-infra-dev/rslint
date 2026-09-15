@@ -8,6 +8,8 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import vm from 'node:vm';
+import { ts } from '../src/config/presets/index.js';
 
 function createTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-config-loader-test-'));
@@ -457,25 +459,29 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     ).toThrow(/must expose a "rules" object/);
   });
 
-  test('throws when an object-form prefix collides with a native plugin name', () => {
-    // Asymmetry: a native NAME is legal in the array form (previous test) but
-    // illegal as an object-form KEY — native rules always win, so mounting a
-    // community plugin under a native prefix would silently shadow it.
-    expect(() =>
-      normalizeConfig([
-        {
-          files: ['**/*.ts'],
-          plugins: { '@typescript-eslint': mockPlugin },
-          rules: {},
-        },
-      ]),
-    ).toThrow(/collides with the built-in plugin/);
-  });
+  test.each(['@typescript-eslint', 'node'])(
+    'throws when an object-form prefix collides with native %s',
+    (prefix) => {
+      // Asymmetry: a native NAME is legal in the array form (previous test) but
+      // illegal as an object-form KEY — native rules always win, so mounting a
+      // community plugin under a native prefix would silently shadow it.
+      expect(() =>
+        normalizeConfig([
+          {
+            files: ['**/*.ts'],
+            plugins: { [prefix]: mockPlugin },
+            rules: {},
+          },
+        ]),
+      ).toThrow(/collides with the built-in plugin/);
+    },
+  );
 
   const RESERVED_DECL_ALIASES = [
     'eslint-plugin-import',
     'eslint-plugin-jest',
     'eslint-plugin-jsx-a11y',
+    'eslint-plugin-node',
     'eslint-plugin-promise',
     'eslint-plugin-react-hooks',
     'eslint-plugin-unicorn',
@@ -493,22 +499,26 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     });
   }
 
-  test('accepts an eslint-plugin-* key that is NOT a native decl-name', () => {
-    // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
-    // so reserving it would wrongly false-reject a legitimate community mount.
-    // The asymmetry must be exact: only the 6 aliased names are reserved.
-    const [entry] = normalizeConfig([
-      {
-        files: ['**/*.ts'],
-        plugins: { 'eslint-plugin-react': mockPlugin },
-        rules: { 'eslint-plugin-react/no-foo': 'error' },
-      },
-    ]) as NormalizedPluginEntry[];
-    expect(entry.plugins).toContain('eslint-plugin-react');
-    expect(entry.eslintPlugins).toEqual({
-      'eslint-plugin-react': { ruleNames: ['no-bar', 'no-foo'] },
-    });
-  });
+  test.each(['eslint-plugin-react', 'eslint-plugin-n', 'n'])(
+    'accepts community %s without reserving an unrelated native name',
+    (prefix) => {
+      // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
+      // so reserving it would wrongly false-reject a legitimate community mount.
+      // The upstream n prefix also remains available to community plugins;
+      // rslint's native Node.js plugin uses node.
+      const [entry] = normalizeConfig([
+        {
+          files: ['**/*.ts'],
+          plugins: { [prefix]: mockPlugin },
+          rules: { [`${prefix}/no-foo`]: 'error' },
+        },
+      ]) as NormalizedPluginEntry[];
+      expect(entry.plugins).toContain(prefix);
+      expect(entry.eslintPlugins).toEqual({
+        [prefix]: { ruleNames: ['no-bar', 'no-foo'] },
+      });
+    },
+  );
 
   test('entries with no plugins carry no community-plugin field', () => {
     const [entry] = normalizeConfig([
@@ -595,5 +605,41 @@ describe('collectPluginMeta', () => {
     expect(eslintPluginEntries).toEqual([
       { prefix: 'local', ruleNames: ['no-bar', 'no-foo', 'zzz'] },
     ]);
+  });
+});
+
+describe('TypeScript preset values', () => {
+  test.each(Object.keys(ts.configs) as (keyof typeof ts.configs)[])(
+    '%s keeps its identity across config and helper reads',
+    (name) => {
+      const preset = ts.configs[name];
+      for (const filename of ['rslint.config.mjs', 'helper.mjs']) {
+        const reread = vm.runInNewContext(
+          'ts.configs[name]',
+          { ts, name },
+          {
+            filename: path.join(os.tmpdir(), filename),
+          },
+        );
+        expect(reread).toBe(preset);
+      }
+    },
+  );
+
+  test('configuring a preset before exporting it preserves the modification', () => {
+    const base = ts.configs.base;
+    const previousFiles = base.files;
+    try {
+      const entries = vm.runInNewContext(
+        "ts.configs.base.files = ['src/**/*.ts']; [ts.configs.base]",
+        { ts },
+        { filename: path.join(os.tmpdir(), 'rslint.config.mjs') },
+      );
+      expect(normalizeConfig(entries)[0].files).toEqual(['src/**/*.ts']);
+      expect(entries[0]).toBe(base);
+    } finally {
+      if (previousFiles === undefined) delete base.files;
+      else base.files = previousFiles;
+    }
   });
 });

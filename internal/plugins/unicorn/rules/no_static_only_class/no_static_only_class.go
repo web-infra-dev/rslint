@@ -3,9 +3,9 @@ package no_static_only_class
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -523,7 +523,7 @@ var NoStaticOnlyClassRule = rule.Rule{
 		check := func(node *ast.Node) {
 			// Skip classes that extend another class — the static members
 			// might be supplementing inherited instance members.
-			if ast.GetExtendsHeritageClauseElement(node) != nil {
+			if ast.GetClassExtendsHeritageElement(node) != nil {
 				return
 			}
 

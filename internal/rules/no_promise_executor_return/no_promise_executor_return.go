@@ -3,9 +3,9 @@ package no_promise_executor_return
 import (
 	_ "embed"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -63,10 +63,10 @@ func parseOptions(rawOptions []any) options {
 // identifier table lacks that name can skip every listener. Stay conservative
 // for direct callers that do not provide parser metadata.
 func sourceMayUsePromise(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	_, ok := sourceFile.Identifiers[promiseName]
+	ok := sourceFile.HasIdentifier(promiseName)
 	return ok
 }
 

@@ -56,6 +56,9 @@ ruleTester.run('no-restricted-syntax', {
     // Boundary: empty options array — a no-op rule
     { code: 'var a = 1;', options: [] as any },
 
+    // BigInt Literal.value is the normalized JavaScript BigInt value.
+    { code: 'const n = 1n;', options: ['Literal[value=/n$/]'] as any },
+
     // Boundary: unknown ESTree type silently ignored
     { code: 'var a = 1;', options: ['NotARealNodeType'] as any },
 
@@ -516,10 +519,10 @@ ruleTester.run('no-restricted-syntax', {
       errors: [{ messageId: 'restrictedSyntax' }],
     },
 
-    // Real-world: BigInt usage
+    // Real-world: BigInt.value uses the normalized JavaScript value.
     {
       code: `const n = 1n;`,
-      options: ['Literal[value=/n$/]'] as any,
+      options: ["Literal[value='1']"] as any,
       errors: [{ messageId: 'restrictedSyntax' }],
     },
 

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // scriptText returns the projected text of every script block, which is what a
