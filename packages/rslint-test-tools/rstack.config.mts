@@ -667,6 +667,9 @@ define.test({
     './tests/eslint-plugin-promise/rules/prefer-catch.test.ts',
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',
 
+    // eslint-plugin-vue
+    './tests/eslint-plugin-vue/rules/no-export-in-script-setup.test.ts',
+
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
