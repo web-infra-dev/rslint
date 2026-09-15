@@ -11,6 +11,16 @@ import (
 // call/member chain. It is syntax-only; framework parsers decide which roots
 // and member sequences are legal.
 func GetMemberEntries(node *ast.Node) []MemberEntry {
+	return getMemberEntries(node, false)
+}
+
+// GetMemberEntriesThroughTypeAssertions extracts a member chain while treating
+// TypeScript type assertions as runtime-transparent wrappers.
+func GetMemberEntriesThroughTypeAssertions(node *ast.Node) []MemberEntry {
+	return getMemberEntries(node, true)
+}
+
+func getMemberEntries(node *ast.Node, throughTypeAssertions bool) []MemberEntry {
 	if node == nil {
 		return nil
 	}
@@ -18,7 +28,14 @@ func GetMemberEntries(node *ast.Node) []MemberEntry {
 	if node == nil {
 		return nil
 	}
-
+	if throughTypeAssertions {
+		switch node.Kind {
+		case ast.KindAsExpression:
+			return getMemberEntries(node.AsAsExpression().Expression, true)
+		case ast.KindTypeAssertionExpression:
+			return getMemberEntries(node.AsTypeAssertion().Expression, true)
+		}
+	}
 	switch node.Kind {
 	case ast.KindIdentifier:
 		return []MemberEntry{{
@@ -27,7 +44,7 @@ func GetMemberEntries(node *ast.Node) []MemberEntry {
 		}}
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression()
-		left := GetMemberEntries(property.Expression)
+		left := getMemberEntries(property.Expression, throughTypeAssertions)
 		nameNode := property.Name()
 		if name := propertyName(nameNode); name != "" {
 			return append(left, MemberEntry{
@@ -38,7 +55,7 @@ func GetMemberEntries(node *ast.Node) []MemberEntry {
 		return left
 	case ast.KindElementAccessExpression:
 		element := node.AsElementAccessExpression()
-		left := GetMemberEntries(element.Expression)
+		left := getMemberEntries(element.Expression, throughTypeAssertions)
 		nameNode := ast.SkipParentheses(element.ArgumentExpression)
 		if name := elementAccessName(nameNode); name != "" {
 			return append(left, MemberEntry{
@@ -48,13 +65,13 @@ func GetMemberEntries(node *ast.Node) []MemberEntry {
 		}
 		return nil
 	case ast.KindCallExpression:
-		entries := GetMemberEntries(node.AsCallExpression().Expression)
+		entries := getMemberEntries(node.AsCallExpression().Expression, throughTypeAssertions)
 		if len(entries) > 0 {
 			entries[len(entries)-1].Call = node
 		}
 		return entries
 	case ast.KindTaggedTemplateExpression:
-		return GetMemberEntries(node.AsTaggedTemplateExpression().Tag)
+		return getMemberEntries(node.AsTaggedTemplateExpression().Tag, throughTypeAssertions)
 	default:
 		return nil
 	}
@@ -194,6 +211,16 @@ func MemberEntriesRange(sourceFile *ast.SourceFile, entries []MemberEntry) (core
 // returns its first identifier, if any. A comma expression contributes only
 // its right operand because that is the value JavaScript calls.
 func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
+	return resolveFirstIdentifier(node, false)
+}
+
+// ResolveFirstIdentifierThroughTypeAssertions resolves the first identifier
+// while treating TypeScript type assertions as runtime-transparent wrappers.
+func ResolveFirstIdentifierThroughTypeAssertions(node *ast.Node) *ast.Node {
+	return resolveFirstIdentifier(node, true)
+}
+
+func resolveFirstIdentifier(node *ast.Node, throughTypeAssertions bool) *ast.Node {
 	if node == nil {
 		return nil
 	}
@@ -201,22 +228,30 @@ func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
+	if throughTypeAssertions {
+		switch node.Kind {
+		case ast.KindAsExpression:
+			return resolveFirstIdentifier(node.AsAsExpression().Expression, true)
+		case ast.KindTypeAssertionExpression:
+			return resolveFirstIdentifier(node.AsTypeAssertion().Expression, true)
+		}
+	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
 		return node
 	case ast.KindCallExpression:
-		return ResolveFirstIdentifier(node.AsCallExpression().Expression)
+		return resolveFirstIdentifier(node.AsCallExpression().Expression, throughTypeAssertions)
 	case ast.KindPropertyAccessExpression:
-		return ResolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
+		return resolveFirstIdentifier(node.AsPropertyAccessExpression().Expression, throughTypeAssertions)
 	case ast.KindElementAccessExpression:
-		return ResolveFirstIdentifier(node.AsElementAccessExpression().Expression)
+		return resolveFirstIdentifier(node.AsElementAccessExpression().Expression, throughTypeAssertions)
 	case ast.KindTaggedTemplateExpression:
-		return ResolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
+		return resolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag, throughTypeAssertions)
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken {
-			return ResolveFirstIdentifier(binary.Right)
+			return resolveFirstIdentifier(binary.Right, throughTypeAssertions)
 		}
 		return nil
 	default:

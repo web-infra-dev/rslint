@@ -21,6 +21,7 @@
       "getAwaitedType",
       "getTypeOfSymbol",
       "getReturnTypeOfSignature",
+      "getMinArgumentCount",
       "getContextualTypeForArgumentAtIndex",
       "getResolvedSignature",
       "getBaseTypeOfLiteralType",

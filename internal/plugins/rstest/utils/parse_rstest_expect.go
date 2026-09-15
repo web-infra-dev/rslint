@@ -132,6 +132,30 @@ type ParsedRstestExpectCall struct {
 	trailingMembers int
 }
 
+// PromiseModifierEntry includes Chai modifiers after matchers, but not members of an assertion's result.
+func (parsed *ParsedRstestExpectCall) PromiseModifierEntry() *ParsedRstestFnMemberEntry {
+	for i := range parsed.MemberEntries {
+		entry := &parsed.MemberEntries[i]
+		if entry.Call == parsed.Head {
+			continue
+		}
+		if entry.Node == nil || isComputedDynamicMemberName(entry.Node) {
+			return nil
+		}
+		if entry.Name == "then" || entry.Name == "catch" || entry.Name == "finally" {
+			return nil
+		}
+		chain := classifyRstestExpectChainEntry(*entry, false)
+		if chain.Kind == rstestExpectChainUnknown {
+			return nil
+		}
+		if chain.Kind == rstestExpectChainModifier && (entry.Name == "resolves" || entry.Name == "rejects") {
+			return entry
+		}
+	}
+	return nil
+}
+
 func isRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
@@ -231,11 +255,29 @@ func parseRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
 ) *ParsedRstestExpectCall {
-	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
+	return parseRstestExpectCallOptions(node, analysis, false)
+}
+
+func parseRstestExpectCallWithTypeAssertions(
+	node *ast.Node,
+	analysis *RstestCallAnalysis,
+) *ParsedRstestExpectCall {
+	return parseRstestExpectCallOptions(node, analysis, true)
+}
+
+func parseRstestExpectCallOptions(
+	node *ast.Node,
+	analysis *RstestCallAnalysis,
+	throughTypeAssertions bool,
+) *ParsedRstestExpectCall {
+	if node == nil || node.Kind != ast.KindCallExpression || findTopMostCallExpression(node, throughTypeAssertions) != node {
 		return nil
 	}
-	expression := findTopMostRstestExpectExpression(node)
+	expression := findTopMostRstestExpectExpressionOptions(node, throughTypeAssertions)
 	entries := testFramework.GetMemberEntries(expression)
+	if throughTypeAssertions {
+		entries = testFramework.GetMemberEntriesThroughTypeAssertions(expression)
+	}
 	match := rstestExpectMemberMatch(node, entries, analysis)
 	if !match.ok {
 		return nil
@@ -282,11 +324,19 @@ func ShouldRstestExpectBeAwaited(parsed *ParsedRstestExpectCall, asyncMatchers [
 // head of. Ascending only continues while node stays on the callee side of its
 // parent: a call in argument or computed-key position heads its own chain.
 func FindTopMostCallExpression(node *ast.Node) *ast.Node {
+	return findTopMostCallExpression(node, false)
+}
+
+func findTopMostCallExpression(node *ast.Node, throughTypeAssertions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression:
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+			if !throughTypeAssertions || parent.Expression() != current {
+				return top
+			}
 		case ast.KindCallExpression:
 			if parent.AsCallExpression().Expression != current {
 				return top
@@ -308,16 +358,16 @@ func FindTopMostCallExpression(node *ast.Node) *ast.Node {
 	return top
 }
 
-// findTopMostRstestExpectExpression extends the outermost call through a
-// trailing static member chain. This lets the CallExpression-only parser see
-// property-style Chai assertions such as expect(value).to.be.ok without
-// requiring rules to listen for member-access nodes.
-func findTopMostRstestExpectExpression(node *ast.Node) *ast.Node {
+func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTypeAssertions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
 		switch parent.Kind {
 		case ast.KindParenthesizedExpression:
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+			if !throughTypeAssertions || parent.Expression() != current {
+				return top
+			}
 		case ast.KindPropertyAccessExpression:
 			if parent.AsPropertyAccessExpression().Expression != current {
 				return top
