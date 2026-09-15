@@ -75,6 +75,17 @@ func (c *Component) ScriptSetupRange() (core.TextRange, bool) {
 	return core.TextRange{}, false
 }
 
+// InScriptSetup reports whether a position in the file falls inside the
+// component's `<script setup>` block. Both script blocks are parsed as one
+// text, so a rule that applies to only one of them asks this about each node.
+func (c *Component) InScriptSetup(position int) bool {
+	setup, ok := c.ScriptSetupRange()
+	if !ok {
+		return false
+	}
+	return position >= setup.Pos() && position < setup.End()
+}
+
 // IsExposedToTemplate reports whether a Vue component's template can read or
 // write a binding without the script ever mentioning it again.
 //

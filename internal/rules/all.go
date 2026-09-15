@@ -12,6 +12,7 @@ import (
 	rstestPlugin "github.com/web-infra-dev/rslint/internal/plugins/rstest"
 	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
 	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
+	vuePlugin "github.com/web-infra-dev/rslint/internal/plugins/vue"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
@@ -231,6 +232,7 @@ func allRules() []rule.Rule {
 	implementedRules = append(implementedRules, jsxA11yPlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, promisePlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, unicornPlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, vuePlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, coreRules()...)
 	return implementedRules
 }

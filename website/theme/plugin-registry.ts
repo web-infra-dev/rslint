@@ -176,6 +176,17 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
       },
     ],
   },
+  {
+    prefix: 'vue',
+    group: 'eslint-plugin-vue',
+    importName: 'vuePlugin',
+    presets: [
+      {
+        name: 'vuePlugin.configs.essential',
+        description: 'Vue rules that catch errors',
+      },
+    ],
+  },
 ];
 
 /** One row per preset, with the parent plugin fields attached. */

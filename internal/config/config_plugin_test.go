@@ -22,6 +22,7 @@ func TestEslintPluginDeclNameAliases_PinnedForJSGuard(t *testing.T) {
 		"eslint-plugin-promise":     {},
 		"eslint-plugin-react-hooks": {},
 		"eslint-plugin-unicorn":     {},
+		"eslint-plugin-vue":         {},
 	}
 	got := map[string]struct{}{}
 	for _, plugin := range bundledPluginDeclarations {

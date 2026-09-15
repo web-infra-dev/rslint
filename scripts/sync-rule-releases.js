@@ -18,6 +18,7 @@ const PLUGIN_GROUP_FALLBACKS = new Map([
   ['react_hooks', 'eslint-plugin-react-hooks'],
   ['typescript', '@typescript-eslint'],
   ['unicorn', 'eslint-plugin-unicorn'],
+  ['vue', 'eslint-plugin-vue'],
 ]);
 const pluginGroupByBlob = new Map();
 

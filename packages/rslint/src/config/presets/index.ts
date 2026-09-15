@@ -16,6 +16,7 @@ import { recommended as jestRecommended, style as jestStyle } from './jest.js';
 import { recommended as rstestRecommended } from './rstest.js';
 import { recommended as unicornRecommended } from './unicorn.js';
 import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
+import { essential as vueEssential } from './vue.js';
 
 export const ts = {
   configs: {
@@ -55,6 +56,10 @@ export const jestPlugin = {
 
 export const rstestPlugin = {
   configs: { recommended: rstestRecommended },
+};
+
+export const vuePlugin = {
+  configs: { essential: vueEssential },
 };
 
 export const unicornPlugin = {

@@ -18,6 +18,7 @@ var bundledPluginDeclarations = []bundledPluginDeclaration{
 	{ruleNamespace: "react-hooks", declarationNames: []string{"eslint-plugin-react-hooks", "react-hooks"}},
 	{ruleNamespace: "rstest", declarationNames: []string{"rstest"}},
 	{ruleNamespace: "unicorn", declarationNames: []string{"eslint-plugin-unicorn", "unicorn"}},
+	{ruleNamespace: "vue", declarationNames: []string{"eslint-plugin-vue", "vue"}},
 }
 
 var bundledPluginByDeclarationName = func() map[string]bundledPluginDeclaration {

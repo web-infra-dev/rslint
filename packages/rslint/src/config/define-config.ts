@@ -23,6 +23,7 @@ const NATIVE_PLUGINS = [
   'react-hooks',
   'rstest',
   'unicorn',
+  'vue',
 ] as const;
 
 // Alternate `eslint-plugin-*` declaration names that Go normalizes onto a
@@ -38,6 +39,7 @@ const NATIVE_PLUGIN_DECL_ALIASES = [
   'eslint-plugin-promise',
   'eslint-plugin-react-hooks',
   'eslint-plugin-unicorn',
+  'eslint-plugin-vue',
 ] as const;
 
 /**

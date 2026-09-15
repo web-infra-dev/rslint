@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -89,6 +90,26 @@ func TestComponentScriptSetupRange(t *testing.T) {
 	}
 }
 
+func TestComponentInScriptSetup(t *testing.T) {
+	t.Parallel()
+
+	component := NewComponent(newComponentFS("/App.vue", componentFixture), "/App.vue")
+
+	// The plain script's export sits outside the setup block, which is the
+	// distinction no-export-in-script-setup is built on.
+	if component.InScriptSetup(strings.Index(componentFixture, "export const shared")) {
+		t.Error("an export in the plain block was placed inside the setup block")
+	}
+	if !component.InScriptSetup(strings.Index(componentFixture, "const local")) {
+		t.Error("the setup block's own code was placed outside it")
+	}
+
+	withoutSetup := NewComponent(newComponentFS("/App.vue", "<script>\nconst a = 1;\n</script>\n"), "/App.vue")
+	if withoutSetup.InScriptSetup(10) {
+		t.Error("a component with no setup block placed a position inside one")
+	}
+}
+
 // TestComponentNilStore covers the shape a manually assembled rule context hands
 // a rule, which must answer rather than panic.
 func TestComponentNilStore(t *testing.T) {
@@ -100,6 +121,9 @@ func TestComponentNilStore(t *testing.T) {
 	}
 	if _, ok := component.ScriptSetupRange(); ok {
 		t.Error("a nil store returned a setup range")
+	}
+	if component.InScriptSetup(0) {
+		t.Error("a nil store placed a position inside a setup block")
 	}
 	if (&RuleContext{}).IsExposedToTemplate(nil, "x") {
 		t.Error("an empty context reported a binding exposed to a template")
