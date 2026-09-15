@@ -776,3 +776,60 @@ func TestLoadCLIAdmitsVueComponentWithoutChecker(t *testing.T) {
 		t.Errorf("template text reached the parser: %q", text)
 	}
 }
+
+// TestLoadAPIAdmitsVueComponentAndKeepsCompatibilityForTheRest covers the load
+// path the Node API takes. LoadAPI keeps the compatibility admission it always
+// had, and no compiler Program can admit a component, so components have to be
+// split out to root programs without changing where any other target goes.
+func TestLoadAPIAdmitsVueComponentAndKeepsCompatibilityForTheRest(t *testing.T) {
+	const configDir = "/repo"
+	componentPath := tspath.ResolvePath(configDir, "App.vue")
+	scriptPath := tspath.ResolvePath(configDir, "main.ts")
+
+	fsys := newBindingIndexTestFS([]string{componentPath, scriptPath}, nil)
+	fsys.caseSensitive = true
+	fsys.files[componentPath] = "<template>\n  <div>{{ value }}</div>\n</template>\n\n<script>\nconst value = 1;\n</script>\n"
+	fsys.files[scriptPath] = "export const main = 1;\n"
+
+	plan := target.Plan{Files: []target.File{
+		{
+			PathIdentity:    rslintconfig.PathIdentity{Path: componentPath, CanonicalPath: componentPath},
+			ConfigDirectory: configDir,
+		},
+		{
+			PathIdentity:    rslintconfig.PathIdentity{Path: scriptPath, CanonicalPath: scriptPath},
+			ConfigDirectory: configDir,
+		},
+	}}
+
+	binding, err := sessionForTest(newBuildContext(fsys)).
+		LoadAPI(ProjectSet{}, plan, configDir, true)
+	if err != nil {
+		t.Fatalf("LoadAPI: %v", err)
+	}
+
+	find := func(path string) (*lintprogram.Program, *ast.SourceFile) {
+		for _, candidate := range binding.Programs {
+			if file := candidate.GetSourceFile(path); file != nil {
+				return candidate, file
+			}
+		}
+		return nil, nil
+	}
+
+	componentProgram, componentFile := find(componentPath)
+	if componentFile == nil {
+		t.Fatalf("no program contains %q", componentPath)
+	}
+	if componentProgram.CanProvideTypeChecker(componentFile) {
+		t.Error("a component must be linted without a checker")
+	}
+	if strings.Contains(componentFile.Text(), "<template>") {
+		t.Errorf("template text reached the parser: %q", componentFile.Text())
+	}
+
+	// The partition must not drop or reroute the ordinary target beside it.
+	if _, scriptFile := find(scriptPath); scriptFile == nil {
+		t.Fatalf("no program contains %q", scriptPath)
+	}
+}

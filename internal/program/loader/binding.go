@@ -469,6 +469,11 @@ func finalizeResult(binding *LoadResult) {
 
 // LoadAPI preserves the API's compatibility Program admission behavior while
 // returning only unified Programs to the caller.
+//
+// A Vue single file component is the one exception: no compiler Program can
+// admit one, so components are split out and parsed as roots. Every other
+// unbound target keeps the admission behavior it had, which is what makes this
+// exception safe to carve out of a compatibility path.
 func (s *Session) LoadAPI(
 	set ProjectSet,
 	plan target.Plan,
@@ -479,11 +484,36 @@ func (s *Session) LoadAPI(
 		return LoadResult{}, err
 	}
 	binding, unbound := s.bindTargetsToProjects(set, plan, singleThreaded)
-	if err := s.appendCompatibilityPrograms(&binding, unbound, currentDirectory, singleThreaded); err != nil {
+	components, rest := partitionComponents(unbound)
+	if err := s.appendCompatibilityPrograms(&binding, rest, currentDirectory, singleThreaded); err != nil {
 		return LoadResult{}, err
+	}
+	if len(components) > 0 {
+		useCaseSensitive := true
+		if fsys := s.FS(); fsys != nil {
+			useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+		}
+		groups := groupUnboundTargets(components, currentDirectory, useCaseSensitive)
+		s.retainCompilerPrograms(binding.compilerPrograms)
+		if err := s.appendRootPrograms(&binding, groups, currentDirectory, singleThreaded); err != nil {
+			return LoadResult{}, err
+		}
 	}
 	finalizeResult(&binding)
 	return binding, nil
+}
+
+// partitionComponents splits Vue single file components out of a target set,
+// preserving order within each half.
+func partitionComponents(targets []target.File) (components, rest []target.File) {
+	for _, candidate := range targets {
+		if vuesfc.IsFile(candidate.Path) {
+			components = append(components, candidate)
+			continue
+		}
+		rest = append(rest, candidate)
+	}
+	return components, rest
 }
 
 func allRootsSupportedByParser(targets []target.File, useCaseSensitive bool) bool {
