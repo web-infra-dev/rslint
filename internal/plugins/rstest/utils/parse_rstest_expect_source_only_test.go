@@ -32,6 +32,27 @@ rstestTest('context alias', ({ expect: contextExpect }) => { contextExpect(conte
 import { expect as vitestExpect } from 'vitest';
 import { expect as jestExpect } from '@jest/globals';
 
+let { expect: replacedExpect } = require('@rstest/core');
+replacedExpect = createAssertionLibrary();
+replacedExpect(foreignValue).toBe(1);
+let { expect: replacedMeta } = import.meta.rstest;
+[replacedMeta] = replacements;
+replacedMeta(foreignValue).toBe(1);
+rstestTest('reassigned context', ({ expect: localExpect }) => {
+  localExpect = createAssertionLibrary();
+  localExpect(foreignValue).toBe(1);
+});
+
+var { expect: reinitialized } = require('@rstest/core');
+var reinitialized = createAssertionLibrary();
+reinitialized(foreignValue).toBe(1);
+var { expect: redeclared } = require('@rstest/core');
+var redeclared;
+redeclared(importedValue).toBe(1);
+var { expect: loopExpect } = require('@rstest/core');
+for (var loopExpect of replacements) {}
+loopExpect(foreignValue).toBe(1);
+
 vitestExpect(foreignValue).toBe(1);
 jestExpect(foreignValue).toBe(1);
 function localAssertion() {
@@ -113,8 +134,8 @@ function localAssertion() {
 	}
 	sort.Slice(got, func(left, right int) bool { return got[left].pos < got[right].pos })
 
-	if len(got) != 6 {
-		t.Fatalf("parsed %d Rstest expect calls, want 6: %v", len(got), got)
+	if len(got) != 7 {
+		t.Fatalf("parsed %d Rstest expect calls, want 7: %v", len(got), got)
 	}
 	for index, diagnostic := range got {
 		if diagnostic.text != "toBe" {
