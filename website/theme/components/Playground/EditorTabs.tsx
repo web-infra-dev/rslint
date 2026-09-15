@@ -41,6 +41,7 @@ import {
   SOURCE_FILE_NAMES,
   type SourceFileName,
 } from './source-file';
+import type { SourceTypeEnvironment } from './source-types';
 // Monaco-specific styles only (ast-node-highlight)
 import './EditorTabs.css';
 
@@ -100,6 +101,9 @@ export interface EditorTabsRef {
   highlightRange: (start: number, end: number) => void;
   /** Clear the temporary highlight decoration */
   clearHighlight: () => void;
+  setSourceTypeEnvironment: (
+    environment: SourceTypeEnvironment | undefined,
+  ) => void;
   /**
    * Write the pending URL update now instead of when its debounce expires, so
    * that a reader who edits and immediately shares copies what is on screen.
@@ -174,6 +178,17 @@ export const EditorTabs = ({
   const onConfigChangeRef = useRef(onConfigChange);
   const wasmVersionRef = useRef(wasmVersion);
   const sourceFileNameRef = useRef(initialState.sourceFileName);
+  const sourceTypeLibrariesRef = useRef<monaco.IDisposable[]>([]);
+  const activeSourceTypeEnvironmentRef = useRef<
+    SourceTypeEnvironment | undefined
+  >(undefined);
+  const codeCompilerOptionsRef = useRef<
+    | {
+        javascript: ReturnType<typeof javascriptDefaults.getCompilerOptions>;
+        typescript: ReturnType<typeof typescriptDefaults.getCompilerOptions>;
+      }
+    | undefined
+  >(undefined);
 
   const lastValidTsConfig = useRef<any>(null);
 
@@ -221,6 +236,53 @@ export const EditorTabs = ({
   }, []);
 
   useImperativeHandle(ref, () => ({
+    setSourceTypeEnvironment: (environment) => {
+      if (activeSourceTypeEnvironmentRef.current?.key === environment?.key) {
+        return;
+      }
+      for (const library of sourceTypeLibrariesRef.current) library.dispose();
+      sourceTypeLibrariesRef.current = [];
+      activeSourceTypeEnvironmentRef.current = environment;
+      if (!environment) {
+        if (codeCompilerOptionsRef.current) {
+          javascriptDefaults.setCompilerOptions(
+            codeCompilerOptionsRef.current.javascript,
+          );
+          typescriptDefaults.setCompilerOptions(
+            codeCompilerOptionsRef.current.typescript,
+          );
+          codeCompilerOptionsRef.current = undefined;
+        }
+        return;
+      }
+
+      if (!codeCompilerOptionsRef.current) {
+        codeCompilerOptionsRef.current = {
+          javascript: javascriptDefaults.getCompilerOptions(),
+          typescript: typescriptDefaults.getCompilerOptions(),
+        };
+        javascriptDefaults.setCompilerOptions({
+          ...codeCompilerOptionsRef.current.javascript,
+          module: ModuleKind.ESNext,
+          moduleResolution: ModuleResolutionKind.NodeJs,
+          target: ScriptTarget.ESNext,
+          skipLibCheck: true,
+        });
+        typescriptDefaults.setCompilerOptions({
+          ...codeCompilerOptionsRef.current.typescript,
+          module: ModuleKind.ESNext,
+          moduleResolution: ModuleResolutionKind.NodeJs,
+          target: ScriptTarget.ESNext,
+          skipLibCheck: true,
+        });
+      }
+      sourceTypeLibrariesRef.current = environment.declarations.flatMap(
+        ({ content, monacoPath }) => [
+          javascriptDefaults.addExtraLib(content, monacoPath),
+          typescriptDefaults.addExtraLib(content, monacoPath),
+        ],
+      );
+    },
     flushShareUrl: () => {
       if (typeof window === 'undefined') return;
       cancelPendingSerialize();
@@ -433,6 +495,18 @@ export const EditorTabs = ({
       selDisposable.dispose();
       editor.getModel()?.dispose();
       editor.dispose();
+      for (const library of sourceTypeLibrariesRef.current) library.dispose();
+      sourceTypeLibrariesRef.current = [];
+      activeSourceTypeEnvironmentRef.current = undefined;
+      if (codeCompilerOptionsRef.current) {
+        javascriptDefaults.setCompilerOptions(
+          codeCompilerOptionsRef.current.javascript,
+        );
+        typescriptDefaults.setCompilerOptions(
+          codeCompilerOptionsRef.current.typescript,
+        );
+        codeCompilerOptionsRef.current = undefined;
+      }
       if (editingTimer.current) {
         window.clearTimeout(editingTimer.current);
       }
