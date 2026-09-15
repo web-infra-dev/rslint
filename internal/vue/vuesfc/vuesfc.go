@@ -48,6 +48,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/web-infra-dev/rslint/internal/vue/htmlscan"
 )
 
 // BlockKind classifies a top-level SFC block by its tag name.
@@ -119,26 +120,6 @@ func contributesContent(block Block) bool {
 		supportedLang(block.Lang)
 }
 
-// rawTextTags are the elements whose content HTML does not parse as markup, so
-// their content ends at the first matching end tag rather than at a balanced
-// one. A `</script>` inside a string literal therefore closes the block. That is the
-// same place Vue's own parser ends it, and the reason SFC authors are told to
-// split that sequence.
-var rawTextTags = map[string]struct{}{
-	"script":   {},
-	"style":    {},
-	"textarea": {},
-	"title":    {},
-}
-
-// voidTags never have content or an end tag. None of them is a legal top-level
-// SFC block, but one written by mistake must not swallow the rest of the file.
-var voidTags = map[string]struct{}{
-	"area": {}, "base": {}, "br": {}, "col": {}, "embed": {}, "hr": {},
-	"img": {}, "input": {}, "link": {}, "meta": {}, "param": {},
-	"source": {}, "track": {}, "wbr": {},
-}
-
 // Extract splits text into top-level blocks and builds the offset-preserving
 // script projection described in the package comment.
 //
@@ -166,14 +147,14 @@ func scan(text string, result *Result) {
 
 		switch {
 		case strings.HasPrefix(text[index:], "<!--"):
-			end := commentEnd(text, index)
+			end := htmlscan.CommentEnd(text, index)
 			result.Comments = append(result.Comments, core.NewTextRange(index, end))
 			index = end
 		case strings.HasPrefix(text[index:], "<!"), strings.HasPrefix(text[index:], "<?"):
-			index = declarationEnd(text, index)
+			index = htmlscan.DeclarationEnd(text, index)
 		case strings.HasPrefix(text[index:], "</"):
 			// A stray end tag at the top level closes nothing.
-			index = declarationEnd(text, index)
+			index = htmlscan.DeclarationEnd(text, index)
 		default:
 			block, end, ok := readBlock(text, index)
 			if !ok {
@@ -190,118 +171,42 @@ func scan(text string, result *Result) {
 // readBlock reads one top-level element beginning at the `<` at start. It
 // reports false when start does not begin a start tag.
 func readBlock(text string, start int) (Block, int, bool) {
-	nameEnd := tagNameEnd(text, start+1)
+	nameEnd := htmlscan.TagNameEnd(text, start+1)
 	if nameEnd == start+1 {
 		return Block{}, start, false
 	}
-	tag := foldASCII(text[start+1 : nameEnd])
+	tag := htmlscan.Fold(text[start+1 : nameEnd])
 
-	attributes, tagEnd, selfClosing := readStartTag(text, nameEnd)
+	startTag := htmlscan.ReadStartTag(text, nameEnd)
 
-	block := Block{
-		Kind:     blockKind(tag),
-		Tag:      tag,
-		Lang:     attributes.lang,
-		Setup:    attributes.setup,
-		External: attributes.src,
-	}
-
-	if selfClosing || isIn(voidTags, tag) {
-		block.Outer = core.NewTextRange(start, tagEnd)
-		block.Content = core.NewTextRange(tagEnd, tagEnd)
-		return block, tagEnd, true
-	}
-
-	contentEnd, outerEnd := findEndTag(text, tag, tagEnd)
-	block.Content = core.NewTextRange(tagEnd, contentEnd)
-	block.Outer = core.NewTextRange(start, outerEnd)
-	return block, outerEnd, true
-}
-
-// startTagAttributes carries only the attributes SFC block splitting reads.
-type startTagAttributes struct {
-	lang  string
-	setup bool
-	src   bool
-}
-
-// readStartTag consumes a start tag's attributes beginning at index, which
-// must sit just past the tag name. It returns the index just past the closing
-// `>` and whether the tag closed itself.
-//
-// Attribute values are parsed rather than scanned for, so a `>` inside a
-// quoted value does not end the tag early.
-func readStartTag(text string, index int) (startTagAttributes, int, bool) {
-	var attributes startTagAttributes
-	selfClosing := false
-
-	for index < len(text) {
-		index = skipSpace(text, index)
-		if index >= len(text) {
-			break
-		}
-		switch text[index] {
-		case '>':
-			return attributes, index + 1, selfClosing
-		case '/':
-			selfClosing = true
-			index++
-			continue
-		}
-
-		nameStart := index
-		for index < len(text) && !isSpace(text[index]) &&
-			text[index] != '=' && text[index] != '>' && text[index] != '/' {
-			index++
-		}
-		name := foldASCII(text[nameStart:index])
-
-		value := ""
-		hasValue := false
-		probe := skipSpace(text, index)
-		if probe < len(text) && text[probe] == '=' {
-			hasValue = true
-			value, index = readAttributeValue(text, probe+1)
-		}
-
-		switch name {
+	block := Block{Kind: blockKind(tag), Tag: tag}
+	for _, attribute := range startTag.Attributes {
+		switch htmlscan.Fold(attribute.Name) {
 		case "lang":
 			// The value is kept verbatim. HTML folds an attribute name, not
 			// its value, and upstream compares `lang` against "ts"/"tsx"
 			// exactly, so `lang="TS"` names no language Vue compiles, and
 			// must name none here either.
-			attributes.lang = value
+			block.Lang = attribute.Value
 		case "setup":
 			// `setup` is a boolean attribute: upstream keys off its presence,
 			// so `setup` and `setup=""` both mark a script setup block.
-			attributes.setup = true
+			block.Setup = true
 		case "src":
-			attributes.src = hasValue && value != ""
+			block.External = attribute.HasValue && attribute.Value != ""
 		}
 	}
-	return attributes, len(text), selfClosing
-}
 
-// readAttributeValue reads a quoted or unquoted attribute value beginning at
-// index and returns it with the index just past it.
-func readAttributeValue(text string, index int) (string, int) {
-	index = skipSpace(text, index)
-	if index >= len(text) {
-		return "", len(text)
+	if startTag.SelfClosing || htmlscan.IsVoid(tag) {
+		block.Outer = core.NewTextRange(start, startTag.End)
+		block.Content = core.NewTextRange(startTag.End, startTag.End)
+		return block, startTag.End, true
 	}
-	if quote := text[index]; quote == '"' || quote == '\'' {
-		index++
-		closing := strings.IndexByte(text[index:], quote)
-		if closing < 0 {
-			return text[index:], len(text)
-		}
-		return text[index : index+closing], index + closing + 1
-	}
-	start := index
-	for index < len(text) && !isSpace(text[index]) && text[index] != '>' {
-		index++
-	}
-	return text[start:index], index
+
+	contentEnd, outerEnd := findEndTag(text, tag, startTag.End)
+	block.Content = core.NewTextRange(startTag.End, contentEnd)
+	block.Outer = core.NewTextRange(start, outerEnd)
+	return block, outerEnd, true
 }
 
 // findEndTag locates the end tag closing a block whose content starts at
@@ -314,7 +219,7 @@ func readAttributeValue(text string, index int) (string, int) {
 // what upstream's error recovery also yields.
 func findEndTag(text string, tag string, contentStart int) (int, int) {
 	depth := 1
-	raw := isIn(rawTextTags, tag)
+	raw := htmlscan.IsRawText(tag)
 
 	for index := contentStart; index < len(text); {
 		next := strings.IndexByte(text[index:], '<')
@@ -324,16 +229,16 @@ func findEndTag(text string, tag string, contentStart int) (int, int) {
 		index += next
 
 		if !raw && strings.HasPrefix(text[index:], "<!--") {
-			index = commentEnd(text, index)
+			index = htmlscan.CommentEnd(text, index)
 			continue
 		}
 
 		if strings.HasPrefix(text[index:], "</") {
-			nameEnd := tagNameEnd(text, index+2)
-			if foldASCII(text[index+2:nameEnd]) == tag {
+			nameEnd := htmlscan.TagNameEnd(text, index+2)
+			if htmlscan.Fold(text[index+2:nameEnd]) == tag {
 				depth--
 				if depth == 0 {
-					return index, declarationEnd(text, nameEnd)
+					return index, htmlscan.DeclarationEnd(text, nameEnd)
 				}
 			}
 			index = nameEnd
@@ -341,11 +246,11 @@ func findEndTag(text string, tag string, contentStart int) (int, int) {
 		}
 
 		if !raw {
-			nameEnd := tagNameEnd(text, index+1)
-			if nameEnd > index+1 && foldASCII(text[index+1:nameEnd]) == tag {
-				if _, tagEnd, selfClosing := readStartTag(text, nameEnd); !selfClosing {
+			nameEnd := htmlscan.TagNameEnd(text, index+1)
+			if nameEnd > index+1 && htmlscan.Fold(text[index+1:nameEnd]) == tag {
+				if startTag := htmlscan.ReadStartTag(text, nameEnd); !startTag.SelfClosing {
 					depth++
-					index = tagEnd
+					index = startTag.End
 					continue
 				}
 			}
@@ -440,89 +345,6 @@ func blockKind(tag string) BlockKind {
 	return BlockOther
 }
 
-// commentEnd returns the index just past the comment starting at start, or the
-// end of the file when it is unterminated.
-func commentEnd(text string, start int) int {
-	if closing := strings.Index(text[start:], "-->"); closing >= 0 {
-		return start + closing + len("-->")
-	}
-	return len(text)
-}
-
-// declarationEnd returns the index just past the next `>` at or after start.
-func declarationEnd(text string, start int) int {
-	if closing := strings.IndexByte(text[start:], '>'); closing >= 0 {
-		return start + closing + 1
-	}
-	return len(text)
-}
-
-// tagNameEnd returns the index just past the tag name starting at start, which
-// equals start when no name is there.
-func tagNameEnd(text string, start int) int {
-	if start >= len(text) || !isASCIILetter(text[start]) {
-		return start
-	}
-	index := start + 1
-	for index < len(text) && isTagNameByte(text[index]) {
-		index++
-	}
-	return index
-}
-
-func isTagNameByte(character byte) bool {
-	return isASCIILetter(character) ||
-		(character >= '0' && character <= '9') ||
-		character == '-' || character == '_' ||
-		character == ':' || character == '.'
-}
-
-func isASCIILetter(character byte) bool {
-	return (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')
-}
-
-func isSpace(character byte) bool {
-	switch character {
-	case ' ', '\t', '\n', '\r', '\f':
-		return true
-	}
-	return false
-}
-
-func skipSpace(text string, index int) int {
-	for index < len(text) && isSpace(text[index]) {
-		index++
-	}
-	return index
-}
-
-// foldASCII lowercases the ASCII letters in value and leaves every other byte
-// alone, which is the fold HTML specifies for a tag or attribute name.
-func foldASCII(value string) string {
-	needsFold := false
-	for index := range len(value) {
-		if value[index] >= 'A' && value[index] <= 'Z' {
-			needsFold = true
-			break
-		}
-	}
-	if !needsFold {
-		return value
-	}
-	folded := []byte(value)
-	for index := range folded {
-		if folded[index] >= 'A' && folded[index] <= 'Z' {
-			folded[index] += 'a' - 'A'
-		}
-	}
-	return string(folded)
-}
-
-func isIn(set map[string]struct{}, key string) bool {
-	_, ok := set[key]
-	return ok
-}
-
 // Extension is the file extension of a Vue Single File Component.
 const Extension = ".vue"
 
@@ -535,5 +357,5 @@ func IsFile(path string) bool {
 	if len(path) <= len(Extension) {
 		return false
 	}
-	return foldASCII(path[len(path)-len(Extension):]) == Extension
+	return htmlscan.Fold(path[len(path)-len(Extension):]) == Extension
 }

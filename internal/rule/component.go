@@ -26,6 +26,10 @@ type Component struct {
 	fs   vfs.FS
 	path string
 	once sync.Once
+	// text is the component's own text, markup and all. It is kept apart from
+	// the projection in sfc, which the parser reads: a template rule handed
+	// that would see only spaces where the markup was.
+	text string
 	sfc  vuesfc.Result
 	ok   bool
 }
@@ -48,6 +52,7 @@ func (c *Component) load() {
 		if !ok {
 			return
 		}
+		c.text = text
 		c.sfc = vuesfc.Extract(text)
 		c.ok = true
 	})
@@ -84,6 +89,33 @@ func (c *Component) InScriptSetup(position int) bool {
 		return false
 	}
 	return position >= setup.Pos() && position < setup.End()
+}
+
+// Text returns the component's own text, markup and all, or the empty string
+// for a file that is not one. Offsets into it are the offsets a rule already
+// holds, because the projection the parser read preserves every one of them.
+func (c *Component) Text() string {
+	c.load()
+	if c == nil || !c.ok {
+		return ""
+	}
+	return c.text
+}
+
+// TemplateRange returns the content range of the component's `<template>`
+// block. A component with no template, or one whose template lives in another
+// file through `src`, reports false.
+func (c *Component) TemplateRange() (core.TextRange, bool) {
+	c.load()
+	if c == nil || !c.ok {
+		return core.TextRange{}, false
+	}
+	for _, block := range c.sfc.Blocks {
+		if block.Kind == vuesfc.BlockTemplate && !block.External && block.Content.Len() > 0 {
+			return block.Content, true
+		}
+	}
+	return core.TextRange{}, false
 }
 
 // IsExposedToTemplate reports whether a Vue component's template can read or

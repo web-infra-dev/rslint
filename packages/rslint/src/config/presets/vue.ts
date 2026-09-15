@@ -18,7 +18,7 @@ const essential: RslintConfigEntry = {
     // 'vue/no-deprecated-data-object-declaration': 'error', // not implemented
     // 'vue/no-dupe-keys': 'error', // not implemented
     // 'vue/no-dupe-v-else-if': 'error', // not implemented
-    // 'vue/no-duplicate-attributes': 'error', // not implemented
+    'vue/no-duplicate-attributes': 'error',
     'vue/no-export-in-script-setup': 'error',
     // 'vue/no-expose-after-await': 'error', // not implemented
     // 'vue/no-lifecycle-after-await': 'error', // not implemented

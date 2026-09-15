@@ -51,7 +51,8 @@ func TestComponentReadsNothingUnlessAsked(t *testing.T) {
 
 		component.IsComponent()
 		component.ScriptSetupRange()
-		component.ScriptSetupRange()
+		component.Text()
+		component.TemplateRange()
 
 		if fileSystem.reads != 1 {
 			t.Errorf("read the component %d times, want 1", fileSystem.reads)
@@ -110,6 +111,31 @@ func TestComponentInScriptSetup(t *testing.T) {
 	}
 }
 
+func TestComponentTextAndTemplate(t *testing.T) {
+	t.Parallel()
+
+	component := NewComponent(newComponentFS("/App.vue", componentFixture), "/App.vue")
+
+	// Text is the component's own markup, not the blanked projection the
+	// parser reads. A template rule handed the projection would see spaces.
+	if got := component.Text(); got != componentFixture {
+		t.Fatalf("Text() = %q, want the component's own text", got)
+	}
+
+	template, ok := component.TemplateRange()
+	if !ok {
+		t.Fatal("the template block was not found")
+	}
+	if got := componentFixture[template.Pos():template.End()]; got != "\n  <div/>\n" {
+		t.Errorf("template range covers %q", got)
+	}
+
+	noTemplate := NewComponent(newComponentFS("/App.vue", "<script>\nconst a = 1;\n</script>\n"), "/App.vue")
+	if _, ok := noTemplate.TemplateRange(); ok {
+		t.Error("a component with no template reported a template block")
+	}
+}
+
 // TestComponentNilStore covers the shape a manually assembled rule context hands
 // a rule, which must answer rather than panic.
 func TestComponentNilStore(t *testing.T) {
@@ -124,6 +150,12 @@ func TestComponentNilStore(t *testing.T) {
 	}
 	if component.InScriptSetup(0) {
 		t.Error("a nil store placed a position inside a setup block")
+	}
+	if got := component.Text(); got != "" {
+		t.Errorf("Text() = %q, want empty", got)
+	}
+	if _, ok := component.TemplateRange(); ok {
+		t.Error("a nil store returned a template range")
 	}
 	if (&RuleContext{}).IsExposedToTemplate(nil, "x") {
 		t.Error("an empty context reported a binding exposed to a template")

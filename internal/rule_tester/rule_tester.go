@@ -271,9 +271,16 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 							Globals:         globals,
 						},
 						Severity: rule.SeverityError,
+						// Either half may be absent: a rule about markup has
+						// no script listeners, and nearly every rule has no
+						// template listeners.
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							if r.Run == nil {
+								return nil
+							}
 							return r.Run(ctx, options)
 						},
+						RunTemplate: templateRunnerForTest(r, options),
 					},
 				}
 			},
@@ -575,4 +582,19 @@ func RunRuleTesterFromESLintJSON(root Root, tsconfigPath string, testFilePath st
 	suite := ConvertESLintTestSuite(eslintSuite)
 	RunRuleTester(root, tsconfigPath, t, r, suite.Valid, suite.Invalid)
 	return nil
+}
+
+// templateRunnerForTest mirrors the config package's adapter: a nil
+// RunTemplate must stay nil so the linter never parses a template for a rule
+// that has nothing to say about one.
+func templateRunnerForTest(
+	r *rule.Rule,
+	options []any,
+) func(ctx rule.RuleContext) rule.TemplateListeners {
+	if r.RunTemplate == nil {
+		return nil
+	}
+	return func(ctx rule.RuleContext) rule.TemplateListeners {
+		return r.RunTemplate(ctx, options)
+	}
 }

@@ -1,0 +1,22 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowCoexistClass": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow a static `class` attribute beside a bound `:class`, which Vue merges rather than dropping."
+        },
+        "allowCoexistStyle": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow a static `style` attribute beside a bound `:style`, which Vue merges rather than dropping."
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "maxItems": 1
+}

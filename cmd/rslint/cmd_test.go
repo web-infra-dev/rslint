@@ -2528,3 +2528,66 @@ const xs = [1, 2];
 		t.Errorf("script at offset %d on the wire, want %d", got, want)
 	}
 }
+
+// TestHandleLintCommandRunsBothVuePasses is the end-to-end proof that a Vue
+// component is linted by two syntax trees in one run: the TypeScript AST over
+// its <script setup>, and the template tree over its <template>.
+//
+// The two are independent (different parsers, different node kinds, different
+// listener spaces), so the only way to know they coexist on one file is to make
+// one file violate a rule in each and see both diagnostics come back.
+func TestHandleLintCommandRunsBothVuePasses(t *testing.T) {
+	const component = `<template>
+  <div foo="a" foo="b">{{ value }}</div>
+</template>
+
+<script setup>
+export const value = 1;
+</script>
+`
+
+	dir := t.TempDir()
+	componentPath := tspath.NormalizePath(filepath.Join(dir, "App.vue"))
+	if err := os.WriteFile(componentPath, []byte(component), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDirectory := tspath.NormalizePath(dir)
+
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: &discovery.ConfigCatalog{
+			Configs: map[string]rslintconfig.RslintConfig{configDirectory: {{
+				Files:   []string{"**/*.vue"},
+				Plugins: []string{"vue"},
+				Rules: rslintconfig.Rules{
+					"vue/no-duplicate-attributes":   "error",
+					"vue/no-export-in-script-setup": "error",
+				},
+			}}},
+			Explicit: true,
+		},
+		AllowFiles:     []string{componentPath},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+
+	if strings.Contains(stderr, "error:") {
+		t.Fatalf("lint reported a fatal error: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// The template pass fired, on the template's own line.
+	if !strings.Contains(stdout, "vue/no-duplicate-attributes") {
+		t.Errorf("the template pass reported nothing:\n%s", stdout)
+	}
+	// The script pass fired, on the script's own line.
+	if !strings.Contains(stdout, "vue/no-export-in-script-setup") {
+		t.Errorf("the script pass reported nothing:\n%s", stdout)
+	}
+	// Both diagnostics point into the component, not into a projection of it:
+	// line 2 is the template's, line 6 the script's.
+	for _, want := range []string{`"line":2`, `"line":6`} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("no diagnostic at %s:\n%s", want, stdout)
+		}
+	}
+}

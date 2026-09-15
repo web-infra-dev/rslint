@@ -73,6 +73,16 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 		if impl.RequiresTypeInfo {
 			continue
 		}
+		if impl.Run == nil {
+			// A rule that only inspects a Vue template has no script body,
+			// so it cannot hold the bug this check looks for. Assert it has
+			// the other half rather than skipping quietly: a rule with
+			// neither is a registration mistake, and must still fail here.
+			if impl.RunTemplate == nil {
+				t.Fatalf("rule %q registers neither Run nor RunTemplate", key)
+			}
+			continue
+		}
 		body, file, err := parser.runBodyFor(impl.Run)
 		if err != nil {
 			// We require an unambiguous file:line for every registered Run
@@ -639,13 +649,24 @@ func collectNonTypeAwareRules(t *testing.T) []rule.ConfiguredRule {
 			continue
 		}
 		ruleImpl := impl
-		out = append(out, rule.ConfiguredRule{
+		configured := rule.ConfiguredRule{
 			Name:     name,
 			Severity: rule.SeverityWarning,
-			Run: func(ctx rule.RuleContext) rule.RuleListeners {
+		}
+		// Either half may be absent, exactly as in the production adapters:
+		// preserving nil is what lets the linter skip a half a rule does not
+		// have instead of calling through a nil function.
+		if ruleImpl.Run != nil {
+			configured.Run = func(ctx rule.RuleContext) rule.RuleListeners {
 				return ruleImpl.Run(ctx, nil)
-			},
-		})
+			}
+		}
+		if ruleImpl.RunTemplate != nil {
+			configured.RunTemplate = func(ctx rule.RuleContext) rule.TemplateListeners {
+				return ruleImpl.RunTemplate(ctx, nil)
+			}
+		}
+		out = append(out, configured)
 	}
 	return out
 }
