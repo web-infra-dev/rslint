@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // voidElements is the set of HTML void elements that cannot have children.
@@ -32,10 +33,11 @@ var VoidDomElementsNoChildrenRule = rule.Rule{
 	Name:   "react/void-dom-elements-no-children",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		scopes := scopeAnalysis.For(ctx)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings)) {
+				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings), scopes) {
 					return
 				}
 				args := call.Arguments

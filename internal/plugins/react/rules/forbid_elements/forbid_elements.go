@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed forbid_elements.schema.json
@@ -113,7 +114,7 @@ func reportIfForbidden(ctx rule.RuleContext, indexed map[string]forbidEntry, ele
 //     with a syntax-only fallback when the TypeChecker is nil)
 //
 // The Checker is optional — only used to refine the bare-callee branch.
-func isCreateElementCall(callee *ast.Node, pragma string, tc *checker.Checker) bool {
+func isCreateElementCall(callee *ast.Node, pragma string, tc *checker.Checker, scopes scopeAnalysis.Provider) bool {
 	if callee == nil {
 		return false
 	}
@@ -131,7 +132,7 @@ func isCreateElementCall(callee *ast.Node, pragma string, tc *checker.Checker) b
 		if callee.AsIdentifier().Text != "createElement" {
 			return false
 		}
-		return reactutil.IsDestructuredFromPragmaImport(callee, pragma, tc)
+		return reactutil.IsDestructuredFromPragmaImport(callee, pragma, tc, scopes)
 	}
 
 	// Member-access callee: `<pragma>.createElement(arg)` or
@@ -180,6 +181,7 @@ var ForbidElementsRule = rule.Rule{
 		}
 
 		pragma := reactutil.GetReactPragma(ctx.Settings)
+		scopes := scopeAnalysis.For(ctx)
 
 		return rule.RuleListeners{
 			ast.KindJsxOpeningElement:     checkJsxTag,
@@ -194,7 +196,7 @@ var ForbidElementsRule = rule.Rule{
 				// not by upstream `forbid-elements`, which inspects
 				// `callee.property.name` / `callee.object.name` directly —
 				// neither sensitive to optionality).
-				if !isCreateElementCall(call.Expression, pragma, ctx.TypeChecker) {
+				if !isCreateElementCall(call.Expression, pragma, ctx.TypeChecker, scopes) {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_children_prop.schema.json
@@ -40,6 +41,7 @@ var NoChildrenPropRule = rule.Rule{
 		}
 
 		pragma := reactutil.GetReactPragma(ctx.Settings)
+		scopes := scopeAnalysis.For(ctx)
 
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
@@ -63,7 +65,7 @@ var NoChildrenPropRule = rule.Rule{
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCall(call.Expression, pragma) {
+				if !reactutil.IsCreateElementCall(call.Expression, pragma, scopes) {
 					return
 				}
 				if call.Arguments == nil || len(call.Arguments.Nodes) < 2 {

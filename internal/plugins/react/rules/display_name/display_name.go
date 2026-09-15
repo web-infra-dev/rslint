@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed display_name.schema.json
@@ -115,6 +116,7 @@ type nodeWalker struct {
 	createClass         string
 	wrappers            []reactutil.ComponentWrapperEntry
 	tc                  *checker.Checker
+	scopes              scopeAnalysis.Provider
 	checkContextObjects bool
 	nestedMemoSupported bool
 
@@ -435,7 +437,7 @@ func (w *nodeWalker) matchesComponentWrapper(call, fn *ast.Node) bool {
 	if entry.matchesConfigured != 0 {
 		return entry.matchesConfigured == boolCacheTrue
 	}
-	matched := reactutil.MatchesAnyComponentWrapperWithChecker(call, fn, w.wrappers, w.pragma, w.tc)
+	matched := reactutil.MatchesAnyComponentWrapperWithChecker(call, fn, w.wrappers, w.pragma, w.tc, w.scopes)
 	if w.wrapperCalls == nil {
 		w.wrapperCalls = make(map[*ast.Node]wrapperCallCacheEntry)
 	}
@@ -877,13 +879,13 @@ func (w *nodeWalker) classifyAndRegisterFunctionLike(n *ast.Node) {
 	if directInWrapper && w.wrapperWrapsKnownSiblingComponent(directParent, n) {
 		return
 	}
-	classifies := reactutil.IsStatelessReactComponentWithWrappers(n, w.pragma, w.tc, w.wrappers)
+	classifies := reactutil.IsStatelessReactComponentWithWrappers(n, w.pragma, w.tc, w.wrappers, w.scopes)
 	if !classifies {
 		// User-configured wrapper fallback — mirrors
 		// `IsDetectedComponent` FunctionLike arm. Some wrappers don't
 		// imply Branch 11 but still register the inner function as a
 		// component.
-		if directInWrapper && reactutil.FunctionReturnsJSXOrNullWithChecker(n, w.pragma, w.tc) {
+		if directInWrapper && reactutil.FunctionReturnsJSXOrNullWithChecker(n, w.pragma, w.tc, w.scopes) {
 			outer := w.outermostWrapperCall(n)
 			if outer != nil {
 				w.addComponent(outer, bindingNameForCallExpression(outer))
@@ -1017,7 +1019,7 @@ func (w *nodeWalker) collect() {
 			if n.Parent != nil && n.Parent.Kind != ast.KindObjectLiteralExpression {
 				break
 			}
-			if reactutil.IsStatelessReactComponentWithWrappers(n, w.pragma, w.tc, w.wrappers) {
+			if reactutil.IsStatelessReactComponentWithWrappers(n, w.pragma, w.tc, w.wrappers, w.scopes) {
 				w.classifyAndRegisterFunctionLike(n)
 				// Shorthand methods carry a transpiler-derivable name —
 				// upstream's `hasTranspilerName` recognizes
@@ -1489,6 +1491,7 @@ var DisplayNameRule = rule.Rule{
 			createClass:         createClass,
 			wrappers:            wrappers,
 			tc:                  ctx.TypeChecker,
+			scopes:              scopeAnalysis.For(ctx),
 			checkContextObjects: checkContextObjects,
 			nestedMemoSupported: nestedMemoSupported,
 			byNode:              map[*ast.Node]*detectedComponent{},

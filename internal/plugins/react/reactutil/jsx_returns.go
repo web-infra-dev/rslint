@@ -3,6 +3,7 @@ package reactutil
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // FunctionReturnsJSXOrNull reports whether the function's body contains a
@@ -20,8 +21,8 @@ import (
 // Mirrors upstream jsxUtil.isReturningJSX invoked with default arguments
 // (which accept JSX, `null`, and `<pragma>.createElement(...)` returns).
 // Pass an empty pragma to default to "React".
-func FunctionReturnsJSXOrNull(fn *ast.Node, pragma string) bool {
-	return functionReturnsJSXInternal(fn, true, pragma, nil)
+func FunctionReturnsJSXOrNull(fn *ast.Node, pragma string, scopes scopeAnalysis.Provider) bool {
+	return functionReturnsJSXInternal(fn, true, pragma, nil, scopes)
 }
 
 // FunctionReturnsJSXOrNullWithChecker is the TypeChecker-aware variant of
@@ -31,8 +32,13 @@ func FunctionReturnsJSXOrNull(fn *ast.Node, pragma string) bool {
 // scope walk semantically (any binding the TS resolver can reach is
 // considered, not just bindings in the immediately-enclosing block). When
 // `tc` is nil, falls back to the local-block scan.
-func FunctionReturnsJSXOrNullWithChecker(fn *ast.Node, pragma string, tc *checker.Checker) bool {
-	return functionReturnsJSXInternal(fn, true, pragma, tc)
+func FunctionReturnsJSXOrNullWithChecker(
+	fn *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
+	return functionReturnsJSXInternal(fn, true, pragma, tc, scopes)
 }
 
 // FunctionReturnsJSX is the strict sibling of FunctionReturnsJSXOrNull:
@@ -40,17 +46,28 @@ func FunctionReturnsJSXOrNullWithChecker(fn *ast.Node, pragma string, tc *checke
 // calls still qualify. Mirrors upstream jsxUtil.isReturningJSX invoked with
 // `strict=true, ignoreNull=true`. `<pragma>.createElement(...)` calls still
 // qualify. Pass an empty pragma to default to "React".
-func FunctionReturnsJSX(fn *ast.Node, pragma string) bool {
-	return functionReturnsJSXInternal(fn, false, pragma, nil)
+func FunctionReturnsJSX(fn *ast.Node, pragma string, scopes scopeAnalysis.Provider) bool {
+	return functionReturnsJSXInternal(fn, false, pragma, nil, scopes)
 }
 
 // FunctionReturnsJSXWithChecker is the TypeChecker-aware strict variant.
 // See FunctionReturnsJSXOrNullWithChecker for the resolution semantics.
-func FunctionReturnsJSXWithChecker(fn *ast.Node, pragma string, tc *checker.Checker) bool {
-	return functionReturnsJSXInternal(fn, false, pragma, tc)
+func FunctionReturnsJSXWithChecker(
+	fn *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
+	return functionReturnsJSXInternal(fn, false, pragma, tc, scopes)
 }
 
-func functionReturnsJSXInternal(fn *ast.Node, acceptNull bool, pragma string, tc *checker.Checker) bool {
+func functionReturnsJSXInternal(
+	fn *ast.Node,
+	acceptNull bool,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
 	if fn == nil {
 		return false
 	}
@@ -63,7 +80,7 @@ func functionReturnsJSXInternal(fn *ast.Node, acceptNull bool, pragma string, tc
 	case ast.KindArrowFunction:
 		body = fn.AsArrowFunction().Body
 		if body != nil && body.Kind != ast.KindBlock {
-			return isJSXExpression(body, acceptNull, pragma, tc)
+			return isJSXExpression(body, acceptNull, pragma, tc, scopes)
 		}
 	case ast.KindMethodDeclaration:
 		body = fn.AsMethodDeclaration().Body
@@ -84,7 +101,7 @@ func functionReturnsJSXInternal(fn *ast.Node, acceptNull bool, pragma string, tc
 		switch n.Kind {
 		case ast.KindReturnStatement:
 			rs := n.AsReturnStatement()
-			if rs.Expression != nil && isJSXExpression(rs.Expression, acceptNull, pragma, tc) {
+			if rs.Expression != nil && isJSXExpression(rs.Expression, acceptNull, pragma, tc, scopes) {
 				found = true
 				return true
 			}
@@ -147,7 +164,13 @@ func functionReturnsJSXInternal(fn *ast.Node, acceptNull bool, pragma string, tc
 // `function Hello() { return <div /> as ReactNode; }` is not a component
 // upstream, and peeling the wrapper here would report components ESLint never
 // reports.
-func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker.Checker) bool {
+func isJSXExpression(
+	expr *ast.Node,
+	acceptNull bool,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
 	expr = ast.SkipParentheses(expr)
 	if expr == nil {
 		return false
@@ -158,7 +181,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 	case ast.KindNullKeyword:
 		return acceptNull
 	case ast.KindCallExpression:
-		return IsCreateElementCallWithChecker(expr.AsCallExpression().Expression, pragma, tc)
+		return IsCreateElementCallWithChecker(expr.AsCallExpression().Expression, pragma, tc, scopes)
 	case ast.KindIdentifier:
 		// Upstream's `isJSXValue` for the Identifier case calls
 		// `findVariableByName` and then `isJSX(variable)` — and `isJSX`
@@ -179,7 +202,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 		return false
 	case ast.KindConditionalExpression:
 		ce := expr.AsConditionalExpression()
-		return isJSXExpression(ce.WhenTrue, acceptNull, pragma, tc) || isJSXExpression(ce.WhenFalse, acceptNull, pragma, tc)
+		return isJSXExpression(ce.WhenTrue, acceptNull, pragma, tc, scopes) || isJSXExpression(ce.WhenFalse, acceptNull, pragma, tc, scopes)
 	case ast.KindBinaryExpression:
 		bin := expr.AsBinaryExpression()
 		if bin.OperatorToken == nil {
@@ -187,11 +210,11 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 		}
 		switch bin.OperatorToken.Kind {
 		case ast.KindCommaToken:
-			return isJSXExpression(bin.Right, acceptNull, pragma, tc)
+			return isJSXExpression(bin.Right, acceptNull, pragma, tc, scopes)
 		case ast.KindAmpersandAmpersandToken,
 			ast.KindBarBarToken,
 			ast.KindQuestionQuestionToken:
-			return isJSXExpression(bin.Left, acceptNull, pragma, tc) || isJSXExpression(bin.Right, acceptNull, pragma, tc)
+			return isJSXExpression(bin.Left, acceptNull, pragma, tc, scopes) || isJSXExpression(bin.Right, acceptNull, pragma, tc, scopes)
 		}
 	}
 	return false

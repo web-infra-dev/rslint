@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // isPropertyOwnedSFC mirrors upstream's
@@ -44,6 +45,7 @@ var NoThisInSfcRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
+		scopes := scopeAnalysis.For(ctx)
 
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -61,7 +63,7 @@ var NoThisInSfcRule = rule.Rule{
 			if ast.SkipParentheses(expr).Kind != ast.KindThisKeyword {
 				return
 			}
-			component := reactutil.GetParentStatelessComponent(node, pragma, wrappers)
+			component := reactutil.GetParentStatelessComponent(node, pragma, wrappers, scopes)
 			if component == nil {
 				return
 			}

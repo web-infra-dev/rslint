@@ -3,6 +3,7 @@ package reactutil
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // IsInsideReactComponent reports whether `node` is lexically inside a
@@ -233,12 +234,12 @@ func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast
 // approximate match). This is intentionally conservative: missed detection
 // causes a rule miss, over-detection would cause false-positive reports in
 // non-component functions.
-func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry) *ast.Node {
+func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry, scopes scopeAnalysis.Provider) *ast.Node {
 	if comp := GetEnclosingReactComponent(node, pragma, createClass); comp != nil {
 		return comp
 	}
 	for p := node.Parent; p != nil; p = p.Parent {
-		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers, scopes) {
 			return p
 		}
 	}
@@ -260,12 +261,12 @@ func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass s
 // check, which bails when the result is undefined.
 //
 // Pass empty strings for pragma/createClass to fall back to defaults.
-func GetParentReactComponentScopeBasedOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry) *ast.Node {
+func GetParentReactComponentScopeBasedOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry, scopes scopeAnalysis.Provider) *ast.Node {
 	if comp := GetParentReactComponentScopeBased(node, pragma, createClass); comp != nil {
 		return comp
 	}
 	for p := node.Parent; p != nil; p = p.Parent {
-		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers, scopes) {
 			return p
 		}
 	}
@@ -286,12 +287,12 @@ func GetParentReactComponentScopeBasedOrStateless(node *ast.Node, pragma, create
 // be the resolved `settings.componentWrapperFunctions` list (plus the
 // built-in `memo` / `forwardRef` defaults) so user-configured HOCs are
 // recognized as component-wrapping calls.
-func GetParentStatelessComponent(node *ast.Node, pragma string, wrappers []ComponentWrapperEntry) *ast.Node {
+func GetParentStatelessComponent(node *ast.Node, pragma string, wrappers []ComponentWrapperEntry, scopes scopeAnalysis.Provider) *ast.Node {
 	for p := node.Parent; p != nil; p = p.Parent {
 		if !ast.IsFunctionLike(p) {
 			continue
 		}
-		if IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
+		if IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers, scopes) {
 			return p
 		}
 	}
@@ -335,8 +336,8 @@ func GetParentStatelessComponent(node *ast.Node, pragma string, wrappers []Compo
 // resolution inside the JSX-return checks (relevant for any input where
 // the function returns a name bound elsewhere — `return view` ↔
 // `let view = <div/>` etc).
-func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
-	return isStatelessReactComponentCore(fn, pragma, nil, nil)
+func IsStatelessReactComponent(fn *ast.Node, pragma string, scopes scopeAnalysis.Provider) bool {
+	return isStatelessReactComponentCore(fn, pragma, nil, nil, scopes)
 }
 
 // IsStatelessReactComponentWithChecker mirrors IsStatelessReactComponent and
@@ -348,8 +349,8 @@ func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
 // default wrappers (`memo` / `forwardRef`, pragma-qualified or bare). To
 // honor `settings.componentWrapperFunctions` here, use
 // `IsStatelessReactComponentWithWrappers` instead.
-func IsStatelessReactComponentWithChecker(fn *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isStatelessReactComponentCore(fn, pragma, tc, nil)
+func IsStatelessReactComponentWithChecker(fn *ast.Node, pragma string, tc *checker.Checker, scopes scopeAnalysis.Provider) bool {
+	return isStatelessReactComponentCore(fn, pragma, tc, nil, scopes)
 }
 
 // IsStatelessReactComponentWithWrappers is the variant that consults a
@@ -367,14 +368,14 @@ func IsStatelessReactComponentWithChecker(fn *ast.Node, pragma string, tc *check
 //
 // Pass `wrappers = nil` for hardcoded defaults; pass the configured
 // `GetComponentWrapperFunctions(...)` list to honor user settings.
-func IsStatelessReactComponentWithWrappers(fn *ast.Node, pragma string, tc *checker.Checker, wrappers []ComponentWrapperEntry) bool {
-	return isStatelessReactComponentCore(fn, pragma, tc, wrappers)
+func IsStatelessReactComponentWithWrappers(fn *ast.Node, pragma string, tc *checker.Checker, wrappers []ComponentWrapperEntry, scopes scopeAnalysis.Provider) bool {
+	return isStatelessReactComponentCore(fn, pragma, tc, wrappers, scopes)
 }
 
 // isStatelessReactComponentCore is the shared decision tree. `wrappers`
 // nil means "use hardcoded memo/forwardRef defaults" (matching the legacy
 // public API); non-nil means "consult this list in Branch 11 instead".
-func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Checker, wrappers []ComponentWrapperEntry) bool {
+func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Checker, wrappers []ComponentWrapperEntry, scopes scopeAnalysis.Provider) bool {
 	if fn == nil {
 		return false
 	}
@@ -400,12 +401,12 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return false
 		}
-		return isFirstLetterCapitalized(name.AsIdentifier().Text) && functionReturnsJSXInternal(fn, false, pragma, tc)
+		return isFirstLetterCapitalized(name.AsIdentifier().Text) && functionReturnsJSXInternal(fn, false, pragma, tc, scopes)
 	case ast.KindFunctionDeclaration:
 		// Branch: FunctionDeclaration requires isReturningJSXOrNull AND
 		// (no id || capitalized). Anonymous FD is only legal as
 		// `export default function() {...}`.
-		if !functionReturnsJSXInternal(fn, true, pragma, tc) {
+		if !functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 			return false
 		}
 		name := fn.Name()
@@ -446,12 +447,12 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 
 	// Branch 1 — ExportDefault (strict isReturningJSX).
 	if isExportDefaultAssignment(parent) {
-		return functionReturnsJSXInternal(fn, false, pragma, tc)
+		return functionReturnsJSXInternal(fn, false, pragma, tc, scopes)
 	}
 
 	// Branch 2 — VariableDeclarator.
 	if parent.Kind == ast.KindVariableDeclaration {
-		if !functionReturnsJSXInternal(fn, true, pragma, tc) {
+		if !functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 			return false
 		}
 		binding := parent.AsVariableDeclaration().Name()
@@ -465,7 +466,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	// when not strictly returning JSX.
 	if parent.Kind == ast.KindReturnStatement ||
 		(parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == fn) {
-		if !functionReturnsJSXInternal(fn, false, pragma, tc) {
+		if !functionReturnsJSXInternal(fn, false, pragma, tc, scopes) {
 			return false
 		}
 	}
@@ -475,7 +476,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	if parent.Kind == ast.KindBinaryExpression && !isMEAssign {
 		bin := parent.AsBinaryExpression()
 		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
-			if !functionReturnsJSXInternal(fn, true, pragma, tc) {
+			if !functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 				return false
 			}
 			// Named FE defers to its own id (matches upstream's final
@@ -499,7 +500,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	// AssignmentExpression / PropertyAssignment position.
 	if parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == fn {
 		grand := parent.Parent
-		if grand != nil && !isMEAssign && functionReturnsJSXInternal(fn, true, pragma, tc) {
+		if grand != nil && !isMEAssign && functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 			switch grand.Kind {
 			case ast.KindBinaryExpression:
 				bin := grand.AsBinaryExpression()
@@ -536,7 +537,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 		if funcExpr != nil {
 			funcExpr = funcExpr.Parent
 		}
-		if funcExpr != nil && funcExpr.Parent != nil && !isMEAssign && functionReturnsJSXInternal(fn, true, pragma, tc) {
+		if funcExpr != nil && funcExpr.Parent != nil && !isMEAssign && functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 			gp := funcExpr.Parent
 			switch gp.Kind {
 			case ast.KindBinaryExpression:
@@ -565,7 +566,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 		if nameNode != nil && nameNode.Kind == ast.KindComputedPropertyName {
 			keyExpr := ast.SkipParentheses(nameNode.AsComputedPropertyName().Expression)
 			if keyExpr.Kind == ast.KindPropertyAccessExpression || keyExpr.Kind == ast.KindElementAccessExpression {
-				if !functionReturnsJSXInternal(fn, false, pragma, tc) && !functionReturnsOnlyNull(fn) {
+				if !functionReturnsJSXInternal(fn, false, pragma, tc, scopes) && !functionReturnsOnlyNull(fn) {
 					return false
 				}
 			}
@@ -587,7 +588,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 				if !isFirstLetterCapitalized(name.AsIdentifier().Text) {
 					return false
 				}
-				return functionReturnsJSXInternal(fn, false, pragma, tc)
+				return functionReturnsJSXInternal(fn, false, pragma, tc, scopes)
 			}
 			return false
 		}
@@ -611,17 +612,17 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 		// every legacy caller's behavior.
 		matched := false
 		if wrappers != nil {
-			matched = MatchesAnyComponentWrapperWithChecker(effectiveParent, fn, wrappers, pragma, tc)
+			matched = MatchesAnyComponentWrapperWithChecker(effectiveParent, fn, wrappers, pragma, tc, scopes)
 		} else {
 			matched = isPragmaComponentWrapperCall(effectiveParent, fn, pragma)
 		}
-		if matched && functionReturnsJSXInternal(fn, true, pragma, tc) {
+		if matched && functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 			return true
 		}
 	}
 
 	// Branch 12 — require allowed position AND isReturningJSXOrNull.
-	if !isInAllowedPositionForComponent(fn) || !functionReturnsJSXInternal(fn, true, pragma, tc) {
+	if !isInAllowedPositionForComponent(fn) || !functionReturnsJSXInternal(fn, true, pragma, tc, scopes) {
 		return false
 	}
 
@@ -968,7 +969,13 @@ func WrapperWrapsKnownSiblingComponent(call *ast.Node, fn *ast.Node) bool {
 // identity must dedupe by node pointer or by remapping inner FunctionLike
 // to its enclosing wrapper call (see no-multi-comp's collection pass for
 // the canonical pattern).
-func IsDetectedComponent(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry, tc *checker.Checker) bool {
+func IsDetectedComponent(
+	node *ast.Node,
+	pragma, createClass string,
+	wrappers []ComponentWrapperEntry,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
 	if node == nil {
 		return false
 	}
@@ -979,13 +986,13 @@ func IsDetectedComponent(node *ast.Node, pragma, createClass string, wrappers []
 		ast.KindMethodDeclaration,
 		ast.KindGetAccessor,
 		ast.KindSetAccessor:
-		if IsStatelessReactComponentWithWrappers(node, pragma, tc, wrappers) {
+		if IsStatelessReactComponentWithWrappers(node, pragma, tc, wrappers, scopes) {
 			return true
 		}
 		parent := SkipExpressionWrappersUp(node)
 		if parent != nil && parent.Kind == ast.KindCallExpression &&
-			MatchesAnyComponentWrapperWithChecker(parent, node, wrappers, pragma, tc) &&
-			FunctionReturnsJSXOrNullWithChecker(node, pragma, tc) {
+			MatchesAnyComponentWrapperWithChecker(parent, node, wrappers, pragma, tc, scopes) &&
+			FunctionReturnsJSXOrNullWithChecker(node, pragma, tc, scopes) {
 			return true
 		}
 		return false
@@ -1002,7 +1009,7 @@ func IsDetectedComponent(node *ast.Node, pragma, createClass string, wrappers []
 		if inner == nil || !IsFunctionLikeForComponent(inner) {
 			return false
 		}
-		if !MatchesAnyComponentWrapperWithChecker(node, inner, wrappers, pragma, tc) {
+		if !MatchesAnyComponentWrapperWithChecker(node, inner, wrappers, pragma, tc, scopes) {
 			return false
 		}
 		if WrapperWrapsKnownSiblingComponent(node, inner) {

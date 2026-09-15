@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_invalid_html_attribute.schema.json
@@ -139,8 +140,8 @@ func literalString(node *ast.Node) (string, bool) {
 	return "", false
 }
 
-func isCreateElementCall(callee *ast.Node) bool {
-	if reactutil.IsCreateElementCall(callee, reactutil.DefaultReactPragma) {
+func isCreateElementCall(callee *ast.Node, scopes scopeAnalysis.Provider) bool {
+	if reactutil.IsCreateElementCall(callee, reactutil.DefaultReactPragma, scopes) {
 		return true
 	}
 	if callee == nil {
@@ -280,6 +281,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 		if !configured(options) {
 			return rule.RuleListeners{}
 		}
+		scopes := scopeAnalysis.For(ctx)
 		reportLiteral := func(valueNode, nonStringRemoveNode, emptyRemoveNode *ast.Node, element string, decodeJSX bool) {
 			value, isString := literalString(valueNode)
 			if decodeJSX {
@@ -380,7 +382,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 		}
 		checkCall := func(node *ast.Node) {
 			call := node.AsCallExpression()
-			if !isCreateElementCall(call.Expression) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+			if !isCreateElementCall(call.Expression, scopes) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 				return
 			}
 			tagNode := ast.SkipParentheses(call.Arguments.Nodes[0])

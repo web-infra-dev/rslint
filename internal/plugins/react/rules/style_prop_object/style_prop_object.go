@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed style_prop_object.schema.json
@@ -16,6 +17,7 @@ var StylePropObjectRule = rule.Rule{
 	Name:   "react/style-prop-object",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		scopes := scopeAnalysis.For(ctx)
 		// Parse the `allow` option: list of component names to skip
 		var allowedComponents map[string]bool
 		if len(options) > 0 {
@@ -123,7 +125,7 @@ var StylePropObjectRule = rule.Rule{
 			// and @jsx comment pragmas are not supported.
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings)) {
+				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings), scopes) {
 					return
 				}
 				args := call.Arguments

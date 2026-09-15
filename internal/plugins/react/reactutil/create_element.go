@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // IsCreateElementCall reports whether the callee is `<pragma>.createElement`
@@ -33,8 +34,8 @@ import (
 // recognize bare `createElement(...)` calls (with the
 // `isDestructuredFromPragmaImport` gate), use
 // `IsCreateElementCallWithChecker`.
-func IsCreateElementCall(callee *ast.Node, pragma string) bool {
-	return isCreateElementCallCore(callee, pragma, nil)
+func IsCreateElementCall(callee *ast.Node, pragma string, scopes scopeAnalysis.Provider) bool {
+	return isPragmaFactoryCallCore(callee, pragma, nil, scopes, nil, createElementOnly)
 }
 
 // IsCreateElementCallWithChecker is the import-aware variant. When `tc`
@@ -44,23 +45,24 @@ func IsCreateElementCall(callee *ast.Node, pragma string) bool {
 // `const { createElement } = React` / `const createElement = React.createElement`
 // / `const { createElement } = require('react')`). Mirrors upstream
 // `isCreateElement`'s second branch byte-for-byte.
-func IsCreateElementCallWithChecker(callee *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isCreateElementCallCore(callee, pragma, tc)
+func IsCreateElementCallWithChecker(
+	callee *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
+	return isPragmaFactoryCallCore(callee, pragma, tc, scopes, nil, createElementOnly)
 }
 
 // NewCreateElementCallMatcher returns a per-file matcher with the definition
 // lookup used by eslint-plugin-react. Bindings are resolved lazily and cached,
 // independently of whether this file has a TypeChecker.
-func NewCreateElementCallMatcher(ctx rule.RuleContext) func(*ast.Node) bool {
+func NewCreateElementCallMatcher(ctx rule.RuleContext, scopes scopeAnalysis.Provider) func(*ast.Node) bool {
 	pragma := GetReactPragmaFromContext(ctx)
-	isImported := newPragmaImportMatcher(ctx, pragma, "createElement")
+	isImported := newPragmaImportMatcher(ctx, scopes, pragma, "createElement")
 	return func(callee *ast.Node) bool {
-		return isPragmaFactoryCallCore(callee, pragma, nil, isImported, createElementOnly)
+		return isPragmaFactoryCallCore(callee, pragma, nil, scopes, isImported, createElementOnly)
 	}
-}
-
-func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isPragmaFactoryCallCore(callee, pragma, tc, nil, createElementOnly)
 }
 
 // IsCreateOrCloneElementCall reports whether the callee resolves to
@@ -78,8 +80,13 @@ func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 // (`as` / `satisfies` / `<T>x` / `x!`) on the pragma identifier are NOT
 // skipped — that would over-match relative to ESLint's JS-only AST and
 // is a divergence we deliberately avoid.
-func IsCreateOrCloneElementCall(callee *ast.Node, pragma string, tc *checker.Checker) bool {
-	return isPragmaFactoryCallCore(callee, pragma, tc, nil, createOrCloneElement)
+func IsCreateOrCloneElementCall(
+	callee *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
+	return isPragmaFactoryCallCore(callee, pragma, tc, scopes, nil, createOrCloneElement)
 }
 
 type pragmaFactoryNames int
@@ -103,6 +110,7 @@ func isPragmaFactoryCallCore(
 	callee *ast.Node,
 	pragma string,
 	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
 	isImported func(*ast.Node) bool,
 	names pragmaFactoryNames,
 ) bool {
@@ -127,7 +135,7 @@ func isPragmaFactoryCallCore(
 		if isImported != nil {
 			return isImported(callee)
 		}
-		return IsDestructuredFromPragmaImport(callee, pragma, tc)
+		return IsDestructuredFromPragmaImport(callee, pragma, tc, scopes)
 	}
 
 	// Member-access callee: `<pragma>.<name>(arg)` or
