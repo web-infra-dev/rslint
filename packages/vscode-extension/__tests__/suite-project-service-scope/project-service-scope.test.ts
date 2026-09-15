@@ -4,11 +4,9 @@ import path from 'node:path';
 import { findFixAllAction, requestFixAll } from '../suite/fixall-helpers';
 import { waitForRslintDiagnostics as waitForDiagnostics } from '../utils/diagnostics';
 
-// Type-aware rule scope when parserOptions uses `projectService: true`
-// (the shape `ts.configs.recommended` exports) without an explicit
-// `project`. The LSP and CLI must agree: only files covered by the
-// fallback tsconfig's `include` get type-aware rules, AND a nested
-// config that has no tsconfig must not enable type-aware rules.
+// Type-aware rule scope with explicit `projectService: true` and no
+// `project`. The LSP and CLI must agree: files in the selected configured
+// Program get type-aware rules; unowned files keep source-only gap linting.
 //
 // Fixture: fixtures-project-service-scope
 //   - rslint.config.js            — parserOptions.projectService: true (no explicit project).

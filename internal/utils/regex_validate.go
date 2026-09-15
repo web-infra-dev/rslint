@@ -6,7 +6,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )

@@ -1,6 +1,6 @@
 package utils
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // NoUnusedExpressionOptions contains the expression-shape switches shared by
 // ESLint core and typescript-eslint's no-unused-expressions rules.

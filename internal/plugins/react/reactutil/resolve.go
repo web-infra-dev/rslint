@@ -1,8 +1,8 @@
 package reactutil
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 )
 
 // ResolveIdentifierInitializer returns the value-side AST node that an

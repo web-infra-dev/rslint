@@ -1,0 +1,35 @@
+Upstream package fixtures: eslint-plugin-n v18.3.0, tests/fixtures/shebang.
+
+-- string-bin/package.json --
+{
+  "name": "test",
+  "version": "0.0.0",
+  "bin": "./bin/test.js"
+}
+
+-- object-bin/package.json --
+{
+  "name": "test",
+  "version": "0.0.0",
+  "bin": {
+    "a": "./bin/a.js",
+    "b": "./bin/b.js",
+    "c": "./bin",
+    "t": "./bin/t.ts"
+  }
+}
+
+-- no-bin-field/package.json --
+{
+  "name": "test",
+  "version": "0.0.0"
+}
+
+-- unpublished/package.json --
+{
+  "name": "test",
+  "version": "0.0.0",
+  "files": [
+    "./published.js"
+  ]
+}

@@ -3,7 +3,7 @@ package prefer_await_to_then
 import (
 	_ "embed"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 

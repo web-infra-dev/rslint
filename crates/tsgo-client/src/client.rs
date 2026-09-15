@@ -49,7 +49,7 @@ pub enum ProtocolError {
 impl Client {
     pub fn builder(exe: &OsStr, options: Options) -> Builder {
         let mut cmd = process::Command::new(exe);
-        cmd.arg("--api");
+        cmd.args(["project", "--api"]);
         Client::with_command(cmd, options)
     }
 

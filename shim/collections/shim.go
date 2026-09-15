@@ -3,7 +3,7 @@
 
 package collections
 
-import "github.com/microsoft/typescript-go/internal/collections"
+import "github.com/microsoft/TypeScript/tsc/internal/collections"
 
 type CopyOnWriteMap[K comparable, V any] = collections.CopyOnWriteMap[K,V]
 type CopyOnWriteSet[K comparable] = collections.CopyOnWriteSet[K]

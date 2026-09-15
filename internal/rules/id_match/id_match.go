@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -163,7 +163,7 @@ func (r *idMatch) checkIdentifier(node *ast.Node) {
 		return
 	}
 
-	if ast.IsAccessExpression(parent) {
+	if ast.IsAccessExpression(parent) || utils.IsHeritageQualifiedName(parent) {
 		r.checkMemberAccess(node, name, parent)
 		return
 	}
@@ -216,7 +216,8 @@ func (r *idMatch) checkMemberAccess(node *ast.Node, name string, member *ast.Nod
 	if !r.opts.properties {
 		return
 	}
-	if object := ast.SkipParentheses(member.Expression()); object.Kind == ast.KindIdentifier &&
+	object, _ := utils.MemberExpressionParts(member)
+	if object = ast.SkipParentheses(object); object.Kind == ast.KindIdentifier &&
 		object.Text() == name {
 		r.reportIfInvalid(node, name)
 		return

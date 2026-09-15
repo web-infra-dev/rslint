@@ -193,6 +193,7 @@ func TestForbidForeignPropTypesRule(t *testing.T) {
 			Code: `type X = typeof Foo.propTypes;`,
 			Tsx:  true,
 		},
+		{Code: `type X = Foo.propTypes;`, Tsx: true},
 		{
 			Code: `type X = { p: typeof Foo.propTypes };`,
 			Tsx:  true,
@@ -918,17 +919,20 @@ func TestForbidForeignPropTypesRule(t *testing.T) {
 				{MessageId: "forbiddenPropType", Line: 1, Column: 6, EndLine: 1, EndColumn: 15},
 			},
 		},
-		// Interface heritage clause — tsgo represents
-		// `interface I extends Foo.propTypes {}` with a value-level
-		// PropertyAccessExpression in the heritage clause's
-		// ExpressionWithTypeArguments (mirroring TypeScript's grammar:
-		// `extends` takes a LeftHandSideExpression). Upstream's
-		// MemberExpression listener fires equivalently.
+		// Interface heritage uses a qualified type name in the compiler,
+		// while ESTree retains the MemberExpression visited by this rule.
 		{
 			Code: `interface I extends Foo.propTypes {}`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "forbiddenPropType", Line: 1, Column: 25, EndLine: 1, EndColumn: 34},
+			},
+		},
+		{
+			Code: `class C implements NS.Foo.propTypes {}`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "forbiddenPropType"},
 			},
 		},
 		// Class method NAMED `propTypes` — `findParentClassProperty`

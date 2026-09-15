@@ -3,9 +3,9 @@ package test_framework_test
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 

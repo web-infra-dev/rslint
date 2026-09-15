@@ -1,10 +1,11 @@
 package consistent_indexed_object_style
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -537,3 +538,23 @@ const (
 	expectSuggestion
 	expectNoEdit
 )
+
+func TestConsistentIndexedObjectStyleHeritage(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for _, declaration := range []string{"interface I extends", "class C implements", "class C extends"} {
+		for _, target := range []string{"Record<string, number>", "Record<'a' | 'b', number>", "Record<string, Array<number>>"} {
+			valid = append(valid, rule_tester.ValidTestCase{
+				Code:    fmt.Sprintf("%s %s {}", declaration, target),
+				Options: []any{"index-signature"},
+			})
+		}
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:    declaration + " Base<Record<string, number>> {}",
+			Options: []any{"index-signature"},
+			Output:  []string{declaration + " Base<{ [key: string]: number }> {}"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "preferIndexSignature"}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ConsistentIndexedObjectStyleRule, valid, invalid)
+}

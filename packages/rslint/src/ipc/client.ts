@@ -508,7 +508,14 @@ export class IpcClient {
     this.pending.delete(msg.id);
     if (msg.kind === ERROR_KIND) {
       const data = msg.data as ErrorResponseData | undefined;
-      p.reject(new Error(`peer error: ${data?.message ?? '(no message)'}`));
+      const message = data?.message;
+      p.reject(
+        new Error(
+          typeof message === 'string' && message.length > 0
+            ? message
+            : 'request failed',
+        ),
+      );
       return;
     }
     p.resolve(msg);

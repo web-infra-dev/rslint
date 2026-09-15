@@ -3,7 +3,7 @@ package no_render_return_value
 import (
 	"regexp"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -165,6 +165,22 @@ var NoRenderReturnValueRule = rule.Rule{
 // skipped so `(a) => (call())` reaches the same ArrowFunction.
 func consumesReturnValue(parent *ast.Node, call *ast.Node) bool {
 	switch parent.Kind {
+	case ast.KindComputedPropertyName:
+		computed := parent.AsComputedPropertyName()
+		if ast.SkipParentheses(computed.Expression) != call || parent.Parent == nil {
+			return false
+		}
+		owner := parent.Parent
+		switch owner.Kind {
+		case ast.KindPropertyAssignment,
+			ast.KindBindingElement:
+			return true
+		case ast.KindMethodDeclaration,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor:
+			return owner.Parent != nil && owner.Parent.Kind == ast.KindObjectLiteralExpression
+		}
+		return false
 	case ast.KindVariableDeclaration,
 		ast.KindPropertyAssignment,
 		ast.KindReturnStatement:

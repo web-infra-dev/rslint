@@ -232,7 +232,10 @@ func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any
 		if resp.Kind == KindError {
 			var e ErrorResponseData
 			_ = resp.Decode(&e)
-			return nil, fmt.Errorf("ipc: peer error: %s", e.Message)
+			if e.Message == "" {
+				e.Message = "request failed"
+			}
+			return nil, errors.New(e.Message)
 		}
 		return resp, nil
 	case <-ctx.Done():

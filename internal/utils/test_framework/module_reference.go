@@ -1,8 +1,8 @@
 package test_framework
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -147,6 +147,46 @@ func ResolveFunctionIdentifierReferenceFromSymbolModules(
 	sourceFile *ast.SourceFile,
 	importModules []string,
 ) (string, *ast.Node, ReferenceMode) {
+	return resolveIdentifierReferenceFromSymbolModules(
+		localName,
+		identifier,
+		symbol,
+		sourceFile,
+		importModules,
+		false,
+	)
+}
+
+// ResolveTypeIdentifierReferenceFromSymbolModules resolves an identifier used
+// in a type position against every specifier that exports the same type
+// surface. Unlike the function-reference resolver, it accepts a type-only
+// import, written either as `import type { Mock } from "@rstest/core"` or as
+// `import { type Mock } from "@rstest/core"`.
+func ResolveTypeIdentifierReferenceFromSymbolModules(
+	localName string,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+	sourceFile *ast.SourceFile,
+	importModules []string,
+) (string, *ast.Node, ReferenceMode) {
+	return resolveIdentifierReferenceFromSymbolModules(
+		localName,
+		identifier,
+		symbol,
+		sourceFile,
+		importModules,
+		true,
+	)
+}
+
+func resolveIdentifierReferenceFromSymbolModules(
+	localName string,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+	sourceFile *ast.SourceFile,
+	importModules []string,
+	allowTypeOnlySpecifier bool,
+) (string, *ast.Node, ReferenceMode) {
 	if identifier == nil || identifier.Kind != ast.KindIdentifier {
 		return localName, identifier, ReferenceModeGlobal
 	}
@@ -160,7 +200,16 @@ func ResolveFunctionIdentifierReferenceFromSymbolModules(
 			continue
 		}
 
-		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules); ok {
+		// A type-only import is erased before runtime, so it neither binds the
+		// module's export nor shadows anything: the call is the global
+		// registration, whether the `type` sits on the clause or the specifier.
+		// A caller resolving an identifier in a type position asks for the
+		// opposite and opts out.
+		if !allowTypeOnlySpecifier && ast.IsTypeOnlyImportDeclaration(declaration) {
+			continue
+		}
+
+		if name, originalNode, ok := resolveModuleImportSpecifier(declaration, importModules, allowTypeOnlySpecifier); ok {
 			return name, originalNode, ReferenceModeImport
 		}
 		if name, originalNode, ok := resolveModuleRequireBinding(declaration, importModules); ok {
@@ -206,6 +255,12 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 			continue
 		}
 
+		// A type-only import is erased before runtime: it binds a name in the
+		// type world only, so nothing reaches the module namespace through it.
+		if ast.IsTypeOnlyImportDeclaration(declaration) {
+			continue
+		}
+
 		if declaration.Kind == ast.KindNamespaceImport {
 			importDeclaration := FindImportDeclaration(declaration)
 			if importDeclaration != nil &&
@@ -221,12 +276,39 @@ func IsModuleNamespaceSymbolModules(symbol *ast.Symbol, importModules []string) 
 				return true
 			}
 		}
+
+		// `import core = require('m')` binds the module namespace the same way
+		// a namespace import does.
+		if declaration.Kind == ast.KindImportEqualsDeclaration {
+			if isImportEqualsOfModules(declaration, importModules) {
+				return true
+			}
+		}
 	}
 
 	return false
 }
 
-func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string) (string, *ast.Node, bool) {
+// isImportEqualsOfModules reports whether declaration is
+// `import name = require(module)` for any of importModules.
+func isImportEqualsOfModules(declaration *ast.Node, importModules []string) bool {
+	importEquals := declaration.AsImportEqualsDeclaration()
+	if importEquals == nil || importEquals.ModuleReference == nil ||
+		importEquals.ModuleReference.Kind != ast.KindExternalModuleReference {
+		return false
+	}
+	reference := importEquals.ModuleReference.AsExternalModuleReference()
+	if reference == nil || reference.Expression == nil {
+		return false
+	}
+	specifier := internalUtils.SkipAssertionsAndParens(reference.Expression)
+	if specifier == nil || !ast.IsStringLiteralLike(specifier) {
+		return false
+	}
+	return matchesModule(specifier.Text(), importModules)
+}
+
+func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string, allowTypeOnly bool) (string, *ast.Node, bool) {
 	if declaration == nil || declaration.Kind != ast.KindImportSpecifier {
 		return "", nil, false
 	}
@@ -239,7 +321,10 @@ func resolveModuleImportSpecifier(declaration *ast.Node, importModules []string)
 	}
 
 	specifier := declaration.AsImportSpecifier()
-	if specifier == nil || specifier.IsTypeOnly {
+	// A type-only binding names no value at runtime, so a caller resolving a
+	// function reference must not accept one. The check covers the inline
+	// `type` modifier and the one on the enclosing clause alike.
+	if specifier == nil || (ast.IsTypeOnlyImportDeclaration(declaration) && !allowTypeOnly) {
 		return "", nil, false
 	}
 	if specifier.PropertyName != nil {
@@ -291,8 +376,12 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 		return false
 	}
 
-	node = ast.SkipParentheses(node)
-	if node == nil || !ast.IsRequireCall(node, true /* requireStringLiteralLikeArgument */) {
+	// TypeScript assertions are erased before runtime, so
+	// `require('m') as any` still binds the module.
+	node = internalUtils.SkipAssertionsAndParens(node)
+	// The argument is checked below rather than by IsRequireCall, which would
+	// reject `require('m' as any)` before the assertion is skipped.
+	if node == nil || !ast.IsRequireCall(node, false /* requireStringLiteralLikeArgument */) {
 		return false
 	}
 
@@ -300,7 +389,7 @@ func IsModuleRequireCallModules(node *ast.Node, importModules []string) bool {
 	if len(arguments) == 0 || arguments[0] == nil {
 		return false
 	}
-	specifier := ast.SkipParentheses(arguments[0])
+	specifier := internalUtils.SkipAssertionsAndParens(arguments[0])
 	if specifier == nil {
 		return false
 	}

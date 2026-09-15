@@ -1,0 +1,277 @@
+Fixtures from eslint-plugin-n v18.3.0 tests/fixtures/no-extraneous.
+-- dependencies/node_modules/@bbb/aaa.js --
+
+-- dependencies/node_modules/aaa.js --
+
+-- dependencies/node_modules/bbb/index.js --
+
+-- dependencies/node_modules/bbb/package.json --
+{
+  "name": "bbb",
+  "main": "index.js"
+}
+-- dependencies/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "dependencies": {
+        "aaa": "0.0.0",
+        "@bbb/aaa": "0.0.0"
+    }
+}
+-- devDependencies/node_modules/@bbb/aaa.js --
+
+-- devDependencies/node_modules/aaa.js --
+
+-- devDependencies/node_modules/bbb/index.js --
+
+-- devDependencies/node_modules/bbb/package.json --
+{
+  "name": "bbb",
+  "main": "index.js"
+}
+-- devDependencies/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "devDependencies": {
+        "aaa": "0.0.0",
+        "@bbb/aaa": "0.0.0"
+    }
+}
+-- import-map/package.json --
+{
+    "imports": {
+        "#b": "./src/a.js"
+    }
+}
+-- import-map/src/b.js --
+
+-- noDependencies/node_modules/@bbb/aaa.js --
+
+-- noDependencies/node_modules/aaa.js --
+
+-- noDependencies/node_modules/bbb.js --
+
+-- noDependencies/package.json --
+{
+    "name": "test",
+    "version": "0.0.0"
+}
+-- optionalDependencies/node_modules/@bbb/aaa.js --
+
+-- optionalDependencies/node_modules/aaa.js --
+
+-- optionalDependencies/node_modules/bbb/index.js --
+
+-- optionalDependencies/node_modules/bbb/package.json --
+{
+  "name": "bbb",
+  "main": "index.js"
+}
+-- optionalDependencies/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "optionalDependencies": {
+        "aaa": "0.0.0",
+        "@bbb/aaa": "0.0.0"
+    }
+}
+-- peerDependencies/node_modules/@bbb/aaa.js --
+
+-- peerDependencies/node_modules/aaa.js --
+
+-- peerDependencies/node_modules/bbb/index.js --
+
+-- peerDependencies/node_modules/bbb/package.json --
+{
+  "name": "bbb",
+  "main": "index.js"
+}
+-- peerDependencies/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "peerDependencies": {
+        "aaa": "0.0.0",
+        "@bbb/aaa": "0.0.0"
+    }
+}
+-- tsconfig-paths/index.ts --
+// File needs to exists
+-- tsconfig-paths/src/configurations/foo.ts --
+export default {}
+-- tsconfig-paths/tsconfig.json --
+{
+    "compilerOptions": {
+        "paths": {
+            "~configurations/*": ["./src/configurations/*"],
+            "@configurations/*": ["./src/configurations/*"],
+            "#configurations/*": ["./src/configurations/*"]
+        }
+    }
+}
+-- typesOnly/node_modules/@types/picomatch/index.d.ts --
+export type Glob = string
+export function scan(): unknown
+-- typesOnly/node_modules/picomatch/index.js --
+export function scan() {}
+-- typesOnly/node_modules/picomatch/package.json --
+{
+    "name": "picomatch",
+    "version": "0.0.0",
+    "main": "index.js"
+}
+-- typesOnly/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "dependencies": {
+        "@types/picomatch": "0.0.0"
+    }
+}
+-- workspace/node_modules/root-dep/index.js --
+export default {}
+-- workspace/node_modules/root-dep/package.json --
+{
+    "name": "root-dep",
+    "version": "0.0.0"
+}
+-- workspace/node_modules/root-dev-dep/index.js --
+export default {}
+-- workspace/node_modules/root-dev-dep/package.json --
+{
+    "name": "root-dev-dep",
+    "version": "0.0.0"
+}
+-- workspace/package.json --
+{
+    "name": "workspace-root",
+    "version": "0.0.0",
+    "private": true,
+    "workspaces": [
+        "./{packages,apps}/*/"
+    ],
+    "dependencies": {
+        "root-dep": "0.0.0"
+    },
+    "devDependencies": {
+        "root-dev-dep": "0.0.0"
+    }
+}
+-- workspace/packages/app/package.json --
+{
+    "name": "workspace-app",
+    "version": "0.0.0"
+}
+-- workspace/packages/app/src/index.js --
+import rootDep from "root-dep"
+
+rootDep()
+-- workspace-negated/node_modules/root-dep/index.js --
+export default {}
+-- workspace-negated/node_modules/root-dep/package.json --
+{
+    "name": "root-dep",
+    "version": "0.0.0"
+}
+-- workspace-negated/package.json --
+{
+    "name": "workspace-negated-root",
+    "version": "0.0.0",
+    "private": true,
+    "workspaces": [
+        "packages/*",
+        "!packages/excluded"
+    ],
+    "dependencies": {
+        "root-dep": "0.0.0"
+    }
+}
+-- workspace-negated/packages/excluded/package.json --
+{
+    "name": "workspace-excluded-app",
+    "version": "0.0.0"
+}
+-- workspace-negated/packages/excluded/src/index.js --
+import rootDep from "root-dep"
+
+rootDep()
+-- workspace-nested/inner/node_modules/root-dep/index.js --
+export default {}
+-- workspace-nested/inner/node_modules/root-dep/package.json --
+{
+    "name": "root-dep",
+    "version": "0.0.0"
+}
+-- workspace-nested/inner/package.json --
+{
+    "name": "workspace-inner-root",
+    "version": "0.0.0",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
+    "dependencies": {
+        "root-dep": "0.0.0"
+    }
+}
+-- workspace-nested/inner/packages/app/package.json --
+{
+    "name": "workspace-nested-app",
+    "version": "0.0.0"
+}
+-- workspace-nested/inner/packages/app/src/index.js --
+import rootDep from "root-dep"
+
+rootDep()
+-- workspace-nested/node_modules/outer-dep/index.js --
+export default {}
+-- workspace-nested/node_modules/outer-dep/package.json --
+{
+    "name": "outer-dep",
+    "version": "0.0.0"
+}
+-- workspace-nested/package.json --
+{
+    "name": "workspace-outer-root",
+    "version": "0.0.0",
+    "private": true,
+    "workspaces": [
+        "**"
+    ],
+    "dependencies": {
+        "outer-dep": "0.0.0"
+    }
+}
+-- workspace-object/node_modules/root-dep/index.js --
+export default {}
+-- workspace-object/node_modules/root-dep/package.json --
+{
+    "name": "root-dep",
+    "version": "0.0.0"
+}
+-- workspace-object/package.json --
+{
+    "name": "workspace-object-root",
+    "version": "0.0.0",
+    "private": true,
+    "workspaces": {
+        "packages": [
+            "@(packages|apps)/*"
+        ]
+    },
+    "dependencies": {
+        "root-dep": "0.0.0"
+    }
+}
+-- workspace-object/packages/app/package.json --
+{
+    "name": "workspace-object-app",
+    "version": "0.0.0"
+}
+-- workspace-object/packages/app/src/index.js --
+import rootDep from "root-dep"
+
+rootDep()

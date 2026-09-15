@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	no_null "github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_null"
 	"github.com/web-infra-dev/rslint/internal/rule"

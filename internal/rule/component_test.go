@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 

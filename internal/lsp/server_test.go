@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/jsonrpc"
-	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
+	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // mockFS is a mock implementation of vfs.FS for testing. Only FileExists is properly implemented;

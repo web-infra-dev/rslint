@@ -3,44 +3,44 @@
 
 package module
 
-import "github.com/microsoft/typescript-go/internal/ast"
-import "github.com/microsoft/typescript-go/internal/collections"
-import "github.com/microsoft/typescript-go/internal/core"
-import "github.com/microsoft/typescript-go/internal/diagnostics"
-import "github.com/microsoft/typescript-go/internal/module"
+import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/microsoft/TypeScript/tsc/internal/collections"
+import "github.com/microsoft/TypeScript/tsc/internal/core"
+import "github.com/microsoft/TypeScript/tsc/internal/diagnostics"
+import "github.com/microsoft/TypeScript/tsc/internal/module"
 import _ "unsafe"
 
-//go:linkname ComparePatternKeys github.com/microsoft/typescript-go/internal/module.ComparePatternKeys
+//go:linkname ComparePatternKeys github.com/microsoft/TypeScript/tsc/internal/module.ComparePatternKeys
 func ComparePatternKeys(a string, b string) int
 type DiagAndArgs = module.DiagAndArgs
 type Ending = module.Ending
 const EndingChangeable = module.EndingChangeable
 const EndingExtensionChangeable = module.EndingExtensionChangeable
 const EndingFixed = module.EndingFixed
-//go:linkname GetAutomaticTypeDirectiveNames github.com/microsoft/typescript-go/internal/module.GetAutomaticTypeDirectiveNames
+//go:linkname GetAutomaticTypeDirectiveNames github.com/microsoft/TypeScript/tsc/internal/module.GetAutomaticTypeDirectiveNames
 func GetAutomaticTypeDirectiveNames(options *core.CompilerOptions, host module.ResolutionHost) []string
-//go:linkname GetCompilerOptionsWithRedirect github.com/microsoft/typescript-go/internal/module.GetCompilerOptionsWithRedirect
+//go:linkname GetCompilerOptionsWithRedirect github.com/microsoft/TypeScript/tsc/internal/module.GetCompilerOptionsWithRedirect
 func GetCompilerOptionsWithRedirect(compilerOptions *core.CompilerOptions, redirectedReference module.ResolvedProjectReference) *core.CompilerOptions
-//go:linkname GetConditions github.com/microsoft/typescript-go/internal/module.GetConditions
+//go:linkname GetConditions github.com/microsoft/TypeScript/tsc/internal/module.GetConditions
 func GetConditions(options *core.CompilerOptions, resolutionMode core.ResolutionMode) []string
-//go:linkname GetPackageNameFromTypesPackageName github.com/microsoft/typescript-go/internal/module.GetPackageNameFromTypesPackageName
+//go:linkname GetPackageNameFromTypesPackageName github.com/microsoft/TypeScript/tsc/internal/module.GetPackageNameFromTypesPackageName
 func GetPackageNameFromTypesPackageName(mangledName string) string
-//go:linkname GetResolutionDiagnostic github.com/microsoft/typescript-go/internal/module.GetResolutionDiagnostic
+//go:linkname GetResolutionDiagnostic github.com/microsoft/TypeScript/tsc/internal/module.GetResolutionDiagnostic
 func GetResolutionDiagnostic(options *core.CompilerOptions, resolvedModule *module.ResolvedModule, file *ast.SourceFile) *diagnostics.Message
-//go:linkname GetTypesPackageName github.com/microsoft/typescript-go/internal/module.GetTypesPackageName
+//go:linkname GetTypesPackageName github.com/microsoft/TypeScript/tsc/internal/module.GetTypesPackageName
 func GetTypesPackageName(packageName string) string
 const InferredTypesContainingFile = module.InferredTypesContainingFile
-//go:linkname IsApplicableVersionedTypesKey github.com/microsoft/typescript-go/internal/module.IsApplicableVersionedTypesKey
+//go:linkname IsApplicableVersionedTypesKey github.com/microsoft/TypeScript/tsc/internal/module.IsApplicableVersionedTypesKey
 func IsApplicableVersionedTypesKey(key string) bool
-//go:linkname MangleScopedPackageName github.com/microsoft/typescript-go/internal/module.MangleScopedPackageName
+//go:linkname MangleScopedPackageName github.com/microsoft/TypeScript/tsc/internal/module.MangleScopedPackageName
 func MangleScopedPackageName(packageName string) string
-//go:linkname MatchPatternOrExact github.com/microsoft/typescript-go/internal/module.MatchPatternOrExact
+//go:linkname MatchPatternOrExact github.com/microsoft/TypeScript/tsc/internal/module.MatchPatternOrExact
 func MatchPatternOrExact(patterns *module.ParsedPatterns, candidate string) core.Pattern
 type ModeAwareCache[T any] = module.ModeAwareCache[T]
 type ModeAwareCacheKey = module.ModeAwareCacheKey
-//go:linkname NewResolver github.com/microsoft/typescript-go/internal/module.NewResolver
-func NewResolver(host module.ResolutionHost, options *core.CompilerOptions, typingsLocation string, projectName string) *module.Resolver
-//go:linkname NewResolverWithOptions github.com/microsoft/typescript-go/internal/module.NewResolverWithOptions
+//go:linkname NewResolver github.com/microsoft/TypeScript/tsc/internal/module.NewResolver
+func NewResolver(host module.ResolutionHost, options *core.CompilerOptions, typingsLocation string, projectName string, extraExtensions []string) *module.Resolver
+//go:linkname NewResolverWithOptions github.com/microsoft/TypeScript/tsc/internal/module.NewResolverWithOptions
 func NewResolverWithOptions(host module.ResolutionHost, compilerOptions *core.CompilerOptions, typingsLocation string, projectName string, opts module.ResolverOptions) *module.Resolver
 type NodeResolutionFeatures = module.NodeResolutionFeatures
 const NodeResolutionFeaturesAll = module.NodeResolutionFeaturesAll
@@ -54,13 +54,13 @@ const NodeResolutionFeaturesNodeNextDefault = module.NodeResolutionFeaturesNodeN
 const NodeResolutionFeaturesNone = module.NodeResolutionFeaturesNone
 const NodeResolutionFeaturesSelfName = module.NodeResolutionFeaturesSelfName
 type PackageId = module.PackageId
-//go:linkname ParseNodeModuleFromPath github.com/microsoft/typescript-go/internal/module.ParseNodeModuleFromPath
+//go:linkname ParseNodeModuleFromPath github.com/microsoft/TypeScript/tsc/internal/module.ParseNodeModuleFromPath
 func ParseNodeModuleFromPath(resolved string, isFolder bool) string
-//go:linkname ParsePackageName github.com/microsoft/typescript-go/internal/module.ParsePackageName
+//go:linkname ParsePackageName github.com/microsoft/TypeScript/tsc/internal/module.ParsePackageName
 func ParsePackageName(moduleName string) (packageName string, rest string)
 type ParsedPatterns = module.ParsedPatterns
 type ResolutionHost = module.ResolutionHost
-//go:linkname ResolveConfig github.com/microsoft/typescript-go/internal/module.ResolveConfig
+//go:linkname ResolveConfig github.com/microsoft/TypeScript/tsc/internal/module.ResolveConfig
 func ResolveConfig(moduleName string, containingFile string, host module.ResolutionHost) *module.ResolvedModule
 type ResolvedEntrypoint = module.ResolvedEntrypoint
 type ResolvedModule = module.ResolvedModule
@@ -68,9 +68,9 @@ type ResolvedProjectReference = module.ResolvedProjectReference
 type ResolvedTypeReferenceDirective = module.ResolvedTypeReferenceDirective
 type Resolver = module.Resolver
 type ResolverOptions = module.ResolverOptions
-//go:linkname TryGetJSExtensionForFile github.com/microsoft/typescript-go/internal/module.TryGetJSExtensionForFile
+//go:linkname TryGetJSExtensionForFile github.com/microsoft/TypeScript/tsc/internal/module.TryGetJSExtensionForFile
 func TryGetJSExtensionForFile(fileName string, options *core.CompilerOptions) string
-//go:linkname TryParsePatterns github.com/microsoft/typescript-go/internal/module.TryParsePatterns
+//go:linkname TryParsePatterns github.com/microsoft/TypeScript/tsc/internal/module.TryParsePatterns
 func TryParsePatterns(pathMappings *collections.OrderedMap[string, []string]) *module.ParsedPatterns
-//go:linkname UnmangleScopedPackageName github.com/microsoft/typescript-go/internal/module.UnmangleScopedPackageName
+//go:linkname UnmangleScopedPackageName github.com/microsoft/TypeScript/tsc/internal/module.UnmangleScopedPackageName
 func UnmangleScopedPackageName(packageName string) string

@@ -19,6 +19,9 @@ export const RuleConfig: React.FC<{ name: string; group: string }> = ({
   group,
 }) => {
   const config = GROUP_CONFIG[group];
+  const prefix = PLUGIN_REGISTRY.find(
+    (plugin) => plugin.group === group,
+  )?.prefix;
 
   const code = config
     ? `import { defineConfig, ${config.importName} } from '@rslint/core';
@@ -35,7 +38,7 @@ export default defineConfig([
 
 export default defineConfig([
   {
-    rules: {
+${prefix ? `    plugins: ['${prefix}'],\n` : ''}    rules: {
       '${name}': 'error',
     },
   },

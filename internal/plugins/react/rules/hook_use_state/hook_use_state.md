@@ -9,6 +9,12 @@ This rule ensures that a React `useState` call uses a symmetric
 `[value, setValue]` destructure. Returning a `useState` result directly is
 allowed.
 
+Suggestions that replace a TypeScript destructuring pattern also remove its
+type annotation. The annotation describes the original pattern and is not
+carried over to the replacement.
+
+JavaScript JSDoc casts are transparent to this rule.
+
 Examples of **incorrect** code for this rule:
 
 ```javascript

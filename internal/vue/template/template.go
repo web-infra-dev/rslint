@@ -26,7 +26,7 @@ package template
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/vue/htmlscan"
 	"github.com/web-infra-dev/rslint/internal/vue/vast"
 )

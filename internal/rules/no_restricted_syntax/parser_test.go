@@ -8,6 +8,7 @@ import (
 func TestParseSelector_Wellformed(t *testing.T) {
 	cases := []string{
 		"Identifier",
+		"123",
 		"#identifier",
 		"*",
 		"FunctionExpression",
@@ -21,6 +22,9 @@ func TestParseSelector_Wellformed(t *testing.T) {
 		"FunctionDeclaration[params.length<=2]",
 		"FunctionDeclaration[params.length<2]",
 		"FunctionDeclaration[params.0.name=x]",
+		"ImportDeclaration[source.value=some/path]",
+		"Literal[value=-1]",
+		"BinaryExpression[name=&&]",
 		"Identifier[name=type(string)]",
 		"Literal[value=.5]",
 		"Literal[regex.flags=/./]",
@@ -32,6 +36,8 @@ func TestParseSelector_Wellformed(t *testing.T) {
 		"FunctionDeclaration FunctionExpression",
 		"Literal + Literal",
 		"* ~ *",
+		"!IfStatement > BlockStatement",
+		"ExpressionStatement + !ExpressionStatement",
 		":is(Identifier, Literal)",
 		":matches(Identifier, Literal)",
 		":not(VariableDeclaration)",
@@ -75,7 +81,7 @@ func TestParseSelector_Malformed(t *testing.T) {
 		"Identifier[name=/foo/g]",            // unsupported regex flag
 		"Identifier[name=/foo/ii]",           // duplicate regex flag
 		"Identifier[name=type()]",            // empty typeof operand
-		"Literal[value=-1]",                  // esquery numbers are unsigned
+		"Literal[value=5.]",                  // esquery requires a fractional digit
 		":nth-child",                         // missing arg
 		":nth-child(",                        // unterminated paren
 		":nth-child(abc)",                    // non-numeric arg
@@ -87,7 +93,6 @@ func TestParseSelector_Malformed(t *testing.T) {
 		":unknownPseudo",                     // unsupported pseudo
 		":HAS(Identifier)",                   // named pseudos are case-sensitive
 		"FunctionDeclaration[params.length>", // missing operand
-		"BinaryExpression[name=&&]",          // illegal operator value
 	}
 	for _, c := range cases {
 		t.Run(c, func(t *testing.T) {
@@ -112,6 +117,12 @@ func TestParseRuleOptions_Shapes(t *testing.T) {
 	t.Run("single string", func(t *testing.T) {
 		got := parseRuleOptions([]interface{}{"Identifier"})
 		if len(got) != 1 || got[0].selector != "Identifier" {
+			t.Fatalf("unexpected entries: %#v", got)
+		}
+	})
+	t.Run("exit selector", func(t *testing.T) {
+		got := parseRuleOptions([]interface{}{"Identifier:exit"})
+		if len(got) != 1 || got[0].selector != "Identifier:exit" || got[0].compiled == nil {
 			t.Fatalf("unexpected entries: %#v", got)
 		}
 	})

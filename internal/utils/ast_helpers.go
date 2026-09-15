@@ -3,7 +3,7 @@ package utils
 import (
 	"slices"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // skipTransparentKinds matches parentheses + TS type assertions.
@@ -447,6 +447,44 @@ func IsClassExtendsHeritageClause(node *ast.Node) bool {
 	grandparent := parent.Parent
 	return grandparent != nil &&
 		(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression)
+}
+
+// IsHeritageQualifiedName identifies the dotted names that ESTree exposes as
+// MemberExpression in interface extends and class implements clauses. Ordinary
+// type references, type queries, and heritage type arguments stay type names.
+func IsHeritageQualifiedName(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindQualifiedName {
+		return false
+	}
+	entity := node
+	for entity.Parent != nil && entity.Parent.Kind == ast.KindQualifiedName &&
+		entity.Parent.AsQualifiedName().Left == entity {
+		entity = entity.Parent
+	}
+	ref := entity.Parent
+	return ref != nil && ref.Kind == ast.KindTypeReference &&
+		ref.AsTypeReferenceNode().TypeName == entity &&
+		ref.Parent != nil && ref.Parent.Kind == ast.KindHeritageClause
+}
+
+// MemberExpressionParts returns the object and property of an ESTree-style
+// member access. A computed property is returned without unwrapping it. Both
+// results are nil for nodes outside these member-access shapes.
+func MemberExpressionParts(node *ast.Node) (object, property *ast.Node) {
+	if node == nil {
+		return nil, nil
+	}
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		return node.AsPropertyAccessExpression().Expression, node.AsPropertyAccessExpression().Name()
+	case ast.KindElementAccessExpression:
+		return node.AsElementAccessExpression().Expression, node.AsElementAccessExpression().ArgumentExpression
+	case ast.KindQualifiedName:
+		if IsHeritageQualifiedName(node) {
+			return node.AsQualifiedName().Left, node.AsQualifiedName().Right
+		}
+	}
+	return nil, nil
 }
 
 // VisitDescendants walks node and everything beneath it, depth-first in source

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // FunctionReturnAnalysis holds the result of analyzing return behavior of a function.

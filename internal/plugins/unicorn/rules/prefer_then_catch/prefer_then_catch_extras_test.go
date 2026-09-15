@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	prefer_then_catch "github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"

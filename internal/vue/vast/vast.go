@@ -29,7 +29,7 @@
 // node's Loc is already exact.
 package vast
 
-import "github.com/microsoft/typescript-go/shim/core"
+import "github.com/microsoft/TypeScript/tsc/shim/core"
 
 // Kind identifies what a node is.
 type Kind uint8

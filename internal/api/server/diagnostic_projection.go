@@ -1,8 +1,8 @@
 package server
 
 import (
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/api"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )

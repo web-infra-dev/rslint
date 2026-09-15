@@ -3,7 +3,7 @@ package unicornutil
 import (
 	"regexp"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 

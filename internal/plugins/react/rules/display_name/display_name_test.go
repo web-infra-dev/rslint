@@ -3,9 +3,9 @@ package display_name
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -1748,9 +1748,6 @@ func TestDisplayNameRule(t *testing.T) {
 			Settings: map[string]interface{}{
 				"react": map[string]interface{}{"createClass": "createClass"},
 			},
-			// SKIP: rslint does not support ESLint's `/** @jsx ... */` directive
-			// comments. The pragma is read solely from settings.react.pragma.
-			Skip:   true,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: noDisplayName}},
 		},
 

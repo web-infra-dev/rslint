@@ -143,7 +143,7 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Optimization lock-in: SourceFile.Identifiers stores normalized
+			// ---- Optimization lock-in: SourceFile.HasIdentifier collects normalized
 			// names, so the whole-file candidate gate must retain escaped uses ----
 			{
 				Code:    `\u0066oo;`,

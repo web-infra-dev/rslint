@@ -5,11 +5,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/binder"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -317,10 +317,9 @@ func TestSourcePotentialReferenceGate(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/new-for-builtins-gate-fallback-test.ts",
 		Path:     tspath.Path("/new-for-builtins-gate-fallback-test.ts"),
-	}, "helper();", core.ScriptKindTS)
-	sourceFile.Identifiers = nil
+	}, `\u0041rray();`, core.ScriptKindTS) // cspell:disable-line
 	if !sourceHasPotentialReference(sourceFile) {
-		t.Fatal("sourceHasPotentialReference() must fail open without a parser identifier index")
+		t.Fatal("sourceHasPotentialReference() must collect normalized names for an uncached source file")
 	}
 }
 

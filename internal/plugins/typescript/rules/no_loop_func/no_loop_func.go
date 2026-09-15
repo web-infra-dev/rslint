@@ -3,7 +3,7 @@ package no_loop_func
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	core "github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/utils"

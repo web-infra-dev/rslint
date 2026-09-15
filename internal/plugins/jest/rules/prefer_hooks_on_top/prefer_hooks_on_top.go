@@ -1,7 +1,7 @@
 package prefer_hooks_on_top
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )

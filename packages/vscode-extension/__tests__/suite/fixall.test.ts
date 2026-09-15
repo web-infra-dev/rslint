@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import {
   waitForDiagnostics,
+  waitForTypeAssertionDiagnostics,
   waitForDiagnosticsToChange,
   waitForDiagnosticsCount,
   openFixture,
@@ -125,7 +126,7 @@ suite('rslint fixAll - code actions', function () {
     const fixableContent =
       "const frVal: string = 'hello';\nconst frRes = (frVal as string).toUpperCase();\n";
     await withTmpFile(fixableContent, async (doc) => {
-      const initialDiags = await waitForDiagnostics(doc);
+      const initialDiags = await waitForTypeAssertionDiagnostics(doc);
       assert.ok(initialDiags.length > 0, 'Should have initial diagnostics');
 
       const fixableDiags = initialDiags.filter((d) =>
@@ -164,7 +165,7 @@ suite('rslint fixAll - code actions', function () {
       '',
     ].join('\n');
     await withTmpFile(mixedContent, async (doc) => {
-      const initialDiags = await waitForDiagnostics(doc);
+      const initialDiags = await waitForTypeAssertionDiagnostics(doc);
       assert.ok(initialDiags.length > 0, 'Should have diagnostics');
 
       const fixableBefore = initialDiags.filter((d) =>
@@ -244,7 +245,7 @@ suite('rslint fixAll - code actions', function () {
     const fixableContent =
       "const sfVal: string = 'x';\nconst sfRes = (sfVal as string).trim();\n";
     await withTmpFile(fixableContent, async (doc) => {
-      const initialDiags = await waitForDiagnostics(doc);
+      const initialDiags = await waitForTypeAssertionDiagnostics(doc);
       const fixableCount = initialDiags.filter((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       ).length;

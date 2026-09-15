@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"

@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/binder"
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // IsInStrictMode checks whether a node is in strict mode code.

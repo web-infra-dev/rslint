@@ -1,7 +1,7 @@
 package prefer_hooks_in_order
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )

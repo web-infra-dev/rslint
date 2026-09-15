@@ -4,9 +4,9 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -114,6 +114,11 @@ var NoUnderscoreDangleRule = rule.Rule{
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				checkMemberAccess(ctx, node, opts)
+			},
+			ast.KindQualifiedName: func(node *ast.Node) {
+				if utils.IsHeritageQualifiedName(node) {
+					checkMemberAccess(ctx, node, opts)
+				}
 			},
 		}
 	},
@@ -357,17 +362,13 @@ func checkMemberAccess(ctx rule.RuleContext, node *ast.Node, opts noUnderscoreDa
 }
 
 func memberPropertyNode(node *ast.Node) *ast.Node {
-	if node.Kind == ast.KindElementAccessExpression {
-		return ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
-	}
-	return node.AsPropertyAccessExpression().Name()
+	_, property := utils.MemberExpressionParts(node)
+	return ast.SkipParentheses(property)
 }
 
 func memberObjectNode(node *ast.Node) *ast.Node {
-	if node.Kind == ast.KindElementAccessExpression {
-		return node.AsElementAccessExpression().Expression
-	}
-	return node.AsPropertyAccessExpression().Expression
+	object, _ := utils.MemberExpressionParts(node)
+	return object
 }
 
 // isThisConstructorReference ports the helper of the same name: the receiver

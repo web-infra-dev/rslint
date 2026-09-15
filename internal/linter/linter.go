@@ -13,9 +13,9 @@ import (
 	vuetemplate "github.com/web-infra-dev/rslint/internal/vue/template"
 	"github.com/web-infra-dev/rslint/internal/vue/vast"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 var (

@@ -3,7 +3,7 @@ package linter
 import (
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // textSourceFile is a lightweight ast.SourceFileLike backed only by raw

@@ -1,9 +1,9 @@
 package no_unnecessary_qualifier
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -94,7 +94,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// reachable in scope at the qualifier's position and matches what
 		// the qualifier resolves to. tsgo's GetSymbolAtLocation handles
 		// Identifier / QualifiedName / PropertyAccessExpression natively
-		// (see typescript-go/internal/checker/checker.go getSymbolAtLocation
+		// (see typescript-go/tsc/internal/checker/checker.go getSymbolAtLocation
 		// switch on KindPropertyAccessExpression / KindQualifiedName), so we
 		// pass the qualifier node as-is — same as upstream's
 		// `services.getSymbolAtLocation(qualifier)`.

@@ -347,3 +347,24 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 		},
 	)
 }
+
+func TestNoJasmineGlobalsTypes(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_jasmine_globals.NoJasmineGlobalsRule, []rule_tester.ValidTestCase{
+		{Code: `interface I extends jasmine.SomeType {}`},
+		{Code: `class C implements jasmine.SomeType {}`},
+		{Code: `interface I extends jasmine.nested.SomeType {}`},
+		{Code: `type T = jasmine.SomeType;`},
+		{Code: `type T = typeof jasmine.any;`},
+		{Code: `let value: jasmine;`},
+		{Code: `interface I extends Base<jasmine.SomeType> {}`},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:   `class C extends jasmine.SomeType {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "illegalJasmine"}},
+		},
+		{
+			Code:   `class C implements Base { value = jasmine; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "illegalJasmine"}},
+		},
+	})
+}

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -674,14 +674,14 @@ func declaredType(n *ast.Node, aliases map[string][]*ast.Node, aliasesBySymbol m
 				continue
 			}
 			for _, heritage := range clause.AsHeritageClause().Types.Nodes {
-				if heritage != nil && heritage.Kind == ast.KindExpressionWithTypeArguments {
-					entry := heritage.AsExpressionWithTypeArguments()
+				if heritage != nil && heritage.Kind == ast.KindTypeReference {
+					entry := heritage.AsTypeReferenceNode()
 					var base propDeclaration
 					var ok bool
-					if name := reactutil.EntityNameRightmost(entry.Expression); name != nil && name.AsIdentifier().Text == "ReturnType" && entry.TypeArguments != nil && len(entry.TypeArguments.Nodes) == 1 {
+					if name := reactutil.EntityNameRightmost(entry.TypeName); name != nil && name.AsIdentifier().Text == "ReturnType" && entry.TypeArguments != nil && len(entry.TypeArguments.Nodes) == 1 {
 						base, ok = returnTypeDeclaration(entry.TypeArguments.Nodes[0], aliases, aliasesBySymbol, seen, resolve)
 					} else {
-						base, ok = declaredType(entry.Expression, aliases, aliasesBySymbol, seen, resolve)
+						base, ok = declaredType(entry.TypeName, aliases, aliasesBySymbol, seen, resolve)
 					}
 					if ok {
 						mergeDeclaration(&result, base)

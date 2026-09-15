@@ -151,7 +151,9 @@ disqualifiers
 dlclark
 Dmts
 dobedo
+Dogfooding
 dont
+dorny
 dotless
 doublestar
 DPUB
@@ -186,6 +188,7 @@ fatih
 fdescribe
 fdir
 FEFF
+fflate
 fieldset
 figcaption
 fileless
@@ -219,6 +222,7 @@ forinstatement
 formedness
 forofstatement
 Foto
+Fprintf
 frameset
 fround
 fsys
@@ -238,6 +242,7 @@ gimvy
 gimy
 gimyu
 github
+gitlink
 glossref
 gnored
 GOARCH
@@ -257,6 +262,7 @@ gruber
 Gujr
 guoyu
 handl
+hardlinks
 hashtable
 haspopup
 Hebr
@@ -310,7 +316,11 @@ Laoo
 Larcher
 ldflags
 ldquo
+LASTEXITCODE
+libasound
 libc
+libgbm
+libnss
 libsyncrpc
 lifecycles
 Lingui
@@ -354,6 +364,7 @@ misalign
 miscategorise
 misparsed
 misrefactored
+mktemp
 Mlym
 mmap
 mobx
@@ -392,6 +403,7 @@ Nkoo
 nocase
 noconfig
 nodesep
+nodeutil
 noembed
 noglobstar
 nolint
@@ -581,6 +593,7 @@ subclassing
 subpackages
 subtag
 subtags
+subtest
 subtests
 supa
 supersets
@@ -593,6 +606,7 @@ tablist
 Taml
 tanstack
 tarask
+TARGETARCH
 tarjan
 tascript
 tekuri
@@ -685,6 +699,7 @@ valuemin
 valuenow
 valuetext
 variabledeclaration
+varint
 vfsmatch
 visitchildren
 vitest
@@ -731,6 +746,10 @@ pingback
 prerender
 reparses
 batgo
+Swatinem
+CBOR
+allowjs
+projectservice
 vuesfc
 htmlscan
 vast

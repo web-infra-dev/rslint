@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -22,10 +22,10 @@ func sourceMayUseEval(sourceFile *ast.SourceFile) bool {
 	// text checks retain computed string accesses such as window['eval']; an
 	// escaped computed name necessarily contains both '[' and a backslash.
 	// Stay conservative for direct callers that do not provide parser metadata.
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	if _, ok := sourceFile.Identifiers["eval"]; ok {
+	if sourceFile.HasIdentifier("eval") {
 		return true
 	}
 	text := sourceFile.Text()
@@ -125,9 +125,12 @@ func (state *noEvalState) checkIdentifier(node *ast.Node) {
 
 	// Property names are already identifier nodes, so handle dot access here
 	// instead of dispatching a listener for every PropertyAccessExpression.
-	if ast.IsPropertyAccessExpression(parent) && parent.AsPropertyAccessExpression().Name() == node {
-		state.checkMemberAccess(parent.AsPropertyAccessExpression().Expression, node)
-		return
+	if ast.IsPropertyAccessExpression(parent) || utils.IsHeritageQualifiedName(parent) {
+		object, property := utils.MemberExpressionParts(parent)
+		if property == node {
+			state.checkMemberAccess(object, node)
+			return
+		}
 	}
 
 	// Grouping parentheses are absent from ESTree. Walk through them so direct
@@ -211,9 +214,8 @@ func (state *noEvalState) isGlobalObjectChain(node *ast.Node) bool {
 				(chainName == "" || chainName == name) &&
 				state.isGlobalObjectReference(node, name)
 		}
-		if ast.IsPropertyAccessExpression(node) {
-			propertyAccess := node.AsPropertyAccessExpression()
-			name := propertyAccess.Name()
+		if ast.IsPropertyAccessExpression(node) || utils.IsHeritageQualifiedName(node) {
+			object, name := utils.MemberExpressionParts(node)
 			if name == nil || !isGlobalObjectName(name.Text()) {
 				return false
 			}
@@ -222,7 +224,7 @@ func (state *noEvalState) isGlobalObjectChain(node *ast.Node) bool {
 			} else if chainName != name.Text() {
 				return false
 			}
-			node = propertyAccess.Expression
+			node = object
 			continue
 		}
 		if ast.IsElementAccessExpression(node) {

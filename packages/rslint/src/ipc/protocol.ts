@@ -36,6 +36,9 @@ export type MessageKind =
   // logical payload is used by the API and LSP adapters.
   | 'loadConfigs'
   | 'activateConfigs'
+  // CLI-only: start the same activation, returning provisional metadata for
+  // planning. activateConfigs must complete before lint/fix execution.
+  | 'prepareConfigs'
   // Go → Node reverse request: run JS ESLint-plugin rules for a batch of
   // files in the worker pool and return the diagnostics.
   | 'pluginLint';
