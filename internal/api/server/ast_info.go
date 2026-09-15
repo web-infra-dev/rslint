@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
@@ -21,6 +23,7 @@ import (
 type programCache struct {
 	mu              sync.RWMutex
 	fileContent     string
+	sourceFileName  string
 	compilerOptions string // JSON serialized for comparison
 	program         *compiler.Program
 	sourceFile      *ast.SourceFile
@@ -31,8 +34,12 @@ var astInfoProgramCache = &programCache{}
 
 // HandleGetAstInfo handles get AST info requests in IPC mode
 func (h *Handler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoResponse, error) {
-	// Fixed user file name for program creation
-	const userFileName = "/index.ts"
+	userFileName := req.SourceFileName
+	if userFileName == "" {
+		userFileName = "/index.ts"
+	} else {
+		userFileName = tspath.ResolvePath("/", userFileName)
+	}
 
 	// Serialize compiler options for comparison
 	compilerOptionsJSON := "{}"
@@ -45,7 +52,7 @@ func (h *Handler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoRe
 	}
 
 	// Check if we can use cached program
-	program, userSourceFile := getCachedProgram(req.FileContent, compilerOptionsJSON)
+	program, userSourceFile := getCachedProgram(userFileName, req.FileContent, compilerOptionsJSON)
 	if program == nil || userSourceFile == nil {
 		// Cache miss - create new program
 		var err error
@@ -131,7 +138,7 @@ func (h *Handler) HandleGetAstInfo(req api.GetAstInfoRequest) (*api.GetAstInfoRe
 }
 
 // getCachedProgram returns the cached program if it matches the current request
-func getCachedProgram(fileContent, compilerOptionsJSON string) (*compiler.Program, *ast.SourceFile) {
+func getCachedProgram(sourceFileName, fileContent, compilerOptionsJSON string) (*compiler.Program, *ast.SourceFile) {
 	astInfoProgramCache.mu.RLock()
 	defer astInfoProgramCache.mu.RUnlock()
 
@@ -139,8 +146,8 @@ func getCachedProgram(fileContent, compilerOptionsJSON string) (*compiler.Progra
 		return nil, nil
 	}
 
-	// Check if cache is valid (only fileContent and compilerOptions matter)
-	if astInfoProgramCache.fileContent == fileContent &&
+	if astInfoProgramCache.sourceFileName == sourceFileName &&
+		astInfoProgramCache.fileContent == fileContent &&
 		astInfoProgramCache.compilerOptions == compilerOptionsJSON {
 		return astInfoProgramCache.program, astInfoProgramCache.sourceFile
 	}
@@ -180,6 +187,7 @@ func createAndCacheProgram(fileName, fileContent, compilerOptionsJSON string, co
 
 	// Update cache
 	astInfoProgramCache.mu.Lock()
+	astInfoProgramCache.sourceFileName = fileName
 	astInfoProgramCache.fileContent = fileContent
 	astInfoProgramCache.compilerOptions = compilerOptionsJSON
 	astInfoProgramCache.program = program
@@ -198,6 +206,10 @@ func buildTsConfigContent(fileName string, compilerOptions map[string]any) strin
 		"strict":           true,
 		"strictNullChecks": true,
 	}
+	if strings.HasSuffix(fileName, ".js") || strings.HasSuffix(fileName, ".jsx") {
+		opts["allowJs"] = true
+		opts["checkJs"] = true
+	}
 
 	// Merge with provided options (provided options override defaults)
 	for k, v := range compilerOptions {
@@ -210,6 +222,10 @@ func buildTsConfigContent(fileName string, compilerOptions map[string]any) strin
 		// Fallback to minimal config on error
 		return fmt.Sprintf(`{"compilerOptions":{"target":"ESNext","module":"ESNext","strict":true},"files":["%s"]}`, fileName)
 	}
+	fileNameJSON, err := json.Marshal(fileName)
+	if err != nil {
+		return fmt.Sprintf(`{"compilerOptions":%s,"files":["/index.ts"]}`, string(optsJSON))
+	}
 
-	return fmt.Sprintf(`{"compilerOptions":%s,"files":["%s"]}`, string(optsJSON), fileName)
+	return fmt.Sprintf(`{"compilerOptions":%s,"files":[%s]}`, string(optsJSON), string(fileNameJSON))
 }

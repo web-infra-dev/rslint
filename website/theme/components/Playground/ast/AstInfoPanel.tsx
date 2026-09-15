@@ -24,6 +24,7 @@ import { CollapsibleItem } from './CollapsibleItem';
 interface AstInfoPanelProps {
   info?: GetAstInfoResponse;
   loading?: boolean;
+  enabled?: boolean;
   onRequestAstInfo?: (
     position: number,
     end?: number,
@@ -62,11 +63,20 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
 export const AstInfoPanel: React.FC<AstInfoPanelProps> = ({
   info,
   loading,
+  enabled = true,
   onRequestAstInfo,
   onFetchAstInfoForLazy,
   onHighlightRange,
   onClearHighlight,
 }) => {
+  if (!enabled) {
+    return (
+      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-gray-400">
+        AST details for this file type require Rslint v0.9.3 or newer
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center text-center text-sm text-gray-400">

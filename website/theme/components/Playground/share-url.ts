@@ -1,5 +1,10 @@
 import { deflateSync, inflateSync } from 'fflate';
 import { SHARE_DICT_V1 } from './share-dict';
+import {
+  DEFAULT_SOURCE_FILE_NAME,
+  isSourceFileName,
+  type SourceFileName,
+} from './source-file';
 
 export const DEFAULT_CODE = ['let a: any;', 'a.b = 10;'].join('\n');
 
@@ -31,6 +36,7 @@ export const DEFAULT_TSCONFIG = `{
 
 export interface ShareState {
   code: string;
+  sourceFileName: SourceFileName;
   rslintConfig: string;
   tsconfig: string;
   /**
@@ -80,8 +86,13 @@ const FLAG_CODE = 1;
 const FLAG_RSLINT_CONFIG = 2;
 const FLAG_TSCONFIG = 4;
 const FLAG_WASM_VERSION = 8;
+const FLAG_SOURCE_FILE_NAME = 16;
 const ALL_FLAGS =
-  FLAG_CODE | FLAG_RSLINT_CONFIG | FLAG_TSCONFIG | FLAG_WASM_VERSION;
+  FLAG_CODE |
+  FLAG_RSLINT_CONFIG |
+  FLAG_TSCONFIG |
+  FLAG_WASM_VERSION |
+  FLAG_SOURCE_FILE_NAME;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -158,11 +169,12 @@ function encodeFrame(
 function decodeFrame(frame: Uint8Array): ShareState | null {
   if (frame.length === 0) return null;
   const flags = frame[0];
-  if (flags === 0 || flags > ALL_FLAGS) return null;
+  if (flags === 0 || (flags & ~ALL_FLAGS) !== 0) return null;
   const cursor = { offset: 1 };
 
   const state: ShareState = {
     code: DEFAULT_CODE,
+    sourceFileName: DEFAULT_SOURCE_FILE_NAME,
     rslintConfig: DEFAULT_RSLINT_CONFIG,
     tsconfig: DEFAULT_TSCONFIG,
   };
@@ -180,20 +192,29 @@ function decodeFrame(frame: Uint8Array): ShareState | null {
       [FLAG_CODE, 'code'],
       [FLAG_RSLINT_CONFIG, 'rslintConfig'],
       [FLAG_TSCONFIG, 'tsconfig'],
+      [FLAG_SOURCE_FILE_NAME, 'sourceFileName'],
     ] as const
   ).filter(([flag]) => flags & flag);
   keys.forEach(([, key], index) => {
+    let value: string;
     if (index === keys.length - 1) {
-      state[key] = decoder.decode(frame.subarray(cursor.offset));
+      value = decoder.decode(frame.subarray(cursor.offset));
       cursor.offset = frame.length;
-      return;
+    } else {
+      const length = readVarint(frame, cursor);
+      if (cursor.offset + length > frame.length) throw new RangeError();
+      value = decoder.decode(
+        frame.subarray(cursor.offset, cursor.offset + length),
+      );
+      cursor.offset += length;
     }
-    const length = readVarint(frame, cursor);
-    if (cursor.offset + length > frame.length) throw new RangeError();
-    state[key] = decoder.decode(
-      frame.subarray(cursor.offset, cursor.offset + length),
-    );
-    cursor.offset += length;
+
+    if (key === 'sourceFileName') {
+      if (!isSourceFileName(value)) throw new RangeError();
+      state.sourceFileName = value;
+    } else {
+      state[key] = value;
+    }
   });
   return state;
 }
@@ -218,12 +239,16 @@ export function encodeShareState(state: ShareState): string | null {
     flags |= FLAG_TSCONFIG;
     sections.push(encoder.encode(state.tsconfig));
   }
-  const version =
+  if (state.sourceFileName !== DEFAULT_SOURCE_FILE_NAME) {
+    flags |= FLAG_SOURCE_FILE_NAME;
+    sections.push(encoder.encode(state.sourceFileName));
+  }
+  const parsedVersion =
     state.wasmVersion === undefined ? null : parseVersion(state.wasmVersion);
-  if (version !== null) flags |= FLAG_WASM_VERSION;
+  if (parsedVersion !== null) flags |= FLAG_WASM_VERSION;
   if (flags === 0) return null;
 
-  const compressed = deflateSync(encodeFrame(flags, version, sections), {
+  const compressed = deflateSync(encodeFrame(flags, parsedVersion, sections), {
     level: 9,
     mem: 12,
     dictionary: getDictionary(),
@@ -270,6 +295,7 @@ export function decodeShareState(payload: string): ShareState | null {
 export function readShareState(): ShareState {
   const defaults: ShareState = {
     code: DEFAULT_CODE,
+    sourceFileName: DEFAULT_SOURCE_FILE_NAME,
     rslintConfig: DEFAULT_RSLINT_CONFIG,
     tsconfig: DEFAULT_TSCONFIG,
   };
