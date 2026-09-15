@@ -203,15 +203,10 @@ func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool
 		if init == nil || !ast.IsFunctionExpression(init) {
 			return false, false
 		}
-		// For static class fields like `static foo = function() {}`, the static modifier
-		// is on the PropertyDeclaration, not the FunctionExpression. We need to check
-		// the PropertyDeclaration's modifiers to make ignoreStatic work correctly.
-		// Unlike MethodDeclaration, we don't check function parameters here - upstream
-		// typescript-eslint also skips parameter checking for PropertyDeclaration.
-		dangerous := !ignoreStatic || !utils.IncludesModifier(valueDeclaration, ast.KindStaticKeyword)
-		// PropertyDeclaration function expressions always have `this` typed by the class context,
-		// so we return true for firstParamIsThis (matching upstream's undefined behavior)
-		return dangerous, true
+		// TypeScript-ESLint treats a function-valued property as dangerous without
+		// consulting ignoreStatic or the function's parameters. The option applies
+		// to method declarations, not to class fields.
+		return true, true
 	case ast.KindPropertyAssignment:
 		assignee := valueDeclaration.Initializer()
 		if !ast.IsFunctionExpression(assignee) {
@@ -231,140 +226,192 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.NewSchema(schemaJSON),
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		opts := parseOptions(options)
-
-		isNativelyBound := func(object *ast.Node, property *ast.Node) bool {
-			// We can't rely entirely on the type-level checks made at the end of this
-			// function, because sometimes type declarations don't come from the
-			// default library, but come from, for example, "@types/node". And we can't
-			// tell if a method is unbound just by looking at its signature declared in
-			// the interface.
-			//
-			// See related discussion https://github.com/typescript-eslint/typescript-eslint/pull/8952#discussion_r1576543310
-			if ast.IsIdentifier(object) && ast.IsIdentifier(property) {
-				objectSymbol := ctx.TypeChecker.GetSymbolAtLocation(object)
-				if utils.IsHeritageQualifiedName(property.Parent) {
-					objectSymbol = heritageValueSymbol(ctx.TypeChecker, object)
-				}
-				notImported := objectSymbol != nil && isNotImported(objectSymbol, ctx.SourceFile)
-
-				if notImported {
-					if members, ok := nativelyBoundMembers[object.Text()]; ok {
-						if _, ok := members[property.Text()]; ok {
-							return true
-						}
-					}
-				}
-			}
-
-			// if `${object.name}.${property.name}` doesn't match any of
-			// the nativelyBoundMembers, then we fallback to type-level checks
-			return utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(object), supportedGlobalTypes...) && utils.IsAnyBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(property))
-		}
-
-		checkIfMethodAndReport := func(node *ast.Node, symbol *ast.Symbol) bool {
-			if symbol == nil {
-				return false
-			}
-
-			dangerous, firstParamIsThis := checkIfMethod(symbol, opts.IgnoreStatic)
-
-			if !dangerous {
-				return false
-			}
-
-			if firstParamIsThis {
-				ctx.ReportNode(node, buildUnboundMessage())
-			} else {
-				ctx.ReportNode(node, buildUnboundWithoutThisAnnotationMessage())
-			}
-			return true
-		}
-
-		checkBindingProperty := func(patternNode *ast.Node, initNode *ast.Node, propertyName *ast.Node, parentIsAssignmentPatternLike bool) {
-			if initNode != nil {
-				if !isNativelyBound(initNode, propertyName) {
-					reported := checkIfMethodAndReport(propertyName, checker.Checker_getPropertyOfType(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(initNode), propertyName.Text()))
-					if reported {
-						return
-					}
-					// In assignment patterns, we should also check the type of
-					// Foo's nativelyBound method because initNode might be used as
-					// default value:
-					//   function ({ nativelyBound }: Foo = NativeObject) {}
-				} else if !parentIsAssignmentPatternLike {
-					return
-				}
-			}
-
-			utils.TypeRecurser(ctx.TypeChecker.GetTypeAtLocation(patternNode), func(t *checker.Type) bool {
-				return checkIfMethodAndReport(propertyName, checker.Checker_getPropertyOfType(ctx.TypeChecker, t, propertyName.Text()))
-			})
-		}
-
-		return rule.RuleListeners{
-			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				if isSafeUse(node) || isNativelyBound(node.Expression(), node.Name()) {
-					return
-				}
-
-				checkIfMethodAndReport(node, ctx.TypeChecker.GetSymbolAtLocation(node))
-			},
-			ast.KindQualifiedName: func(node *ast.Node) {
-				if !utils.IsHeritageQualifiedName(node) {
-					return
-				}
-				object, property := utils.MemberExpressionParts(node)
-				if isSafeUse(node) || isNativelyBound(object, property) {
-					return
-				}
-				checkIfMethodAndReport(node, heritageValueSymbol(ctx.TypeChecker, node))
-			},
-
-			rule.ListenerOnAllowPattern(ast.KindObjectLiteralExpression): func(node *ast.Node) {
-				if !ast.IsAssignmentExpression(node.Parent, true) {
-					return
-				}
-
-				initNode := node.Parent.AsBinaryExpression().Right
-
-				for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
-					if !ast.IsPropertyAssignment(property) && !ast.IsShorthandPropertyAssignment(property) {
-						continue
-					}
-
-					checkBindingProperty(node, initNode, property.Name(), true)
-				}
-			},
-			ast.KindObjectBindingPattern: func(node *ast.Node) {
-				if isNodeInsideTypeDeclaration(node) {
-					return
-				}
-
-				var initNode *ast.Node
-
-				parentIsAssignmentPatternLike := ast.IsBindingElement(node.Parent) || ast.IsParameterDeclaration(node.Parent)
-				if ast.IsVariableDeclaration(node.Parent) || parentIsAssignmentPatternLike {
-					initNode = node.Parent.Initializer()
-				}
-
-				for _, property := range node.AsBindingPattern().Elements.Nodes {
-					if !ast.IsBindingElement(property) {
-						continue
-					}
-
-					bindingElem := property.AsBindingElement()
-					propertyName := bindingElem.PropertyName
-					if propertyName == nil {
-						propertyName = bindingElem.Name()
-					}
-					if bindingElem.DotDotDotToken != nil || !ast.IsIdentifier(propertyName) {
-						continue
-					}
-
-					checkBindingProperty(node, initNode, propertyName, parentIsAssignmentPatternLike)
-				}
-			},
-		}
+		return CreateListeners(ctx, options, nil)
 	},
 })
+
+// CreateListeners lets adapters exempt member references without changing binding-pattern checks.
+func CreateListeners(ctx rule.RuleContext, options []any, exempt func(*ast.Node) bool) rule.RuleListeners {
+	opts := parseOptions(options)
+
+	isNativelyBound := func(object *ast.Node, property *ast.Node) bool {
+		// We can't rely entirely on the type-level checks made at the end of this
+		// function, because sometimes type declarations don't come from the
+		// default library, but come from, for example, "@types/node". And we can't
+		// tell if a method is unbound just by looking at its signature declared in
+		// the interface.
+		//
+		// See related discussion https://github.com/typescript-eslint/typescript-eslint/pull/8952#discussion_r1576543310
+		if ast.IsIdentifier(object) && ast.IsIdentifier(property) {
+			objectSymbol := ctx.TypeChecker.GetSymbolAtLocation(object)
+			if utils.IsHeritageQualifiedName(property.Parent) {
+				objectSymbol = heritageValueSymbol(ctx.TypeChecker, object)
+			}
+			notImported := objectSymbol != nil && isNotImported(objectSymbol, ctx.SourceFile)
+
+			if notImported {
+				if members, ok := nativelyBoundMembers[object.Text()]; ok {
+					if _, ok := members[property.Text()]; ok {
+						return true
+					}
+				}
+			}
+		}
+
+		// if `${object.name}.${property.name}` doesn't match any of
+		// the nativelyBoundMembers, then we fallback to type-level checks
+		return utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(object), supportedGlobalTypes...) && utils.IsAnyBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(property))
+	}
+
+	checkIfMethodAndReport := func(node *ast.Node, symbol *ast.Symbol) bool {
+		if symbol == nil {
+			return false
+		}
+
+		dangerous, firstParamIsThis := checkIfMethod(symbol, opts.IgnoreStatic)
+
+		if !dangerous {
+			return false
+		}
+
+		if firstParamIsThis {
+			ctx.ReportNode(node, buildUnboundMessage())
+		} else {
+			ctx.ReportNode(node, buildUnboundWithoutThisAnnotationMessage())
+		}
+		return true
+	}
+
+	checkBindingProperty := func(patternNode *ast.Node, initNode *ast.Node, propertyName *ast.Node, parentIsAssignmentPatternLike bool) {
+		if initNode != nil {
+			if !isNativelyBound(initNode, propertyName) {
+				reported := checkIfMethodAndReport(propertyName, checker.Checker_getPropertyOfType(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(initNode), propertyName.Text()))
+				if reported {
+					return
+				}
+				// In assignment patterns, we should also check the type of
+				// Foo's nativelyBound method because initNode might be used as
+				// default value:
+				//   function ({ nativelyBound }: Foo = NativeObject) {}
+			} else if !parentIsAssignmentPatternLike {
+				return
+			}
+		}
+
+		utils.TypeRecurser(ctx.TypeChecker.GetTypeAtLocation(patternNode), func(t *checker.Type) bool {
+			return checkIfMethodAndReport(propertyName, checker.Checker_getPropertyOfType(ctx.TypeChecker, t, propertyName.Text()))
+		})
+	}
+
+	checkMember := func(node *ast.Node) {
+		if exempt != nil && exempt(node) {
+			return
+		}
+		object, property := utils.MemberExpressionParts(node)
+		if isSafeUse(node) || isNativelyBound(object, property) {
+			return
+		}
+		objectType := ctx.TypeChecker.GetTypeAtLocation(object)
+		checkProperty := func(name string) bool {
+			unionParts := []*checker.Type{objectType}
+			if objectType.Flags()&checker.TypeFlagsUnion != 0 {
+				unionParts = objectType.Types()
+			}
+			for _, unionPart := range unionParts {
+				intersectionParts := []*checker.Type{unionPart}
+				if unionPart.Flags()&checker.TypeFlagsIntersection != 0 {
+					intersectionParts = unionPart.Types()
+				}
+				for _, intersectionPart := range intersectionParts {
+					if checkIfMethodAndReport(node, checker.Checker_getPropertyOfType(ctx.TypeChecker, intersectionPart, name)) {
+						return true
+					}
+				}
+			}
+			return false
+		}
+		if node.Kind == ast.KindElementAccessExpression {
+			keyType := ctx.TypeChecker.GetTypeAtLocation(property)
+			keyParts := []*checker.Type{keyType}
+			if keyType.Flags()&checker.TypeFlagsUnion != 0 {
+				keyParts = keyType.Types()
+			}
+			for _, keyPart := range keyParts {
+				if keyPart.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral) == 0 {
+					continue
+				}
+				if checkProperty(checker.GetPropertyNameFromType(keyPart)) {
+					break
+				}
+			}
+			return
+		}
+		if ast.IsIdentifier(property) {
+			checkProperty(property.Text())
+			return
+		}
+		checkIfMethodAndReport(node, ctx.TypeChecker.GetSymbolAtLocation(node))
+	}
+
+	return rule.RuleListeners{
+		ast.KindPropertyAccessExpression: checkMember,
+		ast.KindElementAccessExpression:  checkMember,
+		ast.KindQualifiedName: func(node *ast.Node) {
+			if !utils.IsHeritageQualifiedName(node) {
+				return
+			}
+			object, property := utils.MemberExpressionParts(node)
+			if isSafeUse(node) || isNativelyBound(object, property) {
+				return
+			}
+			checkIfMethodAndReport(node, heritageValueSymbol(ctx.TypeChecker, node))
+		},
+
+		rule.ListenerOnAllowPattern(ast.KindObjectLiteralExpression): func(node *ast.Node) {
+			if !ast.IsAssignmentExpression(node.Parent, true) {
+				return
+			}
+
+			initNode := node.Parent.AsBinaryExpression().Right
+
+			for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+				if !ast.IsPropertyAssignment(property) && !ast.IsShorthandPropertyAssignment(property) {
+					continue
+				}
+
+				if ast.IsIdentifier(property.Name()) {
+					checkBindingProperty(node, initNode, property.Name(), true)
+				}
+			}
+		},
+		ast.KindObjectBindingPattern: func(node *ast.Node) {
+			if isNodeInsideTypeDeclaration(node) {
+				return
+			}
+
+			var initNode *ast.Node
+
+			parentIsAssignmentPatternLike := ast.IsBindingElement(node.Parent) || ast.IsParameterDeclaration(node.Parent)
+			if ast.IsVariableDeclaration(node.Parent) || parentIsAssignmentPatternLike {
+				initNode = node.Parent.Initializer()
+			}
+
+			for _, property := range node.AsBindingPattern().Elements.Nodes {
+				if !ast.IsBindingElement(property) {
+					continue
+				}
+
+				bindingElem := property.AsBindingElement()
+				propertyName := bindingElem.PropertyName
+				if propertyName == nil {
+					propertyName = bindingElem.Name()
+				}
+				if bindingElem.DotDotDotToken != nil || !ast.IsIdentifier(propertyName) {
+					continue
+				}
+
+				checkBindingProperty(node, initNode, propertyName, parentIsAssignmentPatternLike)
+			}
+		},
+	}
+}
