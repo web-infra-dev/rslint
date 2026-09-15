@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_multi_comp.schema.json
@@ -64,7 +65,13 @@ type componentEntry struct {
 //   - Bare FunctionLike that classifies as a stateless component on its
 //     own (capitalized name, returns JSX, in an allowed position): register
 //     the FunctionLike itself.
-func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers []reactutil.ComponentWrapperEntry, tc *checker.Checker) []componentEntry {
+func collectComponents(
+	sf *ast.SourceFile,
+	pragma, createClass string,
+	wrappers []reactutil.ComponentWrapperEntry,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) []componentEntry {
 	seen := map[*ast.Node]bool{}
 	var entries []componentEntry
 
@@ -116,7 +123,7 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 			if reactutil.IsAsyncGeneratorFunction(n) {
 				break
 			}
-			if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, tc, wrappers) {
+			if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, tc, wrappers, scopes) {
 				add(n)
 			}
 		case ast.KindFunctionDeclaration,
@@ -132,7 +139,7 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 			}
 			directParent := reactutil.SkipExpressionWrappersUp(n)
 			directInWrapper := directParent != nil && directParent.Kind == ast.KindCallExpression &&
-				reactutil.MatchesAnyComponentWrapperWithChecker(directParent, n, wrappers, pragma, tc)
+				reactutil.MatchesAnyComponentWrapperWithChecker(directParent, n, wrappers, pragma, tc, scopes)
 			// Wrap-known-sibling gate: when the FunctionLike's enclosing
 			// pragma-wrapper call's body returns JSX whose root tag names
 			// a sibling/outer detected component, upstream's
@@ -150,7 +157,7 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 			if directInWrapper && reactutil.WrapperWrapsKnownSiblingComponent(directParent, n) {
 				break
 			}
-			if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, tc, wrappers) {
+			if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, tc, wrappers, scopes) {
 				// Pragma-wrapper redirect: upstream's
 				// `getStatelessComponent` returns
 				// `getPragmaComponentWrapper(node)` — the OUTER-MOST
@@ -158,19 +165,19 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 				// must mirror that ascent to keep the report node's
 				// line number aligned with upstream when wrappers span
 				// multiple lines.
-				if outer := reactutil.OutermostComponentWrapperCall(n, pragma, wrappers, tc); outer != nil {
+				if outer := reactutil.OutermostComponentWrapperCall(n, pragma, wrappers, tc, scopes); outer != nil {
 					add(outer)
 				} else {
 					add(n)
 				}
-			} else if directInWrapper && reactutil.FunctionReturnsJSXOrNullWithChecker(n, pragma, tc) {
+			} else if directInWrapper && reactutil.FunctionReturnsJSXOrNullWithChecker(n, pragma, tc, scopes) {
 				// User-configured wrapper fallback — same shape as
 				// reactutil.IsDetectedComponent's FunctionLike arm. The
 				// `IsStatelessReactComponentWithWrappers` decision tree
 				// only honors wrappers in its Branch 11; user wrappers
 				// applied to a FunctionLike that doesn't satisfy a
 				// branch's structural gates need this explicit check.
-				if outer := reactutil.OutermostComponentWrapperCall(n, pragma, wrappers, tc); outer != nil {
+				if outer := reactutil.OutermostComponentWrapperCall(n, pragma, wrappers, tc, scopes); outer != nil {
 					add(outer)
 				}
 			}
@@ -183,7 +190,7 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 			if inner == nil || !reactutil.IsFunctionLikeForComponent(inner) {
 				break
 			}
-			if !reactutil.MatchesAnyComponentWrapperWithChecker(n, inner, wrappers, pragma, tc) {
+			if !reactutil.MatchesAnyComponentWrapperWithChecker(n, inner, wrappers, pragma, tc, scopes) {
 				break
 			}
 			if reactutil.WrapperWrapsKnownSiblingComponent(n, inner) {
@@ -257,8 +264,9 @@ var NoMultiCompRule = rule.Rule{
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
+		scopes := scopeAnalysis.For(ctx)
 
-		entries := collectComponents(ctx.SourceFile, pragma, createClass, wrappers, ctx.TypeChecker)
+		entries := collectComponents(ctx.SourceFile, pragma, createClass, wrappers, ctx.TypeChecker, scopes)
 
 		kept := entries
 		if opts.IgnoreStateless {

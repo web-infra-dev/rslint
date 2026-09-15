@@ -6,7 +6,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // Message constants mirror eslint-plugin-react v7.37.x byte-for-byte,
@@ -2300,11 +2302,12 @@ func TestNoUnstableNestedComponentsAncestorTracking(t *testing.T) {
 // argument shape (nil fn vs nil checker on a present fn) because a
 // future regression could land in either guard.
 func TestNilCheckerFallback(t *testing.T) {
+	scopes := scopeAnalysis.For(rule.RuleContext{})
 	t.Run("nil fn + nil checker", func(t *testing.T) {
-		if reactutil.FunctionReturnsJSXOrNullWithChecker(nil, "", nil) {
+		if reactutil.FunctionReturnsJSXOrNullWithChecker(nil, "", nil, scopes) {
 			t.Fatal("nil fn + nil tc must yield false")
 		}
-		if reactutil.FunctionReturnsJSXWithChecker(nil, "", nil) {
+		if reactutil.FunctionReturnsJSXWithChecker(nil, "", nil, scopes) {
 			t.Fatal("nil fn + nil tc must yield false (strict)")
 		}
 	})
@@ -2315,24 +2318,24 @@ func TestNilCheckerFallback(t *testing.T) {
 		// points accept an explicitly nil-typed *ast.Node without
 		// panicking when the checker is also nil.
 		var nilFn *ast.Node
-		_ = reactutil.FunctionReturnsJSXOrNullWithChecker(nilFn, "Preact", nil)
-		_ = reactutil.FunctionReturnsJSXWithChecker(nilFn, "", nil)
+		_ = reactutil.FunctionReturnsJSXOrNullWithChecker(nilFn, "Preact", nil, scopes)
+		_ = reactutil.FunctionReturnsJSXWithChecker(nilFn, "", nil, scopes)
 	})
 
 	t.Run("import-aware helpers degrade safely with nil checker", func(t *testing.T) {
-		if reactutil.IsDestructuredFromPragmaImport(nil, "React", nil) {
+		if reactutil.IsDestructuredFromPragmaImport(nil, "React", nil, scopes) {
 			t.Fatal("IsDestructuredFromPragmaImport(nil ident, nil tc) must return false")
 		}
-		if reactutil.IsCreateElementCallWithChecker(nil, "React", nil) {
+		if reactutil.IsCreateElementCallWithChecker(nil, "React", nil, scopes) {
 			t.Fatal("IsCreateElementCallWithChecker(nil callee, nil tc) must return false")
 		}
-		if reactutil.MatchesAnyComponentWrapperWithChecker(nil, nil, nil, "React", nil) {
+		if reactutil.MatchesAnyComponentWrapperWithChecker(nil, nil, nil, "React", nil, scopes) {
 			t.Fatal("MatchesAnyComponentWrapperWithChecker(nil call, nil fn, nil tc) must return false")
 		}
-		if reactutil.IsStatelessReactComponentWithChecker(nil, "React", nil) {
+		if reactutil.IsStatelessReactComponentWithChecker(nil, "React", nil, scopes) {
 			t.Fatal("IsStatelessReactComponentWithChecker(nil fn, nil tc) must return false")
 		}
-		if reactutil.IsStatelessReactComponentWithWrappers(nil, "React", nil, nil) {
+		if reactutil.IsStatelessReactComponentWithWrappers(nil, "React", nil, nil, scopes) {
 			t.Fatal("IsStatelessReactComponentWithWrappers(nil fn, nil tc, nil wrappers) must return false")
 		}
 	})

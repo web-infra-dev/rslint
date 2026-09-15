@@ -3,6 +3,7 @@ package reactutil
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // ComponentWrapperEntry describes one user-configured component-wrapping
@@ -119,8 +120,12 @@ func GetComponentWrapperFunctions(settings map[string]interface{}, pragma string
 //
 //   - A call-level optional bare Identifier (`memo?.(arg)`) follows the same
 //     configured-wrapper or pragma-import gate as its non-optional form.
-func MatchesAnyComponentWrapper(call, fn *ast.Node, wrappers []ComponentWrapperEntry) bool {
-	return matchesAnyComponentWrapperCore(call, fn, wrappers, "", nil)
+func MatchesAnyComponentWrapper(
+	call, fn *ast.Node,
+	wrappers []ComponentWrapperEntry,
+	scopes scopeAnalysis.Provider,
+) bool {
+	return MatchesAnyComponentWrapperWithChecker(call, fn, wrappers, "", nil, scopes)
 }
 
 // MatchesAnyComponentWrapperWithChecker is the import-aware variant.
@@ -140,11 +145,13 @@ func MatchesAnyComponentWrapper(call, fn *ast.Node, wrappers []ComponentWrapperE
 // where upstream skips. Use this variant whenever a TypeChecker is
 // available; otherwise the same helper falls back to its syntax-only import
 // scan.
-func MatchesAnyComponentWrapperWithChecker(call, fn *ast.Node, wrappers []ComponentWrapperEntry, pragma string, tc *checker.Checker) bool {
-	return matchesAnyComponentWrapperCore(call, fn, wrappers, pragma, tc)
-}
-
-func matchesAnyComponentWrapperCore(call, fn *ast.Node, wrappers []ComponentWrapperEntry, pragma string, tc *checker.Checker) bool {
+func MatchesAnyComponentWrapperWithChecker(
+	call, fn *ast.Node,
+	wrappers []ComponentWrapperEntry,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -180,7 +187,7 @@ func matchesAnyComponentWrapperCore(call, fn *ast.Node, wrappers []ComponentWrap
 				// the binding precisely, and when not it falls back to
 				// a syntax-only SourceFile scan that handles the
 				// canonical top-level pragma-import shapes.
-				if !IsDestructuredFromPragmaImport(callee, pragma, tc) {
+				if !IsDestructuredFromPragmaImport(callee, pragma, tc, scopes) {
 					continue
 				}
 				return true
@@ -207,7 +214,7 @@ func matchesAnyComponentWrapperCore(call, fn *ast.Node, wrappers []ComponentWrap
 			if w.Object != effectivePragma {
 				continue
 			}
-			if !IsDestructuredFromPragmaImport(callee, pragma, tc) {
+			if !IsDestructuredFromPragmaImport(callee, pragma, tc, scopes) {
 				continue
 			}
 			return true

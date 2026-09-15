@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 const msgNoNamespace = "React component {{name}} must not be in a namespace, as React does not support them"
@@ -15,7 +16,7 @@ var NoNamespaceRule = rule.Rule{
 	Name:   "react/no-namespace",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		isCreateElement := reactutil.NewCreateElementCallMatcher(ctx)
+		isCreateElement := reactutil.NewCreateElementCallMatcher(ctx, scopeAnalysis.For(ctx))
 
 		reportIfNamespaced := func(node *ast.Node, name string) {
 			if name == "" || strings.IndexByte(name, ':') == -1 {

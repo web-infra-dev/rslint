@@ -13,7 +13,7 @@ import (
 // child before moving to the parent. It reads the last definition regardless
 // of whether that definition declares a value. Reference resolution alone
 // therefore cannot answer this particular React question.
-func newPragmaImportMatcher(ctx rule.RuleContext, pragma, name string) func(*ast.Node) bool {
+func newPragmaImportMatcher(ctx rule.RuleContext, scopes scopeAnalysis.Provider, pragma, name string) func(*ast.Node) bool {
 	sourceFile := ctx.SourceFile
 	// Only a script puts configured globals in the same scope as its code.
 	// Modules and CommonJS wrappers search their own children first.
@@ -31,7 +31,7 @@ func newPragmaImportMatcher(ctx rule.RuleContext, pragma, name string) func(*ast
 		}
 		if manager == nil {
 			pragmaLower = ecmascript.StringToLowerCase(pragma)
-			manager = scopeAnalysis.Declarations(ctx)
+			manager = scopes.Declarations()
 			firstChild = make(map[*scope.Scope]*scope.Scope)
 			for _, current := range manager.Scopes {
 				if current.Parent != nil && firstChild[current.Parent] == nil {

@@ -3,6 +3,7 @@ package reactutil
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // IsAsyncGeneratorFunction reports whether `node` is a function expression /
@@ -63,9 +64,15 @@ func IsAsyncGeneratorFunction(node *ast.Node) bool {
 // not the inner forwardRef call — so the component is registered against the
 // memo call's range, which on multi-line source changes the report's line
 // number compared to picking the inner wrapper.
-func OutermostComponentWrapperCall(fn *ast.Node, pragma string, wrappers []ComponentWrapperEntry, tc *checker.Checker) *ast.Node {
+func OutermostComponentWrapperCall(
+	fn *ast.Node,
+	pragma string,
+	wrappers []ComponentWrapperEntry,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) *ast.Node {
 	return OutermostComponentWrapperCallFunc(fn, func(call, arg *ast.Node) bool {
-		return MatchesAnyComponentWrapperWithChecker(call, arg, wrappers, pragma, tc)
+		return MatchesAnyComponentWrapperWithChecker(call, arg, wrappers, pragma, tc, scopes)
 	})
 }
 
