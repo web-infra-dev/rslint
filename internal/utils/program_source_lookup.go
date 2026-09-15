@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // ProgramSourceLookup resolves a filesystem target to the exact source file in
@@ -23,7 +23,7 @@ func NewProgramSourceLookup(program *compiler.Program, fs vfs.FS) *ProgramSource
 }
 
 func exactProgramSourcePathID(filePath string) string {
-	return string(tspath.ToPath(tspath.NormalizePath(filePath), "", true))
+	return NormalizeAbsoluteDrive(string(tspath.ToPath(filePath, "", true)))
 }
 
 func (lookup *ProgramSourceLookup) canonicalPathID(filePath string) string {

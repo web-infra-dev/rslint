@@ -1,8 +1,8 @@
 package reactutil
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 )
 
 // IsInsideReactComponent reports whether `node` is lexically inside a
@@ -85,6 +85,12 @@ func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass strin
 		if !ast.IsFunctionLike(p) {
 			continue
 		}
+		// ESTree omits redundant parentheses. Walk through the wrappers
+		// retained by ts-go before inspecting the function's property.
+		functionValue := p
+		for functionValue.Parent != nil && functionValue.Parent.Kind == ast.KindParenthesizedExpression {
+			functionValue = functionValue.Parent
+		}
 		// `key: function() {...}` — FE wrapped in PropertyAssignment;
 		// its parent is the ObjectLiteralExpression.
 		// `key() {...}` shorthand — MethodDeclaration / GetAccessor /
@@ -94,7 +100,7 @@ func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass strin
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 			objLit = p.Parent
 		default:
-			propEntry := p.Parent
+			propEntry := functionValue.Parent
 			if propEntry == nil || propEntry.Kind != ast.KindPropertyAssignment {
 				continue
 			}
@@ -108,15 +114,26 @@ func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass strin
 		for arg.Parent != nil && arg.Parent.Kind == ast.KindParenthesizedExpression {
 			arg = arg.Parent
 		}
-		callExpr := arg.Parent
-		if callExpr == nil || callExpr.Kind != ast.KindCallExpression {
+		callLike := arg.Parent
+		if callLike == nil {
 			continue
 		}
-		call := callExpr.AsCallExpression()
-		if !isObjectArgumentOf(call, arg) {
+		var callee *ast.Node
+		var arguments *ast.NodeList
+		switch callLike.Kind {
+		case ast.KindCallExpression:
+			call := callLike.AsCallExpression()
+			callee, arguments = call.Expression, call.Arguments
+		case ast.KindNewExpression:
+			newExpression := callLike.AsNewExpression()
+			callee, arguments = newExpression.Expression, newExpression.Arguments
+		default:
 			continue
 		}
-		if IsCreateClassCall(call, pragma, createClass) {
+		if !nodeListContains(arguments, arg) {
+			continue
+		}
+		if isCreateClassCallee(callee, pragma, createClass) {
 			return objLit
 		}
 	}
@@ -210,7 +227,8 @@ func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast
 // Only a restricted subset of upstream's heuristics is implemented — the
 // patterns covering production React code: named FunctionDeclaration,
 // FunctionExpression / ArrowFunction assigned to a capital-cased
-// VariableDeclarator, PropertyAssignment, or ExportAssignment (default export),
+// VariableDeclarator, PropertyAssignment, or ExportAssignment (`export
+// default` only — `export =` is not a component upstream),
 // plus function expression in a CallExpression (e.g. React.memo wrapper —
 // approximate match). This is intentionally conservative: missed detection
 // causes a rule miss, over-detection would cause false-positive reports in
@@ -427,7 +445,7 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	}
 
 	// Branch 1 — ExportDefault (strict isReturningJSX).
-	if parent.Kind == ast.KindExportAssignment {
+	if isExportDefaultAssignment(parent) {
 		return functionReturnsJSXInternal(fn, false, pragma, tc)
 	}
 
@@ -719,6 +737,19 @@ func functionReturnsOnlyNull(fn *ast.Node) bool {
 	return sawReturn && allNull
 }
 
+// isExportDefaultAssignment reports whether `node` is ESTree's
+// `ExportDefaultDeclaration`. tsgo represents both `export default <expr>`
+// and TypeScript's `export = <expr>` with a KindExportAssignment node and
+// tells them apart through `IsExportEquals`, while typescript-eslint keeps
+// them as distinct node types — `ExportDefaultDeclaration` versus
+// `TSExportAssignment`. eslint-plugin-react's component detection only ever
+// matches `ExportDefaultDeclaration`, so `export = function Hello() { ... }`
+// is not a component upstream and must not be classified as one here.
+func isExportDefaultAssignment(node *ast.Node) bool {
+	return node != nil && node.Kind == ast.KindExportAssignment &&
+		!node.AsExportAssignment().IsExportEquals
+}
+
 // isInAllowedPositionForComponent mirrors eslint-plugin-react's
 // `utils.isInAllowedPositionForComponent`: only parent node kinds in the
 // allow-list may host a stateless functional component. Sequence expressions
@@ -735,9 +766,10 @@ func isInAllowedPositionForComponent(fn *ast.Node) bool {
 	case ast.KindVariableDeclaration,
 		ast.KindPropertyAssignment,
 		ast.KindReturnStatement,
-		ast.KindExportAssignment,
 		ast.KindArrowFunction:
 		return true
+	case ast.KindExportAssignment:
+		return isExportDefaultAssignment(parent)
 	case ast.KindBinaryExpression:
 		bin := parent.AsBinaryExpression()
 		if bin.OperatorToken == nil {

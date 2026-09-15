@@ -1,17 +1,17 @@
 package no_conditional_expect
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_conditional_expect"
 )
 
 func sourceMayContainConditionalRstestExpect(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
-	_, ok := sourceFile.Identifiers["expect"]
+	ok := sourceFile.HasIdentifier("expect")
 	return ok
 }
 

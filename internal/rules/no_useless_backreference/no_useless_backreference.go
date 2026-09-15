@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -77,7 +77,7 @@ func sourceMayUseRegExp(ctx rule.RuleContext) bool {
 	// constructor forms can match, so files lacking all of their names can
 	// safely avoid broad call/new listeners.
 	sourceFile := ctx.SourceFile
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
 	for _, name := range [...]string{
@@ -87,7 +87,7 @@ func sourceMayUseRegExp(ctx rule.RuleContext) bool {
 		"self",
 		"global",
 	} {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

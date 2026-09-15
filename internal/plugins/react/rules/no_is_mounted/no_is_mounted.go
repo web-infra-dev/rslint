@@ -1,7 +1,7 @@
 package no_is_mounted
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -12,7 +12,10 @@ import (
 // Property nor MethodDefinition in ESTree.
 func isPropertyOrMethodDefinition(node *ast.Node) bool {
 	if ast.IsMethodOrAccessor(node) {
-		return true
+		// @typescript-eslint/parser exposes abstract class members as
+		// TSAbstractMethodDefinition rather than MethodDefinition, so they do
+		// not satisfy upstream's ancestor check.
+		return !ast.HasSyntacticModifier(node, ast.ModifierFlagsAbstract)
 	}
 	switch node.Kind {
 	case ast.KindPropertyAssignment,

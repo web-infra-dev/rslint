@@ -6,9 +6,9 @@ import (
 	"time"
 	"weak"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	import_utils "github.com/web-infra-dev/rslint/internal/plugins/import/utils"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"

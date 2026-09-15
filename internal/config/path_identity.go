@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // PathIdentity keeps the caller-visible path together with the physical file

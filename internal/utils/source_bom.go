@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // BOM is U+FEFF encoded in the UTF-8 strings rslint uses for source text.

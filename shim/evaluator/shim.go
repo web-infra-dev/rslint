@@ -3,17 +3,17 @@
 
 package evaluator
 
-import "github.com/microsoft/typescript-go/internal/ast"
-import "github.com/microsoft/typescript-go/internal/evaluator"
+import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/microsoft/TypeScript/tsc/internal/evaluator"
 import _ "unsafe"
 
-//go:linkname AnyToString github.com/microsoft/typescript-go/internal/evaluator.AnyToString
+//go:linkname AnyToString github.com/microsoft/TypeScript/tsc/internal/evaluator.AnyToString
 func AnyToString(v any) string
 type Evaluator = evaluator.Evaluator
-//go:linkname IsTruthy github.com/microsoft/typescript-go/internal/evaluator.IsTruthy
+//go:linkname IsTruthy github.com/microsoft/TypeScript/tsc/internal/evaluator.IsTruthy
 func IsTruthy(v any) bool
-//go:linkname NewEvaluator github.com/microsoft/typescript-go/internal/evaluator.NewEvaluator
+//go:linkname NewEvaluator github.com/microsoft/TypeScript/tsc/internal/evaluator.NewEvaluator
 func NewEvaluator(evaluateEntity evaluator.Evaluator, outerExpressionsToSkip ast.OuterExpressionKinds) evaluator.Evaluator
-//go:linkname NewResult github.com/microsoft/typescript-go/internal/evaluator.NewResult
+//go:linkname NewResult github.com/microsoft/TypeScript/tsc/internal/evaluator.NewResult
 func NewResult(value any, isSyntacticallyString bool, resolvedOtherFiles bool, hasExternalReferences bool) evaluator.Result
 type Result = evaluator.Result

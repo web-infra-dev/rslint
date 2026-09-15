@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
@@ -39,6 +39,12 @@ func IsRstestCoreImportModule(specifier string) bool {
 	return specifier == RstestImportModule || specifier == RstackTestImportModule
 }
 
+// IsImportMetaRstest reports whether node is the Rstest module namespace
+// exposed through import.meta. Parentheses around either link are transparent.
+func IsImportMetaRstest(node *ast.Node) bool {
+	return isImportMetaRstest(node)
+}
+
 type RstestFnType = testFramework.FnKind
 
 type RstestImportMode = testFramework.ReferenceMode
@@ -71,6 +77,9 @@ type ParsedRstestFnCall struct {
 	// resolution, so prefer them over scanning Members, which is call-site only.
 	Skipped bool
 	Todo    bool
+	// IsPlaywright distinguishes registrations whose API has no `it` export.
+	// It survives const aliases and fixture extension chains.
+	IsPlaywright bool
 	// focus is allocated only when the resolved registration carries `.only`.
 	// Keeping rare provenance behind one pointer avoids increasing every parsed
 	// registration allocation in files without focused tests.

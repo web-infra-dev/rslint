@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 )
 

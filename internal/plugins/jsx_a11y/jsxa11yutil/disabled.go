@@ -1,6 +1,6 @@
 package jsxa11yutil
 
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // IsDisabledElement mirrors upstream `isDisabledElement(attributes)`
 // (eslint-plugin-jsx-a11y/src/util/isDisabledElement.js) verbatim:

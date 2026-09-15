@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -45,6 +46,7 @@ type moduleLoadCoordinator struct {
 
 	statesByPath     map[string]*configLoadState
 	stateByIdentity  map[tspath.Path]*configLoadState
+	ownerByIdentity  map[string]string
 	failureByPath    map[string]ConfigFailure
 	nextCandidateID  int
 	configsRequested int
@@ -68,6 +70,7 @@ func newModuleLoadCoordinator(
 		singleThreaded:  singleThreaded,
 		statesByPath:    make(map[string]*configLoadState),
 		stateByIdentity: make(map[tspath.Path]*configLoadState),
+		ownerByIdentity: make(map[string]string),
 		failureByPath:   make(map[string]ConfigFailure),
 	}
 }
@@ -141,6 +144,15 @@ func (coordinator *moduleLoadCoordinator) loadCandidates(rawCandidates []configC
 	request.Candidates = make([]ConfigLoadCandidate, 0, len(paths))
 	for _, path := range paths {
 		candidate := groupByPath[path].candidate
+		// Competing filenames in one directory must share an original owner
+		// spelling before Node receives its opaque routing key.
+		ownerID := rslintconfig.ExactPathID(candidate.directory)
+		if owner, exists := coordinator.ownerByIdentity[ownerID]; exists {
+			candidate.directory = owner
+		} else {
+			coordinator.ownerByIdentity[ownerID] = candidate.directory
+		}
+		groupByPath[path].candidate = candidate
 		coordinator.nextCandidateID++
 		id := fmt.Sprintf("config-%06d", coordinator.nextCandidateID)
 		request.Candidates = append(request.Candidates, ConfigLoadCandidate{
@@ -221,12 +233,22 @@ func (coordinator *moduleLoadCoordinator) validateNativeCaseAlias(left configCan
 		}
 		return tspath.NormalizePath(path)
 	}
+	samePhysicalPath := func(leftPath string, rightPath string) bool {
+		if tspath.ToPath(leftPath, "", true) == tspath.ToPath(rightPath, "", true) {
+			return true
+		}
+		// Realpath may preserve native case aliases (notably EvalSymlinks on
+		// macOS). Verify both directory and file identities without assuming
+		// that distinct spellings mean distinct filesystem objects.
+		leftInfo, rightInfo := coordinator.fs.Stat(leftPath), coordinator.fs.Stat(rightPath)
+		return leftInfo != nil && rightInfo != nil && os.SameFile(leftInfo, rightInfo)
+	}
 	leftPhysicalDirectory := physicalPath(left.directory)
 	rightPhysicalDirectory := physicalPath(right.directory)
 	leftPhysicalPath := physicalPath(left.path)
 	rightPhysicalPath := physicalPath(right.path)
-	if tspath.ToPath(leftPhysicalDirectory, "", true) != tspath.ToPath(rightPhysicalDirectory, "", true) ||
-		tspath.ToPath(leftPhysicalPath, "", true) != tspath.ToPath(rightPhysicalPath, "", true) {
+	if !samePhysicalPath(leftPhysicalDirectory, rightPhysicalDirectory) ||
+		!samePhysicalPath(leftPhysicalPath, rightPhysicalPath) {
 		return fmt.Errorf(
 			"config candidates %q and %q differ only by case but resolve to distinct filesystem paths",
 			left.path,

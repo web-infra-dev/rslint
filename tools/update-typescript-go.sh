@@ -1,19 +1,29 @@
-#!/usr/bin/env -S bash -euxo pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
-# pushd typescript-go
-# git switch main
-# git reset --hard origin/main
-# git pull --prune
-# popd
-# git add ./typescript-go
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-go work sync
+# Resolve module metadata from the exact submodule revision, then regenerate
+# the shims against that checkout. See CONTRIBUTING.md for the update workflow.
+test -f typescript-go/tsc/go.mod
+# cspell:ignore GOWORK modfile
+export GOWORK="$PWD/go.work"
 
-find ./shim -type f -name 'go.mod' -execdir go get -u -x github.com/microsoft/typescript-go@latest \; -execdir go mod tidy -v \;
-go mod tidy
+compiler_module=github.com/microsoft/TypeScript/tsc
+compiler_revision=$(git -C typescript-go rev-parse HEAD)
+compiler_version=$(go list -m -f '{{.Version}}' "$compiler_module@$compiler_revision")
+
+go mod edit "-require=$compiler_module@$compiler_version"
+while IFS= read -r -d '' module_file; do
+  go mod edit -modfile="$module_file" "-require=$compiler_module@$compiler_version"
+done < <(find ./shim -type f -name go.mod -print0)
 
 go run ./tools/gen_shims
 
-git add ./shim ./go.mod ./go.sum
+while IFS= read -r -d '' module_file; do
+  (cd "$(dirname "$module_file")" && go mod tidy)
+done < <(find ./shim -type f -name go.mod -print0)
+go mod tidy
 
-go build ./cmd/rslint
+go build ./cmd/rslint ./cmd/tsgo
+go test "$compiler_module/shim/checker"

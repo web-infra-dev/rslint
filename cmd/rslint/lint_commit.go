@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )

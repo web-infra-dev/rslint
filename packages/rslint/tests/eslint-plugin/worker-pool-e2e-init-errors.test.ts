@@ -36,7 +36,7 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       // missing specifier appears in the message so users get a
       // pointer to the broken config entry.
       await expect(pool.init()).rejects.toThrow(
-        /eslint-plugin-this-does-not-exist/,
+        /^worker init failed: failed to import config file .*eslint-plugin-this-does-not-exist/,
       );
     });
 

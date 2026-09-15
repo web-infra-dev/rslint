@@ -5,12 +5,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed no_unused_vars.schema.json
@@ -58,6 +59,7 @@ type analysisContext struct {
 	parameterBoundary  parameterBoundary
 	fallbackInfos      map[*ast.Symbol]referenceInfo
 	fallbackCandidates map[string][]*ast.Node
+	heritageReferences map[*ast.Symbol][]*ast.Node
 	jsxScanned         bool
 	globalSourceFile   bool
 	declarationFile    bool
@@ -1872,6 +1874,61 @@ func classifyReferenceNodes(refs []*ast.Node) referenceInfo {
 	return info
 }
 
+// withHeritageReferences applies ESLint's type-capable binding lookup to the
+// root of interface extends/class implements member names. The compiler's
+// QualifiedName lookup requires a namespace there, so it can miss a class or
+// interface and can even resolve a different, outer namespace. Keep RefStore's
+// checker semantics intact for its other consumers and replace only these
+// references in this rule. Plain value bindings must still be skipped.
+func withHeritageReferences(ctx rule.RuleContext, info referenceInfo, sym *ast.Symbol, ac *analysisContext) referenceInfo {
+	if ctx.Refs == nil || sym == nil || sym.Flags&scope.ReferenceType.DeclarationMeaning() == 0 {
+		return info
+	}
+	// Without a checker there is no merged identity, and the binder symbol
+	// already names the declaration.
+	merged := func(sym *ast.Symbol) *ast.Symbol {
+		if ctx.TypeChecker == nil {
+			return sym
+		}
+		return ctx.TypeChecker.GetMergedSymbol(sym)
+	}
+	if ac.heritageReferences == nil {
+		ac.heritageReferences = make(map[*ast.Symbol][]*ast.Node)
+		var walk func(*ast.Node) bool
+		walk = func(node *ast.Node) bool {
+			if node.Kind == ast.KindIdentifier && utils.IsHeritageQualifiedName(node.Parent) &&
+				node.Parent.AsQualifiedName().Left == node {
+				if target := ctx.Refs.ResolveInFileWithMeaning(node, scope.ReferenceType.DeclarationMeaning()); target != nil {
+					target = merged(target)
+					ac.heritageReferences[target] = append(ac.heritageReferences[target], node)
+				}
+			}
+			return node.ForEachChild(walk)
+		}
+		ctx.SourceFile.AsNode().ForEachChild(walk)
+	}
+	refs := ac.heritageReferences[merged(sym)]
+	var filtered []*ast.Node
+	for i, ref := range info.usages {
+		if utils.IsHeritageQualifiedName(ref.Parent) {
+			if filtered == nil {
+				filtered = make([]*ast.Node, 0, len(info.usages)+len(refs))
+				filtered = append(filtered, info.usages[:i]...)
+			}
+		} else if filtered != nil {
+			filtered = append(filtered, ref)
+		}
+	}
+	if filtered == nil && len(refs) == 0 {
+		return info
+	}
+	if filtered == nil {
+		filtered = append(make([]*ast.Node, 0, len(info.usages)+len(refs)), info.usages...)
+	}
+	info.usages = append(filtered, refs...)
+	return info
+}
+
 // collectCheckerReferenceInfo handles the narrow cases ctx.Refs cannot model:
 // parameter-property names, empty namespaces, and declarations without a
 // binder symbol. Its syntactic candidate index is built at most once per file;
@@ -2128,6 +2185,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	}
 
 	info := getReferenceInfo(ctx, nameNode, name, definition, rawSym, sym, ac)
+	info = withHeritageReferences(ctx, info, sym, ac)
 	varInfo.References = info.usages
 
 	// For declaration merging (e.g., multiple interfaces with same name),

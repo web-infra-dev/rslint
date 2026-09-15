@@ -1,9 +1,9 @@
 package rule
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -118,6 +118,18 @@ func (ctx *RuleContext) ProcessCurrentDirectory() string {
 		return ""
 	}
 	return ctx.fileCache.processCurrentDirectory
+}
+
+// Severity returns the configured severity of the rule bound to this context.
+// Rules that arbitrate between several enabled rules over the same source
+// position need it so a warning-level rule cannot displace an error-level one.
+// It returns SeverityError on an unbound context, matching the default of
+// ParseSeverity.
+func (ctx *RuleContext) Severity() DiagnosticSeverity {
+	if ctx == nil {
+		return SeverityError
+	}
+	return ctx.reporter.severity
 }
 
 // ruleContextReporter is immutable after Rule.Run starts. Keeping only the

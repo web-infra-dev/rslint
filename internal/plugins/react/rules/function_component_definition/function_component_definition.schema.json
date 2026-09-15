@@ -1,0 +1,46 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "namedComponents": {
+          "anyOf": [
+            {
+              "enum": [
+                "function-declaration",
+                "arrow-function",
+                "function-expression"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "function-declaration",
+                  "arrow-function",
+                  "function-expression"
+                ]
+              }
+            }
+          ]
+        },
+        "unnamedComponents": {
+          "anyOf": [
+            { "enum": ["arrow-function", "function-expression"] },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["arrow-function", "function-expression"]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -71,8 +71,9 @@ export interface RslintOptions {
   fix?: boolean;
   /**
    * In-memory file overlay (path → content) for project inputs (issue #1106):
-   * put the `tsconfig.json` that `parserOptions.project` names plus any
-   * dependency files here, then lint a buffer with `lintText`. Keys resolve
+   * put a config selected by `parserOptions.project` or discovered by
+   * `projectService`, plus dependency files, here before calling `lintText`.
+   * Automatic project discovery uses the same overlay as source loading. Keys resolve
    * against `cwd` like a linted path (relative or absolute both work); a
    * same-path `lintText` code entry wins. `parserOptions.project` resolves from
    * the config entry's effective base, while paths inside the tsconfig resolve

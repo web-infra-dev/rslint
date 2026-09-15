@@ -231,6 +231,15 @@ rstest.mock('./service');`,
 				},
 			},
 			{
+				// A type-only import of the preferred spelling binds no value, so
+				// rewriting a call to reach it would name a type.
+				Code: `import type { rs } from '@rstest/core';
+rstest.mock('./service');`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					namespaceError("rs", "rstest", 2, 1, 7),
+				},
+			},
+			{
 				// Dropping the only specifier would leave a side-effect import.
 				Code: `import { rs } from '@rstest/core';
 import { rstest } from '@rstest/core';`,

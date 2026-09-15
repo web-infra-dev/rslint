@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@components/ui/button';
 import { Share2Icon, CheckIcon } from 'lucide-react';
-// Removed ToggleGroup in favor of Button to match Share style
 import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert';
 import { AlertCircleIcon } from 'lucide-react';
 import './ResultPanel.css';
@@ -37,6 +36,7 @@ interface ResultPanelProps {
   onRequestTsAst?: () => void;
   astInfo?: GetAstInfoResponse | null;
   astInfoLoading?: boolean;
+  astInfoEnabled?: boolean;
   onRequestAstInfo?: (
     position: number,
     end?: number,
@@ -50,6 +50,12 @@ interface ResultPanelProps {
     kind?: number,
     fileName?: string,
   ) => Promise<GetAstInfoResponse | null>;
+  /**
+   * Write any pending URL update before the current one is read, so that the
+   * copied link carries the editors' current contents rather than whatever the
+   * debounce last wrote.
+   */
+  onBeforeShare?: () => void;
   /** Highlight a range in the editor (on hover) */
   onHighlightRange?: (pos: number, end: number) => void;
   /** Clear the highlight decoration */
@@ -83,10 +89,12 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
     onRequestTsAst,
     astInfo,
     astInfoLoading,
+    astInfoEnabled,
     onRequestAstInfo,
     onFetchAstInfoForLazy,
     onHighlightRange,
     onClearHighlight,
+    onBeforeShare,
   } = props;
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window === 'undefined') return 'lint';
@@ -395,6 +403,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
   const [shareCopied, setShareCopied] = useState(false);
   async function copyShareUrl() {
     try {
+      onBeforeShare?.();
       const url = window.location.href;
       await copyToClipboard(url);
       setShareCopied(true);
@@ -527,6 +536,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
                   <AstInfoPanel
                     info={astInfo ?? undefined}
                     loading={astInfoLoading}
+                    enabled={astInfoEnabled}
                     onRequestAstInfo={onRequestAstInfo}
                     onFetchAstInfoForLazy={onFetchAstInfoForLazy}
                     onHighlightRange={onHighlightRange}

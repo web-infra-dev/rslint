@@ -26,7 +26,7 @@
 package cfg
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // Block is one basic block: the events its consumer recorded, in evaluation

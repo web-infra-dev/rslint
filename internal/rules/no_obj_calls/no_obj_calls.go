@@ -3,8 +3,8 @@ package no_obj_calls
 import (
 	"sort"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -42,18 +42,18 @@ var globalObjects = func() map[string]bool {
 }()
 
 func sourceMayUseNonCallableGlobal(sourceFile *ast.SourceFile) bool {
-	if sourceFile == nil || sourceFile.Identifiers == nil {
+	if sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile {
 		return true
 	}
 	for _, name := range nonCallableGlobalNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}
-	// Computed global-object access such as globalThis["Math"] does not put
-	// "Math" in SourceFile.Identifiers.
+	// Keep references through configured global objects as well, including
+	// computed access whose property name is not a literal.
 	for _, name := range globalObjectNames {
-		if _, ok := sourceFile.Identifiers[name]; ok {
+		if sourceFile.HasIdentifier(name) {
 			return true
 		}
 	}

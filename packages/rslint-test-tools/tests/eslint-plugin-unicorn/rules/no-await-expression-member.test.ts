@@ -1,0 +1,63 @@
+import { RuleTester } from '../rule-tester';
+
+const ruleTester = new RuleTester();
+
+// Mirrors Unicorn v74.0.0. Additional edge shapes are tested in Go only.
+ruleTester.run('no-await-expression-member', null as never, {
+  valid: [
+    'const foo = await promise',
+    'const {foo: bar} = await promise',
+    'const foo = !await promise',
+    'const foo = typeof await promise',
+    'const foo = await notPromise.method()',
+    'const foo = foo[await promise]',
+    'new (await promiseReturnsAClass)',
+    '(await promiseReturnsAFunction)()',
+    'function foo () {return (await promise) as string;}',
+    '(await promise)!.property',
+    "const {default: foo} = await import('./foo.js');",
+    'const [, secondElement] = await getArray();',
+    'const {property} = await getObject();',
+    "const response = await fetch('/foo'); const data = await response.json();",
+  ].map((code) => ({ code, filename: 'src/virtual.mts' })),
+  invalid: [
+    '(await promise)[0]',
+    '(await promise).property',
+    'const foo = (await promise).bar()',
+    'const foo = (await promise).bar?.()',
+    'const foo = (await promise)?.bar()',
+    'const firstElement = (await getArray())[0]',
+    'const secondElement = (await getArray())[1]',
+    'const thirdElement = (await getArray())[2]',
+    'const optionalFirstElement = (await getArray())?.[0]',
+    'const {propertyOfFirstElement} = (await getArray())[0]',
+    'const [firstElementOfFirstElement] = (await getArray())[0]',
+    'let foo, firstElement = (await getArray())[0]',
+    'var firstElement = (await getArray())[0], bar',
+    'const property = (await getObject()).property',
+    'let property = (await getObject()).property',
+    'const renamed = (await getObject()).property',
+    '(await promise).foo.bar',
+    'const property = (await getObject())[property]',
+    'const property = (await getObject())?.property',
+    'const {propertyOfProperty} = (await getObject()).property',
+    'const {propertyOfProperty} = (await getObject()).propertyOfProperty',
+    'const [firstElementOfProperty] = (await getObject()).property',
+    'const [firstElementOfProperty] = (await getObject()).firstElementOfProperty',
+    'firstElement = (await getArray())[0]',
+    'property = (await getArray()).property',
+    'const foo: Type = (await promise)[0]',
+    'const foo: Type | A = (await promise).foo',
+    "const foo = (await import('./foo.js')).default;",
+    "const data = await (await fetch('/foo')).json();",
+  ].map((code) => ({
+    code,
+    filename: 'src/virtual.mts',
+    errors: [
+      {
+        messageId: 'no-await-expression-member',
+        message: 'Do not access a member directly from an await expression.',
+      },
+    ],
+  })),
+});

@@ -1,7 +1,7 @@
 package scope
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // IsInsideOwnInitializer reports whether `location` falls inside the value a

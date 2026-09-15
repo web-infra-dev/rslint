@@ -24,7 +24,7 @@ package no_restricted_imports
 import (
 	_ "embed"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	core "github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
 	"github.com/web-infra-dev/rslint/internal/utils"

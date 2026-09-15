@@ -95,11 +95,8 @@ func TestNoWrapperObjectTypesExtras(t *testing.T) {
 
 		// ---- Branch lock-in: `class extends X` is OUT of scope ----
 		// Upstream registers TSClassImplements + TSInterfaceHeritage, NOT a
-		// class-extends listener. tsgo's KindExpressionWithTypeArguments is
-		// shared with `class extends`, so the rule must filter on
-		// HeritageClause.Token to avoid reporting here. (Upstream's own valid
-		// suite includes `class MyClass extends Number {}` for the same
-		// reason.)
+		// class-extends listener. The compiler uses ExpressionWithTypeArguments
+		// for class extends and TypeReference for the type-only heritage entries.
 		{Code: `class Foo extends Number {}`},
 		{Code: `class Foo extends Boolean {}`},
 		{Code: `const Cls = class extends Object {};`},

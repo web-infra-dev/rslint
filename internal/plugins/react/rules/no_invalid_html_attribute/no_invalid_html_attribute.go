@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -137,18 +137,6 @@ func literalString(node *ast.Node) (string, bool) {
 		return node.AsStringLiteral().Text, true
 	}
 	return "", false
-}
-
-func jsxLiteralString(ctx rule.RuleContext, node *ast.Node) (string, bool) {
-	value, ok := literalString(node)
-	if !ok {
-		return "", false
-	}
-	raw := sourceText(ctx, node)
-	if len(raw) >= 2 && ((raw[0] == '"' && raw[len(raw)-1] == '"') || (raw[0] == '\'' && raw[len(raw)-1] == '\'')) {
-		return ecmascript.DecodeJSXEntities(raw[1 : len(raw)-1]), true
-	}
-	return value, true
 }
 
 func isCreateElementCall(callee *ast.Node) bool {
@@ -295,7 +283,7 @@ var NoInvalidHtmlAttributeRule = rule.Rule{
 		reportLiteral := func(valueNode, nonStringRemoveNode, emptyRemoveNode *ast.Node, element string, decodeJSX bool) {
 			value, isString := literalString(valueNode)
 			if decodeJSX {
-				value, isString = jsxLiteralString(ctx, valueNode)
+				value, isString = reactutil.GetJsxStringLiteralValue(ctx.SourceFile, valueNode)
 			}
 			if !isString {
 				ctx.ReportNodeWithDeferredSuggestions(valueNode, message("onlyStrings", "“rel” attribute only supports strings."), func() []rule.RuleSuggestion {

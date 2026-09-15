@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 

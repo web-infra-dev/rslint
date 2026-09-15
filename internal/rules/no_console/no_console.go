@@ -3,8 +3,9 @@ package no_console
 import (
 	_ "embed"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_console.schema.json
@@ -43,26 +44,18 @@ var NoConsoleRule = rule.Rule{
 			})
 		}
 
+		checkDottedAccess := func(node *ast.Node) {
+			object, property := utils.MemberExpressionParts(node)
+			if object == nil || property == nil || object.Kind != ast.KindIdentifier || object.Text() != "console" {
+				return
+			}
+			reportIfConsole(node, object, property.Text())
+		}
+
 		return rule.RuleListeners{
 			// Handle console.log, console.warn, etc.
-			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				propAccess := node.AsPropertyAccessExpression()
-				if propAccess == nil {
-					return
-				}
-
-				if propAccess.Expression.Kind != ast.KindIdentifier {
-					return
-				}
-
-				objectName := propAccess.Expression.AsIdentifier().Text
-				if objectName != "console" {
-					return
-				}
-
-				propertyName := propAccess.Name().Text()
-				reportIfConsole(node, propAccess.Expression, propertyName)
-			},
+			ast.KindPropertyAccessExpression: checkDottedAccess,
+			ast.KindQualifiedName:            checkDottedAccess,
 
 			// Handle console["log"], console[foo], etc.
 			ast.KindElementAccessExpression: func(node *ast.Node) {

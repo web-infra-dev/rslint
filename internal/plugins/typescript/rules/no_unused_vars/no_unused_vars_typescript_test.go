@@ -562,3 +562,42 @@ export {};`,
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
 }
+
+func TestNoUnusedVarsHeritage(t *testing.T) {
+	// These member references are syntactically valid even when the checker
+	// rejects the inherited type. ESLint still resolves a type-capable root.
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, []rule_tester.ValidTestCase{
+		{Code: `class Cls { static method() {} } export interface I extends Cls.method {}`},
+		{Code: `class Cls { static method() {} } export class C implements Cls.method {}`},
+		{Code: `interface Obj { method(): void } export interface I extends Obj.method {}`},
+		{Code: `type Obj = { method(): void }; export class C implements Obj.method {}`},
+		{Code: `class Cls {} export interface I extends Cls.nested.member {}`},
+		{Code: `namespace NS { export interface Base {} } export interface I extends NS.Base {}`},
+		{Code: `class Cls {} namespace Cls { export interface Base {} } export interface I extends Cls.Base {}`},
+		{Code: `interface Base<T> { value: T } class Cls {} export interface I extends Base<Cls> {}`},
+		{Code: `declare const obj: { Base: new () => object }; export class C extends obj.Base {}`},
+		{Code: `import type * as NS from 'missing'; export interface I extends NS.Base {}`},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:   `declare const obj: { m(): void }; export interface I extends obj.m {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'obj' is defined but never used."}},
+		},
+		{
+			Code:   `namespace NS { export interface Base {} } export function f() { let NS = 0; class C implements NS.Base {} return C; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'NS' is assigned a value but never used."}},
+		},
+		{
+			Code:   `namespace NS { export interface Base {} } export function f() { class NS {} class C implements NS.Base {} return C; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'NS' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 13}},
+		},
+		{
+			Code:   `const obj = { m() {} }; export type T = typeof obj.m;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Message: "'obj' is assigned a value but only used as a type."}},
+		},
+		{
+			Code:    `interface _Cls {} export interface I extends _Cls.member {}`,
+			Options: map[string]any{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar"}},
+		},
+	})
+}

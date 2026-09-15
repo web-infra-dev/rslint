@@ -47,7 +47,7 @@ package vuesfc
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // BlockKind classifies a top-level SFC block by its tag name.

@@ -3,8 +3,8 @@ package inspector
 import (
 	"unsafe"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
 // BuildFlowInfoWithDepth builds FlowInfo with a depth limit to avoid infinite recursion

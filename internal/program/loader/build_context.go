@@ -7,12 +7,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/tsoptions"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -105,7 +105,7 @@ func (c *buildContext) newTransientCompilerHost(cwd string) compiler.CompilerHos
 }
 
 func (c *buildContext) newCompilerHost(cwd string) compiler.CompilerHost {
-	host := compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil)
+	host := compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil, nil)
 	if c.metadataFS != nil {
 		host = &programBuildCompilerHost{
 			CompilerHost: host,
@@ -118,21 +118,23 @@ func (c *buildContext) newCompilerHost(cwd string) compiler.CompilerHost {
 // createProjectProgram creates a tsconfig-backed Program and preserves the
 // lenient syntactic-error behavior used by the CLI and API.
 func (c *buildContext) createProjectProgram(singleThreaded bool, cwd string, tsconfigPath string) (*compiler.Program, error) {
-	host, config, err := c.parseConfig(cwd, tsconfigPath)
+	config, err := c.parseConfig(cwd, tsconfigPath)
 	if err != nil {
 		return nil, err
 	}
-	return utils.CreateProgramFromParsedConfigLenient(singleThreaded, config, host)
+	return utils.CreateProgramFromParsedConfigLenient(singleThreaded, config, c.newCompilerHostWithCache(cwd))
 }
 
-func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (compiler.CompilerHost, *tsoptions.ParsedCommandLine, error) {
+// parseConfig reads metadata without binding the source cache to a filesystem.
+// Program construction chooses its serial or parallel view before doing that.
+func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (*tsoptions.ParsedCommandLine, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !c.compilerFS().FileExists(resolvedConfigPath) {
-		return nil, nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
+		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
 	c.registerTSConfig(resolvedConfigPath)
 
-	host := c.newCompilerHostWithCache(cwd)
+	host := c.newCompilerHost(cwd)
 	config, _ := tsoptions.GetParsedCommandLineOfConfigFile(
 		tsconfigPath,
 		&core.CompilerOptions{},
@@ -140,7 +142,7 @@ func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (compiler.Co
 		host,
 		c.extendedConfigCacheInterface(),
 	)
-	return host, config, nil
+	return config, nil
 }
 
 // createCompatibilityProgram creates a source-only compiler Program using the

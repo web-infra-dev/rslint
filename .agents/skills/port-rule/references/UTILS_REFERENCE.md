@@ -2,7 +2,7 @@
 
 This document provides a comprehensive reference for utility functions available in `internal/utils/`. These utilities are commonly used when implementing lint rules.
 
-> **Note**: This is a reference document for [PORT_RULE.md](./PORT_RULE.md). See that document for the complete rule porting workflow.
+Look up the operation or named function needed by the current rule. Workflow and coverage requirements live in [SKILL.md](../SKILL.md) and [PORT_RULE.md](./PORT_RULE.md).
 
 ---
 
@@ -74,6 +74,8 @@ utils.TypeRecurser(t, func(subType *checker.Type) bool {
 
 ### AST Helpers
 
+For member access, JSX/heritage, runtime-expression wrappers and call callee boundaries, see [Member and Call Expressions](./AST_PATTERNS.md#member-and-call-expressions), which maps the helpers in `internal/utils/ast_helpers.go` and `internal/utils/jsx.go`.
+
 ```go
 // Get heritage clauses of a class/interface
 heritageClauses := utils.GetHeritageClauses(classNode) // *ast.NodeList
@@ -82,11 +84,11 @@ heritageClauses := utils.GetHeritageClauses(classNode) // *ast.NodeList
 isAsync := utils.IncludesModifier(funcNode, ast.KindAsyncKeyword)
 
 // Whether a node could plausibly evaluate to an Error object — mirrors
-// ESLint's astUtils.couldBeError. Unwraps parens + TS assertions internally.
+// ESLint's astUtils.couldBeError. Unwraps only parens, not TS assertions.
 // Used by no-throw-literal, prefer-promise-reject-errors, etc.
 mayBeError := utils.CouldBeError(node)
 
-// Whether a node, after unwrapping parens + TS assertions, is the literal
+// Whether a node, after unwrapping only parens, is the literal
 // identifier `undefined`. Lexical check only — does not detect `void 0`.
 isUndef := utils.IsUndefinedIdentifier(node)
 ```
@@ -556,7 +558,7 @@ set.Clear()
 ## `shim/ast/` - AST Utilities
 
 ```go
-import "github.com/microsoft/typescript-go/shim/ast"
+import "github.com/microsoft/TypeScript/tsc/shim/ast"
 ```
 
 Reach for these **before** writing a helper of your own — the shim already covers a wide surface. This list is curated to the functions most commonly reused when porting rules; see `shim/ast/shim.go` for the full inventory.
@@ -566,7 +568,7 @@ Reach for these **before** writing a helper of your own — the shim already cov
 Use these instead of hand-rolled loops. See [AST_PATTERNS.md § ParenthesizedExpression](./AST_PATTERNS.md#parenthesizedexpression).
 
 - `ast.SkipParentheses(node)` — innermost non-paren expression
-- `ast.WalkUpParenthesizedExpressions(node)` — first non-paren ancestor
+- `ast.WalkUpParenthesizedExpressions(node)` — walks upward while the supplied node is parenthesized; returns a non-paren input unchanged
 
 ### Optional chain
 
@@ -605,7 +607,7 @@ Use these instead of hand-rolled loops. See [AST_PATTERNS.md § ParenthesizedExp
 ## `shim/scanner/` - Scanner Utilities
 
 ```go
-import "github.com/microsoft/typescript-go/shim/scanner"
+import "github.com/microsoft/TypeScript/tsc/shim/scanner"
 ```
 
 ### SkipTrivia
@@ -635,7 +637,7 @@ Create a token-by-token scanner for more complex scanning needs. See [AST_PATTER
 ## `shim/checker/` - TypeChecker Native Methods
 
 ```go
-import "github.com/microsoft/typescript-go/shim/checker"
+import "github.com/microsoft/TypeScript/tsc/shim/checker"
 ```
 
 For type-aware rules, **check `internal/utils/ts_api_utils.go` and `internal/utils/ts_eslint.go` first** — they wrap the common patterns with the correct invariants (e.g. `IsPromiseLike` handles subclass resolution, `NeedsToBeAwaited` handles generic constraints). Only fall through to the raw `Checker_*` functions below when no wrapper exists. Do **not** hand-roll type analysis on top of AST shape alone — the checker already answers those questions authoritatively.
@@ -726,7 +728,7 @@ lower := ecmascript.StringToLowerCase(name)
 ecmascript.StringToLocaleUpperCase(s)
 ecmascript.StringToLocaleLowerCase(s)
 
-// String(n) / string concatenation. strconv picks the same digits but leaves
+// String(n) / string concatenation. Go's formatter picks the same digits but leaves
 // fixed notation at a different point and spells the infinities differently.
 text := ecmascript.NumberToString(42) // "42", not "4.2e+01"
 
@@ -847,27 +849,28 @@ isglob.IsExtglob("@(a|b)") // true, the extended-list question on its own
 
 Open the upstream rule's imports and its plugin's `package.json`, then match:
 
-| Upstream reads the pattern with       | Use                                                         |
-| ------------------------------------- | ----------------------------------------------------------- |
-| a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp` (import as `esregexp`)            |
-| `minimatch` at `^3.x`                 | `utils/minimatch3`                                          |
-| `is-glob`                             | `utils/isglob`                                              |
-| any other glob package                | **not supported — stop and report to the user (see below)** |
+| Upstream reads the pattern with       | Use                                                                               |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| a regexp literal or `new RegExp(...)` | `utils/ecmascript/regexp` (import as `esregexp`)                                  |
+| `minimatch` at `^3.x`                 | `utils/minimatch3`                                                                |
+| `is-glob`                             | `utils/isglob`                                                                    |
+| other glob or ignore packages         | Inspect the existing capabilities below and compare the rule's actual operations. |
 
 The stdlib `regexp` is not banned outright. A pattern written in this repository that RE2 and JavaScript read the same way, and that no user input reaches, can stay on it. Anything a user can influence — a rule option, a config file, the source under lint — takes `esregexp`, however plain the pattern looks: RE2 refuses syntax JavaScript accepts, and the caller usually swallows the compile error and reports nothing.
 
-### ⚠️ Only minimatch 3 and is-glob are ported
+### Existing matching capabilities
 
-**If the rule you are porting reads globs with anything else, stop and report it to the user. Do not substitute `minimatch3` or `doublestar` and carry on, and do not port the package yourself.**
+Use [reuse and compatibility](PORT_RULE.md#reuse-and-compatibility) before adding another matcher. These are discovery entry points, not interchangeable dialects:
 
-`minimatch@10` is the one to expect. ESLint moved to it for the paths it matches on its own behalf (flat config `files` / `ignores`), and a plugin may follow. Only the 3.x reading is ported, because that is what the plugin ecosystem pins — `eslint-plugin-import` and `eslint-plugin-react` both depend on `minimatch@^3.1.2`.
+| Capability                      | Existing entry point                                                                         | Contract to check                                                                                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Basic path patterns             | Go `path.Match` / `filepath.Match`                                                           | No recursive globstar; platform separators differ.                                                                                                                 |
+| Recursive globs                 | `internal/utils/glob.go` (`MatchGlob`, backed by the installed `doublestar` version)         | Wildcards, character classes and brace alternatives; extended groups and negation differ from npm matchers.                                                        |
+| Plugin-style globs              | `internal/utils/minimatch3`                                                                  | Options for dotfiles, braces, extended groups, negation and case sensitivity; inspect the package's documented differences.                                        |
+| Git ignore parsing and matching | `internal/config/gitignore/collector.go` and `internal/config/ignore_pattern.go`             | Ordered negations, directory reachability, escaping and filesystem case mode; expose the common matching operation if its current API is tied to config discovery. |
+| TypeScript file specifications  | `shim/vfs/vfsmatch/shim.go`, implementation under `typescript-go/tsc/internal/vfs/vfsmatch/` | TypeScript include/exclude modes, implicit directories and special treatment of hidden/package paths; a generated shim may still need module registration.         |
 
-The substitutions are not close enough to make quietly:
-
-- **`minimatch3`** differs from 10 on POSIX character classes: `a[[:alpha:]]b` matches `aXb` under 10, and does not under 3.
-- **`doublestar`** differs from 10 on 13 of 37 sampled patterns. Six are extended glob syntax, which it does not implement at all. The other seven are not exotic: `src/**` matches `src` itself under doublestar but not under minimatch, POSIX classes and `{1..3}` ranges are unsupported, a leading `!` is a literal rather than a negation, and the empty path and `a//b` are handled differently.
-
-Report which upstream package and version the rule depends on, and which of its patterns would be read differently. The user decides whether to port it, accept a documented divergence, or skip the rule.
+Pin the upstream package/version as the behavioral reference. Test the defaults and options actually passed by the rule before selecting a tool. For example, support for `**` alone says nothing about `?`, dotfiles, escaped metacharacters or parent-directory negation. Use a small adapter where it closes a practical gap, and document remaining narrow differences with the rule. Preserve the existing JavaScript regexp requirements for regexp-valued options.
 
 ---
 
@@ -875,4 +878,4 @@ Report which upstream package and version the rule depends on, and which of its 
 
 - [PORT_RULE.md](./PORT_RULE.md) - Main rule porting workflow
 - [AST_PATTERNS.md](./AST_PATTERNS.md) - AST traversal patterns and examples
-- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Commands and checklist
+- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Commands and locations

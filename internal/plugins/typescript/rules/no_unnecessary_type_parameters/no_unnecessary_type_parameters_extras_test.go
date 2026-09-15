@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -1762,4 +1762,16 @@ func TestNoUnnecessaryTypeParametersEditDemand(t *testing.T) {
 		diagnostics[rule.EditDemandAutofix][0].Suggestions != nil {
 		t.Errorf("suggestions attached without suggestion demand")
 	}
+}
+
+func TestNoUnnecessaryTypeParametersHeritage(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeParametersRule, []rule_tester.ValidTestCase{
+		{Code: `class C<T> implements Array<T> {}`},
+		{Code: `class C<T> implements ReadonlyArray<T> {}`},
+		{Code: `class C<T> implements Array<T> { value: T; }`},
+		{Code: `class C<T> implements ReadonlyArray<T> { value: T; }`},
+		{Code: `class C<T> implements Array<(T)> {}`},
+		{Code: `class C<T> extends Array<T> {}`},
+		{Code: `class C<T> extends ReadonlyArray<T> {}`},
+	}, nil)
 }

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_default_export"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"

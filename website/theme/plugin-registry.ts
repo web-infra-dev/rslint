@@ -28,7 +28,7 @@ export interface PluginMeta {
    * belongs to a manifest entry.
    */
   group: string;
-  /** Named export from `@rslint/core` (e.g. `importPlugin`). */
+  /** Named preset export from `@rslint/core`, or empty when there is no preset. */
   importName: string;
   /** Presets shipped by this plugin. Empty when the plugin has no preset. */
   presets: PluginPresetMeta[];
@@ -116,6 +116,12 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
         description: 'Import/export rules',
       },
     ],
+  },
+  {
+    prefix: 'node',
+    group: 'eslint-plugin-node',
+    importName: '',
+    presets: [],
   },
   {
     prefix: 'promise',

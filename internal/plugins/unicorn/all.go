@@ -4,12 +4,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/empty_brace_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_from_fill"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_expression_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
@@ -17,29 +20,37 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_null"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_object_as_default_parameter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_thenable"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_assignment"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_outside_of_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_flat_depth"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/number_literal_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_add_event_listener_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_number_to_fixed_digits_argument"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_post_message_target_origin"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/throw_new_error"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -49,12 +60,15 @@ func GetAllRules() []rule.Rule {
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
+		empty_brace_spaces.EmptyBraceSpacesRule,
 		error_message.ErrorMessageRule,
 		filename_case.FilenameCaseRule,
 		new_for_builtins.NewForBuiltinsRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
+		no_array_from_fill.NoArrayFromFillRule,
 		no_array_front_mutation.NoArrayFrontMutationRule,
+		no_await_expression_member.NoAwaitExpressionMemberRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
 		no_document_cookie.NoDocumentCookieRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
@@ -62,29 +76,37 @@ func GetAllRules() []rule.Rule {
 		no_invalid_fetch_options.NoInvalidFetchOptionsRule,
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
 		no_magic_array_flat_depth.NoMagicArrayFlatDepthRule,
+		no_new_buffer.NoNewBufferRule,
 		no_nested_ternary.NoNestedTernaryRule,
 		no_null.NoNullRule,
 		no_object_as_default_parameter.NoObjectAsDefaultParameterRule,
 		no_static_only_class.NoStaticOnlyClassRule,
 		no_thenable.NoThenableRule,
 		no_this_assignment.NoThisAssignmentRule,
+		no_this_outside_of_class.NoThisOutsideOfClassRule,
 		no_unnecessary_array_flat_depth.NoUnnecessaryArrayFlatDepthRule,
+		no_unreadable_iife.NoUnreadableIifeRule,
 		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,
+		number_literal_case.NumberLiteralCaseRule,
 		prefer_add_event_listener_options.PreferAddEventListenerOptionsRule,
 		prefer_array_flat.PreferArrayFlatRule,
 		prefer_array_flat_map.PreferArrayFlatMapRule,
 		prefer_array_some.PreferArraySomeRule,
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
+		prefer_date_now.PreferDateNowRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		prefer_set_has.PreferSetHasRule,
+		prefer_set_size.PreferSetSizeRule,
+		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
 		prefer_then_catch.PreferThenCatchRule,
 		prefer_ternary.PreferTernaryRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
 		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,
+		require_post_message_target_origin.RequirePostMessageTargetOriginRule,
 		throw_new_error.ThrowNewErrorRule,
 	}
 }

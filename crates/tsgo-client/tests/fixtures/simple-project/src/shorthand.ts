@@ -25,3 +25,14 @@ export function mixedProperties(id: number) {
     timestamp: Date.now(), // regular property
   };
 }
+
+interface DestructuringSource {
+  destructured: string;
+  defaulted?: number;
+  restOnly: boolean;
+}
+
+export function readDestructured(source: DestructuringSource) {
+  const { destructured, defaulted = 1, ...rest } = source;
+  return [destructured, defaulted, rest];
+}

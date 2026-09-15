@@ -4,8 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -38,7 +38,7 @@ type options struct {
 	globalObjects     map[string]sourceBindingState
 }
 
-func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (options, bool) {
+func parseOptions(optionsList []any, sourceFile *ast.SourceFile) (options, bool) {
 	isGlobalsObject := false
 	var globalsObjectMap map[string]interface{}
 	if len(optionsList) > 0 {
@@ -72,7 +72,7 @@ func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (optio
 	}
 
 	restrictedGlobals := make(map[string]globalEntry, len(rawGlobals))
-	mayUseRestrictedGlobal := sourceIdentifiers == nil
+	mayUseRestrictedGlobal := sourceFile == nil || sourceFile.AsNode().Kind != ast.KindSourceFile
 	for _, item := range rawGlobals {
 		var name string
 		switch v := item.(type) {
@@ -94,7 +94,7 @@ func parseOptions(optionsList []any, sourceIdentifiers map[string]string) (optio
 			}
 		}
 		if !mayUseRestrictedGlobal && name != "" {
-			_, mayUseRestrictedGlobal = sourceIdentifiers[name]
+			mayUseRestrictedGlobal = sourceFile.HasIdentifier(name)
 		}
 	}
 
@@ -120,11 +120,7 @@ var NoRestrictedGlobalsRule = rule.Rule{
 	Name:   "no-restricted-globals",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		var sourceIdentifiers map[string]string
-		if ctx.SourceFile != nil {
-			sourceIdentifiers = ctx.SourceFile.Identifiers
-		}
-		opts, mayUseRestrictedGlobal := parseOptions(options, sourceIdentifiers)
+		opts, mayUseRestrictedGlobal := parseOptions(options, ctx.SourceFile)
 
 		// If no globals are restricted, there's nothing to check.
 		if len(opts.restrictedGlobals) == 0 {
@@ -135,7 +131,7 @@ var NoRestrictedGlobalsRule = rule.Rule{
 				if !ctx.Globals.Access(name).IsDeclared() {
 					delete(opts.globalObjects, name)
 				} else if !mayUseRestrictedGlobal {
-					_, mayUseRestrictedGlobal = sourceIdentifiers[name]
+					mayUseRestrictedGlobal = ctx.SourceFile.HasIdentifier(name)
 				}
 			}
 		}
@@ -256,7 +252,8 @@ func sourceHasNamedExpressionBinding(sourceFile *ast.SourceFile, name string) bo
 // in the rule's `Program:exit` handler.
 func checkGlobalObjectAccess(node *ast.Node, globalObjectName string, opts options, report func(*ast.Node, string, globalEntry)) {
 	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
-	for utils.IsSpecificMemberAccess(parent, "", globalObjectName) {
+	for utils.IsSpecificMemberAccess(parent, "", globalObjectName) ||
+		(utils.IsHeritageQualifiedName(parent) && parent.AsQualifiedName().Right.Text() == globalObjectName) {
 		parent = ast.WalkUpParenthesizedExpressions(parent.Parent)
 	}
 
@@ -278,6 +275,11 @@ func staticMemberProperty(node *ast.Node) (string, *ast.Node, bool) {
 		return "", nil, false
 	}
 	switch node.Kind {
+	case ast.KindQualifiedName:
+		if utils.IsHeritageQualifiedName(node) {
+			name := node.AsQualifiedName().Right
+			return name.Text(), name, true
+		}
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
 		propName, ok := utils.GetStaticPropertyName(name)
@@ -311,6 +313,9 @@ func shouldSkip(node *ast.Node) bool {
 	// declaration-name classification below.
 	if parent.Kind == ast.KindPropertyAccessExpression &&
 		parent.AsPropertyAccessExpression().Name() == node {
+		return true
+	}
+	if parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Right == node {
 		return true
 	}
 
@@ -392,8 +397,10 @@ func isInTypeContext(node *ast.Node) bool {
 		return false
 	}
 	switch parent.Kind {
-	case ast.KindTypeReference, ast.KindTypeQuery, ast.KindQualifiedName:
+	case ast.KindTypeReference, ast.KindTypeQuery:
 		return true
+	case ast.KindQualifiedName:
+		return !utils.IsHeritageQualifiedName(parent)
 	case ast.KindExpressionWithTypeArguments:
 		return !utils.IsClassExtendsHeritageClause(parent)
 	}

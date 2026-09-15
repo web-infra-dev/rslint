@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 
 // SymbolFlags definition from TypeScript
-// Reference: typescript-go/internal/ast/symbolflags.go
+// Reference: typescript-go/tsc/internal/ast/symbolflags.go
 bitflags! {
     /// Symbol flags from TypeScript compiler
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

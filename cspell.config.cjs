@@ -29,6 +29,7 @@ module.exports = {
     'internal/plugins/jsx_a11y/rules/aria_props/aria_props.md',
     'internal/plugins/jsx_a11y/rules/aria_proptypes/aria_proptypes.md',
     'internal/plugins/react/rules/no_typos/no_typos.md',
+    'internal/plugins/react/rules/no_unused_prop_types/no_unused_prop_types_upstream.json',
     'website/docs/en/rules/*/',
   ],
   dictionaries: ['dictionary'],

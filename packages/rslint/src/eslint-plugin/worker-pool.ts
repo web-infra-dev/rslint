@@ -830,7 +830,7 @@ export class WorkerPool {
         void terminateWorker(worker);
         reject(
           new Error(
-            `worker ${id} init timed out after ${this.opts.workerInitTimeoutMs}ms`,
+            `worker init timed out after ${this.opts.workerInitTimeoutMs}ms`,
           ),
         );
       }, this.opts.workerInitTimeoutMs);
@@ -848,7 +848,7 @@ export class WorkerPool {
         clearTimeout(initTimer);
         reject(
           new Error(
-            `worker ${id} exited during init (code=${code}) before sending ready`,
+            `worker exited during init (code=${code}) before sending ready`,
           ),
         );
       };
@@ -893,7 +893,7 @@ export class WorkerPool {
           worker.once('exit', () => {
             clearTimeout(graceTimer);
           });
-          reject(new Error(`worker ${id} init failed: ${String(msg.message)}`));
+          reject(new Error(`worker init failed: ${String(msg.message)}`));
         } else {
           // Unexpected pre-ready message — ignore.
         }
@@ -901,7 +901,7 @@ export class WorkerPool {
       const onError = (err: Error) => {
         clearTimeout(initTimer);
         worker.off('exit', onExit);
-        reject(new Error(`worker ${id} error during init: ${err.message}`));
+        reject(new Error(`worker error during init: ${err.message}`));
       };
       worker.on('message', onMessage);
       worker.once('error', onError);
@@ -946,7 +946,7 @@ export class WorkerPool {
       this.opts.onLog?.({
         level: 'error',
         source: 'runner',
-        text: `worker ${slot.id} error: ${err instanceof Error ? err.message : String(err)}`,
+        text: `worker error: ${err instanceof Error ? err.message : String(err)}`,
       });
     });
 
@@ -955,7 +955,7 @@ export class WorkerPool {
       for (const [, p] of slot.inflight) {
         clearTimeout(p.timer);
         this.cancelPool.release(p.cancelSlot);
-        p.reject(new Error(`worker ${slot.id} exited with code ${code}`));
+        p.reject(new Error(`worker exited with code ${code}`));
       }
       slot.inflight.clear();
       slot.ready = false;
@@ -968,7 +968,7 @@ export class WorkerPool {
         this.opts.onLog?.({
           level: 'warn',
           source: 'runner',
-          text: `worker ${slot.id} exited unexpectedly (code=${code}); respawning (try ${slot.crashCount}/${this.opts.retryCap})`,
+          text: `worker exited unexpectedly (code=${code}); respawning (try ${slot.crashCount}/${this.opts.retryCap})`,
         });
         // Replace this slot with a fresh worker. We re-use init's logic.
         //
@@ -1026,7 +1026,7 @@ export class WorkerPool {
             this.opts.onLog?.({
               level: 'error',
               source: 'runner',
-              text: `worker ${slot.id} respawn failed: ${(err as Error).message}`,
+              text: `worker respawn failed: ${(err as Error).message}`,
             });
             // Respawn rejected: slot stays `ready=false` from the exit
             // handler above and there is no further event that could
@@ -1049,7 +1049,7 @@ export class WorkerPool {
         this.opts.onLog?.({
           level: 'error',
           source: 'runner',
-          text: `worker ${slot.id} respawn cap reached (${this.opts.retryCap}); pool degraded`,
+          text: `worker respawn cap reached (${this.opts.retryCap}); pool degraded`,
         });
         // If THIS exit was the last one keeping the pool servicing
         // tasks, drain `pendingQueue` so the caller's
@@ -1153,7 +1153,7 @@ export class WorkerPool {
       this.opts.onLog?.({
         level: 'warn',
         source: 'runner',
-        text: `task ${taskId} on worker ${slot.id} timed out after ${this.opts.taskTimeoutMs}ms; terminating worker`,
+        text: `worker task timed out after ${this.opts.taskTimeoutMs}ms; terminating worker`,
       });
       // Reject this task with a "plugin-lint-failed"-shaped result.
       resolveOk({

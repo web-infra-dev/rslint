@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"

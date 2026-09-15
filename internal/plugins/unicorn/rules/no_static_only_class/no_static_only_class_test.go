@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"

@@ -1,7 +1,7 @@
 package program
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // ModuleReferenceKind names the syntax a module reference was written in.

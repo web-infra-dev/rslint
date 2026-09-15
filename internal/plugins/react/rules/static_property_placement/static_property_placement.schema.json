@@ -1,0 +1,58 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["static public field", "static getter", "property assignment"]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "childContextTypes": {
+          "enum": [
+            "static public field",
+            "static getter",
+            "property assignment"
+          ]
+        },
+        "contextTypes": {
+          "enum": [
+            "static public field",
+            "static getter",
+            "property assignment"
+          ]
+        },
+        "contextType": {
+          "enum": [
+            "static public field",
+            "static getter",
+            "property assignment"
+          ]
+        },
+        "defaultProps": {
+          "enum": [
+            "static public field",
+            "static getter",
+            "property assignment"
+          ]
+        },
+        "displayName": {
+          "enum": [
+            "static public field",
+            "static getter",
+            "property assignment"
+          ]
+        },
+        "propTypes": {
+          "enum": [
+            "static public field",
+            "static getter",
+            "property assignment"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}

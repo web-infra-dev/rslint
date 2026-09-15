@@ -3,8 +3,8 @@ package config
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // configTargetResolver matches one immutable flat-config array while retaining

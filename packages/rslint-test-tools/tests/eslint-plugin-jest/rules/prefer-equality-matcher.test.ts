@@ -15,6 +15,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
     { code: 'expect.hasAssertions' },
     { code: 'expect.hasAssertions()' },
     { code: 'expect.assertions(1)' },
+    { code: 'expect(true).toBe(...true)' },
     { code: 'expect(a == 1).toBe(true)' },
     { code: 'expect(1 == a).toBe(true)' },
     { code: 'expect(a == b).toBe(true)' },

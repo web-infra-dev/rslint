@@ -1,0 +1,15 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "fn": { "type": "string", "enum": ["test", "it"] },
+        "withinDescribe": { "type": "string", "enum": ["test", "it"] }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

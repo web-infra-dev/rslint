@@ -116,7 +116,7 @@ func prohibitedPipelineDependency(importPath string) bool {
 		strings.HasPrefix(importPath, "github.com/web-infra-dev/rslint/internal/api") ||
 		strings.HasPrefix(importPath, "github.com/web-infra-dev/rslint/internal/config") ||
 		strings.HasPrefix(importPath, "github.com/web-infra-dev/rslint/internal/lsp") ||
-		strings.HasPrefix(importPath, "github.com/microsoft/typescript-go/shim/vfs")
+		strings.HasPrefix(importPath, "github.com/microsoft/TypeScript/tsc/shim/vfs")
 }
 
 func isProductLintIntegration(packagePath string) bool {

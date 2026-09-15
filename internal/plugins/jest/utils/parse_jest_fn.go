@@ -3,7 +3,7 @@ package utils
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
@@ -230,11 +230,17 @@ func ResolveFunctionReferenceForModule(
 	ctx rule.RuleContext,
 	importModule string,
 ) (string, *ast.Node, JestImportMode) {
-	return testFramework.ResolveFunctionReferenceForModule(
-		node,
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return localName, localNode, JEST_GLOBAL_MODE
+	}
+	identifier := ResolveFirstIdentifier(node.AsCallExpression().Expression)
+	if identifier == nil {
+		return localName, localNode, JEST_GLOBAL_MODE
+	}
+	return testFramework.ResolveFunctionIdentifierReferenceFromSymbol(
 		localName,
-		localNode,
-		ctx.TypeChecker,
+		identifier,
+		ctx.Refs.Resolve(identifier),
 		ctx.SourceFile,
 		importModule,
 	)
@@ -300,19 +306,7 @@ func isValidJestCall(name string, members []string) bool {
 }
 
 func UnwrapBasicTypeAssertions(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
-		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		default:
-			return node
-		}
-	}
-	return node
+	return testFramework.FollowTypeAssertionChain(node)
 }
 
 func UnwrapTypeAssertions(node *ast.Node) *ast.Node {

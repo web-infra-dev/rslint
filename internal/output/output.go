@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 const outputBufferSize = 4096 * 100

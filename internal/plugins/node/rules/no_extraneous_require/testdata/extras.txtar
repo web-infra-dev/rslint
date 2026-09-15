@@ -1,0 +1,101 @@
+Package metadata and runtime files for CommonJS resolution and options.
+-- package.json --
+{"name": "app", "dependencies": {"declared": "*"}, "devDependencies": {"dev": "*", "@types/typed": "*"}, "peerDependencies": {"peer": "*"}, "optionalDependencies": {"optional": "*"}, "workspaces": [], "private": true}
+-- local.js --
+module.exports = {};
+-- node_modules/runtime/index.js --
+module.exports = {};
+-- node_modules/runtime/sub.js --
+module.exports = {};
+-- node_modules/typed/index.js --
+module.exports = {};
+-- node_modules/@scope/runtime/index.js --
+module.exports = {};
+-- node_modules/@scope/runtime/sub.js --
+module.exports = {};
+-- node_modules/type-only/index.d.ts --
+export interface Value {}
+-- node_modules/ts-only/index.ts --
+export const value = 1;
+-- node_modules/custom/index.custom --
+
+-- node_modules/entry/package.json --
+{"main":"entry.custom"}
+-- node_modules/entry/entry.custom --
+
+-- node_modules/import-only/package.json --
+{"exports":{"import":"./index.js"}}
+-- node_modules/import-only/index.js --
+
+-- node_modules/require-only/package.json --
+{"exports":{"require":"./index.js"}}
+-- node_modules/require-only/index.js --
+
+-- node_modules/conditional/package.json --
+{"exports":{"import":"./missing.js","require":"./index.js"}}
+-- node_modules/conditional/index.js --
+
+-- node_modules/blocked/package.json --
+{"exports":{"require":"./missing.js","default":"./index.js"}}
+-- node_modules/blocked/index.js --
+
+-- extra/node_modules/external/index.js --
+
+-- bower_components/bower/index.js --
+
+-- explicit/tsconfig.json --
+{"compilerOptions":{"allowImportingTsExtensions":true}}
+-- paths/tsconfig.json --
+{"compilerOptions":{"paths":{"runtime/*":["./src/*"]}}}
+-- paths/input.ts --
+
+-- broken/package.json --
+invalid json
+-- broken/node_modules/runtime/index.js --
+
+-- workspace-range/package.json --
+{"workspaces":["packages/{1..3}"],"dependencies":{"workspace-dep":"*"}}
+-- workspace-range/packages/2/package.json --
+{"name":"child"}
+-- workspace-range/packages/2/input.js --
+
+-- workspace-range/node_modules/workspace-dep/index.js --
+
+-- workspace-caret/package.json --
+{"workspaces":["packages/[^a]*"],"dependencies":{"workspace-dep":"*"}}
+-- workspace-caret/packages/app/package.json --
+{"name":"child"}
+-- workspace-caret/packages/app/input.js --
+
+-- workspace-caret/node_modules/workspace-dep/index.js --
+
+-- workspace-positive/package.json --
+{"workspaces":{"packages":["packages/*"]},"devDependencies":{"workspace-dep":"*"}}
+-- workspace-positive/packages/app/package.json --
+{"name":"child"}
+-- workspace-positive/packages/app/input.js --
+
+-- workspace-positive/node_modules/workspace-dep/index.js --
+
+-- node_modules/42/index.js --
+
+-- node_modules/false/index.js --
+
+-- node_modules/null/index.js --
+
+-- node_modules/true/index.js --
+
+-- node_modules/undefined/index.js --
+
+-- node_modules/only-mjs/index.mjs --
+
+-- node_modules/only-cjs/index.cjs --
+
+-- node_modules/only-json/index.json --
+{}
+-- node_modules/only-node/index.node --
+
+-- node_modules/9007199254740992/index.js --
+module.exports = {};
+-- node_modules/18446744073709551616/index.js --
+module.exports = {};

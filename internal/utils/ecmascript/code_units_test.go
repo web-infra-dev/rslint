@@ -45,6 +45,13 @@ func TestStringCodeUnits(t *testing.T) {
 			if got := StringCodeUnitCount(tt.value); got != len(tt.want) {
 				t.Errorf("StringCodeUnitCount(%q) = %d, want %d", tt.value, got, len(tt.want))
 			}
+			wantRunes := make([]rune, len(tt.want))
+			for i, unit := range tt.want {
+				wantRunes[i] = rune(unit)
+			}
+			if got := StringCodeUnitRunes(tt.value); !slices.Equal(got, wantRunes) {
+				t.Errorf("StringCodeUnitRunes(%q) = %v, want %v", tt.value, got, wantRunes)
+			}
 		})
 	}
 }

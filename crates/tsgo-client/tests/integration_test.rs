@@ -158,6 +158,70 @@ fn test_tsgo_integration_simple_project() {
 }
 
 #[test]
+fn test_type_literal_symbol_has_symbol_data() {
+    let tsgo_path = get_tsgo_path().expect("Could not find tsgo executable");
+    let fixture_dir = get_fixtures_dir().join("simple-project");
+    let config_file = fixture_dir.join("tsconfig.json");
+    let options = Options {
+        cwd: Some(fixture_dir),
+        log_file: None,
+        config_file: config_file.to_string_lossy().to_string(),
+    };
+    let client = Client::builder(OsStr::new(&tsgo_path), options)
+        .build()
+        .expect("Failed to build client");
+    let api = Api::with_uninitialized_client(client).expect("Failed to initialize API");
+    let mut buffer = Vec::new();
+    let project = api
+        .load_project(&mut buffer)
+        .expect("Failed to load project");
+    let semantic = &project.semantic;
+
+    let index_sourcefile_id = project
+        .module_list
+        .iter()
+        .position(|path| path.ends_with("/src/index.ts"))
+        .expect("Expected index.ts module") as u32;
+    let parameter_symbol_id = semantic
+        .symtab
+        .iter()
+        .find(|(_, data)| {
+            data.name == b"o"
+                && data
+                    .decl
+                    .as_ref()
+                    .is_some_and(|decl| decl.sourcefile_id == index_sourcefile_id)
+        })
+        .map(|(id, _)| *id)
+        .expect("Expected symbol data for parameter o");
+    let type_id = semantic
+        .sym2type
+        .iter()
+        .find(|(symbol_id, _)| *symbol_id == parameter_symbol_id)
+        .map(|(_, type_id)| *type_id)
+        .expect("Expected type for parameter o");
+    let type_symbol_id = semantic
+        .typetab
+        .iter()
+        .find(|(id, _)| *id == type_id)
+        .and_then(|(_, data)| data.symbol)
+        .expect("Expected the type literal to have a symbol");
+    let type_symbol_data = semantic
+        .symtab
+        .iter()
+        .find(|(id, _)| *id == type_symbol_id)
+        .map(|(_, data)| data)
+        .expect("Expected type literal symbol data in symtab");
+
+    assert_eq!(type_symbol_data.name, b"__type");
+    assert!(
+        SymbolFlags::from_bits_truncate(type_symbol_data.flags).contains(SymbolFlags::TYPE_LITERAL),
+        "Expected a type literal symbol, got flags {}",
+        type_symbol_data.flags
+    );
+}
+
+#[test]
 fn test_runtime_module_exports() {
     let tsgo_path = get_tsgo_path().expect("Could not find tsgo executable");
     let fixture_dir = get_fixtures_dir().join("module-exports");
@@ -355,6 +419,105 @@ fn test_get_shorthand_assignment_value_symbol() {
 
     // Generate snapshot
     insta::assert_json_snapshot!(shorthand_mappings);
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+struct ShorthandBindingSymbolMapping {
+    local_decl_span: String,
+    local_symbol_name: String,
+    property_symbol_name: String,
+    property_decl_span: String,
+}
+
+#[test]
+fn test_get_shorthand_binding_property_symbol() {
+    let tsgo_path = get_tsgo_path().expect(
+        "Could not find tsgo executable. \
+         Please build tsgo first or ensure it's in your PATH.",
+    );
+
+    let fixture_dir = get_fixtures_dir().join("simple-project");
+    let config_file = fixture_dir.join("tsconfig.json");
+    let options = Options {
+        cwd: Some(fixture_dir.clone()),
+        log_file: None,
+        config_file: config_file.to_string_lossy().to_string(),
+    };
+    let client = Client::builder(OsStr::new(&tsgo_path), options)
+        .build()
+        .expect("Failed to build client");
+    let api = Api::with_uninitialized_client(client).expect("Failed to initialize API");
+    let mut buffer = Vec::new();
+    let project = api
+        .load_project(&mut buffer)
+        .expect("Failed to load project");
+    let semantic = &project.semantic;
+    let mut mappings = Vec::new();
+
+    for (local_symbol_id, property_symbol_id) in &semantic.shorthand_binding_symbols {
+        let Some(property_symbol_id_from_lookup) =
+            semantic.get_shorthand_binding_property_symbol(*local_symbol_id)
+        else {
+            panic!("shorthand binding property lookup should find the local symbol");
+        };
+        assert_eq!(*property_symbol_id, property_symbol_id_from_lookup);
+
+        let Some((_, property_symbol_data)) = semantic
+            .symtab
+            .iter()
+            .find(|(id, _)| id == property_symbol_id)
+        else {
+            panic!("property symbol should be present in symtab");
+        };
+        let property_symbol_name = String::from_utf8_lossy(&property_symbol_data.name).to_string();
+        if !["destructured", "defaulted"].contains(&property_symbol_name.as_str()) {
+            continue;
+        }
+
+        assert_ne!(
+            local_symbol_id, property_symbol_id,
+            "property symbol should differ from the local binding symbol"
+        );
+
+        let Some((_, local_symbol_data)) =
+            semantic.symtab.iter().find(|(id, _)| id == local_symbol_id)
+        else {
+            panic!("local binding symbol should be present in symtab");
+        };
+        let local_symbol_name = String::from_utf8_lossy(&local_symbol_data.name).to_string();
+        assert_eq!(local_symbol_name, property_symbol_name);
+
+        let property_flags = SymbolFlags::from_bits_truncate(property_symbol_data.flags);
+        assert!(
+            property_flags.contains(SymbolFlags::PROPERTY),
+            "shorthand binding target should be a property, got: {property_flags:?}"
+        );
+
+        let local_decl_span = if let Some(decl) = &local_symbol_data.decl {
+            format!("{}:{}..{}", decl.sourcefile_id, decl.start, decl.end)
+        } else {
+            "unknown".to_string()
+        };
+        let property_decl_span = if let Some(decl) = &property_symbol_data.decl {
+            format!("{}:{}..{}", decl.sourcefile_id, decl.start, decl.end)
+        } else {
+            "unknown".to_string()
+        };
+        mappings.push(ShorthandBindingSymbolMapping {
+            local_decl_span,
+            local_symbol_name,
+            property_symbol_name,
+            property_decl_span,
+        });
+    }
+
+    mappings.sort();
+    assert_eq!(
+        mappings.len(),
+        2,
+        "expected mappings for the plain and defaulted shorthand bindings"
+    );
+    insta::assert_json_snapshot!(mappings);
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]

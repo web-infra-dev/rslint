@@ -40,7 +40,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/custom-error-definition': 'off', // not implemented
     // 'unicorn/default-export-style': 'error', // not implemented
     // 'unicorn/dom-node-dataset': 'error', // not implemented
-    // 'unicorn/empty-brace-spaces': 'error', // not implemented
+    'unicorn/empty-brace-spaces': 'error',
     'unicorn/error-message': 'error',
     // 'unicorn/escape-case': 'error', // not implemented
     // 'unicorn/expiring-todo-comments': 'error', // not implemented
@@ -62,7 +62,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-array-callback-reference': 'error', // not implemented
     'unicorn/no-array-concat-in-loop': 'error',
     'unicorn/no-array-fill-with-reference-type': 'error',
-    // 'unicorn/no-array-from-fill': 'error', // not implemented
+    'unicorn/no-array-from-fill': 'error',
     'unicorn/no-array-front-mutation': 'off',
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented
     // 'unicorn/no-array-reduce': 'error', // not implemented
@@ -72,7 +72,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-array-splice': 'error', // not implemented
     // 'unicorn/no-asterisk-prefix-in-documentation-comments': 'off', // not implemented
     // 'unicorn/no-async-promise-finally': 'error', // not implemented
-    // 'unicorn/no-await-expression-member': 'error', // not implemented
+    'unicorn/no-await-expression-member': 'error',
     'unicorn/no-await-in-promise-methods': 'error',
     // 'unicorn/no-barrel-files': 'off', // not implemented
     // 'unicorn/no-blob-to-file': 'error', // not implemented
@@ -128,7 +128,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-negation-in-equality-check': 'error', // not implemented
     // 'unicorn/no-nested-ternary': 'error', // not implemented
     // 'unicorn/no-new-array': 'error', // not implemented
-    // 'unicorn/no-new-buffer': 'error', // not implemented
+    'unicorn/no-new-buffer': 'error',
     // 'unicorn/no-non-function-verb-prefix': 'error', // not implemented
     // 'unicorn/no-nonstandard-builtin-properties': 'error', // not implemented
     'unicorn/no-null': 'error',
@@ -145,7 +145,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-subtraction-comparison': 'error', // not implemented
     'unicorn/no-thenable': 'error',
     'unicorn/no-this-assignment': 'error',
-    // 'unicorn/no-this-outside-of-class': 'error', // not implemented
+    'unicorn/no-this-outside-of-class': 'error',
     // 'unicorn/no-top-level-assignment-in-function': 'error', // not implemented
     // 'unicorn/no-top-level-side-effects': 'error', // not implemented
     // 'unicorn/no-transition-all': 'error', // not implemented
@@ -166,7 +166,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unnecessary-string-trim': 'error', // not implemented
     // 'unicorn/no-unreadable-array-destructuring': 'error', // not implemented
     // 'unicorn/no-unreadable-for-of-expression': 'error', // not implemented
-    // 'unicorn/no-unreadable-iife': 'error', // not implemented
+    'unicorn/no-unreadable-iife': 'error',
     'unicorn/no-unreadable-new-expression': 'off',
     // 'unicorn/no-unreadable-object-destructuring': 'error', // not implemented
     // 'unicorn/no-unsafe-buffer-conversion': 'error', // not implemented
@@ -200,7 +200,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-undefined': 'error', // not implemented
     'unicorn/no-xor-as-exponentiation': 'error',
     // 'unicorn/no-zero-fractions': 'error', // not implemented
-    // 'unicorn/number-literal-case': 'error', // not implemented
+    'unicorn/number-literal-case': 'error',
     // 'unicorn/numeric-separators-style': 'error', // not implemented
     // 'unicorn/operator-assignment': 'error', // not implemented
     // 'unicorn/prefer-abort-signal-any': 'error', // not implemented
@@ -229,7 +229,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-classlist-toggle': 'error', // not implemented
     // 'unicorn/prefer-code-point': 'error', // not implemented
     // 'unicorn/prefer-continue': 'error', // not implemented
-    // 'unicorn/prefer-date-now': 'error', // not implemented
+    'unicorn/prefer-date-now': 'error',
     // 'unicorn/prefer-default-parameters': 'error', // not implemented
     // 'unicorn/prefer-direct-iteration': 'error', // not implemented
     // 'unicorn/prefer-dispose': 'off', // not implemented
@@ -299,7 +299,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-scoped-selector': 'error', // not implemented
     'unicorn/prefer-set-has': 'error',
     // 'unicorn/prefer-set-methods': 'error', // not implemented
-    // 'unicorn/prefer-set-size': 'error', // not implemented
+    'unicorn/prefer-set-size': 'error',
     // 'unicorn/prefer-short-arrow-method': 'off', // not implemented
     // 'unicorn/prefer-simple-condition-first': 'error', // not implemented
     // 'unicorn/prefer-simple-sort-comparator': 'error', // not implemented
@@ -318,7 +318,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-string-replace-all': 'error', // not implemented
     // 'unicorn/prefer-string-slice': 'error', // not implemented
     // 'unicorn/prefer-string-starts-ends-with': 'error', // not implemented
-    // 'unicorn/prefer-string-trim-start-end': 'error', // not implemented
+    'unicorn/prefer-string-trim-start-end': 'error',
     // 'unicorn/prefer-structured-clone': 'error', // not implemented
     // 'unicorn/prefer-switch': 'error', // not implemented
     // 'unicorn/prefer-temporal': 'off', // not implemented
@@ -344,7 +344,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/require-module-specifiers': 'error', // not implemented
     'unicorn/require-number-to-fixed-digits-argument': 'error',
     // 'unicorn/require-passive-events': 'error', // not implemented
-    // 'unicorn/require-post-message-target-origin': 'off', // not implemented
+    'unicorn/require-post-message-target-origin': 'off',
     // 'unicorn/require-proxy-trap-boolean-return': 'error', // not implemented
     // 'unicorn/single-line-block-comment-style': 'error', // not implemented
     // 'unicorn/string-content': 'off', // not implemented

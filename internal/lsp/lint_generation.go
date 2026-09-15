@@ -5,10 +5,10 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -108,12 +108,21 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		snapshot.resolvedConfig.GloballyIgnored {
 		return emptyLintGeneration(server.cwd), nil, nil
 	}
+	if snapshot.projectPolicyError != nil {
+		return linter.Generation{}, nil, snapshot.projectPolicyError
+	}
 
 	request := newStandaloneLintProjectRequest(
 		snapshot.target,
 		func() vfs.FS { return server.currentEditorOverlayFSForTarget(p.uri, snapshot.target) },
 	)
+	serviceEnabled := snapshot.projectPolicy.ServiceRootDirectory != ""
+	request.sourceReferences = serviceEnabled
 	loaders := request.loaders()
+	var selectionFS vfs.FS
+	if !serviceEnabled {
+		selectionFS = server.fs
+	}
 	release := linter.ReleaseFunc(nil)
 	releasePending := false
 	defer func() {
@@ -123,19 +132,21 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	}()
 	if p.requestPrograms != nil {
 		loaders, release = p.requestPrograms(ctx, p.uri, snapshot.target)
-		releasePending = release != nil
-	} else if server.lintPrograms != nil && server.lintPrograms.Usable() {
-		loadProgram, loadMetadata, finalize := server.lintPrograms.Request(
-			ctx,
-			p.uri,
-			snapshot.target,
-		)
-		loaders = lintProjectLoaders{
-			program:  loadProgram,
-			metadata: loadMetadata,
+	} else if server.lintPrograms.Usable() {
+		resident := server.lintPrograms.request(ctx, p.uri, snapshot.target, serviceEnabled)
+		loaders = lintProjectLoaders{program: resident.load, metadata: resident.loadMetadata}
+		release = resident.finalize
+		if serviceEnabled {
+			resident.prepareOverlay()
+			selectionFS = resident.overlayFS
 		}
-		release = finalize
-		releasePending = release != nil
+	}
+	loaders.fallback = request.fallback
+	releasePending = release != nil
+	if selectionFS == nil {
+		selectionFS = request.filesystem()
+	} else if serviceEnabled {
+		request.fs = selectionFS
 	}
 
 	program, sourceFile, hasTypeInfo, err := selectLintProgram(
@@ -144,7 +155,8 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		server.session,
 		ctx,
 		snapshot.typeScriptConfigPaths,
-		server.fs,
+		snapshot.projectPolicy,
+		selectionFS,
 		loaders,
 		server.lintSessionRoots,
 	)

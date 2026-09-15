@@ -1,7 +1,7 @@
 package prefer_optional_chain
 
 import (
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 type NodeComparisonResult int

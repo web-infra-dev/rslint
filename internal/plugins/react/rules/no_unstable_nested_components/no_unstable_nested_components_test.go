@@ -3,7 +3,7 @@ package no_unstable_nested_components
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -758,6 +758,29 @@ func TestNoUnstableNestedComponentsRule(t *testing.T) {
         function Parent() {
           const Wrap = React.forwardRef(() => <Inner />);
           return <Wrap />;
+        }
+      `, Tsx: true},
+
+		// ---- TS expression wrappers on the returned value ----
+		// TSESTree keeps `satisfies` / `as` / `!` / `<T>x` as real nodes and
+		// upstream's `isJSXValue` falls through to `default: return false` for
+		// all of them, so a function whose only `return` is TS-wrapped is not a
+		// component upstream and nothing is reported. Verified against
+		// eslint-plugin-react v7.37.5 with @typescript-eslint/parser.
+		{Code: `
+        function ParentComponent() {
+          function UnstableNestedComponent() {
+            return <div /> satisfies React.ReactNode;
+          }
+          return <UnstableNestedComponent />;
+        }
+      `, Tsx: true},
+		{Code: `
+        function ParentComponent() {
+          function UnstableNestedComponent() {
+            return React.createElement("div", null)!;
+          }
+          return <UnstableNestedComponent />;
         }
       `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
@@ -1521,38 +1544,6 @@ func TestNoUnstableNestedComponentsRule(t *testing.T) {
 		// ============================================================
 		// tsgo-specific edge cases beyond the upstream test suite
 		// ============================================================
-
-		// ---- TS wrapper: `<div/> satisfies JSX.Element` return ----
-		{
-			Code: `
-        function ParentComponent() {
-          function UnstableNestedComponent() {
-            return <div /> satisfies React.ReactNode;
-          }
-          return <UnstableNestedComponent />;
-        }
-      `,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: errorMessage, Line: 3, Column: 11},
-			},
-		},
-
-		// ---- TS wrapper: non-null `!` on createElement call ----
-		{
-			Code: `
-        function ParentComponent() {
-          function UnstableNestedComponent() {
-            return React.createElement("div", null)!;
-          }
-          return <UnstableNestedComponent />;
-        }
-      `,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: errorMessage, Line: 3, Column: 11},
-			},
-		},
 
 		// ---- ParenthesizedExpression around React.memo argument ----
 		{

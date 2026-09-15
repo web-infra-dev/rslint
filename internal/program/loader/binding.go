@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/tsoptions"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/vue/vuesfc"
@@ -78,8 +78,7 @@ func storeSourceTargetMapping(
 	if mapping == nil {
 		return
 	}
-	normalizedSource := tspath.NormalizePath(sourcePath)
-	mapping[normalizedSource] = target
+	mapping[exactPathID(sourcePath)] = target
 	if canonicalSourcePath != "" {
 		mapping[exactPathID(canonicalSourcePath)] = target
 	}
