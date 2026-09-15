@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 type RstestTestCallbacks struct {
@@ -114,6 +115,21 @@ func collectRstestCallbackOwnership(
 		},
 	)
 	return ownership
+}
+
+func nearestRstestOwnedCallback(
+	node *ast.Node,
+	ownership map[*ast.Node][]rstestCallbackRegistration,
+) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	for current := node.Parent; current != nil; current = current.Parent {
+		if testFramework.IsFunction(current) && ownership[current] != nil {
+			return current
+		}
+	}
+	return nil
 }
 
 // isModuleTopLevelFunction reports whether function is declared directly at

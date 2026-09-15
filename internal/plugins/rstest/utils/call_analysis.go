@@ -27,6 +27,8 @@ type RstestCallAnalysis struct {
 	callbackInfos map[*ast.Node]rstestCallbackInfo
 	callbacks     RstestTestCallbacks
 	callbacksOK   bool
+	ownership     map[*ast.Node][]rstestCallbackRegistration
+	ownershipOK   bool
 	hasTests      bool
 }
 
@@ -187,6 +189,14 @@ func (analysis *RstestCallAnalysis) callbacksRef() *RstestTestCallbacks {
 		analysis.callbacksOK = true
 	}
 	return &analysis.callbacks
+}
+
+func (analysis *RstestCallAnalysis) callbackOwnership() map[*ast.Node][]rstestCallbackRegistration {
+	if !analysis.ownershipOK {
+		analysis.ownership = collectRstestCallbackOwnership(analysis)
+		analysis.ownershipOK = true
+	}
+	return analysis.ownership
 }
 
 // isFnCallCandidate reports whether syntax and local aliases permit any Rstest
@@ -364,7 +374,7 @@ func (analysis *RstestCallAnalysis) collectVariableCandidates(
 		return
 	}
 	name := declaration.Name()
-	initializer := ast.SkipParentheses(declaration.Initializer)
+	initializer := internalUtils.SkipAssertionsAndParens(declaration.Initializer)
 	if name.Kind == ast.KindObjectBindingPattern &&
 		(isRstestRequireCall(initializer) || isImportMetaRstest(initializer)) {
 		pattern := name.AsBindingPattern()

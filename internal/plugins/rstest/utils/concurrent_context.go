@@ -3,7 +3,6 @@ package utils
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
 type rstestConcurrentContextFileCacheKey struct{}
@@ -54,7 +53,7 @@ func (context *RstestConcurrentContext) IsInConcurrentTest(node *ast.Node) bool 
 
 func (context *RstestConcurrentContext) ownershipIndex() map[*ast.Node][]rstestCallbackRegistration {
 	if context.ownership == nil {
-		context.ownership = collectRstestCallbackOwnership(context.analysis)
+		context.ownership = context.analysis.callbackOwnership()
 	}
 	return context.ownership
 }
@@ -68,13 +67,7 @@ func (context *RstestConcurrentContext) nearestOwnedCallback(node *ast.Node) *as
 	if node == nil {
 		return nil
 	}
-	ownership := context.ownershipIndex()
-	for current := node.Parent; current != nil; current = current.Parent {
-		if testFramework.IsFunction(current) && ownership[current] != nil {
-			return current
-		}
-	}
-	return nil
+	return nearestRstestOwnedCallback(node, context.ownershipIndex())
 }
 
 // callbackRunsConcurrently reports whether function runs concurrently, and
