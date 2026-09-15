@@ -47,6 +47,26 @@ type parsedResult struct {
 	err                  error
 }
 
+// SourceOnlyCompilerOptions are the options a checker-free root Program is
+// built with. They ask for syntax and binding and nothing else: the newest
+// language level so no construct is rejected for the target, JavaScript
+// allowed alongside TypeScript, JSX preserved, and neither the default library
+// nor an import closure materialized.
+//
+// A caller that needs types builds a tsconfig-backed Program instead; these
+// options describe the contract [NewFromRoots] honours, which is why they live
+// beside it rather than in the loader that reaches for them most.
+func SourceOnlyCompilerOptions() *core.CompilerOptions {
+	return &core.CompilerOptions{
+		Target:    core.ScriptTargetESNext,
+		Module:    core.ModuleKindESNext,
+		Jsx:       core.JsxEmitPreserve,
+		AllowJs:   core.TSTrue,
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
+	}
+}
+
 // NewFromRoots parses, resolves direct imports for, and binds one immutable
 // source universe. The returned Program owns its source-file slice
 // and AST generation; callers must build a new Program after source changes.

@@ -17,6 +17,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/vue/vuesfc"
 	"gotest.tools/v3/assert"
 )
 
@@ -219,19 +220,43 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
 		fs := utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, fileName): code})
-		host := utils.CreateCompilerHost(root.Dir, fs)
+		// Wrap the host the way every production entry point does. The parse
+		// cache is also where a file whose bytes are not its parse input is
+		// resolved (utils.sourceForParse), so a .vue test case reads the same
+		// projection a real run does.
+		host := utils.WithParseCache(utils.CreateCompilerHost(root.Dir, fs), utils.NewParseCache())
 
 		tsconfigPath := tsconfigPath
 		if tsconfigPathOverride != "" {
 			tsconfigPath = tsconfigPathOverride
 		}
 
-		program, err := utils.CreateProgram(true, fs, root.Dir, tsconfigPath, host)
-		assert.NilError(t, err, "couldn't create program. code: "+code)
+		// A Vue single file component is never admitted by a tsconfig, so it
+		// is linted the way the CLI lints one: by a checker-free root
+		// program. A test case naming a .vue file therefore exercises the
+		// same construction path a user's component takes, and type-aware
+		// rules are filtered out of it just as they are in a real run.
+		var sourceProgram *lintprogram.Program
+		if vuesfc.IsFile(fileName) {
+			resolved := tspath.ResolvePath(root.Dir, fileName)
+			rootProgram, rootErr := lintprogram.NewFromRoots(lintprogram.RootOptions{
+				RootFileNames:   []string{resolved},
+				Host:            host,
+				CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
+				SingleThreaded:  true,
+			})
+			assert.NilError(t, rootErr, "couldn't create root program. code: "+code)
+			sourceProgram = rootProgram
+		} else {
+			program, programErr := utils.CreateProgram(true, fs, root.Dir, tsconfigPath, host)
+			assert.NilError(t, programErr, "couldn't create program. code: "+code)
+			sourceProgram = lintprogram.NewFromCompiler(program)
+		}
 
-		sourceFile := program.GetSourceFile(fileName)
+		sourceFile := sourceProgram.GetSourceFile(fileName)
+		assert.Assert(t, sourceFile != nil, "program does not contain "+fileName)
 		allowedFiles := []string{sourceFile.FileName()}
-		programs := []*lintprogram.Program{lintprogram.NewFromCompiler(program)}
+		programs := []*lintprogram.Program{sourceProgram}
 		lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
 			Programs:         programs,
 			TargetsByProgram: [][]string{allowedFiles},

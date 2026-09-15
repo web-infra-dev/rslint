@@ -551,7 +551,7 @@ func createCompatibilityProgramForTest(
 	program, err := context.createCompatibilityProgram(
 		singleThreaded,
 		currentDirectory,
-		sourceOnlyCompilerOptions(),
+		lintprogram.SourceOnlyCompilerOptions(),
 		rootFileNames,
 	)
 	if err != nil {

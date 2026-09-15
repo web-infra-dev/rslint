@@ -27,17 +27,6 @@ type LoadResult struct {
 	LintTargetBySourcePath map[string]target.File
 }
 
-func sourceOnlyCompilerOptions() *core.CompilerOptions {
-	return &core.CompilerOptions{
-		Target:    core.ScriptTargetESNext,
-		Module:    core.ModuleKindESNext,
-		Jsx:       core.JsxEmitPreserve,
-		AllowJs:   core.TSTrue,
-		NoLib:     core.TSTrue,
-		NoResolve: core.TSTrue,
-	}
-}
-
 func authoritativePath(filePath string, fsys vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
 	if fsys != nil {
@@ -439,7 +428,7 @@ func (s *Session) appendCompatibilityPrograms(
 		compilerProgram, err := s.context.createCompatibilityProgram(
 			singleThreaded,
 			currentDirectory,
-			sourceOnlyCompilerOptions(),
+			lintprogram.SourceOnlyCompilerOptions(),
 			rootFileNames,
 		)
 		if err != nil {
@@ -498,7 +487,7 @@ func (s *Session) LoadAPI(
 }
 
 func allRootsSupportedByParser(targets []target.File, useCaseSensitive bool) bool {
-	options := sourceOnlyCompilerOptions()
+	options := lintprogram.SourceOnlyCompilerOptions()
 	supportedExtensions := tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule(options, tspath.AllSupportedExtensions)
 	for _, target := range targets {
 		if !tspath.HasExtension(target.Path) {
@@ -545,7 +534,7 @@ func (s *Session) appendRootPrograms(
 		rootProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
 			RootFileNames:   rootFileNames,
 			Host:            s.context.newTransientCompilerHost(currentDirectory),
-			CompilerOptions: sourceOnlyCompilerOptions(),
+			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
 			SingleThreaded:  singleThreaded,
 		})
 		if err != nil {
