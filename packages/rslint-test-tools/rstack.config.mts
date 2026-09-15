@@ -668,6 +668,7 @@ define.test({
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',
 
     // eslint-plugin-vue
+    './tests/eslint-plugin-vue/rules/no-duplicate-attributes.test.ts',
     './tests/eslint-plugin-vue/rules/no-export-in-script-setup.test.ts',
 
     // eslint-plugin-unicorn
