@@ -415,7 +415,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			Target: linter.TargetProjection{
 				Path: targetPathForSourcePath,
 				ReadText: func(path string, source ast.SourceFileLike) (string, error) {
-					return utils.RestoreSourceBOM(generationFS, path, source.Text()), nil
+					text, err := utils.TargetSourceText(generationFS, path, source)
+					if err != nil {
+						return "", err
+					}
+					return utils.RestoreSourceBOM(generationFS, path, text), nil
 				},
 			},
 			Plugin: plugin,

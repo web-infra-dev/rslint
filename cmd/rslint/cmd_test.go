@@ -2353,3 +2353,94 @@ func TestParseLintFlagsTiming(t *testing.T) {
 		}
 	}
 }
+
+// TestHandleLintCommandFixesVueComponentWithoutTouchingTemplate is the
+// regression test for the one way .vue support could destroy a user's work.
+//
+// A component is parsed as a projection of its <script> blocks with every
+// other byte blanked. If an autofix were spliced into that projection and
+// written back, the template and the style would be replaced by spaces. The
+// fix pipeline must instead splice into the component's own text, which is
+// exact because the projection preserves every offset.
+//
+// The template here is deliberately not valid JavaScript, so a projection
+// leaking into the parser would surface as syntax diagnostics rather than as
+// the one expected rule diagnostic.
+func TestHandleLintCommandFixesVueComponentWithoutTouchingTemplate(t *testing.T) {
+	const component = `<template>
+  <div v-if="a < b && c > d">{{ msg }}</div>
+  <p>definitely not JavaScript: </div> <<< &amp; */</p>
+</template>
+
+<script>
+var value = 1;
+export default { data() { return { msg: 'hi' } } };
+</script>
+
+<style scoped>
+.a { color: red }
+</style>
+`
+
+	dir := t.TempDir()
+	componentPath := tspath.NormalizePath(filepath.Join(dir, "App.vue"))
+	if err := os.WriteFile(componentPath, []byte(component), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDir := tspath.NormalizePath(dir)
+
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: &discovery.ConfigCatalog{
+			Configs: map[string]rslintconfig.RslintConfig{configDir: {
+				{
+					Files: []string{"**/*.vue"},
+					Rules: rslintconfig.Rules{"no-var": "error"},
+				},
+			}},
+			Explicit: true,
+		},
+		AllowFiles:     []string{componentPath},
+		Fix:            true,
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+
+	fixedBytes, err := os.ReadFile(componentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed := string(fixedBytes)
+
+	if strings.Contains(stderr, "error:") {
+		t.Fatalf("lint reported a fatal error: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// The script was fixed.
+	if !strings.Contains(fixed, "let value = 1;") {
+		t.Errorf("no-var was not applied to the script block; file is:\n%s", fixed)
+	}
+	if strings.Contains(fixed, "var value = 1;") {
+		t.Errorf("the `var` survived; file is:\n%s", fixed)
+	}
+
+	// Everything outside the script block is byte-identical.
+	for _, fragment := range []string{
+		`<template>`,
+		`  <div v-if="a < b && c > d">{{ msg }}</div>`,
+		`  <p>definitely not JavaScript: </div> <<< &amp; */</p>`,
+		`</template>`,
+		`<style scoped>`,
+		`.a { color: red }`,
+		`</style>`,
+	} {
+		if !strings.Contains(fixed, fragment) {
+			t.Errorf("fix destroyed %q; file is:\n%s", fragment, fixed)
+		}
+	}
+
+	// The fix changed exactly the three bytes of the keyword and nothing else.
+	if want := strings.Replace(component, "var value = 1;", "let value = 1;", 1); fixed != want {
+		t.Errorf("fixed component differs beyond the keyword.\n got:\n%s\nwant:\n%s", fixed, want)
+	}
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/vue/vuesfc"
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
@@ -503,7 +504,16 @@ func allRootsSupportedByParser(targets []target.File, useCaseSensitive bool) boo
 		if !tspath.HasExtension(target.Path) {
 			return false
 		}
+		// A Vue Single File Component is admitted by the root parser even
+		// though TypeScript knows no such extension: the caching compiler
+		// host hands the parser the component's projected <script> text (see
+		// utils.sourceForParse). It is deliberately not added to the
+		// extensions a tsconfig can admit, so a component never joins a
+		// project program and is always linted without a checker.
 		fileName := tspath.GetCanonicalFileName(target.Path, useCaseSensitive)
+		if vuesfc.IsFile(fileName) {
+			continue
+		}
 		supported := false
 		for _, extensions := range supportedExtensions {
 			if tspath.FileExtensionIsOneOf(fileName, extensions) {

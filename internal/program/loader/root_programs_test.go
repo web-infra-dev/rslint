@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -275,7 +276,11 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 		caseSensitive bool
 		supported     bool
 	}{
-		{name: "custom extension", fileName: "target.vue", caseSensitive: true},
+		// A .vue root is admitted by the direct path and unknown to the
+		// compatibility one, so the two deliberately disagree about it now;
+		// see TestLoadCLIAdmitsVueComponentWithoutChecker. This case needs an
+		// extension neither path knows.
+		{name: "custom extension", fileName: "target.svelte", caseSensitive: true},
 		{name: "extensionless", fileName: "target", caseSensitive: true},
 		{name: "upper-case extension on case-sensitive FS", fileName: "target.TS", caseSensitive: true},
 		{name: "upper-case extension on case-insensitive FS", fileName: "target.TS", caseSensitive: false, supported: true},
@@ -713,4 +718,61 @@ func configuredRuleNameSet(rules []rule.ConfiguredRule) map[string]struct{} {
 		result[configured.Name] = struct{}{}
 	}
 	return result
+}
+
+// TestLoadCLIAdmitsVueComponentWithoutChecker locks in how a Vue Single File
+// Component reaches the linter: through root construction, never through a
+// tsconfig program, and therefore always without a type checker.
+//
+// The routing is what makes that true rather than a policy check anywhere. A
+// component fails the extension test a tsconfig admits files by, so target
+// binding leaves it unbound, and the root parser then accepts it because
+// allRootsSupportedByParser makes an exception for it.
+func TestLoadCLIAdmitsVueComponentWithoutChecker(t *testing.T) {
+	const configDir = "/repo"
+	targetPath := tspath.ResolvePath(configDir, "App.vue")
+
+	fsys := newBindingIndexTestFS([]string{targetPath}, nil)
+	fsys.caseSensitive = true
+	fsys.files[targetPath] = "<template>\n  <div>{{ value }}</div>\n</template>\n\n<script>\nconst value = 1;\n</script>\n"
+
+	plan := target.Plan{Files: []target.File{{
+		PathIdentity:    rslintconfig.PathIdentity{Path: targetPath, CanonicalPath: targetPath},
+		ConfigDirectory: configDir,
+	}}}
+
+	binding, err := sessionForTest(newBuildContext(fsys)).
+		LoadCLI(ProjectSet{}, plan, configDir, true)
+	if err != nil {
+		t.Fatalf("LoadCLI: %v", err)
+	}
+
+	if len(binding.compilerPrograms) != 0 || len(binding.Programs) != 1 {
+		t.Fatalf("component did not use root construction: compiler programs=%d Programs=%d",
+			len(binding.compilerPrograms), len(binding.Programs))
+	}
+
+	sourceProgram := binding.Programs[0]
+	sourceFile := sourceProgram.GetSourceFile(targetPath)
+	if sourceFile == nil {
+		t.Fatalf("program does not contain %q", targetPath)
+	}
+
+	if sourceProgram.CanProvideTypeChecker(sourceFile) {
+		t.Error("a component must be linted without a checker, so type-aware rules are filtered out")
+	}
+
+	// The parsed text is the projection: the script survives at its own
+	// offsets and nothing outside it can reach a rule.
+	text := sourceFile.Text()
+	if len(text) != len(fsys.files[targetPath]) {
+		t.Fatalf("parsed text length = %d, want the component's %d", len(text), len(fsys.files[targetPath]))
+	}
+	scriptOffset := strings.Index(fsys.files[targetPath], "const value = 1;")
+	if got := strings.Index(text, "const value = 1;"); got != scriptOffset {
+		t.Errorf("script at offset %d in the parsed text, want %d", got, scriptOffset)
+	}
+	if strings.Contains(text, "<template>") || strings.Contains(text, "{{ value }}") {
+		t.Errorf("template text reached the parser: %q", text)
+	}
 }

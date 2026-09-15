@@ -8,7 +8,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -116,10 +115,10 @@ func (c *ParseCache) acquire(opts ast.SourceFileParseOptions, text string) *ast.
 // on miss. snapshot.hash must be the hash of snapshot.text; keeping them in one
 // immutable value prevents callers from accidentally tearing the pair.
 func (c *ParseCache) acquireSnapshot(opts ast.SourceFileParseOptions, snapshot sourceSnapshot) *ast.SourceFile {
-	// I6: derive ScriptKind exactly like the default host
+	// I6: resolve the parse input exactly like the default host
 	// (typescript-go/internal/compiler/host.go) so the key always matches
 	// what the parse below actually uses.
-	scriptKind := core.GetScriptKindFromFileName(opts.FileName)
+	parseText, scriptKind := sourceForParse(opts, snapshot.text)
 	key := project.NewParseCacheKey(opts, snapshot.hash, scriptKind)
 	if value, ok := c.m.Load(key); ok {
 		if sourceFile, ok := value.(*ast.SourceFile); ok {
@@ -127,7 +126,7 @@ func (c *ParseCache) acquireSnapshot(opts ast.SourceFileParseOptions, snapshot s
 		}
 	}
 	return c.acquireParseMiss(key, func() *ast.SourceFile {
-		return parser.ParseSourceFile(opts, snapshot.text, scriptKind) // I2/I3: same text, Hash left zero
+		return parser.ParseSourceFile(opts, parseText, scriptKind) // I2/I3: same text, Hash left zero
 	})
 }
 
@@ -326,7 +325,7 @@ func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *as
 		if h.cacheAST {
 			return h.cache.acquireSnapshot(opts, snapshot)
 		}
-		return parser.ParseSourceFile(opts, snapshot.text, core.GetScriptKindFromFileName(opts.FileName))
+		return parser.ParseSourceFile(sourceForParseArgs(opts, snapshot.text))
 	}
 
 	text, ok := h.FS().ReadFile(opts.FileName)
@@ -336,7 +335,7 @@ func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *as
 	if h.cacheAST {
 		return h.cache.acquire(opts, text)
 	}
-	return parser.ParseSourceFile(opts, text, core.GetScriptKindFromFileName(opts.FileName))
+	return parser.ParseSourceFile(sourceForParseArgs(opts, text))
 }
 
 func (h *cachingCompilerHost) acquireSourceSnapshot(

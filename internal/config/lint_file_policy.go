@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/vue/vuesfc"
 )
 
 // DefaultLintFileExtensions are the file extensions rslint discovers when a
@@ -13,17 +14,35 @@ import (
 // .js/.mjs/.cjs set with JSX and TypeScript-family files.
 var DefaultLintFileExtensions = []string{".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"}
 
-var defaultLintFileExtensionSet = func() map[string]struct{} {
-	m := make(map[string]struct{}, len(DefaultLintFileExtensions))
-	for _, ext := range DefaultLintFileExtensions {
-		m[ext] = struct{}{}
+// OptInLintFileExtensions are extensions rslint can parse but never discovers
+// on its own: a config reaches them only by naming them in `files`.
+//
+// A Vue Single File Component is here rather than in the discovery baseline
+// because adding it there would change what every existing project lints. A
+// repository holding .vue files would suddenly report every core and
+// typescript-eslint diagnostic in their <script> blocks on the run after an
+// upgrade, without anyone asking for it. Enabling them is a decision, so it
+// takes writing `files: ['**/*.vue']` or extending a config that does.
+var OptInLintFileExtensions = []string{vuesfc.Extension}
+
+var defaultLintFileExtensionSet = newExtensionSet(DefaultLintFileExtensions)
+
+var supportedLintFileExtensionSet = newExtensionSet(
+	append(append([]string(nil), DefaultLintFileExtensions...), OptInLintFileExtensions...),
+)
+
+func newExtensionSet(extensions []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(extensions))
+	for _, extension := range extensions {
+		set[extension] = struct{}{}
 	}
-	return m
-}()
+	return set
+}
 
 // IsSupportedLintFile reports whether rslint can parse and lint this path.
+// Being supported does not make a file discovered: see isDefaultLintFile.
 func IsSupportedLintFile(filePath string) bool {
-	_, ok := defaultLintFileExtensionSet[strings.ToLower(path.Ext(filePath))]
+	_, ok := supportedLintFileExtensionSet[strings.ToLower(path.Ext(filePath))]
 	return ok
 }
 

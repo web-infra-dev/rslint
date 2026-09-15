@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // rulesSkippedInEditors names rules whose evidence exists only in encoded file
@@ -188,8 +189,8 @@ func newLintGeneration(
 		servedRules = rule.FilterNonTypeAwareRules(servedRules)
 	}
 	if readText == nil {
-		readText = func(_ string, source ast.SourceFileLike) (string, error) {
-			return source.Text(), nil
+		readText = func(path string, source ast.SourceFileLike) (string, error) {
+			return utils.TargetSourceText(sourceProgram.FS(), path, source)
 		}
 	}
 	var plugin *linter.PluginGeneration
