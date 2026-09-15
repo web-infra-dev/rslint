@@ -30,7 +30,7 @@ const SOURCE_TYPE_PACKAGES: SourceTypePackage[] = [
     specifier: '@rstest/core',
     packageUrl: 'https://esm.sh/@rstest/core',
     monacoPath: 'file:///node_modules/@rstest/core/index.d.ts',
-    lintPath: '/rstest-core.d.ts',
+    lintPath: '/node_modules/.rslint-playground-source-types/rstest-core.d.ts',
     importPattern: /\bfrom\s*(['"])@rstest\/core\1/,
   },
 ];

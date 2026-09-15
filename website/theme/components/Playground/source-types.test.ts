@@ -1,4 +1,8 @@
 import { describe, expect, test } from 'rstack/test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
+import ts from 'typescript';
 import {
   addSourceTypeResolutions,
   cancelUnusedSourceTypeLoads,
@@ -34,7 +38,8 @@ describe('Playground source dependency types', () => {
           specifier: '@rstest/core',
           content: 'export declare const test: unknown;',
           monacoPath: 'file:///node_modules/@rstest/core/index.d.ts',
-          lintPath: '/rstest-core.d.ts',
+          lintPath:
+            '/node_modules/.rslint-playground-source-types/rstest-core.d.ts',
         },
       ],
     };
@@ -50,7 +55,9 @@ describe('Playground source dependency types', () => {
         strict: true,
         paths: {
           existing: ['./existing.d.ts'],
-          '@rstest/core': ['/rstest-core.d.ts'],
+          '@rstest/core': [
+            '/node_modules/.rslint-playground-source-types/rstest-core.d.ts',
+          ],
         },
       },
     });
@@ -60,6 +67,41 @@ describe('Playground source dependency types', () => {
         paths: { existing: ['./existing.d.ts'] },
       },
     });
+  });
+
+  test('keeps stale lint declarations out of default tsconfig roots', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rslint-source-types-'));
+    try {
+      writeFileSync(join(root, 'index.ts'), 'export {};');
+      writeFileSync(join(root, 'rstest-core.d.ts'), 'export {};');
+      const sourceTypeDirectory = join(
+        root,
+        'node_modules',
+        '.rslint-playground-source-types',
+      );
+      mkdirSync(sourceTypeDirectory, { recursive: true });
+      writeFileSync(
+        join(sourceTypeDirectory, 'rstest-core.d.ts'),
+        'export {};',
+      );
+
+      const parsed = ts.parseJsonConfigFileContent(
+        { compilerOptions: { strict: true } },
+        ts.sys,
+        root,
+      );
+      const fileNames = parsed.fileNames
+        .map((fileName) => relative(root, fileName).split('\\').join('/'))
+        .sort();
+
+      expect(fileNames).toContain('index.ts');
+      expect(fileNames).toContain('rstest-core.d.ts');
+      expect(fileNames).not.toContain(
+        'node_modules/.rslint-playground-source-types/rstest-core.d.ts',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test('cancels a declaration request that is no longer needed', async () => {
@@ -131,21 +173,31 @@ describe('Playground source dependency types', () => {
       const declarationsByPath = Object.fromEntries(
         first.declarations.map(({ content, lintPath }) => [lintPath, content]),
       );
-      expect(declarationsByPath['/rstest-core.d.ts']).toContain(
-        `from './rstest-chai.d.ts'`,
-      );
-      expect(declarationsByPath['/rstest-core.d.ts']).toContain(
-        `from 'https://esm.sh/@rsbuild/core@2.2.5/dist/index.d.ts'`,
-      );
-      expect(declarationsByPath['/rstest-core.d.ts']).toContain(
-        `from 'node:stream'`,
-      );
-      expect(declarationsByPath['/rstest-chai.d.ts']).toContain(
-        `require("./rstest-deep-eql.d.ts")`,
-      );
-      expect(declarationsByPath['/rstest-chai.d.ts']).toContain(
-        `from "./rstest-assertion-error.d.ts"`,
-      );
+      expect(
+        declarationsByPath[
+          '/node_modules/.rslint-playground-source-types/rstest-core.d.ts'
+        ],
+      ).toContain(`from './rstest-chai.d.ts'`);
+      expect(
+        declarationsByPath[
+          '/node_modules/.rslint-playground-source-types/rstest-core.d.ts'
+        ],
+      ).toContain(`from 'https://esm.sh/@rsbuild/core@2.2.5/dist/index.d.ts'`);
+      expect(
+        declarationsByPath[
+          '/node_modules/.rslint-playground-source-types/rstest-core.d.ts'
+        ],
+      ).toContain(`from 'node:stream'`);
+      expect(
+        declarationsByPath[
+          '/node_modules/.rslint-playground-source-types/rstest-chai.d.ts'
+        ],
+      ).toContain(`require("./rstest-deep-eql.d.ts")`);
+      expect(
+        declarationsByPath[
+          '/node_modules/.rslint-playground-source-types/rstest-chai.d.ts'
+        ],
+      ).toContain(`from "./rstest-assertion-error.d.ts"`);
 
       expect(requests.sort()).toEqual(
         [
