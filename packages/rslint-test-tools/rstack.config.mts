@@ -171,6 +171,7 @@ define.test({
     './tests/eslint-plugin-node/rules/callback-return.test.ts',
     './tests/eslint-plugin-node/rules/global-require.test.ts',
     './tests/eslint-plugin-node/rules/hashbang.test.ts',
+    './tests/eslint-plugin-node/rules/no-callback-literal.test.ts',
     './tests/eslint-plugin-node/rules/no-exports-assign.test.ts',
     './tests/eslint-plugin-node/rules/no-extraneous-import.test.ts',
     './tests/eslint-plugin-node/rules/no-extraneous-require.test.ts',
