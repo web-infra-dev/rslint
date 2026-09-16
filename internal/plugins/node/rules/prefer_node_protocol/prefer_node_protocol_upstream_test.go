@@ -14,13 +14,17 @@ func runProtocolTests(t *testing.T, valid []rule_tester.ValidTestCase, invalid [
 		if valid[i].FileName == "" {
 			valid[i].FileName = "input.js"
 		}
-		valid[i].LanguageOptions.SourceType = "module"
+		if valid[i].LanguageOptions.SourceType == "" {
+			valid[i].LanguageOptions.SourceType = "module"
+		}
 	}
 	for i := range invalid {
 		if invalid[i].FileName == "" {
 			invalid[i].FileName = "input.js"
 		}
-		invalid[i].LanguageOptions.SourceType = "module"
+		if invalid[i].LanguageOptions.SourceType == "" {
+			invalid[i].LanguageOptions.SourceType = "module"
+		}
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.allowJs.json", t, &prefer_node_protocol.PreferNodeProtocolRule, valid, invalid)
 }

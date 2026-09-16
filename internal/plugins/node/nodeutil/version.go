@@ -1,7 +1,9 @@
 package nodeutil
 
 import (
+	"math"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/semver"
@@ -11,7 +13,10 @@ import (
 
 // NodeVersion contains normalized comparator alternatives from tsgo's semver parser.
 // Node rules use it to decide whether every supported runtime provides an API.
-type NodeVersion struct{ alternatives [][]versionComparator }
+type NodeVersion struct {
+	alternatives [][]versionComparator
+	uncertain    bool
+}
 type versionComparator struct {
 	operator   string
 	version    semver.Version
@@ -43,6 +48,7 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 	text = strings.ReplaceAll(text, "~>", "~")
 	// npm treats an empty union arm as *, while tsgo drops it.
 	arms := strings.Split(text, "||")
+	uncertain := false
 	for i, arm := range arms {
 		if ecmascript.StringTrim(arm) == "" {
 			arms[i] = "*"
@@ -50,7 +56,8 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 		}
 		tokens := strings.Fields(arm)
 		hyphenRange := len(tokens) == 3 && tokens[1] == "-"
-		for _, token := range tokens {
+		armChanged := false
+		for j, token := range tokens {
 			if token == "-" {
 				continue
 			}
@@ -65,13 +72,46 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 			if hasPrerelease && !versionPrerelease.MatchString(prerelease) {
 				return NodeVersion{}, false
 			}
+			// Keep valid extreme ranges in their configuration precedence slot.
+			// Also guard MaxUint32 itself: range expansion can increment it.
+			// Substitute only for grammar validation, never for comparisons.
+			if len(base) < 10 {
+				continue
+			}
+			parts := strings.Split(base, ".")
+			changed := false
+			for k, part := range parts {
+				if len(part) < 10 || part[0] == '0' {
+					continue
+				}
+				value, err := strconv.ParseUint(part, 10, 64)
+				if err == nil && value >= math.MaxUint32 {
+					if value > 1<<53-1 {
+						return NodeVersion{}, false
+					}
+					parts[k] = "1"
+					changed = true
+					uncertain = true
+				}
+			}
+			if changed {
+				prefix := len(token) - len(strings.TrimLeft(token, "<>=~^"))
+				tokens[j] = token[:prefix] + strings.Join(parts, ".") + token[prefix+len(base):]
+				armChanged = true
+			}
+		}
+		if armChanged {
+			arms[i] = strings.Join(tokens, " ")
 		}
 	}
-	// Keep range expansion in the compiler; only npm's stricter wildcard order
-	// and its broader prerelease identifier grammar need adaptation here.
+	// Keep range expansion and grammar validation in the compiler, including
+	// validation of ranges whose numeric bounds cannot be compared safely.
 	parsed, ok := semver.TryParseVersionRange(strings.Join(arms, "||"))
 	if !ok {
 		return NodeVersion{}, false
+	}
+	if uncertain {
+		return NodeVersion{uncertain: true}, true
 	}
 	var result NodeVersion
 	var emptyAlternative []versionComparator
@@ -165,6 +205,9 @@ func ConfiguredNodeVersion(ctx rule.RuleContext, options map[string]any) NodeVer
 // Supports reports whether the configured range has no intersection with
 // versions below since, matching the replacement selection in eslint-plugin-n.
 func (version NodeVersion) Supports(since string) bool {
+	if version.uncertain {
+		return false
+	}
 	boundary := semver.MustParse(since)
 	for _, alternative := range version.alternatives {
 		constraints := append(append([]versionComparator{}, alternative...), versionComparator{operator: "<", version: boundary})
@@ -191,21 +234,19 @@ func (version NodeVersion) Supports(since string) bool {
 // range. Unlike Supports, it handles gaps between releases that gained a
 // feature, and excludes prereleases absent from the supported range.
 func (version NodeVersion) IsSubsetOf(supported string) bool {
-	domain, ok := parseNodeVersion(supported)
-	if !ok {
+	if version.uncertain {
 		return false
 	}
-	sawNonempty := false
+	domain, ok := parseNodeVersion(supported)
+	if !ok || domain.uncertain {
+		return false
+	}
 	for _, sub := range version.alternatives {
 		lower, upper, empty := versionBounds(sub)
 		if empty {
-			// Preserve npm subset()'s ordered handling of contradictory arms.
-			if sawNonempty {
-				return false
-			}
+			// An empty arm contributes no versions, regardless of union order.
 			continue
 		}
-		sawNonempty = true
 		contained := false
 		for _, dom := range domain.alternatives {
 			domLower, domUpper, domEmpty := versionBounds(dom)

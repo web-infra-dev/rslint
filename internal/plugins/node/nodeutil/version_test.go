@@ -107,6 +107,10 @@ func TestConfiguredNodeVersion(t *testing.T) {
 		options, settings        map[string]any
 	}{
 		{name: "fallback", metadata: `{}`, expected: ">=16.0.0"},
+		{name: "extreme option keeps precedence", metadata: `{"engines":{"node":"^20"}}`, options: map[string]any{"version": "<=4294967296"}, settings: map[string]any{"node": map[string]any{"version": "^20"}}, expected: "<=4294967296"},
+		{name: "extreme setting keeps precedence", metadata: `{"engines":{"node":"^20"}}`, settings: map[string]any{"node": map[string]any{"version": "~12.4294967295.0"}}, expected: "~12.4294967295.0"},
+		{name: "extreme engine keeps precedence", metadata: `{"engines":{"node":"<=4294967296"},"devEngines":{"runtime":{"name":"node","version":"^20"}}}`, expected: "<=4294967296"},
+		{name: "extreme dev engine keeps precedence", metadata: `{"devEngines":{"runtime":{"name":"node","version":"^0.0.4294967295"}}}`, expected: "^0.0.4294967295"},
 		{name: "engines", metadata: `{"engines":{"node":"^12.20.0"}}`, expected: "^12.20.0"},
 		{name: "empty engine range", metadata: `{"engines":{"node":""}}`, expected: "*"},
 		{name: "dev engine", metadata: `{"devEngines":{"runtime":{"name":"node","version":"^14.18.0"}}}`, expected: "^14.18.0"},
@@ -153,8 +157,13 @@ func TestNodeVersionSubsetRanges(t *testing.T) {
 		text     string
 		esm, cjs bool
 	}{
-		{">=16 || >20 <16", false, false},
+		// Empty alternatives must not make union order change the answer.
+		// npm subset() incorrectly rejects the first ordering.
+		{">=16 || >20 <16", true, true},
 		{">20 <16 || >=16", true, true},
+		{">20 <16 || >=16 || >20 <16", true, true},
+		{">=10 || >20 <16", false, false},
+		{">20 <16 || >=10", false, false},
 		{"16.0.0 >=16.0.0-rc.1", true, true},
 		{"", false, false},
 		{"*", false, false},
@@ -236,9 +245,31 @@ func TestNodeVersionSubsetRanges(t *testing.T) {
 }
 
 func TestInvalidNodeVersionRanges(t *testing.T) {
-	for _, text := range []string{"invalid", ">=", "16 | 20", "16, 20", "<=4294967296", "\u008510", "10 - 12\u0085"} {
+	for _, text := range []string{"invalid", ">=", "16 | 20", "16, 20", "\u008510", "10 - 12\u0085", "<=04294967296", "<=4294967296.invalid", ">=4294967296 || invalid", ">>4294967296", "<=9007199254740992"} {
 		if _, ok := parseNodeVersion(text); ok {
 			t.Errorf("accepted invalid range %q", text)
+		}
+	}
+}
+
+func TestExtremeNodeVersionRanges(t *testing.T) {
+	for _, text := range []string{
+		"<=4294967296", ">=12 <4294967296", ">4294967295", "^0.0.4294967295",
+		"~12.4294967295.0", "12 - 4294967295", "^16 || <=4294967296", "<=9007199254740991",
+	} {
+		t.Run(text, func(t *testing.T) {
+			version, ok := parseNodeVersion(text)
+			if !ok || !version.uncertain {
+				t.Fatal("expected a valid range with uncertain feature support")
+			}
+			if version.Supports("5.10.0") || version.IsSubsetOf("^12.20.0 || >=14.13.1") {
+				t.Fatal("an extreme range must not imply feature support")
+			}
+		})
+	}
+	for _, text := range []string{"16.0.0+4294967296", "16.0.0-4294967296", "4294967294.0.0"} {
+		if version, ok := parseNodeVersion(text); !ok || version.uncertain {
+			t.Errorf("ordinary range or large metadata treated as uncertain: %s", text)
 		}
 	}
 }

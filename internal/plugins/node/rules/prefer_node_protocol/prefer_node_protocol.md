@@ -29,8 +29,11 @@ const util = process.getBuiltinModule("node:util");
 Relative paths, third-party packages, template literals, `require.resolve()`,
 and optional `require?.()` calls are ignored. Names available only with the
 prefix, such as `node:test`, do not make the bare name `test` a built-in module.
-As upstream, the rule matches call syntax even if `require` or `process` is
-shadowed by a local variable.
+Calls on locally defined `require`, `process`, or `globalThis` are ignored
+unless they are recognized Node bindings. Direct imports or `require()` loads
+of `process` and `require` functions initialized by an imported
+`module.createRequire()` are recognized; arbitrary local aliases and custom
+wrappers are not followed.
 
 ## Options
 
@@ -63,12 +66,21 @@ always checked because that API implies support for the prefix.
 
 ## Differences from upstream
 
-Version ranges containing a major, minor or patch number greater than
-`4294967295` are treated as invalid, so the next configured version source is
-used. For example, with `{ version: "<=4294967296" }` and no other version
-configuration, `import "fs"` is reported and fixed to `import "node:fs"`;
-upstream leaves it unchanged. This only affects ranges containing version
-numbers far beyond released Node.js versions.
+- Custom local bindings are left unchanged. For example,
+  `function require(name) { return name; } require("fs")` is not reported,
+  because adding the prefix would change the returned value. Upstream fixes
+  calls based on their spelling even when the name refers to a custom function.
+- Contradictory alternatives do not affect a version range. Both
+  `>=16 || >20 <16` and `>20 <16 || >=16` enable fixes for imports and
+  `require()`, because `>20 <16` contains no versions. Upstream disables these
+  checks for the first ordering.
+- Ranges with a major, minor, or patch number of `4294967295` or greater
+  (up to the maximum valid number, `9007199254740991`) conservatively disable
+  checks for imports and `require()`. They do not fall through to another
+  configured range. For example, `>4294967295` leaves `import "fs"` unchanged,
+  while upstream fixes it. `<=4294967296` also leaves it unchanged, since that
+  range includes old Node versions without prefix support.
+  `process.getBuiltinModule()` is still checked.
 
 ## References
 

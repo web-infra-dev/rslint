@@ -74,13 +74,93 @@ func TestPreferNodeProtocolSchema(t *testing.T) {
 }
 
 func TestPreferNodeProtocolOversizedVersion(t *testing.T) {
-	// Documented parser boundary: npm accepts this impossible Node version
-	// and disables the rule; tsgo rejects it, so configuration falls back.
-	runProtocolTests(t, nil, []rule_tester.InvalidTestCase{{
-		Code: `import "fs";`, Options: map[string]any{"version": "<=4294967296"},
-		Output: []string{`import "node:fs";`},
-		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
-	}})
+	for _, version := range []string{"<=4294967296", ">=12 <4294967296", "~12.4294967295.0", "^0.0.4294967295", ">4294967295"} {
+		t.Run(version, func(t *testing.T) {
+			runProtocolTests(t, []rule_tester.ValidTestCase{{
+				Code: `import "fs"; require("fs");`, Options: map[string]any{"version": version},
+				Settings: map[string]any{"node": map[string]any{"version": ">=16"}},
+			}}, []rule_tester.InvalidTestCase{{
+				Code: `process.getBuiltinModule("fs");`, Options: map[string]any{"version": version},
+				Output: []string{`process.getBuiltinModule("node:fs");`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30}},
+			}})
+		})
+	}
+}
+
+func TestPreferNodeProtocolBindings(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: `function f(require, process, globalThis) { require("fs"); process.getBuiltinModule("path"); globalThis.process.getBuiltinModule("util"); }`},
+		{Code: `function require(value) { return value; } require("fs");`},
+		{Code: `{ require("fs"); let require = custom; }`},
+		{Code: `try {} catch (process) { process.getBuiltinModule("fs"); }`},
+		{Code: `const {require, process} = custom; require("fs"); process.getBuiltinModule("fs");`},
+		{Code: `import require from "custom"; import process from "custom"; require("fs"); process.getBuiltinModule("fs");`},
+		{Code: `import {createRequire} from "custom"; const require = createRequire(import.meta.url); require("fs");`},
+		{Code: `import {createRequire} from "node:module"; function f(createRequire) { const require = createRequire(import.meta.url); require("fs"); }`},
+		{Code: `import {createRequire} from "node:module"; let require = createRequire(import.meta.url); require = custom; require("fs");`},
+		{Code: `const require = custom; const process = require("node:process"); process.getBuiltinModule("fs");`},
+		{Code: `let process = require("node:process"); process = custom; process.getBuiltinModule("fs");`},
+		{Code: `import type process from "node:process"; process.getBuiltinModule("fs");`, FileName: "input.ts"},
+		{Code: `import type {createRequire} from "node:module"; const require = createRequire(import.meta.url); require("fs");`, FileName: "input.ts"},
+		{Code: `declare const process: any; declare const require: any; process.getBuiltinModule("fs"); require("fs");`, FileName: "input.ts"},
+		{Code: `function f(require) { require("fs"); }`, LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}, FileName: "input.cjs"},
+		// Module specifiers are exact names, not host filesystem paths.
+		{Code: `import process from "./process"; process.getBuiltinModule("fs");`},
+		{Code: `import {createRequire} from "C:/module"; const require = createRequire(import.meta.url); require("fs");`},
+		{Code: `require("./fs"); require("C:\\fs"); process.getBuiltinModule("\\\\server\\fs"); require("fs\\promises"); import("file:///fs");`},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, prefix := range []string{
+		`import {createRequire} from "node:module"; const require = createRequire(import.meta.url);`,
+		`import {createRequire as makeRequire} from "node:module"; const require = makeRequire(import.meta.url);`,
+		`import module from "node:module"; const require = module.createRequire(import.meta.url);`,
+		`import * as module from "node:module"; const require = module["createRequire"](import.meta.url);`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: prefix + "\n" + `require("fs");`, Output: []string{prefix + "\n" + `require("node:fs");`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 2, Column: 9, EndLine: 2, EndColumn: 13}},
+		})
+	}
+	for _, prefix := range []string{
+		`import process from "node:process";`,
+		`import * as process from "node:process";`,
+		`import {default as process} from "node:process";`,
+		`const process = require("node:process");`,
+		`interface process { custom: string }`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: prefix + "\n" + `process.getBuiltinModule("fs");`, FileName: "input.ts",
+			Output: []string{prefix + "\n" + `process.getBuiltinModule("node:fs");`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 2, Column: 26, EndLine: 2, EndColumn: 30}},
+		})
+	}
+	invalid = append(invalid, rule_tester.InvalidTestCase{
+		Code: `require("fs");`, FileName: "input.cjs", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+		Output: []string{`require("node:fs");`},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 13}},
+	})
+	invalid = append(invalid, rule_tester.InvalidTestCase{
+		Code: `const process = require("node:process");` + "\n" + `process.getBuiltinModule("fs");`, FileName: "input.cjs", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+		Output: []string{`const process = require("node:process");` + "\n" + `process.getBuiltinModule("node:fs");`},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 2, Column: 26, EndLine: 2, EndColumn: 30}},
+	})
+	runProtocolTests(t, valid, invalid)
+}
+
+func TestPreferNodeProtocolEmptyAlternatives(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, version := range []string{">=16 || >20 <16", ">20 <16 || >=16"} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: `import "fs"; require("fs");`, Options: map[string]any{"version": version},
+			Output: []string{`import "node:fs"; require("node:fs");`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12},
+				{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
+			},
+		})
+	}
+	runProtocolTests(t, nil, invalid)
 }
 
 // Expectations compared with eslint-plugin-n v18.3.0, including complete ranges and fixes.
@@ -117,7 +197,6 @@ func TestPreferNodeProtocolAst(t *testing.T) {
 		{Code: "process.getBuiltinModule(\"fs\"); import \"path\"; require(\"util\");", Options: map[string]any{"version": "12.20.0"}, Output: []string{"process.getBuiltinModule(\"node:fs\"); import \"node:path\"; require(\"util\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:path` over `path`.", Line: 1, Column: 40, EndLine: 1, EndColumn: 46}}},
 		{Code: "require(\"fs\"); import \"path\"; process.getBuiltinModule(\"util\");", Options: map[string]any{"version": ">=14.18.0"}, Output: []string{"require(\"fs\"); import \"node:path\"; process.getBuiltinModule(\"node:util\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:path` over `path`.", Line: 1, Column: 23, EndLine: 1, EndColumn: 29}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:util` over `util`.", Line: 1, Column: 56, EndLine: 1, EndColumn: 62}}},
 		{Code: "require((\"fs\")); (require)(\"path\");", Output: []string{"require((\"node:fs\")); (require)(\"node:path\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 14}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:path` over `path`.", Line: 1, Column: 28, EndLine: 1, EndColumn: 34}}},
-		{Code: "function f(require, process) { require(\"fs\"); process.getBuiltinModule(\"path\"); }", Output: []string{"function f(require, process) { require(\"node:fs\"); process.getBuiltinModule(\"node:path\"); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 40, EndLine: 1, EndColumn: 44}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:path` over `path`.", Line: 1, Column: 72, EndLine: 1, EndColumn: 78}}},
 		{Code: "process?.getBuiltinModule?.(\"fs\"); globalThis?.process?.getBuiltinModule?.(\"path\", extra);", Output: []string{"process?.getBuiltinModule?.(\"node:fs\"); globalThis?.process?.getBuiltinModule?.(\"node:path\", extra);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 29, EndLine: 1, EndColumn: 33}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:path` over `path`.", Line: 1, Column: 76, EndLine: 1, EndColumn: 82}}},
 		{Code: "(globalThis.process).getBuiltinModule((\"fs\")); ((process)).getBuiltinModule(\"path\");", Output: []string{"(globalThis.process).getBuiltinModule((\"node:fs\")); ((process)).getBuiltinModule(\"node:path\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 40, EndLine: 1, EndColumn: 44}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:path` over `path`.", Line: 1, Column: 77, EndLine: 1, EndColumn: 83}}},
 		{Code: "process[\"getBuiltin\" + \"Module\"](\"fs\"); globalThis[`process`][`getBuiltinModule`](\"path\");", Output: []string{"process[\"getBuiltin\" + \"Module\"](\"node:fs\"); globalThis[`process`][`getBuiltinModule`](\"node:path\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 34, EndLine: 1, EndColumn: 38}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:path` over `path`.", Line: 1, Column: 83, EndLine: 1, EndColumn: 89}}},
