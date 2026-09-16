@@ -194,16 +194,6 @@ class D implements process.env {}`,
 				Code:   "\"😀\";\r\nprocess /* comment */\r\n  [\"env\" /* comment */];",
 				Errors: []rule_tester.InvalidTestCaseError{noProcessEnvAt(2, 1, 3, 24)},
 			},
-			// Espree accepts optional private access, but rslint rejects the file
-			// with TS18030 before running rules. Keep the upstream expectation
-			// visible until that syntax is supported (see Differences from upstream).
-			{
-				Code:     `class C { #env; f(process) { process?.#env; } }`,
-				FileName: "input.js",
-				TSConfig: "tsconfig.allowJs.json",
-				Skip:     true,
-				Errors:   []rule_tester.InvalidTestCaseError{noProcessEnvAt(1, 30, 1, 43)},
-			},
 		},
 	)
 }

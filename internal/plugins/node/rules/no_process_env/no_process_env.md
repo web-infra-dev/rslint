@@ -41,10 +41,6 @@ With this configuration, `process.env.NODE_ENV` and `process["env"]["NODE_ENV"]`
 
 This rule has no automatic fix or suggestions.
 
-## Differences from upstream
-
-JavaScript files containing optional access to a private field, such as `process?.#env`, currently report a syntax error instead of this rule's diagnostics. Non-optional private-field access (`process.#env`) is checked normally.
-
 ## Original documentation
 
 - [eslint-plugin-n: no-process-env](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/no-process-env.md)
