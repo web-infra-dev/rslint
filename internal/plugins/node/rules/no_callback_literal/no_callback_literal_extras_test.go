@@ -50,6 +50,10 @@ func TestNoCallbackLiteralExtras(t *testing.T) {
 			{Code: "declare function cb(error: Error): void; abstract class Task { abstract callback(): void; }", FileName: "input.ts"},
 			// Shadowing does not change the syntactic handling of null or undefined.
 			{Code: "function task(undefined) { cb(undefined); }"},
+			// Instantiation and non-null expressions around a callee remain distinct from a generic call.
+			{Code: "(cb<Error>)(false); cb!?.(false); (cb!)?.(false);", FileName: "input.ts"},
+			// Newer regex syntax remains valid in the result position.
+			{Code: "cb(null, /(?i:error)/); callback(null, /(?<a>a)|(?<a>b)/);"},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: every non-null Literal kind ----
@@ -92,6 +96,22 @@ func TestNoCallbackLiteralExtras(t *testing.T) {
 			{Code: "const view = <Result value={cb(false)} />;", FileName: "input.tsx", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 29, 1, 38)}},
 			// A rest binding does not hide a nested callback call.
 			{Code: "const { ...rest } = cb(false);", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 21, 1, 30)}},
+			// Escaped callback names use the decoded identifier, with ranges covering the source spelling.
+			{Code: `c\u0062(false); call\u0062ack(0);`, Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 15), unexpectedLiteralAt(1, 17, 1, 33)}},
+			// An optional generic call still has an identifier callee.
+			{Code: "cb?.<Error>(false);", FileName: "input.ts", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 19)}},
+			// Chained access or invocation does not report the same inner callback twice.
+			{Code: "cb?.(false).x; (cb?.(0))(false); ((cb?.(null)))(false);", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 12), unexpectedLiteralAt(1, 17, 1, 24)}},
+			// Nested JSDoc casts are transparent in JavaScript.
+			{Code: "cb(/** @type {Error} */ (/** @satisfies {unknown} */ (0)));", FileName: "input.js", TSConfig: "tsconfig.allowJs.json", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 59)}},
+			// Overflowing numeric literals remain literals; unary expressions remain unknown.
+			{Code: "cb(1e999); cb(-1e999); cb(0n);", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 10), unexpectedLiteralAt(1, 24, 1, 30)}},
+			// Nested and destructuring assignments follow their final right operand.
+			{Code: "cb((a = b = c = 0)); cb(([a] = [])); cb(({a} = {}));", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 20), unexpectedLiteralAt(1, 22, 1, 36), unexpectedLiteralAt(1, 38, 1, 52)}},
+			// Documented difference: regex literals are rejected even when older Node.js versions cannot construct them.
+			{Code: "cb(/(?i:error)/); cb(/(?<a>a)|(?<a>b)/);", Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 17), unexpectedLiteralAt(1, 19, 1, 40)}},
+			// Unicode set notation remains a non-error regex literal.
+			{Code: `cb(/[\q{ab|cd}]/v);`, Errors: []rule_tester.InvalidTestCaseError{unexpectedLiteralAt(1, 1, 1, 19)}},
 		},
 	)
 }

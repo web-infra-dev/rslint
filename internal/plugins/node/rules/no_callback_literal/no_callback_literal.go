@@ -38,8 +38,13 @@ func couldBeError(node *ast.Node) bool {
 		return true
 	}
 	switch node.Kind {
+	case ast.KindRegularExpressionLiteral:
+		// Upstream can accept newer regex syntax when its Node.js runtime cannot
+		// instantiate the literal (ESTree value is null). Always treat regexes as
+		// non-errors, independently of the runtime used to launch the linter.
+		return false
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
-		ast.KindRegularExpressionLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword,
+		ast.KindTrueKeyword, ast.KindFalseKeyword,
 		ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression,
 		ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
 		return false
