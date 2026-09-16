@@ -176,6 +176,7 @@ define.test({
     './tests/eslint-plugin-node/rules/no-extraneous-import.test.ts',
     './tests/eslint-plugin-node/rules/no-extraneous-require.test.ts',
     './tests/eslint-plugin-node/rules/no-missing-import.test.ts',
+    './tests/eslint-plugin-node/rules/no-mixed-requires.test.ts',
     './tests/eslint-plugin-node/rules/no-new-require.test.ts',
     './tests/eslint-plugin-node/rules/no-process-exit.test.ts',
 

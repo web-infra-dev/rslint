@@ -1,0 +1,26 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "grouping": {
+              "type": "boolean"
+            },
+            "allowCall": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
