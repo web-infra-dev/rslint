@@ -17,9 +17,6 @@ func TestNoExtraneousImportExtras(t *testing.T) {
 		// broken condition does not fall through
 		{Code: "import 'broken-condition';", FileName: "input.js"},
 
-		// Documented difference: enhanced-resolve's undocumented alias override
-		// resolves this local file and reports "virtual"; only modules is supported here.
-		{Code: "import 'virtual';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./local.js"}}}},
 		// non npm sources
 		{Code: "import './local'; import '/absolute'; import 'node:fs'; import 'fs'; import 'data:text/javascript,0'; import 'https://example.com/a.js'; import '#internal'; import 'virtual:thing';", FileName: "input.js"},
 		// Node's legacy internal builtins cannot be shadowed by installed packages.
@@ -87,6 +84,9 @@ import '_tls_wrap';`, FileName: "input.js"},
 		// malformed package stops resolution
 		{Code: "import 'runtime';", FileName: "malformed/input.js"},
 	}, []rule_tester.InvalidTestCase{
+		// Resolver aliases and BigInt values follow the upstream behavior.
+		{Code: "import 'virtual';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./local.js"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"virtual" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 17}}},
+
 		{Code: "import 'tsx-only/index.js';", FileName: "input.ts", Settings: map[string]any{"n": nil, "node": map[string]any{"typescriptExtensionMap": "react"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"tsx-only" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 27}}},
 		// Directory exports resolve with relative and absolute custom module folders.
 		{Code: "import 'export-directory';", FileName: "input.js", Options: map[string]any{"resolverConfig": map[string]any{"modules": "node_modules/custom"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"export-directory" is extraneous.`, Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},

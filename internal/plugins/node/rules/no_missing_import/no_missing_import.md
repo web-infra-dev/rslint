@@ -94,10 +94,14 @@ substituted. Type-only imports also activate the `types` export condition.
 
 ## Differences from upstream
 
-Only `resolverConfig.modules` is supported. If you map `virtual` to
-`./local.js` with `resolverConfig.alias`, rslint may report `import 'virtual'`
-as missing even when the target file exists. For local aliases in TypeScript
-files, use `compilerOptions.paths` instead.
+The supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
+`extensionAlias`, and `conditionNames`. Other properties are ignored. For example,
+`mainFiles: ['entry']` does not change directory lookup to `entry.js`; use an
+explicit file path instead.
+
+When object-form aliases overlap, rslint tries their names in sorted order;
+upstream uses declaration order. Use an alias array to specify priority, such as
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
 
 Some invalid `package.json#imports` mappings, such as
 `"#entry": [null, "./entry.js"]`, produce different error messages. Both
@@ -106,6 +110,11 @@ linters report an error; rslint reports that the import cannot be resolved.
 An unpaired Unicode surrogate in a module name, such as `import('\uD800')`,
 may appear as replacement characters in the reported name. File lookup still
 matches Node.js: `import './\uD800.js'` resolves an existing file named `�.js`.
+
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 

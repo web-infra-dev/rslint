@@ -79,8 +79,25 @@ Unresolved relative imports use their lexical absolute path; unresolved package
 names have no file path to match.
 
 Resolution uses the Node plugin's shared `settings.node` options, including
-`resolvePaths`, `tryExtensions`, and `resolverConfig.modules`, and TypeScript
-path aliases. Legacy `settings.n` is also recognized, as in the other Node rules.
+`resolvePaths`, `tryExtensions`, and the `modules`, `alias`, `extensions`,
+`extensionAlias`, and `conditionNames` properties of `resolverConfig`, and
+TypeScript path aliases. Legacy `settings.n` is also recognized, as in the other Node rules.
+
+## Differences from upstream
+
+The supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
+`extensionAlias`, and `conditionNames`. Other properties are ignored. For example,
+`mainFiles: ['entry']` does not change directory lookup to `entry.js`; use an
+explicit file path instead.
+
+When object-form aliases overlap, rslint tries their names in sorted order;
+upstream uses declaration order. Use an alias array to specify priority, such as
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
+
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 

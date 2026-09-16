@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -623,5 +625,42 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		assert.Assert(t, !known && !isArray)
 		truthy, known := evaluator.EvalControlFlowTruthiness(nil)
 		assert.Assert(t, !known && !truthy)
+	}
+}
+
+func TestStaticStringEvaluatorBigInt(t *testing.T) {
+	for _, test := range []struct {
+		expression, want string
+		known            bool
+	}{
+		{"42n", "42", true}, {"0x2_an", "42", true}, {"0o52n", "42", true}, {"0b101010n", "42", true},
+		{"'' + 42n", "42", true}, {"`pkg${40n + 2n}`", "pkg42", true},
+		{"[40n + 2n, 40n].join('/')", "42/40", true},
+		{"(7n - 1n) * 7n", "42", true}, {"-43n / 2n", "-21", true}, {"-43n % 2n", "-1", true},
+		{"2n ** 5n", "32", true}, {"0n ** 0n", "1", true}, {"(-2n) ** 3n", "-8", true},
+		{"6n | 3n", "7", true}, {"6n & 3n", "2", true}, {"6n ^ 3n", "5", true}, {"~42n", "-43", true},
+		{"42n << 2n", "168", true}, {"42n << -1n", "21", true}, {"42n >> -1n", "84", true},
+		{"-43n >> 1n", "-22", true}, {"-1n >> 999999999999999999999n", "-1", true},
+		{"0n << 999999999999999999999n", "0", true},
+		{"0n ? 'bad' : 'fs'", "fs", true}, {"!0n", "true", true}, {"0n || 'fs'", "fs", true}, {"1n && 'fs'", "fs", true},
+		{"1n === 1n", "true", true}, {"1n === 1", "false", true}, {"1n !== 1", "true", true},
+		{"1n == '1'", "true", true}, {"1n == true", "true", true}, {"0n == null", "false", true},
+		{"1n + []", "1", true}, {"[1] + 2n", "12", true}, {"1n === []", "false", true}, {"[] !== 1n", "true", true},
+		{"2n > 1.5", "true", true}, {"1.5 < 2n", "true", true}, {"2n <= '2'", "true", true},
+		{"9007199254740993n > 9007199254740992", "true", true},
+		{"2n >= 'invalid'", "false", true}, {"0n != 0/0", "true", true}, {"2n < 1/0", "true", true},
+		{"2n > -1/0", "true", true}, {"1n == [1]", "true", true},
+		{"40n + 2", "", false}, {"+42n", "", false}, {"1n / 0n", "", false}, {"1n % 0n", "", false},
+		{"2n ** -1n", "", false}, {"42n >>> 1n", "", false}, {"2n ** 999999999999n", "", false},
+		{"1n << 999999999999n", "", false}, {"'x'.charAt(0n)", "", false},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/bigint.js", Path: "/bigint.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			got, known := NewStaticStringEvaluatorWithoutScope().EvalToString(node)
+			if known != test.known || known && got != test.want {
+				t.Fatalf("EvalToString = (%q, %v), want (%q, %v)", got, known, test.want, test.known)
+			}
+		})
 	}
 }

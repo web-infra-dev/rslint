@@ -21,22 +21,23 @@ import (
 
 // ResolutionOptions selects runtime files independently of the compiler's
 // declaration-file preference. Nil extension/module lists use Node defaults;
-// empty lists disable that search. Conditions adds active export conditions to
-// CommonJS's require condition. Package traversal and export-path validation
+// empty lists disable that search. Conditions selects active export conditions. Package traversal and export-path validation
 // stay with tsgo.
 type ResolutionOptions struct {
-	Extensions       []string
-	Modules          []string
-	Paths            []string
-	Conditions       []string
-	ExtensionAliases map[string][]string
+	Extensions        []string            `json:"extensions"`
+	Modules           []string            `json:"modules"`
+	Paths             []string            `json:"paths"`
+	Conditions        []string            `json:"conditions"`
+	ExtensionAliases  map[string][]string `json:"extensionAliases"`
+	Aliases           []moduleAlias       `json:"aliases"`
+	AliasesConfigured bool                `json:"aliasesConfigured"`
 	// Import paths do not use directory main/index fallback unless they name a
 	// package. Require callers retain the ordinary Node directory lookup.
-	NoDirectory bool
+	NoDirectory bool `json:"noDirectory"`
 }
 
 type nodeResolutionKey struct{ name, file, options string }
-type nodeResolution struct{ path, resolveError string }
+type nodeResolution struct{ path, resourceSuffix, resolveError string }
 
 // ResolveModule resolves a runtime package through this generation's FS.
 // It does not load the result into the Program or fall back to @types packages.
@@ -48,12 +49,17 @@ func ResolveModule(p *program.Program, name, containingFile string, options Reso
 // ResolveModuleWithError also preserves the resolution failure for missing
 // module diagnostics. Package traversal and exports selection still use tsgo.
 func ResolveModuleWithError(p *program.Program, name, containingFile string, options ResolutionOptions) (string, string) {
+	result := resolveModuleCached(p, name, containingFile, options)
+	return result.path, result.resolveError
+}
+
+func resolveModuleCached(p *program.Program, name, containingFile string, options ResolutionOptions) nodeResolution {
 	if p.FS() == nil {
-		return "", ""
+		return nodeResolution{}
 	}
-	encoded, err := json.Marshal([]any{options.Extensions, options.Modules, options.Paths, options.Conditions, options.ExtensionAliases, options.NoDirectory})
+	encoded, err := json.Marshal(options)
 	if err != nil {
-		return "", ""
+		return nodeResolution{}
 	}
 	result := program.Cached(p, nodeResolutionKey{name, containingFile, string(encoded)}, func() nodeResolution {
 		if options.Extensions == nil {
@@ -65,73 +71,82 @@ func ResolveModuleWithError(p *program.Program, name, containingFile string, opt
 		if options.Conditions == nil {
 			options.Conditions = []string{"node", "require", "import"}
 		}
-		originalName := name
-		// enhanced-resolve separates resource queries/fragments from the path.
-		if index := strings.IndexAny(name, "?#"); index > 0 {
-			name = name[:index]
-		}
-		folders := options.Modules
-		if len(folders) == 0 {
-			// Package imports and self-references do not use module directories.
-			// Run tsgo once with external directory probes disabled.
-			folders = []string{"node_modules"}
-		}
-		if tspath.IsExternalModuleNameRelative(name) {
-			// Module search directories govern bare packages, not local files.
-			folders = []string{"node_modules"}
-		}
-		var resolveError string
-		for _, base := range append(slices.Clone(options.Paths), tspath.GetDirectoryPath(containingFile)) {
-			base = tspath.ResolvePath(p.CurrentDirectory(), base)
-			resolveError = "Can't resolve '" + originalName + "' in '" + base + "'"
-			for _, folder := range folders {
-				view := &nodeResolutionFS{
-					FS: p.FS(), folder: folder, options: options,
-					explicitExtension: path.Ext(name), resolved: map[string]string{},
-					request:        name,
-					noModuleSearch: len(options.Modules) == 0 && !tspath.IsExternalModuleNameRelative(name),
+		resolver := moduleAliasResolver{program: p, fileName: containingFile, options: options}
+		return resolver.resolve(name)
+	})
+	return result
+}
+
+// resolveModuleRequest keeps package traversal and file probes in tsgo.
+func resolveModuleRequest(p *program.Program, name, containingFile string, options ResolutionOptions, resolveAlias func(string) (nodeResolution, bool)) nodeResolution {
+	originalName := name
+	// enhanced-resolve separates resource queries/fragments from the path.
+	if index := strings.IndexAny(name, "?#"); index > 0 {
+		name = name[:index]
+	}
+	folders := options.Modules
+	if len(folders) == 0 {
+		// Package imports and self-references do not use module directories.
+		// Run tsgo once with external directory probes disabled.
+		folders = []string{"node_modules"}
+	}
+	if tspath.IsExternalModuleNameRelative(name) {
+		// Module search directories govern bare packages, not local files.
+		folders = []string{"node_modules"}
+	}
+	var resolveError string
+	for _, base := range append(slices.Clone(options.Paths), tspath.GetDirectoryPath(containingFile)) {
+		base = tspath.ResolvePath(p.CurrentDirectory(), base)
+		resolveError = "Can't resolve '" + originalName + "' in '" + base + "'"
+		for _, folder := range folders {
+			view := &nodeResolutionFS{
+				FS: p.FS(), folder: folder, options: options, resolveAlias: resolveAlias,
+				explicitExtension: path.Ext(name), resolved: map[string]string{},
+				request:        name,
+				noModuleSearch: len(options.Modules) == 0 && !tspath.IsExternalModuleNameRelative(name),
+			}
+			if options.NoDirectory {
+				view.blockedDirectory = view.physical(tspath.ResolvePath(base, name))
+			}
+			resolver := view.newResolver(p.CurrentDirectory())
+			result, _ := resolver.ResolveModuleName(name, tspath.ResolvePath(base, "__import__.js"), core.ResolutionModeCommonJS, nil)
+			if !view.unresolved && result != nil && result.IsResolved() {
+				if view.builtin {
+					return nodeResolution{}
 				}
-				if options.NoDirectory {
-					view.blockedDirectory = view.physical(tspath.ResolvePath(base, name))
+				return nodeResolution{path: view.Realpath(result.ResolvedFileName), resourceSuffix: view.resourceSuffix}
+			}
+			if view.exportsFile != "" {
+				request := name
+				if view.importsTarget != "" {
+					request = view.importsTarget
 				}
-				resolver := view.newResolver(p.CurrentDirectory())
-				result, _ := resolver.ResolveModuleName(name, tspath.ResolvePath(base, "__import__.js"), core.ResolutionModeCommonJS, nil)
-				if !view.unresolved && result != nil && result.IsResolved() {
-					if view.builtin {
-						return nodeResolution{}
-					}
-					return nodeResolution{path: view.Realpath(result.ResolvedFileName)}
+				packageName, _ := module.ParsePackageName(request)
+				subpath := "." + strings.TrimPrefix(request, packageName)
+				conditions, err := json.Marshal(options.Conditions)
+				if err != nil {
+					return nodeResolution{resolveError: err.Error()}
 				}
-				if view.exportsFile != "" {
-					request := name
-					if view.importsTarget != "" {
-						request = view.importsTarget
-					}
-					packageName, _ := module.ParsePackageName(request)
-					subpath := "." + strings.TrimPrefix(request, packageName)
-					conditions, _ := json.Marshal(options.Conditions)
-					resolveError = `"` + subpath + `" is not exported under the conditions ` + string(conditions) + " from package " + tspath.GetDirectoryPath(view.exportsFile) + " (see exports field in " + view.exportsFile + ")"
-					if view.unresolved {
-						resolveError = "Package path " + subpath + " is exported from package " + tspath.GetDirectoryPath(view.exportsFile) + ", but no valid target file was found (see exports field in " + view.exportsFile + ")"
-					}
-					// A found package's exports failure cannot fall through to a
-					// different copy in a later module directory.
-					break
-				} else if view.importsFile != "" && !view.importsMatched {
-					resolveError = "Package import " + name + " is not imported from package " + tspath.GetDirectoryPath(view.importsFile) + " (see imports field in " + view.importsFile + ")"
+				resolveError = `"` + subpath + `" is not exported under the conditions ` + string(conditions) + " from package " + tspath.GetDirectoryPath(view.exportsFile) + " (see exports field in " + view.exportsFile + ")"
+				if view.unresolved {
+					resolveError = "Package path " + subpath + " is exported from package " + tspath.GetDirectoryPath(view.exportsFile) + ", but no valid target file was found (see exports field in " + view.exportsFile + ")"
 				}
-				if view.importsFile != "" {
-					if name == "#" {
-						resolveError = "Request should have at least 2 characters"
-					} else if strings.HasSuffix(name, "/") {
-						resolveError = "Resolving to directories is not possible with the imports field (request was " + name + ")"
-					}
+				// A found package's exports failure cannot fall through to a
+				// different copy in a later module directory.
+				break
+			} else if view.importsFile != "" && !view.importsMatched {
+				resolveError = "Package import " + name + " is not imported from package " + tspath.GetDirectoryPath(view.importsFile) + " (see imports field in " + view.importsFile + ")"
+			}
+			if view.importsFile != "" {
+				if name == "#" {
+					resolveError = "Request should have at least 2 characters"
+				} else if strings.HasSuffix(name, "/") {
+					resolveError = "Resolving to directories is not possible with the imports field (request was " + name + ")"
 				}
 			}
 		}
-		return nodeResolution{resolveError: resolveError}
-	})
-	return result.path, result.resolveError
+	}
+	return nodeResolution{resolveError: resolveError}
 }
 
 // The private view projects runtime candidates onto tsgo's file probes.
@@ -151,6 +166,8 @@ type nodeResolutionFS struct {
 	vfs.FS
 	folder            string
 	options           ResolutionOptions
+	resolveAlias      func(string) (nodeResolution, bool)
+	resourceSuffix    string
 	explicitExtension string
 	resolved          map[string]string
 	activeDirectories map[string]bool
@@ -197,11 +214,15 @@ func (f *nodeResolutionFS) physical(name string) string {
 }
 
 func (f *nodeResolutionFS) probe(name string, applyAlias bool) string {
+	if result, matched := f.aliasFile(name); matched {
+		return result
+	}
+
 	if aliases, ok := f.options.ExtensionAliases[path.Ext(name)]; ok && applyAlias {
 		for _, extension := range aliases {
 			candidate := strings.TrimSuffix(name, path.Ext(name)) + extension
-			if f.FS.FileExists(candidate) {
-				return candidate
+			if found := f.probeFile(candidate); found != "" {
+				return found
 			}
 		}
 		return ""
@@ -210,9 +231,36 @@ func (f *nodeResolutionFS) probe(name string, applyAlias bool) string {
 		return name
 	}
 	for _, extension := range f.options.Extensions {
-		if candidate := name + extension; f.FS.FileExists(candidate) {
-			return candidate
+		if found := f.probeFile(name + extension); found != "" {
+			return found
 		}
+	}
+	return ""
+}
+
+func (f *nodeResolutionFS) aliasFile(name string) (string, bool) {
+	if f.resolveAlias != nil {
+		if result, matched := f.resolveAlias(name); matched {
+			if result.resolveError != "" {
+				return "", true
+			}
+			if result.path == "" {
+				f.builtin = true
+				return name, true
+			}
+			f.resourceSuffix = result.resourceSuffix
+			return result.path, true
+		}
+	}
+	return "", false
+}
+
+func (f *nodeResolutionFS) probeFile(name string) string {
+	if result, matched := f.aliasFile(name); matched {
+		return result
+	}
+	if f.FS.FileExists(name) {
+		return name
 	}
 	return ""
 }
@@ -232,7 +280,10 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 		return true
 	case strings.HasSuffix(physical, nodeTargetSuffix), strings.HasSuffix(physical, nodeExportSuffix):
 		target := strings.TrimSuffix(strings.TrimSuffix(physical, nodeTargetSuffix), nodeExportSuffix)
-		resolved = f.probe(target, false)
+		// Relative imports maps honor extension aliases; package main and
+		// exports targets retain their explicitly selected extensions.
+		applyAlias := strings.HasPrefix(f.request, "#") && f.importsTarget == ""
+		resolved = f.probe(target, applyAlias)
 		if resolved == "" && !f.options.NoDirectory && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
 			// enhanced-resolve permits directory exports. Ask tsgo to resolve
 			// their main/index using its regular relative-directory traversal.
@@ -297,6 +348,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 	}
 	if object, ok := value.Value.(*hujson.Object); ok {
 		if imports := value.Find("/imports"); imports != nil {
+			filterNodeConditions(imports, f.options.Conditions)
 			markNodeImportTargets(imports, f.options.Conditions)
 			if entries, ok := imports.Value.(*hujson.Object); ok && f.importsFile == "" && strings.HasPrefix(f.request, "#") {
 				f.recordImports(entries, f.physical(name))
@@ -328,6 +380,7 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 					if selfReference || strings.HasSuffix(name, "/"+packageName+"/package.json") {
 						f.exportsFile = f.physical(name)
 					}
+					filterNodeConditions(&member.Value, f.options.Conditions)
 					if !prepareNodeExports(&member.Value, f.options.Conditions) {
 						// A blocked selection must retain an exports map: a bare
 						// null field permits tsgo's legacy main/index fallback.
@@ -478,7 +531,7 @@ func prepareNodeExports(value *hujson.Value, conditions []string) bool {
 func nodeExportArrayCondition(object *hujson.Object, conditions []string) (hujson.Value, bool) {
 	for _, member := range object.Members {
 		key := nodePackageMemberName(member)
-		if key == "default" || key == "require" || slices.Contains(conditions, key) {
+		if key == "default" || slices.Contains(conditions, key) {
 			if nested, ok := member.Value.Value.(*hujson.Object); ok {
 				if selected, found := nodeExportArrayCondition(nested, conditions); found {
 					return selected, true
@@ -556,4 +609,30 @@ func nearestCompilerOptions(p *program.Program, fileName string) *core.CompilerO
 		}
 		return nil
 	})
+}
+
+// tsgo activates the require condition for CommonJS internally. Remove inactive
+// conditions before handing it exports/imports, so an explicit override can
+// replace that default as well as add custom conditions. Keep subpath keys.
+func filterNodeConditions(value *hujson.Value, conditions []string) {
+	switch object := value.Value.(type) {
+	case *hujson.Object:
+		hasPathKeys := slices.ContainsFunc(object.Members, func(member hujson.ObjectMember) bool {
+			key := nodePackageMemberName(member)
+			return strings.HasPrefix(key, ".") || strings.HasPrefix(key, "#")
+		})
+		if !hasPathKeys {
+			object.Members = slices.DeleteFunc(object.Members, func(member hujson.ObjectMember) bool {
+				key := nodePackageMemberName(member)
+				return !strings.HasPrefix(key, ".") && !strings.HasPrefix(key, "#") && key != "default" && !slices.Contains(conditions, key)
+			})
+		}
+		for i := range object.Members {
+			filterNodeConditions(&object.Members[i].Value, conditions)
+		}
+	case *hujson.Array:
+		for i := range object.Elements {
+			filterNodeConditions(&object.Elements[i], conditions)
+		}
+	}
 }

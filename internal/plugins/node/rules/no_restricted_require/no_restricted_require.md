@@ -84,22 +84,33 @@ Use `node:path` to construct absolute patterns with the host's separators.
 Patterns are matched as written, including literal backslashes on Windows.
 
 Resolution uses `settings.node.resolvePaths`, `settings.node.tryExtensions`,
-`settings.node.resolverConfig.modules`, and TypeScript path aliases and extension
-settings.
+and the `modules`, `alias`, `extensions`, `extensionAlias`, and `conditionNames`
+properties of `settings.node.resolverConfig`. TypeScript files also use tsconfig
+path aliases and extension settings. Explicit `alias` and `extensionAlias`
+settings replace those TypeScript mappings, including when set to empty objects.
 
 ## Differences from upstream
 
-When restricting absolute file paths, aliases configured with
-`settings.node.resolverConfig.alias` are not followed. If `virtual` points to a
-restricted `/project/api.js`, upstream reports `require('virtual')`; rslint does
-not report it unless `virtual` also resolves as an installed module. Restrict
-`'virtual'` by name or configure the alias in `tsconfig.json` instead. Of the
-`resolverConfig` options, only `modules` is supported.
+Custom package or directory entry points configured with `resolverConfig.mainFields`
+or `resolverConfig.mainFiles` are not supported. For example, with
+`mainFiles: ['api']`, upstream resolves `require('./server')` to `server/api.js`,
+while rslint still uses `server/index.js`. Write the full file path in the require
+call, or restrict the requested name (`'./server'`) instead. Resolver options
+other than the five listed above are ignored.
 
-Write restricted module names as strings when constructing them with BigInt
-arithmetic. With `['42']` restricted, upstream reports `require(40n + 2n)` and
-rslint does not. Use `require('42')` to ensure the restriction is checked;
-`require(42n)` is also checked.
+When multiple aliases in an object match the same request, rslint tries their
+names in sorted order; upstream uses their declaration order. Use the array form
+of `resolverConfig.alias` to specify priority explicitly, for example
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
+
+Very large BigInt calculations may be left unevaluated. For example, upstream
+reports `require((1n << 65536n) ? 'fs' : 'path')` when `fs` is restricted, while
+rslint skips it. Use an explicit module name for such calls.
+
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 

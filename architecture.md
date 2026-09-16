@@ -172,8 +172,11 @@ restrictions. The import and require restriction rules share ordered matching
 and message construction in `nodeutil`; rules select their source nodes and
 resolution mode, then report the matching diagnostic. Runtime resolution
 reuses tsgo's resolver and config parser through the Program's existing
-filesystem and generation-scoped cache. Resolution results retain failure
-details for missing-module diagnostics and target paths for restrictions,
+filesystem and generation-scoped cache. Shared resolver options select aliases,
+extensions and export conditions; aliases reuse the same file probes before
+symlink resolution. Resolution results retain failure
+details for missing-module diagnostics and separate resource suffixes from
+filesystem paths for restrictions,
 including lexical paths for unresolved local imports and requires. Restrictions
 compare host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
 Rules select their exemptions and report on the collected source nodes.

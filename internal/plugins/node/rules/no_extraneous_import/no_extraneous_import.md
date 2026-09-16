@@ -88,14 +88,14 @@ extension substitution, using the same formats as upstream.
 
 ## Differences from upstream
 
-Only `resolverConfig.modules` changes how this rule finds imported packages in
-rslint. Other `resolverConfig` options, such as `alias`, are ignored. For example,
-suppose `virtual` is neither declared nor installed, but `local.js` exists. With
-`resolverConfig: { alias: { virtual: './local.js' } }`, eslint-plugin-n reports
-`import 'virtual'` as an undeclared dependency; rslint ignores the alias and
-reports nothing.
-For local aliases in TypeScript files, use `compilerOptions.paths`. To allow an
-undeclared package, add its name to `allowModules`.
+The supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
+`extensionAlias`, and `conditionNames`. Other properties are ignored. For example,
+`mainFiles: ['entry']` does not change directory lookup to `entry.js`; use an
+explicit file path instead.
+
+When object-form aliases overlap, rslint tries their names in sorted order;
+upstream uses declaration order. Use an alias array to specify priority, such as
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
 
 With `workspaces: ['packages/{1..3}']`, rslint treats `packages/1`, `packages/2`
 and `packages/3` as workspace members; eslint-plugin-n instead matches the literal
@@ -108,6 +108,11 @@ but rslint excludes it. An installed dependency declared only at the workspace
 root is therefore reported by rslint in that child package, but accepted by
 eslint-plugin-n. Use `packages/[!a]*` to exclude package names starting with `a`
 in both tools.
+
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 

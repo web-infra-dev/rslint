@@ -76,14 +76,14 @@ func TestNoExtraneousRequireExtras(t *testing.T) {
 		{Code: "require('runtime');", FileName: "broken/input.js"},
 		// workspace object permits dev dependency
 		{Code: "require('workspace-dep');", FileName: "workspace-positive/packages/app/input.js"},
-		// documented resolver alias difference
-		{Code: "require('virtual');", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./local.js"}}}}},
 		// documented workspace range difference
 		{Code: "require('workspace-dep');", FileName: "workspace-range/packages/2/input.js"},
-		// documented compound BigInt difference
-		{Code: "require(40n + 2n);", FileName: "input.js"},
 	}
 	invalid := []rule_tester.InvalidTestCase{
+		// Resolver aliases and BigInt values follow the upstream behavior.
+		{Code: "require('virtual');", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./local.js"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"virtual" is extraneous.`, Line: 1, Column: 9, EndLine: 1, EndColumn: 18}}},
+		{Code: "require(40n + 2n);", FileName: "input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"42" is extraneous.`, Line: 1, Column: 9, EndLine: 1, EndColumn: 17}}},
+
 		// escaped require
 		{Code: "r\\u0065quire('runtime');", FileName: "input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: "\"runtime\" is extraneous.", Line: 1, Column: 14, EndLine: 1, EndColumn: 23}}},
 		// computed require through escaped global

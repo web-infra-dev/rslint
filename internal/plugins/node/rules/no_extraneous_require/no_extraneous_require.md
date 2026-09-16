@@ -89,12 +89,14 @@ for compatibility and takes precedence over `settings.node` when both are set.
 
 ## Differences from upstream
 
-Only `resolverConfig.modules` changes package resolution in rslint; other
-resolver overrides are ignored. For example, with an existing `local.js` and
-`resolverConfig: { alias: { virtual: './local.js' } }`, upstream reports
-`require('virtual')` as extraneous. If `virtual` is not installed, rslint reports
-nothing. Use TypeScript `compilerOptions.paths` for local aliases, or
-`allowModules` to permit undeclared packages.
+The supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
+`extensionAlias`, and `conditionNames`. Other properties are ignored. For example,
+`mainFiles: ['entry']` does not change directory lookup to `entry.js`; use an
+explicit file path instead.
+
+When object-form aliases overlap, rslint tries their names in sorted order;
+upstream uses declaration order. Use an alias array to specify priority, such as
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
 
 With `workspaces: ['packages/{1..3}']`, rslint includes `packages/1`, `packages/2`,
 and `packages/3`; upstream matches the literal directory `packages/1..3`.
@@ -107,10 +109,14 @@ rslint excludes it. A dependency declared only at the workspace root is therefor
 reported by rslint in that child package but accepted upstream. Use
 `packages/[!a]*` to exclude names starting with `a` in both tools.
 
-Compound BigInt expressions are not evaluated. For example, if the package `42`
-is installed but undeclared, upstream reports `require(40n + 2n)` and rslint does
-not. Use a string argument such as `require('42')`. Direct BigInt literals such
-as `require(42n)` are supported.
+Very large BigInt calculations may be left unevaluated. For example,
+`require((1n << 65536n) ? 'pkg' : 'other')` is not checked. Use an explicit module
+name for such calls.
+
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 

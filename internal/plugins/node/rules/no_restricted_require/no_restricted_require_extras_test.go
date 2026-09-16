@@ -100,12 +100,6 @@ func TestNoRestrictedRequireExtras(t *testing.T) {
 		{Code: "require('./server');", Options: []any{[]any{map[string]any{"name": []any{filepath.Join(root.Dir, "server/**"), "!./server"}}}}},
 		// empty extensions preserve lexical path
 		{Code: "require('./server/api');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"tryExtensions": []any{}}}},
-		// documented resolver override difference
-		// Only resolverConfig.modules is supported; upstream reports this alias, rslint ignores it.
-		{Code: "require('virtual');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": filepath.Join(root.Dir, "server/api.js")}}}}},
-		// documented compound BigInt difference
-		// The shared evaluator does not fold compound BigInt values; upstream reports this, rslint ignores it.
-		{Code: "require(40n + 2n);", Options: []any{[]any{"42"}}},
 		// scope-dependent computed key
 		{Code: "const method = 'require'; globalThis[method]('fs');", Options: []any{[]any{"fs"}}},
 		// private property is not resolve
@@ -118,6 +112,24 @@ func TestNoRestrictedRequireExtras(t *testing.T) {
 		{Code: "require('fs\\n'); require('fs\\r'); require('fs\\u2028');", Options: []any{[]any{"fs"}}},
 		// file without require references
 		{Code: "export const value = 1;", Options: []any{[]any{"fs"}}, LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+		// BigInt mixed types and invalid operations
+		{Code: "require(`${40n + 2}`); require(`${1n / 0n}`); require(`${2n ** -1n}`); require(`${42n >>> 1n}`); require('fs'.charAt(0n));", Options: []any{[]any{"*"}}},
+		// alias removes original restriction
+		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/index.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg": filepath.Join(root.Dir, "server/api.js")}}}}},
+		// disabled alias removes original restriction
+		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/index.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg": false}}}}},
+		// exact alias does not match subpath
+		{Code: "require('exact/api');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"exact$": filepath.Join(root.Dir, "server")}}}}},
+		// empty alias overrides TypeScript paths
+		{Code: "require('alias/api');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, FileName: "input.ts", Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{}}}}},
+		// explicit alias overrides TypeScript paths
+		{Code: "require('alias/api');", Options: []any{[]any{filepath.Join(root.Dir, "server/index.js")}}, FileName: "input.ts", Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"alias/api": filepath.Join(root.Dir, "server/index.js")}}}}},
+		// empty extension aliases override TypeScript defaults
+		{Code: "require('./server/mapped.js');", Options: []any{[]any{filepath.Join(root.Dir, "server/mapped.ts")}}, FileName: "input.ts", Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"extensionAlias": map[string]any{}}}}},
+		// require condition no longer matches
+		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/index.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"conditionNames": []any{"import"}}}}},
+		// empty conditions disable conditional entries
+		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/index.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"conditionNames": []any{}}}}},
 	}, []rule_tester.InvalidTestCase{
 		// later positive restores a match
 		{Code: "require('foo/bar');", Options: []any{[]any{map[string]any{"name": []any{"foo/*", "!foo/bar", "foo/bar"}, "message": "Use public API."}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'foo/bar' module is restricted from being used. Use public API.", Line: 1, Column: 9, EndLine: 1, EndColumn: 18}}},
@@ -177,6 +189,10 @@ func TestNoRestrictedRequireExtras(t *testing.T) {
 		{Code: "require('./server/custom');", Options: []any{[]any{filepath.Join(root.Dir, "server/custom.ext")}}, Settings: map[string]any{"node": map[string]any{"tryExtensions": []any{".ext"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'./server/custom' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 26}}},
 		// legacy settings take priority
 		{Code: "require('./server/custom');", Options: []any{[]any{filepath.Join(root.Dir, "server/custom.ext")}}, Settings: map[string]any{"n": map[string]any{"tryExtensions": []any{".ext"}}, "node": map[string]any{"tryExtensions": []any{".js"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'./server/custom' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 26}}},
+		// resolver alias restriction
+		{Code: "require('virtual');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": filepath.Join(root.Dir, "server/api.js")}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'virtual' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 18}}},
+		// compound BigInt conversion
+		{Code: "require(40n + 2n);", Options: []any{[]any{"42"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'42' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 17}}},
 		// escaped global identifier
 		{Code: "requ\\u0069re('fs');", Options: []any{[]any{"fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 14, EndLine: 1, EndColumn: 18}}},
 		// computed require on configured global objects
@@ -199,8 +215,44 @@ func TestNoRestrictedRequireExtras(t *testing.T) {
 		{Code: "require('./server/');", Options: []any{[]any{filepath.Join(root.Dir, "server/index.js")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'./server/' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 20}}},
 		// escaped global object identifier
 		{Code: "\\u0067lobalThis['require']('fs');", Options: []any{[]any{"fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 28, EndLine: 1, EndColumn: 32}}},
-		// RuleTester registers this rule as "test" for named disable directives.
+		// disabled line and scoped directives
 		{Code: "// eslint-disable-next-line test\nrequire('fs');\n/* eslint-disable test */\nrequire.resolve('fs');\n/* eslint-enable test */\nrequire('fs');", Options: []any{[]any{"fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 6, Column: 9, EndLine: 6, EndColumn: 13}}},
+		// BigInt strings and branch selection
+		{Code: "require('pkg' + (40n + 2n)); require(`${42n}`); require(0n ? 'path' : 'fs'); require(1n === 1n ? 'fs' : 'path');", Options: []any{[]any{"pkg42", "42", "fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg42' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 27}, {MessageId: "restricted", Message: "'42' module is restricted from being used.", Line: 1, Column: 38, EndLine: 1, EndColumn: 46}, {MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 57, EndLine: 1, EndColumn: 75}, {MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 86, EndLine: 1, EndColumn: 111}}},
+		// BigInt signs division remainder and shifts
+		{Code: "require('' + (-43n / 2n)); require('' + (-43n % 2n)); require('' + (42n << -1n));", Options: []any{[]any{"-21", "-1", "21"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'-21' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 25}, {MessageId: "restricted", Message: "'-1' module is restricted from being used.", Line: 1, Column: 36, EndLine: 1, EndColumn: 52}, {MessageId: "restricted", Message: "'21' module is restricted from being used.", Line: 1, Column: 63, EndLine: 1, EndColumn: 80}}},
+		// BigInt exact mixed comparisons
+		{Code: "require(9007199254740993n > 9007199254740992 ? 'fs' : 'path'); require(1n === 1 ? 'path' : 'fs');", Options: []any{[]any{"fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 61}, {MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 72, EndLine: 1, EndColumn: 96}}},
+		// alias replaces installed module
+		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg": filepath.Join(root.Dir, "server/api.js")}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 14}}},
+		// aliases exact prefix wildcard and fallback
+		{Code: "require('exact'); require('prefix/api'); require('wild-api'); require('fallback');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"exact$": filepath.Join(root.Dir, "server/api.js"), "prefix": filepath.Join(root.Dir, "server"), "wild-*": filepath.Join(root.Dir, "server/*.js"), "fallback": []any{"./absent", filepath.Join(root.Dir, "server/api.js")}}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'exact' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 16}, {MessageId: "restricted", Message: "'prefix/api' module is restricted from being used.", Line: 1, Column: 27, EndLine: 1, EndColumn: 39}, {MessageId: "restricted", Message: "'wild-api' module is restricted from being used.", Line: 1, Column: 50, EndLine: 1, EndColumn: 60}, {MessageId: "restricted", Message: "'fallback' module is restricted from being used.", Line: 1, Column: 71, EndLine: 1, EndColumn: 81}}},
+		// alias chains and cycles
+		{Code: "require('a'); require('cycle');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"a": "b", "b": filepath.Join(root.Dir, "server/api.js"), "cycle": "other", "other": "cycle"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'a' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 12}}},
+		// ordered overlapping aliases
+		{Code: "require('virtual/api');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": []any{map[string]any{"name": "virtual/api", "onlyModule": true, "alias": filepath.Join(root.Dir, "server/api.js")}, map[string]any{"name": "virtual", "alias": "missing"}}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'virtual/api' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 22}}},
+		// extension override replaces shared extensions
+		{Code: "require('./server/custom');", Options: []any{[]any{filepath.Join(root.Dir, "server/custom.ext")}}, Settings: map[string]any{"node": map[string]any{"tryExtensions": []any{".js"}, "resolverConfig": map[string]any{"extensions": []any{".ext"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'./server/custom' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 26}}},
+		// extension alias in JavaScript
+		{Code: "require('./server/mapped.js');", Options: []any{[]any{filepath.Join(root.Dir, "server/mapped.ts")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"extensionAlias": map[string]any{".js": []any{".ts"}}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'./server/mapped.js' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 29}}},
+		// explicit conditions replace require
+		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/esm.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"conditionNames": []any{"import"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 14}}},
+	})
+}
+
+// Upstream also ignores the unrelated package root for this wildcard alias.
+// A disabled subpath must not bypass an absolute restriction on that root.
+func TestNoRestrictedRequireResolverEdges(t *testing.T) {
+	root := restrictedRequireRoot(t)
+	runRestrictedRequireTests(t, root, []rule_tester.ValidTestCase{
+		// Documented limits: upstream reports each of these calls.
+		{Code: "require((1n << 65536n) ? 'fs' : 'path');", Options: []any{[]any{"fs"}}},
+		{Code: "require('./server');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"mainFiles": []any{"api"}}}}},
+		// The equivalent upstream object puts virtual/api before virtual.
+		// Use an alias array when declaration order must be preserved.
+		{Code: "require('virtual/api');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual/api": filepath.Join(root.Dir, "server/api.js"), "virtual": "missing"}}}}},
+	}, []rule_tester.InvalidTestCase{
+		{Code: "require('pkg'); require('pkg/sub');", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/**")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg/*": false}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 14}}},
 	})
 }
 

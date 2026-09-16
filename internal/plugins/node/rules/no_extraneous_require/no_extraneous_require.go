@@ -52,8 +52,6 @@ var NoExtraneousRequireRule = rule.Rule{
 								value := nodeutil.RequireResolutionOptions(ctx, opts)
 								resolution = &value
 							}
-							// As with no-extraneous-import, only resolverConfig.modules
-							// is supported; other overrides have documented differences.
 							if nodeutil.ResolveModule(p, resource, fileName, *resolution) == "" {
 								name = ""
 							}
