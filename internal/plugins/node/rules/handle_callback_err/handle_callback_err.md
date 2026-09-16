@@ -45,13 +45,13 @@ export default [
 
 A string beginning with `^` is a JavaScript regular expression with the Unicode (`u`) flag. For example, `"^.+Error$"` matches `connectionError`. Strings without a leading `^` match a parameter name exactly.
 
+Invalid patterns such as `"^["` cause a configuration error before linting starts.
+
 This rule has no automatic fix or suggestions.
 
 ## Differences from upstream
 
-An invalid regular expression such as `"^["` produces no reports from this rule in rslint. Upstream raises an error when checking a parameter with that pattern. Check that your configured pattern is valid.
-
-Use Unicode category abbreviations such as `\p{L}` instead of long property names such as `\p{Letter}`. For example, with `"^\\p{Letter}+$"`, upstream reports `function f(错误) {}` but rslint does not. Changing the option to `"^\\p{L}+$"` makes both report it.
+Use Unicode category abbreviations such as `\p{L}` instead of long property names such as `\p{Letter}`. For example, rslint rejects `"^\\p{Letter}+$"` as an unsupported pattern, while upstream accepts it and reports `function f(错误) {}`. Changing the option to `"^\\p{L}+$"` makes both report it.
 
 ## Original documentation
 

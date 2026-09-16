@@ -25,11 +25,6 @@ func TestHandleCallbackErrExtras(t *testing.T) {
 			{Code: `function f(err) { try {} catch (error) { var err = 1; } }`},
 			// Constructor parameter properties also have a local parameter binding.
 			{Code: `class C { constructor(public err: Error) { use(err); } }`},
-			// Invalid patterns disable matching instead of throwing as upstream does.
-			{Code: `function f(err) {}`, Options: []any{`^[`}},
-			// The shared regexp engine accepts the category abbreviation L, but not
-			// the long alias Letter. Upstream reports this callback; see the docs.
-			{Code: `function f(错误) {}`, Options: []any{`^\p{Letter}+$`}},
 			// No parameters or a later error parameter.
 			{Code: `function f() {} const g = (data, err) => {};`, FileName: `input.js`, TSConfig: "tsconfig.allowJs.json"},
 			// Explicit default, and empty option falls back to err.
@@ -147,4 +142,38 @@ function g(err) {}`, Errors: []rule_tester.InvalidTestCaseError{expectedAt(4, 1,
 			{Code: `function f(err) { function err() {} }`, FileName: `input.js`, TSConfig: "tsconfig.allowJs.json", Errors: []rule_tester.InvalidTestCaseError{expectedAt(1, 1, 1, 38)}},
 		},
 	)
+}
+
+func TestHandleCallbackErrOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options []any
+		wantErr bool
+	}{
+		{name: "default"},
+		{name: "empty name", options: []any{""}},
+		{name: "literal name", options: []any{"error"}},
+		{name: "literal regexp syntax", options: []any{"["}},
+		{name: "non-leading caret", options: []any{"err^["}},
+		{name: "escaped leading caret", options: []any{`\^[`}},
+		{name: "caret after newline", options: []any{"\n^["}},
+		{name: "name pattern", options: []any{`^(err|error)$`}},
+		{name: "lookahead and backreference", options: []any{`^(?=err)(err)\1$`}},
+		{name: "Unicode category", options: []any{`^\p{L}+$`}},
+		{name: "unclosed class", options: []any{`^[`}, wantErr: true},
+		{name: "unclosed group", options: []any{`^(`}, wantErr: true},
+		{name: "invalid Unicode escape", options: []any{`^\a`}, wantErr: true},
+		// Long property names remain unsupported; reject the configuration
+		// instead of silently disabling the rule. See Differences from upstream.
+		{name: "unsupported Unicode category alias", options: []any{`^\p{Letter}+$`}, wantErr: true},
+		{name: "non-string option", options: []any{true}, wantErr: true},
+		{name: "extra option", options: []any{"err", "error"}, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := handle_callback_err.HandleCallbackErrRule.Schema.Validate(tc.options)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Validate(%#v) = %v; want error: %v", tc.options, err, tc.wantErr)
+			}
+		})
+	}
 }
