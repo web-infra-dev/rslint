@@ -12,6 +12,11 @@ interface ExpectedError {
   endColumn: number;
 }
 
+interface LanguageOptions {
+  globals?: Record<string, 'readonly' | 'writable' | 'off'>;
+  sourceType?: 'script' | 'module' | 'commonjs';
+}
+
 interface TestCase {
   name?: string;
   skip?: string;
@@ -19,6 +24,7 @@ interface TestCase {
   filename?: string;
   options?: unknown[];
   settings?: Record<string, unknown>;
+  languageOptions?: LanguageOptions;
   errors?: (string | ExpectedError)[];
   output?: string;
 }
@@ -39,10 +45,7 @@ export class RuleTester {
   constructor(
     private readonly config: {
       fixtureFiles?: Record<string, string>;
-      languageOptions?: {
-        globals?: Record<string, 'readonly' | 'writable' | 'off'>;
-        sourceType?: 'script' | 'module' | 'commonjs';
-      };
+      languageOptions?: LanguageOptions;
     } = {},
   ) {}
 
@@ -87,6 +90,11 @@ export class RuleTester {
                   plugins: ['node'],
                   languageOptions: {
                     ...this.config.languageOptions,
+                    ...item.languageOptions,
+                    globals: {
+                      ...this.config.languageOptions?.globals,
+                      ...item.languageOptions?.globals,
+                    },
                     parserOptions: { projectService: false },
                   },
                   settings: item.settings,

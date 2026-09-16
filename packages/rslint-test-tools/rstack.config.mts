@@ -169,6 +169,7 @@ define.test({
     './tests/eslint/rules/no-warning-comments.test.ts',
     // eslint-plugin-node
     './tests/eslint-plugin-node/rules/callback-return.test.ts',
+    './tests/eslint-plugin-node/rules/exports-style.test.ts',
     './tests/eslint-plugin-node/rules/global-require.test.ts',
     './tests/eslint-plugin-node/rules/handle-callback-err.test.ts',
     './tests/eslint-plugin-node/rules/hashbang.test.ts',
