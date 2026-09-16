@@ -18,6 +18,14 @@ func TestValidExpectWithPromiseExtras(t *testing.T) {
 		{Code: `declare const subject: { value: Promise<number> }; (expect(subject) as any).to.have.property('value').and.resolves.toBe(1);`},
 		{Code: `async function check(subject: { value: Promise<number> }) { await (expect(subject) as any).to.have.property('value').and.resolves.toBe(1); }`},
 		{Code: `declare const subject: { value: Promise<number> }; expect(subject).to.have.ownProperty('value').and.resolves.toBe(1);`},
+		{Code: `expect({ p: Promise.resolve(1) }).property('p');`},
+		{Code: `expect({ p: 1 }).property('p').toEqual(1);`},
+		{Code: `expect({ p: Promise.resolve(1) }).property('p').resolves.toEqual(1);`},
+		{Code: `class PromiseWithValue extends Promise<number> { value = 1 } declare const subject: PromiseWithValue; expect(subject).property('value');`},
+		{Code: `class PromiseWithValue extends Promise<number> { value = 1 } declare const subject: PromiseWithValue; expect(subject).property('value').toEqual(1);`},
+		{Code: `declare const key: string; expect({ p: Promise.resolve(1) }).property(key).toEqual(1);`},
+		{Code: `expect({ a: { p: Promise.resolve(1) } }).nested.property('a.p').toEqual(1);`},
+		{Code: `(import.meta.other.expect(1) as any).resolves.toBe(1);`},
 		{Code: `declare const subject: { nested: { value: Promise<number> } }; expect(subject).to.have.nested.property('nested.value').and.resolves.toBe(1);`},
 		{Code: `declare const subject: Iterable<number> & { then(a: () => void, b: () => void): unknown }; expect(subject).toContain(1).resolves.toBe(1);`, Options: thenables},
 		{Code: `declare const subject: (() => void) & { then(a: () => void, b: () => void): unknown }; expect(subject).toThrow().resolves.toBe(1);`, Options: thenables},
@@ -139,6 +147,13 @@ func TestValidExpectWithPromiseExtras(t *testing.T) {
 		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve", Message: "Subject is not a promise so " + modifier + " is not needed"}}})
 	}
 	for _, code := range []string{
+		`class PromiseWithValue extends Promise<number> { value = 1 } declare const subject: PromiseWithValue; expect(subject).toBeDefined().property('value').toEqual(1);`,
+		`expect({ p: Promise.resolve(1) }).property('p').toEqual(1);`,
+		`expect({ p: Promise.resolve(1) }).ownProperty('p').toEqual(1);`,
+		`expect({ p: Promise.resolve(1) }).haveOwnProperty('p').toEqual(1);`,
+		`(expect(Promise.resolve(1)) satisfies unknown).toBe(1);`,
+		`expect(Promise.resolve(1))!.toBe(1);`,
+		`(((expect(Promise.resolve(1)) as any)!) satisfies unknown).toBe(1);`,
 		`declare const x: PromiseLike<number>; expect(x).toBe(1);`,
 		customPromiseDeclaration + ` function f<T extends CustomPromise<number>>(x: T) { expect(x).toBe(1); }`,
 		customPromiseDeclaration + ` declare const x: CustomPromise<number> | CustomPromise<string>; expect(x).toBe(1);`,
@@ -153,6 +168,10 @@ func TestValidExpectWithPromiseExtras(t *testing.T) {
 		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: thenables, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "poorlyExpectedPromise"}}})
 	}
 	invalid = append(invalid,
+		rule_tester.InvalidTestCase{Code: `expect({ p: 1 }).property('p').resolves.toEqual(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
+		rule_tester.InvalidTestCase{Code: `(import.meta.rstest.expect(1) as any).resolves.toBe(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
+		rule_tester.InvalidTestCase{Code: `(import.meta.rstest.expect(1) satisfies unknown).resolves.toBe(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
+		rule_tester.InvalidTestCase{Code: `import.meta.rstest.expect(1)!.resolves.toBe(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},
 		rule_tester.InvalidTestCase{Code: `expect(1)["resolves"].toBe(1);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve", Line: 1, Column: 11, EndLine: 1, EndColumn: 21}}},
 		rule_tester.InvalidTestCase{Code: "expect(1)[`rejects`].toBe(1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve", Line: 1, Column: 11, EndLine: 1, EndColumn: 20}}},
 		rule_tester.InvalidTestCase{Code: `declare const x: { then(a: () => void): unknown }; expect(x).resolves.toBe(1);`, Options: thenables, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unneededRejectResolve"}}},

@@ -32,7 +32,7 @@ var ValidExpectWithPromiseRule = rule.Rule{
 				(checkThenables && isStrictThenable(ctx.TypeChecker, node, typ))
 		}
 		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) {
-			parsed := analysis.ParseExpectCallThroughTypeAssertions(node)
+			parsed := analysis.ParseExpectCallThroughTransparentExpressions(node)
 			if parsed == nil || parsed.Reason != rstestUtils.RstestExpectParseReasonNone ||
 				(parsed.Entry != rstestUtils.RstestExpectEntryCall && parsed.Entry != rstestUtils.RstestExpectEntrySoft) {
 				return
@@ -44,15 +44,20 @@ var ValidExpectWithPromiseRule = rule.Rule{
 			subject := arguments[0]
 			modifier := parsed.PromiseModifierEntry()
 			typ := ctx.TypeChecker.GetTypeAtLocation(subject)
-			if modifier != nil {
-				var known bool
-				typ, known = promiseSubjectTypeAtModifier(ctx.TypeChecker, parsed, modifier, typ)
-				if !known {
-					return
-				}
+			typ, poorlyExpected, known := analyzePromiseSubject(
+				ctx.TypeChecker, parsed, modifier, typ, func(typ *checker.Type) bool {
+					return isPromise(subject, typ)
+				},
+			)
+			if poorlyExpected {
+				ctx.ReportNode(parsed.Expression, rule.RuleMessage{Id: "poorlyExpectedPromise", Description: "Subject is a promise so resolve or reject should be used"})
+				return
+			}
+			if modifier == nil || !known {
+				return
 			}
 			promise := false
-			if modifier != nil && modifier.Name == "rejects" {
+			if modifier.Name == "rejects" {
 				// Rstest invokes callable subjects before testing their returned value.
 				promise = utils.Every(utils.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, typ)), func(part *checker.Type) bool {
 					signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, part, checker.SignatureKindCall)
@@ -65,26 +70,42 @@ var ValidExpectWithPromiseRule = rule.Rule{
 			} else {
 				promise = isPromise(subject, typ)
 			}
-			if promise && modifier == nil {
-				ctx.ReportNode(parsed.Expression, rule.RuleMessage{Id: "poorlyExpectedPromise", Description: "Subject is a promise so resolve or reject should be used"})
-			} else if !promise && modifier != nil {
+			if !promise {
 				ctx.ReportNode(modifier.Node, rule.RuleMessage{Id: "unneededRejectResolve", Description: "Subject is not a promise so " + modifier.Name + " is not needed"})
 			}
 		}}
 	},
 }
 
-func promiseSubjectTypeAtModifier(
+// analyzePromiseSubject follows the Chai assertion chain once. Matchers inspect
+// the current subject before any subject transformation they perform; for
+// example, property('value') checks the original object and only then makes the
+// selected property the subject of subsequent matchers and modifiers.
+func analyzePromiseSubject(
 	typeChecker *checker.Checker,
 	parsed *rstestUtils.ParsedRstestExpectCall,
 	modifier *rstestUtils.ParsedRstestFnMemberEntry,
 	typ *checker.Type,
-) (*checker.Type, bool) {
+	isPromise func(*checker.Type) bool,
+) (*checker.Type, bool, bool) {
 	nested := false
+	matcherIndex := 0
+	subjectUnchecked := true
 	for i := range parsed.MemberEntries {
 		entry := &parsed.MemberEntries[i]
-		if entry.Node == modifier.Node {
-			return typ, true
+		if modifier != nil && entry.Node == modifier.Node {
+			return typ, false, true
+		}
+		isMatcher := matcherIndex < len(parsed.Matchers) &&
+			parsed.Matchers[matcherIndex].Entry.Node == entry.Node
+		if isMatcher {
+			matcherIndex++
+			if modifier == nil && !isChaiPropertySubjectTransform(entry) && subjectUnchecked {
+				subjectUnchecked = false
+				if isPromise(typ) {
+					return typ, true, true
+				}
+			}
 		}
 		switch entry.Name {
 		case "nested":
@@ -94,24 +115,37 @@ func promiseSubjectTypeAtModifier(
 		case "property", "ownProperty", "haveOwnProperty":
 			call := rstestUtils.MatcherCall(entry)
 			if call == nil || nested || len(call.AsCallExpression().Arguments.Nodes) == 0 {
-				return nil, false
+				return nil, false, false
 			}
 			name, ok := utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(call.AsCallExpression().Arguments.Nodes[0]))
 			if !ok {
-				return nil, false
+				return nil, false, false
 			}
 			typ = typeChecker.GetTypeOfPropertyOfType(typ, name)
 			if typ == nil {
-				return nil, false
+				return nil, false, false
 			}
+			subjectUnchecked = true
 		case "ownPropertyDescriptor", "haveOwnPropertyDescriptor",
 			"throw", "throws", "Throw", "toThrow", "toThrowError", "toContain":
 			if rstestUtils.MatcherCall(entry) != nil {
-				return nil, false
+				return nil, false, false
 			}
 		}
 	}
-	return nil, false
+	return typ, false, modifier == nil
+}
+
+func isChaiPropertySubjectTransform(entry *rstestUtils.ParsedRstestFnMemberEntry) bool {
+	if entry == nil || rstestUtils.MatcherCall(entry) == nil {
+		return false
+	}
+	switch entry.Name {
+	case "property", "ownProperty", "haveOwnProperty":
+		return true
+	default:
+		return false
+	}
 }
 
 func callableReturnType(typeChecker *checker.Checker, subject *ast.Node, typ *checker.Type) (*checker.Type, bool) {

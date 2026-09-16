@@ -18,6 +18,10 @@ ruleTester.run('valid-expect-with-promise', {} as never, {
     {
       code: `declare const subject: { value: Promise<number> }; (expect(subject) as any).to.have.property('value').and.resolves.toBe(1)`,
     },
+    { code: `expect({ value: Promise.resolve(1) }).property('value')` },
+    {
+      code: `expect({ value: Promise.resolve(1) }).property('value').resolves.toBe(1)`,
+    },
   ],
   invalid: [
     {
@@ -30,6 +34,22 @@ ruleTester.run('valid-expect-with-promise', {} as never, {
           column: 1,
         },
       ],
+    },
+    {
+      code: `(expect(Promise.resolve()) satisfies unknown).toBe(1)`,
+      errors: [{ messageId: 'poorlyExpectedPromise' }],
+    },
+    {
+      code: `expect(Promise.resolve())!.toBe(1)`,
+      errors: [{ messageId: 'poorlyExpectedPromise' }],
+    },
+    {
+      code: `expect({ value: Promise.resolve(1) }).property('value').toBe(1)`,
+      errors: [{ messageId: 'poorlyExpectedPromise' }],
+    },
+    {
+      code: `(import.meta.rstest.expect(1) as any).resolves.toBe(1)`,
+      errors: [{ messageId: 'unneededRejectResolve' }],
     },
     {
       code: 'expect("hello world").resolves.toContain(1)',

@@ -179,19 +179,20 @@ func (analysis *RstestCallAnalysis) ParseExpectCall(
 	return parsed
 }
 
-// ParseExpectCallThroughTypeAssertions parses an expect chain whose receiver
-// may be wrapped in a TypeScript type assertion. It is opt-in so existing
-// parser consumers retain their established assertion-boundary behavior.
-func (analysis *RstestCallAnalysis) ParseExpectCallThroughTypeAssertions(node *ast.Node) *ParsedRstestExpectCall {
+// ParseExpectCallThroughTransparentExpressions parses an expect chain through
+// TypeScript expression wrappers that preserve its JavaScript runtime value.
+// It is opt-in so existing parser consumers retain their established wrapper
+// boundaries.
+func (analysis *RstestCallAnalysis) ParseExpectCallThroughTransparentExpressions(node *ast.Node) *ParsedRstestExpectCall {
 	analysis.Callbacks()
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return nil
 	}
-	root := testFramework.ResolveFirstIdentifierThroughTypeAssertions(node.AsCallExpression().Expression)
+	root := testFramework.ResolveFirstIdentifierThroughTransparentExpressions(node.AsCallExpression().Expression)
 	if root != nil && root.Kind == ast.KindIdentifier && analysis.candidates[root.AsIdentifier().Text]&rstestCandidateExpect == 0 {
 		return nil
 	}
-	return parseRstestExpectCallWithTypeAssertions(node, analysis)
+	return parseRstestExpectCallThroughTransparentExpressions(node, analysis)
 }
 
 func (analysis *RstestCallAnalysis) Callbacks() RstestTestCallbacks {

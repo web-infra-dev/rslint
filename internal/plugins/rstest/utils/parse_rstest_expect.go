@@ -4,7 +4,7 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -259,7 +259,7 @@ func parseRstestExpectCall(
 	return parseRstestExpectCallOptions(node, analysis, false)
 }
 
-func parseRstestExpectCallWithTypeAssertions(
+func parseRstestExpectCallThroughTransparentExpressions(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
 ) *ParsedRstestExpectCall {
@@ -269,17 +269,17 @@ func parseRstestExpectCallWithTypeAssertions(
 func parseRstestExpectCallOptions(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
-	throughTypeAssertions bool,
+	throughTransparentExpressions bool,
 ) *ParsedRstestExpectCall {
-	if node == nil || node.Kind != ast.KindCallExpression || findTopMostCallExpression(node, throughTypeAssertions) != node {
+	if node == nil || node.Kind != ast.KindCallExpression || findTopMostCallExpression(node, throughTransparentExpressions) != node {
 		return nil
 	}
-	expression := findTopMostRstestExpectExpressionOptions(node, throughTypeAssertions)
+	expression := findTopMostRstestExpectExpressionOptions(node, throughTransparentExpressions)
 	entries := testFramework.GetMemberEntries(expression)
-	if throughTypeAssertions {
-		entries = testFramework.GetMemberEntriesThroughTypeAssertions(expression)
+	if throughTransparentExpressions {
+		entries = testFramework.GetMemberEntriesThroughTransparentExpressions(expression)
 	}
-	match := rstestExpectMemberMatch(node, entries, analysis)
+	match := rstestExpectMemberMatch(node, entries, analysis, throughTransparentExpressions)
 	if !match.ok {
 		return nil
 	}
@@ -328,59 +328,65 @@ func FindTopMostCallExpression(node *ast.Node) *ast.Node {
 	return findTopMostCallExpression(node, false)
 }
 
-func findTopMostCallExpression(node *ast.Node, throughTypeAssertions bool) *ast.Node {
+func findTopMostCallExpression(node *ast.Node, throughTransparentExpressions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression:
-		case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-			if !throughTypeAssertions || parent.Expression() != current {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			// Parentheses are always transparent to call-chain parsing.
+		} else if expression, ok := internalUtils.TransparentExpression(parent); ok {
+			if !throughTransparentExpressions || expression != current {
 				return top
 			}
-		case ast.KindCallExpression:
-			if parent.AsCallExpression().Expression != current {
+		} else {
+			switch parent.Kind {
+			case ast.KindCallExpression:
+				if parent.AsCallExpression().Expression != current {
+					return top
+				}
+				top = parent
+			case ast.KindPropertyAccessExpression:
+				if parent.AsPropertyAccessExpression().Expression != current {
+					return top
+				}
+			case ast.KindElementAccessExpression:
+				if parent.AsElementAccessExpression().Expression != current {
+					return top
+				}
+			default:
 				return top
 			}
-			top = parent
-		case ast.KindPropertyAccessExpression:
-			if parent.AsPropertyAccessExpression().Expression != current {
-				return top
-			}
-		case ast.KindElementAccessExpression:
-			if parent.AsElementAccessExpression().Expression != current {
-				return top
-			}
-		default:
-			return top
 		}
 		current, parent = parent, parent.Parent
 	}
 	return top
 }
 
-func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTypeAssertions bool) *ast.Node {
+func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTransparentExpressions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression:
-		case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-			if !throughTypeAssertions || parent.Expression() != current {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			// Parentheses are always transparent to expect-chain parsing.
+		} else if expression, ok := internalUtils.TransparentExpression(parent); ok {
+			if !throughTransparentExpressions || expression != current {
 				return top
 			}
-		case ast.KindPropertyAccessExpression:
-			if parent.AsPropertyAccessExpression().Expression != current {
+		} else {
+			switch parent.Kind {
+			case ast.KindPropertyAccessExpression:
+				if parent.AsPropertyAccessExpression().Expression != current {
+					return top
+				}
+				top = parent
+			case ast.KindElementAccessExpression:
+				if parent.AsElementAccessExpression().Expression != current {
+					return top
+				}
+				top = parent
+			default:
 				return top
 			}
-			top = parent
-		case ast.KindElementAccessExpression:
-			if parent.AsElementAccessExpression().Expression != current {
-				return top
-			}
-			top = parent
-		default:
-			return top
 		}
 		current, parent = parent, parent.Parent
 	}
@@ -409,8 +415,9 @@ func rstestExpectMemberMatch(
 	node *ast.Node,
 	entries []testFramework.MemberEntry,
 	analysis *RstestCallAnalysis,
+	throughTransparentExpressions bool,
 ) rstestExpectMatch {
-	if isImportMetaRstestExpectCall(node) {
+	if isImportMetaRstestExpectCallOptions(node, throughTransparentExpressions) {
 		// GetMemberEntries cannot represent the import.meta prefix and starts
 		// the chain at the rstest property, so expect sits at index 1.
 		if len(entries) > 1 && entries[1].Name == "expect" {
@@ -799,7 +806,7 @@ func classifyRstestExpectRoot(
 	for _, declaration := range symbol.Declarations {
 		switch declaration.Kind {
 		case ast.KindVariableDeclaration, ast.KindBindingElement:
-			if utils.IsVariableWriteReference(declaration.Name()) {
+			if internalUtils.IsVariableWriteReference(declaration.Name()) {
 				initializations++
 			}
 		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindFunctionDeclaration:
@@ -811,7 +818,7 @@ func classifyRstestExpectRoot(
 	}
 	if ctx.Refs != nil {
 		for _, reference := range ctx.Refs.References(symbol) {
-			if utils.IsWriteReference(reference) {
+			if internalUtils.IsWriteReference(reference) {
 				return rstestExpectRoot{Kind: rstestExpectRootNone}
 			}
 		}
@@ -850,11 +857,15 @@ func classifyRstestExpectRoot(
 }
 
 func isImportMetaRstestExpectCall(node *ast.Node) bool {
+	return isImportMetaRstestExpectCallOptions(node, false)
+}
+
+func isImportMetaRstestExpectCallOptions(node *ast.Node, throughTransparentExpressions bool) bool {
 	call := node.AsCallExpression()
 	if call == nil {
 		return false
 	}
-	_, parts, _, ok := parseImportMetaRstestChain(call.Expression)
+	_, parts, _, ok := parseImportMetaRstestChainOptions(call.Expression, throughTransparentExpressions)
 	return ok && len(parts) > 0 && parts[0].name == "expect"
 }
 

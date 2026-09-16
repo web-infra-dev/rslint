@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // GetMemberEntries extracts identifiers and static property names from a
@@ -14,13 +15,15 @@ func GetMemberEntries(node *ast.Node) []MemberEntry {
 	return getMemberEntries(node, false)
 }
 
-// GetMemberEntriesThroughTypeAssertions extracts a member chain while treating
-// TypeScript type assertions as runtime-transparent wrappers.
-func GetMemberEntriesThroughTypeAssertions(node *ast.Node) []MemberEntry {
+// GetMemberEntriesThroughTransparentExpressions extracts a member chain while
+// treating TypeScript's runtime-transparent expression wrappers as part of the
+// chain. The ordinary helper deliberately preserves those wrappers as parsing
+// boundaries for existing consumers.
+func GetMemberEntriesThroughTransparentExpressions(node *ast.Node) []MemberEntry {
 	return getMemberEntries(node, true)
 }
 
-func getMemberEntries(node *ast.Node, throughTypeAssertions bool) []MemberEntry {
+func getMemberEntries(node *ast.Node, throughTransparentExpressions bool) []MemberEntry {
 	if node == nil {
 		return nil
 	}
@@ -28,12 +31,9 @@ func getMemberEntries(node *ast.Node, throughTypeAssertions bool) []MemberEntry 
 	if node == nil {
 		return nil
 	}
-	if throughTypeAssertions {
-		switch node.Kind {
-		case ast.KindAsExpression:
-			return getMemberEntries(node.AsAsExpression().Expression, true)
-		case ast.KindTypeAssertionExpression:
-			return getMemberEntries(node.AsTypeAssertion().Expression, true)
+	if throughTransparentExpressions {
+		if expression, ok := internalUtils.TransparentExpression(node); ok {
+			return getMemberEntries(expression, true)
 		}
 	}
 	switch node.Kind {
@@ -44,7 +44,7 @@ func getMemberEntries(node *ast.Node, throughTypeAssertions bool) []MemberEntry 
 		}}
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression()
-		left := getMemberEntries(property.Expression, throughTypeAssertions)
+		left := getMemberEntries(property.Expression, throughTransparentExpressions)
 		nameNode := property.Name()
 		if name := propertyName(nameNode); name != "" {
 			return append(left, MemberEntry{
@@ -55,7 +55,7 @@ func getMemberEntries(node *ast.Node, throughTypeAssertions bool) []MemberEntry 
 		return left
 	case ast.KindElementAccessExpression:
 		element := node.AsElementAccessExpression()
-		left := getMemberEntries(element.Expression, throughTypeAssertions)
+		left := getMemberEntries(element.Expression, throughTransparentExpressions)
 		nameNode := ast.SkipParentheses(element.ArgumentExpression)
 		if name := elementAccessName(nameNode); name != "" {
 			return append(left, MemberEntry{
@@ -65,13 +65,13 @@ func getMemberEntries(node *ast.Node, throughTypeAssertions bool) []MemberEntry 
 		}
 		return nil
 	case ast.KindCallExpression:
-		entries := getMemberEntries(node.AsCallExpression().Expression, throughTypeAssertions)
+		entries := getMemberEntries(node.AsCallExpression().Expression, throughTransparentExpressions)
 		if len(entries) > 0 {
 			entries[len(entries)-1].Call = node
 		}
 		return entries
 	case ast.KindTaggedTemplateExpression:
-		return getMemberEntries(node.AsTaggedTemplateExpression().Tag, throughTypeAssertions)
+		return getMemberEntries(node.AsTaggedTemplateExpression().Tag, throughTransparentExpressions)
 	default:
 		return nil
 	}
@@ -214,13 +214,14 @@ func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	return resolveFirstIdentifier(node, false)
 }
 
-// ResolveFirstIdentifierThroughTypeAssertions resolves the first identifier
-// while treating TypeScript type assertions as runtime-transparent wrappers.
-func ResolveFirstIdentifierThroughTypeAssertions(node *ast.Node) *ast.Node {
+// ResolveFirstIdentifierThroughTransparentExpressions resolves the first
+// identifier while treating TypeScript's runtime-transparent expression
+// wrappers as part of the surrounding call/member chain.
+func ResolveFirstIdentifierThroughTransparentExpressions(node *ast.Node) *ast.Node {
 	return resolveFirstIdentifier(node, true)
 }
 
-func resolveFirstIdentifier(node *ast.Node, throughTypeAssertions bool) *ast.Node {
+func resolveFirstIdentifier(node *ast.Node, throughTransparentExpressions bool) *ast.Node {
 	if node == nil {
 		return nil
 	}
@@ -228,12 +229,9 @@ func resolveFirstIdentifier(node *ast.Node, throughTypeAssertions bool) *ast.Nod
 	if node == nil {
 		return nil
 	}
-	if throughTypeAssertions {
-		switch node.Kind {
-		case ast.KindAsExpression:
-			return resolveFirstIdentifier(node.AsAsExpression().Expression, true)
-		case ast.KindTypeAssertionExpression:
-			return resolveFirstIdentifier(node.AsTypeAssertion().Expression, true)
+	if throughTransparentExpressions {
+		if expression, ok := internalUtils.TransparentExpression(node); ok {
+			return resolveFirstIdentifier(expression, true)
 		}
 	}
 
@@ -241,17 +239,17 @@ func resolveFirstIdentifier(node *ast.Node, throughTypeAssertions bool) *ast.Nod
 	case ast.KindIdentifier:
 		return node
 	case ast.KindCallExpression:
-		return resolveFirstIdentifier(node.AsCallExpression().Expression, throughTypeAssertions)
+		return resolveFirstIdentifier(node.AsCallExpression().Expression, throughTransparentExpressions)
 	case ast.KindPropertyAccessExpression:
-		return resolveFirstIdentifier(node.AsPropertyAccessExpression().Expression, throughTypeAssertions)
+		return resolveFirstIdentifier(node.AsPropertyAccessExpression().Expression, throughTransparentExpressions)
 	case ast.KindElementAccessExpression:
-		return resolveFirstIdentifier(node.AsElementAccessExpression().Expression, throughTypeAssertions)
+		return resolveFirstIdentifier(node.AsElementAccessExpression().Expression, throughTransparentExpressions)
 	case ast.KindTaggedTemplateExpression:
-		return resolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag, throughTypeAssertions)
+		return resolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag, throughTransparentExpressions)
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken {
-			return resolveFirstIdentifier(binary.Right, throughTypeAssertions)
+			return resolveFirstIdentifier(binary.Right, throughTransparentExpressions)
 		}
 		return nil
 	default:
