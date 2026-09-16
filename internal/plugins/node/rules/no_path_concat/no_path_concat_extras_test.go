@@ -85,7 +85,26 @@ func TestNoPathConcatExtras(t *testing.T) {
 		{Code: "import * as ns from \"path\"; let p; ({...p} = ns); __dirname + p.default.sep;"},
 		// array literal alias remains untracked.
 		{Code: "const [load] = [require]; __dirname + load(\"path\").sep;"},
+		// require alias becomes module.
+		{Code: "let p = require; p = p(\"path\"); __dirname + p.sep;"},
+		// namespace alias becomes default.
+		{Code: "import * as ns from \"path\"; let p = ns; p = p.default; __dirname + p.sep;"},
+		// resolve alias is not module.
+		{Code: "const {resolve: load} = require; __dirname + load(\"path\").sep;"},
+		// require and module in destructuring defaults.
+		{Code: "let p; ({p = require} = source); p = p(\"path\"); __dirname + p.sep;"},
 	}, []rule_tester.InvalidTestCase{
+		// independent global writes.
+		{Code: "__dirname + \"/x\"; __filename + \"/y\"; __dirname = other;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 19, 1, 36)}},
+		// independent filename writes.
+		{Code: "__dirname + \"/x\"; __filename + \"/y\"; __filename = other;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 1, 1, 17)}},
+		// property key is not global write.
+		{Code: "({__dirname: target} = obj); __dirname + \"/x\";", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 30, 1, 46)}},
+		// escaped global identifier.
+		// cspell:ignore dirn
+		{Code: "__dirn\\u0061me + \"/x\";", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 1, 1, 22)}},
+		// overwritten direct require alias.
+		{Code: "let load = require; load = other; __dirname + load(\"path\").sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 35, 1, 63)}},
 		// shadowed writes do not invalidate a global.
 		{Code: "function f(__dirname) { __dirname = \"/tmp\"; } __dirname + \"/x\";", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 47, 1, 63)}},
 		// parameter initializer is outside body bindings.

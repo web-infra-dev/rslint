@@ -21,6 +21,10 @@ var NoPathConcatRule = rule.Rule{
 			message rule.RuleMessage
 		}
 		var reports []report
+		var globals [2]struct {
+			references []*ast.Node
+			modified   bool
+		}
 		var separators map[*ast.Node]bool
 		var evaluator *utils.StaticStringEvaluator
 		var startsWithSeparator func(*ast.Node) bool
@@ -135,9 +139,31 @@ var NoPathConcatRule = rule.Rule{
 			}
 		}
 		listeners := rule.RuleListeners{
+			ast.KindIdentifier: func(node *ast.Node) {
+				index := 0
+				switch node.Text() {
+				case "__dirname":
+				case "__filename":
+					index = 1
+				default:
+					return
+				}
+				global := &globals[index]
+				if global.modified || !ctx.Globals.Access(node.Text()).IsDeclared() || !ctx.Refs.IsGlobalReference(node) {
+					return
+				}
+				if utils.IsWriteReference(node) {
+					global.modified = true
+					global.references = nil
+					return
+				}
+				global.references = append(global.references, node)
+			},
 			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
-				for _, node := range nodeutil.CollectUnmodifiedGlobalReferences(ctx, "__dirname", "__filename") {
-					check(node, pathMessage)
+				for _, global := range globals {
+					for _, node := range global.references {
+						check(node, pathMessage)
+					}
 				}
 				// Global references are checked on exit; expose all diagnostics in
 				// source order, preserving duplicate reports on the same template.
