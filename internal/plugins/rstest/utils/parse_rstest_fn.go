@@ -248,6 +248,13 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 }
 
 func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool) {
+	return parseImportMetaRstestChainOptions(node, false)
+}
+
+func parseImportMetaRstestChainOptions(
+	node *ast.Node,
+	throughTransparentExpressions bool,
+) (*ast.Node, []rstestChainPart, bool, bool) {
 	if node == nil {
 		return nil, nil, false, false
 	}
@@ -258,11 +265,16 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 	if isImportMetaRstest(node) {
 		return node, nil, false, true
 	}
+	if throughTransparentExpressions {
+		if expression, ok := internalUtils.TransparentExpression(node); ok {
+			return parseImportMetaRstestChainOptions(expression, true)
+		}
+	}
 
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		property := node.AsPropertyAccessExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChain(property.Expression)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(property.Expression, throughTransparentExpressions)
 		if !ok {
 			return nil, nil, false, false
 		}
@@ -276,7 +288,7 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 		}), rootInvoked, true
 	case ast.KindElementAccessExpression:
 		element := node.AsElementAccessExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChain(element.Expression)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(element.Expression, throughTransparentExpressions)
 		if !ok {
 			return nil, nil, false, false
 		}
@@ -291,7 +303,7 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 		}), rootInvoked, true
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChain(call.Expression)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(call.Expression, throughTransparentExpressions)
 		if !ok {
 			return nil, nil, false, false
 		}
@@ -305,7 +317,7 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 		return root, parts, rootInvoked, true
 	case ast.KindTaggedTemplateExpression:
 		tagged := node.AsTaggedTemplateExpression()
-		root, parts, rootInvoked, ok := parseImportMetaRstestChain(tagged.Tag)
+		root, parts, rootInvoked, ok := parseImportMetaRstestChainOptions(tagged.Tag, throughTransparentExpressions)
 		if !ok || len(parts) == 0 || parts[len(parts)-1].invocation != rstestNotInvoked {
 			return nil, nil, false, false
 		}
@@ -315,7 +327,7 @@ func parseImportMetaRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, b
 		if !internalUtils.IsCommaOperator(node) {
 			return nil, nil, false, false
 		}
-		return parseImportMetaRstestChain(node.AsBinaryExpression().Right)
+		return parseImportMetaRstestChainOptions(node.AsBinaryExpression().Right, throughTransparentExpressions)
 	default:
 		return nil, nil, false, false
 	}

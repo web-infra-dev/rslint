@@ -20,6 +20,23 @@ func SkipAssertionsAndParens(node *ast.Node) *ast.Node {
 	return ast.SkipOuterExpressions(node, skipTransparentKinds)
 }
 
+// TransparentExpression returns the wrapped expression for TypeScript syntax
+// that is erased and therefore preserves the JavaScript runtime value.
+// Parentheses are intentionally excluded because callers walking parent links
+// need to distinguish them, while descending callers can use ast.SkipParentheses.
+func TransparentExpression(node *ast.Node) (*ast.Node, bool) {
+	if node == nil {
+		return nil, false
+	}
+	switch node.Kind {
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression,
+		ast.KindSatisfiesExpression, ast.KindNonNullExpression:
+		return node.Expression(), true
+	default:
+		return nil, false
+	}
+}
+
 // OutermostParenthesizedExpression returns node's outermost
 // ParenthesizedExpression wrapper, or node itself when it is not wrapped.
 // Unlike ast.WalkUpParenthesizedExpressions, this preserves the wrapper that

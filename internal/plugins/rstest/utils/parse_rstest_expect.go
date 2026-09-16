@@ -4,7 +4,7 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -133,6 +133,30 @@ type ParsedRstestExpectCall struct {
 	trailingMembers int
 }
 
+// PromiseModifierEntry includes Chai modifiers after matchers, but not members of an assertion's result.
+func (parsed *ParsedRstestExpectCall) PromiseModifierEntry() *ParsedRstestFnMemberEntry {
+	for i := range parsed.MemberEntries {
+		entry := &parsed.MemberEntries[i]
+		if entry.Call == parsed.Head {
+			continue
+		}
+		if entry.Node == nil || isComputedDynamicMemberName(entry.Node) {
+			return nil
+		}
+		if entry.Name == "then" || entry.Name == "catch" || entry.Name == "finally" {
+			return nil
+		}
+		chain := classifyRstestExpectChainEntry(*entry, false)
+		if chain.Kind == rstestExpectChainUnknown {
+			return nil
+		}
+		if chain.Kind == rstestExpectChainModifier && (entry.Name == "resolves" || entry.Name == "rejects") {
+			return entry
+		}
+	}
+	return nil
+}
+
 func isRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
@@ -232,12 +256,30 @@ func parseRstestExpectCall(
 	node *ast.Node,
 	analysis *RstestCallAnalysis,
 ) *ParsedRstestExpectCall {
-	if node == nil || node.Kind != ast.KindCallExpression || FindTopMostCallExpression(node) != node {
+	return parseRstestExpectCallOptions(node, analysis, false)
+}
+
+func parseRstestExpectCallThroughTransparentExpressions(
+	node *ast.Node,
+	analysis *RstestCallAnalysis,
+) *ParsedRstestExpectCall {
+	return parseRstestExpectCallOptions(node, analysis, true)
+}
+
+func parseRstestExpectCallOptions(
+	node *ast.Node,
+	analysis *RstestCallAnalysis,
+	throughTransparentExpressions bool,
+) *ParsedRstestExpectCall {
+	if node == nil || node.Kind != ast.KindCallExpression || findTopMostCallExpression(node, throughTransparentExpressions) != node {
 		return nil
 	}
-	expression := findTopMostRstestExpectExpression(node)
+	expression := findTopMostRstestExpectExpressionOptions(node, throughTransparentExpressions)
 	entries := testFramework.GetMemberEntries(expression)
-	match := rstestExpectMemberMatch(node, entries, analysis)
+	if throughTransparentExpressions {
+		entries = testFramework.GetMemberEntriesThroughTransparentExpressions(expression)
+	}
+	match := rstestExpectMemberMatch(node, entries, analysis, throughTransparentExpressions)
 	if !match.ok {
 		return nil
 	}
@@ -283,54 +325,68 @@ func ShouldRstestExpectBeAwaited(parsed *ParsedRstestExpectCall, asyncMatchers [
 // head of. Ascending only continues while node stays on the callee side of its
 // parent: a call in argument or computed-key position heads its own chain.
 func FindTopMostCallExpression(node *ast.Node) *ast.Node {
+	return findTopMostCallExpression(node, false)
+}
+
+func findTopMostCallExpression(node *ast.Node, throughTransparentExpressions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression:
-		case ast.KindCallExpression:
-			if parent.AsCallExpression().Expression != current {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			// Parentheses are always transparent to call-chain parsing.
+		} else if expression, ok := internalUtils.TransparentExpression(parent); ok {
+			if !throughTransparentExpressions || expression != current {
 				return top
 			}
-			top = parent
-		case ast.KindPropertyAccessExpression:
-			if parent.AsPropertyAccessExpression().Expression != current {
+		} else {
+			switch parent.Kind {
+			case ast.KindCallExpression:
+				if parent.AsCallExpression().Expression != current {
+					return top
+				}
+				top = parent
+			case ast.KindPropertyAccessExpression:
+				if parent.AsPropertyAccessExpression().Expression != current {
+					return top
+				}
+			case ast.KindElementAccessExpression:
+				if parent.AsElementAccessExpression().Expression != current {
+					return top
+				}
+			default:
 				return top
 			}
-		case ast.KindElementAccessExpression:
-			if parent.AsElementAccessExpression().Expression != current {
-				return top
-			}
-		default:
-			return top
 		}
 		current, parent = parent, parent.Parent
 	}
 	return top
 }
 
-// findTopMostRstestExpectExpression extends the outermost call through a
-// trailing static member chain. This lets the CallExpression-only parser see
-// property-style Chai assertions such as expect(value).to.be.ok without
-// requiring rules to listen for member-access nodes.
-func findTopMostRstestExpectExpression(node *ast.Node) *ast.Node {
+func findTopMostRstestExpectExpressionOptions(node *ast.Node, throughTransparentExpressions bool) *ast.Node {
 	top := node
 	current := node
 	for parent := current.Parent; parent != nil; {
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression:
-		case ast.KindPropertyAccessExpression:
-			if parent.AsPropertyAccessExpression().Expression != current {
+		if parent.Kind == ast.KindParenthesizedExpression {
+			// Parentheses are always transparent to expect-chain parsing.
+		} else if expression, ok := internalUtils.TransparentExpression(parent); ok {
+			if !throughTransparentExpressions || expression != current {
 				return top
 			}
-			top = parent
-		case ast.KindElementAccessExpression:
-			if parent.AsElementAccessExpression().Expression != current {
+		} else {
+			switch parent.Kind {
+			case ast.KindPropertyAccessExpression:
+				if parent.AsPropertyAccessExpression().Expression != current {
+					return top
+				}
+				top = parent
+			case ast.KindElementAccessExpression:
+				if parent.AsElementAccessExpression().Expression != current {
+					return top
+				}
+				top = parent
+			default:
 				return top
 			}
-			top = parent
-		default:
-			return top
 		}
 		current, parent = parent, parent.Parent
 	}
@@ -359,8 +415,9 @@ func rstestExpectMemberMatch(
 	node *ast.Node,
 	entries []testFramework.MemberEntry,
 	analysis *RstestCallAnalysis,
+	throughTransparentExpressions bool,
 ) rstestExpectMatch {
-	if isImportMetaRstestExpectCall(node) {
+	if isImportMetaRstestExpectCallOptions(node, throughTransparentExpressions) {
 		// GetMemberEntries cannot represent the import.meta prefix and starts
 		// the chain at the rstest property, so expect sits at index 1.
 		if len(entries) > 1 && entries[1].Name == "expect" {
@@ -749,7 +806,7 @@ func classifyRstestExpectRoot(
 	for _, declaration := range symbol.Declarations {
 		switch declaration.Kind {
 		case ast.KindVariableDeclaration, ast.KindBindingElement:
-			if utils.IsVariableWriteReference(declaration.Name()) {
+			if internalUtils.IsVariableWriteReference(declaration.Name()) {
 				initializations++
 			}
 		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindFunctionDeclaration:
@@ -761,7 +818,7 @@ func classifyRstestExpectRoot(
 	}
 	if ctx.Refs != nil {
 		for _, reference := range ctx.Refs.References(symbol) {
-			if utils.IsWriteReference(reference) {
+			if internalUtils.IsWriteReference(reference) {
 				return rstestExpectRoot{Kind: rstestExpectRootNone}
 			}
 		}
@@ -800,11 +857,15 @@ func classifyRstestExpectRoot(
 }
 
 func isImportMetaRstestExpectCall(node *ast.Node) bool {
+	return isImportMetaRstestExpectCallOptions(node, false)
+}
+
+func isImportMetaRstestExpectCallOptions(node *ast.Node, throughTransparentExpressions bool) bool {
 	call := node.AsCallExpression()
 	if call == nil {
 		return false
 	}
-	_, parts, _, ok := parseImportMetaRstestChain(call.Expression)
+	_, parts, _, ok := parseImportMetaRstestChainOptions(call.Expression, throughTransparentExpressions)
 	return ok && len(parts) > 0 && parts[0].name == "expect"
 }
 

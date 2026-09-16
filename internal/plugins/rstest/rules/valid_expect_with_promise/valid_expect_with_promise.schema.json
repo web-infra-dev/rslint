@@ -1,0 +1,13 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "checkThenables": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "maxItems": 1
+}

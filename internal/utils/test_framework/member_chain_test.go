@@ -98,6 +98,62 @@ func TestGetMemberEntriesRejectsDynamicElementAccess(t *testing.T) {
 	}
 }
 
+func TestMemberChainTransparentExpressionPolicy(t *testing.T) {
+	tests := []string{
+		`(expect(value) as any).resolves.toBe(1)`,
+		`(<any>expect(value)).resolves.toBe(1)`,
+		`(expect(value) satisfies unknown).resolves.toBe(1)`,
+		`expect(value)!.resolves.toBe(1)`,
+		`(((expect(value) as any)!) satisfies unknown).resolves.toBe(1)`,
+	}
+	for _, code := range tests {
+		t.Run(code, func(t *testing.T) {
+			_, call := parseFirstCall(t, code)
+			entries := GetMemberEntries(call)
+			defaultNames := make([]string, len(entries))
+			for i, entry := range entries {
+				defaultNames[i] = entry.Name
+			}
+			if want := []string{"resolves", "toBe"}; !slices.Equal(defaultNames, want) {
+				t.Fatalf("default member names = %v, want wrapper-bounded suffix %v", defaultNames, want)
+			}
+			entries = GetMemberEntriesThroughTransparentExpressions(call)
+			names := make([]string, len(entries))
+			for i, entry := range entries {
+				names[i] = entry.Name
+			}
+			want := []string{"expect", "resolves", "toBe"}
+			if !slices.Equal(names, want) {
+				t.Fatalf("transparent member names = %v, want %v", names, want)
+			}
+
+			root := ResolveFirstIdentifierThroughTransparentExpressions(call.AsCallExpression().Expression)
+			if root == nil || root.Kind != ast.KindIdentifier || root.AsIdentifier().Text != "expect" {
+				t.Fatalf("transparent first identifier = %#v, want expect", root)
+			}
+		})
+	}
+}
+
+func TestTransparentTraversalDoesNotCrossNonReceiverPositions(t *testing.T) {
+	tests := []struct {
+		code string
+		want string
+	}{
+		{`consume(expect(value) as any)`, "consume"},
+		{`receiver[expect(value) as any]()`, "receiver"},
+	}
+	for _, test := range tests {
+		t.Run(test.code, func(t *testing.T) {
+			_, call := parseFirstCall(t, test.code)
+			root := ResolveFirstIdentifierThroughTransparentExpressions(call.AsCallExpression().Expression)
+			if root == nil || root.Kind != ast.KindIdentifier || root.AsIdentifier().Text != test.want {
+				t.Fatalf("first identifier = %#v, want %s", root, test.want)
+			}
+		})
+	}
+}
+
 func TestResolveFirstIdentifier(t *testing.T) {
 	_, call := parseFirstCall(t, "((test).each)`table`('name', () => {})")
 	identifier := ResolveFirstIdentifier(call.AsCallExpression().Expression)

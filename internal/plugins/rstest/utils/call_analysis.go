@@ -179,6 +179,22 @@ func (analysis *RstestCallAnalysis) ParseExpectCall(
 	return parsed
 }
 
+// ParseExpectCallThroughTransparentExpressions parses an expect chain through
+// TypeScript expression wrappers that preserve its JavaScript runtime value.
+// It is opt-in so existing parser consumers retain their established wrapper
+// boundaries.
+func (analysis *RstestCallAnalysis) ParseExpectCallThroughTransparentExpressions(node *ast.Node) *ParsedRstestExpectCall {
+	analysis.Callbacks()
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return nil
+	}
+	root := testFramework.ResolveFirstIdentifierThroughTransparentExpressions(node.AsCallExpression().Expression)
+	if root != nil && root.Kind == ast.KindIdentifier && analysis.candidates[root.AsIdentifier().Text]&rstestCandidateExpect == 0 {
+		return nil
+	}
+	return parseRstestExpectCallThroughTransparentExpressions(node, analysis)
+}
+
 func (analysis *RstestCallAnalysis) Callbacks() RstestTestCallbacks {
 	return *analysis.callbacksRef()
 }
