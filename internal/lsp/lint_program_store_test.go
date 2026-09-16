@@ -727,6 +727,7 @@ func TestLintProgramStoreProjectServiceTracksMissingReferences(t *testing.T) {
 	first, state := load()
 	if state == nil {
 		t.Fatal("missing reference prevented resident Program creation")
+		return
 	}
 	if _, tracked := state.failedLookups[lintProgramLexicalPathID(refPath, server.fs)]; !tracked {
 		t.Fatal("missing external reference bypassed failed-lookup tracking")

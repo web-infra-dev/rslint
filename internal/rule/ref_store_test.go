@@ -830,6 +830,7 @@ func TestRefStoreTypeOnlyExportCheckerFallbackRespectsMeaningAndShadowing(t *tes
 	target := refs.Resolve(specifierIdent)
 	if target == nil {
 		t.Fatal("Resolve(type-only export HTMLElement) = nil, want the global type symbol")
+		return
 	}
 	if target == localValue {
 		t.Fatal("type-only export resolved to the shadowing local value symbol")
@@ -1052,6 +1053,7 @@ func TestRefStoreLocalExportCheckerFallbackResolvesGlobalValue(t *testing.T) {
 	target := refs.Resolve(specifierIdent)
 	if target == nil {
 		t.Fatal("Resolve(local export window) = nil, want the global value symbol")
+		return
 	}
 	if target.Flags&ast.SymbolFlagsValue == 0 {
 		t.Fatalf("resolved checker symbol flags = %v, want a value-capable symbol", target.Flags)
