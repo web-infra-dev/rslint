@@ -2,6 +2,7 @@
 package nodeutil
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -16,32 +17,30 @@ import (
 
 var npmSpecifier = esregexp.MustCompile(`^(@[\w~-][\w.~-]*/)?[\w~-][\w.~-]*`, "")
 
+// ImportVisitorOptions selects which literal imports the rule checks.
+// IgnoreTypeImport applies to import declarations, not type-only re-exports.
+type ImportVisitorOptions struct {
+	IncludeCore      bool
+	IgnoreTypeImport bool
+}
+
 // VisitImports shares the literal import/export shapes used by the Node rules.
-// ignoreTypeImport applies to import declarations, not type-only re-exports.
-func VisitImports(ignoreTypeImport bool, check func(*ast.Node, string, bool)) rule.RuleListeners {
+func VisitImports(options ImportVisitorOptions, check func(*ast.Node, string, bool)) rule.RuleListeners {
 	visit := func(source *ast.Node, typeOnly bool) {
 		if source == nil {
 			return
 		}
-		var specifier string
 		switch source.Kind {
-		case ast.KindStringLiteral:
-			// Preserve the JavaScript value. Lone surrogates have a documented
-			// display difference when a missing-import diagnostic is serialized.
-			specifier = source.Text()
-		case ast.KindBigIntLiteral:
-			specifier = utils.NormalizeBigIntLiteral(source.Text())
-		case ast.KindNumericLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral:
-			var ok bool
-			specifier, ok = utils.NewStaticStringEvaluatorWithoutScope().EvalToString(source)
-			if !ok {
-				return
-			}
+		case ast.KindStringLiteral, ast.KindBigIntLiteral, ast.KindNumericLiteral,
+			ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral:
+			// Only ESTree literals qualify. The shared helper preserves JS
+			// number rounding, BigInt values and canonical regexp flags.
 		default:
 			return
 		}
+		specifier, _ := utils.GetStaticExpressionValue(source)
 		specifier, _, _ = strings.Cut(specifier, "!")
-		if isNodeBuiltin(specifier) {
+		if !options.IncludeCore && isNodeBuiltin(specifier) {
 			return
 		}
 		check(source, specifier, typeOnly)
@@ -50,7 +49,7 @@ func VisitImports(ignoreTypeImport bool, check func(*ast.Node, string, bool)) ru
 		ast.KindImportDeclaration: func(node *ast.Node) {
 			declaration := node.AsImportDeclaration()
 			typeOnly := declaration.ImportClause != nil && declaration.ImportClause.AsImportClause().IsTypeOnly()
-			if !ignoreTypeImport || !typeOnly {
+			if !options.IgnoreTypeImport || !typeOnly {
 				visit(declaration.ModuleSpecifier, typeOnly)
 			}
 		},
@@ -138,8 +137,48 @@ func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
 // Extraneous-dependency rules intentionally use HasTypeScriptAlias instead:
 // their upstream contract exempts an alias even when its target is missing.
 func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
-	if isNodeBuiltin(name) || !typeOnly && isImportURL(name) {
-		return ""
+	_, resolveError := resolveImport(p, name, fileName, typeOnly, options)
+	return resolveError
+}
+
+// ImportFilePath supplies the target for absolute-path restrictions. Missing
+// local imports retain their lexical path; unresolved packages have no path.
+func ImportFilePath(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
+	resolved, _ := resolveImport(p, name, fileName, typeOnly, options)
+	if resolved != "" {
+		if isImportURL(name) {
+			return resolved
+		}
+		// The resolver uses tsgo paths; upstream matches host filesystem paths.
+		resolved = filepath.FromSlash(resolved)
+		// Runtime lookup removes resource queries/fragments, but restrictions
+		// compare the complete resource returned by enhanced-resolve.
+		if index := strings.IndexAny(name, "?#"); index > 0 {
+			resolved += name[index:]
+		}
+		return resolved
+	}
+	if tspath.PathIsRelative(name) || strings.HasPrefix(name, "/") || strings.HasPrefix(name, `\`) {
+		// Only the lexical fallback uses host paths, never VFS lookup keys.
+		// A rooted Windows path without a drive inherits the importer's volume.
+		directory := filepath.Dir(filepath.FromSlash(fileName))
+		if filepath.Separator == '\\' && filepath.VolumeName(name) == "" && !tspath.PathIsRelative(name) {
+			name = filepath.VolumeName(directory) + name
+		}
+		if IsAbsolutePath(name) {
+			return filepath.Clean(name)
+		}
+		return filepath.Join(directory, name)
+	}
+	return ""
+}
+
+func resolveImport(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) (string, string) {
+	if isNodeBuiltin(name) {
+		return "", ""
+	}
+	if !typeOnly && isImportURL(name) {
+		return name, ""
 	}
 	moduleName, _ := ImportModuleName(name)
 	options.NoDirectory = moduleName == ""
@@ -161,15 +200,14 @@ func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool
 					}
 					target = tspath.ResolvePath(tspath.GetDirectoryPath(config.ConfigFilePath), target)
 					if resolved := ResolveModule(p, target, fileName, options); resolved != "" {
-						return ""
+						return resolved, ""
 					}
 				}
-				return "Can't resolve '" + name + "' in '" + tspath.GetDirectoryPath(fileName) + "'"
+				return "", "Can't resolve '" + name + "' in '" + tspath.GetDirectoryPath(fileName) + "'"
 			}
 		}
 	}
-	_, resolveError := ResolveModuleWithError(p, name, fileName, options)
-	return resolveError
+	return ResolveModuleWithError(p, name, fileName, options)
 }
 
 // ImportResolutionOptions implements the documented resolverConfig.modules

@@ -16,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_path_concat"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_process_env"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_process_exit"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_restricted_import"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -36,5 +37,6 @@ func GetAllRules() []rule.Rule {
 		no_path_concat.NoPathConcatRule,
 		no_process_env.NoProcessEnvRule,
 		no_process_exit.NoProcessExitRule,
+		no_restricted_import.NoRestrictedImportRule,
 	}
 }

@@ -22,7 +22,7 @@ interface TestCase {
   skip?: string;
   code: string;
   filename?: string;
-  options?: unknown[];
+  options?: unknown[] | ((root: string) => unknown[]);
   settings?: Record<string, unknown>;
   languageOptions?: LanguageOptions;
   errors?: (string | ExpectedError)[];
@@ -99,7 +99,12 @@ export class RuleTester {
                   },
                   settings: item.settings,
                   rules: {
-                    [`node/${name}`]: ['error', ...(item.options ?? [])],
+                    [`node/${name}`]: [
+                      'error',
+                      ...(typeof item.options === 'function'
+                        ? item.options(root)
+                        : (item.options ?? [])),
+                    ],
                   },
                 },
               ],

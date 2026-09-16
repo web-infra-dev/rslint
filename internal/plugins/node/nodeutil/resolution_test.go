@@ -167,3 +167,40 @@ func TestNearestCompilerOptionsGeneration(t *testing.T) {
 		t.Fatal("invalid Program returned options")
 	}
 }
+
+// Node's host path.resolve removes trailing separators and preserves the
+// importer's drive/UNC share. A nil Program forces the lexical fallback.
+func TestImportFilePathLexicalFallback(t *testing.T) {
+	fileName := "/project/client/input.js"
+	if runtime.GOOS == "windows" {
+		fileName = "C:/project/client/input.js"
+	}
+	for _, tc := range []struct {
+		name, posix, windows string
+	}{
+		{".", "/project/client", `C:\project\client`},
+		{"../server/missing.js", "/project/server/missing.js", `C:\project\server\missing.js`},
+		{"../server/", "/project/server", `C:\project\server`},
+		{"../missing/../", "/project", `C:\project`},
+		{"/server//missing/../", "/server", `C:\server`},
+		{`\server\missing\..`, `/project/client/\server\missing\..`, `C:\server`},
+		{"//server/share/../../missing", "/missing", `\\server\share\missing`},
+		{"./missing?raw#part", "/project/client/missing?raw#part", `C:\project\client\missing?raw#part`},
+		{"pkg", "", ""}, {"fs", "", ""},
+		{"https://example.com/mod.js?raw#part", "https://example.com/mod.js?raw#part", "https://example.com/mod.js?raw#part"},
+	} {
+		want := tc.posix
+		if runtime.GOOS == "windows" {
+			want = tc.windows
+		}
+		if got := ImportFilePath(nil, tc.name, fileName, false, ResolutionOptions{}); got != want {
+			t.Errorf("ImportFilePath(%q) = %q, want %q", tc.name, got, want)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		got := ImportFilePath(nil, "../../missing", "//server/share/client/input.js", false, ResolutionOptions{})
+		if got != `\\server\share\missing` {
+			t.Errorf("UNC fallback = %q", got)
+		}
+	}
+}
