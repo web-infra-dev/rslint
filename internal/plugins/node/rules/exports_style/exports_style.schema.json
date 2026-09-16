@@ -1,0 +1,13 @@
+{
+  "type": "array",
+  "items": [
+    { "enum": ["module.exports", "exports"] },
+    {
+      "type": "object",
+      "properties": { "allowBatchAssign": { "type": "boolean" } },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}

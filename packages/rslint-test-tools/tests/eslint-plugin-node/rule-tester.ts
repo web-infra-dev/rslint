@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
-import { lint } from '@rslint/core/internal';
+import { lint, type Diagnostic } from '@rslint/core/internal';
 import { createTempDir, cleanupTempDir } from '../cli/js-config/helpers';
 
 interface ExpectedError {
@@ -10,6 +10,12 @@ interface ExpectedError {
   column: number;
   endLine: number;
   endColumn: number;
+  fixes?: Diagnostic['fixes'];
+}
+
+interface LanguageOptions {
+  globals?: Record<string, 'readonly' | 'writable' | 'off'>;
+  sourceType?: 'script' | 'module' | 'commonjs';
 }
 
 interface TestCase {
@@ -19,6 +25,7 @@ interface TestCase {
   filename?: string;
   options?: unknown[];
   settings?: Record<string, unknown>;
+  languageOptions?: LanguageOptions;
   errors?: (string | ExpectedError)[];
   output?: string;
 }
@@ -39,10 +46,7 @@ export class RuleTester {
   constructor(
     private readonly config: {
       fixtureFiles?: Record<string, string>;
-      languageOptions?: {
-        globals?: Record<string, 'readonly' | 'writable' | 'off'>;
-        sourceType?: 'script' | 'module' | 'commonjs';
-      };
+      languageOptions?: LanguageOptions;
     } = {},
   ) {}
 
@@ -87,6 +91,11 @@ export class RuleTester {
                   plugins: ['node'],
                   languageOptions: {
                     ...this.config.languageOptions,
+                    ...item.languageOptions,
+                    globals: {
+                      ...this.config.languageOptions?.globals,
+                      ...item.languageOptions?.globals,
+                    },
                     parserOptions: { projectService: false },
                   },
                   settings: item.settings,
@@ -116,7 +125,7 @@ export class RuleTester {
                   start: { line: expected.line, column: expected.column },
                   end: { line: expected.endLine, column: expected.endColumn },
                 });
-                expect(diagnostic.fixes).toBeUndefined();
+                expect(diagnostic.fixes).toEqual(expected.fixes);
                 continue;
               }
               // Hashbang's upstream string expectations describe a fix on
