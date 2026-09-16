@@ -134,7 +134,11 @@ export class RuleTester {
                   start: { line: expected.line, column: expected.column },
                   end: { line: expected.endLine, column: expected.endColumn },
                 });
-                expect(diagnostic.fixes).toBeUndefined();
+                if (item.output === undefined) {
+                  expect(diagnostic.fixes).toBeUndefined();
+                } else {
+                  expect(diagnostic.fixes?.length).toBeGreaterThan(0);
+                }
                 continue;
               }
               // Hashbang's upstream string expectations describe a fix on

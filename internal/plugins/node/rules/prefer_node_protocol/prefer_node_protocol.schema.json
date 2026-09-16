@@ -1,0 +1,12 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": { "version": { "type": "string" } },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

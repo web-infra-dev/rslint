@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_sync"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_top_level_await"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unpublished_bin"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -46,5 +47,6 @@ func GetAllRules() []rule.Rule {
 		no_sync.NoSyncRule,
 		no_top_level_await.NoTopLevelAwaitRule,
 		no_unpublished_bin.NoUnpublishedBinRule,
+		prefer_node_protocol.PreferNodeProtocolRule,
 	}
 }
