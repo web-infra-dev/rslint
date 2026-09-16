@@ -105,12 +105,9 @@ type NativeGeneration struct {
 	TargetsByProgram [][]string
 	RulesForFile     RuleHandler
 	Cwd              string
-	// UnnamedInput marks targets supplied without a user filename. Their
-	// internal paths still select config and parser behavior.
-	UnnamedInput   bool
-	TypeCheck      bool
-	SingleThreaded bool
-	Timing         *TimingCollector
+	TypeCheck        bool
+	SingleThreaded   bool
+	Timing           *TimingCollector
 }
 
 // TargetProjection binds Program-facing paths to the stable target identity

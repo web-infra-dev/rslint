@@ -67,7 +67,7 @@ var HashbangRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		program := ctx.Program()
-		if program == nil || ctx.UnnamedInput || ctx.SourceFile.FileName() == "<input>" {
+		if program == nil || ctx.SourceFile.FileName() == "<input>" {
 			return nil
 		}
 		fileName := ctx.SourceFile.FileName()

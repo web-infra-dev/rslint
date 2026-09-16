@@ -115,15 +115,6 @@ func TestHandleLint_RejectsMismatchedCanonicalFiles(t *testing.T) {
 	}
 }
 
-func TestHandleLint_RejectsAmbiguousUnnamedInput(t *testing.T) {
-	for _, files := range [][]string{nil, {}, {"a.ts", "b.ts"}} {
-		_, err := (&Handler{}).HandleLint(api.LintRequest{Files: files, UnnamedInput: true})
-		if err == nil || !strings.Contains(err.Error(), "unnamedInput requires exactly one explicit file") {
-			t.Fatalf("files %v: expected unnamed input error, got %v", files, err)
-		}
-	}
-}
-
 func TestHandleLint_PluginWirePathUsesProgramIdentityWhileResultsUseRequestedAlias(t *testing.T) {
 	root := t.TempDir()
 	realPath := filepath.Join(root, "real.ts")

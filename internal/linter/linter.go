@@ -41,11 +41,10 @@ func validatePrograms(sourcePrograms []*program.Program) error {
 	return nil
 }
 
-// programRunOptions contains run-scoped input metadata, sinks, and scheduling
-// knobs. File and rule selection remain owned by the prepared plan.
+// programRunOptions contains the run-scoped sinks and scheduling knobs that do
+// not change a prepared plan's meaning.
 type programRunOptions struct {
 	Cwd                  string
-	UnnamedInput         bool
 	CollectExecutedRules bool
 	SingleThreaded       bool
 	Timing               *TimingCollector
@@ -187,7 +186,6 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
-			UnnamedInput:    opts.UnnamedInput,
 			Settings:        environment.Settings,
 			LanguageOptions: languageOptions,
 			Globals:         rule.NewGlobals(languageOptions, globalsInit, environment.Globals, inlineGlobals, inlineGlobalDeclarations),
@@ -509,7 +507,6 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		plan := opts.LintPlan
 		runOpts := programRunOptions{
 			Cwd:                  opts.Cwd,
-			UnnamedInput:         opts.UnnamedInput,
 			CollectExecutedRules: true,
 			SingleThreaded:       opts.SingleThreaded,
 			Timing:               opts.Timing,

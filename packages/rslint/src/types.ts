@@ -65,9 +65,6 @@ export interface LintResponse {
 
 export interface LintOptions {
   files?: string[];
-  // The single explicit target is an unnamed text buffer. Its path exists
-  // for parsing/config selection, not filename-dependent rule policy.
-  unnamedInput?: boolean;
   // Optional physical paths parallel to files. High-level Node APIs provide
   // these after target planning so Go does not repeat realpath resolution.
   canonicalFiles?: string[];

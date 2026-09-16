@@ -85,9 +85,6 @@ type HandshakeResponse struct {
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
 	Files []string `json:"files,omitempty"`
-	// UnnamedInput marks a single explicit text target whose path is only a
-	// parser/config anchor, not a filename supplied by the caller.
-	UnnamedInput bool `json:"unnamedInput,omitempty"`
 	// CanonicalFiles is parallel to Files when the host already resolved physical
 	// identity. Go uses these paths for this request instead of repeating realpath
 	// calls; omitted by lower-level clients that have no pre-resolved identity.

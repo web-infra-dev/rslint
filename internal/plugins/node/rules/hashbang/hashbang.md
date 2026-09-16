@@ -10,7 +10,6 @@ This rule finds the nearest `package.json` for each file. Files listed in its
 `bin` field must start with `#!/usr/bin/env node`, without a Unicode BOM and with
 an LF line ending. Other files must not have a hashbang. Files without a package
 are left alone.
-Unnamed text passed to `lintText` is also skipped; provide `filePath` to check it.
 
 For a package with `"bin": "./bin/cli.js"`, this is **incorrect** in `bin/cli.js`:
 

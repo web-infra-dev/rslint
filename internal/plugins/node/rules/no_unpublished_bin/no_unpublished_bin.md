@@ -11,7 +11,6 @@ For each linted file, this rule finds the nearest `package.json` and checks
 whether the file matches its `bin` field. It reports the complete file if the
 executable is excluded by `files`, `.npmignore`, or the applicable `.gitignore`.
 It does not check whether unvisited executable files exist and provides no fixes.
-Unnamed text passed to `lintText` is skipped; provide `filePath` to check it.
 
 This package configuration is **incorrect** when linting `bin/cli.js`:
 
@@ -111,8 +110,8 @@ executable is reported as unpublished:
   entries. Tabs and non-breaking spaces can also change which files match;
   see the [hashbang examples](../hashbang/hashbang.md).
 - **Malformed filename patterns.** With `"files": ["[cli.js"]`, rslint includes
-  the literal filename `[cli.js`; upstream reports it as unpublished. With
-  `"files": ["lib/cli{1..3..0}.js"]`, rslint includes `lib/cli1.js`; upstream
+  the literal filename `[cli.js`; upstream throws an error for the malformed
+  pattern. With `"files": ["lib/cli{1..3..0}.js"]`, rslint includes `lib/cli1.js`; upstream
   reports it. Use closed brackets and positive brace steps.
 - **Invalid conversion expressions or executable entries.** An expression
   such as `[` causes rslint to skip this rule for the file. A `bin` entry such

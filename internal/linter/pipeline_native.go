@@ -76,7 +76,6 @@ func (generation Generation) runLinterOptions(plan *LintPlan) RunLinterOptions {
 	options := RunLinterOptions{
 		SingleThreaded: native.SingleThreaded,
 		Cwd:            native.Cwd,
-		UnnamedInput:   native.UnnamedInput,
 		TypeCheck:      native.TypeCheck,
 		Timing:         native.Timing,
 	}

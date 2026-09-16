@@ -295,8 +295,6 @@ export class Rslint {
   /**
    * Lint a string of code as if it lived at `filePath` (default a synthetic
    * `.ts` path).
-   * Package executable checks skip unnamed text; provide `filePath` to enable
-   * filename-dependent checks for a named buffer.
    *
    * A leading `U+FEFF` in `code` is a byte order mark, and a byte order mark is
    * never part of the text an offset indexes — the mark is stripped before
@@ -337,7 +335,6 @@ export class Rslint {
           workingDirectory: this.#cwd,
           files: [filePath],
           canonicalFiles: [resolvedFile.canonicalPath],
-          unnamedInput: options.filePath == null,
           // Overlay (in-memory tsconfig + deps) underlays the code buffer; a
           // same-path code entry wins so `lintText` always lints `code`.
           fileContents: { ...this.#resolveOverlay(), [filePath]: code },
