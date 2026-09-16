@@ -417,9 +417,26 @@ func configsForActiveOwners(
 // one execution and one slot per declared tsconfig.
 func (s *Session) executeTargetProjectPlan(
 	plan projectPlan,
-	targetPlan target.Plan,
-	singleThreaded bool,
+	request ProjectBuildRequest,
 ) (ProjectSet, error) {
+	targetPlan := request.Targets
+	singleThreaded := request.SingleThreaded
+	execution := newTargetedProjectExecution(s, plan, singleThreaded)
+	if request.Scope == ActiveOwners {
+		// Broad lint still validates every active declaration, in plan order,
+		// before reporting a later path-resolution failure. Parsing metadata
+		// does not require loading any project's sources or imports.
+		indexes := make([]int, len(plan.specs))
+		for index := range indexes {
+			indexes[index] = index
+		}
+		execution.parseConcurrent(indexes)
+		for index := range indexes {
+			if err := execution.slots[index].parseErr; err != nil {
+				return ProjectSet{}, fmt.Errorf("create TypeScript Program from %q: %w", plan.specs[index].tsconfigPath, err)
+			}
+		}
+	}
 	if plan.terminalErr != nil {
 		return ProjectSet{}, plan.terminalErr
 	}
@@ -427,7 +444,6 @@ func (s *Session) executeTargetProjectPlan(
 		return ProjectSet{targetProjects: plan.targetProjects}, nil
 	}
 
-	execution := newTargetedProjectExecution(s, plan, singleThreaded)
 	directBuilds := newTargetedProjectBuildQueue(execution)
 	directProjectByTarget := make([]int, len(targetPlan.Files))
 	for index := range directProjectByTarget {
@@ -436,8 +452,28 @@ func (s *Session) executeTargetProjectPlan(
 	groups := groupTargetsByProjects(targetPlan.Files, plan.targetProjects, func(owner string) []int {
 		return orderedProjectIndexesForConfig(plan, owner)
 	})
+	if request.Scope == ActiveOwners {
+		roots := make([][]string, len(plan.specs))
+		for index := range roots {
+			roots[index] = execution.slots[index].config.FileNames()
+		}
+		// The eager binder's exact identity ranking is also valid before
+		// construction. Copy the groups because ranking filters its input slice.
+		directProjectByTarget = directRootOwners(roots, targetPlan.Files, plan.targetProjects,
+			append([]projectTargetGroup(nil), groups...), s.FS(), singleThreaded)
+	}
 
 	err := runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
+		if request.Scope == ActiveOwners {
+			for _, targetIndex := range group.targetIndexes {
+				if index := directProjectByTarget[targetIndex]; index >= 0 {
+					if err := directBuilds.enqueue(index); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
 		targetIndexes := group.targetIndexes
 		unresolved := len(targetIndexes)
 		orderedProjectIndexes := group.projectIndexes
@@ -550,20 +586,58 @@ func (s *Session) executeTargetProjectPlan(
 		validatedDirectBuilds[projectIndex] = struct{}{}
 	}
 
-	keep := make([]bool, len(plan.specs))
-	for _, projectIndex := range directProjectByTarget {
-		if projectIndex >= 0 {
-			keep[projectIndex] = true
-		}
-	}
 	for targetIndex, projectIndex := range directProjectByTarget {
 		if projectIndex >= 0 && !execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
+			if request.Scope == ActiveOwners && !plan.specs[projectIndex].sourceReferences {
+				// Ordinary broad lint has always tried ordered source membership
+				// when its first metadata root was not admitted by the compiler.
+				directProjectByTarget[targetIndex] = -1
+				continue
+			}
 			return ProjectSet{}, fmt.Errorf(
 				"project root %q from %q was absent from its TypeScript Program",
 				targetPlan.Files[targetIndex].Path,
 				plan.specs[projectIndex].tsconfigPath,
 			)
 		}
+	}
+	keep := make([]bool, len(plan.specs))
+	for _, projectIndex := range directProjectByTarget {
+		if projectIndex >= 0 {
+			keep[projectIndex] = true
+		}
+	}
+	if request.Scope == ActiveOwners {
+		// Canonical source aliases can have another extension, so broad lint
+		// cannot exclude import candidates using the target's name alone.
+		// Preserve parallel construction for the unresolved groups, sharing
+		// the same slots with direct builds and other owners.
+		fallbackBuilds := newTargetedProjectBuildQueue(execution)
+		for _, group := range groups {
+			for _, targetIndex := range group.targetIndexes {
+				if directProjectByTarget[targetIndex] >= 0 {
+					continue
+				}
+				for _, projectIndex := range group.projectIndexes {
+					if err := fallbackBuilds.enqueue(projectIndex); err != nil {
+						fallbackBuilds.wait()
+						return ProjectSet{}, err
+					}
+				}
+				break
+			}
+		}
+		fallbackBuilds.wait()
+		for index := range execution.slots {
+			if err := execution.slots[index].buildErr; err != nil {
+				return ProjectSet{}, fmt.Errorf("create TypeScript Program from %q: %w", plan.specs[index].tsconfigPath, err)
+			}
+			keep[index] = execution.slots[index].program != nil
+		}
+		// Every unresolved group's candidates are already built. Let binding
+		// perform their ordered source lookup once, using its shared identity
+		// index, instead of scanning the same sources during construction.
+		return execution.projectSet(keep, directProjectByTarget, targetPlan.Files), nil
 	}
 
 	// Direct ownership has been decided for every target before this fallback

@@ -18,7 +18,8 @@ import (
 
 type configOrders map[string]int
 
-// ProjectScope preserves the construction choices made by CLI/API callers.
+// ProjectScope preserves the validation and checking ranges of CLI/API callers.
+// Plain lint uses selected targets to guide project construction.
 type ProjectScope uint8
 
 const (
@@ -298,10 +299,10 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 	}
 	var set ProjectSet
 	var err error
-	if request.Scope == Targeted {
-		set, err = s.executeTargetProjectPlan(plan, request.Targets, request.SingleThreaded)
-	} else {
+	if request.Scope == AllDeclared {
 		set, err = s.executeProjectPlan(plan, request.SingleThreaded)
+	} else {
+		set, err = s.executeTargetProjectPlan(plan, request)
 	}
 	if err != nil {
 		return ProjectSet{}, err

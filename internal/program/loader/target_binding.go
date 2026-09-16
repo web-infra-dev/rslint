@@ -120,12 +120,35 @@ func directRootProgramOwners(
 	groups := groupTargetsByProjects(targets, set.targetProjects, func(owner string) []int {
 		return orderedProgramIndexesForConfig(set, owner)
 	})
+	roots := make([][]string, len(set.compilerPrograms))
+	for index, program := range set.compilerPrograms {
+		if program != nil && program.CommandLine() != nil {
+			roots[index] = program.CommandLine().FileNames()
+		}
+	}
+	return directRootOwners(roots, targets, set.targetProjects, groups, fsys, singleThreaded)
+}
+
+// directRootOwners ranks parsed roots without requiring constructed Programs.
+// Keep exact and physical identities separate, even on case-insensitive hosts.
+func directRootOwners(
+	roots [][]string,
+	targets []target.File,
+	targetProjects map[target.File][]int,
+	groups []projectTargetGroup,
+	fsys vfs.FS,
+	singleThreaded bool,
+) []int {
+	owners := make([]int, len(targets))
+	for index := range owners {
+		owners[index] = -1
+	}
 	var rankedPrograms []bool
-	if len(set.targetProjects) > 0 {
-		rankedPrograms = make([]bool, len(set.compilerPrograms))
+	if len(targetProjects) > 0 {
+		rankedPrograms = make([]bool, len(roots))
 		rankedGroups := groups[:0]
 		for _, group := range groups {
-			_, overridden := set.targetProjects[targets[group.targetIndexes[0]]]
+			_, overridden := targetProjects[targets[group.targetIndexes[0]]]
 			if overridden && len(group.projectIndexes) == 1 {
 				// A single candidate has no root/import ranking to
 				// decide. Binding still checks its actual source and identity.
@@ -147,15 +170,12 @@ func directRootProgramOwners(
 
 	rootPaths := make([]string, 0)
 	rootPathIndexByID := make(map[string]int)
-	membershipsByProgram := make([][]projectRootMembership, len(set.compilerPrograms))
-	for programIndex, program := range set.compilerPrograms {
+	membershipsByProgram := make([][]projectRootMembership, len(roots))
+	for programIndex, fileNames := range roots {
 		if rankedPrograms != nil && !rankedPrograms[programIndex] {
 			continue
 		}
-		if program == nil || program.CommandLine() == nil {
-			continue
-		}
-		for _, rootFileName := range program.CommandLine().FileNames() {
+		for _, rootFileName := range fileNames {
 			rootFileName = tspath.NormalizePath(rootFileName)
 			exactID := exactPathID(rootFileName)
 			rootPathIndex, ok := rootPathIndexByID[exactID]
@@ -205,7 +225,7 @@ func directRootProgramOwners(
 	// Only an alias in a project before the exact winner can change ownership.
 	// Resolve those root identities once per path, in directory batches.
 	canonicalLimitByTarget := make([]int, len(targets))
-	needsCanonicalRoots := make([]bool, len(set.compilerPrograms))
+	needsCanonicalRoots := make([]bool, len(roots))
 	for _, group := range groups {
 		orderedPrograms := group.projectIndexes
 		for _, targetIndex := range group.targetIndexes {

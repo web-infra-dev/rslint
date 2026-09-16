@@ -2096,6 +2096,177 @@ func TestBuildTargetProjectIgnoresUnreachedPredictedConfigError(t *testing.T) {
 	if set.Len() != 1 {
 		t.Fatalf("selected Programs = %d, want one", set.Len())
 	}
+	// Broad lint validates every active declaration even when its sources are
+	// unnecessary. Its error and precedence must match full construction.
+	for _, terminalError := range []bool{false, true} {
+		for _, singleThreaded := range []bool{false, true} {
+			configs := map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-first.json", "./nested/unreadable.json")}
+			broadPlan := plan
+			if terminalError {
+				laterOwner := tspath.ResolvePath(dir, "z")
+				configs[laterOwner] = projectConfig("./missing.json")
+				broadPlan.Files = append(append([]target.File(nil), plan.Files...),
+					testLintTarget(fsys, laterOwner, tspath.ResolvePath(laterOwner, "target.ts")))
+			}
+			_, err := NewSession(fsys).BuildProjects(ProjectBuildRequest{
+				Configs: configs, Targets: broadPlan, Scope: ActiveOwners, SingleThreaded: singleThreaded,
+			})
+			if err == nil || !strings.Contains(err.Error(), "unreadable.json") || !strings.Contains(err.Error(), "no parsed config returned") {
+				t.Fatalf("terminal=%t serial=%t: lost active configuration failure: %v", terminalError, singleThreaded, err)
+			}
+		}
+	}
+}
+
+func TestBuildProjectsPreservesBroadValidationPrecedence(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	// Model a declared config disappearing after path collection. A later
+	// owner's path-resolution error must not hide that earlier build error.
+	plan := projectPlan{
+		specs:       []projectSpec{{tsconfigPath: tspath.ResolvePath(dir, "removed.json"), programCwd: dir}},
+		terminalErr: os.ErrNotExist,
+	}
+	for _, singleThreaded := range []bool{false, true} {
+		fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		_, eagerError := NewSession(fsys).executeProjectPlan(plan, singleThreaded)
+		_, err := NewSession(fsys).executeTargetProjectPlan(plan, ProjectBuildRequest{
+			Scope: ActiveOwners, SingleThreaded: singleThreaded,
+		})
+		if eagerError == nil || err == nil || !strings.Contains(err.Error(), "removed.json") || err.Error() != eagerError.Error() {
+			t.Fatalf("broad validation precedence changed: got %v, want %v", err, eagerError)
+		}
+	}
+}
+
+func TestBuildProjectsPreservesBroadRootFallback(t *testing.T) {
+	for _, test := range []struct {
+		name, target, wantProject string
+		files                     map[string]string
+		projects                  []string
+	}{
+		{
+			name: "unsupported ordinary root remains a gap", target: "target.js",
+			projects: []string{"./first.json"},
+			files: map[string]string{
+				"target.js":  `export const value = 1;`,
+				"first.json": `{"files":["target.js"],"compilerOptions":{"noLib":true}}`,
+			},
+		},
+		{
+			name: "missing first root uses ordered source fallback", target: "target.js", wantProject: "import.json",
+			projects: []string{"./first.json", "./import.json", "./direct.json"},
+			files: map[string]string{
+				"target.js":   `export const value = 1;`,
+				"main.ts":     `import "./target.js";`,
+				"first.json":  `{"files":["target.js"],"compilerOptions":{"noLib":true}}`,
+				"import.json": `{"files":["main.ts"],"compilerOptions":{"noLib":true,"allowJs":true}}`,
+				"direct.json": `{"files":["target.js"],"compilerOptions":{"noLib":true,"allowJs":true}}`,
+			},
+		},
+		{
+			name: "distinct physical root keeps later direct priority", target: "target.ts", wantProject: "direct.json",
+			projects: []string{"./first.json", "./import.json", "./direct.json"},
+			files: map[string]string{
+				"Target.ts":   `export const upper = 1;`,
+				"target.ts":   `export const lower = 2;`,
+				"main.ts":     `import "./target";`,
+				"first.json":  `{"files":["Target.ts"],"compilerOptions":{"noLib":true}}`,
+				"import.json": `{"files":["main.ts"],"compilerOptions":{"noLib":true}}`,
+				"direct.json": `{"files":["target.ts"],"compilerOptions":{"noLib":true}}`,
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := tspath.NormalizePath(t.TempDir())
+			files := make(map[string]string, len(test.files))
+			for name, content := range test.files {
+				files[tspath.ResolvePath(dir, name)] = content
+			}
+			fsys := &exactCaseProgramFS{FS: bundled.WrapFS(osvfs.FS()), files: files}
+			file := testLintTarget(fsys, dir, tspath.ResolvePath(dir, test.target))
+			plan := target.Plan{Files: []target.File{file}}
+			for _, scope := range []ProjectScope{AllDeclared, ActiveOwners} {
+				for _, singleThreaded := range []bool{false, true} {
+					session := NewSession(fsys)
+					projects, err := session.BuildProjects(ProjectBuildRequest{
+						Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(test.projects...)},
+						Targets: plan, Scope: scope, SingleThreaded: singleThreaded,
+					})
+					if err != nil {
+						t.Fatalf("scope=%d serial=%t: %v", scope, singleThreaded, err)
+					}
+					binding, err := session.LoadAPI(projects, plan, dir, singleThreaded)
+					if err != nil {
+						t.Fatal(err)
+					}
+					bound := 0
+					for index, sources := range binding.TargetsByProgram {
+						for _, sourceName := range sources {
+							bound++
+							program := binding.Programs[index]
+							wantProject := ""
+							if test.wantProject != "" {
+								wantProject = tspath.ResolvePath(dir, test.wantProject)
+							}
+							if sourceName != file.Path || program.Options().ConfigFilePath != wantProject ||
+								program.CanProvideTypeChecker(program.GetSourceFile(sourceName)) != (test.wantProject != "") {
+								t.Fatalf("scope=%d: wrong binding: source=%q project=%q, want %q", scope, sourceName, program.Options().ConfigFilePath, wantProject)
+							}
+						}
+					}
+					if bound != 1 {
+						t.Fatalf("target was bound %d times", bound)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestBuildProjectsPreservesBroadImportedSourceAliases(t *testing.T) {
+	for _, aliasTarget := range []bool{false, true} {
+		for _, singleThreaded := range []bool{false, true} {
+			dir := tspath.NormalizePath(t.TempDir())
+			source, alias := "real.js", "alias.ts"
+			lintTarget, imported := source, alias
+			if aliasTarget {
+				source, alias = "real.ts", "alias.js"
+				lintTarget, imported = alias, source
+			}
+			writeProgramTestFiles(t, dir, map[string]string{
+				"tsconfig.json": `{"files":["main.ts"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+				"main.ts":       `import "./` + imported + `";`,
+				source:          `export const value = 1;`,
+			})
+			if err := os.Symlink(source, tspath.ResolvePath(dir, alias)); err != nil {
+				t.Skipf("symlinks unavailable: %v", err)
+			}
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			file := testLintTarget(fsys, dir, tspath.ResolvePath(dir, lintTarget))
+			plan := target.Plan{Files: []target.File{file}}
+			for _, scope := range []ProjectScope{AllDeclared, ActiveOwners} {
+				session := NewSession(fsys)
+				projects, err := session.BuildProjects(ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig.json")},
+					Targets: plan, Scope: scope, SingleThreaded: singleThreaded,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding, err := session.LoadAPI(projects, plan, dir, singleThreaded)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(binding.Programs) != 1 || len(binding.TargetsByProgram[0]) != 1 {
+					t.Fatalf("alias became a source-only gap: %v", binding.TargetsByProgram)
+				}
+				name := binding.TargetsByProgram[0][0]
+				if name != tspath.ResolvePath(dir, imported) || !binding.Programs[0].CanProvideTypeChecker(binding.Programs[0].GetSourceFile(name)) {
+					t.Fatalf("wrong imported source/capability: %s", name)
+				}
+			}
+		}
+	}
 }
 
 func TestBuildTargetProjectFallsBackToFirstImportOnlyAfterRootScan(t *testing.T) {

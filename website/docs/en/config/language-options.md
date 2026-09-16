@@ -136,7 +136,7 @@ When an entry has `basePath`, its explicit project literals and globs resolve fr
 
 When both project settings are omitted, Rslint retains the governing config directory's default `tsconfig.json` fallback; neither `basePath` nor `tsconfigRootDir` moves this implicit lookup. A declaration of `project: []` suppresses fallback when no paths were declared. A final matching false/null or `projectService: false` disables default binding for that target. Unmatched false/null does not disable another target's fallback. See [`basePath`](/config/base-path) for path origins.
 
-Plain whole-directory CLI lint builds explicit projects for active ordinary owners; focused CLI/API lint selects needed projects from target membership. `--type-check` and `--type-check-only` retain [program-wide explicit checking](/guide/type-checking#what-gets-type-checked), including declarations outside the lint target scope. These modes also check complete service-selected Programs. A per-target clear does not erase the owner's program-wide declarations.
+Plain CLI/API lint selects projects from target membership. Whole-directory CLI lint still validates every explicit declaration of its active ordinary owners, even when a project does not need to be built. Files without a direct project may require building additional projects to check import membership. `--type-check` and `--type-check-only` retain [program-wide explicit checking](/guide/type-checking#what-gets-type-checked), including declarations outside the lint target scope. These modes also check complete service-selected Programs. A per-target clear does not erase the owner's program-wide declarations.
 
 ## languageOptions.globals
 
