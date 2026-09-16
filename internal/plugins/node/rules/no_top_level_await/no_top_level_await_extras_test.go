@@ -247,6 +247,16 @@ func TestNoTopLevelAwaitASTBoundaries(t *testing.T) {
 			// Both documented rewrites expose an unambiguous await expression.
 			{Code: "const object = { [await keyPromise]() {} };", FileName: "published/input.ts", Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 19, 1, 35)}},
 			{Code: "const key = await (keyPromise); const object = { [key]() {} };", FileName: "published/input.ts", Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 13, 1, 31)}},
+			// tsgo retains a non-null assertion JS diagnostic after the module await reparse.
+			{Code: "export {}; await !value;", FileName: "published/input.js", Skip: true, Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 12, 1, 24)}},
+			{Code: "export {}; await (!value);", FileName: "published/input.js", Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 12, 1, 26)}},
+			// Operand forms in a configured module and the documented export workaround.
+			{Code: "await (value);\nawait [value];\nawait ({ value });\nawait `value`;", FileName: "published/input.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+				forbiddenAt(1, 1, 1, 14), forbiddenAt(2, 1, 2, 14), forbiddenAt(3, 1, 3, 18), forbiddenAt(4, 1, 4, 14),
+			}},
+			{Code: "export {};\nawait (value);\nawait [value];\nawait ({ value });\nawait `value`;", FileName: "published/input.js", Errors: []rule_tester.InvalidTestCaseError{
+				forbiddenAt(2, 1, 2, 14), forbiddenAt(3, 1, 3, 14), forbiddenAt(4, 1, 4, 18), forbiddenAt(5, 1, 5, 14),
+			}},
 		},
 	)
 }

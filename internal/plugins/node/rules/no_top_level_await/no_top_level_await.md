@@ -76,6 +76,13 @@ The replacement uses JavaScript regular expressions and capture substitutions.
 
 ## Differences from upstream
 
+- **JavaScript files without module syntax.** In `.js` files outside a
+  TypeScript project, `sourceType: 'module'` can still miss `await (value)`,
+  `await [value]`, `await ({ value })`, and `` await `value` ``.
+  Add `export {}` or use an `.mjs` file to make these expressions checked.
+- **Awaiting a negation.** In JavaScript, `await !value;` can produce a syntax
+  error instead of this rule's diagnostic. Write `await (!value);` in a file
+  with `export {}` or an `.mjs` extension to check it.
 - **Parenthesized operands in computed names.** A top-level expression such as
   `const object = { [await (keyPromise)]() {} };` can be missed. Use
   `[await keyPromise]`, or move `const key = await (keyPromise);` before the
