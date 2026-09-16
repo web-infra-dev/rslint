@@ -1,3 +1,4 @@
+// cspell:ignore prevalue premissing
 package no_missing_import
 
 import (
@@ -83,6 +84,16 @@ func TestNoMissingImportExtras(t *testing.T) {
 			{Code: "import '#local';", FileName: "maps/input.ts", Options: []any{}, Settings: map[string]any{}},
 			// builtins and URL runtime imports
 			{Code: "import '_http_agent'; import 'node:fs/promises'; import 'data:text/javascript,0'; import 'https://example.com/a';", FileName: "src/input.js"},
+			// empty modules scope
+			{Code: "import '#entry'; import 'review-self'; import '#builtin';", FileName: "review/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{}}}}},
+			// directory absence fallback
+			{Code: "import 'shadow/private';", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{"absent_modules", "second_modules"}}}}},
+			// wildcard aliases
+			{Code: "import '@prevalue-post'; import 'value-tail';", FileName: "review/input.ts"},
+			// invalid target fallback
+			{Code: "import '#invalid-first';", FileName: "review/input.js"},
+			// relative modules path
+			{Code: "import './node_modules/local.js';", FileName: "review/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{}}}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// scalar conversion
@@ -105,8 +116,8 @@ func TestNoMissingImportExtras(t *testing.T) {
 			{Code: "import '#array-fallback';", FileName: "maps/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '#array-fallback' in '{{root}}/maps'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 25}}},
 			// imports #pattern/
 			{Code: "import '#pattern/';", FileName: "maps/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: "Resolving to directories is not possible with the imports field (request was #pattern/)", Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
-			// Documented difference: imports #redirect
-			{Code: "import '#redirect';", FileName: "maps/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '#redirect' in '{{root}}/maps'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
+			// imports redirects retain the target export error
+			{Code: "import '#redirect';", FileName: "maps/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/node_modules/pkg (see exports field in {{root}}/node_modules/pkg/package.json)"), Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
 			// imports #entry?raw
 			{Code: "import '#entry?raw';", FileName: "maps/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Package import #entry?raw is not imported from package {{root}}/maps (see imports field in {{root}}/maps/package.json)"), Line: 1, Column: 8, EndLine: 1, EndColumn: 20}}},
 			// imports #
@@ -166,6 +177,22 @@ func TestNoMissingImportExtras(t *testing.T) {
 			{Code: "import 'missing'; import('missing'); export * from 'missing';", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve 'missing' in '{{root}}/src'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 17}, {MessageId: "notFound", Message: message("Can't resolve 'missing' in '{{root}}/src'"), Line: 1, Column: 26, EndLine: 1, EndColumn: 35}, {MessageId: "notFound", Message: message("Can't resolve 'missing' in '{{root}}/src'"), Line: 1, Column: 52, EndLine: 1, EndColumn: 61}}},
 			// invalid builtin name and file URL
 			{Code: "import 'node:missing'; import 'file:///missing.js'; import ''; ", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve 'node:missing' in '{{root}}/src'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 22}, {MessageId: "notFound", Message: message("Can't resolve 'file:///missing.js' in '{{root}}/src'"), Line: 1, Column: 31, EndLine: 1, EndColumn: 51}, {MessageId: "notFound", Message: message("Can't resolve '' in '{{root}}/src'"), Line: 1, Column: 60, EndLine: 1, EndColumn: 62}}},
+			// empty modules external
+			{Code: "import '#external'; import 'pkg'; import 'review-self/private';", FileName: "review/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '#external' in '{{root}}/review'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 19}, {MessageId: "notFound", Message: message("Can't resolve 'pkg' in '{{root}}/review'"), Line: 1, Column: 28, EndLine: 1, EndColumn: 33}, {MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/review (see exports field in {{root}}/review/package.json)"), Line: 1, Column: 42, EndLine: 1, EndColumn: 63}}},
+			// directory precedence
+			{Code: "import 'shadow/private'; import 'shadow/missing';", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"modules": []any{"first_modules", "second_modules"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/first_modules/shadow (see exports field in {{root}}/first_modules/shadow/package.json)"), Line: 1, Column: 8, EndLine: 1, EndColumn: 24}, {MessageId: "notFound", Message: message("Package path ./missing is exported from package {{root}}/first_modules/shadow, but no valid target file was found (see exports field in {{root}}/first_modules/shadow/package.json)"), Line: 1, Column: 33, EndLine: 1, EndColumn: 49}}},
+			// wildcard misses
+			{Code: "import '@premissing-post'; import '@prevalue-post-extra';", FileName: "review/input.ts", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '@premissing-post' in '{{root}}/review'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 26}, {MessageId: "notFound", Message: message("Can't resolve '@prevalue-post-extra' in '{{root}}/review'"), Line: 1, Column: 35, EndLine: 1, EndColumn: 57}}},
+			// self redirect
+			{Code: "import '#self';", FileName: "review/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/review (see exports field in {{root}}/review/package.json)"), Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
+			// invalid imports target
+			{Code: "import '#local-modules';", FileName: "review/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '#local-modules' in '{{root}}/review'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 24}}},
+			// redirect messages
+			{Code: "import '#private'; import '#missing'; import '#conditional'; import '#array';", FileName: "review/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/node_modules/pkg (see exports field in {{root}}/node_modules/pkg/package.json)"), Line: 1, Column: 8, EndLine: 1, EndColumn: 18}, {MessageId: "notFound", Message: message("Package path ./missing is exported from package {{root}}/node_modules/pkg, but no valid target file was found (see exports field in {{root}}/node_modules/pkg/package.json)"), Line: 1, Column: 27, EndLine: 1, EndColumn: 37}, {MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/node_modules/pkg (see exports field in {{root}}/node_modules/pkg/package.json)"), Line: 1, Column: 46, EndLine: 1, EndColumn: 60}, {MessageId: "notFound", Message: message("\"./private\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/node_modules/pkg (see exports field in {{root}}/node_modules/pkg/package.json)"), Line: 1, Column: 69, EndLine: 1, EndColumn: 77}}},
+			// redirect wildcard priority
+			{Code: "import '#wild/private'; import '#wild/missing';", FileName: "review/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("\"./unknown\" is not exported under the conditions [\"node\",\"require\",\"import\"] from package {{root}}/node_modules/pkg (see exports field in {{root}}/node_modules/pkg/package.json)"), Line: 1, Column: 8, EndLine: 1, EndColumn: 23}, {MessageId: "notFound", Message: message("Package path ./missing is exported from package {{root}}/node_modules/pkg, but no valid target file was found (see exports field in {{root}}/node_modules/pkg/package.json)"), Line: 1, Column: 32, EndLine: 1, EndColumn: 47}}},
+			// Invalid imports targets may differ in wording, but cannot hide a later exports failure.
+			{Code: "import '#invalid-then-private';", FileName: "review/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '#invalid-then-private' in '{{root}}/review'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 31}}},
 		},
 	)
 }

@@ -147,11 +147,18 @@ func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool
 		if config := nearestCompilerOptions(p, fileName); config != nil && config.Paths != nil {
 			for alias, targets := range config.Paths.Entries() {
 				alias = strings.TrimRight(alias, `/\*`)
-				if name != alias && !strings.HasPrefix(name, alias+"/") {
+				pattern := core.TryParsePattern(alias)
+				wildcard := pattern.IsValid() && pattern.StarIndex >= 0 && pattern.Matches(name)
+				if !wildcard && name != alias && !strings.HasPrefix(name, alias+"/") {
 					continue
 				}
 				for _, target := range targets {
-					target = strings.TrimRight(target, `/\*`) + strings.TrimPrefix(name, alias)
+					target = strings.TrimRight(target, `/\*`)
+					if wildcard {
+						target = strings.Replace(target, "*", pattern.MatchedText(name), 1)
+					} else {
+						target += strings.TrimPrefix(name, alias)
+					}
 					target = tspath.ResolvePath(tspath.GetDirectoryPath(config.ConfigFilePath), target)
 					if resolved := ResolveModule(p, target, fileName, options); resolved != "" {
 						return ""

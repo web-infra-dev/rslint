@@ -82,3 +82,19 @@ export {};
 {"compilerOptions":{"baseUrl":"./src","paths":{"base/*":["./*"]}}}
 -- baseurl/src/present.ts --
 export {};
+-- review/tsconfig.json --
+{"compilerOptions": {"paths": {"@pre*-post": ["./absent/*/index.ts", "./generated/*/index.ts"], "*-tail": ["./generated/*/index.ts"]}}}
+-- review/generated/value/index.ts --
+export {};
+-- review/package.json --
+{"name":"review-self","imports":{"#entry":"./entry.js","#external":"pkg","#private":"pkg/private","#missing":"pkg/missing","#conditional":{"browser":"pkg","node":"pkg/private"},"#wild/*":"pkg/*","#wild/private":"pkg/unknown","#array":["pkg/private","pkg"],"#builtin":"node:fs","#local-modules":"./node_modules/local.js","#self":"review-self/private","#invalid-first":["./node_modules/local.js","./entry.js"],"#invalid-then-private":["./node_modules/local.js","pkg/private","pkg"]},"exports":{".":"./entry.js","./private":null}}
+-- review/entry.js --
+export {};
+-- review/node_modules/local.js --
+export {};
+-- first_modules/shadow/package.json --
+{"exports": {"./private": null, "./missing": "./absent.js"}}
+-- second_modules/shadow/package.json --
+{"exports": {"./private": "./entry.js", "./missing": "./entry.js"}}
+-- second_modules/shadow/entry.js --
+export {};

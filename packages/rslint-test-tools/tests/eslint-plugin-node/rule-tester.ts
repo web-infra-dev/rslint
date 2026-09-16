@@ -108,7 +108,7 @@ export class RuleTester {
               if (typeof expected !== 'string') {
                 expect(diagnostic.message).toBe(
                   typeof expected.message === 'function'
-                    ? expected.message(root)
+                    ? expected.message(root.replaceAll('\\', '/'))
                     : expected.message,
                 );
                 expect(diagnostic.messageId).toBe(expected.messageId);

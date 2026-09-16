@@ -94,27 +94,18 @@ substituted. Type-only imports also activate the `types` export condition.
 
 ## Differences from upstream
 
-The [upstream documentation](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/shared-settings.md#resolverconfig)
-lists `modules` as the only supported `resolverConfig` field. Rslint supports
-that field. Upstream also accepts additional fields in practice, outside its
-documented support; rslint ignores those extra fields. For example, mapping
-`virtual` to `./local.js` through `resolverConfig.alias` lets upstream accept
-`import 'virtual'` when that file exists; rslint reports it as missing.
-Use TypeScript `compilerOptions.paths` when checking local aliases.
-`allowModules` can exempt an intentionally unresolved module, but does not
-check that an alias target exists.
+Only `resolverConfig.modules` is supported. If you map `virtual` to
+`./local.js` with `resolverConfig.alias`, rslint may report `import 'virtual'`
+as missing even when the target file exists. For local aliases in TypeScript
+files, use `compilerOptions.paths` instead.
 
-Some failures in `package.json#imports` have different wording. If `#redirect`
-maps to a private package export, rslint reports `Can't resolve '#redirect'`
-with the importing directory; upstream explains which export is unavailable.
-An invalid target array such as `[null, './entry.js']` also produces a normal
-missing-import message instead of upstream's `Invalid value used as weak map key`.
-Both cases are reported by both linters.
+Some invalid `package.json#imports` mappings, such as
+`"#entry": [null, "./entry.js"]`, produce different error messages. Both
+linters report an error; rslint reports that the import cannot be resolved.
 
-Module names containing an unpaired Unicode surrogate, such as
-`import('\uD800')`, may display replacement characters in rslint's message.
-File lookup replaces each unpaired surrogate with `�`, matching Node.js. For
-example, `import './\uD800.js'` resolves an existing file named `�.js`.
+An unpaired Unicode surrogate in a module name, such as `import('\uD800')`,
+may appear as replacement characters in the reported name. File lookup still
+matches Node.js: `import './\uD800.js'` resolves an existing file named `�.js`.
 
 ## References
 
