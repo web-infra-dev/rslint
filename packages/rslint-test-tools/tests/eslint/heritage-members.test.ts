@@ -1,10 +1,11 @@
-import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Linter } from 'eslint';
 import * as parser from '@typescript-eslint/parser';
 import { lint } from '@rslint/core/internal';
 import { afterAll, expect, test } from 'rstack/test';
+import { cleanupTempDir } from '../cli/js-config/helpers';
 
 interface ExpectedDiagnostic {
   message: string;
@@ -38,7 +39,7 @@ if (cases.length === 0)
 const cwd = mkdtempSync(path.join(tmpdir(), 'rslint-heritage-members-'));
 const file = path.join(cwd, 'member.ts');
 const eslint = new Linter();
-afterAll(() => rmSync(cwd, { recursive: true, force: true }));
+afterAll(() => cleanupTempDir(cwd));
 
 for (const entry of cases) {
   test(`${entry.rule}: ${entry.name}`, async () => {

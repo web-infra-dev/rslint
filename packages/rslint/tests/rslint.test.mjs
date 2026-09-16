@@ -16,6 +16,18 @@ import {
   symlink,
 } from 'node:fs/promises';
 
+async function cleanupTempDir(tempDir) {
+  // Windows can retain a child process's working directory during teardown.
+  // Retry only filesystem cleanup; assertions and lint execution run once.
+  // Linear backoff allows a busy host time to release locks. Exhaustion throws.
+  await rm(tempDir, {
+    recursive: true,
+    force: true,
+    maxRetries: 20,
+    retryDelay: 1_000,
+  });
+}
+
 const serviceConfig = {
   ...ts.configs.base,
   languageOptions: { parserOptions: { projectService: true } },
@@ -170,7 +182,7 @@ describe('Rslint class', () => {
       expect(rendered).not.toContain('asyncDispose');
       expect(diagnostics).toEqual([]);
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -241,7 +253,7 @@ describe('Rslint class', () => {
       expect(result.output).toBe('const found = [1].some(Boolean);\n');
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -299,7 +311,7 @@ describe('Rslint class', () => {
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -345,7 +357,7 @@ describe('Rslint class', () => {
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -433,7 +445,7 @@ describe('Rslint class', () => {
   });
 
   test('outputFixes writes output to absolute paths, skips no-output/relative', async () => {
-    const { readFile, rm, mkdtemp } = await import('node:fs/promises');
+    const { readFile, mkdtemp } = await import('node:fs/promises');
     const os = await import('node:os');
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-outputfixes-'));
     const target = path.join(tmp, 'a.ts');
@@ -470,7 +482,7 @@ describe('Rslint class', () => {
       }
       expect(relWritten).toBe(false);
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -527,7 +539,7 @@ describe('Rslint class', () => {
   });
 
   test('auto-discovers config and appends overrideConfig', async () => {
-    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { mkdtemp, writeFile } = await import('node:fs/promises');
     const os = await import('node:os');
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-discover-'));
     try {
@@ -551,7 +563,7 @@ describe('Rslint class', () => {
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -578,7 +590,7 @@ describe('Rslint class', () => {
       expect(syntaxResults[0].messages[0].ruleId).toBe('TypeScript(TS1134)');
     } finally {
       await Promise.all([configured.close(), syntaxOnly.close()]);
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -613,7 +625,7 @@ describe('Rslint class', () => {
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -665,7 +677,7 @@ describe('Rslint class', () => {
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -702,7 +714,7 @@ module.exports = config;`
           await rslint.close();
         }
       } finally {
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -718,7 +730,7 @@ module.exports = config;`
       ).rejects.toThrow(/JS\/TS config module/);
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -749,7 +761,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -779,7 +791,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -823,7 +835,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -865,7 +877,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -921,7 +933,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -964,7 +976,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1025,7 +1037,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1061,7 +1073,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1099,7 +1111,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1140,7 +1152,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1191,7 +1203,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1269,7 +1281,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1319,7 +1331,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1355,7 +1367,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1397,7 +1409,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1427,7 +1439,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1461,7 +1473,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1495,7 +1507,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1536,7 +1548,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1579,7 +1591,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1617,7 +1629,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1661,7 +1673,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1699,7 +1711,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1738,7 +1750,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1767,7 +1779,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1802,7 +1814,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1839,7 +1851,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1877,7 +1889,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1914,7 +1926,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -1968,7 +1980,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2029,7 +2041,7 @@ module.exports = config;`
       expect(response.diagnostics).toHaveLength(1);
       expect(response.diagnostics[0].ruleName).toBe('no-debugger');
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2108,7 +2120,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2144,7 +2156,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2173,7 +2185,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2203,7 +2215,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2241,7 +2253,7 @@ module.exports = config;`
         await rslint.close();
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2339,7 +2351,7 @@ module.exports = config;`
         }
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2404,7 +2416,7 @@ module.exports = config;`
         );
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2458,7 +2470,7 @@ module.exports = config;`
       ]);
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2496,7 +2508,7 @@ module.exports = config;`
         ]);
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2528,7 +2540,7 @@ module.exports = config;`
         ).rejects.toThrow(/project.*projectService/);
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2563,7 +2575,7 @@ module.exports = config;`
       ]);
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -2612,7 +2624,7 @@ module.exports = config;`
         ]);
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2715,7 +2727,7 @@ module.exports = config;`
         }
       } finally {
         await instance.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2821,7 +2833,7 @@ module.exports = config;`
           }
         }
       } finally {
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2903,7 +2915,7 @@ module.exports = config;`
         }
       } finally {
         await instance.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -2952,7 +2964,7 @@ module.exports = config;`
       ]);
     } finally {
       await Promise.all(instances.map((instance) => instance.close()));
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -3052,7 +3064,7 @@ module.exports = config;`
         }
       } finally {
         await instance.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -3102,7 +3114,7 @@ module.exports = config;`
         ]);
       } finally {
         await instance.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -3140,7 +3152,7 @@ module.exports = config;`
         ]);
       } finally {
         await instance.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -3179,7 +3191,7 @@ module.exports = config;`
       ]);
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -3252,7 +3264,7 @@ module.exports = config;`
         );
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -3337,7 +3349,7 @@ module.exports = config;`
         ]);
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -3387,7 +3399,7 @@ module.exports = config;`
         ).toBe(true);
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -3450,7 +3462,7 @@ module.exports = config;`
         ).toBe(mode === 'project');
       } finally {
         await rslint.close();
-        await rm(tmp, { recursive: true, force: true });
+        await cleanupTempDir(tmp);
       }
     },
   );
@@ -3496,7 +3508,7 @@ module.exports = config;`
       expect(messages[0].messageId).toBe('forInViolation');
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -3539,7 +3551,7 @@ module.exports = config;`
       expect(messages[0].messageId).toBe('forInViolation');
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -3580,7 +3592,7 @@ module.exports = config;`
       expect(messages[0].severity).toBe(2);
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -3619,7 +3631,7 @@ module.exports = config;`
       expect(results[0].messages[0].messageId).toBe('forInViolation');
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 
@@ -3734,7 +3746,7 @@ module.exports = config;`
       expect(results[0].filePath).toBe(path.join(tmp, 'probe.ts'));
     } finally {
       await rslint.close();
-      await rm(tmp, { recursive: true, force: true });
+      await cleanupTempDir(tmp);
     }
   });
 

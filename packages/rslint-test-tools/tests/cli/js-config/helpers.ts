@@ -31,7 +31,15 @@ export async function createTempDir(
 }
 
 export async function cleanupTempDir(tempDir: string): Promise<void> {
-  await fs.rm(tempDir, { recursive: true, force: true });
+  // Windows can retain a child process's working directory during teardown.
+  // Retry only filesystem cleanup; assertions and CLI execution run once.
+  // Linear backoff allows a busy host time to release locks. Exhaustion throws.
+  await fs.rm(tempDir, {
+    recursive: true,
+    force: true,
+    maxRetries: 20,
+    retryDelay: 1_000,
+  });
 }
 
 export const TS_CONFIG = JSON.stringify({

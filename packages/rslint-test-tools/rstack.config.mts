@@ -8,6 +8,9 @@ define.test({
   // Normal completion is event-driven. This is only the final in-process
   // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
   testTimeout: 35 * 60_000,
+  // Fixture setup and async cleanup can also be delayed by a busy CI host.
+  // Keep their deadlock sentinel consistent with the tests, rather than 10s.
+  hookTimeout: 35 * 60_000,
   include: [
     // cli
     './tests/cli/basic.test.ts',
