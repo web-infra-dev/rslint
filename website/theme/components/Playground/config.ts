@@ -28,7 +28,7 @@ const SANDBOX_POLICY = [
   "default-src 'none'",
   `script-src 'unsafe-inline' blob: ${MODULE_HOSTS}`,
   `connect-src ${MODULE_HOSTS}`,
-  'worker-src blob:',
+  `worker-src blob: ${MODULE_HOSTS}`,
 ].join('; ');
 
 /**
