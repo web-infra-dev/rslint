@@ -4,10 +4,15 @@ define.test({
   testEnvironment: 'node',
   globals: true,
   // CI pods expose the shared host's CPU count, so cap worker-process churn.
-  pool: { maxWorkers: 16 },
+  // Each conformance CLI can also start up to eight plugin workers. Match the
+  // core tests on Windows so concurrent files do not multiply that load.
+  pool: { maxWorkers: process.platform === 'win32' ? 1 : 16 },
   // Normal completion is event-driven. This is only the final in-process
   // deadlock sentinel, deliberately later than the 30-minute child watchdogs.
   testTimeout: 35 * 60_000,
+  // Fixture setup and async cleanup can also be delayed by a busy CI host.
+  // Keep their deadlock sentinel consistent with the tests, rather than 10s.
+  hookTimeout: 35 * 60_000,
   include: [
     // cli
     './tests/cli/basic.test.ts',
