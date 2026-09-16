@@ -55,13 +55,6 @@ if (x) { test("a", () => {}); }`},
 			{Code: `import { test } from './helpers';
 if (x) { test("a", () => {}); }`},
 			{Code: `if (x) { expect(1).toBe(1); }`},
-			// A non-null assertion or a type assertion around the callee is not
-			// a chain the registration parser follows, so the call is not
-			// recognised as Rstest and nothing is reported.
-			{Code: `if (x) { test!("a", () => {}); }`},
-			{Code: `if (x) { (test as any)("a", () => {}); }`},
-			{Code: `if (x) { (test satisfies unknown)("a", () => {}); }`},
-
 			// ---- E. The function boundary stops the walk ----
 			// The registration is decided by the wrapper's caller, not by the
 			// `if` the wrapper happens to sit under.
@@ -74,6 +67,11 @@ if (x) { test("a", () => {}); }`},
 			{Code: `describe("a", () => { test("b", () => {}); });`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// TypeScript erases these wrappers, so each call remains a real Rstest
+			// registration controlled by the enclosing `if`.
+			{Code: `if (x) { test!("a", () => {}); }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noConditionalTests", Message: "Avoid using if conditions in a test", Line: 1, Column: 10, EndLine: 1, EndColumn: 14}}},
+			{Code: `if (x) { (test as any)("a", () => {}); }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noConditionalTests", Message: "Avoid using if conditions in a test", Line: 1, Column: 11, EndLine: 1, EndColumn: 15}}},
+			{Code: `if (x) { (test satisfies unknown)("a", () => {}); }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noConditionalTests", Message: "Avoid using if conditions in a test", Line: 1, Column: 11, EndLine: 1, EndColumn: 15}}},
 			// ---- 1. The two shapes upstream's fixed parent depth gets wrong ----
 			{
 				Code: `if (x) { test("a", () => {}); }`,
