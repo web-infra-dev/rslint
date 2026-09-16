@@ -3,12 +3,15 @@ package utils
 import (
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"gotest.tools/v3/assert"
@@ -208,6 +211,70 @@ func TestTypeMatchesDeclarationSpecifierDefaultTypeRoots(t *testing.T) {
 	assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, filePath), specifier, lintprogram.NewFromCompiler(program)), false)
 }
 
+// The overlay supplies every file. Missing package.json probes must not pass
+// synthetic UNC roots to io/fs, whose paths cannot start with a slash.
+type declarationPathFS struct{ vfs.FS }
+
+func (declarationPathFS) FileExists(string) bool { return false }
+
+func TestTypeMatchesDeclarationSpecifierPaths(t *testing.T) {
+	for _, test := range []struct {
+		name, directory, file, pattern string
+		caseSensitive                  bool
+		typeRoots                      []string
+		want                           bool
+	}{
+		{"relative POSIX", "/repo/project", "/repo/project/src/file.ts", "./src/*.ts", true, nil, true},
+		{"absolute POSIX", "/repo/project", "/repo/project/src/file.ts", "/repo/project/src/*.ts", true, nil, true},
+		{"case-sensitive match", "/repo/project", "/repo/project/Src/File.ts", "./Src/File.ts", true, nil, true},
+		{"case-sensitive miss", "/repo/project", "/repo/project/Src/File.ts", "./src/file.ts", true, nil, false},
+		{"canonical insensitive path", "/Repo/Project", "/Repo/Project/Src/File.ts", "./src/file.ts", false, nil, true},
+		// Upstream folds the path on insensitive filesystems, not the pattern.
+		{"pattern remains case-sensitive", "/Repo/Project", "/Repo/Project/Src/File.ts", "./Src/File.ts", false, nil, false},
+		{"Windows relative", `C:\Repo\Project`, `C:\Repo\Project\src\file.ts`, "./src/*.ts", false, nil, true},
+		{"Windows absolute", "C:/Repo/Project", "C:/Repo/Project/src/file.ts", "c:/repo/project/src/*.ts", false, nil, true},
+		{"Windows drive casing", "C:/Repo/Project", "c:/Repo/Project/src/file.ts", "./src/*.ts", false, nil, true},
+		{"Windows other drive", "C:/repo/project", "D:/repo/project/src/file.ts", "**/file.ts", false, nil, false},
+		{"UNC relative", "//Server/Share/Project", "//Server/Share/Project/src/file.ts", "./src/*.ts", false, nil, true},
+		{"UNC absolute", "//Server/Share/Project", "//Server/Share/Project/src/file.ts", "//server/share/project/src/*.ts", false, nil, true},
+		{"UNC other share", "//server/share/project", "//server/other/project/src/file.ts", "**/file.ts", false, nil, false},
+		{"Unicode directory", "/repo/Kit/代码", "/repo/Kit/代码/file.ts", "./file.ts", false, nil, true},
+		{"spaces in directory", "C:/My Project", "C:/My Project/src/file.ts", "./src/*.ts", false, nil, true},
+		{"parent segments", "/repo/project/src/..", "/repo/project/src/../file.ts", "./file.ts", true, nil, true},
+		{"trailing directory separator", "C:/repo/project/", "C:/repo/project/file.ts", "./file.ts", false, nil, true},
+		{"backslashes escape glob characters", "C:/repo/project", "C:/repo/project/src/file.ts", `**\file.ts`, false, nil, false},
+		{"escaped dot in pattern", "C:/repo/project", "C:/repo/project/file.ts", `./file\.ts`, false, nil, true},
+		{"leading pattern space", "/repo/project", "/repo/project/file.ts", " **/file.ts", true, nil, false},
+		{"trailing pattern space", "/repo/project", "/repo/project/file.ts", "**/file.ts ", true, nil, false},
+		{"Unicode pattern space", "C:/repo/project", "C:/repo/project/file.ts", "\u00a0**/file.ts", false, nil, false},
+		{"outside working directory", "/repo/project", "/repo/shared/file.ts", "**/file.ts", true, nil, false},
+		// Declaration-location uses string prefixes for cwd and typeRoots.
+		{"sibling directory sharing cwd prefix", "/repo/project", "/repo/project-extra/file.ts", "**/file.ts", true, nil, true},
+		{"configured type root", "/repo/project", "/repo/project/types/file.ts", "**/file.ts", true, []string{"/repo/project/types"}, false},
+		{"type root prefix", "/repo/project", "/repo/project/types-extra/file.ts", "**/file.ts", true, []string{"/repo/project/types"}, false},
+		{"Windows type root casing", "C:/Repo/Project", "C:/Repo/Project/Types/file.ts", "**/file.ts", false, []string{"c:/repo/project/types"}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := tspath.NormalizePath(test.directory)
+			file := tspath.NormalizePath(test.file)
+			// All reads use exact fixture names; the flag controls the compiler's
+			// path identity without relying on the machine running this test.
+			fs := NewOverlayVFS(declarationPathFS{iovfs.From(fstest.MapFS{}, test.caseSensitive)}, map[string]string{
+				file: "class Demo {}\ntype Test = Demo;",
+			})
+			program, err := CreateProgramFromOptions(true, &core.CompilerOptions{
+				NoLib: core.TSTrue, Types: []string{}, TypeRoots: test.typeRoots,
+			}, []string{file}, CreateCompilerHost(directory, fs))
+			assert.NilError(t, err)
+			c, done := program.GetTypeChecker(t.Context())
+			defer done()
+			specifier, ok := ParseTypeOrValueSpecifier(map[string]any{"from": "file", "path": test.pattern})
+			assert.Assert(t, ok)
+			assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, file), specifier, lintprogram.NewFromCompiler(program)), test.want)
+		})
+	}
+}
+
 // A workspace package is installed as a link, so its declarations resolve to a
 // real path outside node_modules while still belonging to the linked package.
 func TestTypeMatchesSomeSpecifierFromLinkedWorkspacePackage(t *testing.T) {
@@ -252,6 +319,13 @@ func TestTypeMatchesSomeSpecifierFromLinkedWorkspacePackage(t *testing.T) {
 
 	assert.Equal(t, matches("demo-pkg"), true)
 	assert.Equal(t, matches("other"), false)
+	// no-sync must retain package identity after resolving a workspace link.
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(demo, TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromPackage, Package: "demo-pkg",
+	}, lintprogram.NewFromCompiler(program)), true)
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(demo, TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromFile, Path: "**/index.d.ts",
+	}, lintprogram.NewFromCompiler(program)), false)
 }
 
 // Dual-published packages drop unnamed package.json files into their build

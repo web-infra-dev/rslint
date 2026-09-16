@@ -60,6 +60,9 @@ Object entries use TypeScript declaration information:
 | `{ from: 'package', package: 'effect' }` | Declarations from an optional package name pattern |
 | `{ from: 'lib' }` | TypeScript standard library declarations and intrinsic types |
 
+Use `/` separators in file patterns on every platform. Backslashes escape glob
+characters.
+
 Each object can include a `name` array. These names refer to the declared type,
 including its containing class or interface, such as
 `{ from: 'lib', name: ['CSSStyleSheet.replaceSync'] }`. Imported aliases use the
@@ -73,6 +76,9 @@ original declaration name. Omit `name` to ignore all matching declarations.
   ignore declarations in `foo.ts`. Upstream also accepts this pattern for
   `foo.ts`. Use `**/foo.ts` or `**/foo.{ts,tsx}` for the same result in both.
 - An empty file pattern ignores no declarations. Upstream stops with an error.
+- File patterns such as `./helpers.ts` also work on Windows and in working
+  directories containing uppercase letters on case-insensitive file systems.
+  Upstream can fail to ignore matching declarations in these cases.
 
 ## Original documentation
 

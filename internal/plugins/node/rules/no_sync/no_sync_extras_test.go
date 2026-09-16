@@ -92,6 +92,12 @@ func TestNoSyncExtras(t *testing.T) {
 			{Code: "declare function fooSync():void; fooSync();", FileName: "input.ts", Options: []any{map[string]any{"ignores": []any{map[string]any{"from": "file", "name": []any{}}}}}, Errors: []rule_tester.InvalidTestCaseError{syncError("fooSync", 1, 34, 1, 43)}},
 			// relative file pattern
 			{Code: "import {fooSync} from \"./foo\"; fooSync();", FileName: "input.ts", Options: []any{map[string]any{"ignores": []any{map[string]any{"from": "file", "path": "foo.ts"}}}}, Errors: []rule_tester.InvalidTestCaseError{syncError("fooSync", 1, 32, 1, 41)}},
+			// File patterns preserve leading, trailing, and Unicode spaces.
+			{Code: `import {fooSync} from "./foo"; fooSync();`, Options: map[string]any{"ignores": []any{
+				map[string]any{"from": "file", "path": " **/foo.ts"},
+				map[string]any{"from": "file", "path": "**/foo.ts "},
+				map[string]any{"from": "file", "path": "\u00a0**/foo.ts"},
+			}}, Errors: []rule_tester.InvalidTestCaseError{syncError("fooSync", 1, 32, 1, 41)}},
 			// empty file pattern (upstream throws; native ignores nothing)
 			{Code: "import {fooSync} from \"./foo\"; fooSync();", FileName: "input.ts", Options: []any{map[string]any{"ignores": []any{map[string]any{"from": "file", "path": ""}}}}, Errors: []rule_tester.InvalidTestCaseError{syncError("fooSync", 1, 32, 1, 41)}},
 			// wrong package
