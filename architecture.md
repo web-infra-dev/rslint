@@ -172,6 +172,9 @@ filesystem and generation-scoped cache. Resolution results retain failure
 details for missing-module diagnostics; rules select their exemptions and
 report on the collected source nodes. Relative lookup settings use the process
 directory from `RuleContext`, independently of the owning tsconfig's directory.
+Node rules share reference traversal in `nodeutil` for global writes, module
+properties, aliases and destructuring, using `RuleContext.Refs` for symbols.
+Rules keep their own matching conditions and diagnostic policy.
 The glob matcher uses code-unit input for regexp2; rule callers do not select a
 character encoding or translate backend capture numbers. These packages do not
 decide which files to lint or discover ignore files; those policies belong to
