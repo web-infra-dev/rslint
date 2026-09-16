@@ -60,10 +60,9 @@ working directory.
 
 ## Differences from upstream
 
-For `"never"`, paths containing escape sequences are reported without an
-automatic fix. For example, `import './\u0061.js'` resolves like `import './a.js'`,
-but upstream can remove the wrong characters from the escaped spelling. Use
-the unescaped spelling or remove the extension manually.
+For `"never"`, rslint removes the extension while preserving escapes elsewhere
+in the path. For example, `import './\u0061.js'` becomes `import './\u0061'`;
+upstream can remove the wrong characters from the escaped spelling.
 
 Automatic fixes also leave non-string `import()` arguments unchanged. If a
 custom extension contains a backslash, line break, or the string's quote
@@ -75,6 +74,8 @@ On Unix, directory imports whose names contain literal backslashes are not
 expanded. For example, if a directory named `a\b` contains `index.js`, upstream
 expands `import './a\\b'` to `import './a\\b/index.js'`; rslint leaves this
 JavaScript import unchanged. Use directory names without literal backslashes.
+In TypeScript, a missing-extension diagnostic may still be reported, but no
+extension is added automatically when the path cannot be checked reliably.
 
 ## References
 

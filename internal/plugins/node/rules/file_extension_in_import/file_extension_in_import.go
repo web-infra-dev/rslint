@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed file_extension_in_import.schema.json
@@ -144,7 +145,7 @@ var FileExtensionInImportRule = rule.Rule{
 					Id: "requireExt", Description: "require file extension '" + expectedExt + "'.",
 					Data: map[string]string{"ext": expectedExt},
 				}, func() []rule.RuleFix {
-					if source.Kind != ast.KindStringLiteral {
+					if !canProbe || source.Kind != ast.KindStringLiteral || ast.IsUnterminatedLiteral(source) {
 						return nil
 					}
 					quote := ctx.SourceFile.Text()[source.End()-1]
@@ -168,19 +169,28 @@ var FileExtensionInImportRule = rule.Rule{
 					Id: "forbidExt", Description: "forbid file extension '" + currentExt + "'.",
 					Data: map[string]string{"ext": currentExt},
 				}, func() []rule.RuleFix {
+					if !canProbe || source.Kind != ast.KindStringLiteral || ast.IsUnterminatedLiteral(source) {
+						return nil
+					}
 					basename := strings.TrimSuffix(filepath.Base(filePath), extension(filePath))
 					if len(existingExtensions(p, filePath, basename)) != 1 {
 						return nil
 					}
 					span := utils.TrimNodeTextRange(ctx.SourceFile, source)
-					// Upstream offsets decoded strings into raw tokens, which can
-					// remove unrelated characters when the path contains escapes.
-					// Keep the diagnostic but omit that unsafe fix.
-					if source.Kind != ast.KindStringLiteral || ctx.SourceFile.Text()[span.Pos()+1:span.End()-1] != source.Text() {
-						return nil
+					raw := ctx.SourceFile.Text()[span.Pos():span.End()]
+					index := strings.LastIndex(name, currentExt)
+					start, end := index+1, index+1+len(currentExt)
+					if raw[1:len(raw)-1] != source.Text() {
+						// Decoded positions count UTF-16 units; edits address source bytes.
+						units := utils.ParseJSStringLiteralSource(raw)
+						first := ecmascript.StringCodeUnitCount(name[:index])
+						last := first + ecmascript.StringCodeUnitCount(currentExt)
+						if last > len(units) {
+							return nil
+						}
+						start, end = units[first].Start, units[last-1].End
 					}
-					start := span.Pos() + 1 + strings.LastIndex(name, currentExt)
-					return []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(start, start+len(currentExt)))}
+					return []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(span.Pos()+start, span.Pos()+end))}
 				})
 			}
 		})

@@ -11,16 +11,18 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Additional syntax and filesystem cases checked against eslint-plugin-n v18.3.0.
-// Escaped-path removals deliberately omit upstream's unsafe raw-token edit.
+// Escaped-path removals preserve source spelling instead of upstream's unsafe offsets.
 func TestFileExtensionInImportExtras(t *testing.T) {
 	root := extensionRoot(t, "testdata/upstream.txtar", "testdata/extras.txtar")
 	absolute := tspath.ResolvePath(root.Dir, "a")
@@ -112,9 +114,9 @@ func TestFileExtensionInImportExtras(t *testing.T) {
 			// resolvePaths selection
 			{Code: "import './only'", FileName: "test.js", Settings: map[string]any{"node": map[string]any{"resolvePaths": []any{strings.ReplaceAll("{{root}}/search", "{{root}}", root.Dir)}}}, Output: []string{"import './only.js'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireExt", Message: "require file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}}},
 			// escaped path safe removal
-			{Code: "import './\\u0061.js'", FileName: "test.js", Options: []any{"never"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 21}}},
+			{Code: "import './\\u0061.js'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './\\u0061'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 21}}},
 			// escaped extension safe removal
-			{Code: "import './a.\\x6as'", FileName: "test.js", Options: []any{"never"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
+			{Code: "import './a.\\x6as'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
 			// escaped path insertion
 			{Code: "import './\\u0061'", FileName: "test.js", Output: []string{"import './\\u0061.js'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireExt", Message: "require file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 18}}},
 			// ESTree also treats regular expressions as literals; do not rewrite them as strings.
@@ -163,9 +165,57 @@ func TestFileExtensionInImportLiteralBackslash(t *testing.T) {
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &FileExtensionInImportRule,
 		[]rule_tester.ValidTestCase{{Code: code, FileName: "test.js"}},
 		[]rule_tester.InvalidTestCase{{
-			Code: code, FileName: "test.ts", Output: []string{`import '.\\my-folder.js'`},
+			Code: code, FileName: "test.ts",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireExt", Message: "require file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: len(code) + 1}},
 		}})
+}
+
+func TestFileExtensionInImportWindowsSeparators(t *testing.T) {
+	if filepath.Separator != '\\' {
+		t.Skip("Windows path separators require a Windows host.")
+	}
+	root := extensionRoot(t, "testdata/upstream.txtar")
+	rooted := filepath.FromSlash(tspath.ResolvePath(root.Dir, "a.js"))
+	rooted = strings.TrimPrefix(rooted, filepath.VolumeName(rooted))
+	code := "import " + strconv.Quote(rooted)
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &FileExtensionInImportRule, nil, []rule_tester.InvalidTestCase{{
+		Code: `import '.\\\u0061.\x6as'`, FileName: "test.js", Options: []any{"never"}, Output: []string{`import '.\\\u0061'`},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 25}},
+	}, {
+		Code: `import '.\\my-folder\\'`, FileName: "test.js", Output: []string{`import '.\\my-folder\\index.js'`},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "requireExt", Message: "require file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 24}},
+	}, {
+		Code: code, FileName: "test.js", Options: []any{"never"}, Output: []string{"import " + strconv.Quote(strings.TrimSuffix(rooted, ".js"))},
+		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: len(code) + 1}},
+	}})
+}
+
+func TestFileExtensionInImportUnterminatedLiteral(t *testing.T) {
+	root := extensionRoot(t, "testdata/upstream.txtar")
+	code := `import './missing\'`
+	filename := tspath.ResolvePath(root.Dir, "test.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{filename: code})
+	// RuleTester rejects syntax errors; retain this partial editor input in a Program.
+	p, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		Host: utils.CreateCompilerHost(root.Dir, fs), CompilerOptions: &core.CompilerOptions{},
+		RootFileNames: []string{filename}, SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program: p, File: filename,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: FileExtensionInImportRule.Name, Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners { return FileExtensionInImportRule.Run(ctx, nil) },
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+	})
+	if len(diagnostics) != 1 || diagnostics[0].Message.Id != "requireExt" || diagnostics[0].Message.Description != "require file extension '.js'." || diagnostics[0].Range != core.NewTextRange(7, len(code)) || diagnostics[0].FixesPtr != nil {
+		t.Fatalf("unexpected diagnostics: %#v", diagnostics)
+	}
 }
 
 func TestFileExtensionInImportSymlinks(t *testing.T) {
@@ -242,7 +292,8 @@ func TestFileExtensionInImportEditDemand(t *testing.T) {
 		{`import './my-folder'`, "always", "requireExt", true},
 		{`import './a.js'`, "never", "forbidExt", true},
 		{`import './multi.js'`, "never", "forbidExt", false},
-		{`import './\u0061.js'`, "never", "forbidExt", false},
+		{`import './\u0061.js'`, "never", "forbidExt", true},
+		{`import './a.\x6as'`, "never", "forbidExt", true},
 	} {
 		t.Run(test.code, func(t *testing.T) {
 			root := extensionRoot(t, "testdata/upstream.txtar")
@@ -295,4 +346,29 @@ func TestFileExtensionInImportEditDemand(t *testing.T) {
 	if got := FileExtensionInImportRule.Run(rule.RuleContext{}, nil); got != nil {
 		t.Fatal("expected no listeners without a Program")
 	}
+}
+
+func TestFileExtensionInImportEscapedPaths(t *testing.T) {
+	root := extensionRoot(t, "testdata/upstream.txtar", "testdata/extras.txtar")
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &FileExtensionInImportRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "import '.\\/a.js'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import '.\\/a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 17}}},
+		{Code: "import '\\u002e/a\\u002ejs'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import '\\u002e/a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+		{Code: "import './\\u{61}.\\u006a\\u0073'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './\\u{61}'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 31}}},
+		{Code: "import './a\\x2e\\x6a\\x73'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 25}}},
+		{Code: "import './\\uD83D\\uDE00.js'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './\\uD83D\\uDE00'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 27}}},
+		{Code: "import './\\u{1F600}.js'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './\\u{1F600}'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 24}}},
+		{Code: "import './😀.\\x6as'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './😀'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 20}}},
+		{Code: "const label = '😀'; import './café.\\u006As';", FileName: "test.js", Options: []any{"never"}, Output: []string{"const label = '😀'; import './café';"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 28, EndLine: 1, EndColumn: 44}}},
+		{Code: "import './a\\\n.js'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a\\\n'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 2, EndColumn: 5}}},
+		{Code: "import './a.\\\r\njs'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 2, EndColumn: 4}}},
+		{Code: "import './a.j\\\ns'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 2, EndColumn: 3}}},
+		{Code: "import './a.js\\\r\n'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a\\\r\n'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 2, EndColumn: 2}}},
+		{Code: "import './a.\\\u2028js'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 2, EndColumn: 4}}},
+		{Code: "import './a.j\\\u2029s'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 2, EndColumn: 3}}},
+		{Code: "import './\\u0061.\\x6as!loader.js'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './\\u0061!loader.js'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 34}}},
+		{Code: "import './a.\\x6as\\u0021loader'", FileName: "test.js", Options: []any{"never"}, Output: []string{"import './a\\u0021loader'"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 8, EndLine: 1, EndColumn: 31}}},
+		{Code: "import( /* before */ ('./\\u0061.js') /* after */ );", FileName: "test.js", Options: []any{"never"}, Output: []string{"import( /* before */ ('./\\u0061') /* after */ );"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 23, EndLine: 1, EndColumn: 36}}},
+		{Code: "export * from \"./\\u0061.\\x6as\";", FileName: "test.js", Options: []any{"never"}, Output: []string{"export * from \"./\\u0061\";"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 15, EndLine: 1, EndColumn: 31}}},
+		{Code: "export type {T} from './\\u0064.js';", FileName: "test.ts", Options: []any{"never"}, Output: []string{"export type {T} from './\\u0064';"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 35}}},
+	})
 }
