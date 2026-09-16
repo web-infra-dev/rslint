@@ -53,6 +53,7 @@ func TestMaxNestedDescribeExtras(t *testing.T) {
 			{Code: `const suiteBody = () => { describe('two', () => {}); }; describe('one', suiteBody);`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 27)}},
 			{Code: `let suiteBody = () => { describe('two', () => {}); }; describe('one', suiteBody);`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 25)}},
 			{Code: `var suiteBody = () => { describe('two', () => {}); }; describe('one', suiteBody);`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 25)}},
+			{Code: `function wrap(fn) { return fn; } function body() { describe('middle', wrap(() => { describe('inner', () => {}); })); } describe('outer', body);`, Options: maxOption(2), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(3, 2, 1, 84)}},
 			{Code: `function shared() { describe('child', () => {}); } describe('one', shared); describe('other', () => { describe('inner', shared); });`, Options: maxOption(2), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(3, 2, 1, 21)}},
 			{Code: `describe('one', wrap(() => { describe('two', () => {}); }));`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 30)}},
 			{Code: `function register() { const body = () => { describe('inner', () => {}); }; describe('outer', body); } register();`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 44)}},

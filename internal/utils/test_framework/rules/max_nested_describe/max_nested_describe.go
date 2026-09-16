@@ -30,6 +30,11 @@ type options struct {
 	max int
 }
 
+type describeFrame struct {
+	node  *ast.Node
+	depth int
+}
+
 func parseOptions(rawOptions []any) options {
 	opts := options{max: defaultMax}
 	if len(rawOptions) == 0 {
@@ -67,27 +72,30 @@ func NewRule(config Config) rule.Rule {
 				return rule.RuleListeners{}
 			}
 			opts := parseOptions(rawOptions)
-			describes := make([]*ast.Node, 0, defaultMax+1)
+			describes := make([]describeFrame, 0, defaultMax+1)
 
 			return rule.RuleListeners{
 				ast.KindCallExpression: func(node *ast.Node) {
 					if !runtime.IsDescribeCall(node) {
 						return
 					}
-					describes = append(describes, node)
-					depth := len(describes)
+					depth := 1
+					if len(describes) > 0 {
+						depth = describes[len(describes)-1].depth + 1
+					}
 					if runtime.DescribeDepth != nil {
 						if semanticDepth := runtime.DescribeDepth(node); semanticDepth > depth {
 							depth = semanticDepth
 						}
 					}
+					describes = append(describes, describeFrame{node: node, depth: depth})
 					if depth > opts.max {
 						ctx.ReportNode(node, exceededMaxDepthMessage(depth, opts.max))
 					}
 				},
 				rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
 					last := len(describes) - 1
-					if last >= 0 && describes[last] == node {
+					if last >= 0 && describes[last].node == node {
 						describes = describes[:last]
 					}
 				},
