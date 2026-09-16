@@ -417,11 +417,12 @@ func TypeMatchesDeclarationSpecifier(t *checker.Type, specifier TypeOrValueSpeci
 	}
 	cwd := canonical(program.CurrentDirectory())
 	typeRoots, _ := program.Options().GetEffectiveTypeRoots(program.CurrentDirectory())
+	pathOptions := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()}
 	// Picomatch treats whitespace in a configured pattern literally.
 	globOptions := minimatch3.Options{PreserveWhitespace: true}
 	for _, file := range files {
 		name := canonical(file.FileName())
-		if Some(typeRoots, func(root string) bool { return strings.HasPrefix(name, canonical(root)) }) {
+		if Some(typeRoots, func(root string) bool { return tspath.ContainsPath(canonical(root), name, pathOptions) }) {
 			continue
 		}
 		if !specifier.pathProvided && specifier.Path == "" {
@@ -430,10 +431,10 @@ func TypeMatchesDeclarationSpecifier(t *checker.Type, specifier TypeOrValueSpeci
 			}
 			continue
 		}
-		if !strings.HasPrefix(name, cwd) {
+		if !tspath.ContainsPath(cwd, name, pathOptions) {
 			continue
 		}
-		relative := tspath.GetRelativePathFromDirectory(cwd, name, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()})
+		relative := tspath.GetRelativePathFromDirectory(cwd, name, pathOptions)
 		if minimatch3.Match(specifier.Path, name, globOptions) || minimatch3.Match(specifier.Path, "./"+relative, globOptions) {
 			return true
 		}

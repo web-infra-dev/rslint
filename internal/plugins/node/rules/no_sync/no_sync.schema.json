@@ -55,7 +55,8 @@
                     "enum": ["package"]
                   },
                   "package": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "regex-u"
                   },
                   "name": {
                     "type": "array",

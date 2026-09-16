@@ -61,7 +61,8 @@ Object entries use TypeScript declaration information:
 | `{ from: 'lib' }` | TypeScript standard library declarations and intrinsic types |
 
 Use `/` separators in file patterns on every platform. Backslashes escape glob
-characters.
+characters. Package patterns are JavaScript regular expressions in Unicode mode;
+invalid patterns, such as `(`, are configuration errors.
 
 Each object can include a `name` array. These names refer to the declared type,
 including its containing class or interface, such as
@@ -72,13 +73,39 @@ original declaration name. Omit `name` to ignore all matching declarations.
 
 - When type information is unavailable, object entries in `ignores` suppress
   nothing; string entries still apply. Upstream stops with an error in this case.
-- The file pattern `**/foo.(ts)` matches parentheses literally, so it does not
-  ignore declarations in `foo.ts`. Upstream also accepts this pattern for
-  `foo.ts`. Use `**/foo.ts` or `**/foo.{ts,tsx}` for the same result in both.
 - An empty file pattern ignores no declarations. Upstream stops with an error.
 - File patterns such as `./helpers.ts` also work on Windows and in working
   directories containing uppercase letters on case-insensitive file systems.
   Upstream can fail to ignore matching declarations in these cases.
+- Directory checks distinguish siblings with a shared prefix. For example, with
+  `typeRoots: ['./types']`, `{ from: 'file' }` can ignore declarations in
+  `types-extra/helper.ts`; upstream incorrectly excludes them. A file glob cannot
+  match declarations in a sibling `project-extra` directory when the working
+  directory is `project`, even though upstream may accept them.
+- Package patterns are validated before linting. Upstream may only report an
+  invalid pattern when it encounters a matching call. Long Unicode property
+  names such as `\p{Letter}` are unsupported; use `\p{L}` instead.
+
+Some file globs match differently. The table shows whether each pattern ignores
+an example declaration in a case-sensitive project directory. Prefer explicit
+paths, `**/foo.ts`, or alternatives such as `**/*.{ts,tsx}` when sharing a
+configuration with upstream.
+
+| File pattern | Example declaration | rslint ignores | Upstream ignores |
+| --- | --- | --- | --- |
+| `./src/*.ts` | `src/foo.ts` | Yes | No |
+| `**/[!a-z]*.ts` | `foo.ts` | No | Yes |
+| `**/[^a-z]*.ts` | `.foo.ts` | No | Yes |
+| `**/[[:digit:]]*.ts` | `1.ts` | No | Yes |
+| `**/!(foo\|bar).ts` | `foobar.ts` | Yes | No |
+| `!(**/foo.ts)` | `foo.ts` | Yes | No |
+| `**/.*/foo.ts` | `foo.ts` | Yes | No |
+| `**/foo.(ts)` | `foo.ts` | No | Yes |
+| `**/[foo].ts` | `[foo].ts` | No | Yes |
+| `**/file{01..03}.ts` | `file01.ts` | Yes | No |
+| `**/file{1..3..2}.ts` | `file2.ts` | No | Yes |
+| `**//foo.ts` | `foo.ts` | Yes | No |
+| `**/foo.ts/**` | `foo.ts` | No | Yes |
 
 ## Original documentation
 

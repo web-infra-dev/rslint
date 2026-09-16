@@ -215,3 +215,34 @@ func TestNoSyncSymbolsAndSyntax(t *testing.T) {
 		},
 	)
 }
+
+func TestNoSyncOptions(t *testing.T) {
+	for _, test := range []struct {
+		pattern string
+		wantErr bool
+	}{
+		{"", false},
+		{"demo-pkg", false},
+		{"@scope/package", false},
+		{`^(?:foo|bar)$`, false},
+		{`(?=a)(a)\1`, false},
+		{`\u{61}aa`, false},
+		{`\p{L}+`, false},
+		{"(", true},
+		{"[", true},
+		{`\a`, true},
+		{`\u{110000}`, true},
+		// The regexp validator requires the short Unicode category name.
+		{`\p{Letter}`, true},
+	} {
+		t.Run(test.pattern, func(t *testing.T) {
+			options := []any{map[string]any{"ignores": []any{map[string]any{
+				"from": "package", "package": test.pattern,
+			}}}}
+			err := NoSyncRule.Schema.Validate(options)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("Validate(%#v) = %v; want error: %v", options, err, test.wantErr)
+			}
+		})
+	}
+}

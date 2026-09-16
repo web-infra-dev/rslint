@@ -224,6 +224,23 @@ func TestTypeMatchesDeclarationSpecifierPaths(t *testing.T) {
 		typeRoots                      []string
 		want                           bool
 	}{
+		// File-glob differences are documented with concrete examples.
+		{"glob ./src/*.ts", "/repo", "/repo/src/foo.ts", "./src/*.ts", true, nil, true},
+		{"glob **/[!a-z]*.ts", "/repo", "/repo/foo.ts", "**/[!a-z]*.ts", true, nil, false},
+		{"glob **/[^a-z]*.ts", "/repo", "/repo/.foo.ts", "**/[^a-z]*.ts", true, nil, false},
+		{"glob **/[[:digit:]]*.ts", "/repo", "/repo/1.ts", "**/[[:digit:]]*.ts", true, nil, false},
+		{"glob **/!(foo|bar).ts", "/repo", "/repo/foobar.ts", "**/!(foo|bar).ts", true, nil, true},
+		{"glob !(**/foo.ts)", "/repo", "/repo/foo.ts", "!(**/foo.ts)", true, nil, true},
+		{"glob **/.*/foo.ts", "/repo", "/repo/foo.ts", "**/.*/foo.ts", true, nil, true},
+		{"glob ./*", "/repo", "/repo/foo.ts", "./*", true, nil, true},
+		{"glob **/foo.(ts)", "/repo", "/repo/foo.ts", "**/foo.(ts)", true, nil, false},
+		{"glob **/[foo].ts", "/repo", "/repo/[foo].ts", "**/[foo].ts", true, nil, false},
+		{"glob **/file{01..03}.ts", "/repo", "/repo/file01.ts", "**/file{01..03}.ts", true, nil, true},
+		{"glob **/file{1..3..2}.ts", "/repo", "/repo/file2.ts", "**/file{1..3..2}.ts", true, nil, false},
+		{"glob ./#*.ts", "/repo", "/repo/#foo.ts", "./#*.ts", true, nil, true},
+		{"glob **//foo.ts", "/repo", "/repo/foo.ts", "**//foo.ts", true, nil, true},
+		{"glob ./!(bar).ts", "/repo", "/repo/foo.ts", "./!(bar).ts", true, nil, true},
+		{"glob **/foo.ts/**", "/repo", "/repo/foo.ts", "**/foo.ts/**", true, nil, false},
 		{"relative POSIX", "/repo/project", "/repo/project/src/file.ts", "./src/*.ts", true, nil, true},
 		{"absolute POSIX", "/repo/project", "/repo/project/src/file.ts", "/repo/project/src/*.ts", true, nil, true},
 		{"case-sensitive match", "/repo/project", "/repo/project/Src/File.ts", "./Src/File.ts", true, nil, true},
@@ -248,10 +265,15 @@ func TestTypeMatchesDeclarationSpecifierPaths(t *testing.T) {
 		{"trailing pattern space", "/repo/project", "/repo/project/file.ts", "**/file.ts ", true, nil, false},
 		{"Unicode pattern space", "C:/repo/project", "C:/repo/project/file.ts", "\u00a0**/file.ts", false, nil, false},
 		{"outside working directory", "/repo/project", "/repo/shared/file.ts", "**/file.ts", true, nil, false},
-		// Declaration-location uses string prefixes for cwd and typeRoots.
-		{"sibling directory sharing cwd prefix", "/repo/project", "/repo/project-extra/file.ts", "**/file.ts", true, nil, true},
+		// Directory containment must not confuse siblings sharing a prefix.
+		{"sibling directory sharing cwd prefix", "/repo/project", "/repo/project-extra/file.ts", "**/file.ts", true, nil, false},
 		{"configured type root", "/repo/project", "/repo/project/types/file.ts", "**/file.ts", true, []string{"/repo/project/types"}, false},
-		{"type root prefix", "/repo/project", "/repo/project/types-extra/file.ts", "**/file.ts", true, []string{"/repo/project/types"}, false},
+		{"type root prefix", "/repo/project", "/repo/project/types-extra/file.ts", "**/file.ts", true, []string{"/repo/project/types"}, true},
+		{"Windows cwd prefix", "C:/Repo/Project", "c:/repo/project-extra/file.ts", "**/file.ts", false, nil, false},
+		{"UNC cwd prefix", "//server/share/project", "//server/share/project-extra/file.ts", "**/file.ts", false, nil, false},
+		{"Windows type root prefix", "C:/Repo/Project", "c:/repo/project/Types-extra/file.ts", "**/file.ts", false, []string{"C:/repo/project/types"}, true},
+		{"UNC type root prefix", "//server/share/project", "//server/share/project/types-extra/file.ts", "**/file.ts", false, []string{"//server/share/project/types"}, true},
+		{"type root trailing separator", "/repo/project", "/repo/project/types/file.ts", "**/file.ts", true, []string{"/repo/project/types/"}, false},
 		{"Windows type root casing", "C:/Repo/Project", "C:/Repo/Project/Types/file.ts", "**/file.ts", false, []string{"c:/repo/project/types"}, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -271,6 +293,12 @@ func TestTypeMatchesDeclarationSpecifierPaths(t *testing.T) {
 			specifier, ok := ParseTypeOrValueSpecifier(map[string]any{"from": "file", "path": test.pattern})
 			assert.Assert(t, ok)
 			assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, file), specifier, lintprogram.NewFromCompiler(program)), test.want)
+			if test.typeRoots != nil {
+				// Omitting the glob must retain the same type-root exclusion.
+				assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, file), TypeOrValueSpecifier{
+					From: TypeOrValueSpecifierFromFile,
+				}, lintprogram.NewFromCompiler(program)), test.want)
+			}
 		})
 	}
 }
