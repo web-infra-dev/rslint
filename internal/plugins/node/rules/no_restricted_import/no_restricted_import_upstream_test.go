@@ -1,9 +1,9 @@
 package no_restricted_import
 
 import (
+	"path/filepath"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -37,7 +37,7 @@ func TestNoRestrictedImportUpstream(t *testing.T) {
 			// upstream valid 12
 			{Code: "import \"foo/bar\";", Options: []any{[]any{map[string]any{"name": "@foo/bar"}}}},
 			// upstream valid 13
-			{Code: "import \"../foo\";", FileName: "lib/sub/test.js", Options: []any{[]any{map[string]any{"name": tspath.ResolvePath(root.Dir, "foo")}}}},
+			{Code: "import \"../foo\";", FileName: "lib/sub/test.js", Options: []any{[]any{map[string]any{"name": filepath.Join(root.Dir, "foo")}}}},
 			// upstream valid 14
 			{Code: "import(fs)", Options: []any{[]any{"fs"}}},
 		},
@@ -71,9 +71,9 @@ func TestNoRestrictedImportUpstream(t *testing.T) {
 			// upstream invalid 14
 			{Code: "import \"./foo/bar\";", Options: []any{[]any{map[string]any{"name": "./foo/*"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'./foo/bar' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
 			// upstream invalid 15
-			{Code: "import \"../foo\";", FileName: "lib/test.js", Options: []any{[]any{map[string]any{"name": tspath.ResolvePath(root.Dir, "foo")}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../foo' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}}},
+			{Code: "import \"../foo\";", FileName: "lib/test.js", Options: []any{[]any{map[string]any{"name": filepath.Join(root.Dir, "foo")}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../foo' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}}},
 			// upstream invalid 16
-			{Code: "import \"../../foo\";", FileName: "lib/sub/test.js", Options: []any{[]any{map[string]any{"name": tspath.ResolvePath(root.Dir, "foo")}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../../foo' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
+			{Code: "import \"../../foo\";", FileName: "lib/sub/test.js", Options: []any{[]any{map[string]any{"name": filepath.Join(root.Dir, "foo")}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../../foo' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 19}}},
 			// upstream invalid 17
 			{Code: "import(\"fs\")", Options: []any{[]any{"fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}}},
 		},
@@ -104,9 +104,9 @@ func TestNoRestrictedImportDocumentation(t *testing.T) {
 			// documentation invalid 4
 			{Code: "import 'lodash/pick';\nimport 'foo-module/private/a';\nimport 'bar-module/a';", Options: []any{[]any{map[string]any{"name": "lodash/*", "message": "Please use xyz-module instead."}, map[string]any{"name": []any{"foo-module/private/*", "bar-module/*", "!baz-module/good"}, "message": "Please use xyz-module instead."}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'lodash/pick' module is restricted from being used. Please use xyz-module instead.", Line: 1, Column: 8, EndLine: 1, EndColumn: 21}, {MessageId: "restricted", Message: "'foo-module/private/a' module is restricted from being used. Please use xyz-module instead.", Line: 2, Column: 8, EndLine: 2, EndColumn: 30}, {MessageId: "restricted", Message: "'bar-module/a' module is restricted from being used. Please use xyz-module instead.", Line: 3, Column: 8, EndLine: 3, EndColumn: 22}}},
 			// documentation invalid 5
-			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": tspath.ResolvePath(root.Dir, "server/**"), "message": "Don't use server code from client code."}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js' module is restricted from being used. Don't use server code from client code.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": filepath.Join(root.Dir, "server/**"), "message": "Don't use server code from client code."}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js' module is restricted from being used. Don't use server code from client code.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
 			// documentation invalid 6
-			{Code: "import '../client/view.js';", FileName: "server/input.js", Options: []any{[]any{map[string]any{"name": tspath.ResolvePath(root.Dir, "client/**"), "message": "Don't use client code from server code."}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../client/view.js' module is restricted from being used. Don't use client code from server code.", Line: 1, Column: 8, EndLine: 1, EndColumn: 27}}},
+			{Code: "import '../client/view.js';", FileName: "server/input.js", Options: []any{[]any{map[string]any{"name": filepath.Join(root.Dir, "client/**"), "message": "Don't use client code from server code."}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../client/view.js' module is restricted from being used. Don't use client code from server code.", Line: 1, Column: 8, EndLine: 1, EndColumn: 27}}},
 		},
 	)
 }

@@ -1,6 +1,7 @@
 // All upstream tests and documentation examples, eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-restricted-import.js
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/no-restricted-import.md
+import path from 'node:path';
 import { RuleTester } from '../rule-tester';
 
 new RuleTester({ languageOptions: { sourceType: 'module' } }).run(
@@ -110,7 +111,7 @@ new RuleTester({ languageOptions: { sourceType: 'module' } }).run(
         options: (root: string) => [
           [
             {
-              name: `${root}/foo`,
+              name: path.join(root, 'foo'),
             },
           ],
         ],
@@ -438,7 +439,7 @@ new RuleTester({ languageOptions: { sourceType: 'module' } }).run(
         options: (root: string) => [
           [
             {
-              name: `${root}/foo`,
+              name: path.join(root, 'foo'),
             },
           ],
         ],
@@ -460,7 +461,7 @@ new RuleTester({ languageOptions: { sourceType: 'module' } }).run(
         options: (root: string) => [
           [
             {
-              name: `${root}/foo`,
+              name: path.join(root, 'foo'),
             },
           ],
         ],
@@ -636,7 +637,7 @@ new RuleTester({ languageOptions: { sourceType: 'module' } }).run(
         options: (root: string) => [
           [
             {
-              name: `${root}/server/**`,
+              name: path.join(root, 'server/**'),
               message: "Don't use server code from client code.",
             },
           ],
@@ -660,7 +661,7 @@ new RuleTester({ languageOptions: { sourceType: 'module' } }).run(
         options: (root: string) => [
           [
             {
-              name: `${root}/client/**`,
+              name: path.join(root, 'client/**'),
               message: "Don't use client code from server code.",
             },
           ],

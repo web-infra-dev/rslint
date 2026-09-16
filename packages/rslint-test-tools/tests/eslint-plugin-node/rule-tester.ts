@@ -102,7 +102,7 @@ export class RuleTester {
                     [`node/${name}`]: [
                       'error',
                       ...(typeof item.options === 'function'
-                        ? item.options(root.replaceAll('\\', '/'))
+                        ? item.options(root)
                         : (item.options ?? [])),
                     ],
                   },

@@ -172,9 +172,10 @@ restrictions; restriction ordering and messages stay inside the rule. It
 reuses tsgo's resolver and config parser through the Program's existing
 filesystem and generation-scoped cache. Resolution results retain failure
 details for missing-module diagnostics and target paths for restrictions,
-including lexical paths for unresolved local imports; rules select their
-exemptions and report on the collected source nodes. Relative lookup settings
-use the process directory from `RuleContext`, independently of the owning
+including lexical paths for unresolved local imports. Restrictions compare
+host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
+Rules select their exemptions and report on the collected source nodes.
+Relative lookup settings use the process directory from `RuleContext`, independently of the owning
 tsconfig's directory.
 The require collector also follows CommonJS module-object aliases to property
 reads. It delegates symbols and references to `RuleContext.Refs` and reuses

@@ -2,7 +2,6 @@ package no_restricted_import
 
 import (
 	_ "embed"
-	"path/filepath"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -53,10 +52,8 @@ func parseRestrictions(options []any) []restriction {
 			if negated {
 				name = name[1:]
 			}
-			absolute := filepath.IsAbs(name)
-			if absolute {
-				name = filepath.ToSlash(name)
-			}
+			// Preserve the pattern: changing separators changes glob semantics.
+			absolute := nodeutil.IsAbsolutePath(name)
 			r.patterns = append(r.patterns, restrictionPattern{nodeutil.CompileGlob(name), absolute, negated})
 		}
 		restrictions = append(restrictions, r)

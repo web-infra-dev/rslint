@@ -2,7 +2,6 @@ package no_restricted_import
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -60,6 +59,43 @@ func TestNoRestrictedImportLiteralBackslash(t *testing.T) {
 		}})
 }
 
+// The upstream glob mode only treats / as a separator. Windows filesystem
+// paths must stay native: replacing backslashes would change * and **.
+func TestNoRestrictedImportNativePatterns(t *testing.T) {
+	root := restrictedImportRoot(t)
+	for _, tc := range []struct {
+		name, pattern  string
+		posix, windows bool
+	}{
+		{"native star", filepath.Join(root.Dir, "server", "*"), false, true},
+		{"native globstar", filepath.Join(root.Dir, "server", "**"), true, true},
+		{"forward slashes", root.Dir + "/server/**", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want := tc.posix
+			if filepath.Separator == '\\' {
+				want = tc.windows
+			}
+			code := `import '../server/nested/missing.js';`
+			options := []any{[]any{tc.pattern}}
+			var valid []rule_tester.ValidTestCase
+			var invalid []rule_tester.InvalidTestCase
+			if want {
+				invalid = []rule_tester.InvalidTestCase{{
+					Code: code, FileName: "client/input.js", Options: options,
+					Errors: []rule_tester.InvalidTestCaseError{{
+						MessageId: "restricted", Message: "'../server/nested/missing.js' module is restricted from being used.",
+						Line: 1, Column: 8, EndLine: 1, EndColumn: 37,
+					}},
+				}}
+			} else {
+				valid = []rule_tester.ValidTestCase{{Code: code, FileName: "client/input.js", Options: options}}
+			}
+			rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoRestrictedImportRule, valid, invalid)
+		})
+	}
+}
+
 func TestNoRestrictedImportSchema(t *testing.T) {
 	for _, tc := range []struct {
 		options []any
@@ -107,15 +143,15 @@ func TestNoRestrictedImportExtras(t *testing.T) {
 			// non-extended syntax does not expand
 			{Code: "import 'pkg/file1.js'; import 'pkg/a.js'; import 'foo';", FileName: "input.js", Options: []any{[]any{"pkg/file?.js", "pkg/[ab].js", "pkg/{a,b}.js", "@(foo|bar)", "!(bar)"}}},
 			// directory imports retain lexical paths
-			{Code: "import '../server';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/index.js", "{{root}}", root.Dir)}}},
+			{Code: "import '../server';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "server/index.js")}}},
 			// unresolved packages and builtins have no absolute path
-			{Code: "import 'missing-package'; import 'fs'; import 'node:fs'; import 'https://example.com/mod.js';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/**", "{{root}}", root.Dir)}}},
+			{Code: "import 'missing-package'; import 'fs'; import 'node:fs'; import 'https://example.com/mod.js';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "**")}}},
 			// absolute and name patterns share ordering
-			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": []any{"../server/*", strings.ReplaceAll("!{{root}}/server/api.js", "{{root}}", root.Dir)}}}}},
+			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": []any{"../server/*", "!" + filepath.Join(root.Dir, "server/api.js")}}}}},
 			// missing map target has no path
-			{Code: "import '#missing';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/missing.js", "{{root}}", root.Dir)}}},
+			{Code: "import '#missing';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "missing.js")}}},
 			// absolute restriction retains resource query
-			{Code: "import '../server/api.js?raw#part';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/api.js", "{{root}}", root.Dir)}}},
+			{Code: "import '../server/api.js?raw#part';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// negation is ordered
@@ -157,33 +193,33 @@ func TestNoRestrictedImportExtras(t *testing.T) {
 			// multiline literal and UTF-16 ranges
 			{Code: "const emoji = '💡'; import('模块/💡');\nimport('multi\\\nline');", FileName: "input.js", Options: []any{[]any{"模块/*", "multiline"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'模块/💡' module is restricted from being used.", Line: 1, Column: 28, EndLine: 1, EndColumn: 35}, {MessageId: "restricted", Message: "'multiline' module is restricted from being used.", Line: 2, Column: 8, EndLine: 3, EndColumn: 6}}},
 			// unresolved relative path fallback
-			{Code: "import '../server/not-found';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/**", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/not-found' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 29}}},
+			{Code: "import '../server/not-found';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "server/**")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/not-found' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 29}}},
 			// dot and parent directory fallback
-			{Code: "import '.'; import '..';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/client", "{{root}}", root.Dir), strings.ReplaceAll("{{root}}", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'.' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 11}, {MessageId: "restricted", Message: "'..' module is restricted from being used.", Line: 1, Column: 20, EndLine: 1, EndColumn: 24}}},
+			{Code: "import '.'; import '..';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "client"), filepath.FromSlash(root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'.' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 11}, {MessageId: "restricted", Message: "'..' module is restricted from being used.", Line: 1, Column: 20, EndLine: 1, EndColumn: 24}}},
 			// relative files use resolved extensions
-			{Code: "import '../server/api';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/api.js", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 23}}},
+			{Code: "import '../server/api';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 23}}},
 			// resolved package and package subpath
-			{Code: "import 'pkg'; export * from 'pkg/sub';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/node_modules/pkg/**", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}, {MessageId: "restricted", Message: "'pkg/sub' module is restricted from being used.", Line: 1, Column: 29, EndLine: 1, EndColumn: 38}}},
+			{Code: "import 'pkg'; export * from 'pkg/sub';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/**")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}, {MessageId: "restricted", Message: "'pkg/sub' module is restricted from being used.", Line: 1, Column: 29, EndLine: 1, EndColumn: 38}}},
 			// name restrictions are independent of resolution
 			{Code: "import 'missing-package';", FileName: "client/input.js", Options: []any{[]any{"missing-package"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'missing-package' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 25}}},
 			// negative path only removes a matching target
-			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": []any{"../server/*", strings.ReplaceAll("!{{root}}/server/other.js", "{{root}}", root.Dir)}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": []any{"../server/*", "!" + filepath.Join(root.Dir, "server/other.js")}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
 			// positive path after name exclusion
-			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": []any{"**", "!../server/*", strings.ReplaceAll("{{root}}/server/api.js", "{{root}}", root.Dir)}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+			{Code: "import '../server/api.js';", FileName: "client/input.js", Options: []any{[]any{map[string]any{"name": []any{"**", "!../server/*", filepath.Join(root.Dir, "server/api.js")}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
 			// package import maps
-			{Code: "import '#entry';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/**", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'#entry' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}}},
+			{Code: "import '#entry';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "server/**")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'#entry' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}}},
 			// TypeScript aliases and extension mapping
-			{Code: "import {value} from 'alias/mapped.js';", FileName: "client/input.ts", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/mapped.ts", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'alias/mapped.js' module is restricted from being used.", Line: 1, Column: 21, EndLine: 1, EndColumn: 38}}},
+			{Code: "import {value} from 'alias/mapped.js';", FileName: "client/input.ts", Options: []any{[]any{filepath.Join(root.Dir, "server/mapped.ts")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'alias/mapped.js' module is restricted from being used.", Line: 1, Column: 21, EndLine: 1, EndColumn: 38}}},
 			// type and runtime conditions choose different paths
-			{Code: "import type {Value} from 'pkg/types'; import 'pkg/types'; export type * from 'pkg/types';", FileName: "client/input.ts", Options: []any{[]any{strings.ReplaceAll("{{root}}/node_modules/pkg/types.d.ts", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg/types' module is restricted from being used.", Line: 1, Column: 26, EndLine: 1, EndColumn: 37}, {MessageId: "restricted", Message: "'pkg/types' module is restricted from being used.", Line: 1, Column: 78, EndLine: 1, EndColumn: 89}}},
+			{Code: "import type {Value} from 'pkg/types'; import 'pkg/types'; export type * from 'pkg/types';", FileName: "client/input.ts", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/types.d.ts")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg/types' module is restricted from being used.", Line: 1, Column: 26, EndLine: 1, EndColumn: 37}, {MessageId: "restricted", Message: "'pkg/types' module is restricted from being used.", Line: 1, Column: 78, EndLine: 1, EndColumn: 89}}},
 			// shared extension settings
-			{Code: "import '../server/custom';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/custom.ext", "{{root}}", root.Dir)}}, Settings: map[string]any{"node": map[string]any{"tryExtensions": []any{".ext"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/custom' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
+			{Code: "import '../server/custom';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "server/custom.ext")}}, Settings: map[string]any{"node": map[string]any{"tryExtensions": []any{".ext"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/custom' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26}}},
 			// shared additional base directories
-			{Code: "import 'extra';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/vendor/node_modules/extra/**", "{{root}}", root.Dir)}}, Settings: map[string]any{"node": map[string]any{"resolvePaths": []any{strings.ReplaceAll("{{root}}/vendor", "{{root}}", root.Dir)}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'extra' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
+			{Code: "import 'extra';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "vendor/node_modules/extra/**")}}, Settings: map[string]any{"node": map[string]any{"resolvePaths": []any{filepath.Join(root.Dir, "vendor")}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'extra' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 15}}},
 			// shared module search directories
-			{Code: "import 'custom';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/custom_modules/custom/**", "{{root}}", root.Dir)}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"modules": []any{"custom_modules"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'custom' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}}},
+			{Code: "import 'custom';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "custom_modules/custom/**")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"modules": []any{"custom_modules"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'custom' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 16}}},
 			// absolute restriction matches full resource query
-			{Code: "import '../server/api.js?raw#part';", FileName: "client/input.js", Options: []any{[]any{strings.ReplaceAll("{{root}}/server/api.js?raw#part", "{{root}}", root.Dir)}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js?raw#part' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 35}}},
+			{Code: "import '../server/api.js?raw#part';", FileName: "client/input.js", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js?raw#part")}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'../server/api.js?raw#part' module is restricted from being used.", Line: 1, Column: 8, EndLine: 1, EndColumn: 35}}},
 		},
 	)
 }

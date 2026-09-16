@@ -14,6 +14,7 @@ Pass an array of restricted module names or objects with `name` and an optional
 `message`. With no options, the rule reports nothing.
 
 ```js
+import { resolve } from 'node:path';
 import { defineConfig } from '@rslint/core';
 
 export default defineConfig([
@@ -28,6 +29,10 @@ export default defineConfig([
           {
             name: ['lodash/*', '!lodash/pick'],
             message: 'Import from lodash or use lodash/pick.',
+          },
+          {
+            name: resolve(import.meta.dirname, 'server', '**'),
+            message: 'Keep server code out of the client.',
           },
         ],
       ],
@@ -52,8 +57,8 @@ import lodash from 'lodash';
 import pick from 'lodash/pick';
 ```
 
-- `name` accepts a string or an array of patterns. `*` matches within a path
-  segment; `**` as a complete segment matches across directories. `?`, brackets,
+- `name` accepts a string or an array of patterns. `*` matches text except `/`;
+  `**` as a complete `/`-separated segment matches across directories. `?`, brackets,
   braces, and extended glob groups are literal text.
 - Patterns in one `name` array apply in order. A leading `!` removes an earlier
   match; a later positive pattern can add it again. An initial `!(` is literal.
@@ -65,11 +70,13 @@ import pick from 'lodash/pick';
 - Loader parameters after the first `!` are removed before matching. Query
   strings and fragments remain part of the name.
 
-Absolute patterns match resolved file paths. For example,
-`{ name: '/project/server/**', message: 'Keep server code out of the client.' }`
-restricts imports resolving under that directory, including relative imports
-and installed packages. Unresolved relative or absolute imports use their
-lexical absolute path; unresolved package names have no file path to match.
+Absolute patterns match resolved file paths, including relative imports and
+installed packages. Use `node:path` to build absolute patterns with the current
+platform's separators, as in the example above. Patterns are matched as written;
+backslashes are literal characters, including on Windows.
+
+Unresolved relative imports use their lexical absolute path; unresolved package
+names have no file path to match.
 
 Resolution uses the Node plugin's shared `settings.node` options, including
 `resolvePaths`, `tryExtensions`, and `resolverConfig.modules`, and TypeScript

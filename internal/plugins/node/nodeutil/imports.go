@@ -146,23 +146,29 @@ func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool
 func ImportFilePath(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
 	resolved, _ := resolveImport(p, name, fileName, typeOnly, options)
 	if resolved != "" {
+		if isImportURL(name) {
+			return resolved
+		}
+		// The resolver uses tsgo paths; upstream matches host filesystem paths.
+		resolved = filepath.FromSlash(resolved)
 		// Runtime lookup removes resource queries/fragments, but restrictions
 		// compare the complete resource returned by enhanced-resolve.
-		if index := strings.IndexAny(name, "?#"); index > 0 && !isImportURL(name) {
+		if index := strings.IndexAny(name, "?#"); index > 0 {
 			resolved += name[index:]
 		}
 		return resolved
 	}
 	if tspath.PathIsRelative(name) || strings.HasPrefix(name, "/") || strings.HasPrefix(name, `\`) {
-		// Node's path.resolve preserves literal backslashes on POSIX. This
-		// fallback is a match target, not a normalized VFS lookup path.
-		if filepath.Separator == '/' {
-			if filepath.IsAbs(name) {
-				return filepath.Clean(name)
-			}
-			return filepath.Join(tspath.GetDirectoryPath(fileName), name)
+		// Only the lexical fallback uses host paths, never VFS lookup keys.
+		// A rooted Windows path without a drive inherits the importer's volume.
+		directory := filepath.Dir(filepath.FromSlash(fileName))
+		if filepath.Separator == '\\' && filepath.VolumeName(name) == "" && !tspath.PathIsRelative(name) {
+			name = filepath.VolumeName(directory) + name
 		}
-		return tspath.ResolvePath(tspath.GetDirectoryPath(fileName), name)
+		if IsAbsolutePath(name) {
+			return filepath.Clean(name)
+		}
+		return filepath.Join(directory, name)
 	}
 	return ""
 }

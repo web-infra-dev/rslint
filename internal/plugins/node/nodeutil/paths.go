@@ -6,7 +6,9 @@ package nodeutil
 import (
 	"encoding/json"
 	"maps"
+	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,6 +20,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/gitignore"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
+
+// IsAbsolutePath follows Node's path.isAbsolute on the host. Unlike Go's
+// filepath.IsAbs, Node accepts rooted Windows paths without a drive letter.
+func IsAbsolutePath(name string) bool {
+	return len(name) > 0 && os.IsPathSeparator(name[0]) || tspath.IsRootedDiskPath(name) && filepath.IsAbs(name)
+}
 
 // PackageJSON is immutable package metadata from one Program generation.
 type PackageJSON struct {

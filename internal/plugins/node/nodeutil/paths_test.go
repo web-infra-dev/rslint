@@ -2,6 +2,7 @@
 package nodeutil
 
 import (
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -189,4 +190,27 @@ func TestPublicationGenerationAndConfiguration(t *testing.T) {
 		})
 	}
 	group.Wait()
+}
+
+// Expectations from Node's path.posix.isAbsolute and path.win32.isAbsolute.
+func TestIsAbsolutePath(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		posix, windows bool
+	}{
+		{"", false, false}, {".", false, false}, {"../module", false, false},
+		{"file:///a", false, false}, {"^/untitled", false, false},
+		{"/server", true, true}, {`\server`, false, true},
+		{"//server/share", true, true}, {`\\server\share`, false, true},
+		{"C:", false, false}, {"C:module", false, false},
+		{"C:/server", false, true}, {`C:\server`, false, true}, {"1:/server", false, false},
+	} {
+		want := tc.posix
+		if filepath.Separator == '\\' {
+			want = tc.windows
+		}
+		if got := IsAbsolutePath(tc.name); got != want {
+			t.Errorf("IsAbsolutePath(%q) = %v, want %v", tc.name, got, want)
+		}
+	}
 }
