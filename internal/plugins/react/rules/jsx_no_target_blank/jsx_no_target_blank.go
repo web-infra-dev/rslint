@@ -1,14 +1,19 @@
 package jsx_no_target_blank
 
 import (
+	"bytes"
 	_ "embed"
+	"encoding/json"
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -90,15 +95,23 @@ func stringLiteralText(node *ast.Node) (string, bool) {
 	return "", false
 }
 
+func jsxAttributeStringValue(sf *ast.SourceFile, node *ast.Node) (string, bool) {
+	if node == nil || node.Kind != ast.KindStringLiteral {
+		return "", false
+	}
+	raw := utils.TrimmedNodeText(sf, node)
+	// Use the JSX transform's code-point semantics, not Espree's uint16 truncation.
+	return jsxtransforms.DecodeEntities(raw[1 : len(raw)-1]), true
+}
+
 // templateOrStringText extends stringLiteralText by also accepting a
 // NoSubstitutionTemplateLiteral — this mirrors upstream's `getStringFromValue`
 // branch that reads `TemplateLiteral.quasis[0].value.cooked` for the `rel`
 // attribute. Parentheses are skipped.
 //
-// TemplateExpression (templates with `${}`) is deliberately not handled:
-// upstream would read only the first quasi, but rslint treats the value as
-// non-literal so the enclosing check falls through to "non-string branch" —
-// the same effective outcome for every rel string we care about.
+// For templates with substitutions, return only complete static space-delimited
+// tokens. Unlike upstream's first-quasi shortcut, an interpolation must not be
+// allowed to extend a supposedly secure token (`noreferrer${suffix}`).
 func templateOrStringText(node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
@@ -109,6 +122,28 @@ func templateOrStringText(node *ast.Node) (string, bool) {
 		return n.AsStringLiteral().Text, true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return n.AsNoSubstitutionTemplateLiteral().Text, true
+	case ast.KindTemplateExpression:
+		template := n.AsTemplateExpression()
+		// A quasi's first/last token may touch an unknown substitution. Drop
+		// those tokens, retaining only tokens bounded by literal spaces or
+		// the beginning/end of the entire template. Keep upstream's literal
+		// space separator rather than broadening its whitespace semantics.
+		completeTokens := func(text string, first, last bool) string {
+			tokens := strings.Split(text, " ")
+			if !first {
+				tokens = tokens[1:]
+			}
+			if !last && len(tokens) > 0 {
+				tokens = tokens[:len(tokens)-1]
+			}
+			return strings.Join(tokens, " ")
+		}
+		parts := []string{completeTokens(template.Head.Text(), true, false)}
+		for _, span := range template.TemplateSpans.Nodes {
+			literal := span.AsTemplateSpan().Literal
+			parts = append(parts, completeTokens(literal.Text(), false, literal.Kind == ast.KindTemplateTail))
+		}
+		return strings.Join(parts, " "), true
 	}
 	return "", false
 }
@@ -125,7 +160,7 @@ func templateOrStringText(node *ast.Node) (string, bool) {
 // examined. NoSubstitutionTemplateLiteral is deliberately excluded for strict
 // upstream parity (upstream's check is `expr.type === 'Literal'`, which
 // excludes templates).
-func attributeValuePossiblyBlank(attr *ast.Node) bool {
+func attributeValuePossiblyBlank(sf *ast.SourceFile, attr *ast.Node) bool {
 	if attr == nil {
 		return false
 	}
@@ -134,7 +169,7 @@ func attributeValuePossiblyBlank(attr *ast.Node) bool {
 		return false
 	}
 	// Direct `attr="_blank"` form.
-	if s, ok := stringLiteralText(init); ok {
+	if s, ok := jsxAttributeStringValue(sf, init); ok {
 		return ecmascript.EqualsWhenLowercased(s, "_blank")
 	}
 	// `attr={…}` form — unwrap the JsxExpression and any paren wrappers.
@@ -194,7 +229,7 @@ func isExternalURL(s string) bool {
 	return externalLinkRe.MatchString(s)
 }
 
-func hasExternalLink(attrs []*ast.Node, linkAttrs []string, warnOnSpread bool, spreadIdx int) bool {
+func hasExternalLink(sf *ast.SourceFile, attrs []*ast.Node, linkAttrs []string, warnOnSpread bool, spreadIdx int) bool {
 	linkIdx := findLastIndex(attrs, func(a *ast.Node) bool {
 		return attrNameIsOneOf(a, linkAttrs)
 	})
@@ -203,7 +238,7 @@ func hasExternalLink(attrs []*ast.Node, linkAttrs []string, warnOnSpread bool, s
 		// Upstream guard: `attr.value.type === 'Literal' && typeof value ===
 		// 'string' && regex.test(value)`. In tsgo this corresponds to a
 		// StringLiteral directly under the attribute (not inside `{…}`).
-		if s, ok := stringLiteralText(init); ok && isExternalURL(s) {
+		if s, ok := jsxAttributeStringValue(sf, init); ok && isExternalURL(s) {
 			return true
 		}
 	}
@@ -229,12 +264,12 @@ func hasDynamicLink(attrs []*ast.Node, linkAttrs []string) bool {
 //
 // A returned `nil` entry represents a non-string branch — callers treat it as
 // "this branch is not a secure rel".
-func relStrings(relInit, targetInit *ast.Node) []*string {
+func relStrings(sf *ast.SourceFile, relInit, targetInit *ast.Node) []*string {
 	if relInit == nil {
 		return nil
 	}
 	// Direct `rel="…"` form.
-	if s, ok := templateOrStringText(relInit); ok {
+	if s, ok := jsxAttributeStringValue(sf, relInit); ok {
 		sCopy := s
 		return []*string{&sCopy}
 	}
@@ -258,13 +293,15 @@ func relStrings(relInit, targetInit *ast.Node) []*string {
 		if targetExpr := jsxExpressionInner(targetInit); targetExpr != nil && targetExpr.Kind == ast.KindConditionalExpression {
 			targetCond := targetExpr.AsConditionalExpression()
 			if relCondName := identifierName(cond.Condition); relCondName != "" && relCondName == identifierName(targetCond.Condition) {
-				tConsequent, _ := stringLiteralText(targetCond.WhenTrue)
-				tAlternate, _ := stringLiteralText(targetCond.WhenFalse)
-				switch "_blank" {
-				case tConsequent:
-					return []*string{consequent}
-				case tAlternate:
-					return []*string{alternate}
+				matched := make([]*string, 0, 2)
+				if value, ok := stringLiteralText(targetCond.WhenTrue); ok && ecmascript.EqualsWhenLowercased(value, "_blank") {
+					matched = append(matched, consequent)
+				}
+				if value, ok := stringLiteralText(targetCond.WhenFalse); ok && ecmascript.EqualsWhenLowercased(value, "_blank") {
+					matched = append(matched, alternate)
+				}
+				if len(matched) != 0 {
+					return matched
 				}
 			}
 		}
@@ -296,7 +333,7 @@ func identifierName(node *ast.Node) string {
 	return ""
 }
 
-func hasSecureRel(attrs []*ast.Node, allowReferrer, warnOnSpread bool, spreadIdx int) bool {
+func hasSecureRel(sf *ast.SourceFile, attrs []*ast.Node, allowReferrer, warnOnSpread bool, spreadIdx int) bool {
 	relIdx := findLastIndex(attrs, func(a *ast.Node) bool { return attrHasName(a, "rel") })
 	targetIdx := findLastIndex(attrs, func(a *ast.Node) bool { return attrHasName(a, "target") })
 	if relIdx == -1 || (warnOnSpread && relIdx < spreadIdx) {
@@ -307,7 +344,7 @@ func hasSecureRel(attrs []*ast.Node, allowReferrer, warnOnSpread bool, spreadIdx
 	if targetIdx != -1 {
 		targetInit = attrs[targetIdx].AsJsxAttribute().Initializer
 	}
-	values := relStrings(relInit, targetInit)
+	values := relStrings(sf, relInit, targetInit)
 	if len(values) == 0 {
 		return false
 	}
@@ -349,9 +386,16 @@ func buildRelFix(sf *ast.SourceFile, attrs []*ast.Node, targetIdx, spreadIdx int
 		return &fix
 	}
 	// `rel="…"` — split on the target token, re-join preserving others.
-	if s, ok := stringLiteralText(init); ok {
+	if s, ok := jsxAttributeStringValue(sf, init); ok {
+		if !utf8.ValidString(s) {
+			return nil
+		}
 		parts := splitNonEmpty(s, relValue)
-		fix := rule.RuleFixReplace(sf, init, `"`+strings.Join(append(parts, relValue), " ")+`"`)
+		// Re-escape decoded JSX text so quotes cannot terminate the attribute
+		// and an encoded ampersand cannot turn into a new character reference.
+		text := strings.Join(append(parts, relValue), " ")
+		text = strings.NewReplacer("&", "&amp;", `"`, "&quot;").Replace(text)
+		fix := rule.RuleFixReplace(sf, init, `"`+text+`"`)
 		return &fix
 	}
 	// `rel={…}` form.
@@ -363,25 +407,30 @@ func buildRelFix(sf *ast.SourceFile, attrs []*ast.Node, targetIdx, spreadIdx int
 	// curly braces the user wrote. Mirrors upstream's `replaceText(value.
 	// expression, …)`.
 	if s, ok := stringLiteralText(expr); ok {
+		// JSON would replace lone-surrogate WTF-8 with U+FFFD instead of preserving it.
+		if !utf8.ValidString(s) {
+			return nil
+		}
 		parts := splitNonEmpty(s, relValue)
-		fix := rule.RuleFixReplace(sf, expr, `"`+strings.Join(append(parts, relValue), " ")+`"`)
+		var text bytes.Buffer
+		encoder := json.NewEncoder(&text)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(strings.Join(append(parts, relValue), " ")); err != nil {
+			return nil
+		}
+		fix := rule.RuleFixReplace(sf, expr, strings.TrimSuffix(text.String(), "\n"))
 		return &fix
 	}
-	// `rel={true}` / `{null}` / `{3}` / `{false}` / `{undefined}` —
+	// `rel={true}` / `{null}` / `{3}` / `{false}` —
 	// non-string primitive; upstream collapses the whole `{…}` down to a
 	// plain string attribute. We only rewrite shapes we can reason about;
 	// arbitrary expressions (identifier, call) are left alone, matching the
 	// upstream "return null" branch.
 	switch expr.Kind {
 	case ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindTrueKeyword,
-		ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindUndefinedKeyword:
+		ast.KindFalseKeyword, ast.KindNullKeyword:
 		fix := rule.RuleFixReplace(sf, init, `"`+relValue+`"`)
 		return &fix
-	case ast.KindIdentifier:
-		if expr.AsIdentifier().Text == "undefined" {
-			fix := rule.RuleFixReplace(sf, init, `"`+relValue+`"`)
-			return &fix
-		}
 	}
 	return nil
 }
@@ -460,7 +509,7 @@ var JsxNoTargetBlankRule = rule.Rule{
 				if targetIdx != -1 {
 					targetAttr = attrs[targetIdx]
 				}
-				if attributeValuePossiblyBlank(targetAttr) {
+				if attributeValuePossiblyBlank(ctx.SourceFile, targetAttr) {
 					return true
 				}
 				return opts.warnOnSpreadAttributes && spreadIdx >= 0
@@ -469,9 +518,9 @@ var JsxNoTargetBlankRule = rule.Rule{
 			if isLink {
 				if shouldProceed() {
 					componentAttrs := linkComponents[name]
-					dangerous := hasExternalLink(attrs, componentAttrs, opts.warnOnSpreadAttributes, spreadIdx) ||
+					dangerous := hasExternalLink(ctx.SourceFile, attrs, componentAttrs, opts.warnOnSpreadAttributes, spreadIdx) ||
 						(opts.enforceDynamicLinks == "always" && hasDynamicLink(attrs, componentAttrs))
-					if dangerous && !hasSecureRel(attrs, opts.allowReferrer, opts.warnOnSpreadAttributes, spreadIdx) {
+					if dangerous && !hasSecureRel(ctx.SourceFile, attrs, opts.allowReferrer, opts.warnOnSpreadAttributes, spreadIdx) {
 						reportWithOptionalFix(ctx, node, messageId, description,
 							buildRelFix(ctx.SourceFile, attrs, targetIdx, spreadIdx, relValue))
 						return
@@ -489,11 +538,11 @@ var JsxNoTargetBlankRule = rule.Rule{
 				if !shouldProceed() {
 					return
 				}
-				if hasSecureRel(attrs, false, false, -1) {
+				if hasSecureRel(ctx.SourceFile, attrs, false, false, -1) {
 					return
 				}
 				formAttrs := formComponents[name]
-				if hasExternalLink(attrs, formAttrs, false, -1) ||
+				if hasExternalLink(ctx.SourceFile, attrs, formAttrs, false, -1) ||
 					(opts.enforceDynamicLinks == "always" && hasDynamicLink(attrs, formAttrs)) {
 					reportWithOptionalFix(ctx, node, messageId, description, nil)
 				}

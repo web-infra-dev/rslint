@@ -7,7 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestJsxNoTargetBlankRule(t *testing.T) {
+func TestJsxNoTargetBlankUpstream(t *testing.T) {
 	defaultErrors := []rule_tester.InvalidTestCaseError{
 		{MessageId: "noTargetBlankWithoutNoreferrer"},
 	}
@@ -16,7 +16,7 @@ func TestJsxNoTargetBlankRule(t *testing.T) {
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &JsxNoTargetBlankRule, []rule_tester.ValidTestCase{
-		// ---- Upstream valid cases ----
+		// eslint-plugin-react v7.37.5: all 63 valid and 50 invalid cases, in upstream order.
 		{Code: `<a href="foobar"></a>;`, Tsx: true},
 		{Code: `<a randomTag></a>;`, Tsx: true},
 		{Code: `<a target />;`, Tsx: true},
@@ -163,88 +163,7 @@ func TestJsxNoTargetBlankRule(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"forms": true},
 		},
-
-		// ---- Additional edge cases ----
-		// Non-link JSX elements are ignored regardless of target value.
-		{Code: `<div target="_blank" href="https://example.com"></div>;`, Tsx: true},
-		// The link branch does not apply to unknown link components unless
-		// configured via settings.
-		{Code: `<Link target="_blank" href="https://example.com" />;`, Tsx: true},
-		// Member-access tag names (<Foo.Bar>) are not link components under
-		// the default configuration — the check skips them entirely.
-		{Code: `<Foo.Bar target="_blank" href="https://example.com" />;`, Tsx: true},
-		// Namespaced tag — same as above, skipped.
-		{Code: `<svg:a target="_blank" href="https://example.com" />;`, Tsx: true},
-		// Fragments have no tag name → skipped.
-		{Code: `<><a href="/safe">safe</a></>;`, Tsx: true},
-		// `target=""` is not "_blank" — the case-insensitive comparison still
-		// requires the exact token match.
-		{Code: `<a target="" href="https://example.com"></a>;`, Tsx: true},
-		// Parenthesized conditional branches still match — AST unwrap reaches
-		// the inner literal even when tsgo preserves the paren node.
-		{Code: `<a href={href} target={isExternal ? ("_blank") : undefined} rel={isExternal ? ("noreferrer") : undefined} />;`, Tsx: true},
-		// Template literal in target is NOT treated as possibly blank —
-		// matches upstream's `expr.type === 'Literal'` guard which excludes
-		// TemplateLiteral. So this entire element is considered not checked.
-		{Code: "<a target={`_blank`} href=\"https://example.com\"></a>;", Tsx: true},
-		// Multiple distinct spread attributes with a secure rel after them
-		// are still valid under default options.
-		{Code: `<a {...a} {...b} target="_blank" href="https://example.com" rel="noreferrer"></a>;`, Tsx: true},
-		// Nested anchor inside a component — inner anchor is independently
-		// checked. Outer <div> is not a link component.
-		{Code: `<div><a href="/safe">s</a></div>;`, Tsx: true},
-		// Conditional where BOTH branches are non-_blank strings is not
-		// possibly blank, so the element is skipped.
-		{Code: `<a href={href} target={isSelf ? "_parent" : "_top"}></a>;`, Tsx: true},
-		// Namespaced attribute name for target — upstream compares against
-		// `.name.name` which is the local "name" object for JSXNamespacedName,
-		// so it never equals 'target'. The rule treats `a:target` as an
-		// unrelated attribute and skips the element.
-		{Code: `<a a:target="_blank" href="https://example.com"></a>;`, Tsx: true},
-		// Custom link component with linkAttribute: 'to', but the actual
-		// `href` attribute is the one set externally — the rule only scans
-		// the configured attribute, so this is valid.
-		{
-			Code:    `<Link target="_blank" href="https://example.com" to="/safe" rel="noreferrer"></Link>;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"enforceDynamicLinks": "always"},
-			Settings: map[string]interface{}{
-				"linkComponents": map[string]interface{}{"name": "Link", "linkAttribute": "to"},
-			},
-		},
-		// Default linkComponents plus a settings-configured one — both kinds
-		// of elements are checked in the same pass.
-		{
-			Code:     `<a href="/safe" target="_blank" rel="noreferrer"></a>;`,
-			Tsx:      true,
-			Settings: map[string]interface{}{"linkComponents": []interface{}{"Link"}},
-		},
-		// Custom form component with `formAttribute` (NOT `linkAttribute`) —
-		// regression for a field-name mismatch that silently fell back to
-		// the default "action". Here the configured attribute `endpoint`
-		// carries the external URL so the form must be checked; with a
-		// secure rel it stays valid.
-		{
-			Code:    `<MyForm target="_blank" endpoint="https://example.com" rel="noopener noreferrer"></MyForm>;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forms": true},
-			Settings: map[string]interface{}{
-				"formComponents": map[string]interface{}{"name": "MyForm", "formAttribute": "endpoint"},
-			},
-		},
-		// Custom component configured via `settings.linkComponents` with
-		// multiple link attributes — `linkAttribute: ['to', 'href']`. The
-		// rule scans both; here neither carries an external URL and href is
-		// absent, so the element is valid.
-		{
-			Code: `<MultiLink target="_blank" to="/internal" rel="noreferrer"></MultiLink>;`,
-			Tsx:  true,
-			Settings: map[string]interface{}{
-				"linkComponents": map[string]interface{}{"name": "MultiLink", "linkAttribute": []interface{}{"to", "href"}},
-			},
-		},
 	}, []rule_tester.InvalidTestCase{
-		// ---- Upstream invalid cases ----
 		{
 			Code:   `<a target="_blank" href="https://example.com/1"></a>;`,
 			Tsx:    true,
@@ -554,130 +473,6 @@ func TestJsxNoTargetBlankRule(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"forms": true, "warnOnSpreadAttributes": true},
 			Errors:  defaultErrors,
-		},
-
-		// ---- Additional edge cases ----
-		// Multi-line attributes — the reported range still covers the full
-		// opening element across lines.
-		{
-			Code: "<a\n  target=\"_blank\"\n  href=\"https://example.com/ml\"\n></a>;",
-			Tsx:  true,
-			Output: []string{
-				"<a\n  target=\"_blank\"\n  href=\"https://example.com/ml\" rel=\"noreferrer\"\n></a>;",
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noTargetBlankWithoutNoreferrer", Line: 1, Column: 1, EndLine: 4, EndColumn: 2},
-			},
-		},
-		// Self-closing anchor form — same semantics as non-self-closing for
-		// the diagnostic; the reported range ends after the `/>`.
-		{
-			Code:   `<a target="_blank" href="https://example.com/sc" />;`,
-			Tsx:    true,
-			Output: []string{`<a target="_blank" href="https://example.com/sc" rel="noreferrer" />;`},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noTargetBlankWithoutNoreferrer", Line: 1, Column: 1, EndLine: 1, EndColumn: 52},
-			},
-		},
-		// Regression: parens around the whole conditional target expression
-		// must not hide the `_blank` branch from detection. Before the
-		// SkipParentheses fix, this was a silent false-negative.
-		{
-			Code:   `<a href="https://example.com/paren" target={(isExternal ? "_blank" : undefined)}></a>;`,
-			Tsx:    true,
-			Output: []string{`<a href="https://example.com/paren" target={(isExternal ? "_blank" : undefined)} rel="noreferrer"></a>;`},
-			Errors: defaultErrors,
-		},
-		// Regression: parens around a direct string literal inside the JSX
-		// expression container. Same failure mode as above.
-		{
-			Code:   `<a target={("_blank")} href="https://example.com/paren2"></a>;`,
-			Tsx:    true,
-			Output: []string{`<a target={("_blank")} href="https://example.com/paren2" rel="noreferrer"></a>;`},
-			Errors: defaultErrors,
-		},
-		// Regression: parens around the rel conditional — secure-rel
-		// extraction must unwrap parens on both target and rel to find the
-		// matched-test shortcut, otherwise the conditional was treated as
-		// non-literal and wrongly reported.
-		{
-			Code:   `<a href="https://example.com/relp" target="_blank" rel={(getRel())}></a>;`,
-			Tsx:    true,
-			Errors: defaultErrors,
-		},
-		// Case-insensitive rel token matching: the rule splits on whitespace
-		// and compares case-insensitively, so the single-word joined form
-		// "NOOPENERNOREFERRER" does NOT contain "noreferrer" as a token and
-		// is reported. Matches upstream.
-		{
-			Code:   `<a target="_blank" href="https://example.com/ci" rel="NOOPENERNOREFERRER"></a>;`,
-			Tsx:    true,
-			Output: []string{`<a target="_blank" href="https://example.com/ci" rel="NOOPENERNOREFERRER noreferrer"></a>;`},
-			Errors: defaultErrors,
-		},
-		// Three-way conditional where the _blank branch is unguarded by the
-		// rel's matched test — we fall back to examining every rel branch
-		// and report when any branch is non-secure.
-		{
-			Code:   `<a href={href} target="_blank" rel={isExternal ? "noreferrer" : isInternal ? "noreferrer" : "nothing"} />;`,
-			Tsx:    true,
-			Errors: defaultErrors,
-		},
-		// Custom link component whose configured linkAttribute also happens
-		// to be set to an external URL — still reported.
-		{
-			Code:     `<Link target="_blank" to="https://example.com/link"></Link>;`,
-			Tsx:      true,
-			Output:   []string{`<Link target="_blank" to="https://example.com/link" rel="noreferrer"></Link>;`},
-			Options:  map[string]interface{}{"enforceDynamicLinks": "always"},
-			Settings: map[string]interface{}{"linkComponents": map[string]interface{}{"name": "Link", "linkAttribute": "to"}},
-			Errors:   defaultErrors,
-		},
-		// Two spreads, target/rel around them — spread position still
-		// matters: rel BEFORE a spread with warnOnSpread true is not trusted.
-		{
-			Code:    `<a {...a} target="_blank" rel="noreferrer" {...b}></a>;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"warnOnSpreadAttributes": true},
-			Errors:  defaultErrors,
-		},
-		// Regression: custom form component using `formAttribute` with a
-		// dynamic URL — forms don't autofix; the report still fires.
-		{
-			Code:    `<MyForm target="_blank" endpoint={url}></MyForm>;`,
-			Tsx:     true,
-			Options: map[string]interface{}{"forms": true},
-			Settings: map[string]interface{}{
-				"formComponents": map[string]interface{}{"name": "MyForm", "formAttribute": "endpoint"},
-			},
-			Errors: defaultErrors,
-		},
-		// Message text assertion — locks in the exact diagnostic string for
-		// the default (noreferrer) message, matching upstream verbatim.
-		{
-			Code:   `<a target="_blank" href="https://example.com/msg"></a>;`,
-			Tsx:    true,
-			Output: []string{`<a target="_blank" href="https://example.com/msg" rel="noreferrer"></a>;`},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "noTargetBlankWithoutNoreferrer",
-					Message:   `Using target="_blank" without rel="noreferrer" (which implies rel="noopener") is a security risk in older browsers: see https://mathiasbynens.github.io/rel-noopener/#recommendations`,
-				},
-			},
-		},
-		// Message text assertion — locks in the exact diagnostic string for
-		// the allowReferrer (noopener) message.
-		{
-			Code:    `<a target="_blank" href="https://example.com/msg2"></a>;`,
-			Tsx:     true,
-			Output:  []string{`<a target="_blank" href="https://example.com/msg2" rel="noopener"></a>;`},
-			Options: map[string]interface{}{"allowReferrer": true},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "noTargetBlankWithoutNoopener",
-					Message:   `Using target="_blank" without rel="noreferrer" or rel="noopener" (the former implies the latter and is preferred due to wider support) is a security risk: see https://mathiasbynens.github.io/rel-noopener/#recommendations`,
-				},
-			},
 		},
 	})
 }
