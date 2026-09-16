@@ -1,0 +1,13 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "anyOf": [
+        { "type": "string", "not": { "pattern": "^\\^" } },
+        { "type": "string", "format": "regex-u" }
+      ]
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
