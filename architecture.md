@@ -175,11 +175,14 @@ details for missing-module diagnostics and target paths for restrictions,
 including lexical paths for unresolved local imports. Restrictions compare
 host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
 Rules select their exemptions and report on the collected source nodes.
-Relative lookup settings use the process directory from `RuleContext`, independently of the owning
-tsconfig's directory.
-The require collector also follows CommonJS module-object aliases to property
-reads. It delegates symbols and references to `RuleContext.Refs` and reuses
-tsgo's binding helpers; rules keep their own matching and diagnostic policy.
+Node API reference tracking also lives
+in `nodeutil`: require collection and API rules share static property, alias,
+destructuring and module traversal, reusing tsgo's binding helpers,
+`RuleContext.Refs` and a name index cached by `RuleContext` per file. Rules own API
+metadata, ignore options and diagnostic messages. Node version configuration
+uses package metadata here and the compiler semver parser through `shim/semver`.
+Relative lookup settings use the process directory from `RuleContext`,
+independently of the owning tsconfig's directory.
 The glob matcher uses code-unit input for regexp2; rule callers do not select a
 character encoding or translate backend capture numbers. These packages do not
 decide which files to lint or discover ignore files; those policies belong to

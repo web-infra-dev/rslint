@@ -43,6 +43,7 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 	file := compilerProgram.GetSourceFile(fileName)
 	if file == nil {
 		t.Fatal("compiler compatibility fixture was not included")
+		return
 	}
 	if len(file.Diagnostics()) != 0 {
 		t.Fatal("fixture has parse diagnostics and would bypass rule execution")

@@ -113,6 +113,7 @@ func TestOnlyInertStatementIntervals(t *testing.T) {
 			second := mergeCandidateForStatement(analysis, sourceFile, statements[secondIndex])
 			if first == nil || second == nil {
 				t.Fatal("expected two merge candidates")
+				return
 			}
 			first.statementIndex, second.statementIndex = firstIndex, secondIndex
 			for _, pair := range [][2]*mergeCandidate{{first, second}, {second, first}} {
