@@ -20,6 +20,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_restricted_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_sync"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_top_level_await"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unpublished_bin"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -44,5 +45,6 @@ func GetAllRules() []rule.Rule {
 		no_restricted_import.NoRestrictedImportRule,
 		no_sync.NoSyncRule,
 		no_top_level_await.NoTopLevelAwaitRule,
+		no_unpublished_bin.NoUnpublishedBinRule,
 	}
 }

@@ -1,0 +1,67 @@
+Publication, package-boundary, and converted-path cases.
+
+-- dotfiles.tsconfig.json --
+{"extends":"./tsconfig.json","files":["metadata/..hidden.js"],"include":[]}
+-- git/package.json --
+{"bin":"cli.js"}
+-- git/.gitignore --
+cli.js
+-- npm-precedence/package.json --
+{"bin":"cli.js"}
+-- npm-precedence/.gitignore --
+cli.js
+-- npm-precedence/.npmignore --
+# An existing npmignore replaces gitignore.
+-- files-precedence/package.json --
+{"bin":"cli.js","files":["cli.js"]}
+-- files-precedence/.gitignore --
+cli.js
+-- both/package.json --
+{"bin":"cli.js","files":["cli.js"]}
+-- both/.npmignore --
+cli.js
+-- negated/package.json --
+{"bin":["bin/cli.js","bin/other.js"],"files":["bin","!bin/cli.js"]}
+-- reinclude/package.json --
+{"bin":"cli.js"}
+-- reinclude/.npmignore --
+*.js
+!cli.js
+-- main/package.json --
+{"bin":"cli.js","main":"./cli.js","files":[]}
+-- main/.npmignore --
+cli.js
+-- directory/package.json --
+{"bin":{"cli":"./bin"},"files":[]}
+-- extension/package.json --
+{"bin":"./cli","files":[]}
+-- missing-bin/package.json --
+{"files":[]}
+-- invalid-bin/package.json --
+{"bin":{"bad":false,"cli":"cli.js"},"files":[]}
+-- private/package.json --
+{"private":true,"bin":"cli.js","files":[]}
+-- nested/package.json --
+{"bin":"inner/cli.js","files":[]}
+-- nested/inner/package.json --
+{"bin":"cli.js","files":["cli.js"]}
+-- fallback/package.json --
+{"bin":"inner/cli.js","files":[]}
+-- fallback/inner/package.json --
+not valid JSON
+-- conversion/package.json --
+{"bin":{"cli":"dist/cli.js","test":"dist/cli.spec.js","local":"src/cli.ts","nested":"nested/cli.js","outside":"../outside.js"},"files":["src"]}
+-- conversion/nested/package.json --
+{"files":["cli.js"]}
+-- metadata/package.json --
+{"bin":{"readme":"README.js","license":"LICENSE.js","hidden":"..hidden.js"},"files":["..hidden.js"]}
+-- classes/package.json --
+{"bin":"bin/foo.js","files":["bin/[!b]oo.js"]}
+-- whitespace/package.json --
+{"bin":"lib/foo.js","files":["lib/foo.js\nbar.js"]}
+-- unclosed/package.json --
+{"bin":"[cli.js","files":["[cli.js"]}
+-- zero-step/package.json --
+{"bin":"lib/cli1.js","files":["lib/cli{1..3..0}.js"]}
+-- unicode/package.json --
+{"bin":{"__proto__":"脚本😀.js"},"files":[]}
