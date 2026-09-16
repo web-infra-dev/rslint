@@ -1,4 +1,3 @@
-// cspell:ignoreRegExp /github\.com\/[^\s]+/
 module github.com/web-infra-dev/rslint
 
 go 1.26.0

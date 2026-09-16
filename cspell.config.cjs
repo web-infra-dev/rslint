@@ -11,6 +11,7 @@ module.exports = {
     'typescript-go',
     'node_modules',
     'pnpm-lock.yaml',
+    '**/go.{mod,sum}',
     'shim',
     'packages/vscode-extension/out',
     'packages/rslint-test-tools/tests',
