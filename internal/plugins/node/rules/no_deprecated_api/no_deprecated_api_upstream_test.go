@@ -1,5 +1,6 @@
 // Upstream tests and documentation examples from eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-deprecated-api.js
+// cspell:ignore freelist lchmod linklist
 package no_deprecated_api
 
 import (

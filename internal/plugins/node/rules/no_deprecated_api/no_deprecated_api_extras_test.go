@@ -1,5 +1,6 @@
 // Additional cases compared with eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-deprecated-api.js
+// cspell:ignore cipheriv decipheriv fips freelist lchmod linklist prng unenroll
 package no_deprecated_api
 
 import (
@@ -90,6 +91,13 @@ func TestNoDeprecatedAPIExtras(t *testing.T) {
 		},
 	}
 	invalid := []rule_tester.InvalidTestCase{
+		// tsgo unwraps template literal property names in binding patterns.
+		{Code: "const {[`Buffer`]: B} = require('buffer'); new B(); const {[`require`]: load} = global; load('fs').exists;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "deprecated", Message: "'new buffer.Buffer()' was deprecated since v6.0.0. Use 'buffer.Buffer.alloc()' or 'buffer.Buffer.from()' instead.", Line: 1, Column: 44, EndLine: 1, EndColumn: 51},
+				{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 89, EndLine: 1, EndColumn: 106},
+			},
+		},
 		// Object parameter defaults track module APIs
 		{Code: "function f({Buffer: B} = require('buffer')) { new B(); } function g({exists: e} = require('fs')) {}",
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},

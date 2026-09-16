@@ -1,4 +1,5 @@
 // API metadata from eslint-plugin-n v18.3.0 lib/rules/no-deprecated-api.js.
+// cspell:ignore cipheriv decipheriv fips freelist lchmod linklist prng unenroll
 package no_deprecated_api
 
 var deprecatedAPIs = []deprecatedAPI{

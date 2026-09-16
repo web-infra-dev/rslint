@@ -177,7 +177,8 @@ host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
 Rules select their exemptions and report on the collected source nodes.
 Node API reference tracking also lives
 in `nodeutil`: require collection and API rules share static property, alias,
-destructuring and module traversal through `RuleContext.Refs`. Rules own API
+destructuring and module traversal, reusing tsgo's binding helpers,
+`RuleContext.Refs` and a name index cached by `RuleContext` per file. Rules own API
 metadata, ignore options and diagnostic messages. Node version configuration
 uses package metadata here and the compiler semver parser through `shim/semver`.
 Relative lookup settings use the process directory from `RuleContext`,

@@ -32,9 +32,15 @@ type ReferenceTracker struct {
 	globalStack       map[string]bool
 }
 
+type referenceNamesKey struct{}
+
 // NewReferenceTracker follows Node API aliases using existing name and symbol indexes.
+// The linter supplies ctx.Refs; the name index is shared across Node rules per file.
 func NewReferenceTracker(ctx rule.RuleContext) *ReferenceTracker {
-	return &ReferenceTracker{ctx: ctx, names: utils.NewReferenceIndex(ctx.SourceFile, nil),
+	names := rule.CachedByFile(ctx, referenceNamesKey{}, func() *utils.ReferenceIndex {
+		return utils.NewReferenceIndex(ctx.SourceFile, nil)
+	})
+	return &ReferenceTracker{ctx: ctx, names: names,
 		variableStack: make(map[*ast.Symbol]bool), globalStack: make(map[string]bool)}
 }
 
@@ -69,22 +75,12 @@ func (tracker *ReferenceTracker) trackGlobalRoot(name string, value *ReferenceTr
 func (tracker *ReferenceTracker) globalReferences(name string) []*ast.Node {
 	var references []*ast.Node
 	tracker.names.ForEachReferenceByName(name, nil, func(identifier *ast.Node) bool {
-		if tracker.isGlobalReference(identifier, name) {
+		if tracker.ctx.Refs.IsGlobalReference(identifier) {
 			references = append(references, identifier)
 		}
 		return false
 	})
 	return references
-}
-
-func (tracker *ReferenceTracker) isGlobalReference(identifier *ast.Node, name string) bool {
-	if identifier == nil || identifier.Kind != ast.KindIdentifier || utils.IsNonReferenceIdentifier(identifier) {
-		return false
-	}
-	if tracker.ctx.Refs != nil {
-		return tracker.ctx.Refs.IsGlobalReference(identifier)
-	}
-	return !utils.IsShadowed(identifier, name)
 }
 
 func (tracker *ReferenceTracker) trackExpression(node *ast.Node, value *ReferenceTrace) {
@@ -128,20 +124,9 @@ func (tracker *ReferenceTracker) trackExpression(node *ast.Node, value *Referenc
 				tracker.trackExpression(parent, value)
 			}
 		}
-	case ast.KindVariableDeclaration:
-		declaration := parent.AsVariableDeclaration()
-		if declaration != nil && declaration.Initializer == node {
-			tracker.trackAssignmentTarget(declaration.Name(), value)
-		}
-	case ast.KindParameter:
-		parameter := parent.AsParameterDeclaration()
-		if parameter != nil && parameter.Initializer == node {
-			tracker.trackAssignmentTarget(parameter.Name(), value)
-		}
-	case ast.KindBindingElement:
-		element := parent.AsBindingElement()
-		if element != nil && element.Initializer == node {
-			tracker.trackAssignmentTarget(element.Name(), value)
+	case ast.KindVariableDeclaration, ast.KindParameter, ast.KindBindingElement:
+		if parent.Initializer() == node {
+			tracker.trackAssignmentTarget(parent.Name(), value)
 		}
 	case ast.KindShorthandPropertyAssignment:
 		property := parent.AsShorthandPropertyAssignment()
@@ -159,40 +144,18 @@ func (tracker *ReferenceTracker) trackAssignmentTarget(node *ast.Node, value *Re
 	switch node.Kind {
 	case ast.KindIdentifier:
 		tracker.trackIdentifier(node, value)
-	case ast.KindObjectBindingPattern:
-		pattern := node.AsBindingPattern()
-		if pattern == nil || pattern.Elements == nil {
-			return
-		}
-		for _, elementNode := range pattern.Elements.Nodes {
-			element := elementNode.AsBindingElement()
-			if element == nil || element.DotDotDotToken != nil || element.Name() == nil {
+	case ast.KindObjectBindingPattern, ast.KindObjectLiteralExpression:
+		for _, element := range ast.GetElementsOfBindingOrAssignmentPattern(node) {
+			if ast.GetRestIndicatorOfBindingOrAssignmentElement(element) != nil {
 				continue
 			}
-			propertyName := element.PropertyName
+			propertyName := ast.TryGetPropertyNameOfBindingOrAssignmentElement(element)
 			if propertyName == nil {
-				propertyName = element.Name()
+				continue
 			}
 			if name, ok := tracker.staticPropertyName(propertyName); ok && value.Properties[name] != nil {
-				value.Properties[name].read(elementNode)
-				tracker.trackAssignmentTarget(element.Name(), value.Properties[name])
-			}
-		}
-	case ast.KindObjectLiteralExpression:
-		for _, propertyNode := range node.AsObjectLiteralExpression().Properties.Nodes {
-			switch propertyNode.Kind {
-			case ast.KindPropertyAssignment:
-				property := propertyNode.AsPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.Properties[name] != nil {
-					value.Properties[name].read(propertyNode)
-					tracker.trackAssignmentTarget(property.Initializer, value.Properties[name])
-				}
-			case ast.KindShorthandPropertyAssignment:
-				property := propertyNode.AsShorthandPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.Properties[name] != nil {
-					value.Properties[name].read(propertyNode)
-					tracker.trackAssignmentTarget(property.Name(), value.Properties[name])
-				}
+				value.Properties[name].read(element)
+				tracker.trackAssignmentTarget(ast.GetTargetOfBindingOrAssignmentElement(element), value.Properties[name])
 			}
 		}
 	case ast.KindBinaryExpression:
@@ -204,25 +167,23 @@ func (tracker *ReferenceTracker) trackAssignmentTarget(node *ast.Node, value *Re
 }
 
 func (tracker *ReferenceTracker) trackIdentifier(identifier *ast.Node, value *ReferenceTrace) {
-	if tracker.ctx.Refs != nil {
-		if symbol := tracker.ctx.Refs.ResolveInFile(identifier); symbol != nil {
-			tracker.trackVariable(symbol, value)
-			return
-		}
+	if symbol := tracker.ctx.Refs.ResolveInFile(identifier); symbol != nil {
+		tracker.trackVariable(symbol, value)
+		return
 	}
 	// Declaration names are not reference positions; use their binder symbol.
-	if declaration := identifier.Parent; declaration != nil && declaration.Name() == identifier && declaration.Symbol() != nil {
-		tracker.trackVariable(declaration.Symbol(), value)
+	if symbol := utils.BindingNameSymbol(identifier); symbol != nil {
+		tracker.trackVariable(symbol, value)
 		return
 	}
 	name := identifier.AsIdentifier().Text
-	if tracker.ctx.Globals.Access(name).IsDeclared() && tracker.isGlobalReference(identifier, name) {
+	if tracker.ctx.Globals.Access(name).IsDeclared() && tracker.ctx.Refs.IsGlobalReference(identifier) {
 		tracker.trackGlobalVariable(name, value)
 	}
 }
 
 func (tracker *ReferenceTracker) trackVariable(symbol *ast.Symbol, value *ReferenceTrace) {
-	if tracker.ctx.Refs == nil || symbol == nil || tracker.variableStack[symbol] {
+	if symbol == nil || tracker.variableStack[symbol] {
 		return
 	}
 	tracker.variableStack[symbol] = true
@@ -241,7 +202,7 @@ func (tracker *ReferenceTracker) trackGlobalVariable(name string, value *Referen
 	tracker.globalStack[name] = true
 	defer delete(tracker.globalStack, name)
 	tracker.names.ForEachReferenceByName(name, nil, func(reference *ast.Node) bool {
-		if !ast.IsWriteOnlyAccess(reference) && tracker.isGlobalReference(reference, name) {
+		if !ast.IsWriteOnlyAccess(reference) && tracker.ctx.Refs.IsGlobalReference(reference) {
 			tracker.trackExpression(reference, value)
 		}
 		return false
@@ -287,12 +248,10 @@ func referenceValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
 		if binary == nil || binary.OperatorToken == nil {
 			return false
 		}
-		switch binary.OperatorToken.Kind {
-		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+		if ast.IsLogicalOrCoalescingBinaryOperator(binary.OperatorToken.Kind) {
 			return binary.Left == node || binary.Right == node
-		case ast.KindCommaToken:
-			return binary.Right == node
 		}
+		return binary.OperatorToken.Kind == ast.KindCommaToken && binary.Right == node
 	}
 	return false
 }
@@ -325,13 +284,10 @@ func (tracker *ReferenceTracker) TrackModules(modules map[string]*ReferenceTrace
 		"getBuiltinModule": {Call: load},
 	}}})
 	for _, node := range tracker.ctx.SourceFile.Statements.Nodes {
-		var source *ast.Node
-		switch node.Kind {
-		case ast.KindImportDeclaration:
-			source = node.AsImportDeclaration().ModuleSpecifier
-		case ast.KindExportDeclaration:
-			source = node.AsExportDeclaration().ModuleSpecifier
+		if node.Kind != ast.KindImportDeclaration && node.Kind != ast.KindExportDeclaration {
+			continue
 		}
+		source := ast.GetExternalModuleName(node)
 		if source == nil || source.Kind != ast.KindStringLiteral {
 			continue
 		}
@@ -349,31 +305,23 @@ func (tracker *ReferenceTracker) TrackModules(modules map[string]*ReferenceTrace
 		}
 		properties["default"] = moduleValue
 		if node.Kind == ast.KindImportDeclaration {
-			clauseNode := node.AsImportDeclaration().ImportClause
-			if clauseNode == nil {
-				continue
-			}
-			clause := clauseNode.AsImportClause()
-			if clause.Name() != nil {
-				tracker.trackIdentifier(clause.Name(), moduleValue)
-			}
-			bindings := clause.NamedBindings
-			if bindings == nil {
-				continue
-			}
-			if bindings.Kind == ast.KindNamespaceImport {
-				tracker.trackIdentifier(bindings.Name(), &ReferenceTrace{Properties: properties})
-			} else {
-				for _, specifier := range bindings.AsNamedImports().Elements.Nodes {
-					imported := specifier.AsImportSpecifier().PropertyName
+			for _, binding := range utils.GetImportBindingNodes(node) {
+				value := moduleValue
+				switch binding.Parent.Kind {
+				case ast.KindNamespaceImport:
+					value = &ReferenceTrace{Properties: properties}
+				case ast.KindImportSpecifier:
+					imported := binding.Parent.PropertyName()
 					if imported == nil {
-						imported = specifier.Name()
+						imported = binding
 					}
-					if next := properties[imported.Text()]; next != nil {
-						next.read(specifier)
-						tracker.trackIdentifier(specifier.Name(), next)
+					value = properties[imported.Text()]
+					if value == nil {
+						continue
 					}
+					value.read(binding.Parent)
 				}
+				tracker.trackIdentifier(binding, value)
 			}
 		} else {
 			clause := node.AsExportDeclaration().ExportClause
