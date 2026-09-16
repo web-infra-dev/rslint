@@ -1,0 +1,68 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "convertPath": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {},
+              "patternProperties": {
+                "^.+$": {
+                  "type": "array",
+                  "items": [
+                    { "type": "string", "format": "regex" },
+                    { "type": "string" }
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "uniqueItems": true
+                  },
+                  "replace": {
+                    "type": "array",
+                    "items": [
+                      { "type": "string", "format": "regex" },
+                      { "type": "string" }
+                    ],
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                },
+                "additionalProperties": false,
+                "required": ["include", "replace"]
+              },
+              "minItems": 1
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

@@ -94,6 +94,13 @@ a different `bin` entry or publication pattern. **Use the array form of
   a path relative to the outer package.
   For a package directory named `Pkg`, a converted path `../pkg/lib/a.js`
   remains inside the package on a case-insensitive filesystem.
+- **Filename case.** On a case-insensitive filesystem, `"bin": "bin/CLI.js"`
+  requires a hashbang in `bin/cli.js`. rslint preserves its existing hashbang;
+  upstream can remove it. With `ignoreUnpublished: true`, a differently cased
+  `main` entry still identifies the same published file. Case-sensitive
+  filesystems continue to distinguish these filenames.
+  The same applies to aliases: `"bin": "bin/cli"` requires a hashbang in
+  `BIN/CLI.JS` and `BIN/CLI/INDEX.JS` on a case-insensitive filesystem.
 - **Excluding or escaping filename characters.** With
   `additionalExecutables: ["[!b]oo.js"]` or `["[^b]oo.js"]`, rslint selects
   `foo.js` as an executable and excludes `boo.js`; upstream misses `foo.js`.

@@ -67,13 +67,41 @@ func TestPackageGeneration(t *testing.T) {
 
 func TestBinAliases(t *testing.T) {
 	for _, bin := range []any{[]any{"bin/test"}, map[string]any{"cli": "bin/test"}, "bin/test"} {
-		if !isBinFile("/pkg/bin/test.js", bin, "/pkg") {
+		if !isBinFile("/pkg/bin/test.js", bin, "/pkg", true) {
 			t.Errorf("bin resolution failed: %#v", bin)
 		}
 	}
 	for _, bin := range []any{nil, false, 42, "", map[string]any{"cli": false}} {
-		if isBinFile("/pkg/bin/test.js", bin, "/pkg") {
+		if isBinFile("/pkg/bin/test.js", bin, "/pkg", true) {
 			t.Errorf("invalid bin matched: %#v", bin)
+		}
+	}
+	for _, sensitive := range []bool{true, false} {
+		for _, test := range []struct {
+			directory, file, bin string
+			want                 bool
+		}{
+			{"/pkg", "/pkg/bin/CLI.js", "bin/cli.js", !sensitive},
+			{"/pkg", "/pkg/bin/CLI.js", "bin/cli", !sensitive},
+			{"/pkg", "/pkg/bin/CLI/index.js", "bin/cli", !sensitive},
+			{"/pkg", "/pkg/BIN/CLI.JS", "bin/cli", !sensitive},
+			{"/pkg", "/pkg/BIN/CLI/INDEX.JS", "bin/cli", !sensitive},
+			{"/pkg", "/pkg/BIN/CLI/INDEX", "bin/cli", !sensitive},
+			{"/pkg", "/pkg/bin/cli.jsx", "bin/cli", false},
+			{"/pkg", "/pkg/bin/cli/myindex.js", "bin/cli", false},
+			{"/pkg", "/pkg/bin/cli/index.js.js", "bin/cli", false},
+			{"/pkg", "/pkg/中文😀/CLI/INDEX.JS", "中文😀/cli", !sensitive},
+			{"/pkg", "/pkg/bin/İ.js", "bin/i.js", false},
+			{"/pkg", "/pkg/bin/i.js", "bin/İ.js", false},
+			{"/pkg", "/pkg/bin/K.js", "bin/k.js", !sensitive},
+			{"C:/pkg", "c:/pkg/bin/cli.js", `bin\cli.js`, true},
+			{"C:/pkg", "D:/pkg/bin/cli.js", "bin/cli.js", false},
+			{"//server/share/pkg", "//SERVER/share/pkg/bin/cli.js", "bin/cli.js", true},
+			{"//server/share/pkg", "//server/other/pkg/bin/cli.js", "bin/cli.js", false},
+		} {
+			if got := isBinFile(test.file, test.bin, test.directory, sensitive); got != test.want {
+				t.Errorf("bin %q matching %q (case sensitive %v) = %v, want %v", test.bin, test.file, sensitive, got, test.want)
+			}
 		}
 	}
 }
@@ -283,7 +311,8 @@ func TestPublicationCrossPlatformPaths(t *testing.T) {
 					{"lib/nested/restored.js", false}, {"lib/blocked/restored.js", true},
 					{"lib/NESTED/ignored.js", !caseSensitive},
 					{"lib/中文 space[1]/ignored.js", true}, {"lib/中文 space[1]/a.js", false},
-					{"main.js", false}, {"README.js", false}, {"..hidden.js", false},
+					{"main.js", false}, {"MAIN.js", caseSensitive}, {"README.js", false}, {"..hidden.js", false},
+					{"maİn.js", true},
 					{"../Pkg/lib/a.js", false}, {"../Pkg-other/lib/a.js", true},
 					{`..\outside.js`, true}, {"lib/../../outside.js", true},
 					{"D:/Work/Pkg/lib/a.js", true}, {"//Other/Share/Work/Pkg/lib/a.js", true},

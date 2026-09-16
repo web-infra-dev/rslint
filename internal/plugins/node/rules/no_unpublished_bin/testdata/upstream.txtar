@@ -1,0 +1,87 @@
+Fixtures from eslint-plugin-n v18.3.0 tests/fixtures/no-unpublished-bin.
+
+-- brace-extglob/bin/foo.js --
+#!/usr/bin/env node
+console.log("foo")
+-- brace-extglob/bin/foo.test.js --
+console.log("test")
+-- brace-extglob/package.json --
+{
+    "name": "brace-extglob",
+    "version": "1.0.0",
+    "bin": {
+        "foo": "bin/foo.js"
+    },
+    "files": [
+        "{bin,src}/**/!(*.test).js"
+    ]
+}
+-- issue115/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "bin": {
+        "a": "lib/a.js"
+    },
+    "files": [
+        "lib/a.js"
+    ]
+}
+-- multi-files/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "bin": {
+        "a": "a.js",
+        "b": "b.js"
+    },
+    "files": [
+        "lib"
+    ]
+}
+-- multi-npmignore/.npmignore --
+/a.js
+-- multi-npmignore/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "bin": {
+        "a": "a.js",
+        "b": "b.js"
+    }
+}
+-- multi-ok/package.json --
+{
+    "private": true,
+    "name": "test",
+    "version": "1.0.0",
+    "bin": {
+        "a": "a.js",
+        "b": "b.js"
+    }
+}
+-- simple-files/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "bin": "a.js",
+    "files": [
+        "lib"
+    ]
+}
+-- simple-npmignore/.npmignore --
+/a.js
+-- simple-npmignore/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "bin": "a.js"
+}
+-- simple-ok/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "bin": "a.js"
+}
+-- documentation/package.json --
+{"name":"command-name","bin":"bin/index.js"}

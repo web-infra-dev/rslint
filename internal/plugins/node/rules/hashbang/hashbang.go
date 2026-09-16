@@ -79,7 +79,7 @@ var HashbangRule = rule.Rule{
 		if len(options) > 0 {
 			opts, _ = options[0].(map[string]any)
 		}
-		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()})
 		converted, ok := nodeutil.ConvertPath(relative, opts, ctx.Settings)
 		if !ok {
 			return nil
@@ -89,7 +89,7 @@ var HashbangRule = rule.Rule{
 		if ignore, _ := opts["ignoreUnpublished"].(bool); ignore && !additional && nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
-		needsShebang := additional || pkg.IsBinFile(absolute)
+		needsShebang := additional || pkg.IsBinFile(program, absolute)
 		executable := "node"
 		if mapping, ok := opts["executableMap"].(map[string]any); ok {
 			if value, ok := mapping[fileExtension(fileName)].(string); ok {

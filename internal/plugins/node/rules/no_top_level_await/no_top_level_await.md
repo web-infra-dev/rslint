@@ -102,6 +102,10 @@ The replacement uses JavaScript regular expressions and capture substitutions.
   with a path relative to the outer package and incorrectly skip the check.
   For a package directory named `Pkg`, a converted path `../pkg/lib/a.js`
   remains inside the package on a case-insensitive filesystem.
+- **Executable filename case.** On a case-insensitive filesystem, `ignoreBin`
+  also skips `BIN/CLI.JS` and `BIN/CLI/INDEX.JS` when `bin` names `bin/cli`.
+  Upstream does not recognize those differently cased aliases. On a
+  case-sensitive filesystem, these filenames remain distinct.
 - **Unusual filename patterns.** In `files`, `.npmignore`, and `.gitignore`,
   `[!b]oo.js` matches `foo.js` but not `boo.js`, and `cli\?` matches a literal
   question mark. Upstream can select different files for these patterns. Each
