@@ -63,10 +63,6 @@ With `"exports"`, the rule can replace references such as `module.exports.foo` w
 
 The default `"module.exports"` mode and direct assignments to `exports` have no automatic fix. This rule provides no suggestions.
 
-## Differences from upstream
-
-Enable the `node` plugin and configure `node/exports-style` in rslint. The upstream rule is named `n/exports-style`.
-
 ## Original documentation
 
 - [eslint-plugin-n: exports-style](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/exports-style.md)
