@@ -173,6 +173,8 @@ func TestRstestConcurrentCallbackOwnership(t *testing.T) {
 			{Code: `function register() { const callback = () => marker(); test.concurrent("x", callback); } register();`, Errors: reported},
 			{Code: `{ const callback = () => marker(); test.concurrent("x", callback); }`, Errors: reported},
 			{Code: `class C { static { const callback = () => marker(); test.concurrent("x", callback); } }`, Errors: reported},
+			{Code: `let callback = () => marker(); test.concurrent("x", callback);`, Errors: reported},
+			{Code: `var callback = () => marker(); test.concurrent("x", callback);`, Errors: reported},
 			// A closure declared inside a concurrent callback runs as part of
 			// that concurrent test whenever it runs at all.
 			{Code: `test.concurrent("x", () => { const helper = () => marker(); });`, Errors: reported},
@@ -203,8 +205,8 @@ func findCallByCalleeName(sourceFile *ast.SourceFile, name string) *ast.Node {
 }
 
 // TestRstestCallbackOwnershipSourceOnlyScopesAndWrites verifies that the
-// binder resolves callback references without a TypeChecker, while mutable or
-// reassigned bindings are never treated as stable callback ownership.
+// binder resolves callback references without a TypeChecker, while bindings
+// with assignment or update references are not treated as stable ownership.
 func TestRstestCallbackOwnershipSourceOnlyScopesAndWrites(t *testing.T) {
 	for _, testCase := range []struct {
 		name       string
@@ -242,9 +244,14 @@ func TestRstestCallbackOwnershipSourceOnlyScopesAndWrites(t *testing.T) {
 			concurrent: true,
 		},
 		{
-			name:       "mutable initializer is not attributed",
+			name:       "unwritten let initializer is attributed",
 			code:       `let cb = () => { marker(); }; test.concurrent("x", cb);`,
-			concurrent: false,
+			concurrent: true,
+		},
+		{
+			name:       "unwritten var initializer is attributed",
+			code:       `var cb = () => { marker(); }; test.concurrent("x", cb);`,
+			concurrent: true,
 		},
 		{
 			name:       "reassigned function declaration is not attributed",
@@ -316,8 +323,8 @@ test.concurrent("reassigned", reassigned);
 function replaced() { marker(); }
 replaced = () => {};
 test.concurrent("replaced", replaced);
-var mutable = () => marker();
-test.concurrent("mutable", mutable);
+var unwritten = () => marker();
+test.concurrent("unwritten", unwritten);
 function destructured() { marker(); }
 ({ destructured } = replacements);
 test.concurrent("destructured", destructured);`
@@ -371,7 +378,7 @@ test.concurrent("destructured", destructured);`
 	}); err != nil {
 		t.Fatalf("RunLinter: %v", err)
 	}
-	want := []int{2, 7, 12}
+	want := []int{2, 7, 12, 22}
 	if !slices.Equal(lines, want) {
 		t.Fatalf("reported lines %v, want %v", lines, want)
 	}

@@ -36,9 +36,8 @@ func TestMaxNestedDescribeExtras(t *testing.T) {
 			{Code: `const method = 'describe'; import.meta.rstest[method]('one', () => {});`, Options: maxOption(0)},
 			{Code: `describe.unknown('one', () => {});`, Options: maxOption(0)},
 
-			// ---- Callback ownership: mutable or reassigned bindings are not stable ----
+			// ---- Callback ownership: bindings with writes are not stable ----
 			{Code: `let body = () => { describe('stale inner', () => {}); }; body = () => {}; describe('outer', body);`, Options: maxOption(1)},
-			{Code: `var body = () => { describe('mutable inner', () => {}); }; describe('outer', body);`, Options: maxOption(1)},
 			{Code: `function body() { describe('stale inner', () => {}); } body = () => {}; describe('outer', body);`, Options: maxOption(1)},
 			{Code: `function body() { describe('captured inner', () => {}); } describe('outer', body); body = () => {};`, Options: maxOption(1)},
 			{Code: `function body() { describe('stale inner', () => {}); } body ||= () => {}; describe('outer', body);`, Options: maxOption(1)},
@@ -52,6 +51,8 @@ func TestMaxNestedDescribeExtras(t *testing.T) {
 			// ---- Rstest callback ownership: named suite callbacks preserve runtime nesting ----
 			{Code: `describe('one', suiteBody); function suiteBody() { describe('two', () => {}); }`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 52)}},
 			{Code: `const suiteBody = () => { describe('two', () => {}); }; describe('one', suiteBody);`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 27)}},
+			{Code: `let suiteBody = () => { describe('two', () => {}); }; describe('one', suiteBody);`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 25)}},
+			{Code: `var suiteBody = () => { describe('two', () => {}); }; describe('one', suiteBody);`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 25)}},
 			{Code: `function shared() { describe('child', () => {}); } describe('one', shared); describe('other', () => { describe('inner', shared); });`, Options: maxOption(2), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(3, 2, 1, 21)}},
 			{Code: `describe('one', wrap(() => { describe('two', () => {}); }));`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 30)}},
 			{Code: `function register() { const body = () => { describe('inner', () => {}); }; describe('outer', body); } register();`, Options: maxOption(1), Errors: []rule_tester.InvalidTestCaseError{exceededDepthError(2, 1, 1, 44)}},

@@ -242,12 +242,6 @@ func resolveRstestCallbackBinding(
 	case ast.KindFunctionDeclaration:
 		return rstestCallbackInfo{functionNode: declaration, name: name}
 	case ast.KindVariableDeclaration:
-		// Const is the only variable declaration whose initializer is guaranteed
-		// to remain the value observed by every registration. Mutable bindings
-		// would require registration-point dataflow to resolve safely.
-		if !ast.IsVarConst(declaration) {
-			return rstestCallbackInfo{}
-		}
 		initializer := declaration.AsVariableDeclaration().Initializer
 		if initializer == nil {
 			return rstestCallbackInfo{}

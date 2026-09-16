@@ -36,6 +36,8 @@ todoTest("later");`},
 			{Code: `it("case", run); function run() { expect(true).toBeDefined(); }`},
 			{Code: `function run() { expect(true).toBeDefined(); } test("case", run);`},
 			{Code: `const run = () => { expect(true).toBeDefined(); }; test("case", run);`},
+			{Code: `let run = () => { expect(true).toBeDefined(); }; test("case", run);`},
+			{Code: `var run = () => { expect(true).toBeDefined(); }; test("case", run);`},
 			{Code: `test("case", run, TIMEOUT); function run() { expect(true).toBeDefined(); }`},
 			{Code: `test("case", { timeout: 100 }, run); function run() { expect(true).toBeDefined(); }`},
 			{Code: `it("first", shared);
@@ -115,6 +117,12 @@ test("case", () => {});`},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `let run = () => { expect(true).toBeDefined(); }; run = () => {}; test("case", run);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 66, EndLine: 1, EndColumn: 70},
+				},
+			},
 			{
 				Code: `test("case", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{

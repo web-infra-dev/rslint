@@ -41,8 +41,8 @@ let reassigned = () => { suite('stale inner', () => {}); };
 reassigned = () => {};
 suite('reassigned outer', reassigned);
 
-var mutable = () => { suite('mutable inner', () => {}); };
-suite('mutable outer', mutable);
+var unwritten = () => { suite('unwritten inner', () => {}); };
+suite('unwritten outer', unwritten);
 
 function destructured() { suite('destructured inner', () => {}); }
 ({ destructured } = replacements);
@@ -91,10 +91,10 @@ suite('destructured outer', destructured);`
 	}); err != nil {
 		t.Fatalf("RunLinter: %v", err)
 	}
-	if len(diagnostics) != 4 {
-		t.Fatalf("got %d diagnostics, want 4: %v", len(diagnostics), diagnostics)
+	if len(diagnostics) != 5 {
+		t.Fatalf("got %d diagnostics, want 5: %v", len(diagnostics), diagnostics)
 	}
-	wantLines := []int{2, 5, 11, 17}
+	wantLines := []int{2, 5, 11, 17, 26}
 	for index, diagnostic := range diagnostics {
 		if diagnostic.Message.Description != "Too many nested describe calls (2) - maximum allowed is 1" {
 			t.Errorf("diagnostic %d = %q, want depth 2", index, diagnostic.Message.Description)
