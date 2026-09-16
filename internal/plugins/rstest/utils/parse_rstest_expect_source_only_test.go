@@ -32,6 +32,27 @@ rstestTest('context alias', ({ expect: contextExpect }) => { contextExpect(conte
 import { expect as vitestExpect } from 'vitest';
 import { expect as jestExpect } from '@jest/globals';
 
+let { expect: replacedExpect } = require('@rstest/core');
+replacedExpect = createAssertionLibrary();
+replacedExpect(foreignValue).toBe(1);
+let { expect: replacedMeta } = import.meta.rstest;
+[replacedMeta] = replacements;
+replacedMeta(foreignValue).toBe(1);
+rstestTest('reassigned context', ({ expect: localExpect }) => {
+  localExpect = createAssertionLibrary();
+  localExpect(foreignValue).toBe(1);
+});
+
+var { expect: reinitialized } = require('@rstest/core');
+var reinitialized = createAssertionLibrary();
+reinitialized(foreignValue).toBe(1);
+var { expect: redeclared } = require('@rstest/core');
+var redeclared;
+redeclared(importedValue).toBe(1);
+var { expect: loopExpect } = require('@rstest/core');
+for (var loopExpect of replacements) {}
+loopExpect(foreignValue).toBe(1);
+
 vitestExpect(foreignValue).toBe(1);
 jestExpect(foreignValue).toBe(1);
 function localAssertion() {
@@ -113,12 +134,83 @@ function localAssertion() {
 	}
 	sort.Slice(got, func(left, right int) bool { return got[left].pos < got[right].pos })
 
-	if len(got) != 6 {
-		t.Fatalf("parsed %d Rstest expect calls, want 6: %v", len(got), got)
+	if len(got) != 7 {
+		t.Fatalf("parsed %d Rstest expect calls, want 7: %v", len(got), got)
 	}
 	for index, diagnostic := range got {
 		if diagnostic.text != "toBe" {
 			t.Errorf("diagnostic %d covers %q, want toBe", index, diagnostic.text)
 		}
 	}
+}
+
+func TestParseRstestExpectCallRejectsWrittenGlobalInSourceOnlyProgram(t *testing.T) {
+	for _, code := range []string{
+		`expect = replacement; expect(value).toBe(1);`,
+		`expect ||= replacement; expect(value).toBe(1);`,
+		`expect++; expect(value).toBe(1);`,
+		`[expect] = replacements; expect(value).toBe(1);`,
+		`({ expect } = replacement); expect(value).toBe(1);`,
+		`for (expect of replacements) {} expect(value).toBe(1);`,
+		`for (expect in replacements) {} expect(value).toBe(1);`,
+		`expect(value).toBe(1); expect = replacement;`,
+	} {
+		if got := sourceOnlyParsedExpectCount(t, code); got != 0 {
+			t.Errorf("parsed %d Rstest expect calls, want 0 for %q", got, code)
+		}
+	}
+}
+
+func TestParseRstestExpectCallKeepsGlobalForUnrelatedWritesInSourceOnlyProgram(t *testing.T) {
+	for _, code := range []string{
+		`function mutate(expect: any) { expect = replacement; } expect(value).toBe(1);`,
+		`{ let expect; expect = replacement; } expect(value).toBe(1);`,
+		`expect.customMatcher = matcher; expect(value).toBe(1);`,
+	} {
+		if got := sourceOnlyParsedExpectCount(t, code); got != 1 {
+			t.Errorf("parsed %d Rstest expect calls, want 1 for %q", got, code)
+		}
+	}
+}
+
+func sourceOnlyParsedExpectCount(t *testing.T, code string) int {
+	t.Helper()
+	root := fixtures.GetRootDir()
+	fileName := tspath.ResolvePath(root.Dir, "parse-rstest-expect-global-write.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            utils.CreateCompilerHost(root.Dir, fs),
+		CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("NewFromRoots: %v", err)
+	}
+	if program.CanProvideTypeChecker(program.SourceFiles()[0]) {
+		t.Fatal("expected source-only program")
+	}
+
+	count := 0
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program: program,
+		File:    fileName,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name: "rstest/source-only-expect-write-probe",
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+					return rule.RuleListeners{
+						ast.KindCallExpression: func(node *ast.Node) {
+							if analysis.ParseExpectCall(node) != nil {
+								count++
+							}
+						},
+					}
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
+	})
+	return count
 }

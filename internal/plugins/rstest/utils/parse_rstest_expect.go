@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -396,7 +397,9 @@ func rstestExpectRootMatch(
 	ctx := analysis.ctx
 	symbol := resolveRstestRootSymbol(ctx, root)
 	if symbol == nil {
-		return rstestExpectMatch{ok: localName == "expect"}
+		return rstestExpectMatch{
+			ok: localName == "expect" && !analysis.globalExpectWritten,
+		}
 	}
 	rootInfo, ok := analysis.expectRoots[symbol]
 	if !ok {
@@ -742,6 +745,27 @@ func classifyRstestExpectRoot(
 ) rstestExpectRoot {
 	callbacks := analysis.callbacksRef()
 	ctx := analysis.ctx
+	initializations := 0
+	for _, declaration := range symbol.Declarations {
+		switch declaration.Kind {
+		case ast.KindVariableDeclaration, ast.KindBindingElement:
+			if utils.IsVariableWriteReference(declaration.Name()) {
+				initializations++
+			}
+		case ast.KindParameter, ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindFunctionDeclaration:
+			initializations++
+		}
+		if initializations > 1 {
+			return rstestExpectRoot{Kind: rstestExpectRootNone}
+		}
+	}
+	if ctx.Refs != nil {
+		for _, reference := range ctx.Refs.References(symbol) {
+			if utils.IsWriteReference(reference) {
+				return rstestExpectRoot{Kind: rstestExpectRootNone}
+			}
+		}
+	}
 	if callbacks.ContextExpectNames[symbol] {
 		return rstestExpectRoot{Kind: rstestExpectRootDirect, FromTestContext: true}
 	}

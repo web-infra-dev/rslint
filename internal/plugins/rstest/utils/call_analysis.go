@@ -15,6 +15,12 @@ type RstestCallAnalysis struct {
 	isExpect    map[*ast.Node]bool
 	expectRoots map[*ast.Symbol]rstestExpectRoot
 	calls       []*ast.Node
+	// globalExpectWritten records whether the file assigns to the unresolved
+	// global expect binding. Source-only programs cannot resolve that binding
+	// to a symbol, so the symbol-keyed write check in classifyRstestExpectRoot
+	// cannot protect it. This fact is collected during the analysis's existing
+	// file walk so every expect consumer shares one linear-time check.
+	globalExpectWritten bool
 	// functions indexes named function declarations by name so a callback
 	// passed by an identifier the checker could not resolve still has a
 	// candidate. The index is file-wide and carries no scope information, so
@@ -274,6 +280,18 @@ func (analysis *RstestCallAnalysis) indexSourceFile() {
 	visit = func(node *ast.Node) {
 		if node == nil {
 			return
+		}
+		if !analysis.globalExpectWritten &&
+			node.Kind == ast.KindIdentifier &&
+			node.AsIdentifier().Text == "expect" &&
+			internalUtils.IsWriteReference(node) {
+			if analysis.ctx.Refs != nil {
+				analysis.globalExpectWritten = analysis.ctx.Refs.IsGlobalReference(node)
+			} else {
+				// Preserve standalone parser-test behavior for manually assembled
+				// contexts. Normal lint runs always provide RefStore.
+				analysis.globalExpectWritten = !internalUtils.IsShadowed(node, "expect")
+			}
 		}
 		switch node.Kind {
 		case ast.KindImportDeclaration:
