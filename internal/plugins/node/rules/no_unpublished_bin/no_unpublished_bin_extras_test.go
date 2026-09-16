@@ -101,8 +101,8 @@ func TestNoUnpublishedBinConversion(t *testing.T) {
 			// Explicit options override n and node shared settings; n overrides node.
 			{Code: "", FileName: "conversion/src/cli.ts", Options: map[string]any{"convertPath": map[string]any{}}, Settings: map[string]any{"n": object}},
 			{Code: "", FileName: "conversion/src/cli.ts", Settings: map[string]any{"n": map[string]any{"convertPath": map[string]any{}}, "node": object}},
-			// Converted targets use the nested package's publication paths.
-			{Code: "", FileName: "conversion/src/cli.ts", Options: nested},
+			// Nested package metadata cannot exclude a file published by its owner.
+			{Code: "", FileName: "conversion-published/src/cli.ts", Options: nested},
 			// Invalid JS patterns are ignored instead of crashing the linter.
 			{Code: "", FileName: "conversion/src/cli.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{"[", "dist/cli.js"}}}},
 			// Shared Node path resolution treats a leading slash as absolute.
@@ -113,6 +113,8 @@ func TestNoUnpublishedBinConversion(t *testing.T) {
 				"src/**": []any{`^src/(.*)\.ts$`, "dist/$1.js"}, "**": []any{"^", ""},
 			}}},
 		}, []rule_tester.InvalidTestCase{
+			// Nested package metadata cannot include a file excluded by its owner.
+			{Code: "", FileName: "conversion/src/cli.ts", Options: nested, Errors: ignoredBin("nested/cli.js", 1, 1)},
 			{Code: "const cli: string = 'cli';\n", FileName: "conversion/src/cli.ts", Options: convert, Errors: ignoredBin("dist/cli.js", 2, 1)},
 			{Code: "", FileName: "conversion/src/cli.ts", Settings: map[string]any{"n": object}, Errors: ignoredBin("dist/cli.js", 1, 1)},
 			{Code: "", FileName: "conversion/src/cli.ts", Settings: map[string]any{"n": map[string]any{"convertPath": nil}, "node": object}, Errors: ignoredBin("dist/cli.js", 1, 1)},

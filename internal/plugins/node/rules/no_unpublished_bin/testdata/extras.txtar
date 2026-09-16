@@ -53,6 +53,10 @@ not valid JSON
 {"bin":{"cli":"dist/cli.js","test":"dist/cli.spec.js","local":"src/cli.ts","nested":"nested/cli.js","outside":"../outside.js"},"files":["src"]}
 -- conversion/nested/package.json --
 {"files":["cli.js"]}
+-- conversion-published/package.json --
+{"bin":"nested/cli.js","files":["nested"]}
+-- conversion-published/nested/package.json --
+{"files":[]}
 -- metadata/package.json --
 {"bin":{"readme":"README.js","license":"LICENSE.js","hidden":"..hidden.js"},"files":["..hidden.js"]}
 -- classes/package.json --

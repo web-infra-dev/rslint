@@ -63,40 +63,50 @@ and replacement pair in `replace`. For example, the configuration above checks
 
 The object form is also supported:
 `{ "src/**": ["^src/(.*)\\.ts$", "dist/$1.js"] }`.
+Use the array form to specify priority when patterns overlap.
 When the option is omitted, the rule uses `settings.n.convertPath`, then
 `settings.node.convertPath`, or leaves the path unchanged. Omit `convertPath`
 instead of setting it to `null`, which the upstream schema also rejects.
 
 ## Differences from upstream
 
-The following configurations can produce different results from
-`eslint-plugin-n` v18.3.0:
+Compared with `eslint-plugin-n` v18.3.0, these inputs can change whether an
+executable is reported as unpublished:
 
-- Overlapping object-form `convertPath` patterns use alphabetical order instead
-  of property order. For example, `**` wins over `src/**` even if `src/**` was
-  written first. Use the array form when priority matters.
-- Conversion targets starting with `/` resolve from the filesystem root. For
-  example, `/dist/cli.js` does not match a package-local `dist/cli.js` bin entry.
-  Upstream joins that target to the package directory and can throw when
-  checking publication patterns. Use package-relative replacements.
-- Published package-root metadata such as `README.js` is exempt regardless of
-  the working directory. A published `..hidden.js` is treated as inside the
-  package. When conversion enters a nested package, publication patterns are
-  relative to that package. Upstream can report these files incorrectly.
-- Publication patterns can select different files when they contain negated
-  character classes, escaped characters, whitespace, invalid brackets, or
-  zero-step brace ranges. For example,
-  `"files": ["bin/[!b]oo.js"]` includes `bin/foo.js` in rslint; upstream reports
-  that executable as unpublished. Each `files` entry stays one pattern:
-  `"files": ["lib/foo.js\nbar.js"]` excludes `lib/foo.js` in rslint but includes
-  it upstream. List separate filenames in separate entries. An unclosed
-  `[cli.js` pattern matches that literal filename in rslint, while upstream
-  matches nothing. Use closed brackets and positive brace steps. For escaped
-  characters and unusual whitespace, see the additional filename examples in
-  [hashbang](../hashbang/hashbang.md).
-- An invalid conversion expression such as `[` skips this rule for the file;
-  a non-string `bin` entry such as `{ "cli": false }` is ignored. Upstream
-  throws in these cases. Correct the expression or use string executable paths.
+- **Converted executable paths.** A replacement such as `/dist/cli.js` names
+  an absolute path, so it does not identify the package's `dist/cli.js`
+  executable. Upstream treats it as a package-local path and can stop with an
+  error. Use `dist/cli.js` to refer to the executable inside the package.
+- **Published package files.** Package-root metadata such as `README.js` is
+  not reported, even when linting from another directory. A filename such as
+  `..hidden.js` is still inside the package and is not reported when included
+  in `files`. Upstream can incorrectly report these files as unpublished.
+- **Executables inside nested packages.** Suppose a package declares
+  `"bin": "nested/cli.js"` and `"files": ["nested"]`, and `convertPath` maps
+  `src/cli.js` to `nested/cli.js`. rslint does not report that executable,
+  even if `nested/package.json` has `"files": []`; upstream reports it as
+  unpublished. The package declaring `bin` determines which files it publishes.
+- **Excluding and escaping filename characters.** With
+  `"files": ["bin/[!b]oo.js"]`, rslint includes `bin/foo.js` and does not report
+  it; upstream reports it as unpublished. Escaped wildcards name literal
+  characters: `"files": ["bin/cli\\*"]` includes the filename `bin/cli*`, but
+  rslint still reports `bin/cli.js`; upstream includes both. The same matching
+  differences apply to `.npmignore` and `.gitignore`. More filename examples
+  appear in [hashbang](../hashbang/hashbang.md).
+- **Whitespace in filenames.** With `"files": ["lib/foo.js\nbar.js"]`, rslint
+  reports the executable `lib/foo.js`; upstream includes it. The newline is
+  part of one filename pattern in rslint. List separate filenames in separate
+  entries. Tabs and non-breaking spaces can also change which files match;
+  see the [hashbang examples](../hashbang/hashbang.md).
+- **Malformed filename patterns.** With `"files": ["[cli.js"]`, rslint includes
+  the literal filename `[cli.js`; upstream reports it as unpublished. With
+  `"files": ["lib/cli{1..3..0}.js"]`, rslint includes `lib/cli1.js`; upstream
+  reports it. Use closed brackets and positive brace steps.
+- **Invalid conversion expressions or executable entries.** An expression
+  such as `[` causes rslint to skip this rule for the file. A `bin` entry such
+  as `{ "cli": false }` is ignored. Upstream stops with an error in these
+  cases. Correct the expression or use string executable paths so the file
+  can be checked.
 
 ## Original documentation
 

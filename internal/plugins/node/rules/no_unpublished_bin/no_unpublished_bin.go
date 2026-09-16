@@ -40,7 +40,7 @@ var NoUnpublishedBinRule = rule.Rule{
 		if converted != relative {
 			absolute = tspath.ResolvePath(pkg.Directory(), converted)
 		}
-		if !pkg.IsBinFile(absolute) || !nodeutil.IsUnpublished(program, absolute, converted) {
+		if !pkg.IsBinFile(absolute) || !nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
 
