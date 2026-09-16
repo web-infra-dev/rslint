@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/global_require"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/handle_callback_err"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/hashbang"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_callback_literal"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_exports_assign"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_extraneous_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_extraneous_require"
@@ -23,6 +24,7 @@ func GetAllRules() []rule.Rule {
 		global_require.GlobalRequireRule,
 		handle_callback_err.HandleCallbackErrRule,
 		hashbang.HashbangRule,
+		no_callback_literal.NoCallbackLiteralRule,
 		no_exports_assign.NoExportsAssignRule,
 		no_extraneous_import.NoExtraneousImportRule,
 		no_extraneous_require.NoExtraneousRequireRule,
