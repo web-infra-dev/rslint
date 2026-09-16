@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'rstack/test';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 
 import { RSLintService } from '../src/service/service.js';
 import { API_REVERSE_CONFIG_LOAD_CAPABILITY } from '../src/service/protocol.js';
@@ -132,6 +133,49 @@ class HangingLintBackend extends ReverseLintBackend {
 
   override terminate(): void {
     this.terminated = true;
+  }
+}
+
+class GatedTerminationBackend extends ReverseLintBackend {
+  exitRequests = 0;
+  terminationRequests = 0;
+  readonly terminationStarted: Promise<void>;
+  private markTerminationStarted!: () => void;
+  private readonly termination: Promise<void>;
+  private resolveTermination!: () => void;
+  private rejectTermination!: (error: Error) => void;
+
+  constructor() {
+    super();
+    this.terminationStarted = new Promise((resolve) => {
+      this.markTerminationStarted = resolve;
+    });
+    this.termination = new Promise((resolve, reject) => {
+      this.resolveTermination = resolve;
+      this.rejectTermination = reject;
+    });
+  }
+
+  override async sendMessage(kind: string, data: any): Promise<any> {
+    if (kind === 'exit') {
+      this.exitRequests++;
+      return {};
+    }
+    return super.sendMessage(kind, data);
+  }
+
+  override terminate(): Promise<void> {
+    this.terminationRequests++;
+    this.markTerminationStarted();
+    return this.termination;
+  }
+
+  finishTermination(): void {
+    this.resolveTermination();
+  }
+
+  failTermination(error: Error): void {
+    this.rejectTermination(error);
   }
 }
 
@@ -371,6 +415,79 @@ describe('RSLintService reverse lint request scoping', () => {
       ),
     ).rejects.toThrow(/loadConfigs and activateConfigs handlers together/);
     await service.close();
+  });
+
+  test('waits for backend termination after the exit response', async () => {
+    const backend = new GatedTerminationBackend();
+    const service = new RSLintService(backend);
+    let closed = false;
+    const closing = service.close().then(() => {
+      closed = true;
+    });
+
+    try {
+      await backend.terminationStarted;
+      expect(backend.exitRequests).toBe(1);
+      // Cross an event-loop turn so every already-settled close continuation
+      // can run. The backend gate, not a delay, keeps termination pending.
+      await nextTurn();
+      expect(closed).toBe(false);
+      backend.finishTermination();
+      await closing;
+      expect(closed).toBe(true);
+    } finally {
+      backend.finishTermination();
+      await closing;
+    }
+  });
+
+  test('joins concurrent and repeated close calls into one termination', async () => {
+    const backend = new GatedTerminationBackend();
+    const service = new RSLintService(backend);
+    let completed = 0;
+    const observeClose = () =>
+      service.close().then(() => {
+        completed++;
+      });
+    const closing = [observeClose(), observeClose()];
+
+    try {
+      await backend.terminationStarted;
+      closing.push(observeClose());
+      await nextTurn();
+      expect(completed).toBe(0);
+      expect(backend.exitRequests).toBe(1);
+      expect(backend.terminationRequests).toBe(1);
+
+      backend.finishTermination();
+      await Promise.all(closing);
+      await observeClose();
+      expect(completed).toBe(4);
+      expect(backend.exitRequests).toBe(1);
+      expect(backend.terminationRequests).toBe(1);
+    } finally {
+      backend.finishTermination();
+      await Promise.all(closing);
+    }
+  });
+
+  test('propagates termination failure to every close caller', async () => {
+    const backend = new GatedTerminationBackend();
+    const service = new RSLintService(backend);
+    const failure = new Error('backend failed to release its resources');
+    const closing = service.close();
+    const concurrent = service.close();
+    const rejected = Promise.all([
+      expect(closing).rejects.toBe(failure),
+      expect(concurrent).rejects.toBe(failure),
+    ]);
+
+    await backend.terminationStarted;
+    backend.failTermination(failure);
+    await rejected;
+    await expect(service.close()).rejects.toBe(failure);
+    expect(backend.exitRequests).toBe(1);
+    expect(backend.terminationRequests).toBe(1);
   });
 
   test('bounds graceful shutdown when the peer never acknowledges exit', async () => {

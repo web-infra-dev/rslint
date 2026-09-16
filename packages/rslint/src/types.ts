@@ -147,7 +147,8 @@ export interface RslintServiceInterface {
   sendMessage(kind: string, data: any): Promise<any>;
   /** Optional for one-way backends such as the current browser worker. */
   setInboundHandler?(handler: InboundRequestHandler | null): void;
-  terminate(): void;
+  /** Complete only after owned execution resources have closed. */
+  terminate(): void | Promise<void>;
 }
 
 // ============================================================================

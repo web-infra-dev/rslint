@@ -189,7 +189,7 @@ export class RSLintService {
       } finally {
         timedOut = true;
         if (timer) clearTimeout(timer);
-        this.service.terminate();
+        await this.service.terminate();
       }
     })();
     await this.closePromise;

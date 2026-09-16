@@ -948,6 +948,16 @@ The transport and target phase differ by surface:
   loader boundary as the final suffix of every successful config. Their global
   ignores and negations therefore participate in staged reachability and are
   published exactly once; an empty catalog uses the same override directly.
+  Node API shutdown completes only after the Go child has exited and its stdio
+  has closed. `RSLintService.close()` awaits backend termination; the Node
+  backend records close completion from process creation and shares one
+  termination operation across callers. After SIGTERM it waits up to one
+  second before SIGKILL, then allows up to 30 seconds for transport closure.
+  These waits keep the Node event loop alive even when request handling releases
+  its references to the child. Failure to confirm closure rejects shutdown. One-shot `lint()`
+  also waits before returning, so callers can immediately remove its temporary
+  working directory; if linting and shutdown both fail, it preserves both
+  errors. The browser backend retains synchronous worker termination.
 - Extension activation makes a one-time stand-down decision through
   `rstackEditorTakesOver()`. The migration notice in `src/migrationNotice.ts`
   is always created, but when `rstack.rstack` has `rstack.rslint.enable` on,

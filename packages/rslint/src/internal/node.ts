@@ -12,6 +12,24 @@ import type {
   LintResponse,
 } from '../types.js';
 
+const TERMINATION_GRACE_MS = 1_000;
+const TERMINATION_CLOSE_TIMEOUT_MS = 30_000;
+
+function waitForClose(
+  closed: Promise<void>,
+  timeoutMs: number,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    // Keep this timer referenced: request completion and inbound handlers can
+    // unref the child and its pipes while termination is still in progress.
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    void closed.then(() => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+}
+
 /**
  * Node.js implementation of RslintService using child processes
  */
@@ -20,6 +38,9 @@ export class NodeRslintService implements RslintServiceInterface {
   private readonly pendingMessages: Map<number, PendingMessage>;
   private readonly rslintPath: string;
   private readonly process: ChildProcess;
+  private readonly processClosed: Promise<void>;
+  private closed = false;
+  private terminationPromise: Promise<void> | undefined;
   private chunks: Buffer[];
   private chunkSize: number;
   private expectedSize: number | null;
@@ -50,6 +71,15 @@ export class NodeRslintService implements RslintServiceInterface {
       env: {
         ...process.env,
       },
+    });
+    // Register before any request or shutdown: the child may fail to spawn or
+    // exit before terminate() is called. Neither 'error' nor 'exit' proves that
+    // its stdio has closed, and kill() only confirms that a signal was sent.
+    this.processClosed = new Promise((resolve) => {
+      this.process.once('close', () => {
+        this.closed = true;
+        resolve();
+      });
     });
 
     // Start idle: the resident child + its stdio pipes are unref'd so a caller
@@ -318,15 +348,42 @@ export class NodeRslintService implements RslintServiceInterface {
   }
 
   /**
-   * Terminate the rslint process
+   * Terminate the rslint process and wait for its stdio to close.
    */
-  terminate(): void {
+  terminate(): Promise<void> {
+    return (this.terminationPromise ??= this.terminateProcess());
+  }
+
+  private async terminateProcess(): Promise<void> {
     this.dead = true;
-    if (this.process && !this.process.killed) {
-      this.process.stdin!.end();
-      this.process.kill();
-    }
     this.rejectAllPending(new Error('rslint service terminated'));
+    if (this.closed) return;
+
+    this.process.stdin!.end();
+    this.signalProcess('SIGTERM');
+    if (await waitForClose(this.processClosed, TERMINATION_GRACE_MS)) return;
+
+    // A prior successful kill() is not evidence of exit. A peer may ignore
+    // SIGTERM, so still try SIGKILL before the final transport-close bound.
+    this.signalProcess('SIGKILL');
+    if (await waitForClose(this.processClosed, TERMINATION_CLOSE_TIMEOUT_MS)) {
+      return;
+    }
+    throw new Error(
+      `rslint process ${String(this.process.pid)} did not close after termination`,
+    );
+  }
+
+  private signalProcess(signal: NodeJS.Signals): void {
+    if (this.process.exitCode !== null || this.process.signalCode !== null) {
+      return;
+    }
+    try {
+      this.process.kill(signal);
+    } catch {
+      // A signal can race process exit or fail while the child is still alive.
+      // Only the close event can confirm that its resources were released.
+    }
   }
 }
 
@@ -343,11 +400,24 @@ export async function lint(options: LintOptions): Promise<LintResponse> {
       workingDirectory: options.workingDirectory,
     }),
   );
+  let result: LintResponse;
   try {
-    return await service.lint(options);
-  } finally {
-    await service.close();
+    result = await service.lint(options);
+  } catch (lintError) {
+    try {
+      await service.close();
+    } catch (closeError) {
+      throw new AggregateError(
+        [lintError, closeError],
+        'rslint lint and service shutdown both failed',
+      );
+    }
+    throw lintError;
   }
+  // Successful linting is not complete until the child releases its cwd;
+  // callers may immediately remove temporary inputs after this promise settles.
+  await service.close();
+  return result;
 }
 
 export type { LintOptions, LintResponse, Diagnostic } from '../types.js';
