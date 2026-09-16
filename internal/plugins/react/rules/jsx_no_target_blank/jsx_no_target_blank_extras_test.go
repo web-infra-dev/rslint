@@ -43,6 +43,7 @@ func TestJsxNoTargetBlankExtras(t *testing.T) {
 		{Code: "<a href={url} target='_blank' rel={ok ? `noreferrer` : `noreferrer`}/>;", Tsx: true},
 		{Code: "<a href={url} target='_blank' rel={ok ? `noreferrer ${a}` : `${b} noreferrer`}/>;", Tsx: true},
 		{Code: "<a href={url} target={ok ? '_blank' : undefined} rel={ok ? `noreferrer ${a}` : undefined}/>;", Tsx: true},
+		{Code: "<a href={url} target={ok ? '_BLANK' : '_blank'} rel={ok ? `noreferrer ${a}` : `${b} noreferrer`}/>;", Tsx: true},
 		// Intentional upstream divergence: links:false must disable link checks.
 		{Code: `<a href="https://example.com" target="_blank"/>;`, Tsx: true, Options: map[string]interface{}{"links": false}},
 		// Non-link JSX elements are ignored regardless of target value.
@@ -158,6 +159,8 @@ func TestJsxNoTargetBlankExtras(t *testing.T) {
 		{Code: "<a href={url} target='_blank' rel={`noopener ${more}`}/>;", Tsx: true, Errors: defaultErrors},
 		{Code: "<a href={url} target='_blank' rel={`noreferrer\\t${more}`}/>;", Tsx: true, Errors: defaultErrors},
 		{Code: "<a href={url} target='_blank' rel={ok ? `noreferrer ${a}` : `noreferrer${b}`}/>;", Tsx: true, Errors: defaultErrors},
+		{Code: "<a href=\"https://example.com\" target={ok ? '_blank' : '_blank'} rel={ok ? `noreferrer ${extra}` : 'nofollow'}/>;", Tsx: true, Errors: defaultErrors},
+		{Code: "<a href={url} target={ok ? '_BLANK' : '_blank'} rel={ok ? 'nofollow' : `${a} noreferrer`}/>;", Tsx: true, Errors: defaultErrors},
 		{Code: "<a href={url} target='_blank' rel={`noreferrer ${more}`} {...props}/>;", Tsx: true, Options: map[string]interface{}{"warnOnSpreadAttributes": true}, Errors: defaultErrors},
 		{Code: "<form action={url} target='_blank' rel={`noopener ${more}`}/>;", Tsx: true, Options: map[string]interface{}{"forms": true, "allowReferrer": true}, Errors: allowReferrerErrors},
 		// undefined is an Identifier in ESTree, not a literal, and may be

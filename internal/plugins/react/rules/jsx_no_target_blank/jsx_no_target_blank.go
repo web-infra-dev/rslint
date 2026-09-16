@@ -293,13 +293,15 @@ func relStrings(sf *ast.SourceFile, relInit, targetInit *ast.Node) []*string {
 		if targetExpr := jsxExpressionInner(targetInit); targetExpr != nil && targetExpr.Kind == ast.KindConditionalExpression {
 			targetCond := targetExpr.AsConditionalExpression()
 			if relCondName := identifierName(cond.Condition); relCondName != "" && relCondName == identifierName(targetCond.Condition) {
-				tConsequent, _ := stringLiteralText(targetCond.WhenTrue)
-				tAlternate, _ := stringLiteralText(targetCond.WhenFalse)
-				switch "_blank" {
-				case tConsequent:
-					return []*string{consequent}
-				case tAlternate:
-					return []*string{alternate}
+				matched := make([]*string, 0, 2)
+				if value, ok := stringLiteralText(targetCond.WhenTrue); ok && ecmascript.EqualsWhenLowercased(value, "_blank") {
+					matched = append(matched, consequent)
+				}
+				if value, ok := stringLiteralText(targetCond.WhenFalse); ok && ecmascript.EqualsWhenLowercased(value, "_blank") {
+					matched = append(matched, alternate)
+				}
+				if len(matched) != 0 {
+					return matched
 				}
 			}
 		}
