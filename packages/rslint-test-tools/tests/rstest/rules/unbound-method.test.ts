@@ -14,6 +14,11 @@ ruleTester.run('unbound-method', {} as never, {
     { code: declaration + 'expect(service.method).toStrictEqual(other);' },
     { code: declaration + 'expect(service.method).resolves.toBeDefined();' },
     {
+      code:
+        declaration +
+        'const matcher = { asymmetricMatch(received) { received(); return true; } }; expect(service.method).not.toEqual({ nested: matcher });',
+    },
+    {
       code: declaration + "expect(service.method).to.have.property('name');",
     },
     {
@@ -97,6 +102,62 @@ ruleTester.run('unbound-method', {} as never, {
           column: 116,
           endLine: 4,
           endColumn: 130,
+        },
+      ],
+    },
+    {
+      code:
+        declaration +
+        'expect(service.method).toEqual(expect.toSatisfy(received => { received(); return true; }));',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code:
+        declaration +
+        "expect(service.method).toEqual(expect.schemaMatching({ '~standard': { version: 1, vendor: 'test', validate(received) { received(); return { value: received }; } } }));",
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code:
+        declaration +
+        'const matcher = { asymmetricMatch(received) { received(); return true; } }; expect(service.method).toEqual(expect.toBeOneOf([matcher]));',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          line: 4,
+          column: 90,
+          endLine: 4,
+          endColumn: 104,
+        },
+      ],
+    },
+    {
+      code:
+        declaration +
+        'const matchers = [{ asymmetricMatch(received) { received(); return true; } }]; expect(service.method).toBeOneOf(matchers);',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          line: 4,
+          column: 88,
+          endLine: 4,
+          endColumn: 102,
         },
       ],
     },

@@ -16,7 +16,7 @@ var UnboundMethodRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var analysis *rstestUtils.RstestCallAnalysis
 		stableRoots := map[*ast.Symbol]bool{}
-		asymmetricMatcherArguments := map[*ast.Node]bool{}
+		var asymmetricMatchers *asymmetricMatcherAnalysis
 		return unboundMethod.CreateListeners(ctx, options, func(node *ast.Node) bool {
 			argument := node
 			for argument.Parent != nil && utils.SkipAssertionsAndParens(argument.Parent) == node {
@@ -92,10 +92,16 @@ var UnboundMethodRule = rule.Rule{
 			for _, matcher := range parsed.Matchers {
 				if analysis.IsExpectMatcherOverridden(matcher.Name) ||
 					(analysis.HasCustomEqualityTesters() && usesCustomEqualityTesters(matcher.Name)) ||
-					(usesCustomEqualityTesters(matcher.Name) && matcher.Entry.Call != nil &&
-						matcherArgumentsContainAsymmetricMatcher(ctx, analysis, matcher.Entry.Call, asymmetricMatcherArguments)) ||
 					!isNonInvokingMatcher(matcher.Name) {
 					return false
+				}
+				if usesCustomEqualityTesters(matcher.Name) && matcher.Entry.Call != nil {
+					if asymmetricMatchers == nil {
+						asymmetricMatchers = newAsymmetricMatcherAnalysis(ctx, analysis)
+					}
+					if asymmetricMatchers.matcherMayInvokeReceived(matcher.Name, matcher.Entry.Call) {
+						return false
+					}
 				}
 			}
 			return true
@@ -103,82 +109,341 @@ var UnboundMethodRule = rule.Rule{
 	},
 }
 
-func matcherArgumentsContainAsymmetricMatcher(
-	ctx rule.RuleContext,
-	analysis *rstestUtils.RstestCallAnalysis,
-	call *ast.Node,
-	cache map[*ast.Node]bool,
-) bool {
-	if result, ok := cache[call]; ok {
+type asymmetricMatcherAnalysis struct {
+	ctx                rule.RuleContext
+	expect             *rstestUtils.RstestCallAnalysis
+	stableInitializers *utils.StaticStringEvaluator
+	callResults        map[*ast.Node]bool
+	visitingValues     map[*ast.Node]bool
+	visitingTypes      map[*checker.Type]bool
+	bindingMutations   map[*ast.Symbol]bindingMutation
+	checkedBindings    map[*ast.Symbol]bool
+}
+
+type bindingMutation struct {
+	changed             bool
+	mayIntroduceMatcher bool
+}
+
+func newAsymmetricMatcherAnalysis(ctx rule.RuleContext, expect *rstestUtils.RstestCallAnalysis) *asymmetricMatcherAnalysis {
+	return &asymmetricMatcherAnalysis{
+		ctx:                ctx,
+		expect:             expect,
+		stableInitializers: utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs),
+		callResults:        map[*ast.Node]bool{},
+		visitingValues:     map[*ast.Node]bool{},
+		visitingTypes:      map[*checker.Type]bool{},
+		bindingMutations:   map[*ast.Symbol]bindingMutation{},
+		checkedBindings:    map[*ast.Symbol]bool{},
+	}
+}
+
+func (analysis *asymmetricMatcherAnalysis) matcherMayInvokeReceived(name string, call *ast.Node) bool {
+	if result, ok := analysis.callResults[call]; ok {
 		return result
 	}
 	result := false
-	for _, argument := range call.Arguments() {
-		if expressionContainsAsymmetricMatcher(ctx, analysis, argument) {
-			result = true
-			break
+	arguments := call.Arguments()
+	if name == "toBeOneOf" {
+		if len(arguments) != 0 {
+			result = analysis.collectionMayContainInvokingMatcher(arguments[0])
+		}
+	} else {
+		for _, argument := range arguments {
+			if analysis.valueMayInvokeReceived(argument) {
+				result = true
+				break
+			}
 		}
 	}
-	cache[call] = result
+	analysis.callResults[call] = result
 	return result
 }
 
-// expressionContainsAsymmetricMatcher follows only values traversed by an
-// equality comparison. It deliberately does not walk into function bodies or
-// call arguments, which are not themselves compared.
-func expressionContainsAsymmetricMatcher(ctx rule.RuleContext, analysis *rstestUtils.RstestCallAnalysis, node *ast.Node) bool {
+// valueMayInvokeReceived examines only values compared directly with the
+// received method. Ordinary equality stops on a Function/Object type mismatch,
+// so recursively scanning properties or elements here would report asymmetric
+// matchers that the runtime never reaches.
+func (analysis *asymmetricMatcherAnalysis) valueMayInvokeReceived(node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
-	if node == nil || isSafeBuiltinAsymmetricMatcher(analysis, node) {
+	if node == nil || analysis.visitingValues[node] {
 		return false
 	}
-	t := ctx.TypeChecker.GetTypeAtLocation(node)
-	for _, part := range utils.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t)) {
-		member := checker.Checker_getPropertyOfType(ctx.TypeChecker, part, "asymmetricMatch")
-		if member != nil {
-			memberType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(member, node)
-			if len(utils.GetCallSignatures(ctx.TypeChecker, memberType)) != 0 {
+	analysis.visitingValues[node] = true
+	defer delete(analysis.visitingValues, node)
+
+	if node.Kind == ast.KindCallExpression {
+		parsed := analysis.expect.ParseExpectCall(node)
+		if parsed != nil && parsed.Entry == rstestUtils.RstestExpectEntryStatic {
+			if analysis.expect.IsExpectMatcherOverridden(parsed.Matcher) {
 				return true
+			}
+			if !rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[parsed.Matcher] {
+				return false
+			}
+			switch parsed.Matcher {
+			case "toSatisfy", "schemaMatching":
+				return true
+			case "toBeOneOf":
+				arguments := node.Arguments()
+				return len(arguments) != 0 && analysis.collectionMayContainInvokingMatcher(arguments[0])
+			default:
+				return false
 			}
 		}
 	}
+	t := analysis.ctx.TypeChecker.GetTypeAtLocation(node)
+	if !utils.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown) &&
+		analysis.typeHasCallableAsymmetricMatcher(t, node) {
+		return true
+	}
+	if initializer, resolved, mutation := analysis.localInitializer(node); mutation.mayIntroduceMatcher {
+		return true
+	} else if mutation.changed {
+		return utils.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown) ||
+			analysis.typeHasCallableAsymmetricMatcher(t, node)
+	} else if resolved {
+		return analysis.valueMayInvokeReceived(initializer)
+	}
+	switch node.Kind {
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		return analysis.valueMayInvokeReceived(conditional.WhenTrue) ||
+			analysis.valueMayInvokeReceived(conditional.WhenFalse)
+	}
+	return analysis.typeHasCallableAsymmetricMatcher(t, node)
+}
+
+func (analysis *asymmetricMatcherAnalysis) collectionMayContainInvokingMatcher(node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || analysis.visitingValues[node] {
+		return false
+	}
+	analysis.visitingValues[node] = true
+	defer delete(analysis.visitingValues, node)
+
 	switch node.Kind {
 	case ast.KindArrayLiteralExpression:
 		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-			if expressionContainsAsymmetricMatcher(ctx, analysis, element) {
+			if element.Kind == ast.KindSpreadElement {
+				if analysis.collectionMayContainInvokingMatcher(element.AsSpreadElement().Expression) {
+					return true
+				}
+			} else if analysis.sampleMayInvokeReceived(element) {
 				return true
 			}
 		}
-	case ast.KindObjectLiteralExpression:
-		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
-			var value *ast.Node
-			switch property.Kind {
-			case ast.KindPropertyAssignment:
-				value = property.AsPropertyAssignment().Initializer
-			case ast.KindShorthandPropertyAssignment:
-				value = property.Name()
-			case ast.KindSpreadAssignment:
-				value = property.AsSpreadAssignment().Expression
-			}
-			if expressionContainsAsymmetricMatcher(ctx, analysis, value) {
-				return true
-			}
+		return false
+	case ast.KindNewExpression:
+		if utils.IsBuiltinSymbolLike(analysis.ctx.Program(), analysis.ctx.TypeChecker, analysis.ctx.TypeChecker.GetTypeAtLocation(node), "Set") {
+			arguments := node.Arguments()
+			return len(arguments) != 0 && analysis.collectionMayContainInvokingMatcher(arguments[0])
 		}
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		return expressionContainsAsymmetricMatcher(ctx, analysis, conditional.WhenTrue) ||
-			expressionContainsAsymmetricMatcher(ctx, analysis, conditional.WhenFalse)
+		return analysis.collectionMayContainInvokingMatcher(conditional.WhenTrue) ||
+			analysis.collectionMayContainInvokingMatcher(conditional.WhenFalse)
+	}
+	if initializer, resolved, mutation := analysis.localInitializer(node); mutation.mayIntroduceMatcher {
+		return true
+	} else if mutation.changed {
+		return analysis.collectionTypeMayContainInvokingMatcher(analysis.ctx.TypeChecker.GetTypeAtLocation(node), node)
+	} else if resolved {
+		return analysis.collectionMayContainInvokingMatcher(initializer)
+	}
+	return analysis.collectionTypeMayContainInvokingMatcher(analysis.ctx.TypeChecker.GetTypeAtLocation(node), node)
+}
+
+func (analysis *asymmetricMatcherAnalysis) sampleMayInvokeReceived(node *ast.Node) bool {
+	if analysis.valueMayInvokeReceived(node) {
+		return true
+	}
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	if node.Kind == ast.KindCallExpression {
+		parsed := analysis.expect.ParseExpectCall(node)
+		if parsed != nil && parsed.Entry == rstestUtils.RstestExpectEntryStatic &&
+			rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[parsed.Matcher] &&
+			!analysis.expect.IsExpectMatcherOverridden(parsed.Matcher) {
+			return false
+		}
+	}
+	if initializer, resolved, mutation := analysis.localInitializer(node); mutation.mayIntroduceMatcher {
+		return true
+	} else if mutation.changed {
+		t := analysis.ctx.TypeChecker.GetTypeAtLocation(node)
+		return utils.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown) ||
+			analysis.typeHasCallableAsymmetricMatcher(t, node)
+	} else if resolved {
+		return analysis.sampleMayInvokeReceived(initializer)
+	}
+	if node.Kind == ast.KindConditionalExpression {
+		conditional := node.AsConditionalExpression()
+		return analysis.sampleMayInvokeReceived(conditional.WhenTrue) ||
+			analysis.sampleMayInvokeReceived(conditional.WhenFalse)
+	}
+	t := analysis.ctx.TypeChecker.GetTypeAtLocation(node)
+	return utils.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsUnknown)
+}
+
+func (analysis *asymmetricMatcherAnalysis) typeHasCallableAsymmetricMatcher(t *checker.Type, location *ast.Node) bool {
+	if t == nil {
+		return false
+	}
+	for _, part := range utils.UnionTypeParts(checker.Checker_getApparentType(analysis.ctx.TypeChecker, t)) {
+		member := checker.Checker_getPropertyOfType(analysis.ctx.TypeChecker, part, "asymmetricMatch")
+		if member != nil {
+			memberType := analysis.ctx.TypeChecker.GetTypeOfSymbolAtLocation(member, location)
+			if len(utils.GetCallSignatures(analysis.ctx.TypeChecker, memberType)) != 0 {
+				return true
+			}
+		}
 	}
 	return false
 }
 
-func isSafeBuiltinAsymmetricMatcher(analysis *rstestUtils.RstestCallAnalysis, node *ast.Node) bool {
-	if node.Kind != ast.KindCallExpression {
+func (analysis *asymmetricMatcherAnalysis) collectionTypeMayContainInvokingMatcher(t *checker.Type, location *ast.Node) bool {
+	if t == nil || analysis.visitingTypes[t] {
 		return false
 	}
-	parsed := analysis.ParseExpectCall(node)
-	return parsed != nil && parsed.Entry == rstestUtils.RstestExpectEntryStatic &&
-		rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[parsed.Matcher] &&
-		parsed.Matcher != "toSatisfy" && parsed.Matcher != "schemaMatching"
+	analysis.visitingTypes[t] = true
+	defer delete(analysis.visitingTypes, t)
+
+	for _, part := range utils.UnionTypeParts(checker.Checker_getApparentType(analysis.ctx.TypeChecker, t)) {
+		if elementType := utils.GetNumberIndexType(analysis.ctx.TypeChecker, part); elementType != nil {
+			if utils.IsTypeFlagSet(elementType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) ||
+				analysis.typeHasCallableAsymmetricMatcher(elementType, location) {
+				return true
+			}
+		}
+		if !utils.IsBuiltinSymbolLike(analysis.ctx.Program(), analysis.ctx.TypeChecker, part, "Set") {
+			continue
+		}
+		for _, elementType := range checker.Checker_getTypeArguments(analysis.ctx.TypeChecker, part) {
+			if utils.IsTypeFlagSet(elementType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) ||
+				analysis.typeHasCallableAsymmetricMatcher(elementType, location) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (analysis *asymmetricMatcherAnalysis) localInitializer(node *ast.Node) (initializer *ast.Node, resolved bool, mutation bindingMutation) {
+	initializer, ok := analysis.stableInitializers.ResolveIdentifierInitializer(node)
+	if !ok {
+		return nil, false, bindingMutation{}
+	}
+	return initializer, true, analysis.bindingMutation(node)
+}
+
+func (analysis *asymmetricMatcherAnalysis) bindingMutation(node *ast.Node) bindingMutation {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || !ast.IsIdentifier(node) {
+		return bindingMutation{}
+	}
+	symbol := analysis.ctx.Refs.Resolve(node)
+	return analysis.bindingMutationForSymbol(symbol)
+}
+
+func (analysis *asymmetricMatcherAnalysis) bindingMutationForSymbol(symbol *ast.Symbol) bindingMutation {
+	if symbol == nil {
+		return bindingMutation{changed: true, mayIntroduceMatcher: true}
+	}
+	if analysis.checkedBindings[symbol] {
+		return analysis.bindingMutations[symbol]
+	}
+	analysis.checkedBindings[symbol] = true
+	for _, reference := range analysis.ctx.Refs.References(symbol) {
+		outer := reference
+		var access *ast.Node
+		for outer.Parent != nil {
+			parent := outer.Parent
+			if ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) && parent.Expression() == outer {
+				outer = parent
+				continue
+			}
+			if ast.IsAccessExpression(parent) && parent.Expression() == outer {
+				access = parent
+				outer = parent
+				continue
+			}
+			break
+		}
+		if utils.IsWriteReference(outer) {
+			mutation := bindingMutation{changed: true}
+			if access == nil {
+				mutation.mayIntroduceMatcher = true
+			} else if name, ok := utils.AccessExpressionStaticName(access); !ok || name == "asymmetricMatch" {
+				mutation.mayIntroduceMatcher = true
+			}
+			analysis.bindingMutations[symbol] = mutation
+			if mutation.mayIntroduceMatcher {
+				return mutation
+			}
+			continue
+		}
+		if outer.Parent != nil && outer.Parent.Kind == ast.KindDeleteExpression {
+			analysis.bindingMutations[symbol] = bindingMutation{changed: true}
+			continue
+		}
+		if access == nil {
+			if alias, aliasName := analysis.aliasInitializedFrom(outer); alias != nil && alias != symbol {
+				aliasMutation := analysis.bindingMutationForSymbol(alias)
+				if aliasMutation.changed {
+					aliasType := analysis.ctx.TypeChecker.GetTypeAtLocation(aliasName)
+					aliasMutation.mayIntroduceMatcher = aliasMutation.mayIntroduceMatcher ||
+						utils.IsTypeFlagSet(aliasType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) ||
+						analysis.typeHasCallableAsymmetricMatcher(aliasType, outer) ||
+						analysis.collectionTypeMayContainInvokingMatcher(aliasType, outer)
+					// A mutation through an alias invalidates the original initializer.
+					// The caller will fall back to the original binding's type unless
+					// the alias mutation itself is inherently opaque.
+					analysis.bindingMutations[symbol] = aliasMutation
+				}
+				if aliasMutation.mayIntroduceMatcher {
+					return aliasMutation
+				}
+			}
+			continue
+		}
+		if outer.Parent == nil || outer.Parent.Kind != ast.KindCallExpression || outer.Parent.Expression() != outer {
+			continue
+		}
+		if name, ok := utils.AccessExpressionStaticName(access); !ok || collectionMutatingMethod(name) {
+			mutation := bindingMutation{changed: true, mayIntroduceMatcher: !ok}
+			analysis.bindingMutations[symbol] = mutation
+			if mutation.mayIntroduceMatcher {
+				return mutation
+			}
+		}
+	}
+	return analysis.bindingMutations[symbol]
+}
+
+func (analysis *asymmetricMatcherAnalysis) aliasInitializedFrom(node *ast.Node) (*ast.Symbol, *ast.Node) {
+	for node != nil && node.Parent != nil && ast.IsOuterExpression(node.Parent, ast.OEKParentheses|ast.OEKAssertions) && node.Parent.Expression() == node {
+		node = node.Parent
+	}
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindVariableDeclaration {
+		return nil, nil
+	}
+	declaration := node.Parent.AsVariableDeclaration()
+	if declaration.Initializer != node || !ast.IsIdentifier(declaration.Name()) {
+		return nil, nil
+	}
+	return utils.GetVariableDeclarationSymbol(node.Parent, analysis.ctx.TypeChecker), declaration.Name()
+}
+
+func collectionMutatingMethod(name string) bool {
+	switch name {
+	case "add", "clear", "copyWithin", "delete", "fill", "pop", "push", "reverse", "shift", "sort", "splice", "unshift":
+		return true
+	default:
+		return false
+	}
 }
 
 func usesCustomEqualityTesters(name string) bool {
