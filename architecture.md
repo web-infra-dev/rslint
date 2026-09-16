@@ -173,8 +173,9 @@ and message construction in `nodeutil`; rules select their source nodes and
 resolution mode, then report the matching diagnostic. Runtime resolution
 reuses tsgo's resolver and config parser through the Program's existing
 filesystem and generation-scoped cache. Shared resolver options select aliases,
-extensions and export conditions; aliases reuse the same file probes before
-symlink resolution. Resolution results retain failure
+extensions, export conditions, package entry fields and directory entry names.
+Package alias fields reuse cached package metadata; all aliases reuse the same
+file probes before symlink resolution. Resolution results retain failure
 details for missing-module diagnostics and separate resource suffixes from
 filesystem paths for restrictions,
 including lexical paths for unresolved local imports and requires. Restrictions

@@ -84,19 +84,27 @@ Use `node:path` to construct absolute patterns with the host's separators.
 Patterns are matched as written, including literal backslashes on Windows.
 
 Resolution uses `settings.node.resolvePaths`, `settings.node.tryExtensions`,
-and the `modules`, `alias`, `extensions`, `extensionAlias`, and `conditionNames`
-properties of `settings.node.resolverConfig`. TypeScript files also use tsconfig
+and the `modules`, `alias`, `extensions`, `extensionAlias`, `conditionNames`,
+`mainFields`, `mainFiles`, and `aliasFields` properties of `settings.node.resolverConfig`. TypeScript files also use tsconfig
 path aliases and extension settings. Explicit `alias` and `extensionAlias`
 settings replace those TypeScript mappings, including when set to empty objects.
 
+`resolverConfig.mainFields` selects package entry fields in order, for example
+`['browser', 'module', 'main']`. `mainFiles` selects directory entry filenames,
+such as `['api', 'index']`. `aliasFields: ['browser']` applies package mappings
+including `false` to ignore a target. Field names can be nested arrays, such as
+`[['build', 'main'], 'main']`. Empty entry lists disable that lookup.
+
 ## Differences from upstream
 
-Custom package or directory entry points configured with `resolverConfig.mainFields`
-or `resolverConfig.mainFiles` are not supported. For example, with
-`mainFiles: ['api']`, upstream resolves `require('./server')` to `server/api.js`,
-while rslint still uses `server/index.js`. Write the full file path in the require
-call, or restrict the requested name (`'./server'`) instead. Resolver options
-other than the five listed above are ignored.
+Other `resolverConfig` properties, including `fallback`, `symlinks`, and
+`fullySpecified`, are ignored. For example, `fallback: { virtual: './shim.js' }`
+does not redirect an unresolved `virtual` request. Use `alias` if the redirect
+should apply to every matching request.
+
+Package entry names containing literal backslashes are not resolved on POSIX;
+use `/` for portable directory separators. On Windows, rslint accepts relative
+paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
 
 When multiple aliases in an object match the same request, rslint tries their
 names in sorted order; upstream uses their declaration order. Use the array form

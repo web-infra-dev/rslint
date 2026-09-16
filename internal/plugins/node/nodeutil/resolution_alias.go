@@ -15,17 +15,20 @@ type moduleAlias struct {
 	Ignore     bool     `json:"ignore"`
 }
 
-type moduleAliasResolver struct {
-	program  *program.Program
-	fileName string
-	options  ResolutionOptions
-	active   map[string]bool
+type nodeResolutionRequest struct{ name, fileName string }
+
+type nodeResolver struct {
+	program    *program.Program
+	fileName   string
+	options    ResolutionOptions
+	active     map[nodeResolutionRequest]bool
+	mainTarget bool
 }
 
-func (resolver *moduleAliasResolver) resolve(name string) (result nodeResolution) {
+func (resolver *nodeResolver) resolve(name string) (result nodeResolution) {
 	// A target independently overrides query and fragment. Keep both separate
 	// from the filesystem path used by dependency and existence checks.
-	if index := strings.IndexAny(name, "?#"); index > 0 {
+	if index := strings.IndexAny(name, "?#"); index > 0 && !resolver.mainTarget {
 		defer func() {
 			if result.path != "" {
 				query, fragment, hasFragment := strings.Cut(result.resourceSuffix, "#")
@@ -43,36 +46,39 @@ func (resolver *moduleAliasResolver) resolve(name string) (result nodeResolution
 			}
 		}()
 	}
-	if len(resolver.options.Aliases) == 0 {
+	if len(resolver.options.Aliases) == 0 && len(resolver.options.AliasFields) == 0 && len(resolver.options.MainFields) == 0 {
 		if isNodeBuiltin(name) {
 			return nodeResolution{}
 		}
-		return resolveModuleRequest(resolver.program, name, resolver.fileName, resolver.options, nil)
+		return resolver.resolveRequest(name)
 	}
-	if resolver.active[name] || len(resolver.active) >= 100 {
-		return nodeResolution{resolveError: "Recursive alias while resolving '" + name + "'"}
+	key := nodeResolutionRequest{name, resolver.fileName}
+	if resolver.active[key] || len(resolver.active) >= 100 {
+		return nodeResolution{resolveError: "Recursive alias while resolving '" + name + "'", recursive: true}
 	}
 	if resolver.active == nil {
-		resolver.active = map[string]bool{}
+		resolver.active = map[nodeResolutionRequest]bool{}
 	}
-	resolver.active[name] = true
-	defer delete(resolver.active, name)
+	resolver.active[key] = true
+	defer delete(resolver.active, key)
 	request := name
-	if index := strings.IndexAny(request, "?#"); index > 0 {
+	if index := strings.IndexAny(request, "?#"); index > 0 && !resolver.mainTarget {
 		request = request[:index]
 	}
-	if result, matched := resolver.alias(request); matched {
-		return result
+	if !resolver.mainTarget {
+		if result, matched := resolver.alias(request); matched {
+			return result
+		}
 	}
 
-	if isNodeBuiltin(request) {
+	if isNodeBuiltin(request) && len(resolver.options.AliasFields) == 0 {
 		return nodeResolution{}
 	}
-	result = resolveModuleRequest(resolver.program, name, resolver.fileName, resolver.options, resolver.alias)
+	result = resolver.resolveRequest(name)
 	return result
 }
 
-func (resolver *moduleAliasResolver) alias(request string) (nodeResolution, bool) {
+func (resolver *nodeResolver) alias(request string) (nodeResolution, bool) {
 	for _, alias := range resolver.options.Aliases {
 		name, candidate := alias.Name, request
 		if tspath.IsRootedDiskPath(name) && tspath.IsRootedDiskPath(candidate) {
@@ -99,7 +105,9 @@ func (resolver *moduleAliasResolver) alias(request string) (nodeResolution, bool
 				target += strings.TrimPrefix(candidate, name)
 			}
 			matched = true
-			last = resolver.resolve(target)
+			child := *resolver
+			child.mainTarget = false
+			last = child.resolve(target)
 			if last.resolveError == "" {
 				return last, true
 			}

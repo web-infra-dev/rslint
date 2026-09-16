@@ -1,6 +1,7 @@
 package nodeutil
 
 import (
+	"encoding/json"
 	"maps"
 	"os"
 	"path/filepath"
@@ -307,5 +308,236 @@ func TestResolverOverrides(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestResolverEntryFields(t *testing.T) {
+	cases := []struct {
+		name, request, file, config, want string
+		missing                           bool
+	}{
+		{"default", "./main", "input.js", `{}`, "main/main.js", false},
+		{"mainFiles-api", "./plain", "input.js", `{"mainFiles":["api"]}`, "plain/api.js", false},
+		{"mainFiles-fallback", "./plain", "input.js", `{"mainFiles":["absent","api","index"]}`, "plain/api.js", false},
+		{"mainFiles-empty", "./plain", "input.js", `{"mainFiles":[]}`, "", true},
+		{"mainFiles-nested", "./plain", "input.js", `{"mainFiles":["nested/entry"]}`, "plain/nested/entry.js", false},
+		{"mainFiles-explicit-extension", "./plain", "input.js", `{"mainFiles":["api.js"]}`, "plain/api.js", false},
+		{"mainFiles-./plain/", "./plain/", "input.js", `{"mainFiles":["api"]}`, "plain/api.js", false},
+		{"mainFiles-./plain/index", "./plain/index", "input.js", `{"mainFiles":["api"]}`, "plain/index.js", false},
+		{"mainFiles-./plain/index.js", "./plain/index.js", "input.js", `{"mainFiles":["api"]}`, "plain/index.js", false},
+		{"mainFiles-index", "index", "input.js", `{"mainFiles":["api"]}`, "node_modules/index/api.js", false},
+		{"mainFiles-index/index", "index/index", "input.js", `{"mainFiles":["api"]}`, "node_modules/index/index.js", false},
+		{"mainFiles-index/index.js", "index/index.js", "input.js", `{"mainFiles":["api"]}`, "node_modules/index/index.js", false},
+		{"mainFields-[\"module\",\"main\"]", "./main", "input.js", `{"mainFields":["module","main"]}`, "main/module.js", false},
+		{"mainFields-[\"missing\",\"main\"]", "./main", "input.js", `{"mainFields":["missing","main"]}`, "main/main.js", false},
+		{"mainFields-[\"invalid\",\"main\"]", "./main", "input.js", `{"mainFields":["invalid","main"]}`, "main/main.js", false},
+		{"mainFields-[[\"nested\",\"entry\"]]", "./main", "input.js", `{"mainFields":[["nested","entry"]]}`, "main/nested.js", false},
+		{"mainFields-[\"self\",\"selfSlash\",\"main\"]", "./main", "input.js", `{"mainFields":["self","selfSlash","main"]}`, "main/main.js", false},
+		{"mainFields-[\"directory\",\"main\"]", "./main", "input.js", `{"mainFields":["directory","main"]}`, "main/lib/deep.js", false},
+		{"mainFields-[\"parent\"]", "./main", "input.js", `{"mainFields":["parent"]}`, "src/browser.js", false},
+		{"mainFields-[\"absolute\"]", "./main", "input.js", `{"mainFields":["absolute"]}`, "main/index.js", false},
+		{"mainFields-[]", "./main", "input.js", `{"mainFields":[]}`, "main/index.js", false},
+		{"mainFields-[{\"name\":\"absolute\",\"forceRelative\":false}]", "./main", "input.js", `{"mainFields":[{"name":"absolute","forceRelative":false}]}`, "src/browser.js", false},
+		{"mainFields-[{\"name\":[\"nested\",\"entry\"],\"forceRelative\":true}]", "./main", "input.js", `{"mainFields":[{"name":["nested","entry"],"forceRelative":true}]}`, "main/nested.js", false},
+		{"mainFields-[\"browser\"]", "./main", "input.js", `{"mainFields":["browser"]}`, "main/browser.js", false},
+		{"both-empty", "./main", "input.js", `{"mainFields":[],"mainFiles":[]}`, "", true},
+		{"main-before-empty-files", "./main", "input.js", `{"mainFields":["module"],"mainFiles":[]}`, "main/module.js", false},
+		{"directory-in-main", "./main", "input.js", `{"mainFields":["directory","module","main"]}`, "main/lib/deep-module.js", false},
+		{"main-cycle", "./cycle-a", "input.js", `{"mainFields":["main"]}`, "", true},
+		{"exports-before-main", "pkg-exports", "input.js", `{"mainFields":["module"]}`, "node_modules/pkg-exports/node.js", false},
+		{"exports-directory", "pkg-exports/dir", "input.js", `{"mainFiles":["api"]}`, "node_modules/pkg-exports/lib/api.js", false},
+		{"exports-index-name", "pkg-exports/index", "input.js", `{"mainFields":[],"mainFiles":["module"]}`, "", true},
+		{"imports-directory", "#dir", "input.js", `{"mainFiles":["api"]}`, "plain/api.js", false},
+		{"aliasFields-bare", "bare", "input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-fs", "fs", "input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-./src/server.js", "./src/server.js", "input.js", `{"aliasFields":["browser"]}`, "src/alternate.js", false},
+		{"aliasFields-./src/server", "./src/server", "input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-./src/without-extension", "./src/without-extension", "input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-./src/disabled.js", "./src/disabled.js", "input.js", `{"aliasFields":["browser"]}`, "", false},
+		{"aliasFields-./src/absent.js", "./src/absent.js", "input.js", `{"aliasFields":["browser"]}`, "", false},
+		{"aliasFields-./src/identical.js", "./src/identical.js", "input.js", `{"aliasFields":["browser"]}`, "src/identical.js", false},
+		{"aliasFields-./src/missing-mapping.js", "./src/missing-mapping.js", "input.js", `{"aliasFields":["browser"]}`, "", true},
+		{"aliasFields-loop-a", "loop-a", "input.js", `{"aliasFields":["browser"]}`, "", true},
+		{"aliasFields-query?raw#source", "query?raw#source", "input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-pkg-entry", "pkg-entry", "input.js", `{"aliasFields":["browser"]}`, "node_modules/pkg-entry/browser.js", false},
+		{"aliasFields-pkg-exports", "pkg-exports", "input.js", `{"aliasFields":["browser"]}`, "node_modules/pkg-exports/browser.js", false},
+		{"aliasFields-#entry", "#entry", "input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-#dep", "#dep", "input.js", `{"aliasFields":["browser"]}`, "node_modules/pkg-entry/browser.js", false},
+		{"aliasFields-pkg-exports/dir", "pkg-exports/dir", "input.js", `{"aliasFields":["browser"]}`, "node_modules/pkg-exports/lib/index.js", false},
+		{"aliasFields-disabled", "./src/server.js", "input.js", `{"aliasFields":[]}`, "src/server.js", false},
+		{"aliasFields-nested", "bare", "input.js", `{"aliasFields":[["nested","aliases"]]}`, "src/alternate.js", false},
+		{"aliasFields-priority", "./src/server.js", "input.js", `{"aliasFields":["alternate","browser"]}`, "src/alternate.js", false},
+		{"aliasFields-failed-first", "./src/missing-mapping.js", "input.js", `{"aliasFields":["browser","alternate"]}`, "", true},
+		{"aliasFields-subdirectory", "../src/server.js", "sub/input.js", `{"aliasFields":["browser"]}`, "src/alternate.js", false},
+		{"aliasFields-package-context", "dep", "node_modules/pkg-entry/sub/input.js", `{"aliasFields":["browser"]}`, "node_modules/pkg-entry/dep-browser.js", false},
+		{"aliasFields-and-mainFields", "pkg-entry", "input.js", `{"aliasFields":["browser"],"mainFields":["main"]}`, "node_modules/pkg-entry/browser.js", false},
+		{"aliasFields-and-mainFiles", "pkg-exports/dir", "input.js", `{"aliasFields":["browser"],"mainFiles":["api"]}`, "node_modules/pkg-exports/browser.js", false},
+		{"aliasFields-string-ignored", "./main", "input.js", `{"aliasFields":["browser"]}`, "main/main.js", false},
+		{"mainFields-keeps-extension", "./main", "input.js", `{"mainFields":["main"],"extensionAlias":{".js":[".ts"]}}`, "main/main.js", false},
+		{"mainFields-browser-remap-extension", "pkg-entry", "input.js", `{"mainFields":["main"],"aliasFields":["browser"],"extensionAlias":{".js":[".ts"]}}`, "node_modules/pkg-entry/browser.ts", false},
+		{"mainFiles-extension-directory", "./extension-directory.js", "input.js", `{"mainFiles":["api"]}`, "extension-directory.js/api.js", false},
+		{"mainFields-no-entry-files", "./main", "input.js", `{"mainFields":["missing"],"mainFiles":[]}`, "", true},
+		{"mainFiles-absolute-entry", "./plain", "input.js", `{"mainFiles":["@ROOT@/src/browser.js"]}`, "src/browser.js", false},
+		{"mainFields-field-name-array", "./main", "input.js", `{"mainFields":[["nested","entry"],"main"]}`, "main/nested.js", false},
+		{"aliasFields-shadowed-package", "dep", "nested-owner/input.js", `{"aliasFields":["browser"]}`, "nested-owner/mapped.js", false},
+		{"aliasFields-into-nested-package", "./nested-owner/local.js", "input.js", `{"aliasFields":["browser"]}`, "nested-owner/mapped.js", false},
+		{"aliasFields-chain", "a", "maps/input.js", `{"aliasFields":["browser"]}`, "maps/mapped.js", false},
+		{"aliasFields-file-cycle", "./one.js", "maps/input.js", `{"aliasFields":["browser"]}`, "", true},
+		{"aliasFields-directory", "./dir", "maps/input.js", `{"aliasFields":["browser"]}`, "maps/mapped.js", false},
+		{"aliasFields-invalid", "invalid", "maps/input.js", `{"aliasFields":["browser","alternate"]}`, "", true},
+		{"aliasFields-self", "self", "maps/input.js", `{"aliasFields":["browser"]}`, "", true},
+		{"aliasFields-empty", "empty", "maps/input.js", `{"aliasFields":["browser"]}`, "maps/index.js", false},
+		{"aliasFields-ignored-missing", "./missing", "maps/input.js", `{"aliasFields":["browser"]}`, "", false},
+		{"aliasFields-before-global-file", "bare", "input.js", `{"aliasFields":["browser"],"alias":{"@ROOT@/src/browser.js":"@ROOT@/src/alternate.js"}}`, "src/alternate.js", false},
+		{"global-alias-before-field", "bare", "input.js", `{"aliasFields":["browser"],"alias":{"bare":"@ROOT@/src/alternate.js"}}`, "src/alternate.js", false},
+		{"mainFiles-backslash", "./plain", "input.js", `{"mainFiles":["nested\\entry"]}`, "", true},
+		{"mainFiles-parent", "./plain", "input.js", `{"mainFiles":["../src/browser"]}`, "src/browser.js", false},
+		{"mainFiles-empty-name", "./plain", "input.js", `{"mainFiles":["","api"]}`, "plain/api.js", false},
+		{"mainFiles-query", "./plain", "input.js", `{"mainFiles":["api?raw"]}`, "", true},
+		{"mainFields-query", "./main", "input.js", `{"mainFields":["query"]}`, "main/index.js", false},
+		{"mainFields-backslash", "./main", "input.js", `{"mainFields":["backslash"]}`, "main/index.js", false},
+		{"mainFields-package-self-dot", "./main", "input.js", `{"mainFields":["self"],"mainFiles":["main"]}`, "main/main.js", false},
+		{"mainFields-global-file-alias", "./main", "input.js", `{"mainFields":["module"],"alias":{"@ROOT@/main/module.js":"@ROOT@/src/browser.js"}}`, "src/browser.js", false},
+		{"mainFiles-global-file-alias", "./plain", "input.js", `{"mainFiles":["api"],"alias":{"@ROOT@/plain/api.js":"@ROOT@/src/browser.js"}}`, "src/browser.js", false},
+		{"aliasFields-backslash-request", ".\\src\\server.js", "input.js", `{"aliasFields":["browser"]}`, "", true},
+		{"aliasFields-backslash-subdir", "..\\src\\server.js", "sub/input.js", `{"aliasFields":["browser"]}`, "src/alternate.js", false},
+		{"aliasFields-absolute-request", "@ROOT@/src/server.js", "input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-relative-parent", "../src/server.js", "maps/input.js", `{"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"aliasFields-backslash-target", "backslash", "maps/input.js", `{"aliasFields":["browser"]}`, "", true},
+		{"aliasFields-invalid-owner", "a", "invalid-owner/input.js", `{"aliasFields":["browser"]}`, "", true},
+		{"aliasFields-foreign-directory", "./plain", "sub/input.js", `{"aliasFields":["browser"],"mainFiles":["api"]}`, "", true},
+	}
+	archive := txtarfs.MustParseFile(t, "testdata/resolution_entries.txtar")
+	names, err := archive.FileNames("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range []string{"/entry-project", "C:/entry-project", "//server/share/entry-project"} {
+		t.Run(root, func(t *testing.T) {
+			files := map[string]string{}
+			for _, name := range names {
+				data, err := archive.ReadFile(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				files[tspath.ResolvePath(root, name)] = strings.ReplaceAll(string(data), "@ROOT@", root)
+			}
+			p := programForResolution(t, files, tspath.ResolvePath(root, "input.js"))
+			for _, tc := range cases {
+				t.Run(tc.name, func(t *testing.T) {
+					var config map[string]any
+					if err := json.Unmarshal([]byte(strings.ReplaceAll(tc.config, "@ROOT@", root)), &config); err != nil {
+						t.Fatal(err)
+					}
+					var options ResolutionOptions
+					applyResolverConfig(&options, config)
+					// Windows entry filenames accept either separator. Requests using
+					// backslashes follow Node's path semantics; enhanced-resolve treats
+					// .\\ as a package and may resolve ..\\ through node_modules.
+					missing := tc.missing
+					want := tc.want
+					if tspath.GetRootLength(root) > 1 {
+						switch tc.name {
+						case "mainFiles-backslash":
+							want, missing = "plain/nested/entry.js", false
+						case "mainFields-backslash":
+							want = "main/lib/deep.js"
+						case "aliasFields-backslash-request":
+							want, missing = "src/alternate.js", false
+						case "aliasFields-backslash-target":
+							want, missing = "maps/mapped.js", false
+						}
+					} else if tc.name == "aliasFields-backslash-subdir" {
+						want, missing = "", true
+					}
+					got, resolveError := ResolveModuleWithError(p, strings.ReplaceAll(tc.request, "@ROOT@", root), tspath.ResolvePath(root, tc.file), options)
+					if want != "" {
+						want = tspath.ResolvePath(root, want)
+					}
+					if got != want || (resolveError != "") != missing {
+						t.Errorf("ResolveModule(%q, %s) = (%q, %q), want (%q, missing=%v)", tc.request, tc.config, got, resolveError, want, missing)
+					}
+				})
+			}
+			t.Run("import defaults and overrides", func(t *testing.T) {
+				for _, tc := range []struct {
+					request string
+					config  map[string]any
+					want    string
+				}{
+					{"./plain", nil, ""},
+					{"./main", nil, ""},
+					{"pkg-entry", nil, "node_modules/pkg-entry/index.js"},
+					{"./plain", map[string]any{"mainFiles": []string{"api"}}, "plain/api.js"},
+					{"./main", map[string]any{"mainFiles": []string{"index"}}, "main/index.js"},
+					{"./main", map[string]any{"mainFields": []string{"module", "main"}}, "main/module.js"},
+					{"bare", map[string]any{"aliasFields": []string{"browser"}}, "src/browser.js"},
+					{"./plain", map[string]any{"aliasFields": []string{"browser"}}, ""},
+				} {
+					var options ResolutionOptions
+					applyResolverConfig(&options, tc.config)
+					result := resolveImport(p, tc.request, tspath.ResolvePath(root, "input.js"), false, options)
+					want := tc.want
+					if want != "" {
+						want = tspath.ResolvePath(root, want)
+					}
+					if result.path != want || (result.resolveError != "") != (want == "") {
+						t.Errorf("import %q (%v) = %+v, want %q", tc.request, tc.config, result, want)
+					}
+				}
+			})
+			t.Run("package context and resource suffix", func(t *testing.T) {
+				options := ResolutionOptions{Paths: []string{tspath.ResolvePath(root, "search")}, AliasFields: [][]string{{"browser"}}}
+				fileName := tspath.ResolvePath(root, "input.js")
+				if got := ResolveModule(p, "lookup", fileName, options); got != tspath.ResolvePath(root, "search/lookup.js") {
+					t.Errorf("resolvePaths package alias = %q", got)
+				}
+				result := resolveModuleCached(p, "query?raw#source", fileName, options)
+				if result.path != tspath.ResolvePath(root, "src/browser.js") || result.resourceSuffix != "?mapped#source" {
+					t.Errorf("package alias resource suffix = %+v", result)
+				}
+			})
+		})
+	}
+}
+
+func TestResolverEntryFieldSymlinks(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/resolution_entries.txtar")
+	root := tspath.NormalizePath(archive.Materialize(t, ""))
+	for _, link := range []struct{ name, target string }{
+		{"node_modules/linked", "node_modules/pkg-entry"},
+		{"linked-plain", "plain"},
+	} {
+		if err := os.Symlink(tspath.ResolvePath(root, link.target), tspath.ResolvePath(root, link.name)); err != nil {
+			if runtime.GOOS == "windows" {
+				t.Skipf("symlink creation is unavailable: %v", err)
+			}
+			t.Fatal(err)
+		}
+	}
+	fileName := tspath.ResolvePath(root, "input.js")
+	p := programForResolution(t, nil, fileName)
+	for _, tc := range []struct {
+		request string
+		config  map[string]any
+		want    string
+	}{
+		{"linked", map[string]any{"mainFields": []string{"main"}, "aliasFields": []string{"browser"}}, "node_modules/pkg-entry/browser.js"},
+		{"linked", map[string]any{"mainFields": []string{"main"}, "alias": map[string]any{tspath.ResolvePath(root, "node_modules/linked/index.js"): tspath.ResolvePath(root, "src/alternate.js")}}, "src/alternate.js"},
+		{"./linked-plain", map[string]any{"mainFiles": []string{"api"}}, "plain/api.js"},
+	} {
+		var options ResolutionOptions
+		applyResolverConfig(&options, tc.config)
+		want := osvfs.FS().Realpath(tspath.ResolvePath(root, tc.want))
+		if got, err := ResolveModuleWithError(p, tc.request, fileName, options); got != want || err != "" {
+			t.Errorf("symlink %q (%v) = %q, %s; want %q", tc.request, tc.config, got, err, want)
+		}
+	}
+	if !osvfs.FS().UseCaseSensitiveFileNames() {
+		options := ResolutionOptions{MainFields: []nodeMainField{{Name: []string{"module"}, ForceRelative: true}}}
+		want := osvfs.FS().Realpath(tspath.ResolvePath(root, "main/module.js"))
+		if got := ResolveModule(p, "./MAIN", fileName, options); tspath.GetCanonicalFileName(got, false) != tspath.GetCanonicalFileName(want, false) {
+			t.Errorf("case-insensitive package entry = %q, want %q", got, want)
+		}
 	}
 }

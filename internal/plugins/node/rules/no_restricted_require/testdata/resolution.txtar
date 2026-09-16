@@ -1,7 +1,7 @@
 -- tsconfig.json --
 {"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext","jsx":"preserve","paths":{"alias/*":["server/*"]}},"include":["**/*"]}
 -- package.json --
-{"name":"restriction-fixtures","private":true,"imports":{"#entry":"./server/api.js","#directory":"./server"}}
+{"name":"restriction-fixtures","private":true,"browser":{"virtual":"./server/api.js","disabled":false},"imports":{"#entry":"./server/api.js","#directory":"./server"}}
 -- server/api.js --
 module.exports = 1;
 -- server/custom.ext --
@@ -11,7 +11,7 @@ export const value = 3;
 -- server/index.js --
 module.exports = 4;
 -- server/main/package.json --
-{"main":"entry.js"}
+{"main":"entry.js","module":"../api.js","browser":{"./entry.js":"../api.js"}}
 -- server/main/entry.js --
 module.exports = 5;
 -- node_modules/pkg/package.json --

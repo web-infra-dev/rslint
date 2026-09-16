@@ -80,15 +80,25 @@ names have no file path to match.
 
 Resolution uses the Node plugin's shared `settings.node` options, including
 `resolvePaths`, `tryExtensions`, and the `modules`, `alias`, `extensions`,
-`extensionAlias`, and `conditionNames` properties of `resolverConfig`, and
+`extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields` properties of `resolverConfig`, and
 TypeScript path aliases. Legacy `settings.n` is also recognized, as in the other Node rules.
+
+`resolverConfig.mainFields` selects package entry fields in order, for example
+`['browser', 'module', 'main']`. `mainFiles` selects directory entry filenames,
+such as `['api', 'index']`. `aliasFields: ['browser']` applies package mappings
+including `false` to ignore a target. Field names can be nested arrays, such as
+`[['build', 'main'], 'main']`. Empty entry lists disable that lookup.
 
 ## Differences from upstream
 
-The supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
-`extensionAlias`, and `conditionNames`. Other properties are ignored. For example,
-`mainFiles: ['entry']` does not change directory lookup to `entry.js`; use an
-explicit file path instead.
+Other `resolverConfig` properties, including `fallback`, `symlinks`, and
+`fullySpecified`, are ignored. For example, `fallback: { virtual: './shim.js' }`
+does not redirect an unresolved `virtual` request. Use `alias` if the redirect
+should apply to every matching request.
+
+Package entry names containing literal backslashes are not resolved on POSIX;
+use `/` for portable directory separators. On Windows, rslint accepts relative
+paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
 
 When object-form aliases overlap, rslint tries their names in sorted order;
 upstream uses declaration order. Use an alias array to specify priority, such as

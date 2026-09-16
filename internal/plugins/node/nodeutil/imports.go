@@ -184,7 +184,15 @@ func resolveImport(p *program.Program, name, fileName string, typeOnly bool, opt
 		return nodeResolution{path: name}
 	}
 	moduleName, _ := ImportModuleName(name)
-	options.NoDirectory = moduleName == ""
+	if moduleName == "" {
+		if options.MainFields == nil {
+			options.MainFields = []nodeMainField{}
+		}
+		if options.MainFiles == nil {
+			options.MainFiles = []string{}
+		}
+		options.NoDirectory = len(options.MainFields) == 0 && len(options.MainFiles) == 0
+	}
 	return resolveWithTypeScriptAliases(p, name, fileName, options)
 }
 
@@ -313,6 +321,7 @@ func RequireResolutionOptions(ctx rule.RuleContext, options map[string]any) Reso
 func applyResolverConfig(options *ResolutionOptions, config map[string]any) {
 	for key, destination := range map[string]*[]string{
 		"modules": &options.Modules, "extensions": &options.Extensions, "conditionNames": &options.Conditions,
+		"mainFiles": &options.MainFiles,
 	} {
 		switch value := config[key].(type) {
 		case []any, []string:
@@ -320,6 +329,42 @@ func applyResolverConfig(options *ResolutionOptions, config map[string]any) {
 		case string:
 			if key == "modules" && value != "" {
 				*destination = []string{value}
+			}
+		}
+	}
+	mainFields := config["mainFields"]
+	if names, ok := mainFields.([]string); ok {
+		mainFields = utils.Map(names, func(name string) any { return name })
+	}
+	if fields, ok := mainFields.([]any); ok {
+		options.MainFields = []nodeMainField{}
+		for _, value := range fields {
+			field := nodeMainField{ForceRelative: true}
+			if object, ok := value.(map[string]any); ok {
+				value = object["name"]
+				field.ForceRelative, _ = object["forceRelative"].(bool)
+			}
+			if name, ok := value.(string); ok {
+				field.Name = []string{name}
+			} else {
+				field.Name = stringArray(value)
+			}
+			if len(field.Name) != 0 {
+				options.MainFields = append(options.MainFields, field)
+			}
+		}
+	}
+	aliasFields := config["aliasFields"]
+	if names, ok := aliasFields.([]string); ok {
+		aliasFields = utils.Map(names, func(name string) any { return name })
+	}
+	if fields, ok := aliasFields.([]any); ok {
+		options.AliasFields = nil
+		for _, value := range fields {
+			if name, ok := value.(string); ok {
+				options.AliasFields = append(options.AliasFields, []string{name})
+			} else if names := stringArray(value); len(names) != 0 {
+				options.AliasFields = append(options.AliasFields, names)
 			}
 		}
 	}
