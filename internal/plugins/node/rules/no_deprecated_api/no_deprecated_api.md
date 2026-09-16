@@ -53,13 +53,6 @@ For example, `ignoreModuleItems: ['new buffer.Buffer()']` allows `new (require('
 
 Only static APIs are checked. The rule does not infer instance types, dynamic property names, values passed as arguments, or aliases stored on object properties. Reassigning a local alias does not cancel its earlier tracked origin. A user-installed package does not hide a Node builtin: use `require('punycode/')` to select that package rather than `require('punycode')`.
 
-## Differences from upstream
-
-Two uncommon version range spellings can change the replacement advice in a message. Deprecated API uses are still reported.
-
-- A prerelease identifier that starts with a digit and also contains letters, such as `version: '>=5.10.0-1beta'`, is ignored and version resolution continues with the next source. Upstream accepts this range. Use a stable version range when configuring replacement advice, such as `>=5.10.0`.
-- A numeric component after a wildcard, such as `version: '5.x.1'`, is treated as unspecified, equivalent to `5.x`. Upstream rejects this spelling and tries the next version source. Write `5.x` explicitly for matching behavior.
-
 ## References
 
 - [Upstream documentation](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/no-deprecated-api.md)

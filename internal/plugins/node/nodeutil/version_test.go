@@ -44,6 +44,36 @@ func TestNodeVersionReplacementRanges(t *testing.T) {
 		{"5.10 || ^6.0.0-0", true, []bool{true, true, false}},
 		{"\u00a0>=\ufeff5.10.0\u2028<6", true, []bool{true, true, false}},
 		{"5.10.0 - 6.0.0 >=5.11.0", false, []bool{}},
+		{">=5.10.0-1beta", true, []bool{true, false, false}},
+		{"5.10.0-1beta", true, []bool{true, true, true}},
+		{">=5.10.0-01beta", true, []bool{true, false, false}},
+		{">=5.10.0-1-rc.2+build.1", true, []bool{true, false, false}},
+		{">=5.10.0-alpha.1beta", true, []bool{true, false, false}},
+		{">=5.10.0-1beta <5.10.0-2beta", true, []bool{true, false, false}},
+		{">=5.10.0-2beta <5.10.0-1beta", true, []bool{true, true, true}},
+		{">=5.10.0-10beta <5.10.0-2beta", true, []bool{true, false, false}},
+		{">=5.10.0-2beta <5.10.0-10beta", true, []bool{true, true, true}},
+		{">=5.10.0-1beta <5.10.0-alpha", true, []bool{true, false, false}},
+		{">=5.10.0-9 <5.10.0-1beta", true, []bool{true, false, false}},
+		{">=5.10.0-1beta <5.10.0-9", true, []bool{true, true, true}},
+		{"5.10.0-1beta - 5.12.0-2beta", true, []bool{true, false, false}},
+		{">=5.10.0-1beta || >=5.12.0", true, []bool{true, false, false}},
+		{"5.x.1", false, []bool{}},
+		{"x.1", false, []bool{}},
+		{"x.x.1", false, []bool{}},
+		{"5.X.0", false, []bool{}},
+		{"5.*.1", false, []bool{}},
+		{"^5.x.1", true, []bool{true, false, false}},
+		{"~5.x.1", true, []bool{true, false, false}},
+		{">=5.x.1", false, []bool{}},
+		{"5.x.1 - 6", true, []bool{true, false, false}},
+		{"5 - 6.x.1", true, []bool{true, false, false}},
+		{"5.x.x", true, []bool{true, false, false}},
+		{"*.x.x", true, []bool{false, false, false}},
+		{"5.x.x-01", false, []bool{}},
+		{"5.10.0-01", false, []bool{}},
+		{"5.10.0-alpha..beta", false, []bool{}},
+		{"5.10.0-1beta+build.01", true, []bool{true, true, true}},
 	} {
 		t.Run(tc.raw, func(t *testing.T) {
 			version, ok := parseNodeVersion(tc.raw)
@@ -59,19 +89,5 @@ func TestNodeVersionReplacementRanges(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// These uncommon parsing differences affect replacement advice, not detection.
-// Keep them in sync with no-deprecated-api's user-facing differences section.
-func TestNodeVersionRangeDifferences(t *testing.T) {
-	if _, valid := parseNodeVersion(">=5.10.0-1beta"); valid {
-		t.Fatal("digit-led alphanumeric prereleases must fall through to the next version source")
-	}
-	for _, raw := range []string{"5.x.1", "x.1"} {
-		version, valid := parseNodeVersion(raw)
-		if !valid || version.Supports("5.10.0") {
-			t.Errorf("%q must treat components after a wildcard as unspecified", raw)
-		}
 	}
 }

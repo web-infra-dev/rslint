@@ -710,9 +710,8 @@ func TestNoDeprecatedAPIVersionMetadata(t *testing.T) {
 		{file: "old/settings.js", replace: true, settings: map[string]any{"node": map[string]any{"version": "6"}}},
 		{file: "old/zero-setting.js", settings: map[string]any{"node": map[string]any{"version": float64(0)}}},
 		{file: "old/invalid-option.js", options: []any{map[string]any{"version": "invalid"}}},
-		// Documented version syntax differences only change replacement advice.
-		{file: "input.js", replace: true, options: []any{map[string]any{"version": ">=5.10.0-1beta"}}},
-		{file: "input.js", options: []any{map[string]any{"version": "5.x.1"}}},
+		{file: "input.js", options: []any{map[string]any{"version": ">=5.10.0-1beta"}}},
+		{file: "input.js", replace: true, options: []any{map[string]any{"version": "5.x.1"}}},
 	} {
 		message := "'Buffer()' was deprecated since v6.0.0"
 		if tc.replace {

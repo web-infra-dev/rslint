@@ -13,13 +13,16 @@ import (
 // Node rules use it to decide whether every supported runtime provides an API.
 type NodeVersion struct{ alternatives [][]versionComparator }
 type versionComparator struct {
-	operator string
-	version  semver.Version
+	operator   string
+	version    semver.Version
+	prerelease []string
 }
 
 // The patterns are repository-authored npm range syntax, not user regexps.
 var versionPrefix = regexp.MustCompile(`(^|[\s|<>=~^])v([0-9xX*])`)
 var versionOperatorSpace = regexp.MustCompile(`([<>=~^])\s+`)
+var versionWildcardTail = regexp.MustCompile(`(?:^|\.)[xX*]\.[0-9]`)
+var versionPrerelease = regexp.MustCompile(`^(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*$`)
 
 func parseNodeVersion(text string) (NodeVersion, bool) {
 	text = strings.Map(func(r rune) rune {
@@ -36,11 +39,29 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 	for i, arm := range arms {
 		if ecmascript.StringTrim(arm) == "" {
 			arms[i] = "*"
+			continue
+		}
+		tokens := strings.Fields(arm)
+		hyphenRange := len(tokens) == 3 && tokens[1] == "-"
+		for _, token := range tokens {
+			if token == "-" {
+				continue
+			}
+			version := strings.TrimLeft(token, "<>=~^")
+			version, _, _ = strings.Cut(version, "+")
+			base, prerelease, hasPrerelease := strings.Cut(version, "-")
+			// npm expands caret, tilde and hyphen ranges before checking
+			// wildcard order, so ^5.x.1 is valid even though 5.x.1 is not.
+			if !hyphenRange && !strings.ContainsAny(token[:1], "~^") && versionWildcardTail.MatchString(base) {
+				return NodeVersion{}, false
+			}
+			if hasPrerelease && !versionPrerelease.MatchString(prerelease) {
+				return NodeVersion{}, false
+			}
 		}
 	}
-	// Reuse the compiler's range grammar. Its rejection of digit-led alphanumeric
-	// prereleases and acceptance of numeric wildcard tails are documented in the
-	// rule's Differences from upstream; neither changes API detection.
+	// Keep range expansion in the compiler; only npm's stricter wildcard order
+	// and its broader prerelease identifier grammar need adaptation here.
 	parsed, ok := semver.TryParseVersionRange(strings.Join(arms, "||"))
 	if !ok {
 		return NodeVersion{}, false
@@ -59,11 +80,23 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 			if operator == ">=" && !strings.Contains(arms[i], version) {
 				version = strings.TrimSuffix(version, "-0")
 			}
-			value, err := semver.TryParseVersion(version)
+			version, build, hasBuild := strings.Cut(version, "+")
+			base, prerelease, hasPrerelease := strings.Cut(version, "-")
+			if hasBuild {
+				base += "+" + build
+			}
+			value, err := semver.TryParseVersion(base)
 			if err != nil {
 				return NodeVersion{}, false
 			}
-			comparators = append(comparators, versionComparator{operator, value})
+			comparator := versionComparator{operator: operator, version: value}
+			if hasPrerelease {
+				// The range parser accepts npm prereleases such as "1beta";
+				// TryParseVersion rejects them. Retain them separately and reuse
+				// the compiler's identifier comparison without parsing them again.
+				comparator.prerelease = strings.Split(prerelease, ".")
+			}
+			comparators = append(comparators, comparator)
 		}
 		result.alternatives = append(result.alternatives, comparators)
 	}
@@ -117,7 +150,7 @@ func ConfiguredNodeVersion(ctx rule.RuleContext, options map[string]any) NodeVer
 func (version NodeVersion) Supports(since string) bool {
 	boundary := semver.MustParse(since)
 	for _, alternative := range version.alternatives {
-		constraints := append(append([]versionComparator{}, alternative...), versionComparator{"<", boundary})
+		constraints := append(append([]versionComparator{}, alternative...), versionComparator{operator: "<", version: boundary})
 		intersects := true
 		for i, left := range constraints {
 			for _, right := range constraints[i+1:] {
@@ -147,12 +180,15 @@ func comparatorsIntersect(left, right versionComparator) bool {
 		left, right = right, left
 	}
 	cmp := left.version.Compare(&right.version)
+	if cmp == 0 {
+		cmp = semver.ComparePreReleaseIdentifiers(left.prerelease, right.prerelease)
+	}
 	if left.operator == "=" {
 		if right.operator == "=" {
 			return cmp == 0
 		}
 		// A singleton prerelease does not satisfy a stable npm comparator.
-		if strings.Contains(strings.SplitN(left.version.String(), "+", 2)[0], "-") && !strings.Contains(right.version.String(), "-") {
+		if len(left.prerelease) > 0 && len(right.prerelease) == 0 {
 			return false
 		}
 		switch right.operator {

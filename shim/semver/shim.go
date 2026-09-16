@@ -15,3 +15,5 @@ func TryParseVersion(text string) (semver.Version, error)
 func TryParseVersionRange(text string) (semver.VersionRange, bool)
 type Version = semver.Version
 type VersionRange = semver.VersionRange
+//go:linkname ComparePreReleaseIdentifiers github.com/microsoft/TypeScript/tsc/internal/semver.comparePreReleaseIdentifiers
+func ComparePreReleaseIdentifiers(left []string, right []string) int
