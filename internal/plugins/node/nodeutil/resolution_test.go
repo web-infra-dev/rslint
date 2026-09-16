@@ -9,10 +9,13 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -22,7 +25,12 @@ import (
 
 func programForResolution(t *testing.T, files map[string]string, fileName string) *program.Program {
 	t.Helper()
-	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), maps.Clone(files))
+	return programForResolutionFS(t, files, fileName, osvfs.FS())
+}
+
+func programForResolutionFS(t *testing.T, files map[string]string, fileName string, base vfs.FS) *program.Program {
+	t.Helper()
+	fs := utils.NewOverlayVFS(bundled.WrapFS(base), maps.Clone(files))
 	host := utils.CreateCompilerHost(tspath.GetDirectoryPath(fileName), fs)
 	p, err := program.NewFromRoots(program.RootOptions{
 		Host: host, CompilerOptions: &core.CompilerOptions{AllowJs: core.TSTrue},
@@ -33,6 +41,16 @@ func programForResolution(t *testing.T, files map[string]string, fileName string
 	}
 	return p
 }
+
+// The empty base must also accept UNC probes, which io/fs paths cannot express.
+// The overlay supplies all fixture files and directories; iovfs supplies the
+// remaining FS behavior without touching the host filesystem.
+type resolutionFixtureBase struct{ vfs.FS }
+
+func (resolutionFixtureBase) FileExists(string) bool                  { return false }
+func (resolutionFixtureBase) ReadFile(string) (string, bool)          { return "", false }
+func (resolutionFixtureBase) DirectoryExists(string) bool             { return false }
+func (resolutionFixtureBase) GetAccessibleEntries(string) vfs.Entries { return vfs.Entries{} }
 
 func TestResolveModuleGenerationAndOptions(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/node_resolution.txtar")
@@ -424,7 +442,9 @@ func TestResolverEntryFields(t *testing.T) {
 				}
 				files[tspath.ResolvePath(root, name)] = strings.ReplaceAll(string(data), "@ROOT@", root)
 			}
-			p := programForResolution(t, files, tspath.ResolvePath(root, "input.js"))
+			// Missing virtual UNC paths must not probe a real network share.
+			base := resolutionFixtureBase{iovfs.From(fstest.MapFS{}, osvfs.FS().UseCaseSensitiveFileNames())}
+			p := programForResolutionFS(t, files, tspath.ResolvePath(root, "input.js"), base)
 			for _, tc := range cases {
 				t.Run(tc.name, func(t *testing.T) {
 					var config map[string]any
