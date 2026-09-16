@@ -389,6 +389,8 @@ func TestResolverEntryFields(t *testing.T) {
 		{"aliasFields-empty", "empty", "maps/input.js", `{"aliasFields":["browser"]}`, "maps/index.js", false},
 		{"aliasFields-ignored-missing", "./missing", "maps/input.js", `{"aliasFields":["browser"]}`, "", false},
 		{"aliasFields-before-global-file", "bare", "input.js", `{"aliasFields":["browser"],"alias":{"@ROOT@/src/browser.js":"@ROOT@/src/alternate.js"}}`, "src/alternate.js", false},
+		{"mainFields-browser-cycle", "./entry-cycle", "input.js", `{"mainFields":["module","main"],"aliasFields":["browser"]}`, "", true},
+		{"alias-array-cycle", "first", "input.js", `{"alias":{"first":["second","@ROOT@/src/browser.js"],"second":"first"}}`, "", true},
 		{"global-alias-before-field", "bare", "input.js", `{"aliasFields":["browser"],"alias":{"bare":"@ROOT@/src/alternate.js"}}`, "src/alternate.js", false},
 		{"mainFiles-backslash", "./plain", "input.js", `{"mainFiles":["nested\\entry"]}`, "", true},
 		{"mainFiles-parent", "./plain", "input.js", `{"mainFiles":["../src/browser"]}`, "src/browser.js", false},
@@ -492,6 +494,25 @@ func TestResolverEntryFields(t *testing.T) {
 				if got := ResolveModule(p, "lookup", fileName, options); got != tspath.ResolvePath(root, "search/lookup.js") {
 					t.Errorf("resolvePaths package alias = %q", got)
 				}
+				// Ignored targets and builtins do not prevent a later lookup
+				// directory from supplying its own package mapping.
+				for _, request := range []string{"disabled", "fs", "ignored-file"} {
+					want := "src/browser.js"
+					if request == "ignored-file" {
+						want = "node_modules/ignored-file/index.js"
+					}
+					if got := ResolveModule(p, request, fileName, options); got != tspath.ResolvePath(root, want) {
+						t.Errorf("resolvePaths after ignored %q = %q", request, got)
+					}
+				}
+
+				// Each resolvePaths directory is an independent lookup, even if
+				// an earlier directory contains a package with cyclic entries.
+				fallback := ResolutionOptions{Paths: options.Paths, MainFields: []nodeMainField{{Name: []string{"main"}, ForceRelative: true}}}
+				if got := ResolveModule(p, "fallback-pkg", fileName, fallback); got != tspath.ResolvePath(root, "node_modules/fallback-pkg/index.js") {
+					t.Errorf("resolvePaths after cyclic entry = %q", got)
+				}
+
 				result := resolveModuleCached(p, "query?raw#source", fileName, options)
 				if result.path != tspath.ResolvePath(root, "src/browser.js") || result.resourceSuffix != "?mapped#source" {
 					t.Errorf("package alias resource suffix = %+v", result)

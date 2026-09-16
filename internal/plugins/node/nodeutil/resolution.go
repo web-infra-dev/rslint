@@ -102,15 +102,19 @@ func (resolver *nodeResolver) resolveRequest(name string) nodeResolution {
 		folders = []string{"node_modules"}
 	}
 	var resolveError string
+	var recursive bool
+bases:
 	for _, base := range append(slices.Clone(options.Paths), tspath.GetDirectoryPath(containingFile)) {
 		base = tspath.ResolvePath(p.CurrentDirectory(), base)
 		resolveError = "Can't resolve '" + originalName + "' in '" + base + "'"
+		recursive = false
 		if !resolver.mainTarget {
 			if result, matched := resolver.aliasField(name, base, false); matched {
-				if result.resolveError == "" {
+				if result.resolveError == "" && result.path != "" {
 					return result
 				}
 				resolveError = result.resolveError
+				recursive = result.recursive
 				continue
 			}
 		}
@@ -120,7 +124,8 @@ func (resolver *nodeResolver) resolveRequest(name string) nodeResolution {
 			continue
 		}
 		if isNodeBuiltin(name) {
-			return nodeResolution{}
+			resolveError = ""
+			continue
 		}
 		for _, folder := range folders {
 			view := &nodeResolutionFS{
@@ -135,11 +140,13 @@ func (resolver *nodeResolver) resolveRequest(name string) nodeResolution {
 			resolver := view.newResolver(p.CurrentDirectory())
 			result, _ := resolver.ResolveModuleName(name, tspath.ResolvePath(base, "__import__.js"), core.ResolutionModeCommonJS, nil)
 			if view.recursiveError != "" {
-				return nodeResolution{resolveError: view.recursiveError, recursive: true}
+				resolveError, recursive = view.recursiveError, true
+				break
 			}
 			if !view.unresolved && result != nil && result.IsResolved() {
 				if view.builtin {
-					return nodeResolution{}
+					resolveError = ""
+					continue bases
 				}
 				return nodeResolution{path: view.Realpath(result.ResolvedFileName), resourceSuffix: view.resourceSuffix}
 			}
@@ -173,7 +180,7 @@ func (resolver *nodeResolver) resolveRequest(name string) nodeResolution {
 			}
 		}
 	}
-	return nodeResolution{resolveError: resolveError}
+	return nodeResolution{resolveError: resolveError, recursive: recursive}
 }
 
 // The private view projects runtime candidates onto tsgo's file probes.

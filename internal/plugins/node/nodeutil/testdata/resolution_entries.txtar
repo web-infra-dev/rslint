@@ -4,7 +4,7 @@ require('pkg-entry');
 -- sub/input.js --
 require('bare');
 -- package.json --
-{"name":"entry-app","browser":{"bare":"./src/browser.js","fs":"./src/browser.js","./src/server.js":"./src/browser.js","src/server.js":"./src/alternate.js","./src/without-extension":"./src/browser.js","./src/disabled.js":false,"./src/identical.js":"./src/identical.js","./src/missing-mapping.js":"./not-found.js","loop-a":"loop-b","loop-b":"loop-a","./src/absent.js":false,"query":"./src/browser.js?mapped","./src/entry.js":"./src/from-root.js"},"alternate":{"./src/server.js":"./src/alternate.js","./src/missing-mapping.js":"./src/alternate.js"},"nested":{"aliases":{"bare":"./src/alternate.js"}},"imports":{"#dir":"./plain","#entry":"./src/server.js","#dep":"pkg-entry"}}
+{"name":"entry-app","browser":{"bare":"./src/browser.js","disabled":"./src/browser.js","fs":"./src/browser.js","./src/server.js":"./src/browser.js","src/server.js":"./src/alternate.js","./src/without-extension":"./src/browser.js","./src/disabled.js":false,"./src/identical.js":"./src/identical.js","./src/missing-mapping.js":"./not-found.js","loop-a":"loop-b","loop-b":"loop-a","./src/absent.js":false,"query":"./src/browser.js?mapped","./src/entry.js":"./src/from-root.js"},"alternate":{"./src/server.js":"./src/alternate.js","./src/missing-mapping.js":"./src/alternate.js"},"nested":{"aliases":{"bare":"./src/alternate.js"}},"imports":{"#dir":"./plain","#entry":"./src/server.js","#dep":"pkg-entry"}}
 -- src/server.js --
 module.exports = 1;
 -- src/browser.js --
@@ -112,10 +112,26 @@ module.exports = 5;
 -- maps/index.js --
 module.exports = 6;
 -- search/package.json --
-{"browser":{"lookup":"./lookup.js"}}
+{"browser":{"lookup":"./lookup.js","disabled":false}}
 -- search/lookup.js --
 module.exports = 1;
 -- invalid-owner/package.json --
 { invalid json }
 -- invalid-owner/input.js --
 require('a');
+-- entry-cycle/package.json --
+{"module":"module.js","main":"main.js","browser":{"./module.js":"a","a":"b","b":"a"}}
+-- entry-cycle/module.js --
+module.exports = 1;
+-- entry-cycle/main.js --
+module.exports = 2;
+-- search/node_modules/fallback-pkg/package.json --
+{"main":"../fallback-other"}
+-- search/node_modules/fallback-other/package.json --
+{"main":"../fallback-pkg"}
+-- node_modules/fallback-pkg/index.js --
+module.exports = 1;
+-- search/node_modules/ignored-file/package.json --
+{"main":"index.js","browser":{"./index.js":false}}
+-- node_modules/ignored-file/index.js --
+module.exports = 1;

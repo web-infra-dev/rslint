@@ -108,7 +108,7 @@ func (resolver *nodeResolver) alias(request string) (nodeResolution, bool) {
 			child := *resolver
 			child.mainTarget = false
 			last = child.resolve(target)
-			if last.resolveError == "" {
+			if last.resolveError == "" || last.recursive {
 				return last, true
 			}
 		}
