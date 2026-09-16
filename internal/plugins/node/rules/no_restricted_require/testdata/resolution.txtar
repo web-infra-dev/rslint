@@ -1,0 +1,32 @@
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext","jsx":"preserve","paths":{"alias/*":["server/*"]}},"include":["**/*"]}
+-- package.json --
+{"name":"restriction-fixtures","private":true,"imports":{"#entry":"./server/api.js","#directory":"./server"}}
+-- server/api.js --
+module.exports = 1;
+-- server/custom.ext --
+module.exports = 2;
+-- server/mapped.ts --
+export const value = 3;
+-- server/index.js --
+module.exports = 4;
+-- server/main/package.json --
+{"main":"entry.js"}
+-- server/main/entry.js --
+module.exports = 5;
+-- node_modules/pkg/package.json --
+{"name":"pkg","exports":{".":{"import":"./esm.js","require":"./index.js"},"./sub":"./private/sub.js","./hidden":null}}
+-- node_modules/pkg/index.js --
+module.exports = 1;
+-- node_modules/pkg/esm.js --
+export const value = 1;
+-- node_modules/pkg/private/sub.js --
+module.exports = 2;
+-- custom_modules/custom/package.json --
+{"name":"custom","main":"index.js"}
+-- custom_modules/custom/index.js --
+module.exports = 1;
+-- vendor/node_modules/extra/package.json --
+{"name":"extra","main":"index.js"}
+-- vendor/node_modules/extra/index.js --
+module.exports = 1;

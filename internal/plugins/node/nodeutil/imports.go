@@ -145,6 +145,20 @@ func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool
 // local imports retain their lexical path; unresolved packages have no path.
 func ImportFilePath(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
 	resolved, _ := resolveImport(p, name, fileName, typeOnly, options)
+	return moduleFilePath(name, fileName, resolved)
+}
+
+// RequireFilePath uses CommonJS directory and alias resolution for restrictions.
+// Missing local targets share the import rule's lexical-path fallback.
+func RequireFilePath(p *program.Program, name, fileName string, options ResolutionOptions) string {
+	if isNodeBuiltin(name) {
+		return ""
+	}
+	resolved, _ := resolveWithTypeScriptAliases(p, name, fileName, options)
+	return moduleFilePath(name, fileName, resolved)
+}
+
+func moduleFilePath(name, fileName, resolved string) string {
 	if resolved != "" {
 		if isImportURL(name) {
 			return resolved
@@ -182,6 +196,10 @@ func resolveImport(p *program.Program, name, fileName string, typeOnly bool, opt
 	}
 	moduleName, _ := ImportModuleName(name)
 	options.NoDirectory = moduleName == ""
+	return resolveWithTypeScriptAliases(p, name, fileName, options)
+}
+
+func resolveWithTypeScriptAliases(p *program.Program, name, fileName string, options ResolutionOptions) (string, string) {
 	if tspath.HasTSFileExtension(fileName) {
 		if config := nearestCompilerOptions(p, fileName); config != nil && config.Paths != nil {
 			for alias, targets := range config.Paths.Entries() {

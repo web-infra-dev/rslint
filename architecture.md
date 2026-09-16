@@ -167,19 +167,22 @@ Publication paths and metadata exemptions are interpreted relative to the
 containing package, independently of the process working directory.
 `nodeutil` also owns workspace dependency checks, literal import collection,
 runtime import resolution and the Node rules' TypeScript config lookups. Its
-small non-extended glob adapter is shared by path conversion and import
-restrictions; restriction ordering and messages stay inside the rule. It
+small non-extended glob adapter is shared by path conversion and module
+restrictions. The import and require restriction rules share ordered matching
+and message construction in `nodeutil`; rules select their source nodes and
+resolution mode, then report the matching diagnostic. Runtime resolution
 reuses tsgo's resolver and config parser through the Program's existing
 filesystem and generation-scoped cache. Resolution results retain failure
 details for missing-module diagnostics and target paths for restrictions,
-including lexical paths for unresolved local imports. Restrictions compare
-host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
+including lexical paths for unresolved local imports and requires. Restrictions
+compare host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
 Rules select their exemptions and report on the collected source nodes.
 Node API reference tracking also lives
 in `nodeutil`: require collection and API rules share static property, alias,
 destructuring and module traversal, reusing tsgo's binding helpers,
-`RuleContext.Refs` and a name index cached by `RuleContext` per file. Rules own API
-metadata, ignore options and diagnostic messages. Node version configuration
+`RuleContext.Refs` and a name index cached by `RuleContext` per file. Require
+targets also share constant argument evaluation and loader-parameter removal.
+Rules own API metadata, ignore options and diagnostic messages. Node version configuration
 and range comparisons use package metadata here and the compiler semver parser
 through `shim/semver`; rules own their feature availability thresholds.
 Relative lookup settings use the process directory from `RuleContext`,

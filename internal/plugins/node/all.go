@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_process_env"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_process_exit"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_restricted_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_restricted_require"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_sync"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_top_level_await"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unpublished_bin"
@@ -44,6 +45,7 @@ func GetAllRules() []rule.Rule {
 		no_process_env.NoProcessEnvRule,
 		no_process_exit.NoProcessExitRule,
 		no_restricted_import.NoRestrictedImportRule,
+		no_restricted_require.NoRestrictedRequireRule,
 		no_sync.NoSyncRule,
 		no_top_level_await.NoTopLevelAwaitRule,
 		no_unpublished_bin.NoUnpublishedBinRule,
