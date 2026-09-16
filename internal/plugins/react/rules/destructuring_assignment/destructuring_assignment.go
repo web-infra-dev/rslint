@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed destructuring_assignment.schema.json
@@ -161,12 +162,17 @@ func evalParams(params []*ast.Node, refs *rule.RefStore, tc *checker.Checker) []
 // one. This matters for `const {x} = props` inside an inner non-SFC
 // helper of an outer SFC: upstream's `scope.block` is the inner helper,
 // `components.get(inner)` is undefined, and the rule stays silent.
-func getEnclosingSFCComponent(node *ast.Node, pragma string, wrappers []reactutil.ComponentWrapperEntry) *ast.Node {
+func getEnclosingSFCComponent(
+	node *ast.Node,
+	pragma string,
+	wrappers []reactutil.ComponentWrapperEntry,
+	scopes scopeAnalysis.Provider,
+) *ast.Node {
 	for p := node.Parent; p != nil; p = p.Parent {
 		if !ast.IsFunctionLike(p) {
 			continue
 		}
-		if reactutil.IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
+		if reactutil.IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers, scopes) {
 			return p
 		}
 		return nil
@@ -459,6 +465,7 @@ var DestructuringAssignmentRule = rule.Rule{
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
+		scopes := scopeAnalysis.For(ctx)
 		stack := &sfcParamsStack{}
 		enteredSFCs := make([]bool, 0, 8)
 
@@ -483,7 +490,7 @@ var DestructuringAssignmentRule = rule.Rule{
 		// `props` / `context` names, then in `never` mode emit the
 		// destructured-arg diagnostic.
 		handleStatelessComponent := func(node *ast.Node) {
-			isSFC := reactutil.IsStatelessReactComponentWithWrappers(node, pragma, nil, wrappers)
+			isSFC := reactutil.IsStatelessReactComponentWithWrappers(node, pragma, nil, wrappers, scopes)
 			enteredSFCs = append(enteredSFCs, isSFC)
 			if !isSFC {
 				return
@@ -617,7 +624,7 @@ var DestructuringAssignmentRule = rule.Rule{
 			if opts.ignoreClassFields && isInClassProperty(node) {
 				return
 			}
-			if reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers) == nil {
+			if reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers, scopes) == nil {
 				return
 			}
 			reportUseDestruct(node, name)
@@ -712,7 +719,7 @@ var DestructuringAssignmentRule = rule.Rule{
 						// Mirror upstream's `components.get(getScope(context,
 						// node).block)`: enclosing-only semantics. An inner
 						// non-SFC helper of an outer SFC must stay silent.
-						if getEnclosingSFCComponent(node, pragma, wrappers) != nil {
+						if getEnclosingSFCComponent(node, pragma, wrappers, scopes) != nil {
 							reportNoDestruct(node, sfcType)
 						}
 					}
@@ -720,7 +727,7 @@ var DestructuringAssignmentRule = rule.Rule{
 						// Mirror upstream's scope-based class-or-SFC fallback.
 						// The stateless tail intentionally reports the legal but
 						// nonsensical `const {x} = this.props` inside an SFC.
-						if reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers) != nil {
+						if reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers, scopes) != nil {
 							reportNoDestruct(node, classType)
 						}
 					}
@@ -735,7 +742,7 @@ var DestructuringAssignmentRule = rule.Rule{
 					// detection for an object-binding declaration. Default
 					// `destructureInSignature: "ignore"` declarations skip
 					// this branch without repeating component classification.
-					sfcComp := getEnclosingSFCComponent(node, pragma, wrappers)
+					sfcComp := getEnclosingSFCComponent(node, pragma, wrappers, scopes)
 					if sfcComp == nil {
 						return
 					}

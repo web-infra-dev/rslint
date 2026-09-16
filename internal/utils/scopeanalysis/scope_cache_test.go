@@ -1,19 +1,23 @@
 package scopeanalysis
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	tsParser "github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 func cacheContext() rule.RuleContext {
-	return rule.RuleContext{SourceFile: parser.ParseSourceFile(ast.SourceFileParseOptions{
+	return rule.RuleContext{SourceFile: tsParser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/scope.tsx", Path: "/scope.tsx",
 	}, `const x = 1; function f(a = x) { let x = a; return x; } f(x); missing;`, core.ScriptKindTSX)}.WithFileCache(rule.NewFileCache())
 }
@@ -143,8 +147,49 @@ func TestDeclarationsReusesCompleteReferences(t *testing.T) {
 	}
 }
 
+func TestProductionCodeUsesScopeAnalysisFacade(t *testing.T) {
+	root := moduleRoot(t)
+	var violations []string
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if strings.HasPrefix(rel, "internal/utils/scopeanalysis/") {
+			return nil
+		}
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for index, line := range strings.Split(string(contents), "\n") {
+			if strings.Contains(line, "scope.Build(") {
+				violations = append(violations, rel+":"+strconv.Itoa(index+1))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("production code must construct scope managers through scopeanalysis, not scope.Build:\n  %s", strings.Join(violations, "\n  "))
+	}
+}
+
 func BenchmarkGet(b *testing.B) {
-	ctx := rule.RuleContext{SourceFile: parser.ParseSourceFile(ast.SourceFileParseOptions{
+	ctx := rule.RuleContext{SourceFile: tsParser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/scope.ts", Path: "/scope.ts",
 	}, strings.Repeat(`{ let x = value; function f(a = x) { let y = a; return y; } f(x); }`, 100), core.ScriptKindTS)}
 	for _, shared := range []bool{false, true} {
@@ -164,5 +209,23 @@ func BenchmarkGet(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func moduleRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("could not find go.mod")
+		}
+		dir = parent
 	}
 }

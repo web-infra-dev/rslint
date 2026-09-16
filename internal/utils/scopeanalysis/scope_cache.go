@@ -23,41 +23,65 @@ type fileState struct {
 	completeReferences *scope.Manager
 }
 
+// Provider owns scope analysis state for one file.
+type Provider struct {
+	ctx   rule.RuleContext
+	state *fileState
+}
+
+// For returns a provider backed by the RuleContext's file cache.
+func For(ctx rule.RuleContext) Provider {
+	return Provider{ctx: ctx, state: stateFor(ctx)}
+}
+
 // Get shares read-only scope graphs without widening filtered reference requests.
 func Get(ctx rule.RuleContext, options scope.Options) *scope.Manager {
-	state := stateFor(ctx)
+	return For(ctx).Get(options)
+}
+
+// Get returns the graph for the exact options.
+func (provider Provider) Get(options scope.Options) *scope.Manager {
 	key := keyFor(options)
-	if manager := state.managers[key]; manager != nil {
+	if manager := provider.state.managers[key]; manager != nil {
 		return manager
 	}
-	manager := scope.Build(ctx.SourceFile, options)
-	state.managers[key] = manager
+	manager := scope.Build(provider.ctx.SourceFile, options)
+	provider.state.managers[key] = manager
 	if options.CollectReferences && options.ReferenceNames == nil {
-		state.completeReferences = manager
-		state.declarations = manager
-	} else if state.declarations == nil {
-		state.declarations = manager
+		provider.state.completeReferences = manager
+		provider.state.declarations = manager
+	} else if provider.state.declarations == nil {
+		provider.state.declarations = manager
 	}
 	return manager
 }
 
 // References returns a graph containing at least the requested names.
 func References(ctx rule.RuleContext, names map[string]struct{}) *scope.Manager {
-	state := stateFor(ctx)
-	if state.completeReferences != nil {
-		return state.completeReferences
+	return For(ctx).References(names)
+}
+
+// References returns a graph containing at least the requested names.
+func (provider Provider) References(names map[string]struct{}) *scope.Manager {
+	if provider.state.completeReferences != nil {
+		return provider.state.completeReferences
 	}
-	return Get(ctx, scope.Options{CollectReferences: true, ReferenceNames: names})
+	return provider.Get(scope.Options{CollectReferences: true, ReferenceNames: names})
 }
 
 // Declarations returns a graph whose declaration tree is complete.
 // Its reference slices may be absent or filtered and must not be inspected.
 func Declarations(ctx rule.RuleContext) *scope.Manager {
-	state := stateFor(ctx)
-	if state.declarations != nil {
-		return state.declarations
+	return For(ctx).Declarations()
+}
+
+// Declarations returns a graph whose declaration tree is complete.
+// Its reference slices may be absent or filtered and must not be inspected.
+func (provider Provider) Declarations() *scope.Manager {
+	if provider.state.declarations != nil {
+		return provider.state.declarations
 	}
-	return Get(ctx, scope.Options{})
+	return provider.Get(scope.Options{})
 }
 
 func stateFor(ctx rule.RuleContext) *fileState {

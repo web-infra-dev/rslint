@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 const readOnlyPropMessage = "Prop '%s' should be read-only."
@@ -26,6 +27,7 @@ var PreferReadOnlyPropsRule = rule.Rule{
 // TypeScript shapes understood by tsgo.
 func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	pragma := reactutil.GetReactPragmaFromContext(ctx)
+	scopes := scopeAnalysis.For(ctx)
 	typeAliases := map[string][]*ast.Node{}
 	genericImports := map[string]string{}
 	classExpressions := make([]*ast.Node, 0)
@@ -133,22 +135,22 @@ func runRule(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 			validateType(classNode, pd.Type)
 		},
 		ast.KindFunctionDeclaration: func(node *ast.Node) {
-			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, validateType)
+			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, scopes, validateType)
 		},
 		ast.KindFunctionExpression: func(node *ast.Node) {
-			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, validateType)
+			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, scopes, validateType)
 		},
 		ast.KindArrowFunction: func(node *ast.Node) {
-			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, validateType)
+			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, scopes, validateType)
 		},
 		ast.KindMethodDeclaration: func(node *ast.Node) {
-			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, validateType)
+			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, scopes, validateType)
 		},
 		ast.KindGetAccessor: func(node *ast.Node) {
-			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, validateType)
+			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, scopes, validateType)
 		},
 		ast.KindSetAccessor: func(node *ast.Node) {
-			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, validateType)
+			checkFunction(node, ctx.TypeChecker, pragma, genericImports, wrapperFunctions, scopes, validateType)
 		},
 		ast.KindEndOfFile: func(_ *ast.Node) {
 			for _, node := range classExpressions {
@@ -191,21 +193,21 @@ func classPropsTypeArgument(node *ast.Node) *ast.Node {
 	return propsType
 }
 
-func checkFunction(node *ast.Node, tc *checker.Checker, pragma string, genericImports map[string]string, wrappers []reactutil.ComponentWrapperEntry, validateType func(*ast.Node, *ast.Node)) {
+func checkFunction(node *ast.Node, tc *checker.Checker, pragma string, genericImports map[string]string, wrappers []reactutil.ComponentWrapperEntry, scopes scopeAnalysis.Provider, validateType func(*ast.Node, *ast.Node)) {
 	if isAsyncGenerator(node) {
 		return
 	}
 	// The forwardRef arm is checked before component-return heuristics in the
 	// upstream collector. Its second type argument is the props type.
 	if call := parentCall(node); call != nil && call.TypeArguments != nil &&
-		isForwardRefWrapper(call, node, wrappers, pragma, tc) {
+		isForwardRefWrapper(call, node, wrappers, pragma, tc, scopes) {
 		if len(call.TypeArguments.Nodes) >= 2 {
 			validateType(node, call.TypeArguments.Nodes[1])
 		}
 		return
 	}
 
-	if !reactutil.IsStatelessReactComponentWithWrappers(node, pragma, tc, wrappers) {
+	if !reactutil.IsStatelessReactComponentWithWrappers(node, pragma, tc, wrappers, scopes) {
 		return
 	}
 	params := reactutil.FunctionParameters(node)
@@ -234,8 +236,8 @@ func checkFunction(node *ast.Node, tc *checker.Checker, pragma string, genericIm
 	}
 }
 
-func isForwardRefWrapper(call *ast.CallExpression, fn *ast.Node, wrappers []reactutil.ComponentWrapperEntry, pragma string, tc *checker.Checker) bool {
-	return call != nil && fn != nil && reactutil.MatchesAnyComponentWrapperWithChecker(call.AsNode(), fn, wrappers, pragma, tc) &&
+func isForwardRefWrapper(call *ast.CallExpression, fn *ast.Node, wrappers []reactutil.ComponentWrapperEntry, pragma string, tc *checker.Checker, scopes scopeAnalysis.Provider) bool {
+	return call != nil && fn != nil && reactutil.MatchesAnyComponentWrapperWithChecker(call.AsNode(), fn, wrappers, pragma, tc, scopes) &&
 		forwardRefCallName(call, pragma) == "forwardRef"
 }
 

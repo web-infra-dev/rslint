@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_unstable_nested_components.schema.json
@@ -79,6 +80,7 @@ type componentEnv struct {
 	createClass    string
 	wrappers       []reactutil.ComponentWrapperEntry
 	tc             *checker.Checker
+	scopes         scopeAnalysis.Provider
 	componentStack []*ast.Node
 }
 
@@ -86,13 +88,13 @@ type componentEnv struct {
 // reactutil.IsDetectedComponent — see that function's doc for the canonical
 // component-classification semantics.
 func isDetectedComponent(node *ast.Node, env *componentEnv) bool {
-	return reactutil.IsDetectedComponent(node, env.pragma, env.createClass, env.wrappers, env.tc)
+	return reactutil.IsDetectedComponent(node, env.pragma, env.createClass, env.wrappers, env.tc, env.scopes)
 }
 
 // functionReturnsJSX keeps the checker-aware strict-return query behind the
 // same environment adapter as component detection.
 func functionReturnsJSX(node *ast.Node, env *componentEnv) bool {
-	return reactutil.FunctionReturnsJSXWithChecker(node, env.pragma, env.tc)
+	return reactutil.FunctionReturnsJSXWithChecker(node, env.pragma, env.tc, env.scopes)
 }
 
 // isInsideWrapperCall reports whether `node` is the FunctionLike argument of
@@ -115,7 +117,7 @@ func isInsideWrapperCall(node *ast.Node, env *componentEnv) bool {
 	if len(env.componentStack) > 0 && env.componentStack[len(env.componentStack)-1] == parent {
 		return true
 	}
-	return reactutil.MatchesAnyComponentWrapperWithChecker(parent, node, env.wrappers, env.pragma, env.tc)
+	return reactutil.MatchesAnyComponentWrapperWithChecker(parent, node, env.wrappers, env.pragma, env.tc, env.scopes)
 }
 
 // isValueOfObjectProperty mirrors upstream's
@@ -197,7 +199,7 @@ func isComponentInsideCreateElementProp(node *ast.Node, env *componentEnv, isCom
 	}
 	createEl := ast.FindAncestor(start, func(n *ast.Node) bool {
 		return n.Kind == ast.KindCallExpression &&
-			reactutil.IsCreateElementCallWithChecker(n.AsCallExpression().Expression, env.pragma, env.tc)
+			reactutil.IsCreateElementCallWithChecker(n.AsCallExpression().Expression, env.pragma, env.tc, env.scopes)
 	})
 	if createEl == nil {
 		return false
@@ -388,7 +390,7 @@ func isStatelessComponentReturningNull(node *ast.Node, env *componentEnv, isComp
 	// Without this, `myMemo(() => null)` would not classify as a
 	// stateless component → this skip wouldn't fire → we'd over-report
 	// where upstream skips.
-	if !reactutil.IsStatelessReactComponentWithWrappers(node, env.pragma, env.tc, env.wrappers) {
+	if !reactutil.IsStatelessReactComponentWithWrappers(node, env.pragma, env.tc, env.wrappers, env.scopes) {
 		return false
 	}
 	return !functionReturnsJSX(node, env)
@@ -432,7 +434,7 @@ func isFunctionComponentInsideClassComponent(node *ast.Node, env *componentEnv) 
 	// classify as a stateless component for this safety net to fire.
 	// Use the wrappers-aware variant for user-configured wrappers
 	// participating in stateless detection.
-	if !reactutil.IsStatelessReactComponentWithWrappers(enclosingFn, env.pragma, env.tc, env.wrappers) {
+	if !reactutil.IsStatelessReactComponentWithWrappers(enclosingFn, env.pragma, env.tc, env.wrappers, env.scopes) {
 		return false
 	}
 	return functionReturnsJSX(node, env)
@@ -568,6 +570,7 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 			pragma:      reactutil.GetReactPragma(ctx.Settings),
 			createClass: reactutil.GetReactCreateClass(ctx.Settings),
 			tc:          ctx.TypeChecker,
+			scopes:      scopeAnalysis.For(ctx),
 		}
 		// `settings.componentWrapperFunctions` decides which CallExpression
 		// wrappers count as "creating a component" — defaults to memo +

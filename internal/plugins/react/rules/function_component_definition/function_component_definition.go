@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed function_component_definition.schema.json
@@ -119,6 +120,7 @@ var FunctionComponentDefinitionRule = rule.Rule{
 			text:     ctx.SourceFile.Text(),
 			pragma:   pragma,
 			wrappers: wrappers,
+			scopes:   scopeAnalysis.For(ctx),
 			cfg:      cfg,
 		}
 		w.run()
@@ -136,6 +138,7 @@ type walker struct {
 	text     string
 	pragma   string
 	wrappers []reactutil.ComponentWrapperEntry
+	scopes   scopeAnalysis.Provider
 	cfg      options
 
 	pairs []functionPair
@@ -522,11 +525,11 @@ func (w *walker) isDetectedComponentNode(node *ast.Node) bool {
 	if node.Kind != ast.KindArrowFunction && reactutil.IsAsyncGeneratorFunction(node) {
 		return false
 	}
-	wrapper := reactutil.OutermostComponentWrapperCall(node, w.pragma, w.wrappers, w.ctx.TypeChecker)
+	wrapper := reactutil.OutermostComponentWrapperCall(node, w.pragma, w.wrappers, w.ctx.TypeChecker, w.scopes)
 	if wrapper != nil && reactutil.WrapperWrapsKnownSiblingComponent(wrapper, node) {
 		return false
 	}
-	if !reactutil.IsStatelessReactComponentWithWrappers(node, w.pragma, w.ctx.TypeChecker, w.wrappers) {
+	if !reactutil.IsStatelessReactComponentWithWrappers(node, w.pragma, w.ctx.TypeChecker, w.wrappers, w.scopes) {
 		return false
 	}
 	// `getStatelessComponent` redirects a wrapped function to its outer-most

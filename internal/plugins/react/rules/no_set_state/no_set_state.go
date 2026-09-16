@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // NoSetStateRule mirrors eslint-plugin-react's `no-set-state`: report any
@@ -31,6 +32,7 @@ var NoSetStateRule = rule.Rule{
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
+		scopes := scopeAnalysis.For(ctx)
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -64,7 +66,7 @@ var NoSetStateRule = rule.Rule{
 				// Upstream: `components.get(utils.getParentComponent(node))`.
 				// The result is non-null only when the enclosing scope is a
 				// detected component.
-				if reactutil.GetEnclosingReactComponentOrStateless(node, pragma, createClass, wrappers) == nil {
+				if reactutil.GetEnclosingReactComponentOrStateless(node, pragma, createClass, wrappers, scopes) == nil {
 					return
 				}
 

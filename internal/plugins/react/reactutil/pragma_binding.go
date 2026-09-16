@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // IsDestructuredFromPragmaImport mirrors upstream eslint-plugin-react's
@@ -29,7 +30,12 @@ import (
 // `pragma.toLocaleLowerCase()` semantic. `tc` may be nil — when no TypeChecker
 // is available the function uses rslint's shared lexical scope model so every
 // local binding shape is resolved before checking its import origin.
-func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.Checker) bool {
+func IsDestructuredFromPragmaImport(
+	ident *ast.Node,
+	pragma string,
+	tc *checker.Checker,
+	scopes scopeAnalysis.Provider,
+) bool {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -39,7 +45,7 @@ func IsDestructuredFromPragmaImport(ident *ast.Node, pragma string, tc *checker.
 	pragmaLower := ecmascript.StringToLowerCase(pragma)
 
 	if tc == nil {
-		return sourceOnlyPragmaBinding(ident, pragma, pragmaLower)
+		return sourceOnlyPragmaBinding(ident, pragma, pragmaLower, scopes)
 	}
 
 	symbol := tc.GetSymbolAtLocation(ident)
@@ -111,12 +117,12 @@ func isDestructuredFromPragmaSymbol(symbol *ast.Symbol, pragma, pragmaLower stri
 	return false
 }
 
-func sourceOnlyPragmaBinding(ident *ast.Node, pragma, pragmaLower string) bool {
+func sourceOnlyPragmaBinding(ident *ast.Node, pragma, pragmaLower string, scopes scopeAnalysis.Provider) bool {
 	sourceFile := ast.GetSourceFileOfNode(ident)
 	if sourceFile == nil {
 		return false
 	}
-	manager := scope.Build(sourceFile, scope.Options{
+	manager := scopes.Get(scope.Options{
 		CollectReferences: true,
 		ReferenceNames:    map[string]struct{}{ident.AsIdentifier().Text: {}},
 	})

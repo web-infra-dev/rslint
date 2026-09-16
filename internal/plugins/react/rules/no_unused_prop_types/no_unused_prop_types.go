@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed no_unused_prop_types.schema.json
@@ -1332,6 +1333,7 @@ func (c *component) report(ctx rule.RuleContext, opts options, props []*prop) {
 func NoUnusedPropTypesRuleRun(ctx rule.RuleContext, optionsRaw []any) rule.RuleListeners {
 	opts := parseOptions(optionsRaw)
 	pragma := reactutil.GetReactPragmaFromContext(ctx)
+	scopes := scopeAnalysis.For(ctx)
 	createClass := reactutil.GetReactCreateClass(ctx.Settings)
 	checkAsyncSafe := !reactutil.ReactVersionLessThan(ctx.Settings, 16, 3, 0)
 	aliases := collectTypeAliases(ctx.SourceFile.AsNode())
@@ -1375,7 +1377,7 @@ func NoUnusedPropTypesRuleRun(ctx rule.RuleContext, optionsRaw []any) rule.RuleL
 				}
 			}
 		}
-		if isFunctionLike(node) && reactutil.IsStatelessReactComponentWithWrappers(node, pragma, ctx.TypeChecker, componentWrappers) {
+		if isFunctionLike(node) && reactutil.IsStatelessReactComponentWithWrappers(node, pragma, ctx.TypeChecker, componentWrappers, scopes) {
 			newComponent(node)
 		}
 		node.ForEachChild(discover)
