@@ -10,15 +10,15 @@ import (
 // effective globals, shadowing and writes to global roots. Calls are returned
 // in traversal order; separate alias paths can return the same call more than once.
 func CollectRequireCalls(ctx rule.RuleContext) []*ast.Node {
-	return collectRequireCalls(ctx, true)
+	return newReferenceTracker(ctx).collectRequireCalls(true)
 }
 
-func collectRequireCalls(ctx rule.RuleContext, includeResolve bool) []*ast.Node {
+func (tracker *referenceTracker) collectRequireCalls(includeResolve bool) []*ast.Node {
 	var calls []*ast.Node
 	value := &referenceTrace{call: func(node *ast.Node) { calls = append(calls, node) }}
 	if includeResolve {
 		value.properties = map[string]*referenceTrace{"resolve": {call: value.call}}
 	}
-	newReferenceTracker(ctx).trackGlobals(map[string]*referenceTrace{"require": value})
+	tracker.trackGlobals(map[string]*referenceTrace{"require": value})
 	return calls
 }

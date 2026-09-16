@@ -79,6 +79,12 @@ func TestNoPathConcatExtras(t *testing.T) {
 		{Code: "`${__dirname}`; `${import.meta.url}${\"\"}`;"},
 		// Documented difference: upstream reports String.fromCodePoint(47), but rslint does not.
 		{Code: "__dirname + String.fromCodePoint(47);"},
+		// module rest binding.
+		{Code: "const {...p} = require(\"path\"); __dirname + p.sep;"},
+		// namespace rest assignment.
+		{Code: "import * as ns from \"path\"; let p; ({...p} = ns); __dirname + p.default.sep;"},
+		// array literal alias remains untracked.
+		{Code: "const [load] = [require]; __dirname + load(\"path\").sep;"},
 	}, []rule_tester.InvalidTestCase{
 		// shadowed writes do not invalidate a global.
 		{Code: "function f(__dirname) { __dirname = \"/tmp\"; } __dirname + \"/x\";", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 47, 1, 63)}},
@@ -178,6 +184,18 @@ func TestNoPathConcatExtras(t *testing.T) {
 		{Code: "__dirname + \"/\".concat(\"dir\");", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 1, 1, 30)}},
 		// array join.
 		{Code: "__dirname + [\"\", \"dir\"].join(\"/\");", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 1, 1, 34)}},
+		// template key in binding.
+		{Code: "const {[`require`]: load} = global; __dirname + load(\"path\").sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 37, 1, 65)}},
+		// template key in assignment default.
+		{Code: "let load; ({[`require`]: load = fallback} = global); __dirname + load(\"path\").sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 54, 1, 82)}},
+		// namespace default binding.
+		{Code: "import * as ns from \"path\"; const {default: p = fallback} = ns; __dirname + p.sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 65, 1, 82)}},
+		// mixed default and namespace import.
+		{Code: "import p, * as ns from \"path\"; __dirname + p.sep; __filename + ns.default.sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 32, 1, 49), concatErrorAt("usePathFunctions", 1, 51, 1, 78)}},
+		// mixed default and named imports.
+		{Code: "import p, {sep, default as other} from \"path\"; __dirname + p.sep; __dirname + sep; __filename + other.sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 48, 1, 65), concatErrorAt("usePathFunctions", 1, 84, 1, 106)}},
+		// string default import.
+		{Code: "import {\"default\" as p} from \"path\"; __dirname + p.sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 38, 1, 55)}},
 	})
 }
 

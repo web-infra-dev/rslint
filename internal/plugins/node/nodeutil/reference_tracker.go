@@ -117,20 +117,9 @@ func (tracker *referenceTracker) trackExpression(node *ast.Node, value *referenc
 				tracker.trackExpression(parent, value)
 			}
 		}
-	case ast.KindVariableDeclaration:
-		declaration := parent.AsVariableDeclaration()
-		if declaration != nil && declaration.Initializer == node {
-			tracker.trackAssignmentTarget(declaration.Name(), value)
-		}
-	case ast.KindParameter:
-		parameter := parent.AsParameterDeclaration()
-		if parameter != nil && parameter.Initializer == node {
-			tracker.trackAssignmentTarget(parameter.Name(), value)
-		}
-	case ast.KindBindingElement:
-		element := parent.AsBindingElement()
-		if element != nil && element.Initializer == node {
-			tracker.trackAssignmentTarget(element.Name(), value)
+	case ast.KindVariableDeclaration, ast.KindParameter, ast.KindBindingElement:
+		if parent.Initializer() == node {
+			tracker.trackAssignmentTarget(parent.Name(), value)
 		}
 	case ast.KindShorthandPropertyAssignment:
 		property := parent.AsShorthandPropertyAssignment()
@@ -148,43 +137,20 @@ func (tracker *referenceTracker) trackAssignmentTarget(node *ast.Node, value *re
 	switch node.Kind {
 	case ast.KindIdentifier:
 		tracker.trackIdentifier(node, value)
-	case ast.KindObjectBindingPattern:
+	case ast.KindObjectBindingPattern, ast.KindObjectLiteralExpression:
 		if len(value.properties) == 0 {
 			return
 		}
-		pattern := node.AsBindingPattern()
-		if pattern == nil || pattern.Elements == nil {
-			return
-		}
-		for _, elementNode := range pattern.Elements.Nodes {
-			element := elementNode.AsBindingElement()
-			if element == nil || element.DotDotDotToken != nil || element.Name() == nil {
+		for _, element := range ast.GetElementsOfBindingOrAssignmentPattern(node) {
+			if ast.GetRestIndicatorOfBindingOrAssignmentElement(element) != nil {
 				continue
 			}
-			propertyName := element.PropertyName
+			propertyName := ast.TryGetPropertyNameOfBindingOrAssignmentElement(element)
 			if propertyName == nil {
-				propertyName = element.Name()
+				continue
 			}
 			if name, ok := tracker.staticPropertyName(propertyName); ok && value.properties[name] != nil {
-				tracker.trackAssignmentTarget(element.Name(), value.properties[name])
-			}
-		}
-	case ast.KindObjectLiteralExpression:
-		if len(value.properties) == 0 {
-			return
-		}
-		for _, propertyNode := range node.AsObjectLiteralExpression().Properties.Nodes {
-			switch propertyNode.Kind {
-			case ast.KindPropertyAssignment:
-				property := propertyNode.AsPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.properties[name] != nil {
-					tracker.trackAssignmentTarget(property.Initializer, value.properties[name])
-				}
-			case ast.KindShorthandPropertyAssignment:
-				property := propertyNode.AsShorthandPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.properties[name] != nil {
-					tracker.trackAssignmentTarget(property.Name(), value.properties[name])
-				}
+				tracker.trackAssignmentTarget(ast.GetTargetOfBindingOrAssignmentElement(element), value.properties[name])
 			}
 		}
 	case ast.KindBinaryExpression:
@@ -197,12 +163,12 @@ func (tracker *referenceTracker) trackAssignmentTarget(node *ast.Node, value *re
 
 func (tracker *referenceTracker) trackIdentifier(identifier *ast.Node, value *referenceTrace) {
 	if tracker.ctx.Refs != nil {
-		if symbol := tracker.ctx.Refs.Resolve(identifier); utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+		if symbol := tracker.ctx.Refs.ResolveInFile(identifier); utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
 			return
 		}
 	}
-	if symbol := callBindingSymbol(identifier); symbol != nil {
+	if symbol := utils.BindingNameSymbol(identifier); symbol != nil {
 		tracker.trackVariable(symbol, value)
 		return
 	}
@@ -210,17 +176,6 @@ func (tracker *referenceTracker) trackIdentifier(identifier *ast.Node, value *re
 	if tracker.ctx.Globals.Access(name).IsDeclared() && tracker.isGlobalReference(identifier, name) {
 		tracker.trackGlobalVariable(name, value)
 	}
-}
-
-func callBindingSymbol(identifier *ast.Node) *ast.Symbol {
-	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.Parent == nil {
-		return nil
-	}
-	declaration := identifier.Parent
-	if declaration.Name() != identifier {
-		return nil
-	}
-	return declaration.Symbol()
 }
 
 func (tracker *referenceTracker) trackVariable(symbol *ast.Symbol, value *referenceTrace) {
@@ -262,6 +217,10 @@ func (tracker *referenceTracker) staticPropertyName(node *ast.Node) (string, boo
 	if node != nil && node.Kind == ast.KindComputedPropertyName {
 		return tracker.constantString(node.AsComputedPropertyName().Expression)
 	}
+	// tsgo's binding-property helper unwraps computed template literal keys.
+	if node != nil && node.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		return tracker.constantString(node)
+	}
 	return utils.GetStaticPropertyName(node)
 }
 
@@ -285,12 +244,10 @@ func referenceValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
 		if binary == nil || binary.OperatorToken == nil {
 			return false
 		}
-		switch binary.OperatorToken.Kind {
-		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+		if ast.IsLogicalOrCoalescingBinaryOperator(binary.OperatorToken.Kind) {
 			return binary.Left == node || binary.Right == node
-		case ast.KindCommaToken:
-			return binary.Right == node
 		}
+		return binary.OperatorToken.Kind == ast.KindCommaToken && binary.Right == node
 	}
 	return false
 }
