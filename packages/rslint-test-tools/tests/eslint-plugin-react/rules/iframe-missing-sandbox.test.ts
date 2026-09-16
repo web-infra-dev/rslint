@@ -4,6 +4,22 @@ const ruleTester = new RuleTester();
 
 ruleTester.run('iframe-missing-sandbox', {} as never, {
   valid: [
+    {
+      code: `React.createElement("iframe", /** @type {any} */ ({ sandbox: "allow-forms" }));`,
+      filename: 'files/iframe-sandbox.jsx',
+    },
+    {
+      code: `const sandbox = "sandbox"; React.createElement("iframe", { [(sandbox)]: "allow-forms" });`,
+    },
+    {
+      code: `React.createElement("iframe", { get [(sandbox)]() {} });`,
+    },
+    {
+      code: `React.createElement("iframe", { sandbox: ("unknown" as string) });`,
+    },
+    {
+      code: `import { createElement } from "react"; createElement("div");`,
+    },
     { code: `<div sandbox="__unknown__" />;` },
     { code: `<iframe sandbox="" />;` },
     { code: `<iframe sandbox={""} />` },
@@ -65,6 +81,47 @@ ruleTester.run('iframe-missing-sandbox', {} as never, {
     },
   ],
   invalid: [
+    {
+      code: `React.createElement("iframe", { sandbox: /** @type {string} */ ("allow-scripts allow-same-origin") });`,
+      filename: 'files/iframe-sandbox.jsx',
+      errors: [
+        {
+          messageId: 'invalidCombination',
+          message:
+            'An iframe element defines a sandbox attribute with both allow-scripts and allow-same-origin which is invalid',
+        },
+      ],
+    },
+    {
+      code: `React.createElement(/** @satisfies {string} */ ("iframe"));`,
+      filename: 'files/iframe-sandbox.jsx',
+      errors: [
+        {
+          messageId: 'attributeMissing',
+          message: 'An iframe element is missing a sandbox attribute',
+        },
+      ],
+    },
+    {
+      code: `const sandbox = "sandbox"; React.createElement("iframe", { [/** @type {string} */ (sandbox)]: "unknown" });`,
+      filename: 'files/iframe-sandbox.jsx',
+      errors: [
+        {
+          messageId: 'invalidValue',
+          message:
+            'An iframe element defines a sandbox attribute with invalid value "unknown"',
+        },
+      ],
+    },
+    {
+      code: `React.createElement("iframe", ({ sandbox: "allow-forms" } as any));`,
+      errors: [
+        {
+          messageId: 'attributeMissing',
+          message: 'An iframe element is missing a sandbox attribute',
+        },
+      ],
+    },
     { code: `<iframe></iframe>;`, errors: [{ messageId: 'attributeMissing' }] },
     { code: `<iframe/>;`, errors: [{ messageId: 'attributeMissing' }] },
     {

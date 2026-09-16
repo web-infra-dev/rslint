@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -46,7 +47,7 @@ func message(id, description string) rule.RuleMessage {
 func validateSandboxValue(ctx rule.RuleContext, node *ast.Node, value string) {
 	allowScripts := false
 	allowSameOrigin := false
-	for _, token := range strings.Split(value, " ") {
+	for token := range strings.SplitSeq(value, " ") {
 		token = ecmascript.StringTrim(token)
 		if _, ok := allowedValues[token]; !ok {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -112,7 +113,7 @@ func sandboxName(name *ast.Node) bool {
 	if name.Kind != ast.KindComputedPropertyName {
 		return false
 	}
-	expression := name.AsComputedPropertyName().Expression
+	expression := utils.ESTreeRuntimeExpression(name.AsComputedPropertyName().Expression)
 	return expression != nil && expression.Kind == ast.KindIdentifier && expression.AsIdentifier().Text == "sandbox"
 }
 
@@ -121,7 +122,8 @@ var IframeMissingSandboxRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		checkJSX := func(node *ast.Node) {
-			if reactutil.GetJsxElementTypeString(node) != "iframe" {
+			tag := reactutil.GetJsxTagName(node)
+			if tag == nil || tag.Kind != ast.KindIdentifier || tag.Text() != "iframe" {
 				return
 			}
 			found := false
@@ -149,16 +151,22 @@ var IframeMissingSandboxRule = rule.Rule{
 			ast.KindJsxSelfClosingElement: checkJSX,
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !isCreateElement(call.Expression) || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 					return
 				}
-				tag := ast.SkipParentheses(call.Arguments.Nodes[0])
+				// ESTree omits parentheses and JavaScript JSDoc casts, but keeps
+				// authored TypeScript assertions. Reject other tags before the
+				// factory matcher needs to resolve any imported bindings.
+				tag := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0])
 				if tag == nil || tag.Kind != ast.KindStringLiteral || tag.AsStringLiteral().Text != "iframe" {
+					return
+				}
+				if !isCreateElement(call.Expression) {
 					return
 				}
 				found := false
 				if len(call.Arguments.Nodes) > 1 {
-					props := ast.SkipParentheses(call.Arguments.Nodes[1])
+					props := utils.ESTreeRuntimeExpression(call.Arguments.Nodes[1])
 					if props != nil && props.Kind == ast.KindObjectLiteralExpression {
 						for _, member := range props.AsObjectLiteralExpression().Properties.Nodes {
 							value, hasSandbox := objectSandboxProperty(member)
@@ -166,10 +174,7 @@ var IframeMissingSandboxRule = rule.Rule{
 								continue
 							}
 							found = true
-							if value == nil {
-								break
-							}
-							value = ast.SkipParentheses(value)
+							value = utils.ESTreeRuntimeExpression(value)
 							if value != nil && value.Kind == ast.KindStringLiteral {
 								text := value.AsStringLiteral().Text
 								if text != "" {
