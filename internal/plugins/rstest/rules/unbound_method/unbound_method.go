@@ -2,6 +2,7 @@ package unbound_method
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	unboundMethod "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/unbound_method"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -15,6 +16,7 @@ var UnboundMethodRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var analysis *rstestUtils.RstestCallAnalysis
 		stableRoots := map[*ast.Symbol]bool{}
+		asymmetricMatcherArguments := map[*ast.Node]bool{}
 		return unboundMethod.CreateListeners(ctx, options, func(node *ast.Node) bool {
 			argument := node
 			for argument.Parent != nil && utils.SkipAssertionsAndParens(argument.Parent) == node {
@@ -35,11 +37,11 @@ var UnboundMethodRule = rule.Rule{
 				if !checked {
 					stable = true
 					for _, reference := range ctx.Refs.References(symbol) {
-						for reference.Parent != nil && (utils.SkipAssertionsAndParens(reference.Parent) == reference ||
+						for reference.Parent != nil && (utils.SkipAssertionsAndParens(reference.Parent) == utils.SkipAssertionsAndParens(reference) ||
 							(ast.IsAccessExpression(reference.Parent) && reference.Parent.Expression() == reference)) {
 							reference = reference.Parent
 						}
-						if utils.IsWriteReference(reference) {
+						if utils.IsWriteReference(reference) || (reference.Parent != nil && reference.Parent.Kind == ast.KindDeleteExpression) {
 							stable = false
 							break
 						}
@@ -79,14 +81,19 @@ var UnboundMethodRule = rule.Rule{
 					}
 				}
 			}
-			for _, modifier := range parsed.Modifiers {
-				if modifier != "not" && modifier != "resolves" {
+			// Modifiers only contains entries before the first matcher, while Chai
+			// permits promise modifiers later in the chain. `rejects` invokes a
+			// function subject regardless of where it appears.
+			for _, member := range parsed.Members {
+				if member == "rejects" {
 					return false
 				}
 			}
 			for _, matcher := range parsed.Matchers {
 				if analysis.IsExpectMatcherOverridden(matcher.Name) ||
 					(analysis.HasCustomEqualityTesters() && usesCustomEqualityTesters(matcher.Name)) ||
+					(usesCustomEqualityTesters(matcher.Name) && matcher.Entry.Call != nil &&
+						matcherArgumentsContainAsymmetricMatcher(ctx, analysis, matcher.Entry.Call, asymmetricMatcherArguments)) ||
 					!isNonInvokingMatcher(matcher.Name) {
 					return false
 				}
@@ -94,6 +101,84 @@ var UnboundMethodRule = rule.Rule{
 			return true
 		})
 	},
+}
+
+func matcherArgumentsContainAsymmetricMatcher(
+	ctx rule.RuleContext,
+	analysis *rstestUtils.RstestCallAnalysis,
+	call *ast.Node,
+	cache map[*ast.Node]bool,
+) bool {
+	if result, ok := cache[call]; ok {
+		return result
+	}
+	result := false
+	for _, argument := range call.Arguments() {
+		if expressionContainsAsymmetricMatcher(ctx, analysis, argument) {
+			result = true
+			break
+		}
+	}
+	cache[call] = result
+	return result
+}
+
+// expressionContainsAsymmetricMatcher follows only values traversed by an
+// equality comparison. It deliberately does not walk into function bodies or
+// call arguments, which are not themselves compared.
+func expressionContainsAsymmetricMatcher(ctx rule.RuleContext, analysis *rstestUtils.RstestCallAnalysis, node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || isSafeBuiltinAsymmetricMatcher(analysis, node) {
+		return false
+	}
+	t := ctx.TypeChecker.GetTypeAtLocation(node)
+	for _, part := range utils.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t)) {
+		member := checker.Checker_getPropertyOfType(ctx.TypeChecker, part, "asymmetricMatch")
+		if member != nil {
+			memberType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(member, node)
+			if len(utils.GetCallSignatures(ctx.TypeChecker, memberType)) != 0 {
+				return true
+			}
+		}
+	}
+	switch node.Kind {
+	case ast.KindArrayLiteralExpression:
+		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+			if expressionContainsAsymmetricMatcher(ctx, analysis, element) {
+				return true
+			}
+		}
+	case ast.KindObjectLiteralExpression:
+		for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+			var value *ast.Node
+			switch property.Kind {
+			case ast.KindPropertyAssignment:
+				value = property.AsPropertyAssignment().Initializer
+			case ast.KindShorthandPropertyAssignment:
+				value = property.Name()
+			case ast.KindSpreadAssignment:
+				value = property.AsSpreadAssignment().Expression
+			}
+			if expressionContainsAsymmetricMatcher(ctx, analysis, value) {
+				return true
+			}
+		}
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		return expressionContainsAsymmetricMatcher(ctx, analysis, conditional.WhenTrue) ||
+			expressionContainsAsymmetricMatcher(ctx, analysis, conditional.WhenFalse)
+	}
+	return false
+}
+
+func isSafeBuiltinAsymmetricMatcher(analysis *rstestUtils.RstestCallAnalysis, node *ast.Node) bool {
+	if node.Kind != ast.KindCallExpression {
+		return false
+	}
+	parsed := analysis.ParseExpectCall(node)
+	return parsed != nil && parsed.Entry == rstestUtils.RstestExpectEntryStatic &&
+		rstestUtils.RSTEST_ASYMMETRIC_MATCHERS[parsed.Matcher] &&
+		parsed.Matcher != "toSatisfy" && parsed.Matcher != "schemaMatching"
 }
 
 func usesCustomEqualityTesters(name string) bool {
