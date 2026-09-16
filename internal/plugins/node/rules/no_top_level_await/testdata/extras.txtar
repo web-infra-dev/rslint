@@ -1,0 +1,43 @@
+Package metadata for publication and option integration tests.
+
+-- published/package.json --
+{"name":"published"}
+
+-- files/package.json --
+{"files":["lib"],"bin":{"cli":"lib/cli"}}
+
+-- files/.npmignore --
+lib/ignored.js
+
+-- gitignore/package.json --
+{}
+
+-- gitignore/.gitignore --
+ignored.js
+
+-- npmignore/package.json --
+{}
+
+-- npmignore/.gitignore --
+included.js
+
+-- npmignore/.npmignore --
+ignored.js
+
+-- files-gitignore/package.json --
+{"files":["lib"]}
+
+-- files-gitignore/.gitignore --
+lib
+
+-- main/package.json --
+{"files":[],"main":"index.js"}
+
+-- files/lib/nested/package.json --
+{"files":["published.js"]}
+
+-- metadata/package.json --
+{"files":[]}
+
+-- malformed-bin/package.json --
+{"bin":{"cli":false}}
