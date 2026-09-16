@@ -166,12 +166,16 @@ Configured pattern caches include the complete ordered list in their key.
 Publication paths and metadata exemptions are interpreted relative to the
 containing package, independently of the process working directory.
 `nodeutil` also owns workspace dependency checks, literal import collection,
-runtime import resolution and the Node rules' TypeScript config lookups. It
+runtime import resolution and the Node rules' TypeScript config lookups. Its
+small non-extended glob adapter is shared by path conversion and import
+restrictions; restriction ordering and messages stay inside the rule. It
 reuses tsgo's resolver and config parser through the Program's existing
 filesystem and generation-scoped cache. Resolution results retain failure
-details for missing-module diagnostics; rules select their exemptions and
-report on the collected source nodes. Relative lookup settings use the process
-directory from `RuleContext`, independently of the owning tsconfig's directory.
+details for missing-module diagnostics and target paths for restrictions,
+including lexical paths for unresolved local imports; rules select their
+exemptions and report on the collected source nodes. Relative lookup settings
+use the process directory from `RuleContext`, independently of the owning
+tsconfig's directory.
 The require collector also follows CommonJS module-object aliases to property
 reads. It delegates symbols and references to `RuleContext.Refs` and reuses
 tsgo's binding helpers; rules keep their own matching and diagnostic policy.

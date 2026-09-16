@@ -60,7 +60,7 @@ var NoExtraneousImportRule = rule.Rule{
 		// Resolution is immutable within a file, but every occurrence still
 		// needs its own diagnostic. Type-only and runtime imports may differ.
 		targets := map[targetKey]string{}
-		return nodeutil.VisitImports(false, func(source *ast.Node, specifier string, typeOnly bool) {
+		return nodeutil.VisitImports(nodeutil.ImportVisitorOptions{}, func(source *ast.Node, specifier string, typeOnly bool) {
 			key := targetKey{specifier, typeOnly}
 			name, found := targets[key]
 			if !found {

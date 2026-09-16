@@ -33,7 +33,7 @@ var NoMissingImportRule = rule.Rule{
 		allowed := nodeutil.StringListSetting("allowModules", opts, ctx.Settings)
 		var resolutionOptions [2]*nodeutil.ResolutionOptions
 		var resolveErrors [2]map[string]string
-		return nodeutil.VisitImports(ignoreTypeImport, func(source *ast.Node, specifier string, typeOnly bool) {
+		return nodeutil.VisitImports(nodeutil.ImportVisitorOptions{IgnoreTypeImport: ignoreTypeImport}, func(source *ast.Node, specifier string, typeOnly bool) {
 			index := 0
 			if typeOnly {
 				index = 1

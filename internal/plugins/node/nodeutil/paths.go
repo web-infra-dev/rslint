@@ -95,8 +95,6 @@ func isBinFile(fileName string, bin any, directory string) bool {
 	return false
 }
 
-var conversionGlobLiterals = strings.NewReplacer(`\`, `\\`, "?", `\?`, "[", `\[`, "]", `\]`)
-
 // ConvertPath applies the configured source-to-published path mapping.
 // The boolean is false if the conversion cannot be evaluated safely.
 func ConvertPath(fileName string, options, settings map[string]any) (string, bool) {
@@ -133,10 +131,7 @@ func ConvertPath(fileName string, options, settings map[string]any) (string, boo
 			return fileName, false
 		}
 		matches := func(pattern string) bool {
-			// globrex's convertPath mode disables extended syntax. Reuse
-			// minimatch with literal ?, classes and braces in this mode.
-			pattern = conversionGlobLiterals.Replace(pattern)
-			return minimatch3.Match(pattern, fileName, minimatch3.Options{Dot: true, NoBrace: true, NoExt: true, NoNegate: true, NoComment: true, PreserveWhitespace: true})
+			return CompileGlob(pattern).Match(fileName)
 		}
 		if slices.ContainsFunc(utils.ToStringSlice(value["include"]), matches) && !slices.ContainsFunc(utils.ToStringSlice(value["exclude"]), matches) {
 			converted, err := expression.ReplaceFirst(fileName, replacement[1])
