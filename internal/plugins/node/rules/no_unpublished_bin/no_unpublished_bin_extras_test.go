@@ -106,8 +106,9 @@ func TestNoUnpublishedBinConversion(t *testing.T) {
 			{Code: "", FileName: "conversion/src/cli.ts", Settings: map[string]any{"n": map[string]any{"convertPath": map[string]any{}}, "node": object}},
 			// Nested package metadata cannot exclude a file published by its owner.
 			{Code: "", FileName: "conversion-published/src/cli.ts", Options: nested},
-			// Invalid JS patterns are ignored instead of crashing the linter.
-			{Code: "", FileName: "conversion/src/cli.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{"[", "dist/cli.js"}}}},
+			// Shared settings retain their invalid-pattern fallback.
+			{Code: "", FileName: "extension/cli.js", Settings: map[string]any{"node": map[string]any{"convertPath": map[string]any{"**": []any{"[", "dist/cli.js"}}}}},
+			{Code: "", FileName: "extension/cli.js", Settings: map[string]any{"n": map[string]any{"convertPath": []any{map[string]any{"include": []any{"**"}, "replace": []any{"[", "dist/cli.js"}}}}}},
 			// Shared Node path resolution treats a leading slash as absolute.
 			// Upstream joins it to the package then rejects it as an ignore path.
 			{Code: "", FileName: "conversion/src/cli.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{".*", "/dist/cli.js"}}}},
@@ -122,6 +123,7 @@ func TestNoUnpublishedBinConversion(t *testing.T) {
 			{Code: "", FileName: "conversion/src/cli.ts", Settings: map[string]any{"n": object}, Errors: ignoredBin("dist/cli.js", 1, 1)},
 			{Code: "", FileName: "conversion/src/cli.ts", Settings: map[string]any{"n": map[string]any{"convertPath": nil}, "node": object}, Errors: ignoredBin("dist/cli.js", 1, 1)},
 			{Code: "", FileName: "conversion/src/cli.ts", Options: object, Settings: map[string]any{"node": nested}, Errors: ignoredBin("dist/cli.js", 1, 1)},
+			{Code: "", FileName: "conversion/src/cli.ts", Options: object, Settings: map[string]any{"node": map[string]any{"convertPath": map[string]any{"src/**": []any{"[", "dist/cli.js"}}}}, Errors: ignoredBin("dist/cli.js", 1, 1)},
 			{Code: "const view = <main />;\n", FileName: "conversion/src/cli.tsx", Tsx: true, Options: map[string]any{"convertPath": map[string]any{"src/**": []any{`^src/(.*)\.tsx$`, "dist/$1.js"}}}, Errors: ignoredBin("dist/cli.js", 2, 1)},
 			{Code: "", FileName: "conversion/src/cli.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{".*", "../outside.js"}}}, Errors: ignoredBin("../outside.js", 1, 1)},
 			// JavaScript lookahead and named replacements use the existing JS regexp helper.
@@ -141,11 +143,34 @@ func TestNoUnpublishedBinSchema(t *testing.T) {
 		map[string]any{"convertPath": nil}, map[string]any{"unknown": true},
 		map[string]any{"convertPath": []any{}},
 		map[string]any{"convertPath": map[string]any{"src/**": []any{"pattern"}}},
+		map[string]any{"convertPath": map[string]any{"src/**": []any{"pattern", false}}},
 		map[string]any{"convertPath": []any{map[string]any{"include": []any{}, "replace": []any{"x", "y"}}}},
+		map[string]any{"convertPath": []any{map[string]any{"include": []any{"src/**"}, "replace": []any{"pattern", false}}}},
 		map[string]any{"convertPath": []any{map[string]any{"include": []any{"src/**"}}}},
 	} {
 		if err := NoUnpublishedBinRule.Schema.Validate(rule.NormalizeOptions(options)); err == nil {
 			t.Errorf("accepted invalid options %#v", options)
+		}
+	}
+	// Only the first replacement item is a JS regexp. Glob patterns and the
+	// replacement text may contain characters that are invalid as regexps.
+	for _, test := range []struct {
+		pattern any
+		valid   bool
+	}{
+		{"[", false}, {"(", false}, {`(?<name>`, false}, {42, false},
+		{"", true}, {`(?<=src/)(?<name>.+)\.ts$`, true},
+		{`(?=src/)(src)/\1`, true}, {`\a`, true},
+		{`^[A-Z]:[\\/]`, true}, {`^src[\\/]`, true},
+	} {
+		for _, conversion := range []any{
+			map[string]any{"src/[": []any{test.pattern, "["}},
+			[]any{map[string]any{"include": []any{"src/["}, "exclude": []any{"("}, "replace": []any{test.pattern, "["}}},
+		} {
+			options := []any{map[string]any{"convertPath": conversion}}
+			if err := NoUnpublishedBinRule.Schema.Validate(options); (err == nil) != test.valid {
+				t.Errorf("convertPath %#v: error = %v, want valid = %v", conversion, err, test.valid)
+			}
 		}
 	}
 	NoUnpublishedBinRule.Run(rule.RuleContext{}, nil)

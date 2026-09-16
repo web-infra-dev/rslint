@@ -12,9 +12,10 @@
               "patternProperties": {
                 "^.+$": {
                   "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
+                  "items": [
+                    { "type": "string", "format": "regex" },
+                    { "type": "string" }
+                  ],
                   "minItems": 2,
                   "maxItems": 2
                 }
@@ -43,9 +44,10 @@
                   },
                   "replace": {
                     "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
+                    "items": [
+                      { "type": "string", "format": "regex" },
+                      { "type": "string" }
+                    ],
                     "minItems": 2,
                     "maxItems": 2
                   }
