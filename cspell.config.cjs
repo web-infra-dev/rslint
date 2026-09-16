@@ -16,7 +16,7 @@ module.exports = {
     'packages/rslint-test-tools/tests',
     'packages/rslint/THIRD-PARTY-NOTICES.md',
     'packages/rslint/pkg/mod',
-    'packages/rslint/rule-schemas.json',
+    '**/*schema*.json',
     'cmd/tsgo',
     './agents',
     'crates/rslint-native/index.js',
@@ -31,15 +31,6 @@ module.exports = {
     'internal/plugins/react/rules/no_typos/no_typos.md',
     'internal/plugins/react/rules/no_unused_prop_types/no_unused_prop_types_upstream.json',
     'website/docs/en/rules/*/',
-  ],
-  overrides: [
-    {
-      filename:
-        'internal/plugins/node/rules/no_deprecated_api/no_deprecated_api.schema.json',
-      // Fixed upstream API identifier in the option enum.
-      // cspell:ignore freelist
-      ignoreRegExpList: ['/"freelist"/g'],
-    },
   ],
   dictionaries: ['dictionary'],
   dictionaryDefinitions: [
