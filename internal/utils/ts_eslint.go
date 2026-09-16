@@ -997,6 +997,29 @@ func findFirstParsedOpenParenStart(sourceFile *ast.SourceFile, node *ast.Node, m
 	return parenPos
 }
 
+// ESTreeFunctionRange returns a function's range, including a method's function
+// value but excluding its key, modifiers, and decorators.
+func ESTreeFunctionRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	var start int
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		start = scanner.SkipTrivia(sourceFile.Text(), node.Name().End())
+		if node.QuestionToken() != nil {
+			start = scanner.SkipTrivia(sourceFile.Text(), node.QuestionToken().End())
+		}
+	case ast.KindConstructor:
+		keywordStart := node.Pos()
+		if modifiers := node.Modifiers(); modifiers != nil {
+			keywordStart = modifiers.End()
+		}
+		keyword := scanner.GetRangeOfTokenAtPosition(sourceFile, keywordStart)
+		start = scanner.SkipTrivia(sourceFile.Text(), keyword.End())
+	default:
+		start = FindFunctionKeywordPos(sourceFile, node)
+	}
+	return core.NewTextRange(start, node.End())
+}
+
 // FindFunctionKeywordPos returns the start position of the function head,
 // skipping only `export` and `default` keywords. Other modifiers like `async`
 // and `declare` are kept because they are part of the function signature

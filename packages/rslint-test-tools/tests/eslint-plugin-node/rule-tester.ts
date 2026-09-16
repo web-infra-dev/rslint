@@ -15,6 +15,7 @@ interface ExpectedError {
 interface LanguageOptions {
   globals?: Record<string, 'readonly' | 'writable' | 'off'>;
   sourceType?: 'script' | 'module' | 'commonjs';
+  parserOptions?: { project?: string[] };
 }
 
 interface TestCase {
@@ -95,7 +96,11 @@ export class RuleTester {
                       ...this.config.languageOptions?.globals,
                       ...item.languageOptions?.globals,
                     },
-                    parserOptions: { projectService: false },
+                    parserOptions: {
+                      projectService: false,
+                      ...this.config.languageOptions?.parserOptions,
+                      ...item.languageOptions?.parserOptions,
+                    },
                   },
                   settings: item.settings,
                   rules: {

@@ -121,6 +121,93 @@ func TestTypeMatchesSomeSpecifierFromPackage(t *testing.T) {
 	assert.Equal(t, matches("("), false)
 }
 
+func TestTypeMatchesDeclarationSpecifier(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+	filePath := resolve("file.ts")
+	fs := NewOverlayVFS(baseFS, map[string]string{
+		filePath: `import type { External } from "demo-pkg";
+import type { Named, Nested } from "ambient";
+class Local {}
+type LocalType = Local;
+type ExternalType = External;
+type LibraryType = string;
+type AmbientType = Named;
+type NestedType = Nested.Inner;
+type CustomType = Custom;`,
+		resolve("tsconfig.json"):                      `{"compilerOptions":{"strict":true,"typeRoots":["./types"]}}`,
+		resolve("node_modules/demo-pkg/package.json"): `{"name":"demo-pkg","version":"1.0.0","types":"index.d.ts"}`,
+		resolve("node_modules/demo-pkg/index.d.ts"):   `export declare class External {}`,
+		resolve("ambient.d.ts"):                       `declare module "ambient" { export class Named {} export namespace Nested { class Inner {} } }`,
+		resolve("types/custom.d.ts"):                  `interface Custom { value: string }`,
+	})
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err)
+	c, done := program.GetTypeChecker(t.Context())
+	defer done()
+	types := map[string]*checker.Type{}
+	for _, node := range program.GetSourceFile(filePath).Statements.Nodes {
+		if ast.IsTypeAliasDeclaration(node) {
+			types[node.Name().Text()] = c.GetTypeAtLocation(node.Name())
+		}
+	}
+	for _, test := range []struct {
+		name   string
+		option map[string]any
+		want   bool
+	}{
+		{"LocalType", map[string]any{"from": "file"}, true},
+		{"LocalType", map[string]any{"from": "file", "path": "./file.ts"}, true},
+		{"LocalType", map[string]any{"from": "file", "path": "**/file.ts"}, true},
+		{"LocalType", map[string]any{"from": "file", "path": "file.ts"}, false},
+		{"LocalType", map[string]any{"from": "file", "path": ""}, false},
+		{"LocalType", map[string]any{"from": "package"}, false},
+		{"LibraryType", map[string]any{"from": "lib"}, true},
+		{"LibraryType", map[string]any{"from": "file"}, false},
+		{"ExternalType", map[string]any{"from": "package"}, true},
+		{"ExternalType", map[string]any{"from": "package", "package": "demo", "name": []any{"unrelated"}}, true},
+		{"ExternalType", map[string]any{"from": "package", "package": "other"}, false},
+		{"ExternalType", map[string]any{"from": "file"}, false},
+		{"AmbientType", map[string]any{"from": "package"}, true},
+		{"AmbientType", map[string]any{"from": "package", "package": "ambient"}, true},
+		{"AmbientType", map[string]any{"from": "package", "package": ""}, false},
+		// Declaration-location matching stops at the nearest namespace, unlike
+		// the existing TypeScript-ESLint specifier's transparent namespace walk.
+		{"NestedType", map[string]any{"from": "package"}, false},
+		{"NestedType", map[string]any{"from": "file"}, true},
+		{"CustomType", map[string]any{"from": "file"}, false},
+	} {
+		specifier, ok := ParseTypeOrValueSpecifier(test.option)
+		assert.Assert(t, ok)
+		assert.Assert(t, types[test.name] != nil)
+		assert.Equal(t, TypeMatchesDeclarationSpecifier(types[test.name], specifier, lintprogram.NewFromCompiler(program)), test.want, "%s: %v", test.name, test.option)
+	}
+	// Directly constructed specifiers honor non-empty paths and package names,
+	// just like specifiers decoded from rule options.
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(types["LocalType"], TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromFile, Path: "./missing.ts",
+	}, lintprogram.NewFromCompiler(program)), false)
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(types["AmbientType"], TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromPackage, Package: "other",
+	}, lintprogram.NewFromCompiler(program)), false)
+}
+
+func TestTypeMatchesDeclarationSpecifierDefaultTypeRoots(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+	filePath := resolve("file.ts")
+	fs := NewOverlayVFS(baseFS, map[string]string{
+		filePath:                 `type Test = DefaultRoot;`,
+		resolve("tsconfig.json"): `{"compilerOptions":{"types":[]},"files":["file.ts","node_modules/@types/global/index.d.ts"]}`,
+		resolve("node_modules/@types/global/index.d.ts"): `interface DefaultRoot { value: string }`,
+	})
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err)
+	c, done := program.GetTypeChecker(t.Context())
+	defer done()
+	specifier, ok := ParseTypeOrValueSpecifier(map[string]any{"from": "file", "path": "**/*.ts"})
+	assert.Assert(t, ok)
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, filePath), specifier, lintprogram.NewFromCompiler(program)), false)
+}
+
 // A workspace package is installed as a link, so its declarations resolve to a
 // real path outside node_modules while still belonging to the linked package.
 func TestTypeMatchesSomeSpecifierFromLinkedWorkspacePackage(t *testing.T) {

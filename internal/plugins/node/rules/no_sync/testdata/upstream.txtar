@@ -1,0 +1,13 @@
+// Declarations from eslint-plugin-n v18.3.0 no-sync fixtures and documentation.
+-- tsconfig.json --
+{"compilerOptions":{"target":"ESNext","module":"ESNext","moduleResolution":"Bundler","strict":true,"skipLibCheck":true,"allowJs":true,"checkJs":true,"jsx":"preserve","types":[]},"include":["**/*"]}
+-- node_modules/aaa/package.json --
+{"name":"aaa","version":"1.0.0","types":"index.d.ts"}
+-- node_modules/aaa/index.d.ts --
+export function fooSync(): void;
+-- foo.ts --
+export function fooSync(): void {}
+-- node_modules/effect/package.json --
+{"name":"effect","version":"1.0.0","types":"index.d.ts"}
+-- node_modules/effect/index.d.ts --
+export declare namespace Effect { function runSync(value: unknown): unknown; function succeed(value: number): unknown; }

@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 type TypeOrValueSpecifierFrom uint8
@@ -37,7 +38,8 @@ type TypeOrValueSpecifier struct {
 	// pathProvided distinguishes an omitted path from an explicitly empty one.
 	// Both decode to Path == "", but upstream treats only the omitted form as
 	// matching declarations anywhere in the current project.
-	pathProvided bool
+	pathProvided    bool
+	packageProvided bool
 }
 
 // ParseTypeOrValueSpecifier decodes one entry of a type specifier option from
@@ -96,6 +98,7 @@ func ParseTypeOrValueSpecifier(raw any) (TypeOrValueSpecifier, bool) {
 			return TypeOrValueSpecifier{}, false
 		}
 		specifier.Package = str
+		specifier.packageProvided = true
 	}
 	return specifier, true
 }
@@ -235,13 +238,14 @@ func typeDeclaredInLib(
 
 func findParentModuleDeclaration(
 	node *ast.Node,
+	skipNamespaces bool,
 ) *ast.ModuleDeclaration {
 	switch node.Kind {
 	case ast.KindModuleDeclaration:
 		decl := node.AsModuleDeclaration()
-		// A namespace is transparent here: what it wraps still belongs to
-		// whichever `declare module "pkg"` encloses the namespace itself.
-		if decl.Keyword != ast.KindNamespaceKeyword {
+		// TypeScript-ESLint treats namespaces as transparent; declaration-location
+		// matching instead stops at the nearest module or namespace.
+		if !skipNamespaces || decl.Keyword != ast.KindNamespaceKeyword {
 			if ast.IsStringLiteral(decl.Name()) {
 				return decl
 			}
@@ -250,7 +254,7 @@ func findParentModuleDeclaration(
 	case ast.KindSourceFile:
 		return nil
 	}
-	return findParentModuleDeclaration(node.Parent)
+	return findParentModuleDeclaration(node.Parent, skipNamespaces)
 }
 
 func typeDeclaredInDeclareModule(
@@ -258,36 +262,36 @@ func typeDeclaredInDeclareModule(
 	declarations []*ast.Node,
 ) bool {
 	return Some(declarations, func(d *ast.Node) bool {
-		parentModule := findParentModuleDeclaration(d)
+		parentModule := findParentModuleDeclaration(d, true)
 		return parentModule != nil && parentModule.Name().Text() == packageName
 	})
 }
 
-// packageMatchers caches the compiled matcher per `package` specifier, which
-// comes from the rule options and so takes only a handful of distinct values.
-var packageMatchers sync.Map // package name -> *esregexp.RegExp, nil when the pattern is invalid
+// packageMatchers caches the compiled matcher per package pattern and flags.
+var packageMatchers sync.Map // [2]string -> *esregexp.RegExp, nil when invalid
 
 // packageMatcher builds `new RegExp(`${packageName}|${typesPackageName}`)`. The
 // pattern carries no anchors, so "demo" matches "demo-pkg" as well.
-func packageMatcher(packageName string) *esregexp.RegExp {
-	if cached, ok := packageMatchers.Load(packageName); ok {
+func packageMatcher(packageName, flags string) *esregexp.RegExp {
+	key := [2]string{packageName, flags}
+	if cached, ok := packageMatchers.Load(key); ok {
 		matcher, _ := cached.(*esregexp.RegExp)
 		return matcher
 	}
-	matcher, err := esregexp.Compile(packageName+"|"+module.MangleScopedPackageName(packageName), "")
+	matcher, err := esregexp.Compile(packageName+"|"+module.MangleScopedPackageName(packageName), flags)
 	if err != nil {
 		matcher = nil
 	}
-	packageMatchers.Store(packageName, matcher)
+	packageMatchers.Store(key, matcher)
 	return matcher
 }
 
 func typeDeclaredInDeclarationFile(
-	packageName string,
+	packageName, flags string,
 	declarationFiles []*ast.SourceFile,
 	program *program.Program,
 ) bool {
-	matcher := packageMatcher(packageName)
+	matcher := packageMatcher(packageName, flags)
 	if matcher == nil {
 		return false
 	}
@@ -311,7 +315,7 @@ func typeDeclaredInPackageDeclarationFile(
 	program *program.Program,
 ) bool {
 	return typeDeclaredInDeclareModule(packageName, declarations) ||
-		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
+		typeDeclaredInDeclarationFile(packageName, "", declarationFiles, program)
 }
 
 func typeMatchesSpecifier(
@@ -372,6 +376,65 @@ func typeMatchesSpecifier(
 		return Some(parts, func(part *checker.Type) bool {
 			return typeMatchesSpecifier(part, specifier, program, calleeNames)
 		})
+	}
+	return false
+}
+
+// TypeMatchesDeclarationSpecifier matches only a type's declaration origin.
+// Unlike TypeMatchesSomeSpecifier, it does not inspect names, aliases, or union
+// constituents. File specifiers accept globs and exclude libraries/packages.
+func TypeMatchesDeclarationSpecifier(t *checker.Type, specifier TypeOrValueSpecifier, program *program.Program) bool {
+	var declarations []*ast.Node
+	if symbol := checker.Type_symbol(t); symbol != nil {
+		declarations = symbol.Declarations
+	}
+	files := Map(declarations, ast.GetSourceFileOfNode)
+	isLib := typeDeclaredInLib(files, program)
+	if specifier.From == TypeOrValueSpecifierFromLib {
+		return isLib
+	}
+	if isLib {
+		return false
+	}
+	// An empty package pattern matches every resolved external package. Ambient
+	// module declarations also count when no particular package was requested.
+	packageName := ""
+	if specifier.From == TypeOrValueSpecifierFromPackage {
+		packageName = specifier.Package
+	}
+	isPackage := typeDeclaredInDeclarationFile(packageName, "u", files, program) || Some(declarations, func(declaration *ast.Node) bool {
+		module := findParentModuleDeclaration(declaration, false)
+		return module != nil && (specifier.From != TypeOrValueSpecifierFromPackage || !specifier.packageProvided && specifier.Package == "" || module.Name().Text() == packageName)
+	})
+	if specifier.From == TypeOrValueSpecifierFromPackage {
+		return isPackage
+	}
+	if specifier.From != TypeOrValueSpecifierFromFile || isPackage {
+		return false
+	}
+	canonical := func(name string) string {
+		return tspath.GetCanonicalFileName(tspath.NormalizePath(name), program.FS().UseCaseSensitiveFileNames())
+	}
+	cwd := canonical(program.CurrentDirectory())
+	typeRoots, _ := program.Options().GetEffectiveTypeRoots(program.CurrentDirectory())
+	for _, file := range files {
+		name := canonical(file.FileName())
+		if Some(typeRoots, func(root string) bool { return strings.HasPrefix(name, canonical(root)) }) {
+			continue
+		}
+		if !specifier.pathProvided && specifier.Path == "" {
+			if !strings.Contains(name, "/node_modules/") {
+				return true
+			}
+			continue
+		}
+		if !strings.HasPrefix(name, cwd) {
+			continue
+		}
+		relative := tspath.GetRelativePathFromDirectory(cwd, name, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()})
+		if minimatch3.Match(specifier.Path, name, minimatch3.Options{}) || minimatch3.Match(specifier.Path, "./"+relative, minimatch3.Options{}) {
+			return true
+		}
 	}
 	return false
 }
