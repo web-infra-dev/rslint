@@ -145,3 +145,27 @@ func TestMatcherGitPatternMeaning(t *testing.T) {
 		})
 	}
 }
+
+func TestMatcherScopedText(t *testing.T) {
+	matcher := NewMatcherFromTextSources([]TextSource{
+		{Text: "*.js\r\nblocked/\r\n"},
+		{BaseDir: "sub", Text: "!keep.js\n/root-only.txt\n[!b]oo.txt\nliteral\\?.txt\ntrailing\\ \n\tname\t"},
+		{BaseDir: "blocked", Text: "!keep.js"},
+		{BaseDir: "lib[1]", Text: "hidden.txt"},
+	}, false)
+	for _, test := range []struct {
+		path string
+		want bool
+	}{
+		{"keep.js", true}, {"sub/keep.js", false}, {"sub/deep/keep.js", false},
+		{"blocked/keep.js", true}, {"sub/root-only.txt", true}, {"sub/deep/root-only.txt", false},
+		{"sub/foo.txt", true}, {"sub/boo.txt", false},
+		{"sub/literal?.txt", true}, {"sub/literalX.txt", false},
+		{"sub/trailing ", true}, {"sub/trailing", false}, {"sub/\tname\t", true},
+		{"lib[1]/hidden.txt", true}, {"lib1/hidden.txt", false},
+	} {
+		if got := matcher.Match(test.path); got != test.want {
+			t.Errorf("Match(%q) = %v, want %v", test.path, got, test.want)
+		}
+	}
+}

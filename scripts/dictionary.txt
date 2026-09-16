@@ -430,6 +430,7 @@ noteref
 NOTMATCHED
 notunique
 NOTX
+npmignore
 nsec
 nullary
 Nullishness

@@ -1,0 +1,44 @@
+Fixtures from eslint-plugin-n v18.3.0 tests/fixtures/no-top-level-await.
+
+-- dot-slash-files/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "files": [
+        "./lib"
+    ]
+}
+
+-- simple-bin/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "bin": "a.js"
+}
+
+-- simple-files/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "files": [
+        "lib"
+    ]
+}
+
+-- simple-npmignore/.npmignore --
+/src
+
+-- simple-npmignore/package.json --
+{
+    "name": "test",
+    "version": "1.0.0"
+}
+
+-- slash-files/package.json --
+{
+    "name": "test",
+    "version": "1.0.0",
+    "files": [
+        "/lib"
+    ]
+}

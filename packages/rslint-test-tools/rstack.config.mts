@@ -184,6 +184,7 @@ define.test({
     './tests/eslint-plugin-node/rules/no-process-env.test.ts',
     './tests/eslint-plugin-node/rules/no-process-exit.test.ts',
     './tests/eslint-plugin-node/rules/no-restricted-import.test.ts',
+    './tests/eslint-plugin-node/rules/no-top-level-await.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',

@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -95,6 +96,33 @@ func TestHashbangPaths(t *testing.T) {
 	}
 }
 
+type caseInsensitiveFS struct{ vfs.FS }
+
+func (caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
+
+func TestHashbangPublicationPathCasing(t *testing.T) {
+	root := hashbangRoot(t)
+	options := map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{
+		"lib/**": []any{"^lib/", "../STRING-BIN/lib/"},
+	}}
+	const code = "#!/usr/bin/env node\nhello();"
+	// On a sensitive filesystem this conversion leaves the source package.
+	t.Run("sensitive", func(t *testing.T) {
+		rule_tester.RunRuleTester(root, "tsconfig.json", t, &HashbangRule,
+			[]rule_tester.ValidTestCase{{FileName: "string-bin/lib/test.js", Code: code, Options: options}}, nil)
+	})
+	t.Run("insensitive", func(t *testing.T) {
+		insensitiveRoot := root
+		insensitiveRoot.FS = caseInsensitiveFS{root.FS}
+		rule_tester.RunRuleTester(insensitiveRoot, "tsconfig.json", t, &HashbangRule, nil,
+			[]rule_tester.InvalidTestCase{{
+				FileName: "string-bin/lib/test.js", Code: code, Options: options,
+				Output: []string{"hello();"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbang", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}},
+			}})
+	})
+}
+
 func TestHashbangUnpublished(t *testing.T) {
 	root := hashbangRoot(t)
 	archive := txtarfs.MustParseFile(t, "testdata/publishing.txtar")
@@ -151,8 +179,7 @@ func TestHashbangUnpublished(t *testing.T) {
 			if pkg == nil {
 				t.Fatal("package not found")
 			}
-			relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), absolute, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
-			if got := nodeutil.IsUnpublished(p, absolute, relative); got != test.want {
+			if got := nodeutil.IsUnpublished(p, pkg, absolute); got != test.want {
 				t.Errorf("unpublished = %v, want %v", got, test.want)
 			}
 		})
@@ -162,10 +189,15 @@ func TestHashbangUnpublished(t *testing.T) {
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &HashbangRule,
 		[]rule_tester.ValidTestCase{
 			{FileName: "newline-files/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
+			// Nested package files cannot include a target excluded by its publisher.
+			{FileName: "converted/src/library.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{"src/**": []any{"^src/", "nested/lib/"}}}},
 			{FileName: "unrooted-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
 			{FileName: "unrooted-extended-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// The source package owns both publication and executable paths.
+			{FileName: "converted/src/cli.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{"src/**": []any{"^src/", "lib/nested/"}}}, Output: []string{"#!/usr/bin/env node\nhello();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbangNode", Line: 1, Column: 1, EndLine: 1, EndColumn: 9}}},
+			{FileName: "converted/src/library.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{"src/**": []any{"^src/", "lib/nested/"}}}, Output: []string{"hello();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbang", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}}},
 			{
 				FileName: "class-exclusion/lib/foo.js",
 				Code:     "hello();",

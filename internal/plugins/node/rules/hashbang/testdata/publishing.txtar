@@ -42,3 +42,11 @@ lib/drop.js
 {"bin":"lib/foo.js","files":["lib/[!b]oo.js","lib/[^b]oo.js"]}
 -- newline-files/package.json --
 {"bin":"lib/foo.js","files":["lib/foo.js\nbar.js"]}
+-- converted/package.json --
+{"files":["lib"],"bin":"lib/nested/cli.js"}
+
+-- converted/lib/nested/package.json --
+{"files":[]}
+
+-- converted/nested/package.json --
+{"files":["lib"]}

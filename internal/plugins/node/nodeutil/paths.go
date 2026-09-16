@@ -156,41 +156,32 @@ var neverIgnored = esregexp.MustCompile(`^(?:readme\.[^.]*|(?:licen[cs]e|changes
 type publicationKey string
 
 type publication struct {
-	hasFiles, hasIgnore                bool
+	hasFiles                           bool
 	ignore, includes, excludes         *gitignore.Matcher
+	ignoreText                         string
 	extendedIncludes, extendedExcludes []*minimatch3.Matcher
 }
 
 // IsUnpublished applies eslint-plugin-n publication policy, including files,
 // npmignore/gitignore precedence, exclusions, and always-published metadata.
-// convertedPath is the mapping relative to the source package; absolute is its
-// resolved target. A nested target package supplies its own publication paths.
-func IsUnpublished(p *program.Program, absolute, convertedPath string) bool {
-	// Resolve interior . and .. before testing the ancestor component.
-	convertedPath = tspath.NormalizePath(convertedPath)
-	if convertedPath == ".." || strings.HasPrefix(convertedPath, "../") {
+// pkg is the source's publishing package; absolute is the converted target.
+// Nested package metadata cannot change what the publishing package includes.
+func IsUnpublished(p *program.Program, pkg *PackageJSON, absolute string) bool {
+	comparison := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: p.FS().UseCaseSensitiveFileNames()}
+	if !tspath.ContainsPath(pkg.directory, absolute, comparison) {
 		return true
 	}
-	pkg := FindPackage(p, absolute)
-	if pkg == nil {
-		return false
-	}
-	// Publication patterns belong to the package containing the converted
-	// target. Rebase the path if conversion entered a nested package.
-	relative := tspath.GetRelativePathFromDirectory(pkg.directory, absolute, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+	relative := tspath.GetRelativePathFromDirectory(pkg.directory, absolute, comparison)
 	published := program.Cached(p, publicationKey(pkg.directory), func() *publication {
 		return compilePublication(p, pkg)
 	})
-	if !published.hasFiles && !published.hasIgnore {
-		return false
-	}
 	if main, ok := pkg.data["main"].(string); ok && tspath.ResolvePath(pkg.directory, main) == tspath.ResolvePath(pkg.directory, relative) {
 		return false
 	}
 	if relative == "package.json" || neverIgnored.Test(relative) {
 		return false
 	}
-	if published.ignore.Match(relative) {
+	if publicationIgnored(p, pkg.directory, relative, published) {
 		return true
 	}
 	if !published.hasFiles {
@@ -202,15 +193,41 @@ func IsUnpublished(p *program.Program, absolute, convertedPath string) bool {
 	return !included || excluded
 }
 
+type publicationIgnoreKey struct{ packageDirectory, directory string }
+
+func publicationIgnored(p *program.Program, packageDirectory, relative string, published *publication) bool {
+	directory := tspath.GetDirectoryPath(relative)
+	if directory == "" {
+		return published.ignore.Match(relative)
+	}
+	matcher := program.Cached(p, publicationIgnoreKey{packageDirectory, directory}, func() *gitignore.Matcher {
+		sources := []gitignore.TextSource{{Text: published.ignoreText}}
+		base := ""
+		for _, part := range strings.Split(directory, "/") {
+			base = tspath.CombinePaths(base, part)
+			text, ok := p.FS().ReadFile(tspath.ResolvePath(packageDirectory, base, ".npmignore"))
+			if !ok {
+				text, _ = p.FS().ReadFile(tspath.ResolvePath(packageDirectory, base, ".gitignore"))
+			}
+			if text != "" {
+				sources = append(sources, gitignore.TextSource{BaseDir: base, Text: text})
+			}
+		}
+		return gitignore.NewMatcherFromTextSources(sources, false)
+	})
+	return matcher.Match(relative)
+}
+
 func compilePublication(p *program.Program, pkg *PackageJSON) *publication {
 	files, hasFiles := pkg.data["files"].([]any)
 	ignoreText, hasIgnore := p.FS().ReadFile(tspath.ResolvePath(pkg.directory, ".npmignore"))
 	if !hasIgnore && !hasFiles {
 		ignoreText, hasIgnore = p.FS().ReadFile(tspath.ResolvePath(pkg.directory, ".gitignore"))
 	}
-	published := &publication{hasFiles: hasFiles, hasIgnore: hasIgnore}
+	published := &publication{hasFiles: hasFiles}
 	if hasIgnore {
 		published.ignore = gitignore.NewMatcherFromText(ignoreText, false)
+		published.ignoreText = ignoreText
 	}
 	var includes, excludes []string
 	var extendedIncludes, extendedExcludes []string

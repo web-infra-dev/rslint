@@ -86,7 +86,7 @@ var HashbangRule = rule.Rule{
 		}
 		absolute := tspath.ResolvePath(pkg.Directory(), converted)
 		additional := nodeutil.MatchIgnorePatterns(program, utils.ToStringSlice(opts["additionalExecutables"]), converted)
-		if ignore, _ := opts["ignoreUnpublished"].(bool); ignore && !additional && nodeutil.IsUnpublished(program, absolute, converted) {
+		if ignore, _ := opts["ignoreUnpublished"].(bool); ignore && !additional && nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
 		needsShebang := additional || pkg.IsBinFile(absolute)
