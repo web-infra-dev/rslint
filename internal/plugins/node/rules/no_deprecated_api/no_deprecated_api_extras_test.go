@@ -713,7 +713,7 @@ func TestNoDeprecatedAPIVersionMetadata(t *testing.T) {
 		{file: "input.js", options: []any{map[string]any{"version": ">=5.10.0-1beta"}}},
 		{file: "input.js", options: []any{map[string]any{"version": "<=4294967296"}}},
 		{file: "input.js", options: []any{map[string]any{"version": "^0.0.4294967295"}}},
-		{file: "input.js", options: []any{map[string]any{"version": ">4294967295"}}},
+		{file: "input.js", replace: true, options: []any{map[string]any{"version": ">4294967295"}}},
 		{file: "input.js", replace: true, options: []any{map[string]any{"version": "5.x.1"}}},
 	} {
 		message := "'Buffer()' was deprecated since v6.0.0"

@@ -2,6 +2,7 @@ package prefer_node_protocol_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -74,18 +75,39 @@ func TestPreferNodeProtocolSchema(t *testing.T) {
 }
 
 func TestPreferNodeProtocolOversizedVersion(t *testing.T) {
-	for _, version := range []string{"<=4294967296", ">=12 <4294967296", "~12.4294967295.0", "^0.0.4294967295", ">4294967295"} {
-		t.Run(version, func(t *testing.T) {
-			runProtocolTests(t, []rule_tester.ValidTestCase{{
-				Code: `import "fs"; require("fs");`, Options: map[string]any{"version": version},
-				Settings: map[string]any{"node": map[string]any{"version": ">=16"}},
-			}}, []rule_tester.InvalidTestCase{{
-				Code: `process.getBuiltinModule("fs");`, Options: map[string]any{"version": version},
-				Output: []string{`process.getBuiltinModule("node:fs");`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 26, EndLine: 1, EndColumn: 30}},
-			}})
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct {
+		version  string
+		esm, cjs bool
+	}{
+		{"<=4294967296", false, false},
+		{">=12 <4294967296", false, false},
+		{"~12.4294967295.0", true, false},
+		{"^0.0.4294967295", false, false},
+		{">4294967295", true, true},
+		{">=16 <4294967296", true, true},
+		{"14.13.4294967296", true, false},
+		{"9007199254740991.0.0", true, true},
+	} {
+		output := `import "fs";` + "\n" + `require("fs");` + "\n" + `process.getBuiltinModule("node:fs");`
+		var errors []rule_tester.InvalidTestCaseError
+		if test.esm {
+			output = strings.Replace(output, `import "fs"`, `import "node:fs"`, 1)
+			errors = append(errors, rule_tester.InvalidTestCaseError{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12})
+		}
+		if test.cjs {
+			output = strings.Replace(output, `require("fs")`, `require("node:fs")`, 1)
+			errors = append(errors, rule_tester.InvalidTestCaseError{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 2, Column: 9, EndLine: 2, EndColumn: 13})
+		}
+		errors = append(errors, rule_tester.InvalidTestCaseError{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 3, Column: 26, EndLine: 3, EndColumn: 30})
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     `import "fs";` + "\n" + `require("fs");` + "\n" + `process.getBuiltinModule("fs");`,
+			Options:  map[string]any{"version": test.version},
+			Settings: map[string]any{"node": map[string]any{"version": ">=16"}},
+			Output:   []string{output}, Errors: errors,
 		})
 	}
+	runProtocolTests(t, nil, invalid)
 }
 
 func TestPreferNodeProtocolBindings(t *testing.T) {

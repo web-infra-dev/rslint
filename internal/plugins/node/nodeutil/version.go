@@ -3,6 +3,7 @@ package nodeutil
 import (
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -13,15 +14,14 @@ import (
 
 // NodeVersion contains normalized comparator alternatives from tsgo's semver parser.
 // Node rules use it to decide whether every supported runtime provides an API.
-type NodeVersion struct {
-	alternatives [][]versionComparator
-	uncertain    bool
-}
+type NodeVersion struct{ alternatives [][]versionComparator }
 type versionComparator struct {
 	operator   string
-	version    semver.Version
+	version    [3]uint64
 	prerelease []string
 }
+
+const maxNodeVersionComponent = 1<<53 - 1
 
 // The patterns are repository-authored npm range syntax, not user regexps.
 var versionPrefix = regexp.MustCompile(`(^|[\s|<>=~^])v([0-9xX*])`)
@@ -48,7 +48,7 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 	text = strings.ReplaceAll(text, "~>", "~")
 	// npm treats an empty union arm as *, while tsgo drops it.
 	arms := strings.Split(text, "||")
-	uncertain := false
+	var largeComponents map[uint64]uint64
 	for i, arm := range arms {
 		if ecmascript.StringTrim(arm) == "" {
 			arms[i] = "*"
@@ -72,26 +72,40 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 			if hasPrerelease && !versionPrerelease.MatchString(prerelease) {
 				return NodeVersion{}, false
 			}
-			// Keep valid extreme ranges in their configuration precedence slot.
-			// Also guard MaxUint32 itself: range expansion can increment it.
-			// Substitute only for grammar validation, never for comparisons.
+			// tsgo expands ranges using uint32 components. Encode large values
+			// in the upper half of that space, reserving their successor too:
+			// expansion only copies, zeroes or increments a component. Restore
+			// the original values before comparing any bounds. Encoding every
+			// value above MaxInt32 prevents collisions with ordinary components
+			// and their successors; zero/nonzero caret semantics stay intact.
 			if len(base) < 10 {
 				continue
 			}
 			parts := strings.Split(base, ".")
 			changed := false
 			for k, part := range parts {
+				if part == "x" || part == "X" || part == "*" {
+					break // The compiler ignores all following numeric components.
+				}
 				if len(part) < 10 || part[0] == '0' {
 					continue
 				}
 				value, err := strconv.ParseUint(part, 10, 64)
-				if err == nil && value >= math.MaxUint32 {
-					if value > 1<<53-1 {
+				if err == nil && value > math.MaxInt32 {
+					if value > maxNodeVersionComponent {
 						return NodeVersion{}, false
 					}
-					parts[k] = "1"
+					encoded := uint64(math.MaxInt32) + 2 + uint64(len(largeComponents))
+					if encoded >= math.MaxUint32 {
+						return NodeVersion{}, false
+					}
+					if largeComponents == nil {
+						largeComponents = make(map[uint64]uint64)
+					}
+					largeComponents[encoded] = value
+					largeComponents[encoded+1] = value + 1
+					parts[k] = strconv.FormatUint(encoded, 10)
 					changed = true
-					uncertain = true
 				}
 			}
 			if changed {
@@ -104,14 +118,10 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 			arms[i] = strings.Join(tokens, " ")
 		}
 	}
-	// Keep range expansion and grammar validation in the compiler, including
-	// validation of ranges whose numeric bounds cannot be compared safely.
+	// Keep range expansion and grammar validation in the compiler.
 	parsed, ok := semver.TryParseVersionRange(strings.Join(arms, "||"))
 	if !ok {
 		return NodeVersion{}, false
-	}
-	if uncertain {
-		return NodeVersion{uncertain: true}, true
 	}
 	var result NodeVersion
 	var emptyAlternative []versionComparator
@@ -128,22 +138,11 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 			if operator == ">=" && !strings.Contains(arms[i], version) {
 				version = strings.TrimSuffix(version, "-0")
 			}
-			version, build, hasBuild := strings.Cut(version, "+")
-			base, prerelease, hasPrerelease := strings.Cut(version, "-")
-			if hasBuild {
-				base += "+" + build
-			}
-			value, err := semver.TryParseVersion(base)
-			if err != nil {
+			comparator, ok := parseVersionComparator(version, largeComponents)
+			if !ok {
 				return NodeVersion{}, false
 			}
-			comparator := versionComparator{operator: operator, version: value}
-			if hasPrerelease {
-				// The range parser accepts npm prereleases such as "1beta";
-				// TryParseVersion rejects them. Retain them separately and reuse
-				// the compiler's identifier comparison without parsing them again.
-				comparator.prerelease = strings.Split(prerelease, ".")
-			}
+			comparator.operator = operator
 			comparators = append(comparators, comparator)
 		}
 		// npm drops its canonical null-set arm from unions unless it is
@@ -156,6 +155,39 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 	}
 	if len(result.alternatives) == 0 {
 		result.alternatives = [][]versionComparator{emptyAlternative}
+	}
+	return result, true
+}
+
+func parseVersionComparator(text string, largeComponents map[uint64]uint64) (versionComparator, bool) {
+	text, build, hasBuild := strings.Cut(text, "+")
+	base, prerelease, hasPrerelease := strings.Cut(text, "-")
+	if hasBuild {
+		base += "+" + build
+	}
+	if _, err := semver.TryParseVersion(base); err != nil {
+		return versionComparator{}, false
+	}
+	// Reuse compiler validation, retaining npm's full integers for comparisons.
+	// Missing minor/patch components stay zero, as in the compiler.
+	base, _, _ = strings.Cut(base, "+")
+	var result versionComparator
+	i := 0
+	for part := range strings.SplitSeq(base, ".") {
+		value, _ := strconv.ParseUint(part, 10, 64)
+		if original, ok := largeComponents[value]; ok {
+			value = original
+		}
+		if value > maxNodeVersionComponent {
+			return versionComparator{}, false
+		}
+		result.version[i] = value
+		i++
+	}
+	if hasPrerelease {
+		// TryParseVersion rejects npm prereleases such as "1beta". Retain
+		// them separately and reuse the compiler's identifier comparison.
+		result.prerelease = strings.Split(prerelease, ".")
 	}
 	return result, true
 }
@@ -205,12 +237,13 @@ func ConfiguredNodeVersion(ctx rule.RuleContext, options map[string]any) NodeVer
 // Supports reports whether the configured range has no intersection with
 // versions below since, matching the replacement selection in eslint-plugin-n.
 func (version NodeVersion) Supports(since string) bool {
-	if version.uncertain {
+	boundary, ok := parseVersionComparator(since, nil)
+	if !ok {
 		return false
 	}
-	boundary := semver.MustParse(since)
+	boundary.operator = "<"
 	for _, alternative := range version.alternatives {
-		constraints := append(append([]versionComparator{}, alternative...), versionComparator{operator: "<", version: boundary})
+		constraints := append(append([]versionComparator{}, alternative...), boundary)
 		intersects := true
 		for i, left := range constraints {
 			for _, right := range constraints[i+1:] {
@@ -234,11 +267,8 @@ func (version NodeVersion) Supports(since string) bool {
 // range. Unlike Supports, it handles gaps between releases that gained a
 // feature, and excludes prereleases absent from the supported range.
 func (version NodeVersion) IsSubsetOf(supported string) bool {
-	if version.uncertain {
-		return false
-	}
 	domain, ok := parseNodeVersion(supported)
-	if !ok || domain.uncertain {
+	if !ok {
 		return false
 	}
 	for _, sub := range version.alternatives {
@@ -322,7 +352,7 @@ func (bound *versionComparator) admitsPrerelease(lower bool) bool {
 
 func hasPrereleaseTuple(comparators []versionComparator, bound *versionComparator) bool {
 	for _, c := range comparators {
-		if c.version.Compare(&bound.version) == 0 && len(c.prerelease) > 0 {
+		if c.version == bound.version && len(c.prerelease) > 0 {
 			return true
 		}
 	}
@@ -330,7 +360,7 @@ func hasPrereleaseTuple(comparators []versionComparator, bound *versionComparato
 }
 
 func (left versionComparator) compare(right versionComparator) int {
-	if cmp := left.version.Compare(&right.version); cmp != 0 {
+	if cmp := slices.Compare(left.version[:], right.version[:]); cmp != 0 {
 		return cmp
 	}
 	return semver.ComparePreReleaseIdentifiers(left.prerelease, right.prerelease)
@@ -338,7 +368,7 @@ func (left versionComparator) compare(right versionComparator) int {
 
 func comparatorsIntersect(left, right versionComparator) bool {
 	for _, comparator := range []versionComparator{left, right} {
-		if comparator.operator == "<" && strings.HasPrefix(comparator.version.String(), "0.0.0") {
+		if comparator.operator == "<" && comparator.version == [3]uint64{} {
 			return false
 		}
 	}
@@ -352,7 +382,7 @@ func comparatorsIntersect(left, right versionComparator) bool {
 		}
 		// A singleton prerelease needs a prerelease comparator on the same
 		// major/minor/patch tuple, even when the numeric bounds contain it.
-		if len(left.prerelease) > 0 && (len(right.prerelease) == 0 || left.version.Compare(&right.version) != 0) {
+		if len(left.prerelease) > 0 && (len(right.prerelease) == 0 || left.version != right.version) {
 			return false
 		}
 		switch right.operator {

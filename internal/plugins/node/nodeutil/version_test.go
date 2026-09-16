@@ -252,24 +252,62 @@ func TestInvalidNodeVersionRanges(t *testing.T) {
 	}
 }
 
+// Decisions independently checked against npm semver 7.8.5.
 func TestExtremeNodeVersionRanges(t *testing.T) {
-	for _, text := range []string{
-		"<=4294967296", ">=12 <4294967296", ">4294967295", "^0.0.4294967295",
-		"~12.4294967295.0", "12 - 4294967295", "^16 || <=4294967296", "<=9007199254740991",
+	for _, test := range []struct {
+		text                      string
+		valid, esm, cjs, supports bool
+	}{
+		{"<=4294967296", true, false, false, false},
+		{">=12 <4294967296", true, false, false, true},
+		{">4294967295", true, true, true, true},
+		{">=16 <4294967296", true, true, true, true},
+		{"^0.0.4294967295", true, false, false, false},
+		{"~12.4294967295.0", true, true, false, true},
+		{"12 - 4294967295", true, false, false, true},
+		{"^16 || <=4294967296", true, false, false, false},
+		{"<=9007199254740991", false, false, false, false},
+		{"9007199254740991.0.0", true, true, true, true},
+		{">=9007199254740991.0.0", true, true, true, true},
+		{"16.0.0+4294967296", true, true, true, true},
+		{"16.0.0-4294967296", true, false, false, true},
+		{"14.13.4294967296", true, true, false, true},
+		{"14.18.4294967295", true, true, true, true},
+		{"2147483647 - 2147483648", true, true, true, true},
+		{">2147483647 <2147483649", true, true, true, true},
+		{">=4294967296.0.0 <4294967296.0.0", true, true, true, true},
+		{"4294967296.0.0 >=4294967296.0.0", true, true, true, true},
+		{"4294967296.0.0 <4294967296.0.0", true, true, true, true},
+		{"^4294967295.1.2 || 12.20.0", true, true, false, true},
+		{"^12.x.9007199254740992", true, false, false, true},
+		{"~12.x.9999999999999999999999999999", true, false, false, true},
+		{"12.x.9007199254740992 - 16.0.0", true, false, false, true},
+		{"16.0.0 - 16.x.9007199254740992", true, true, true, true},
+		{"^*.9007199254740992.0", true, false, false, false},
+		{"~*.9007199254740992.0", true, false, false, false},
+		{"^0.4294967295.4294967296", true, false, false, false},
+		{"~1.2147483647.4294967296", true, false, false, false},
+		{"^4294967296.4294967295.2147483648", true, true, true, true},
+		{">=4294967296.4294967295.2147483648", true, true, true, true},
+		{"4294967295.4294967295.4294967295 - 4294967296.4294967296.4294967296", true, true, true, true},
 	} {
-		t.Run(text, func(t *testing.T) {
-			version, ok := parseNodeVersion(text)
-			if !ok || !version.uncertain {
-				t.Fatal("expected a valid range with uncertain feature support")
+		t.Run(test.text, func(t *testing.T) {
+			version, ok := parseNodeVersion(test.text)
+			if ok != test.valid {
+				t.Fatalf("valid = %v, want %v", ok, test.valid)
 			}
-			if version.Supports("5.10.0") || version.IsSubsetOf("^12.20.0 || >=14.13.1") {
-				t.Fatal("an extreme range must not imply feature support")
+			if !ok {
+				return
+			}
+			if got := version.IsSubsetOf("^12.20.0 || >=14.13.1"); got != test.esm {
+				t.Errorf("ESM = %v, want %v", got, test.esm)
+			}
+			if got := version.IsSubsetOf("^14.18.0 || >=16.0.0"); got != test.cjs {
+				t.Errorf("CJS = %v, want %v", got, test.cjs)
+			}
+			if got := version.Supports("5.10.0"); got != test.supports {
+				t.Errorf("replacement support = %v, want %v", got, test.supports)
 			}
 		})
-	}
-	for _, text := range []string{"16.0.0+4294967296", "16.0.0-4294967296", "4294967294.0.0"} {
-		if version, ok := parseNodeVersion(text); !ok || version.uncertain {
-			t.Errorf("ordinary range or large metadata treated as uncertain: %s", text)
-		}
 	}
 }

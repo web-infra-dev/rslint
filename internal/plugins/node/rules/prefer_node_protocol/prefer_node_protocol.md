@@ -74,13 +74,6 @@ always checked because that API implies support for the prefix.
   `>=16 || >20 <16` and `>20 <16 || >=16` enable fixes for imports and
   `require()`, because `>20 <16` contains no versions. Upstream disables these
   checks for the first ordering.
-- Ranges with a major, minor, or patch number of `4294967295` or greater
-  (up to the maximum valid number, `9007199254740991`) conservatively disable
-  checks for imports and `require()`. They do not fall through to another
-  configured range. For example, `>4294967295` leaves `import "fs"` unchanged,
-  while upstream fixes it. `<=4294967296` also leaves it unchanged, since that
-  range includes old Node versions without prefix support.
-  `process.getBuiltinModule()` is still checked.
 
 ## References
 
