@@ -86,9 +86,12 @@ a different `bin` entry or publication pattern. **Use the array form of
 - **Checking published files.** With `ignoreUnpublished: true`, rslint keeps
   checking package-root files such as `README.js` when you lint from another
   directory. A name such as `..hidden.js` does not put a file outside its
-  package. When `convertPath` points into a nested package, that package's
-  `files` entries determine publication. Upstream can incorrectly skip the
-  hashbang check in these cases.
+  package. `convertPath` keeps the source package's publication boundary:
+  with `"files": ["lib"]`, a target such as `lib/nested/cli.js` remains included
+  even if `lib/nested/package.json` has an empty `files` array. Subdirectory
+  `.npmignore` files, or `.gitignore` when absent, still apply. Upstream can
+  incorrectly skip the hashbang check by mixing nested package metadata with
+  a path relative to the outer package.
 - **Excluding or escaping filename characters.** With
   `additionalExecutables: ["[!b]oo.js"]` or `["[^b]oo.js"]`, rslint selects
   `foo.js` as an executable and excludes `boo.js`; upstream misses `foo.js`.

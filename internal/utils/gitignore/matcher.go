@@ -23,12 +23,17 @@ type compiledPattern struct {
 // inside its pattern; it does not introduce another rule.
 func NewMatcher(patterns []string, useCaseSensitive bool) *Matcher {
 	matcher := &Matcher{}
+	matcher.appendPatterns(patterns, "", useCaseSensitive)
+	return matcher
+}
+
+func (matcher *Matcher) appendPatterns(patterns []string, baseDir string, useCaseSensitive bool) {
 	for _, line := range patterns {
 		line, ok := normalizeIgnorePattern(line)
 		if !ok {
 			continue
 		}
-		pattern, ok := parsePattern(line, "", func(pattern string) string { return pattern })
+		pattern, ok := parsePattern(line, baseDir, func(pattern string) string { return pattern })
 		if !ok {
 			continue
 		}
@@ -44,7 +49,6 @@ func NewMatcher(patterns []string, useCaseSensitive bool) *Matcher {
 			negated: pattern.Negated, directoryOnly: pattern.DirectoryOnly,
 		})
 	}
-	return matcher
 }
 
 // Only unescaped trailing spaces are insignificant in a Git ignore pattern.
@@ -61,11 +65,24 @@ func normalizeIgnorePattern(line string) (string, bool) {
 
 // NewMatcherFromText splits LF/CRLF-delimited ignore file contents into rules.
 func NewMatcherFromText(content string, useCaseSensitive bool) *Matcher {
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		lines[i] = strings.TrimSuffix(line, "\r")
+	return NewMatcherFromTextSources([]TextSource{{Text: content}}, useCaseSensitive)
+}
+
+// TextSource is ignore-file text scoped to a directory relative to the matcher root.
+type TextSource struct{ BaseDir, Text string }
+
+// NewMatcherFromTextSources combines ignore files in precedence order while
+// preserving parent directory exclusions across their individual scopes.
+func NewMatcherFromTextSources(sources []TextSource, useCaseSensitive bool) *Matcher {
+	matcher := &Matcher{}
+	for _, source := range sources {
+		lines := strings.Split(source.Text, "\n")
+		for i, line := range lines {
+			lines[i] = strings.TrimSuffix(line, "\r")
+		}
+		matcher.appendPatterns(lines, source.BaseDir, useCaseSensitive)
 	}
-	return NewMatcher(lines, useCaseSensitive)
+	return matcher
 }
 
 // Match accepts a slash-separated relative path. A trailing slash marks a

@@ -36,6 +36,9 @@ lib
 -- files/lib/nested/package.json --
 {"files":["published.js"]}
 
+-- files/nested/package.json --
+{"files":["lib"]}
+
 -- metadata/package.json --
 {"files":[]}
 

@@ -111,12 +111,17 @@ func TestNoTopLevelAwaitSharedPathPolicy(t *testing.T) {
 			}}},
 			// An invalid conversion regexp skips the rule instead of throwing.
 			{Code: "await load();", FileName: "published/index.ts", Options: map[string]any{"convertPath": map[string]any{"**": []any{"[", "lib/index.js"}}}},
-			// Publication is relative to the converted target's package.
-			{Code: "await load();", FileName: "files/src/index.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{".*", "lib/nested/private.js"}}}},
+			// A nested target cannot publish a path excluded by the source package.
+			{Code: "await load();", FileName: "files/src/index.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{".*", "nested/lib/index.js"}}}},
+			// A source already inside a nested package uses that package's policy.
+			{Code: "await load();", FileName: "files/lib/nested/private.js"},
 			{Code: "await load();", FileName: "files/src/index.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{".*", "../outside.js"}}}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Conversion keeps the source package's publishing boundary.
+			{Code: "await load();", FileName: "files/src/index.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{".*", "lib/nested/private.js"}}}, Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 1, 1, 13)}},
 			{Code: "await load();", FileName: "files/src/index.ts", Options: map[string]any{"convertPath": map[string]any{"src/**": []any{".*", "lib/nested/published.js"}}}, Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 1, 1, 13)}},
+			{Code: "await load();", FileName: "files/lib/nested/published.js", Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 1, 1, 13)}},
 			{Code: "await load();", FileName: "metadata/README.js", Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 1, 1, 13)}},
 			{Code: "await load();", FileName: "published/..hidden.js", Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 1, 1, 13)}},
 			{Code: "await load();", FileName: "malformed-bin/index.js", Options: map[string]any{"ignoreBin": true}, Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 1, 1, 13)}},

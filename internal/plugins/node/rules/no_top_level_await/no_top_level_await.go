@@ -42,7 +42,7 @@ var NoTopLevelAwaitRule = rule.Rule{
 			return nil
 		}
 		absolute := tspath.ResolvePath(pkg.Directory(), converted)
-		if ignoreBin && pkg.IsBinFile(absolute) || nodeutil.IsUnpublished(program, absolute, converted) {
+		if ignoreBin && pkg.IsBinFile(absolute) || nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
 

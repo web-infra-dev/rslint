@@ -151,8 +151,7 @@ func TestHashbangUnpublished(t *testing.T) {
 			if pkg == nil {
 				t.Fatal("package not found")
 			}
-			relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), absolute, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
-			if got := nodeutil.IsUnpublished(p, absolute, relative); got != test.want {
+			if got := nodeutil.IsUnpublished(p, pkg, absolute); got != test.want {
 				t.Errorf("unpublished = %v, want %v", got, test.want)
 			}
 		})
@@ -162,10 +161,15 @@ func TestHashbangUnpublished(t *testing.T) {
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &HashbangRule,
 		[]rule_tester.ValidTestCase{
 			{FileName: "newline-files/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
+			// Nested package files cannot include a target excluded by its publisher.
+			{FileName: "converted/src/library.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{"src/**": []any{"^src/", "nested/lib/"}}}},
 			{FileName: "unrooted-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
 			{FileName: "unrooted-extended-exclusion/lib/foo.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true}},
 		},
 		[]rule_tester.InvalidTestCase{
+			// The source package owns both publication and executable paths.
+			{FileName: "converted/src/cli.js", Code: "hello();", Options: map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{"src/**": []any{"^src/", "lib/nested/"}}}, Output: []string{"#!/usr/bin/env node\nhello();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbangNode", Line: 1, Column: 1, EndLine: 1, EndColumn: 9}}},
+			{FileName: "converted/src/library.js", Code: "#!/usr/bin/env node\nhello();", Options: map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{"src/**": []any{"^src/", "lib/nested/"}}}, Output: []string{"hello();"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbang", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}}},
 			{
 				FileName: "class-exclusion/lib/foo.js",
 				Code:     "hello();",

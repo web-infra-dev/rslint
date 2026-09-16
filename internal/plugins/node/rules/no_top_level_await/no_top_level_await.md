@@ -87,9 +87,12 @@ The replacement uses JavaScript regular expressions and capture substitutions.
   form when priority matters.
 - **Publication paths.** Package-root files such as `README.js` remain checked
   when linting from another directory. A filename such as `..hidden.js` remains
-  inside its package. If `convertPath` points into a nested package, that
-  package's `files` entries determine whether the file is checked. Upstream can
-  incorrectly skip these files.
+  inside its package. `convertPath` keeps the source package's publication
+  boundary: with `"files": ["lib"]`, a target such as `lib/nested/private.js`
+  stays published even if `lib/nested/package.json` lists only `public.js`.
+  Subdirectory `.npmignore` files, or `.gitignore` when absent, still apply;
+  they can exclude that target. Upstream can use the nested package's metadata
+  with a path relative to the outer package and incorrectly skip the check.
 - **Unusual filename patterns.** In `files`, `.npmignore`, and `.gitignore`,
   `[!b]oo.js` matches `foo.js` but not `boo.js`, and `cli\?` matches a literal
   question mark. Upstream can select different files for these patterns. Each
@@ -98,7 +101,8 @@ The replacement uses JavaScript regular expressions and capture substitutions.
   array entries for separate filenames. Further escaping and whitespace cases
   are described in [hashbang's file-selection notes](/rules/node/hashbang).
 - **Malformed patterns and metadata.** An unclosed bracket such as `[cli.js`
-  is matched literally; upstream matches nothing. A brace range with a zero
+  is matched literally. Upstream matches nothing for this pattern in an ignore
+  file and can throw when it appears in `files`. A brace range with a zero
   step, such as `lib/cli{1..3..0}.js`, includes `lib/cli1.js` here but not upstream;
   use a positive step or list filenames explicitly. An invalid `convertPath`
   regular expression such as `[` skips the rule for that file, and non-string

@@ -148,10 +148,16 @@ func TestPublicationGenerationAndConfiguration(t *testing.T) {
 		t.Helper()
 		root := base
 		root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
-			tspath.ResolvePath(root.Dir, "pkg/package.json"):        `{"files":["lib"],"main":"main.js"}`,
-			tspath.ResolvePath(root.Dir, "pkg/.npmignore"):          ignore,
-			tspath.ResolvePath(root.Dir, "pkg/nested/package.json"): `{"files":["lib"]}`,
-			tspath.ResolvePath(root.Dir, "empty/package.json"):      `{}`,
+			tspath.ResolvePath(root.Dir, "pkg/package.json"):            `{"files":["lib"],"main":"main.js"}`,
+			tspath.ResolvePath(root.Dir, "pkg/.npmignore"):              ignore,
+			tspath.ResolvePath(root.Dir, "pkg/nested/package.json"):     `{"files":["lib"],"main":"README.js"}`,
+			tspath.ResolvePath(root.Dir, "pkg/lib/nested/package.json"): `{"files":[]}`,
+			tspath.ResolvePath(root.Dir, "pkg/lib/nested/.npmignore"):   "ignored.js\n!restored.js",
+			tspath.ResolvePath(root.Dir, "pkg/lib/git/.gitignore"):      "ignored.js",
+			tspath.ResolvePath(root.Dir, "pkg/lib/blocked/.npmignore"):  "!restored.js",
+			tspath.ResolvePath(root.Dir, "pkg/lib/empty/.npmignore"):    "",
+			tspath.ResolvePath(root.Dir, "pkg/lib/empty/.gitignore"):    "ignored.js",
+			tspath.ResolvePath(root.Dir, "empty/package.json"):          `{}`,
 		})
 		raw, _, err := rule_tester.NewProgramHelper(root).CreateTestProgram("hello();", "pkg/lib/a.js", "tsconfig.json")
 		if err != nil {
@@ -159,13 +165,16 @@ func TestPublicationGenerationAndConfiguration(t *testing.T) {
 		}
 		return lintprogram.NewFromCompiler(raw)
 	}
-	first, second := create("lib/a.js"), create("lib/b.js")
+	first, second := create("lib/a.js\nlib/nested/restored.js\nlib/blocked/"), create("lib/b.js")
 	file := tspath.ResolvePath(base.Dir, "pkg/lib/a.js")
 	directory := tspath.GetDirectoryPath(tspath.GetDirectoryPath(file))
+	unpublished := func(p *lintprogram.Program, relative string) bool {
+		return IsUnpublished(p, FindPackage(p, file), tspath.ResolvePath(directory, relative))
+	}
 	var group sync.WaitGroup
 	for range 16 {
 		group.Go(func() {
-			if !IsUnpublished(first, file, "lib/a.js") || IsUnpublished(second, file, "lib/a.js") {
+			if !unpublished(first, "lib/a.js") || unpublished(second, "lib/a.js") {
 				t.Error("ignore state leaked across Program generations")
 			}
 			// One Program can serve different configured files.
@@ -175,16 +184,25 @@ func TestPublicationGenerationAndConfiguration(t *testing.T) {
 			if MatchIgnorePatterns(first, []string{"*.js\n!a.js"}, "b.js") || !MatchIgnorePatterns(first, []string{"*.js", "!a.js"}, "b.js") {
 				t.Error("pattern list boundaries collided")
 			}
-			if IsUnpublished(first, tspath.ResolvePath(directory, "README.js"), "README.js") {
+			if unpublished(first, "README.js") {
 				t.Error("root README was affected by the Program working directory")
 			}
-			if IsUnpublished(first, tspath.ResolvePath(directory, "main.js"), "main.js") || IsUnpublished(first, tspath.ResolvePath(directory, "package.json"), "package.json") {
+			if unpublished(first, "main.js") || unpublished(first, "package.json") {
 				t.Error("always-published metadata was excluded")
 			}
-			if IsUnpublished(first, tspath.ResolvePath(directory, "nested/lib/a.js"), "nested/lib/a.js") {
-				t.Error("converted path did not use the nested package's relative path")
+			if !unpublished(first, "nested/lib/a.js") || !unpublished(first, "nested/README.js") || unpublished(first, "lib/nested/private.js") {
+				t.Error("nested package metadata changed the source package's publication policy")
 			}
-			if IsUnpublished(first, tspath.ResolvePath(base.Dir, "empty/..hidden.js"), "..hidden.js") || !IsUnpublished(first, file, "../lib/a.js") || !IsUnpublished(first, file, "dir/../../lib/a.js") {
+			if !unpublished(first, "lib/nested/ignored.js") || unpublished(first, "lib/nested/restored.js") || !unpublished(first, "lib/git/ignored.js") {
+				t.Error("nested ignore files lost their matching or negation semantics")
+			}
+			if !unpublished(first, "lib/blocked/restored.js") || unpublished(first, "lib/empty/ignored.js") {
+				t.Error("nested ignore files reopened a directory or ignored npmignore precedence")
+			}
+			if unpublished(first, "../pkg/lib/nested/private.js") || !unpublished(first, "../pkg-other/lib/a.js") || !unpublished(first, "D:/outside.js") {
+				t.Error("converted target escaped the publishing package boundary")
+			}
+			if IsUnpublished(first, FindPackage(first, tspath.ResolvePath(base.Dir, "empty/..hidden.js")), tspath.ResolvePath(base.Dir, "empty/..hidden.js")) || !unpublished(first, "../lib/a.js") || !unpublished(first, "dir/../../lib/a.js") {
 				t.Error("ancestor detection did not respect path components")
 			}
 		})
