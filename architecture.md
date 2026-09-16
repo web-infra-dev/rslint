@@ -167,6 +167,8 @@ Publication paths and metadata exemptions are interpreted relative to the
 containing package, independently of the process working directory.
 `nodeutil` also owns workspace dependency checks, literal import collection,
 runtime import resolution and the Node rules' TypeScript config lookups. Its
+extension mapping supplies both source lookup aliases and emitted import
+extensions; rules keep extension style, ambiguity checks and edits local. Its
 small non-extended glob adapter is shared by path conversion and module
 restrictions. The import and require restriction rules share ordered matching
 and message construction in `nodeutil`; rules select their source nodes and

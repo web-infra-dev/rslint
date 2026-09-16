@@ -39,6 +39,8 @@ type ResolutionOptions struct {
 	NoDirectory bool `json:"noDirectory"`
 }
 
+var defaultExtensions = []string{".js", ".json", ".node", ".mjs", ".cjs"}
+
 type nodeResolutionKey struct{ name, file, options string }
 type nodeResolution struct {
 	path, resourceSuffix, resolveError string
@@ -69,7 +71,7 @@ func resolveModuleCached(p *program.Program, name, containingFile string, option
 	}
 	result := program.Cached(p, nodeResolutionKey{name, containingFile, string(encoded)}, func() nodeResolution {
 		if options.Extensions == nil {
-			options.Extensions = []string{".js", ".json", ".node", ".mjs", ".cjs"}
+			options.Extensions = defaultExtensions
 		}
 		if options.Modules == nil {
 			options.Modules = []string{"node_modules"}
