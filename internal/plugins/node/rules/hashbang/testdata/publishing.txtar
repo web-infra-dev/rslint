@@ -50,3 +50,8 @@ lib/drop.js
 
 -- converted/nested/package.json --
 {"files":["lib"]}
+
+-- case-bin/package.json --
+{"bin":"bin/CLI.js","files":[]}
+-- case-main/package.json --
+{"bin":"bin/CLI.js","main":"bin/cli.js","files":[]}

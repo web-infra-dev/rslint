@@ -3,6 +3,7 @@ package no_unpublished_bin
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
@@ -146,4 +147,44 @@ func TestNoUnpublishedBinSchema(t *testing.T) {
 		}
 	}
 	NoUnpublishedBinRule.Run(rule.RuleContext{}, nil)
+}
+
+type unpublishedBinTestFS struct {
+	vfs.FS
+	caseSensitive bool
+}
+
+func (fs unpublishedBinTestFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+
+func TestNoUnpublishedBinFilesystemCase(t *testing.T) {
+	for _, sensitive := range []bool{true, false} {
+		name := "case-insensitive"
+		if sensitive {
+			name = "case-sensitive"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := unpublishedBinRoot(t, "testdata/extras.txtar")
+			// Fixtures retain exact spelling; only metadata and converted paths
+			// differ in case, so no case-folded fixture lookup is needed.
+			root.FS = unpublishedBinTestFS{FS: root.FS, caseSensitive: sensitive}
+			var valid []rule_tester.ValidTestCase
+			var invalid []rule_tester.InvalidTestCase
+			for _, test := range []struct {
+				filename, target string
+				options          map[string]any
+				unpublished      bool
+			}{
+				{"case-bin/bin/cli.js", "bin/cli.js", nil, !sensitive},
+				{"case-main/bin/CLI.js", "bin/CLI.js", nil, sensitive},
+				{"case-conversion/src/cli.js", "../CASE-CONVERSION/cli.js", map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/", "../CASE-CONVERSION/"}}}, sensitive},
+			} {
+				if test.unpublished {
+					invalid = append(invalid, rule_tester.InvalidTestCase{Code: "hello();", FileName: test.filename, Options: test.options, Errors: ignoredBin(test.target, 1, 9)})
+				} else {
+					valid = append(valid, rule_tester.ValidTestCase{Code: "hello();", FileName: test.filename, Options: test.options})
+				}
+			}
+			rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoUnpublishedBinRule, valid, invalid)
+		})
+	}
 }

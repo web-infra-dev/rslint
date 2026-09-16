@@ -69,3 +69,9 @@ not valid JSON
 {"bin":"lib/cli1.js","files":["lib/cli{1..3..0}.js"]}
 -- unicode/package.json --
 {"bin":{"__proto__":"脚本😀.js"},"files":[]}
+-- case-bin/package.json --
+{"bin":"bin/CLI.js","files":[]}
+-- case-main/package.json --
+{"bin":"bin/CLI.js","main":"bin/cli.js","files":[]}
+-- case-conversion/package.json --
+{"bin":"../CASE-CONVERSION/cli.js","files":["cli.js"]}

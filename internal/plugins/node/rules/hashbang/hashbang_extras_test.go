@@ -1,13 +1,13 @@
 package hashbang
 
 import (
-	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"reflect"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -123,7 +123,8 @@ func TestHashbangPublicationPathCasing(t *testing.T) {
 	})
 }
 
-func TestHashbangUnpublished(t *testing.T) {
+func hashbangPublicationRoot(t *testing.T) rule_tester.Root {
+	t.Helper()
 	root := hashbangRoot(t)
 	archive := txtarfs.MustParseFile(t, "testdata/publishing.txtar")
 	names, err := archive.FileNames("")
@@ -139,6 +140,11 @@ func TestHashbangUnpublished(t *testing.T) {
 		files[tspath.ResolvePath(root.Dir, name)] = string(data)
 	}
 	root.FS = utils.NewOverlayVFS(root.FS, files)
+	return root
+}
+
+func TestHashbangUnpublished(t *testing.T) {
+	root := hashbangPublicationRoot(t)
 	for _, test := range []struct {
 		file string
 		want bool
@@ -236,6 +242,52 @@ func TestHashbangUnpublished(t *testing.T) {
 				}},
 			},
 		})
+}
+
+func TestHashbangFilesystemCase(t *testing.T) {
+	for _, sensitive := range []bool{true, false} {
+		name := "case-insensitive"
+		if sensitive {
+			name = "case-sensitive"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := hashbangPublicationRoot(t)
+			if !sensitive {
+				root.FS = caseInsensitiveFS{root.FS}
+			}
+			var valid []rule_tester.ValidTestCase
+			var invalid []rule_tester.InvalidTestCase
+			for _, test := range []struct {
+				filename string
+				options  map[string]any
+			}{
+				{"case-bin/bin/cli.js", nil},
+				{"case-main/bin/CLI.js", map[string]any{"ignoreUnpublished": true}},
+			} {
+				if sensitive {
+					valid = append(valid, rule_tester.ValidTestCase{FileName: test.filename, Code: "hello();", Options: test.options})
+				} else {
+					invalid = append(invalid, rule_tester.InvalidTestCase{
+						FileName: test.filename, Code: "hello();", Options: test.options,
+						Output: []string{"#!/usr/bin/env node\nhello();"},
+						Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbangNode", Message: `This file needs shebang "#!/usr/bin/env node".`, Line: 1, Column: 1, EndLine: 1, EndColumn: 9}},
+					})
+				}
+			}
+			// A case-only bin spelling must not delete an executable's header
+			// when the filesystem identifies both spellings as the same file.
+			if sensitive {
+				invalid = append(invalid, rule_tester.InvalidTestCase{
+					FileName: "case-bin/bin/cli.js", Code: "#!/usr/bin/env node\nhello();",
+					Output: []string{"hello();"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbang", Message: "This file needs no shebang.", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}},
+				})
+			} else {
+				valid = append(valid, rule_tester.ValidTestCase{FileName: "case-bin/bin/cli.js", Code: "#!/usr/bin/env node\nhello();"})
+			}
+			rule_tester.RunRuleTester(root, "tsconfig.json", t, &HashbangRule, valid, invalid)
+		})
+	}
 }
 
 func TestHashbangEditDemand(t *testing.T) {

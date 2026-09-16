@@ -29,7 +29,7 @@ var NoUnpublishedBinRule = rule.Rule{
 		if len(options) > 0 {
 			opts, _ = options[0].(map[string]any)
 		}
-		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+		relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), fileName, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: program.FS().UseCaseSensitiveFileNames()})
 		converted, ok := nodeutil.ConvertPath(relative, opts, ctx.Settings)
 		if !ok {
 			return nil
@@ -40,7 +40,7 @@ var NoUnpublishedBinRule = rule.Rule{
 		if converted != relative {
 			absolute = tspath.ResolvePath(pkg.Directory(), converted)
 		}
-		if !pkg.IsBinFile(absolute) || !nodeutil.IsUnpublished(program, pkg, absolute) {
+		if !pkg.IsBinFile(program, absolute) || !nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
 

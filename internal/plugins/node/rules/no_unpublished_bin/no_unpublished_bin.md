@@ -86,6 +86,11 @@ executable is reported as unpublished:
   `src/cli.js` to `nested/cli.js`. rslint does not report that executable,
   even if `nested/package.json` has `"files": []`; upstream reports it as
   unpublished. The package declaring `bin` determines which files it publishes.
+- **Filename case.** On a case-insensitive filesystem, `"bin": "bin/CLI.js"`
+  also selects `bin/cli.js`. With `"files": []`, rslint reports that file;
+  upstream misses it. If `main` names the same file with different case,
+  rslint keeps its publication exemption. On a case-sensitive filesystem,
+  these filenames remain distinct.
 - **Excluding and escaping filename characters.** With
   `"files": ["bin/[!b]oo.js"]`, rslint includes `bin/foo.js` and does not report
   it; upstream reports it as unpublished. Escaped wildcards name literal
