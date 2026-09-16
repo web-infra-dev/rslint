@@ -3,6 +3,7 @@ package node_plugin
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/callback_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/global_require"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/handle_callback_err"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/hashbang"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_exports_assign"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_extraneous_import"
@@ -16,6 +17,7 @@ func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		callback_return.CallbackReturnRule,
 		global_require.GlobalRequireRule,
+		handle_callback_err.HandleCallbackErrRule,
 		hashbang.HashbangRule,
 		no_exports_assign.NoExportsAssignRule,
 		no_extraneous_import.NoExtraneousImportRule,
