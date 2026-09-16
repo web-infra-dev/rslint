@@ -397,7 +397,9 @@ func rstestExpectRootMatch(
 	ctx := analysis.ctx
 	symbol := resolveRstestRootSymbol(ctx, root)
 	if symbol == nil {
-		return rstestExpectMatch{ok: localName == "expect"}
+		return rstestExpectMatch{
+			ok: localName == "expect" && !analysis.globalExpectWritten,
+		}
 	}
 	rootInfo, ok := analysis.expectRoots[symbol]
 	if !ok {

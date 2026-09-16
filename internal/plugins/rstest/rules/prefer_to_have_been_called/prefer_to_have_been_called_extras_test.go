@@ -131,6 +131,17 @@ func TestPreferToHaveBeenCalledExtras(t *testing.T) {
 	for _, write := range []string{"check = replacement", "check ||= replacement", "[check] = replacements", "({ expect: check } = replacement)", "check++", "for (check of replacements) {}"} {
 		valid = append(valid, rule_tester.ValidTestCase{Code: `let { expect: check } = require('@rstest/core'); ` + write + `; check(fn).toHaveBeenCalledTimes(0);`})
 	}
+	for _, write := range []string{
+		"expect = replacement",
+		"expect ||= replacement",
+		"expect++",
+		"[expect] = replacements",
+		"({ expect } = replacement)",
+		"for (expect of replacements) {}",
+		"for (expect in replacements) {}",
+	} {
+		valid = append(valid, rule_tester.ValidTestCase{Code: write + `; expect(fn).toHaveBeenCalledTimes(0);`})
+	}
 	for _, code := range []string{
 		`let { expect: check } = require('@rstest/core'); check = () => ({ toHaveBeenCalledTimes() {} }); check(null).toHaveBeenCalledTimes(0);`,
 		`let { expect: check } = import.meta.rstest; check = replacement; check(fn).toHaveBeenCalledTimes(0);`,
@@ -211,6 +222,8 @@ function shadow(check: any) { check(fn).toHaveBeenCalledTimes(0); }
 let { expect: changed } = require('@rstest/core');
 changed = replacement;
 changed(fn).toHaveBeenCalledTimes(0);
+expect = () => ({ toHaveBeenCalledTimes() {} });
+expect(null).toHaveBeenCalledTimes(0);
 await check.poll(function () { this.toBeNull(); return fn; }).toHaveBeenCalledTimes(0);`
 	root := fixtures.GetRootDir()
 	fileName := tspath.ResolvePath(root.Dir, "called-source-only.ts")
