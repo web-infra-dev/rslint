@@ -58,6 +58,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	if len(req.CanonicalFiles) > 0 && len(req.CanonicalFiles) != len(req.Files) {
 		return nil, errors.New("canonicalFiles must be parallel to files")
 	}
+	if req.UnnamedInput && len(req.Files) != 1 {
+		return nil, errors.New("unnamedInput requires exactly one explicit file")
+	}
 	canonicalPaths := make(map[string]string, len(req.CanonicalFiles))
 	for index, canonicalPath := range req.CanonicalFiles {
 		filePath := resolveRequestPath(req.Files[index])
@@ -418,6 +421,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				TargetsByProgram: binding.TargetsByProgram,
 				SingleThreaded:   false, // Don't use single-threaded mode for IPC
 				Cwd:              currentDirectory,
+				UnnamedInput:     req.UnnamedInput,
 				RulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 					return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 				},

@@ -10,6 +10,7 @@ This rule finds the nearest `package.json` for each file. Files listed in its
 `bin` field must start with `#!/usr/bin/env node`, without a Unicode BOM and with
 an LF line ending. Other files must not have a hashbang. Files without a package
 are left alone.
+Unnamed text passed to `lintText` is also skipped; provide `filePath` to check it.
 
 For a package with `"bin": "./bin/cli.js"`, this is **incorrect** in `bin/cli.js`:
 
@@ -99,6 +100,8 @@ a different `bin` entry or publication pattern. **Use the array form of
   upstream can remove it. With `ignoreUnpublished: true`, a differently cased
   `main` entry still identifies the same published file. Case-sensitive
   filesystems continue to distinguish these filenames.
+  The same applies to aliases: `"bin": "bin/cli"` requires a hashbang in
+  `BIN/CLI.JS` and `BIN/CLI/INDEX.JS` on a case-insensitive filesystem.
 - **Excluding or escaping filename characters.** With
   `additionalExecutables: ["[!b]oo.js"]` or `["[^b]oo.js"]`, rslint selects
   `foo.js` as an executable and excludes `boo.js`; upstream misses `foo.js`.

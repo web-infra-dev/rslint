@@ -133,9 +133,21 @@ func TestNoTopLevelAwaitPathCasing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, replacement := range []string{"lib/", "../FILES/lib/"} {
-		t.Run(replacement, func(t *testing.T) {
-			options := []any{map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/", replacement}}}}
+	for _, test := range []struct {
+		pattern, replacement string
+		ignoreBin            bool
+		want                 int
+	}{
+		{"^src/", "lib/", false, 2},
+		{"^src/", "../FILES/lib/", false, 2},
+		{"^.*$", "lib/CLI.JS", true, 0},
+		{"^.*$", "lib/CLI/INDEX.JS", true, 0},
+		{"^.*$", "lib/CLI.JS", false, 2},
+		{"^.*$", "lib/CLI.JSX", true, 2},
+		{"^.*$", "lib/CLI/MYINDEX.JS", true, 2},
+	} {
+		t.Run(test.replacement, func(t *testing.T) {
+			options := []any{map[string]any{"ignoreBin": test.ignoreBin, "convertPath": map[string]any{"src/**": []any{test.pattern, test.replacement}}}}
 			count := 0
 			testutil.LintProgram(t, testutil.LintProgramOptions{
 				Program: p,
@@ -151,8 +163,8 @@ func TestNoTopLevelAwaitPathCasing(t *testing.T) {
 					count++
 				},
 			})
-			if count != 2 {
-				t.Errorf("got %d diagnostics, want one for each package spelling", count)
+			if count != test.want {
+				t.Errorf("got %d diagnostics, want %d", count, test.want)
 			}
 		})
 	}

@@ -55,3 +55,5 @@ lib/drop.js
 {"bin":"bin/CLI.js","files":[]}
 -- case-main/package.json --
 {"bin":"bin/CLI.js","main":"bin/cli.js","files":[]}
+-- case-alias/package.json --
+{"bin":"bin/cli","files":[]}

@@ -61,6 +61,8 @@ type RunLinterOptions struct {
 	// every RuleContext. See RuleContext.ProcessCurrentDirectory for what rules
 	// may assume of it.
 	Cwd string
+	// UnnamedInput distinguishes anonymous text from explicitly named buffers.
+	UnnamedInput bool
 
 	// LintPlan owns the ordered Program sequence and its complete immutable
 	// file/rule projection for native execution and optional third-party plugin

@@ -38,7 +38,10 @@ type DiagnosticConsumer struct {
 
 type RuleContext struct {
 	SourceFile *ast.SourceFile
-	Settings   map[string]interface{}
+	// UnnamedInput means the caller supplied text without a filename. The
+	// SourceFile path remains an internal parser/config anchor.
+	UnnamedInput bool
+	Settings     map[string]interface{}
 	// LanguageOptions is the normalized, effective per-file language config.
 	// Rules should use its Effective methods when they need ESLint defaults.
 	LanguageOptions LanguageOptions

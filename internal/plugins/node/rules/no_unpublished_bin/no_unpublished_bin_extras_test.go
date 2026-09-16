@@ -61,6 +61,7 @@ func TestNoUnpublishedBinPublication(t *testing.T) {
 	for _, filename := range []string{
 		"npm-precedence/cli.js", "files-precedence/cli.js", "reinclude/cli.js",
 		"main/cli.js", "missing-bin/cli.js", "nested/inner/cli.js", "negated/bin/other.js",
+		"nested-reinclude/lib/cli.js",
 		"unrelated.js",
 		// Shared publication policy corrects upstream's cwd-dependent README
 		// exemption, dot-prefixed names, and glob edge cases (see rule docs).
@@ -78,6 +79,7 @@ func TestNoUnpublishedBinPublication(t *testing.T) {
 		{"private/cli.js", "cli.js"}, {"fallback/inner/cli.js", "inner/cli.js"},
 		{"whitespace/lib/foo.js", "lib/foo.js"},
 		{"unicode/脚本😀.js", "脚本😀.js"},
+		{"nested-ignore/lib/cli.js", "lib/cli.js"},
 	} {
 		invalid = append(invalid, rule_tester.InvalidTestCase{Code: "hello();", FileName: test.filename, Errors: ignoredBin(test.relative, 1, 9)})
 	}
@@ -176,6 +178,8 @@ func TestNoUnpublishedBinFilesystemCase(t *testing.T) {
 			}{
 				{"case-bin/bin/cli.js", "bin/cli.js", nil, !sensitive},
 				{"case-main/bin/CLI.js", "bin/CLI.js", nil, sensitive},
+				{"case-alias/src/cli.ts", "BIN/CLI.JS", map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/cli\\.ts$", "BIN/CLI.JS"}}}, !sensitive},
+				{"case-alias/src/cli.ts", "BIN/CLI/INDEX.JS", map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/cli\\.ts$", "BIN/CLI/INDEX.JS"}}}, !sensitive},
 				{"case-conversion/src/cli.js", "../CASE-CONVERSION/cli.js", map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/", "../CASE-CONVERSION/"}}}, sensitive},
 			} {
 				if test.unpublished {

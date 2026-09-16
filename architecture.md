@@ -356,6 +356,7 @@ instead of re-exporting aliases.
 ```go
 type RuleContext struct {
     SourceFile     *ast.SourceFile
+    UnnamedInput   bool
     Settings       map[string]interface{}
     LanguageOptions LanguageOptions
     Globals        Globals
@@ -399,6 +400,12 @@ semantic capability delivered by the frozen lint plan; Program construction
 alone never admits a `RequiresTypeInfo` rule. Process cwd is stored once in the
 file-shared cache and exposed through `ProcessCurrentDirectory()` rather than
 copied into every per-rule context.
+
+The public API marks `lintText` calls without `filePath` as `UnnamedInput`.
+Their synthetic path still selects parsing and configuration, while native
+rules can skip checks that require a caller-supplied filename. The API forwards
+this fact through each pipeline generation, including autofix verification;
+rules never infer it from a basename such as `__text__.ts`.
 
 Configuration is resolved once per file shape into one immutable
 `RuleEnvironment` shared by that file's `ConfiguredRule` entries. During

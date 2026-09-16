@@ -11,6 +11,7 @@ For each linted file, this rule finds the nearest `package.json` and checks
 whether the file matches its `bin` field. It reports the complete file if the
 executable is excluded by `files`, `.npmignore`, or the applicable `.gitignore`.
 It does not check whether unvisited executable files exist and provides no fixes.
+Unnamed text passed to `lintText` is skipped; provide `filePath` to check it.
 
 This package configuration is **incorrect** when linting `bin/cli.js`:
 
@@ -32,8 +33,9 @@ Include the executable to make the configuration **correct**:
 
 Both string and object `bin` entries are supported. Entries without `.js` or
 ending at a directory also match the corresponding `.js` or `/index.js` file.
-An existing `.npmignore` replaces `.gitignore`; a `files` array also disables
-`.gitignore` fallback. A `.npmignore` exclusion still applies to entries in
+At the package root, `.npmignore` replaces `.gitignore`; a `files` array also
+disables `.gitignore` fallback. Subdirectory ignore files still apply.
+A `.npmignore` exclusion still applies to entries in
 `files`. The package's `main` file and always-published metadata are exempt.
 
 ## Options
@@ -86,11 +88,16 @@ executable is reported as unpublished:
   `src/cli.js` to `nested/cli.js`. rslint does not report that executable,
   even if `nested/package.json` has `"files": []`; upstream reports it as
   unpublished. The package declaring `bin` determines which files it publishes.
+- **Subdirectory ignore files.** With `"files": ["lib"]`, a `lib/.npmignore`
+  containing `cli.js` excludes the executable `lib/cli.js` in rslint. Upstream
+  checks only the package-root ignore file and does not report that executable.
 - **Filename case.** On a case-insensitive filesystem, `"bin": "bin/CLI.js"`
   also selects `bin/cli.js`. With `"files": []`, rslint reports that file;
   upstream misses it. If `main` names the same file with different case,
   rslint keeps its publication exemption. On a case-sensitive filesystem,
   these filenames remain distinct.
+  The same applies to aliases: `"bin": "bin/cli"` selects `BIN/CLI.JS` and
+  `BIN/CLI/INDEX.JS` on a case-insensitive filesystem.
 - **Excluding and escaping filename characters.** With
   `"files": ["bin/[!b]oo.js"]`, rslint includes `bin/foo.js` and does not report
   it; upstream reports it as unpublished. Escaped wildcards name literal

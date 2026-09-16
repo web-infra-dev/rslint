@@ -263,6 +263,8 @@ func TestHashbangFilesystemCase(t *testing.T) {
 			}{
 				{"case-bin/bin/cli.js", nil},
 				{"case-main/bin/CLI.js", map[string]any{"ignoreUnpublished": true}},
+				{"case-alias/src/cli.ts", map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/cli\\.ts$", "BIN/CLI.JS"}}}},
+				{"case-alias/src/cli.ts", map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/cli\\.ts$", "BIN/CLI/INDEX.JS"}}}},
 			} {
 				if sensitive {
 					valid = append(valid, rule_tester.ValidTestCase{FileName: test.filename, Code: "hello();", Options: test.options})

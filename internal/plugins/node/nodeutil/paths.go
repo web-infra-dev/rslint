@@ -79,17 +79,21 @@ func (pkg *PackageJSON) IsBinFile(p *program.Program, fileName string) bool {
 }
 
 func isBinFile(fileName string, bin any, directory string, caseSensitive bool) bool {
-	comparison := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
+	// Compare canonical filenames without folding again: tsgo deliberately
+	// keeps some Unicode names, such as İ and i, distinct on insensitive hosts.
+	comparison := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}
+	fileName = tspath.GetCanonicalFileName(fileName, caseSensitive)
+	withoutJS := strings.TrimSuffix(fileName, ".js")
+	withoutIndex := strings.TrimSuffix(withoutJS, "/index")
 	match := func(value any) bool {
 		name, ok := value.(string)
 		if !ok {
 			return false
 		}
-		resolved := tspath.ResolvePath(directory, name)
-		withoutJS := strings.TrimSuffix(fileName, ".js")
+		resolved := tspath.GetCanonicalFileName(tspath.ResolvePath(directory, name), caseSensitive)
 		return tspath.ComparePaths(resolved, fileName, comparison) == 0 ||
 			tspath.ComparePaths(resolved, withoutJS, comparison) == 0 ||
-			tspath.ComparePaths(resolved, strings.TrimSuffix(withoutJS, "/index"), comparison) == 0
+			tspath.ComparePaths(resolved, withoutIndex, comparison) == 0
 	}
 	switch value := bin.(type) {
 	case string:
@@ -178,8 +182,12 @@ func IsUnpublished(p *program.Program, pkg *PackageJSON, absolute string) bool {
 	published := program.Cached(p, publicationKey(pkg.directory), func() *publication {
 		return compilePublication(p, pkg)
 	})
-	if main, ok := pkg.data["main"].(string); ok && tspath.ComparePaths(tspath.ResolvePath(pkg.directory, main), absolute, comparison) == 0 {
-		return false
+	if main, ok := pkg.data["main"].(string); ok {
+		mainPath := tspath.GetCanonicalFileName(tspath.ResolvePath(pkg.directory, main), comparison.UseCaseSensitiveFileNames)
+		filePath := tspath.GetCanonicalFileName(absolute, comparison.UseCaseSensitiveFileNames)
+		if tspath.ComparePaths(mainPath, filePath, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}) == 0 {
+			return false
+		}
 	}
 	if relative == "package.json" || neverIgnored.Test(relative) {
 		return false

@@ -80,6 +80,7 @@ export class RSLintService {
   ): Promise<LintResponse> {
     const {
       files,
+      unnamedInput,
       canonicalFiles,
       config,
       configDiscovery,
@@ -97,6 +98,7 @@ export class RSLintService {
     // Send lint request
     return this.service.sendMessage('lint', {
       files,
+      unnamedInput,
       canonicalFiles,
       config,
       configDiscovery,

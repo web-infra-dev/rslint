@@ -73,5 +73,17 @@ not valid JSON
 {"bin":"bin/CLI.js","files":[]}
 -- case-main/package.json --
 {"bin":"bin/CLI.js","main":"bin/cli.js","files":[]}
+-- case-alias/package.json --
+{"bin":"bin/cli","files":[]}
 -- case-conversion/package.json --
 {"bin":"../CASE-CONVERSION/cli.js","files":["cli.js"]}
+-- nested-ignore/package.json --
+{"bin":"lib/cli.js","files":["lib"]}
+-- nested-ignore/lib/.npmignore --
+cli.js
+-- nested-reinclude/package.json --
+{"bin":"lib/cli.js","files":["lib"]}
+-- nested-reinclude/.npmignore --
+lib/cli.js
+-- nested-reinclude/lib/.npmignore --
+!cli.js
