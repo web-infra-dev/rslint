@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // ---------------------------------------------------------------------------
@@ -1777,8 +1778,8 @@ type blockState struct {
 // whether `module` or `exports` is shadowed; it does not walk parent scopes.
 type cjsScopeIndex map[*ast.Node]*scope.Scope
 
-func buildCJSScopeIndex(sourceFile *ast.SourceFile) cjsScopeIndex {
-	manager := scope.Build(sourceFile, scope.Options{CollectReferences: true})
+func buildCJSScopeIndex(ctx rule.RuleContext) cjsScopeIndex {
+	manager := scopeAnalysis.Get(ctx, scope.Options{CollectReferences: true})
 	index := make(cjsScopeIndex, len(manager.References))
 	for _, reference := range manager.References {
 		index[reference.Identifier] = reference.From
@@ -2411,7 +2412,7 @@ var OrderRule = rule.Rule{
 			}
 		}
 		if opts.named.cjsExports {
-			cjsScopes := buildCJSScopeIndex(sf)
+			cjsScopes := buildCJSScopeIndex(ctx)
 			listeners[ast.KindExpressionStatement] = func(node *ast.Node) {
 				handleExpressionStatement(cjsScopes, node, opts, collector)
 			}

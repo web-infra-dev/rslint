@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/rules/no-exports-assign.js
@@ -36,7 +37,7 @@ var NoExportsAssignRule = rule.Rule{
 				// sees function-body bindings from parameter defaults. Ordinary
 				// reference resolution alone cannot model these nested scopes.
 				if scopes == nil {
-					scopes = scope.Build(ctx.SourceFile, scope.Options{})
+					scopes = scopeAnalysis.Declarations(ctx)
 				}
 				for current := scopes.Acquire(node); current != nil; current = current.Parent {
 					if len(current.Declarations(name)) != 0 {

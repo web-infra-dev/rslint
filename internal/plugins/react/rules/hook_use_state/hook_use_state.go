@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed hook_use_state.schema.json
@@ -313,7 +314,7 @@ var HookUseStateRule = rule.Rule{
 						return false
 					})
 				}
-				manager := scope.Build(ctx.SourceFile, scope.Options{CollectReferences: true, ReferenceNames: referenceNames})
+				manager := scopeAnalysis.References(ctx, referenceNames)
 				referenceScopes = make(map[*ast.Node]*scope.Scope, len(manager.References))
 				for _, reference := range manager.References {
 					referenceScopes[reference.Identifier] = reference.From

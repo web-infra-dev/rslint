@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed camelcase.schema.json
@@ -177,7 +178,11 @@ func (s *camelcaseState) checkFile() {
 			}
 			analysisOptions.ReferenceNames = referenceNames
 		}
-		manager = scope.Build(s.ctx.SourceFile, analysisOptions)
+		if analysisOptions.ReferenceNames == nil {
+			manager = scopeAnalysis.Get(s.ctx, analysisOptions)
+		} else {
+			manager = scopeAnalysis.References(s.ctx, analysisOptions.ReferenceNames)
+		}
 		resolvedReferences = make(map[*ast.Node]*scope.Reference, len(manager.References))
 		for _, reference := range manager.References {
 			resolvedReferences[reference.Identifier] = reference
