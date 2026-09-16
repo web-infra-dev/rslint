@@ -1,0 +1,23 @@
+Version configuration fixtures for eslint-plugin-n v18.3.0.
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext"},"include":["**/*"]}
+-- package.json --
+{}
+-- old/package.json --
+{"engines":{"node":"4"}}
+-- engines-first/package.json --
+{"engines":{"node":"6"},"devEngines":{"runtime":{"name":"node","version":"4"}}}
+-- dev-object/package.json --
+{"devEngines":{"runtime":{"name":"node","version":"4"}}}
+-- dev-array/package.json --
+{"engines":{"node":"invalid"},"devEngines":{"runtime":[null,{"name":"deno","version":"2"},{"name":"node","version":"4"}]}}
+-- dev-invalid-first/package.json --
+{"devEngines":{"runtime":[{"name":"node","version":"invalid"},{"name":"node","version":"4"}]}}
+-- empty-range/package.json --
+{"engines":{"node":""},"devEngines":{"runtime":{"name":"node","version":"6"}}}
+-- invalid/package.json --
+{"engines":{"node":4},"devEngines":{"runtime":{"name":"node","version":4}}}
+-- malformed/package.json --
+not JSON
+-- old/nearest/package.json --
+{}

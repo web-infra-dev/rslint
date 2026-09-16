@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/handle_callback_err"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/hashbang"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_callback_literal"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_deprecated_api"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_exports_assign"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_extraneous_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_extraneous_require"
@@ -29,6 +30,7 @@ func GetAllRules() []rule.Rule {
 		handle_callback_err.HandleCallbackErrRule,
 		hashbang.HashbangRule,
 		no_callback_literal.NoCallbackLiteralRule,
+		no_deprecated_api.NoDeprecatedAPIRule,
 		no_exports_assign.NoExportsAssignRule,
 		no_extraneous_import.NoExtraneousImportRule,
 		no_extraneous_require.NoExtraneousRequireRule,
