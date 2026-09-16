@@ -31,6 +31,13 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 		}
 		return r
 	}, ecmascript.StringTrim(text))
+	// npm's range grammar is ASCII after JS whitespace normalization. Do not
+	// let Go's broader whitespace handling accept characters such as U+0085.
+	for _, character := range text {
+		if character > 127 {
+			return NodeVersion{}, false
+		}
+	}
 	text = versionPrefix.ReplaceAllString(text, "${1}${2}")
 	text = versionOperatorSpace.ReplaceAllString(text, "$1")
 	text = strings.ReplaceAll(text, "~>", "~")
@@ -67,6 +74,7 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 		return NodeVersion{}, false
 	}
 	var result NodeVersion
+	var emptyAlternative []versionComparator
 	for i, alternative := range strings.Split(parsed.String(), " || ") {
 		var comparators []versionComparator
 		for _, token := range strings.Fields(alternative) {
@@ -98,7 +106,16 @@ func parseNodeVersion(text string) (NodeVersion, bool) {
 			}
 			comparators = append(comparators, comparator)
 		}
-		result.alternatives = append(result.alternatives, comparators)
+		// npm drops its canonical null-set arm from unions unless it is
+		// the only remaining arm. Other contradictory arms stay intact.
+		if alternative == "<0.0.0-0" {
+			emptyAlternative = comparators
+		} else {
+			result.alternatives = append(result.alternatives, comparators)
+		}
+	}
+	if len(result.alternatives) == 0 {
+		result.alternatives = [][]versionComparator{emptyAlternative}
 	}
 	return result, true
 }
@@ -170,6 +187,114 @@ func (version NodeVersion) Supports(since string) bool {
 	return true
 }
 
+// IsSubsetOf checks that every configured alternative fits a supported npm
+// range. Unlike Supports, it handles gaps between releases that gained a
+// feature, and excludes prereleases absent from the supported range.
+func (version NodeVersion) IsSubsetOf(supported string) bool {
+	domain, ok := parseNodeVersion(supported)
+	if !ok {
+		return false
+	}
+	sawNonempty := false
+	for _, sub := range version.alternatives {
+		lower, upper, empty := versionBounds(sub)
+		if empty {
+			// Preserve npm subset()'s ordered handling of contradictory arms.
+			if sawNonempty {
+				return false
+			}
+			continue
+		}
+		sawNonempty = true
+		contained := false
+		for _, dom := range domain.alternatives {
+			domLower, domUpper, domEmpty := versionBounds(dom)
+			if domEmpty || !versionBoundContains(domLower, lower, true) || !versionBoundContains(domUpper, upper, false) {
+				continue
+			}
+			if lower.admitsPrerelease(true) && !hasPrereleaseTuple(dom, lower) ||
+				upper.admitsPrerelease(false) && !hasPrereleaseTuple(dom, upper) {
+				continue
+			}
+			contained = true
+			break
+		}
+		if !contained {
+			return false
+		}
+	}
+	return true
+}
+
+func versionBounds(comparators []versionComparator) (lower, upper *versionComparator, empty bool) {
+	if len(comparators) == 0 {
+		// npm's default wildcard admits stable versions starting at 0.0.0.
+		return &versionComparator{operator: ">="}, nil, false
+	}
+	for i := range comparators {
+		c := &comparators[i]
+		if c.operator == "=" {
+			for _, other := range comparators {
+				if !comparatorsIntersect(*c, other) {
+					return nil, nil, true
+				}
+			}
+		}
+		if c.operator == "=" || strings.HasPrefix(c.operator, ">") {
+			if lower == nil || !versionBoundContains(c, lower, true) {
+				lower = c
+			}
+		}
+		if c.operator == "=" || strings.HasPrefix(c.operator, "<") {
+			if upper == nil || !versionBoundContains(c, upper, false) {
+				upper = c
+			}
+		}
+	}
+	if lower != nil && upper != nil {
+		order := lower.compare(*upper)
+		empty = order > 0 || order == 0 && (lower.operator == ">" || upper.operator == "<")
+	}
+	return
+}
+
+func versionBoundContains(outer, inner *versionComparator, lower bool) bool {
+	if outer == nil {
+		return true
+	}
+	if inner == nil {
+		return false
+	}
+	order := inner.compare(*outer)
+	if !lower {
+		order = -order
+	}
+	return order > 0 || order == 0 && (outer.operator != ">" && outer.operator != "<" || inner.operator == outer.operator)
+}
+
+func (bound *versionComparator) admitsPrerelease(lower bool) bool {
+	if bound == nil {
+		return false
+	}
+	return len(bound.prerelease) > 0 && (lower || bound.operator != "<" || len(bound.prerelease) != 1 || bound.prerelease[0] != "0")
+}
+
+func hasPrereleaseTuple(comparators []versionComparator, bound *versionComparator) bool {
+	for _, c := range comparators {
+		if c.version.Compare(&bound.version) == 0 && len(c.prerelease) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (left versionComparator) compare(right versionComparator) int {
+	if cmp := left.version.Compare(&right.version); cmp != 0 {
+		return cmp
+	}
+	return semver.ComparePreReleaseIdentifiers(left.prerelease, right.prerelease)
+}
+
 func comparatorsIntersect(left, right versionComparator) bool {
 	for _, comparator := range []versionComparator{left, right} {
 		if comparator.operator == "<" && strings.HasPrefix(comparator.version.String(), "0.0.0") {
@@ -179,16 +304,14 @@ func comparatorsIntersect(left, right versionComparator) bool {
 	if right.operator == "=" {
 		left, right = right, left
 	}
-	cmp := left.version.Compare(&right.version)
-	if cmp == 0 {
-		cmp = semver.ComparePreReleaseIdentifiers(left.prerelease, right.prerelease)
-	}
+	cmp := left.compare(right)
 	if left.operator == "=" {
 		if right.operator == "=" {
 			return cmp == 0
 		}
-		// A singleton prerelease does not satisfy a stable npm comparator.
-		if len(left.prerelease) > 0 && len(right.prerelease) == 0 {
+		// A singleton prerelease needs a prerelease comparator on the same
+		// major/minor/patch tuple, even when the numeric bounds contain it.
+		if len(left.prerelease) > 0 && (len(right.prerelease) == 0 || left.version.Compare(&right.version) != 0) {
 			return false
 		}
 		switch right.operator {

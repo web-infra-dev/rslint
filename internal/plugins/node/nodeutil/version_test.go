@@ -1,6 +1,15 @@
 package nodeutil
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
 
 // Replacement-range decisions compared with npm semver 7.8.5.
 func TestNodeVersionReplacementRanges(t *testing.T) {
@@ -89,5 +98,147 @@ func TestNodeVersionReplacementRanges(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestConfiguredNodeVersion(t *testing.T) {
+	for _, test := range []struct {
+		name, metadata, expected string
+		options, settings        map[string]any
+	}{
+		{name: "fallback", metadata: `{}`, expected: ">=16.0.0"},
+		{name: "engines", metadata: `{"engines":{"node":"^12.20.0"}}`, expected: "^12.20.0"},
+		{name: "empty engine range", metadata: `{"engines":{"node":""}}`, expected: "*"},
+		{name: "dev engine", metadata: `{"devEngines":{"runtime":{"name":"node","version":"^14.18.0"}}}`, expected: "^14.18.0"},
+		{name: "dev engine array", metadata: `{"devEngines":{"runtime":[null,42,{"name":"bun","version":"1"},{"name":"node"},{"name":"node","version":"^20"}]}}`, expected: "^20"},
+		{name: "engine precedence", metadata: `{"engines":{"node":"^12.20.0"},"devEngines":{"runtime":{"name":"node","version":"^20"}}}`, expected: "^12.20.0"},
+		{name: "invalid engine", metadata: `{"engines":{"node":"invalid"},"devEngines":{"runtime":{"name":"node","version":"^20"}}}`, expected: "^20"},
+		{name: "non-string engine", metadata: `{"engines":{"node":12},"devEngines":{"runtime":{"name":"node","version":"^20"}}}`, expected: "^20"},
+		{name: "first node runtime", metadata: `{"devEngines":{"runtime":[{"name":"node","version":"invalid"},{"name":"node","version":"^12"}]}}`, expected: ">=16.0.0"},
+		{name: "invalid metadata shapes", metadata: `{"engines":12,"devEngines":[]}`, expected: ">=16.0.0"},
+		{name: "non-node runtime", metadata: `{"devEngines":{"runtime":{"name":"bun","version":"1"}}}`, expected: ">=16.0.0"},
+		{name: "rule option", metadata: `{"engines":{"node":"^12"}}`, options: map[string]any{"version": "^20"}, settings: map[string]any{"node": map[string]any{"version": "^14"}}, expected: "^20"},
+		{name: "node setting", metadata: `{"engines":{"node":"^12"}}`, settings: map[string]any{"node": map[string]any{"version": "^20"}}, expected: "^20"},
+		{name: "n setting precedence", metadata: `{}`, settings: map[string]any{"n": map[string]any{"version": "^12"}, "node": map[string]any{"version": "^20"}}, expected: "^12"},
+		{name: "invalid settings fall through", metadata: `{"engines":{"node":"^12"}}`, options: map[string]any{"version": "invalid"}, settings: map[string]any{"n": map[string]any{"version": "invalid"}, "node": map[string]any{"version": ""}}, expected: "^12"},
+		{name: "numeric setting", metadata: `{}`, settings: map[string]any{"node": map[string]any{"version": float64(12)}}, expected: "12"},
+		{name: "falsy setting", metadata: `{"engines":{"node":"^12"}}`, settings: map[string]any{"n": map[string]any{"version": false}, "node": map[string]any{"version": float64(0)}}, expected: "^12"},
+		{name: "array setting", metadata: `{}`, settings: map[string]any{"node": map[string]any{"version": []any{}}}, expected: "*"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := packageRoot(t)
+			root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
+				tspath.ResolvePath(root.Dir, "package.json"): test.metadata,
+			})
+			program, file, err := rule_tester.NewProgramHelper(root).CreateTestProgram(`import "fs";`, "nested/input.js", "tsconfig.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := (rule.RuleContext{SourceFile: file, Settings: test.settings}).WithProgram(lintprogram.NewFromCompiler(program))
+			got := ConfiguredNodeVersion(ctx, test.options)
+			want, ok := parseNodeVersion(test.expected)
+			if !ok {
+				t.Fatal("invalid expected range")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("configured range differs from %q", test.expected)
+			}
+		})
+	}
+}
+
+// Expected containment from node-semver 7.8.5, resolved by eslint-plugin-n v18.3.0.
+func TestNodeVersionSubsetRanges(t *testing.T) {
+	for _, test := range []struct {
+		text     string
+		esm, cjs bool
+	}{
+		{">=16 || >20 <16", false, false},
+		{">20 <16 || >=16", true, true},
+		{"16.0.0 >=16.0.0-rc.1", true, true},
+		{"", false, false},
+		{"*", false, false},
+		{" ", false, false},
+		{"16", true, true},
+		{"16.x", true, true},
+		{">= 16", true, true},
+		{"> 15", true, true},
+		{"^16", true, true},
+		{"~16", true, true},
+		{"~> 16", true, true},
+		{"v16.0.0", true, true},
+		{"= v16.0.0", true, true},
+		{"12.20.0", true, false},
+		{"12.19.1", false, false},
+		{"^12.20.0", true, false},
+		{"~12.20", true, false},
+		{"^12.20.0 || >=14.13.1", true, false},
+		{"12.20.0 - 12.22", true, false},
+		{"^12.20.0 || ^14.18.0 || >=16", true, false},
+		{"12 || 14 || 16", false, false},
+		{"^12.20.0 || 13", false, false},
+		{">=12.20.0", false, false},
+		{"13.14.0", false, false},
+		{"14.13.0", false, false},
+		{"14.13.1", true, false},
+		{"14.17.6", true, false},
+		{"14.18.0", true, true},
+		{"15.14.0", true, false},
+		{"16.0.0", true, true},
+		{"^14.13.1", true, false},
+		{"^14.18.0", true, true},
+		{"^14.18.0 || >=16.0.0", true, true},
+		{">=14.18.0", true, false},
+		{">=14.18.0 <15", true, true},
+		{">=16.0.0 <16.0.0", true, true},
+		{"<0.0.0-0", false, false},
+		{"<0.0.0", false, false},
+		{">20 <16", true, true},
+		{"16.0.0 17.0.0", true, true},
+		{">=16.0.0 <=16.0.0", true, true},
+		{">16.0.0 <16.0.1", true, true},
+		{"^16.0.0-rc.1", false, false},
+		{">=16.0.0 <17.0.0-rc.1", false, false},
+		{">=16.0.0 <17.0.0-0", true, true},
+		{"16.0.0-rc.1", false, false},
+		{"16.0.0-rc.1 <17", true, true},
+		{"16.0.0-rc.1 >14", true, true},
+		{"16.0.0-rc.1 >=16", true, true},
+		{"16.0.0-rc.1 >16.0.0-beta", false, false},
+		{">=16.0.0-rc.1 <=16.0.0-rc.1", false, false},
+		{">=16.0.0 || <0.0.0-0", true, true},
+		{"<0.0.0-0 || >=16.0.0", true, true},
+		{"<0.0.0-0 || <0.0.0-0", false, false},
+		{">=16.0.0 || <0.0.0", false, false},
+		{"<0.0.0 || >=16.0.0", false, false},
+		{"16.0.0+build", true, true},
+		{">=16.0.0-beta >=16.0.0", true, true},
+		{"\ufeff>=\u00a016\u2028", true, true},
+		{">=16 ||", false, false},
+		{"|| >=16", false, false},
+		{"<*", false, false},
+		{"^0.0.0", false, false},
+		{"~0.1", false, false},
+	} {
+		t.Run(test.text, func(t *testing.T) {
+			r, ok := parseNodeVersion(test.text)
+			if !ok {
+				t.Fatal("valid range rejected")
+			}
+			if got := r.IsSubsetOf("^12.20.0 || >=14.13.1"); got != test.esm {
+				t.Errorf("ESM: got %v, want %v", got, test.esm)
+			}
+			if got := r.IsSubsetOf("^14.18.0 || >=16.0.0"); got != test.cjs {
+				t.Errorf("CJS: got %v, want %v", got, test.cjs)
+			}
+		})
+	}
+}
+
+func TestInvalidNodeVersionRanges(t *testing.T) {
+	for _, text := range []string{"invalid", ">=", "16 | 20", "16, 20", "<=4294967296", "\u008510", "10 - 12\u0085"} {
+		if _, ok := parseNodeVersion(text); ok {
+			t.Errorf("accepted invalid range %q", text)
+		}
 	}
 }
