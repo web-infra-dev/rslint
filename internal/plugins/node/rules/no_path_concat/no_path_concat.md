@@ -1,15 +1,12 @@
 # no-path-concat
 
-Disallow string concatenation with `__dirname`, `__filename`, and `import.meta`
-paths when the appended text starts with a path separator.
+## Rule details
 
-## Rule Details
+Disallow string concatenation with `__dirname`, `__filename`, and `import.meta` paths when the appended text starts with a path separator.
 
-Use `path.join()` or `path.resolve()` to build file paths. These functions handle
-platform-specific separators and normalize the resulting path. Use `new URL()`
-to resolve relative URLs against `import.meta.url`.
+Use `path.join()` or `path.resolve()` to build file paths. These functions handle platform-specific separators and normalize the resulting path. Use `new URL()` to resolve relative URLs against `import.meta.url`.
 
-Examples of **incorrect** code:
+Examples of **incorrect** code for this rule:
 
 ```javascript
 const config = __dirname + '/config.json';
@@ -19,7 +16,7 @@ const sibling = import.meta.filename + '/sibling';
 const url = `${import.meta.url}/assets`;
 ```
 
-Examples of **correct** code:
+Examples of **correct** code for this rule:
 
 ```javascript
 const config = path.join(__dirname, 'config.json');
@@ -32,13 +29,9 @@ const sourceMap = __filename + '.map';
 const backup = `${import.meta.filename}.bak`;
 ```
 
-The rule checks `+` expressions and template strings. It recognizes `/`, the
-separator for the platform running the linter, and tracked `path.sep` reads.
-Appending an extension or another suffix without a leading separator is allowed.
+The rule checks `+` expressions and template strings. It recognizes `/`, the separator for the platform running the linter, and tracked `path.sep` reads. Appending an extension or another suffix without a leading separator is allowed.
 
-`__dirname` and `__filename` must be enabled globals. Local declarations and
-parameters with these names are ignored, as are globals assigned anywhere in
-the file. `import.meta` paths do not require configured globals.
+`__dirname` and `__filename` must be enabled globals. Local declarations and parameters with these names are ignored, as are globals assigned anywhere in the file. `import.meta` paths do not require configured globals.
 
 ## Options
 
@@ -46,11 +39,9 @@ This rule has no options and provides no automatic fixes or suggestions.
 
 ## Differences from upstream
 
-Some computed separators are not recognized. For example,
-`__dirname + String.fromCodePoint(47)` is reported by upstream but not by rslint.
-Using the equivalent literal `/` or `path.sep` makes this concatenation detectable.
+Some computed separators are not recognized. For example, `__dirname + String.fromCodePoint(47)` is reported by upstream but not by rslint. Using the equivalent literal `/` or `path.sep` makes this concatenation detectable.
 
-## References
+## Original documentation
 
-- [Upstream documentation](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/no-path-concat.md)
-- [Upstream source](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/rules/no-path-concat.js)
+- [eslint-plugin-n: no-path-concat](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/no-path-concat.md)
+- [Source code](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/lib/rules/no-path-concat.js)
