@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
-import { lint, type Diagnostic } from '@rslint/core/internal';
+import { lint } from '@rslint/core/internal';
 import { createTempDir, cleanupTempDir } from '../cli/js-config/helpers';
 
 interface ExpectedError {
@@ -10,7 +10,6 @@ interface ExpectedError {
   column: number;
   endLine: number;
   endColumn: number;
-  fixes?: Diagnostic['fixes'];
 }
 
 interface LanguageOptions {
@@ -125,7 +124,7 @@ export class RuleTester {
                   start: { line: expected.line, column: expected.column },
                   end: { line: expected.endLine, column: expected.endColumn },
                 });
-                expect(diagnostic.fixes).toEqual(expected.fixes);
+                expect(diagnostic.fixes).toBeUndefined();
                 continue;
               }
               // Hashbang's upstream string expectations describe a fix on

@@ -59,9 +59,19 @@ exports.bar = 2;
 
 ## Automatic fixes
 
-With `"exports"`, the rule can replace references such as `module.exports.foo` with `exports.foo`. It can also convert a top-level `module.exports = { ... }` statement into property assignments, preserving comments adjacent to each property. Getters, setters, and spread properties prevent that conversion.
+This rule reports inconsistent export styles without automatic fixes or suggestions. Update the export code manually so you can preserve which object is exported and which references still point to it.
 
-The default `"module.exports"` mode and direct assignments to `exports` have no automatic fix. This rule provides no suggestions.
+## Differences from upstream
+
+Unlike eslint-plugin-n, rslint does not automatically rewrite `module.exports` to `exports`. Replacing the exported object and mutating the existing object can produce different results:
+
+```javascript
+const old = exports;
+module.exports = { a: 1 }; // Reported without an automatic fix.
+console.log(old === module.exports); // false
+```
+
+Changing the assignment to `exports.a = 1` would make the comparison return `true`. Even replacing `module.exports.foo` with `exports.foo` can change behavior when `exports` is shadowed or the two values no longer refer to the same object.
 
 ## Original documentation
 

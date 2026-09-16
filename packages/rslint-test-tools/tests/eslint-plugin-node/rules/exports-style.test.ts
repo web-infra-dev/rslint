@@ -2,7 +2,7 @@ import { RuleTester } from '../rule-tester';
 
 // Every upstream case and documentation example, pinned to eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/exports-style.js
-// Exact messages, ranges and fixes were checked with ESLint 10.9.0.
+// Diagnostics match upstream; unsafe fixes are intentionally omitted as documented.
 new RuleTester({
   languageOptions: {
     sourceType: 'commonjs',
@@ -287,16 +287,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.foo = 1;',
-                startPos: 0,
-                endPos: 25,
-              },
-            ],
           },
         ],
-        output: 'exports.foo = 1;',
       },
       {
         name: 'upstream invalid 11',
@@ -311,16 +303,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 16,
-            fixes: [
-              {
-                text: 'exports',
-                startPos: 0,
-                endPos: 14,
-              },
-            ],
           },
         ],
-        output: 'exports.foo = 1',
       },
       {
         name: 'upstream invalid 12',
@@ -335,16 +319,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.a = 1;',
-                startPos: 0,
-                endPos: 25,
-              },
-            ],
           },
         ],
-        output: 'exports.a = 1;',
       },
       {
         name: 'upstream invalid 13',
@@ -359,16 +335,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.a = 1;\n\nexports.b = 2;',
-                startPos: 0,
-                endPos: 31,
-              },
-            ],
           },
         ],
-        output: 'exports.a = 1;\n\nexports.b = 2;',
       },
       {
         name: 'upstream invalid 14',
@@ -383,17 +351,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: '// before a\nexports.a = 1;\n\n// between a and b\nexports.b = 2;\n// after b',
-                startPos: 0,
-                endPos: 73,
-              },
-            ],
           },
         ],
-        output:
-          '// before a\nexports.a = 1;\n\n// between a and b\nexports.b = 2;\n// after b',
       },
       {
         name: 'upstream invalid 15',
@@ -497,16 +456,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.a = a;',
-                startPos: 0,
-                endPos: 22,
-              },
-            ],
           },
         ],
-        output: 'exports.a = a;',
       },
       {
         name: 'upstream invalid 21',
@@ -537,16 +488,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: "exports['a' + 'b'] = 1;",
-                startPos: 0,
-                endPos: 35,
-              },
-            ],
           },
         ],
-        output: "exports['a' + 'b'] = 1;",
       },
       {
         name: 'upstream invalid 23',
@@ -561,16 +504,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: "exports['foo'] = 1;",
-                startPos: 0,
-                endPos: 29,
-              },
-            ],
           },
         ],
-        output: "exports['foo'] = 1;",
       },
       {
         name: 'upstream invalid 24',
@@ -585,16 +520,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.foo = function (a) {};',
-                startPos: 0,
-                endPos: 30,
-              },
-            ],
           },
         ],
-        output: 'exports.foo = function (a) {};',
       },
       {
         name: 'upstream invalid 25',
@@ -609,16 +536,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.foo = function* (a) {};',
-                startPos: 0,
-                endPos: 31,
-              },
-            ],
           },
         ],
-        output: 'exports.foo = function* (a) {};',
       },
       {
         name: 'upstream invalid 26',
@@ -633,16 +552,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.foo = async function (a) {};',
-                startPos: 0,
-                endPos: 36,
-              },
-            ],
           },
         ],
-        output: 'exports.foo = async function (a) {};',
       },
       {
         name: 'upstream invalid 27',
@@ -657,16 +568,8 @@ new RuleTester({
             column: 1,
             endLine: 1,
             endColumn: 16,
-            fixes: [
-              {
-                text: 'exports',
-                startPos: 0,
-                endPos: 14,
-              },
-            ],
           },
         ],
-        output: 'exports.foo()',
       },
       {
         name: 'upstream invalid 28',
@@ -681,13 +584,6 @@ new RuleTester({
             column: 5,
             endLine: 1,
             endColumn: 20,
-            fixes: [
-              {
-                text: 'exports',
-                startPos: 4,
-                endPos: 18,
-              },
-            ],
           },
           {
             messageId: 'unexpectedModuleExports',
@@ -697,16 +593,8 @@ new RuleTester({
             column: 26,
             endLine: 1,
             endColumn: 41,
-            fixes: [
-              {
-                text: 'exports',
-                startPos: 25,
-                endPos: 39,
-              },
-            ],
           },
         ],
-        output: "a = exports.foo + exports['bar']",
       },
       {
         name: 'upstream invalid 29',
@@ -854,13 +742,6 @@ new RuleTester({
             column: 1,
             endLine: 3,
             endColumn: 17,
-            fixes: [
-              {
-                text: 'exports.foo = 1;\n\nexports.bar = 2;',
-                startPos: 53,
-                endPos: 96,
-              },
-            ],
           },
           {
             messageId: 'unexpectedModuleExports',
@@ -870,17 +751,8 @@ new RuleTester({
             column: 1,
             endLine: 8,
             endColumn: 16,
-            fixes: [
-              {
-                text: 'exports',
-                startPos: 98,
-                endPos: 112,
-              },
-            ],
           },
         ],
-        output:
-          '/*eslint node/exports-style: ["error", "exports"]*/\n\nexports.foo = 1;\n\nexports.bar = 2;\n\nexports.baz = 3',
       },
     ],
   },

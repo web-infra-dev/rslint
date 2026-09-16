@@ -3,12 +3,12 @@ package exports_style
 import (
 	_ "embed"
 	"slices"
-	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
+	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 //go:embed exports_style.schema.json
@@ -42,7 +42,11 @@ var ExportsStyleRule = rule.Rule{
 			allowBatchAssign, _ = config["allowBatchAssign"].(bool)
 		}
 
-		exports, moduleExports := exportReferences(ctx)
+		scopes := scopeAnalysis.Get(ctx, scope.Options{
+			CollectReferences: true,
+			ReferenceNames:    map[string]struct{}{"exports": {}, "module": {}},
+		})
+		exports, moduleExports := exportReferences(ctx, scopes)
 		assignments := map[*ast.Node]int{}
 		if allowBatchAssign {
 			nodes := moduleExports
@@ -55,23 +59,17 @@ var ExportsStyleRule = rule.Rule{
 				}
 			}
 		}
-		report := func(node *ast.Node, message rule.RuleMessage, fix bool) {
+		report := func(node *ast.Node, message rule.RuleMessage) {
 			span := utils.TrimNodeTextRange(ctx.SourceFile, node)
 			if next, ok := utils.TokenAtOrAfter(ctx.SourceFile, node.End()); ok {
 				span = span.WithEnd(next.End)
 			}
-			if fix {
-				ctx.ReportRangeWithDeferredFixes(span, message, func() []rule.RuleFix {
-					return fixModuleExports(ctx, node)
-				})
-			} else {
-				ctx.ReportRange(span, message)
-			}
+			ctx.ReportRange(span, message)
 		}
 		if mode == "module.exports" {
 			for _, node := range exports {
 				if assignments[topAssignment(node)] == 0 {
-					report(node, unexpectedExports, false)
+					report(node, unexpectedExports)
 				}
 			}
 			return nil
@@ -97,9 +95,9 @@ var ExportsStyleRule = rule.Rule{
 		slices.SortStableFunc(reports, func(a, b *ast.Node) int { return a.Pos() - b.Pos() })
 		for _, node := range reports {
 			if node.Kind == ast.KindIdentifier {
-				report(node, unexpectedAssignment, false)
+				report(node, unexpectedAssignment)
 			} else {
-				report(node, unexpectedModuleExports, true)
+				report(node, unexpectedModuleExports)
 			}
 		}
 		return nil
@@ -109,11 +107,7 @@ var ExportsStyleRule = rule.Rule{
 // Upstream reads references from the program's outer global scope. In script
 // files that includes authored top-level bindings; module-local bindings and
 // declarations in nested scopes are excluded.
-func exportReferences(ctx rule.RuleContext) (exports, moduleExports []*ast.Node) {
-	scopes := scope.Build(ctx.SourceFile, scope.Options{
-		CollectReferences: true,
-		ReferenceNames:    map[string]struct{}{"exports": {}, "module": {}},
-	})
+func exportReferences(ctx rule.RuleContext, scopes *scope.Manager) (exports, moduleExports []*ast.Node) {
 	var identifiers []*ast.Node
 	for _, ref := range scopes.References {
 		if utils.IsInJsxTagName(ref.Identifier) {
@@ -249,90 +243,4 @@ func topAssignment(node *ast.Node) *ast.Node {
 		node = parent
 	}
 	return node
-}
-
-func fixModuleExports(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix {
-	if memberParent(node) != nil {
-		return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, "exports")}
-	}
-	assignment := utils.ESTreeParent(node)
-	if !isAssignment(assignment) {
-		return nil
-	}
-	statement := utils.ESTreeParent(assignment)
-	if statement == nil || statement.Kind != ast.KindExpressionStatement || statement.Parent.Kind != ast.KindSourceFile {
-		return nil
-	}
-	object := utils.ESTreeRuntimeExpression(assignment.AsBinaryExpression().Right)
-	if object.Kind != ast.KindObjectLiteralExpression {
-		return nil
-	}
-	var statements []string
-	for _, property := range object.AsObjectLiteralExpression().Properties.Nodes {
-		text, ok := propertyReplacement(ctx, property)
-		if !ok {
-			return nil
-		}
-		statements = append(statements, text)
-	}
-	return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, assignment, strings.Join(statements, "\n\n"))}
-}
-
-func propertyReplacement(ctx rule.RuleContext, property *ast.Node) (string, bool) {
-	text := func(node *ast.Node) string {
-		return utils.TrimmedNodeText(ctx.SourceFile, utils.ESTreeRuntimeExpression(node))
-	}
-	var value string
-	switch property.Kind {
-	case ast.KindPropertyAssignment:
-		value = text(property.AsPropertyAssignment().Initializer)
-	case ast.KindShorthandPropertyAssignment:
-		value = text(property.Name())
-	case ast.KindMethodDeclaration:
-		method := property.AsMethodDeclaration()
-		start, ok := utils.TokenAtOrAfter(ctx.SourceFile, property.Name().End())
-		if !ok {
-			return "", false
-		}
-		value = "function"
-		if method.AsteriskToken != nil {
-			value += "*"
-		}
-		value += " " + ctx.SourceFile.Text()[start.Start:property.End()]
-		if ast.GetCombinedModifierFlags(property)&ast.ModifierFlagsAsync != 0 {
-			value = "async " + value
-		}
-	default:
-		return "", false
-	}
-	key := property.Name()
-	var target string
-	switch key.Kind {
-	case ast.KindComputedPropertyName:
-		target = "[" + text(key.AsComputedPropertyName().Expression) + "]"
-	case ast.KindIdentifier:
-		target = "." + key.Text()
-	default:
-		target = "[" + text(key) + "]"
-	}
-	statement := "exports" + target + " = " + value + ";"
-	comments := ctx.Comments.All()
-	if len(comments) == 0 {
-		return statement, true
-	}
-	span := utils.TrimNodeTextRange(ctx.SourceFile, property)
-	before, _ := utils.TokenBeforePosition(ctx.SourceFile, span.Pos())
-	after, ok := utils.TokenAtOrAfter(ctx.SourceFile, property.End())
-	if !ok {
-		after.Start = property.End()
-	}
-	var lines []string
-	for _, comment := range utils.CommentsInSpan(comments, before.End, span.Pos()) {
-		lines = append(lines, ctx.SourceFile.Text()[comment.Pos():comment.End()])
-	}
-	lines = append(lines, statement)
-	for _, comment := range utils.CommentsInSpan(comments, property.End(), after.Start) {
-		lines = append(lines, ctx.SourceFile.Text()[comment.Pos():comment.End()])
-	}
-	return strings.Join(lines, "\n"), true
 }
