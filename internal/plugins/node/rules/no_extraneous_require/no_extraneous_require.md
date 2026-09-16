@@ -109,10 +109,6 @@ rslint excludes it. A dependency declared only at the workspace root is therefor
 reported by rslint in that child package but accepted upstream. Use
 `packages/[!a]*` to exclude names starting with `a` in both tools.
 
-Very large BigInt calculations may be left unevaluated. For example,
-`require((1n << 65536n) ? 'pkg' : 'other')` is not checked. Use an explicit module
-name for such calls.
-
 Disabling a wildcard alias affects only matching requests. For example,
 `alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
 resolves `pkg` and unrelated packages. Upstream can ignore those other requests

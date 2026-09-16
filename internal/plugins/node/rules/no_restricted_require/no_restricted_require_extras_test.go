@@ -223,6 +223,7 @@ func TestNoRestrictedRequireExtras(t *testing.T) {
 		{Code: "require('' + (-43n / 2n)); require('' + (-43n % 2n)); require('' + (42n << -1n));", Options: []any{[]any{"-21", "-1", "21"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'-21' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 25}, {MessageId: "restricted", Message: "'-1' module is restricted from being used.", Line: 1, Column: 36, EndLine: 1, EndColumn: 52}, {MessageId: "restricted", Message: "'21' module is restricted from being used.", Line: 1, Column: 63, EndLine: 1, EndColumn: 80}}},
 		// BigInt exact mixed comparisons
 		{Code: "require(9007199254740993n > 9007199254740992 ? 'fs' : 'path'); require(1n === 1 ? 'path' : 'fs');", Options: []any{[]any{"fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 61}, {MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 72, EndLine: 1, EndColumn: 96}}},
+		{Code: "require((1n << 65536n) ? 'fs' : 'path');", Options: []any{[]any{"fs"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 39}}},
 		// alias replaces installed module
 		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg": filepath.Join(root.Dir, "server/api.js")}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'pkg' module is restricted from being used.", Line: 1, Column: 9, EndLine: 1, EndColumn: 14}}},
 		// aliases exact prefix wildcard and fallback
@@ -246,7 +247,6 @@ func TestNoRestrictedRequireResolverEdges(t *testing.T) {
 	root := restrictedRequireRoot(t)
 	runRestrictedRequireTests(t, root, []rule_tester.ValidTestCase{
 		// Documented limits: upstream reports each of these calls.
-		{Code: "require((1n << 65536n) ? 'fs' : 'path');", Options: []any{[]any{"fs"}}},
 		{Code: "require('./server');", Options: []any{[]any{filepath.Join(root.Dir, "server/api.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"mainFiles": []any{"api"}}}}},
 		// The equivalent upstream object puts virtual/api before virtual.
 		// Use an alias array when declaration order must be preserved.

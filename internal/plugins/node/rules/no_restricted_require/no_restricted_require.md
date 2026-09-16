@@ -103,10 +103,6 @@ names in sorted order; upstream uses their declaration order. Use the array form
 of `resolverConfig.alias` to specify priority explicitly, for example
 `[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
 
-Very large BigInt calculations may be left unevaluated. For example, upstream
-reports `require((1n << 65536n) ? 'fs' : 'path')` when `fs` is restricted, while
-rslint skips it. Use an explicit module name for such calls.
-
 Disabling a wildcard alias affects only matching requests. For example,
 `alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
 resolves `pkg` and unrelated packages. Upstream can ignore those other requests

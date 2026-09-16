@@ -9,7 +9,7 @@ import (
 )
 
 // Bound constant folding independently of source-controlled exponents/shifts.
-const maxStaticBigIntBits = 1 << 16
+const maxStaticBigIntBits = 1 << 20
 
 // Operands are immutable: cached initializers and aggregate members may share
 // them. math/big supplies the arithmetic; this adapter enforces JS operators,
