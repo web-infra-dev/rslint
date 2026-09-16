@@ -1,0 +1,80 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "allowAtRootLevel": {
+          "type": "boolean",
+          "default": false
+        },
+        "ignores": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "enum": ["file"]
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "enum": ["lib"]
+                  },
+                  "name": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "enum": ["package"]
+                  },
+                  "package": {
+                    "type": "string",
+                    "format": "regex-u"
+                  },
+                  "name": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

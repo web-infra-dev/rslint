@@ -3,12 +3,15 @@ package utils
 import (
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"gotest.tools/v3/assert"
@@ -121,6 +124,185 @@ func TestTypeMatchesSomeSpecifierFromPackage(t *testing.T) {
 	assert.Equal(t, matches("("), false)
 }
 
+func TestTypeMatchesDeclarationSpecifier(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+	filePath := resolve("file.ts")
+	fs := NewOverlayVFS(baseFS, map[string]string{
+		filePath: `import type { External } from "demo-pkg";
+import type { Named, Nested } from "ambient";
+class Local {}
+type LocalType = Local;
+type ExternalType = External;
+type LibraryType = string;
+type AmbientType = Named;
+type NestedType = Nested.Inner;
+type CustomType = Custom;`,
+		resolve("tsconfig.json"):                      `{"compilerOptions":{"strict":true,"typeRoots":["./types"]}}`,
+		resolve("node_modules/demo-pkg/package.json"): `{"name":"demo-pkg","version":"1.0.0","types":"index.d.ts"}`,
+		resolve("node_modules/demo-pkg/index.d.ts"):   `export declare class External {}`,
+		resolve("ambient.d.ts"):                       `declare module "ambient" { export class Named {} export namespace Nested { class Inner {} } }`,
+		resolve("types/custom.d.ts"):                  `interface Custom { value: string }`,
+	})
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err)
+	c, done := program.GetTypeChecker(t.Context())
+	defer done()
+	types := map[string]*checker.Type{}
+	for _, node := range program.GetSourceFile(filePath).Statements.Nodes {
+		if ast.IsTypeAliasDeclaration(node) {
+			types[node.Name().Text()] = c.GetTypeAtLocation(node.Name())
+		}
+	}
+	for _, test := range []struct {
+		name   string
+		option map[string]any
+		want   bool
+	}{
+		{"LocalType", map[string]any{"from": "file"}, true},
+		{"LocalType", map[string]any{"from": "file", "path": "./file.ts"}, true},
+		{"LocalType", map[string]any{"from": "file", "path": "**/file.ts"}, true},
+		{"LocalType", map[string]any{"from": "file", "path": "file.ts"}, false},
+		{"LocalType", map[string]any{"from": "file", "path": ""}, false},
+		{"LocalType", map[string]any{"from": "package"}, false},
+		{"LibraryType", map[string]any{"from": "lib"}, true},
+		{"LibraryType", map[string]any{"from": "file"}, false},
+		{"ExternalType", map[string]any{"from": "package"}, true},
+		{"ExternalType", map[string]any{"from": "package", "package": "demo", "name": []any{"unrelated"}}, true},
+		{"ExternalType", map[string]any{"from": "package", "package": "other"}, false},
+		{"ExternalType", map[string]any{"from": "file"}, false},
+		{"AmbientType", map[string]any{"from": "package"}, true},
+		{"AmbientType", map[string]any{"from": "package", "package": "ambient"}, true},
+		{"AmbientType", map[string]any{"from": "package", "package": ""}, false},
+		// Declaration-location matching stops at the nearest namespace, unlike
+		// the existing TypeScript-ESLint specifier's transparent namespace walk.
+		{"NestedType", map[string]any{"from": "package"}, false},
+		{"NestedType", map[string]any{"from": "file"}, true},
+		{"CustomType", map[string]any{"from": "file"}, false},
+	} {
+		specifier, ok := ParseTypeOrValueSpecifier(test.option)
+		assert.Assert(t, ok)
+		assert.Assert(t, types[test.name] != nil)
+		assert.Equal(t, TypeMatchesDeclarationSpecifier(types[test.name], specifier, lintprogram.NewFromCompiler(program)), test.want, "%s: %v", test.name, test.option)
+	}
+	// Directly constructed specifiers honor non-empty paths and package names,
+	// just like specifiers decoded from rule options.
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(types["LocalType"], TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromFile, Path: "./missing.ts",
+	}, lintprogram.NewFromCompiler(program)), false)
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(types["AmbientType"], TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromPackage, Package: "other",
+	}, lintprogram.NewFromCompiler(program)), false)
+}
+
+func TestTypeMatchesDeclarationSpecifierDefaultTypeRoots(t *testing.T) {
+	rootDir, resolve, baseFS := fixtureRoot()
+	filePath := resolve("file.ts")
+	fs := NewOverlayVFS(baseFS, map[string]string{
+		filePath:                 `type Test = DefaultRoot;`,
+		resolve("tsconfig.json"): `{"compilerOptions":{"types":[]},"files":["file.ts","node_modules/@types/global/index.d.ts"]}`,
+		resolve("node_modules/@types/global/index.d.ts"): `interface DefaultRoot { value: string }`,
+	})
+	program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+	assert.NilError(t, err)
+	c, done := program.GetTypeChecker(t.Context())
+	defer done()
+	specifier, ok := ParseTypeOrValueSpecifier(map[string]any{"from": "file", "path": "**/*.ts"})
+	assert.Assert(t, ok)
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, filePath), specifier, lintprogram.NewFromCompiler(program)), false)
+}
+
+// The overlay supplies every file. Missing package.json probes must not pass
+// synthetic UNC roots to io/fs, whose paths cannot start with a slash.
+type declarationPathFS struct{ vfs.FS }
+
+func (declarationPathFS) FileExists(string) bool { return false }
+
+func TestTypeMatchesDeclarationSpecifierPaths(t *testing.T) {
+	for _, test := range []struct {
+		name, directory, file, pattern string
+		caseSensitive                  bool
+		typeRoots                      []string
+		want                           bool
+	}{
+		// File-glob differences are documented with concrete examples.
+		{"glob ./src/*.ts", "/repo", "/repo/src/foo.ts", "./src/*.ts", true, nil, true},
+		{"glob **/[!a-z]*.ts", "/repo", "/repo/foo.ts", "**/[!a-z]*.ts", true, nil, false},
+		{"glob **/[^a-z]*.ts", "/repo", "/repo/.foo.ts", "**/[^a-z]*.ts", true, nil, false},
+		{"glob **/[[:digit:]]*.ts", "/repo", "/repo/1.ts", "**/[[:digit:]]*.ts", true, nil, false},
+		{"glob **/!(foo|bar).ts", "/repo", "/repo/foobar.ts", "**/!(foo|bar).ts", true, nil, true},
+		{"glob !(**/foo.ts)", "/repo", "/repo/foo.ts", "!(**/foo.ts)", true, nil, true},
+		{"glob **/.*/foo.ts", "/repo", "/repo/foo.ts", "**/.*/foo.ts", true, nil, true},
+		{"glob ./*", "/repo", "/repo/foo.ts", "./*", true, nil, true},
+		{"glob **/foo.(ts)", "/repo", "/repo/foo.ts", "**/foo.(ts)", true, nil, false},
+		{"glob **/[foo].ts", "/repo", "/repo/[foo].ts", "**/[foo].ts", true, nil, false},
+		{"glob **/file{01..03}.ts", "/repo", "/repo/file01.ts", "**/file{01..03}.ts", true, nil, true},
+		{"glob **/file{1..3..2}.ts", "/repo", "/repo/file2.ts", "**/file{1..3..2}.ts", true, nil, false},
+		{"glob ./#*.ts", "/repo", "/repo/#foo.ts", "./#*.ts", true, nil, true},
+		{"glob **//foo.ts", "/repo", "/repo/foo.ts", "**//foo.ts", true, nil, true},
+		{"glob ./!(bar).ts", "/repo", "/repo/foo.ts", "./!(bar).ts", true, nil, true},
+		{"glob **/foo.ts/**", "/repo", "/repo/foo.ts", "**/foo.ts/**", true, nil, false},
+		{"relative POSIX", "/repo/project", "/repo/project/src/file.ts", "./src/*.ts", true, nil, true},
+		{"absolute POSIX", "/repo/project", "/repo/project/src/file.ts", "/repo/project/src/*.ts", true, nil, true},
+		{"case-sensitive match", "/repo/project", "/repo/project/Src/File.ts", "./Src/File.ts", true, nil, true},
+		{"case-sensitive miss", "/repo/project", "/repo/project/Src/File.ts", "./src/file.ts", true, nil, false},
+		{"canonical insensitive path", "/Repo/Project", "/Repo/Project/Src/File.ts", "./src/file.ts", false, nil, true},
+		// Upstream folds the path on insensitive filesystems, not the pattern.
+		{"pattern remains case-sensitive", "/Repo/Project", "/Repo/Project/Src/File.ts", "./Src/File.ts", false, nil, false},
+		{"Windows relative", `C:\Repo\Project`, `C:\Repo\Project\src\file.ts`, "./src/*.ts", false, nil, true},
+		{"Windows absolute", "C:/Repo/Project", "C:/Repo/Project/src/file.ts", "c:/repo/project/src/*.ts", false, nil, true},
+		{"Windows drive casing", "C:/Repo/Project", "c:/Repo/Project/src/file.ts", "./src/*.ts", false, nil, true},
+		{"Windows other drive", "C:/repo/project", "D:/repo/project/src/file.ts", "**/file.ts", false, nil, false},
+		{"UNC relative", "//Server/Share/Project", "//Server/Share/Project/src/file.ts", "./src/*.ts", false, nil, true},
+		{"UNC absolute", "//Server/Share/Project", "//Server/Share/Project/src/file.ts", "//server/share/project/src/*.ts", false, nil, true},
+		{"UNC other share", "//server/share/project", "//server/other/project/src/file.ts", "**/file.ts", false, nil, false},
+		{"Unicode directory", "/repo/Kit/代码", "/repo/Kit/代码/file.ts", "./file.ts", false, nil, true},
+		{"spaces in directory", "C:/My Project", "C:/My Project/src/file.ts", "./src/*.ts", false, nil, true},
+		{"parent segments", "/repo/project/src/..", "/repo/project/src/../file.ts", "./file.ts", true, nil, true},
+		{"trailing directory separator", "C:/repo/project/", "C:/repo/project/file.ts", "./file.ts", false, nil, true},
+		{"backslashes escape glob characters", "C:/repo/project", "C:/repo/project/src/file.ts", `**\file.ts`, false, nil, false},
+		{"escaped dot in pattern", "C:/repo/project", "C:/repo/project/file.ts", `./file\.ts`, false, nil, true},
+		{"leading pattern space", "/repo/project", "/repo/project/file.ts", " **/file.ts", true, nil, false},
+		{"trailing pattern space", "/repo/project", "/repo/project/file.ts", "**/file.ts ", true, nil, false},
+		{"Unicode pattern space", "C:/repo/project", "C:/repo/project/file.ts", "\u00a0**/file.ts", false, nil, false},
+		{"outside working directory", "/repo/project", "/repo/shared/file.ts", "**/file.ts", true, nil, false},
+		// Directory containment must not confuse siblings sharing a prefix.
+		{"sibling directory sharing cwd prefix", "/repo/project", "/repo/project-extra/file.ts", "**/file.ts", true, nil, false},
+		{"configured type root", "/repo/project", "/repo/project/types/file.ts", "**/file.ts", true, []string{"/repo/project/types"}, false},
+		{"type root prefix", "/repo/project", "/repo/project/types-extra/file.ts", "**/file.ts", true, []string{"/repo/project/types"}, true},
+		{"Windows cwd prefix", "C:/Repo/Project", "c:/repo/project-extra/file.ts", "**/file.ts", false, nil, false},
+		{"UNC cwd prefix", "//server/share/project", "//server/share/project-extra/file.ts", "**/file.ts", false, nil, false},
+		{"Windows type root prefix", "C:/Repo/Project", "c:/repo/project/Types-extra/file.ts", "**/file.ts", false, []string{"C:/repo/project/types"}, true},
+		{"UNC type root prefix", "//server/share/project", "//server/share/project/types-extra/file.ts", "**/file.ts", false, []string{"//server/share/project/types"}, true},
+		{"type root trailing separator", "/repo/project", "/repo/project/types/file.ts", "**/file.ts", true, []string{"/repo/project/types/"}, false},
+		{"Windows type root casing", "C:/Repo/Project", "C:/Repo/Project/Types/file.ts", "**/file.ts", false, []string{"c:/repo/project/types"}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := tspath.NormalizePath(test.directory)
+			file := tspath.NormalizePath(test.file)
+			// All reads use exact fixture names; the flag controls the compiler's
+			// path identity without relying on the machine running this test.
+			fs := NewOverlayVFS(declarationPathFS{iovfs.From(fstest.MapFS{}, test.caseSensitive)}, map[string]string{
+				file: "class Demo {}\ntype Test = Demo;",
+			})
+			program, err := CreateProgramFromOptions(true, &core.CompilerOptions{
+				NoLib: core.TSTrue, Types: []string{}, TypeRoots: test.typeRoots,
+			}, []string{file}, CreateCompilerHost(directory, fs))
+			assert.NilError(t, err)
+			c, done := program.GetTypeChecker(t.Context())
+			defer done()
+			specifier, ok := ParseTypeOrValueSpecifier(map[string]any{"from": "file", "path": test.pattern})
+			assert.Assert(t, ok)
+			assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, file), specifier, lintprogram.NewFromCompiler(program)), test.want)
+			if test.typeRoots != nil {
+				// Omitting the glob must retain the same type-root exclusion.
+				assert.Equal(t, TypeMatchesDeclarationSpecifier(typeOfTestAlias(t, program, c, file), TypeOrValueSpecifier{
+					From: TypeOrValueSpecifierFromFile,
+				}, lintprogram.NewFromCompiler(program)), test.want)
+			}
+		})
+	}
+}
+
 // A workspace package is installed as a link, so its declarations resolve to a
 // real path outside node_modules while still belonging to the linked package.
 func TestTypeMatchesSomeSpecifierFromLinkedWorkspacePackage(t *testing.T) {
@@ -165,6 +347,13 @@ func TestTypeMatchesSomeSpecifierFromLinkedWorkspacePackage(t *testing.T) {
 
 	assert.Equal(t, matches("demo-pkg"), true)
 	assert.Equal(t, matches("other"), false)
+	// no-sync must retain package identity after resolving a workspace link.
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(demo, TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromPackage, Package: "demo-pkg",
+	}, lintprogram.NewFromCompiler(program)), true)
+	assert.Equal(t, TypeMatchesDeclarationSpecifier(demo, TypeOrValueSpecifier{
+		From: TypeOrValueSpecifierFromFile, Path: "**/index.d.ts",
+	}, lintprogram.NewFromCompiler(program)), false)
 }
 
 // Dual-published packages drop unnamed package.json files into their build

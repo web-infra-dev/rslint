@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
@@ -71,26 +69,7 @@ var HandleCallbackErrRule = rule.Rule{
 				return
 			}
 
-			var start int
-			switch node.Kind {
-			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-				// ESTree reports the function value, starting after the method key.
-				// This also preserves a TypeScript method's type parameters.
-				start = scanner.SkipTrivia(ctx.SourceFile.Text(), node.Name().End())
-				if node.QuestionToken() != nil {
-					start = scanner.SkipTrivia(ctx.SourceFile.Text(), node.QuestionToken().End())
-				}
-			case ast.KindConstructor:
-				keywordStart := node.Pos()
-				if modifiers := node.Modifiers(); modifiers != nil {
-					keywordStart = modifiers.End()
-				}
-				keyword := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, keywordStart)
-				start = scanner.SkipTrivia(ctx.SourceFile.Text(), keyword.End())
-			default:
-				start = utils.FindFunctionKeywordPos(ctx.SourceFile, node)
-			}
-			ctx.ReportRange(core.NewTextRange(start, node.End()), rule.RuleMessage{
+			ctx.ReportRange(utils.ESTreeFunctionRange(ctx.SourceFile, node), rule.RuleMessage{
 				Id:          "expected",
 				Description: "Expected error to be handled.",
 			})
