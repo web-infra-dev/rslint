@@ -172,6 +172,9 @@ filesystem and generation-scoped cache. Resolution results retain failure
 details for missing-module diagnostics; rules select their exemptions and
 report on the collected source nodes. Relative lookup settings use the process
 directory from `RuleContext`, independently of the owning tsconfig's directory.
+The require collector also follows CommonJS module-object aliases to property
+reads. It delegates symbols and references to `RuleContext.Refs` and reuses
+tsgo's binding helpers; rules keep their own matching and diagnostic policy.
 The glob matcher uses code-unit input for regexp2; rule callers do not select a
 character encoding or translate backend capture numbers. These packages do not
 decide which files to lint or discover ignore files; those policies belong to

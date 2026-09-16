@@ -6,6 +6,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+// requireValue represents the CommonJS values followed by this collector.
+// Scope and symbol lookup remain owned by RuleContext.Refs.
 type requireValue uint8
 
 const (
@@ -13,16 +15,21 @@ const (
 	requireFunction
 	requireResolve
 	requireGlobalObject
+	requiredModule
+	requiredModuleNamespace
 )
 
 func (value requireValue) member(name string) requireValue {
-	if value == requireGlobalObject && name == "require" {
+	switch {
+	case value == requireGlobalObject && name == "require":
 		return requireFunction
-	}
-	if value == requireFunction && name == "resolve" {
+	case value == requireFunction && name == "resolve":
 		return requireResolve
+	case value == requiredModuleNamespace && name == "default":
+		return requiredModule
+	default:
+		return noRequireValue
 	}
-	return noRequireValue
 }
 
 type requireCallTracker struct {
@@ -31,7 +38,19 @@ type requireCallTracker struct {
 	propertyEvaluator *utils.StaticStringEvaluator
 	variableStack     map[*ast.Symbol]bool
 	globalStack       map[string]bool
-	calls             []*ast.Node
+	onCall            func(*ast.Node)
+	includeResolve    bool
+	propertyName      string
+	propertyReads     map[*ast.Node]bool
+}
+
+func newRequireCallTracker(ctx rule.RuleContext) *requireCallTracker {
+	return &requireCallTracker{
+		ctx:           ctx,
+		names:         utils.NewReferenceIndex(ctx.SourceFile, nil),
+		variableStack: make(map[*ast.Symbol]bool),
+		globalStack:   make(map[string]bool),
+	}
 }
 
 // CollectRequireCalls returns require() and require.resolve() calls, following
@@ -39,17 +58,68 @@ type requireCallTracker struct {
 // effective globals, shadowing and writes to global roots. Calls are returned
 // in traversal order; separate alias paths can return the same call more than once.
 func CollectRequireCalls(ctx rule.RuleContext) []*ast.Node {
-	tracker := requireCallTracker{
-		ctx:           ctx,
-		names:         utils.NewReferenceIndex(ctx.SourceFile, nil),
-		variableStack: make(map[*ast.Symbol]bool),
-		globalStack:   make(map[string]bool),
-	}
+	var calls []*ast.Node
+	newRequireCallTracker(ctx).visitRequireCalls(true, func(call *ast.Node) {
+		calls = append(calls, call)
+	})
+	return calls
+}
+
+func (tracker *requireCallTracker) visitRequireCalls(includeResolve bool, onCall func(*ast.Node)) {
+	tracker.includeResolve = includeResolve
+	tracker.onCall = onCall
 	tracker.trackGlobalRoot("require", requireFunction)
 	for _, name := range []string{"global", "globalThis", "self", "window"} {
 		tracker.trackGlobalRoot(name, requireGlobalObject)
 	}
-	return tracker.calls
+}
+
+// CollectModulePropertyReads follows CommonJS module-object aliases to reads
+// of one property, reusing the require collector's alias traversal. ESM imports
+// use upstream's strict CJS mode: default imports expose the object; namespace
+// imports expose it as .default. Module names match exactly, and property-value
+// aliases are not read reports.
+func CollectModulePropertyReads(ctx rule.RuleContext, moduleName, propertyName string) map[*ast.Node]bool {
+	tracker := newRequireCallTracker(ctx)
+	tracker.propertyName = propertyName
+	tracker.propertyReads = make(map[*ast.Node]bool)
+	// Follow each result while its require aliases are still on the stack,
+	// matching the cycle guard of upstream's lazy reference iterator.
+	tracker.visitRequireCalls(false, func(call *ast.Node) {
+		args := call.Arguments()
+		if len(args) == 0 {
+			return
+		}
+		if name, ok := tracker.constantString(args[0]); ok && name == moduleName {
+			tracker.trackExpression(call, requiredModule)
+		}
+	})
+	for _, statement := range ctx.SourceFile.Statements.Nodes {
+		if statement.Kind != ast.KindImportDeclaration {
+			continue
+		}
+		declaration := statement.AsImportDeclaration()
+		if declaration.ModuleSpecifier == nil || declaration.ModuleSpecifier.Text() != moduleName {
+			continue
+		}
+		for _, binding := range utils.GetImportBindingNodes(statement) {
+			value := requiredModule
+			switch binding.Parent.Kind {
+			case ast.KindNamespaceImport:
+				value = requiredModuleNamespace
+			case ast.KindImportSpecifier:
+				name := binding.Parent.PropertyName()
+				if name == nil {
+					name = binding
+				}
+				if name.Text() != "default" {
+					continue
+				}
+			}
+			tracker.trackIdentifier(binding, value)
+		}
+	}
+	return tracker.propertyReads
 }
 
 func (tracker *requireCallTracker) trackGlobalRoot(name string, value requireValue) {
@@ -102,7 +172,9 @@ func (tracker *requireCallTracker) trackExpression(node *ast.Node, value require
 
 	if ast.IsAccessExpression(parent) && utils.AccessExpressionObject(parent) == node {
 		name, ok := tracker.accessExpressionStaticName(parent)
-		if next := value.member(name); ok && next != noRequireValue {
+		if ok && value == requiredModule && name == tracker.propertyName {
+			tracker.propertyReads[parent] = true
+		} else if next := value.member(name); ok && next != noRequireValue {
 			tracker.trackExpression(parent, next)
 		}
 		return
@@ -110,8 +182,8 @@ func (tracker *requireCallTracker) trackExpression(node *ast.Node, value require
 
 	switch parent.Kind {
 	case ast.KindCallExpression:
-		if parent.AsCallExpression().Expression == node && (value == requireFunction || value == requireResolve) {
-			tracker.calls = append(tracker.calls, parent)
+		if parent.AsCallExpression().Expression == node && (value == requireFunction || tracker.includeResolve && value == requireResolve) {
+			tracker.onCall(parent)
 		}
 	case ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
@@ -121,20 +193,9 @@ func (tracker *requireCallTracker) trackExpression(node *ast.Node, value require
 				tracker.trackExpression(parent, value)
 			}
 		}
-	case ast.KindVariableDeclaration:
-		declaration := parent.AsVariableDeclaration()
-		if declaration != nil && declaration.Initializer == node {
-			tracker.trackAssignmentTarget(declaration.Name(), value)
-		}
-	case ast.KindParameter:
-		parameter := parent.AsParameterDeclaration()
-		if parameter != nil && parameter.Initializer == node {
-			tracker.trackAssignmentTarget(parameter.Name(), value)
-		}
-	case ast.KindBindingElement:
-		element := parent.AsBindingElement()
-		if element != nil && element.Initializer == node {
-			tracker.trackAssignmentTarget(element.Name(), value)
+	case ast.KindVariableDeclaration, ast.KindParameter, ast.KindBindingElement:
+		if parent.Initializer() == node {
+			tracker.trackAssignmentTarget(parent.Name(), value)
 		}
 	case ast.KindShorthandPropertyAssignment:
 		property := parent.AsShorthandPropertyAssignment()
@@ -152,43 +213,20 @@ func (tracker *requireCallTracker) trackAssignmentTarget(node *ast.Node, value r
 	switch node.Kind {
 	case ast.KindIdentifier:
 		tracker.trackIdentifier(node, value)
-	case ast.KindObjectBindingPattern:
-		if value == requireResolve {
+	case ast.KindObjectBindingPattern, ast.KindObjectLiteralExpression:
+		if value == requireResolve || value == requiredModule {
 			return
 		}
-		pattern := node.AsBindingPattern()
-		if pattern == nil || pattern.Elements == nil {
-			return
-		}
-		for _, elementNode := range pattern.Elements.Nodes {
-			element := elementNode.AsBindingElement()
-			if element == nil || element.DotDotDotToken != nil || element.Name() == nil {
+		for _, element := range ast.GetElementsOfBindingOrAssignmentPattern(node) {
+			if ast.GetRestIndicatorOfBindingOrAssignmentElement(element) != nil {
 				continue
 			}
-			propertyName := element.PropertyName
+			propertyName := ast.TryGetPropertyNameOfBindingOrAssignmentElement(element)
 			if propertyName == nil {
-				propertyName = element.Name()
+				continue
 			}
 			if name, ok := tracker.staticPropertyName(propertyName); ok && value.member(name) != noRequireValue {
-				tracker.trackAssignmentTarget(element.Name(), value.member(name))
-			}
-		}
-	case ast.KindObjectLiteralExpression:
-		if value == requireResolve {
-			return
-		}
-		for _, propertyNode := range node.AsObjectLiteralExpression().Properties.Nodes {
-			switch propertyNode.Kind {
-			case ast.KindPropertyAssignment:
-				property := propertyNode.AsPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.member(name) != noRequireValue {
-					tracker.trackAssignmentTarget(property.Initializer, value.member(name))
-				}
-			case ast.KindShorthandPropertyAssignment:
-				property := propertyNode.AsShorthandPropertyAssignment()
-				if name, ok := tracker.staticPropertyName(property.Name()); ok && value.member(name) != noRequireValue {
-					tracker.trackAssignmentTarget(property.Name(), value.member(name))
-				}
+				tracker.trackAssignmentTarget(ast.GetTargetOfBindingOrAssignmentElement(element), value.member(name))
 			}
 		}
 	case ast.KindBinaryExpression:
@@ -201,12 +239,12 @@ func (tracker *requireCallTracker) trackAssignmentTarget(node *ast.Node, value r
 
 func (tracker *requireCallTracker) trackIdentifier(identifier *ast.Node, value requireValue) {
 	if tracker.ctx.Refs != nil {
-		if symbol := tracker.ctx.Refs.Resolve(identifier); utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
+		if symbol := tracker.ctx.Refs.ResolveInFile(identifier); utils.IsValueSymbolDeclaredInFile(symbol, tracker.ctx.SourceFile) {
 			tracker.trackVariable(symbol, value)
 			return
 		}
 	}
-	if symbol := callBindingSymbol(identifier); symbol != nil {
+	if symbol := utils.BindingNameSymbol(identifier); symbol != nil {
 		tracker.trackVariable(symbol, value)
 		return
 	}
@@ -214,17 +252,6 @@ func (tracker *requireCallTracker) trackIdentifier(identifier *ast.Node, value r
 	if tracker.ctx.Globals.Access(name).IsDeclared() && tracker.isGlobalReference(identifier, name) {
 		tracker.trackGlobalVariable(name, value)
 	}
-}
-
-func callBindingSymbol(identifier *ast.Node) *ast.Symbol {
-	if identifier == nil || identifier.Kind != ast.KindIdentifier || identifier.Parent == nil {
-		return nil
-	}
-	declaration := identifier.Parent
-	if declaration.Name() != identifier {
-		return nil
-	}
-	return declaration.Symbol()
 }
 
 func (tracker *requireCallTracker) trackVariable(symbol *ast.Symbol, value requireValue) {
@@ -257,22 +284,27 @@ func (tracker *requireCallTracker) trackGlobalVariable(name string, value requir
 func (tracker *requireCallTracker) accessExpressionStaticName(node *ast.Node) (string, bool) {
 	if node.Kind == ast.KindElementAccessExpression {
 		argument := node.AsElementAccessExpression().ArgumentExpression
-		if tracker.propertyEvaluator == nil {
-			tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithoutScope()
-		}
-		return tracker.propertyEvaluator.EvalToString(argument)
+		return tracker.constantString(argument)
 	}
 	return utils.AccessExpressionStaticName(node)
 }
 
 func (tracker *requireCallTracker) staticPropertyName(node *ast.Node) (string, bool) {
 	if node != nil && node.Kind == ast.KindComputedPropertyName {
-		if tracker.propertyEvaluator == nil {
-			tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithoutScope()
-		}
-		return tracker.propertyEvaluator.EvalToString(node.AsComputedPropertyName().Expression)
+		return tracker.constantString(node.AsComputedPropertyName().Expression)
+	}
+	// tsgo's binding-property helper unwraps computed template literal keys.
+	if node != nil && node.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		return tracker.constantString(node)
 	}
 	return utils.GetStaticPropertyName(node)
+}
+
+func (tracker *requireCallTracker) constantString(node *ast.Node) (string, bool) {
+	if tracker.propertyEvaluator == nil {
+		tracker.propertyEvaluator = utils.NewStaticStringEvaluatorWithoutScope()
+	}
+	return tracker.propertyEvaluator.EvalToString(node)
 }
 
 func requireValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
@@ -288,12 +320,10 @@ func requireValuePassesThrough(node *ast.Node, parent *ast.Node) bool {
 		if binary == nil || binary.OperatorToken == nil {
 			return false
 		}
-		switch binary.OperatorToken.Kind {
-		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+		if ast.IsLogicalOrCoalescingBinaryOperator(binary.OperatorToken.Kind) {
 			return binary.Left == node || binary.Right == node
-		case ast.KindCommaToken:
-			return binary.Right == node
 		}
+		return binary.OperatorToken.Kind == ast.KindCommaToken && binary.Right == node
 	}
 	return false
 }
