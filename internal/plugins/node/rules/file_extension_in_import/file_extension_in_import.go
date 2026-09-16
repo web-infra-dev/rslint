@@ -103,6 +103,11 @@ var FileExtensionInImportRule = rule.Rule{
 			if !tspath.PathIsRelative(name) && !strings.HasPrefix(name, "/") && !strings.HasPrefix(name, `\`) {
 				return
 			}
+			// VisitImports already removes loader suffixes. Resolve and check only
+			// the path, keeping queries and fragments out of extension decisions.
+			if index := strings.IndexAny(name, "?#"); index >= 0 {
+				name = name[:index]
+			}
 			index := 0
 			if typeOnly {
 				index = 1
@@ -161,6 +166,20 @@ var FileExtensionInImportRule = rule.Rule{
 						}
 					}
 					position := source.End() - 1
+					if len(name) < len(source.Text()) {
+						span := utils.TrimNodeTextRange(ctx.SourceFile, source)
+						raw := ctx.SourceFile.Text()[span.Pos():span.End()]
+						offset := len(name) + 1
+						if raw[1:len(raw)-1] != source.Text() {
+							units := utils.ParseJSStringLiteralSource(raw)
+							index := ecmascript.StringCodeUnitCount(name)
+							if index >= len(units) {
+								return nil
+							}
+							offset = units[index].Start
+						}
+						position = span.Pos() + offset
+					}
 					return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(position, position), text)}
 				})
 			}

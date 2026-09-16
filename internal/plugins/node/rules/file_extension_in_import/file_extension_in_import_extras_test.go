@@ -372,3 +372,43 @@ func TestFileExtensionInImportEscapedPaths(t *testing.T) {
 		{Code: "export type {T} from './\\u0064.js';", FileName: "test.ts", Options: []any{"never"}, Output: []string{"export type {T} from './\\u0064';"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "forbidExt", Message: "forbid file extension '.js'.", Line: 1, Column: 22, EndLine: 1, EndColumn: 35}}},
 	})
 }
+
+func TestFileExtensionInImportResourceSuffixes(t *testing.T) {
+	root := extensionRoot(t, "testdata/upstream.txtar", "testdata/extras.txtar")
+	var valid []rule_tester.ValidTestCase
+	var invalid []rule_tester.InvalidTestCase
+	for _, suffix := range []string{
+		"!loader.js", "?raw", "#part", "?path=/other.js#part",
+		"!loader?raw#part", "?raw!loader.js#part",
+		`\u0021loader`, `\x3f` + "raw", `\u{23}part`,
+	} {
+		for _, test := range []struct {
+			path, fixed, file, style string
+		}{
+			{"./a", "./a.js", "test.js", "always"},
+			{"./a.js", "./a", "test.js", "never"},
+			{"./my-folder", "./my-folder/index.js", "test.js", "always"},
+			{"./my-folder/", "./my-folder/index.js", "test.js", "always"},
+			{`./\u0061`, `./\u0061.js`, "test.js", "always"},
+			{`./a.\x6as`, "./a", "test.js", "never"},
+			{`./\ud83d\ude00`, `./\ud83d\ude00.js`, "test.js", "always"},
+			{"./d", "./d.js", "test.ts", "always"},
+			{"./d.js", "./d", "test.ts", "never"},
+		} {
+			code := "import '" + test.path + suffix + "'"
+			fixed := "import '" + test.fixed + suffix + "'"
+			messageID, message := "requireExt", "require file extension '.js'."
+			if test.style == "never" {
+				messageID, message = "forbidExt", "forbid file extension '.js'."
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code: code, FileName: test.file, Options: []any{test.style}, Output: []string{fixed},
+				// All source spellings in this matrix are ASCII and single-line.
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: messageID, Message: message, Line: 1, Column: 8, EndLine: 1, EndColumn: len(code) + 1}},
+			})
+			// Besides checking the single fix round, require a clean second lint.
+			valid = append(valid, rule_tester.ValidTestCase{Code: fixed, FileName: test.file, Options: []any{test.style}})
+		}
+	}
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &FileExtensionInImportRule, valid, invalid)
+}

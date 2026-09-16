@@ -64,6 +64,12 @@ For `"never"`, rslint removes the extension while preserving escapes elsewhere
 in the path. For example, `import './\u0061.js'` becomes `import './\u0061'`;
 upstream can remove the wrong characters from the escaped spelling.
 
+Queries, fragments, and loader suffixes are preserved separately from the
+extension. For example, `import './a?raw'` becomes `import './a.js?raw'`, and
+`import './a!loader'` becomes `import './a.js!loader'`. With `"never"`,
+`import './a.js?raw'` becomes `import './a?raw'`. Upstream can append the
+extension after a suffix or remove the query along with the extension.
+
 Automatic fixes also leave non-string `import()` arguments unchanged. If a
 custom extension contains a backslash, line break, or the string's quote
 delimiter, the rule reports it without inserting it verbatim. For example,
