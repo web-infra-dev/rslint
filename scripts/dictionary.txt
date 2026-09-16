@@ -145,6 +145,7 @@ desync
 dgimsuy
 dgimsuvy
 dialytika
+dimsuy
 dirxml
 disqualifier
 disqualifiers
@@ -296,6 +297,7 @@ jsonc
 jsonline
 jsonschema
 jsxa
+jsxdev
 jsxtext
 jsxtransforms
 jsxtx
@@ -385,6 +387,7 @@ myfunc
 mylib
 Mymr
 mynamespace
+mysticatea
 módulo
 nanotime
 napi

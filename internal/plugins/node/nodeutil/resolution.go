@@ -5,6 +5,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -14,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/tailscale/hujson"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // ResolutionOptions selects runtime files independently of the compiler's
@@ -27,21 +30,32 @@ type ResolutionOptions struct {
 	Paths            []string
 	Conditions       []string
 	ExtensionAliases map[string][]string
+	// Import paths do not use directory main/index fallback unless they name a
+	// package. Require callers retain the ordinary Node directory lookup.
+	NoDirectory bool
 }
 
 type nodeResolutionKey struct{ name, file, options string }
+type nodeResolution struct{ path, resolveError string }
 
 // ResolveModule resolves a runtime package through this generation's FS.
 // It does not load the result into the Program or fall back to @types packages.
 func ResolveModule(p *program.Program, name, containingFile string, options ResolutionOptions) string {
+	resolved, _ := ResolveModuleWithError(p, name, containingFile, options)
+	return resolved
+}
+
+// ResolveModuleWithError also preserves the resolution failure for missing
+// module diagnostics. Package traversal and exports selection still use tsgo.
+func ResolveModuleWithError(p *program.Program, name, containingFile string, options ResolutionOptions) (string, string) {
 	if p.FS() == nil {
-		return ""
+		return "", ""
 	}
-	encoded, err := json.Marshal([]any{options.Extensions, options.Modules, options.Paths, options.Conditions, options.ExtensionAliases})
+	encoded, err := json.Marshal([]any{options.Extensions, options.Modules, options.Paths, options.Conditions, options.ExtensionAliases, options.NoDirectory})
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	return program.Cached(p, nodeResolutionKey{name, containingFile, string(encoded)}, func() string {
+	result := program.Cached(p, nodeResolutionKey{name, containingFile, string(encoded)}, func() nodeResolution {
 		if options.Extensions == nil {
 			options.Extensions = []string{".js", ".json", ".node", ".mjs", ".cjs"}
 		}
@@ -51,26 +65,73 @@ func ResolveModule(p *program.Program, name, containingFile string, options Reso
 		if options.Conditions == nil {
 			options.Conditions = []string{"node", "require", "import"}
 		}
+		originalName := name
 		// enhanced-resolve separates resource queries/fragments from the path.
 		if index := strings.IndexAny(name, "?#"); index > 0 {
 			name = name[:index]
 		}
+		folders := options.Modules
+		if len(folders) == 0 {
+			// Package imports and self-references do not use module directories.
+			// Run tsgo once with external directory probes disabled.
+			folders = []string{"node_modules"}
+		}
+		if tspath.IsExternalModuleNameRelative(name) {
+			// Module search directories govern bare packages, not local files.
+			folders = []string{"node_modules"}
+		}
+		var resolveError string
 		for _, base := range append(slices.Clone(options.Paths), tspath.GetDirectoryPath(containingFile)) {
-			for _, folder := range options.Modules {
+			base = tspath.ResolvePath(p.CurrentDirectory(), base)
+			resolveError = "Can't resolve '" + originalName + "' in '" + base + "'"
+			for _, folder := range folders {
 				view := &nodeResolutionFS{
 					FS: p.FS(), folder: folder, options: options,
 					explicitExtension: path.Ext(name), resolved: map[string]string{},
+					request:        name,
+					noModuleSearch: len(options.Modules) == 0 && !tspath.IsExternalModuleNameRelative(name),
+				}
+				if options.NoDirectory {
+					view.blockedDirectory = view.physical(tspath.ResolvePath(base, name))
 				}
 				resolver := view.newResolver(p.CurrentDirectory())
-				base = tspath.ResolvePath(p.CurrentDirectory(), base)
 				result, _ := resolver.ResolveModuleName(name, tspath.ResolvePath(base, "__import__.js"), core.ResolutionModeCommonJS, nil)
 				if !view.unresolved && result != nil && result.IsResolved() {
-					return view.Realpath(result.ResolvedFileName)
+					if view.builtin {
+						return nodeResolution{}
+					}
+					return nodeResolution{path: view.Realpath(result.ResolvedFileName)}
+				}
+				if view.exportsFile != "" {
+					request := name
+					if view.importsTarget != "" {
+						request = view.importsTarget
+					}
+					packageName, _ := module.ParsePackageName(request)
+					subpath := "." + strings.TrimPrefix(request, packageName)
+					conditions, _ := json.Marshal(options.Conditions)
+					resolveError = `"` + subpath + `" is not exported under the conditions ` + string(conditions) + " from package " + tspath.GetDirectoryPath(view.exportsFile) + " (see exports field in " + view.exportsFile + ")"
+					if view.unresolved {
+						resolveError = "Package path " + subpath + " is exported from package " + tspath.GetDirectoryPath(view.exportsFile) + ", but no valid target file was found (see exports field in " + view.exportsFile + ")"
+					}
+					// A found package's exports failure cannot fall through to a
+					// different copy in a later module directory.
+					break
+				} else if view.importsFile != "" && !view.importsMatched {
+					resolveError = "Package import " + name + " is not imported from package " + tspath.GetDirectoryPath(view.importsFile) + " (see imports field in " + view.importsFile + ")"
+				}
+				if view.importsFile != "" {
+					if name == "#" {
+						resolveError = "Request should have at least 2 characters"
+					} else if strings.HasSuffix(name, "/") {
+						resolveError = "Resolving to directories is not possible with the imports field (request was " + name + ")"
+					}
 				}
 			}
 		}
-		return ""
+		return nodeResolution{resolveError: resolveError}
 	})
+	return result.path, result.resolveError
 }
 
 // The private view projects runtime candidates onto tsgo's file probes.
@@ -84,6 +145,7 @@ const nodeTargetSuffix = ".__rslint_node_target__.js"
 // original target to exist as a directory first.
 const nodeExportSuffix = "/.__rslint_node_export__.ts"
 const nodeDirectoryExportSuffix = "/.__rslint_node_directory_export__.ts"
+const nodeBuiltinTarget = "__rslint_node_builtin__.ts"
 
 type nodeResolutionFS struct {
 	vfs.FS
@@ -93,6 +155,14 @@ type nodeResolutionFS struct {
 	resolved          map[string]string
 	activeDirectories map[string]bool
 	unresolved        bool
+	request           string
+	noModuleSearch    bool
+	blockedDirectory  string
+	exportsFile       string
+	importsFile       string
+	importsMatched    bool
+	importsTarget     string
+	builtin           bool
 }
 
 func (f *nodeResolutionFS) newResolver(cwd string) *module.Resolver {
@@ -113,9 +183,15 @@ func (f *nodeResolutionFS) physical(name string) string {
 	if index := strings.LastIndex(name, "/node_modules"); index >= 0 && (len(name) == index+13 || name[index+13] == '/') {
 		rest := strings.TrimPrefix(name[index+13:], "/")
 		if tspath.IsRootedDiskPath(f.folder) {
-			return tspath.ResolvePath(f.folder, rest)
+			name = tspath.ResolvePath(f.folder, rest)
+		} else {
+			name = tspath.ResolvePath(name[:index+1], f.folder, rest)
 		}
-		return tspath.ResolvePath(name[:index+1], f.folder, rest)
+	}
+	// Node encodes filesystem paths as UTF-8, replacing each unpaired UTF-16
+	// surrogate. Keep the original JavaScript value for matching and messages.
+	if !utf8.ValidString(name) {
+		name = string(utf16.Decode(ecmascript.StringCodeUnits(name)))
 	}
 	return name
 }
@@ -145,6 +221,9 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 	physical := f.physical(name)
 	var resolved string
 	switch {
+	case strings.HasPrefix(f.request, "#") && tspath.GetBaseFileName(physical) == nodeBuiltinTarget:
+		f.builtin = true
+		return true
 	case strings.HasSuffix(physical, "/package.json"):
 		return f.FS.FileExists(physical)
 	case strings.HasSuffix(physical, nodeDirectoryExportSuffix):
@@ -154,7 +233,7 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 	case strings.HasSuffix(physical, nodeTargetSuffix), strings.HasSuffix(physical, nodeExportSuffix):
 		target := strings.TrimSuffix(strings.TrimSuffix(physical, nodeTargetSuffix), nodeExportSuffix)
 		resolved = f.probe(target, false)
-		if resolved == "" && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
+		if resolved == "" && !f.options.NoDirectory && !strings.HasSuffix(target, "/") && f.FS.DirectoryExists(target) && !f.activeDirectories[target] {
 			// enhanced-resolve permits directory exports. Ask tsgo to resolve
 			// their main/index using its regular relative-directory traversal.
 			// Guard package main cycles before creating a nested resolver.
@@ -189,7 +268,11 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 }
 
 func (f *nodeResolutionFS) DirectoryExists(name string) bool {
-	return f.FS.DirectoryExists(strings.TrimSuffix(strings.TrimSuffix(f.physical(name), nodeTargetSuffix), nodeExportSuffix))
+	if f.noModuleSearch && tspath.GetBaseFileName(name) == "node_modules" {
+		return false
+	}
+	physical := strings.TrimSuffix(strings.TrimSuffix(f.physical(name), nodeTargetSuffix), nodeExportSuffix)
+	return (f.blockedDirectory == "" || strings.TrimRight(physical, "/") != strings.TrimRight(f.blockedDirectory, "/")) && f.FS.DirectoryExists(physical)
 }
 
 func (f *nodeResolutionFS) Realpath(name string) string {
@@ -213,6 +296,23 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 		return text, true
 	}
 	if object, ok := value.Value.(*hujson.Object); ok {
+		if imports := value.Find("/imports"); imports != nil {
+			markNodeImportTargets(imports, f.options.Conditions)
+			if entries, ok := imports.Value.(*hujson.Object); ok && f.importsFile == "" && strings.HasPrefix(f.request, "#") {
+				f.recordImports(entries, f.physical(name))
+			}
+		}
+		request := f.request
+		if f.importsTarget != "" {
+			request = f.importsTarget
+		}
+		packageName, _ := module.ParsePackageName(request)
+		selfReference := false
+		if name := value.Find("/name"); name != nil {
+			if literal, ok := name.Value.(hujson.Literal); ok && literal.Kind() == '"' {
+				selfReference = literal.String() == packageName
+			}
+		}
 		// Runtime lookup must not select TypeScript's versioned declarations.
 		object.Members = slices.DeleteFunc(object.Members, func(member hujson.ObjectMember) bool {
 			return nodePackageMemberName(member) == "typesVersions"
@@ -224,6 +324,9 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 				if key == "exports" {
 					if literal, ok := member.Value.Value.(hujson.Literal); ok && (string(literal) == "null" || string(literal) == "false" || string(literal) == `""`) {
 						continue
+					}
+					if selfReference || strings.HasSuffix(name, "/"+packageName+"/package.json") {
+						f.exportsFile = f.physical(name)
 					}
 					if !prepareNodeExports(&member.Value, f.options.Conditions) {
 						// A blocked selection must retain an exports map: a bare
@@ -242,6 +345,83 @@ func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 		}
 	}
 	return string(value.Pack()), true
+}
+
+// Remember the selected request for diagnostics; tsgo still resolves its target.
+func (f *nodeResolutionFS) recordImports(entries *hujson.Object, fileName string) {
+	f.importsFile = fileName
+	var best string
+	for _, entry := range entries.Members {
+		key := nodePackageMemberName(entry)
+		pattern := core.TryParsePattern(key)
+		if !pattern.IsValid() || !pattern.Matches(f.request) {
+			continue
+		}
+		if best != "" && key != f.request && (best == f.request || module.ComparePatternKeys(key, best) >= 0) {
+			continue
+		}
+		best = key
+		target := entry.Value
+		if conditions, ok := target.Value.(*hujson.Object); ok {
+			target, _ = nodeExportArrayCondition(conditions, f.options.Conditions)
+		}
+		f.importsMatched, f.importsTarget = false, ""
+		if literal, ok := target.Value.(hujson.Literal); ok {
+			if literal.Kind() == '"' && literal.String() != "" {
+				f.importsMatched = true
+				name := literal.String()
+				if pattern.StarIndex >= 0 {
+					name = strings.ReplaceAll(name, "*", pattern.MatchedText(f.request))
+				}
+				if !tspath.IsExternalModuleNameRelative(name) {
+					f.importsTarget = name
+				}
+			}
+		} else {
+			f.importsMatched = target.Value != nil
+		}
+	}
+}
+
+// Let tsgo select imports-map keys and conditions, including redirects to Node
+// builtins that have no file for a compiler resolver to find.
+func markNodeImportTargets(value *hujson.Value, conditions []string) {
+	switch v := value.Value.(type) {
+	case hujson.Literal:
+		if v.Kind() == '"' {
+			target := v.String()
+			if index := strings.IndexAny(target, "?#"); index > 0 {
+				target = target[:index]
+				value.Value = hujson.String(target)
+			}
+			if isNodeBuiltin(target) {
+				value.Value = hujson.String("./" + nodeBuiltinTarget)
+			} else if strings.HasPrefix(target, "./") {
+				markNodeTargets(value, nodeExportSuffix)
+			}
+		}
+	case *hujson.Object:
+		for i := range v.Members {
+			markNodeImportTargets(&v.Members[i].Value, conditions)
+		}
+	case *hujson.Array:
+		if !prepareNodeExports(value, conditions) {
+			value.Value = &hujson.Array{}
+			return
+		}
+		for i := range v.Elements {
+			markNodeImportTargets(&v.Elements[i], conditions)
+			if target, ok := v.Elements[i].Value.(hujson.Literal); ok && target.Kind() == '"' && !tspath.IsExternalModuleNameRelative(target.String()) {
+				// Package targets stop on resolution failure just like the
+				// marked file targets; tsgo must not try a later array entry.
+				v.Elements = v.Elements[:i+1]
+				if i == 0 {
+					value.Value = target
+				}
+				break
+			}
+		}
+	}
 }
 
 // tsgo owns exports paths, patterns and ordinary condition selection. Only

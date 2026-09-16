@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -108,6 +109,39 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 			t.Errorf("symlinked directory export = %q, want %q", got, want)
 		}
 	})
+}
+
+func TestImportResolutionProcessDirectory(t *testing.T) {
+	fileName := "/process/project/input.ts"
+	p := programForResolution(t, map[string]string{
+		fileName:                                         "export {};",
+		"/process/project/tsconfig.json":                 `{"compilerOptions":{}}`,
+		"/process/project/view.tsx":                      "export {};",
+		"/process/extensions.json":                       `{"compilerOptions":{"jsx":"react"}}`,
+		"/process/deps/node_modules/pkg/index.js":        "export {};",
+		"/process/vendor/deps/node_modules/pkg/index.js": "export {};",
+	}, fileName)
+	options := map[string]any{"resolvePaths": []any{"deps"}, "tsconfigPath": "./extensions.json"}
+	for _, cwd := range []string{"", "vendor"} {
+		t.Run(cwd, func(t *testing.T) {
+			ctx := (rule.RuleContext{SourceFile: p.SourceFiles()[0], Settings: map[string]any{}}).
+				WithProgram(p).WithFileCache(rule.NewFileCacheWithProcessCurrentDirectory("/process"))
+			if cwd != "" {
+				ctx.Settings["cwd"] = cwd
+			}
+			for _, resolution := range []ResolutionOptions{ImportResolutionOptions(ctx, false, options), RequireResolutionOptions(ctx, options)} {
+				want := tspath.ResolvePath("/process", cwd, "deps/node_modules/pkg/index.js")
+				if got := ResolveModule(p, "pkg", fileName, resolution); got != want {
+					t.Errorf("process-relative lookup = %q, want %q", got, want)
+				}
+				// tsconfigPath uses process.cwd even when settings.cwd redirects
+				// module lookup. The selected JSX map resolves view.js to TSX.
+				if got := ImportResolveError(p, "./view.js", fileName, false, resolution); got != "" {
+					t.Errorf("process-relative tsconfigPath: %s", got)
+				}
+			}
+		})
+	}
 }
 
 func TestNearestCompilerOptionsGeneration(t *testing.T) {

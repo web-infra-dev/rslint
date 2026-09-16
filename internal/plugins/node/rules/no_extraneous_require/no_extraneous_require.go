@@ -81,7 +81,7 @@ var NoExtraneousRequireRule = rule.Rule{
 						}
 						if name != "" {
 							if resolution == nil {
-								value := nodeutil.RequireResolutionOptions(p, fileName, opts, ctx.Settings)
+								value := nodeutil.RequireResolutionOptions(ctx, opts)
 								resolution = &value
 							}
 							// As with no-extraneous-import, only resolverConfig.modules

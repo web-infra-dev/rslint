@@ -4,14 +4,74 @@ package nodeutil
 import (
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
 var npmSpecifier = esregexp.MustCompile(`^(@[\w~-][\w.~-]*/)?[\w~-][\w.~-]*`, "")
+
+// VisitImports shares the literal import/export shapes used by the Node rules.
+// ignoreTypeImport applies to import declarations, not type-only re-exports.
+func VisitImports(ignoreTypeImport bool, check func(*ast.Node, string, bool)) rule.RuleListeners {
+	visit := func(source *ast.Node, typeOnly bool) {
+		if source == nil {
+			return
+		}
+		var specifier string
+		switch source.Kind {
+		case ast.KindStringLiteral:
+			// Preserve the JavaScript value. Lone surrogates have a documented
+			// display difference when a missing-import diagnostic is serialized.
+			specifier = source.Text()
+		case ast.KindBigIntLiteral:
+			specifier = utils.NormalizeBigIntLiteral(source.Text())
+		case ast.KindNumericLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword, ast.KindRegularExpressionLiteral:
+			var ok bool
+			specifier, ok = utils.NewStaticStringEvaluatorWithoutScope().EvalToString(source)
+			if !ok {
+				return
+			}
+		default:
+			return
+		}
+		specifier, _, _ = strings.Cut(specifier, "!")
+		if isNodeBuiltin(specifier) {
+			return
+		}
+		check(source, specifier, typeOnly)
+	}
+	return rule.RuleListeners{
+		ast.KindImportDeclaration: func(node *ast.Node) {
+			declaration := node.AsImportDeclaration()
+			typeOnly := declaration.ImportClause != nil && declaration.ImportClause.AsImportClause().IsTypeOnly()
+			if !ignoreTypeImport || !typeOnly {
+				visit(declaration.ModuleSpecifier, typeOnly)
+			}
+		},
+		ast.KindExportDeclaration: func(node *ast.Node) {
+			declaration := node.AsExportDeclaration()
+			visit(declaration.ModuleSpecifier, declaration.IsTypeOnly)
+		},
+		ast.KindCallExpression: func(node *ast.Node) {
+			call := node.AsCallExpression()
+			if call.Expression.Kind == ast.KindImportKeyword && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
+				// ESTree strips parentheses, but retains templates and TS wrappers.
+				visit(utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0]), false)
+			}
+		},
+	}
+}
+
+// isImportURL identifies the URL imports exempted by eslint-plugin-n.
+func isImportURL(specifier string) bool {
+	return strings.HasPrefix(specifier, "data:") || strings.HasPrefix(specifier, "http://") || strings.HasPrefix(specifier, "https://")
+}
 
 // These inverse maps are immutable. tsgo owns the emitted extension table;
 // the Node plugin selects preserve mode when no JSX setting is configured.
@@ -34,8 +94,7 @@ func typescriptExtensionAliases(jsx core.JsxEmit) map[string][]string {
 // Builtins, relative/absolute paths, import maps and URL imports have no npm name.
 func ImportModuleName(specifier string) (name, resource string) {
 	resource, _, _ = strings.Cut(specifier, "!")
-	if isNodeBuiltin(resource) || strings.HasPrefix(resource, "data:") ||
-		strings.HasPrefix(resource, "http://") || strings.HasPrefix(resource, "https://") || !npmSpecifier.Test(resource) {
+	if strings.HasPrefix(resource, ".") || strings.HasPrefix(resource, "/") || strings.HasPrefix(resource, `\`) || isNodeBuiltin(resource) || isImportURL(resource) || !npmSpecifier.Test(resource) {
 		return "", resource
 	}
 	name, _ = module.ParsePackageName(resource)
@@ -75,10 +134,49 @@ func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
 	return false
 }
 
+// ImportResolveError checks actual targets, including TypeScript path aliases.
+// Extraneous-dependency rules intentionally use HasTypeScriptAlias instead:
+// their upstream contract exempts an alias even when its target is missing.
+func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
+	if isNodeBuiltin(name) || !typeOnly && isImportURL(name) {
+		return ""
+	}
+	moduleName, _ := ImportModuleName(name)
+	options.NoDirectory = moduleName == ""
+	if tspath.HasTSFileExtension(fileName) {
+		if config := nearestCompilerOptions(p, fileName); config != nil && config.Paths != nil {
+			for alias, targets := range config.Paths.Entries() {
+				alias = strings.TrimRight(alias, `/\*`)
+				pattern := core.TryParsePattern(alias)
+				wildcard := pattern.IsValid() && pattern.StarIndex >= 0 && pattern.Matches(name)
+				if !wildcard && name != alias && !strings.HasPrefix(name, alias+"/") {
+					continue
+				}
+				for _, target := range targets {
+					target = strings.TrimRight(target, `/\*`)
+					if wildcard {
+						target = strings.Replace(target, "*", pattern.MatchedText(name), 1)
+					} else {
+						target += strings.TrimPrefix(name, alias)
+					}
+					target = tspath.ResolvePath(tspath.GetDirectoryPath(config.ConfigFilePath), target)
+					if resolved := ResolveModule(p, target, fileName, options); resolved != "" {
+						return ""
+					}
+				}
+				return "Can't resolve '" + name + "' in '" + tspath.GetDirectoryPath(fileName) + "'"
+			}
+		}
+	}
+	_, resolveError := ResolveModuleWithError(p, name, fileName, options)
+	return resolveError
+}
+
 // ImportResolutionOptions implements the documented resolverConfig.modules
 // option and the shared Node extension/lookup settings. convertPath is accepted
 // by the extraneous rules' schemas but, as upstream, does not affect these checks.
-func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool, options, settings map[string]any) ResolutionOptions {
+func ImportResolutionOptions(ctx rule.RuleContext, typeOnly bool, options map[string]any) ResolutionOptions {
+	p, fileName, settings := ctx.Program(), ctx.SourceFile.FileName(), ctx.Settings
 	result := ResolutionOptions{
 		Extensions: StringListSetting("tryExtensions", options, settings),
 		Paths:      StringListSetting("resolvePaths", options, settings),
@@ -96,7 +194,11 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 			break
 		}
 	}
-	cwd := p.CurrentDirectory()
+	cwd := ctx.ProcessCurrentDirectory()
+	if cwd == "" {
+		cwd = p.CurrentDirectory()
+	}
+	processDirectory := cwd
 	if configured, ok := settings["cwd"].(string); ok {
 		cwd = tspath.ResolvePath(cwd, configured)
 	}
@@ -122,48 +224,54 @@ func ImportResolutionOptions(p *program.Program, fileName string, typeOnly bool,
 			sharedValue = settings["node"]
 		}
 		shared, _ := sharedValue.(map[string]any)
-		if pairs, ok := shared["typescriptExtensionMap"].([]any); ok {
-			result.ExtensionAliases = map[string][]string{}
-			for _, pair := range pairs {
-				values := stringArray(pair)
-				if len(values) == 2 && values[0] != "" {
-					result.ExtensionAliases[values[1]] = append(result.ExtensionAliases[values[1]], values[0])
-				}
-			}
-		} else {
-			preset, _ := shared["typescriptExtensionMap"].(string)
-			switch preset {
-			case "react", "react-jsx", "react-jsxdev", "react-native", "preserve":
-			default:
-				if configPath, ok := shared["tsconfigPath"].(string); ok && configPath != "" {
-					config = readCompilerOptions(p, configPath)
-					if config != nil && config.AllowImportingTsExtensions == core.TSTrue {
-						result.ExtensionAliases = nil
-					} else if config != nil {
-						if config.Jsx == core.JsxEmitPreserve {
-							preset = "preserve"
-						} else if config.Jsx != core.JsxEmitNone {
-							preset = "react"
-						}
-					}
-				}
-			}
-			switch preset {
-			case "react", "react-jsx", "react-jsxdev", "react-native", "preserve":
-				result.ExtensionAliases = emittedExtensionAliases
-				if preset == "preserve" {
-					result.ExtensionAliases = preservedExtensionAliases
-				}
+		for _, value := range []map[string]any{options, shared} {
+			if aliases, ok := configuredExtensionAliases(p, processDirectory, value); ok {
+				result.ExtensionAliases = aliases
+				break
 			}
 		}
 	}
 	return result
 }
 
+func configuredExtensionAliases(p *program.Program, cwd string, options map[string]any) (map[string][]string, bool) {
+	if pairs, ok := options["typescriptExtensionMap"].([]any); ok {
+		aliases := map[string][]string{}
+		for _, pair := range pairs {
+			values := stringArray(pair)
+			if len(values) == 2 && values[0] != "" {
+				aliases[values[1]] = append(aliases[values[1]], values[0])
+			}
+		}
+		return aliases, true
+	}
+	preset, _ := options["typescriptExtensionMap"].(string)
+	switch preset {
+	case "preserve":
+		return preservedExtensionAliases, true
+	case "react", "react-jsx", "react-jsxdev", "react-native":
+		return emittedExtensionAliases, true
+	}
+	if configPath, ok := options["tsconfigPath"].(string); ok && configPath != "" {
+		if config := readCompilerOptions(p, tspath.ResolvePath(cwd, configPath)); config != nil {
+			if config.AllowImportingTsExtensions == core.TSTrue {
+				return nil, true
+			}
+			if config.Jsx == core.JsxEmitPreserve {
+				return preservedExtensionAliases, true
+			}
+			if config.Jsx != core.JsxEmitNone {
+				return emittedExtensionAliases, true
+			}
+		}
+	}
+	return nil, false
+}
+
 // RequireResolutionOptions uses the same lookup and TypeScript settings as
 // imports, but CommonJS does not activate the import or types export conditions.
-func RequireResolutionOptions(p *program.Program, fileName string, options, settings map[string]any) ResolutionOptions {
-	result := ImportResolutionOptions(p, fileName, false, options, settings)
+func RequireResolutionOptions(ctx rule.RuleContext, options map[string]any) ResolutionOptions {
+	result := ImportResolutionOptions(ctx, false, options)
 	result.Conditions = []string{"node", "require"}
 	return result
 }

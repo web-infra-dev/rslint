@@ -8,7 +8,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_extraneous_import.schema.json
@@ -46,7 +45,7 @@ var NoExtraneousImportRule = rule.Rule{
 				index = 1
 			}
 			if resolutionOptions[index] == nil {
-				resolution := nodeutil.ImportResolutionOptions(p, fileName, typeOnly, opts, ctx.Settings)
+				resolution := nodeutil.ImportResolutionOptions(ctx, typeOnly, opts)
 				resolutionOptions[index] = &resolution
 			}
 			if nodeutil.ResolveModule(p, resource, fileName, *resolutionOptions[index]) != "" {
@@ -61,25 +60,7 @@ var NoExtraneousImportRule = rule.Rule{
 		// Resolution is immutable within a file, but every occurrence still
 		// needs its own diagnostic. Type-only and runtime imports may differ.
 		targets := map[targetKey]string{}
-		check := func(source *ast.Node, typeOnly bool) {
-			if source == nil {
-				return
-			}
-			var specifier string
-			switch source.Kind {
-			case ast.KindStringLiteral:
-				specifier = source.Text()
-			case ast.KindBigIntLiteral:
-				specifier = utils.NormalizeBigIntLiteral(source.Text())
-			case ast.KindNumericLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
-				var ok bool
-				specifier, ok = utils.NewStaticStringEvaluatorWithoutScope().EvalToString(source)
-				if !ok {
-					return
-				}
-			default:
-				return
-			}
+		return nodeutil.VisitImports(false, func(source *ast.Node, specifier string, typeOnly bool) {
 			key := targetKey{specifier, typeOnly}
 			name, found := targets[key]
 			if !found {
@@ -92,24 +73,6 @@ var NoExtraneousImportRule = rule.Rule{
 					Data: map[string]string{"moduleName": name},
 				})
 			}
-		}
-		return rule.RuleListeners{
-			ast.KindImportDeclaration: func(node *ast.Node) {
-				declaration := node.AsImportDeclaration()
-				check(declaration.ModuleSpecifier, declaration.ImportClause != nil && declaration.ImportClause.AsImportClause().IsTypeOnly())
-			},
-			ast.KindExportDeclaration: func(node *ast.Node) {
-				declaration := node.AsExportDeclaration()
-				check(declaration.ModuleSpecifier, declaration.IsTypeOnly)
-			},
-			ast.KindCallExpression: func(node *ast.Node) {
-				call := node.AsCallExpression()
-				if call.Expression.Kind == ast.KindImportKeyword && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-					// ESTree strips parentheses, but preserves template literals and
-					// authored TS wrappers. Type import expressions are a different AST.
-					check(utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0]), false)
-				}
-			},
-		}
+		})
 	},
 }

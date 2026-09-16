@@ -5,7 +5,7 @@ import { createTempDir, cleanupTempDir } from '../cli/js-config/helpers';
 
 interface ExpectedError {
   messageId: string;
-  message: string;
+  message: string | ((root: string) => string);
   line: number;
   column: number;
   endLine: number;
@@ -14,6 +14,7 @@ interface ExpectedError {
 
 interface TestCase {
   name?: string;
+  skip?: string;
   code: string;
   filename?: string;
   options?: unknown[];
@@ -68,7 +69,9 @@ export class RuleTester {
       });
       for (const [kind, entries] of Object.entries(cases)) {
         entries.forEach((item, index) => {
-          test(`${kind} ${index}: ${item.name ?? 'BOM and line endings'}`, async () => {
+          const run = item.skip ? test.skip : test;
+          const label = item.skip ?? item.name ?? 'BOM and line endings';
+          run(`${kind} ${index}: ${label}`, async () => {
             const filename = path.join(
               root,
               (item.filename ?? 'input.js').replace(
@@ -103,7 +106,11 @@ export class RuleTester {
               expect(diagnostic.ruleName).toBe(`node/${name}`);
               expect(diagnostic.suggestions).toBeUndefined();
               if (typeof expected !== 'string') {
-                expect(diagnostic.message).toBe(expected.message);
+                expect(diagnostic.message).toBe(
+                  typeof expected.message === 'function'
+                    ? expected.message(root.replaceAll('\\', '/'))
+                    : expected.message,
+                );
                 expect(diagnostic.messageId).toBe(expected.messageId);
                 expect(diagnostic.range).toEqual({
                   start: { line: expected.line, column: expected.column },

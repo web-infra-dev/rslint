@@ -1,0 +1,100 @@
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"module":"nodenext","target":"esnext","jsx":"preserve","paths":{"@local/*":["./src/*"],"@multi/*":["./absent/*","./src/*"],"@exact":["./src/present.ts"]}},"include":["**/*"]}
+-- src/present.js --
+export const value = 1;
+-- src/�.js --
+export {};
+-- src/😀.js --
+export {};
+-- src/dir-�/index.js --
+export {};
+-- node_modules/unicode-target/package.json --
+{"exports":{"./*":"./*.js"}}
+-- node_modules/unicode-target/�.js --
+export {};
+-- src/present.ts --
+export const value = 1;
+-- src/view.tsx --
+export default <div />;
+-- src/no-extension --
+export default 1;
+-- src/entry.custom --
+export default 1;
+-- src/directory/index.js --
+export default 1;
+-- src/package/package.json --
+{"main":"./main.js"}
+-- src/package/main.js --
+export default 1;
+-- src/alias-file.ts --
+export default 1;
+-- node_modules/pkg/package.json --
+{"name":"pkg","exports":{".":{"types":"./types.d.ts","default":"./index.js"},"./private":null,"./missing":"./absent.js"}}
+-- node_modules/pkg/index.js --
+export default 1;
+-- node_modules/pkg/types.d.ts --
+export type Value = string;
+-- node_modules/types-only/package.json --
+{"exports":{".":{"types":"./index.d.ts"}}}
+-- node_modules/types-only/index.d.ts --
+export type Value = string;
+-- node_modules/declaration-only/package.json --
+{"types":"./index.d.ts"}
+-- node_modules/declaration-only/index.d.ts --
+export type Value = string;
+-- node_modules/@scope/pkg/index.js --
+export default 1;
+-- custom_modules/custom/index.js --
+export default 1;
+-- other/remote.js --
+export default 1;
+-- maps/tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"module":"nodenext","target":"esnext","jsx":"preserve","paths":{"#local":["./entry.ts"]}}}
+-- maps/entry.ts --
+export default 1;
+-- maps/package.json --
+{"name":"self","imports":{"#entry":"./entry.js","#pkg":"pkg","#builtin":"node:fs","#missing":"./absent.js","#directory":"./directory","#files/*":"./files/*.js","#query":"./entry.js?raw","#fragment":"./entry.js#raw","#file-builtin":"./__rslint_node_builtin__.ts","#null":null,"#types":{"types":"./entry.ts"},"#array":[null,"./entry.js"],"#array-fallback":["./absent.js","./entry.js"],"#pattern/*":"./files/*.js","#redirect":"pkg/private","#file-alias":"./entry.js"},"exports":{".":"./entry.js","./private":null,"./missing":"./absent.js"}}
+-- maps/entry.js --
+export default 1;
+-- maps/directory/index.js --
+export default 1;
+-- maps/files/entry.js --
+export default 1;
+-- config/explicit.json --
+{"compilerOptions":{"allowImportingTsExtensions":true}}
+-- config/no-jsx.json --
+{"compilerOptions":{}}
+-- direct/tsconfig.json --
+{"compilerOptions":{"allowImportingTsExtensions":true}}
+-- direct/input.ts --
+export {};
+-- direct/present.ts --
+export default 1;
+-- maps/__rslint_node_builtin__.ts --
+export {};
+-- inherit/base/tsconfig.json --
+{"compilerOptions":{"paths":{"inherited/*":["./src/*"]}}}
+-- inherit/base/src/present.ts --
+export {};
+-- inherit/app/tsconfig.json --
+{"extends":"../base/tsconfig.json"}
+-- baseurl/tsconfig.json --
+{"compilerOptions":{"baseUrl":"./src","paths":{"base/*":["./*"]}}}
+-- baseurl/src/present.ts --
+export {};
+-- review/tsconfig.json --
+{"compilerOptions": {"paths": {"@pre*-post": ["./absent/*/index.ts", "./generated/*/index.ts"], "*-tail": ["./generated/*/index.ts"]}}}
+-- review/generated/value/index.ts --
+export {};
+-- review/package.json --
+{"name":"review-self","imports":{"#entry":"./entry.js","#external":"pkg","#private":"pkg/private","#missing":"pkg/missing","#conditional":{"browser":"pkg","node":"pkg/private"},"#wild/*":"pkg/*","#wild/private":"pkg/unknown","#array":["pkg/private","pkg"],"#builtin":"node:fs","#local-modules":"./node_modules/local.js","#self":"review-self/private","#invalid-first":["./node_modules/local.js","./entry.js"],"#invalid-then-private":["./node_modules/local.js","pkg/private","pkg"]},"exports":{".":"./entry.js","./private":null}}
+-- review/entry.js --
+export {};
+-- review/node_modules/local.js --
+export {};
+-- first_modules/shadow/package.json --
+{"exports": {"./private": null, "./missing": "./absent.js"}}
+-- second_modules/shadow/package.json --
+{"exports": {"./private": "./entry.js", "./missing": "./entry.js"}}
+-- second_modules/shadow/entry.js --
+export {};
