@@ -93,6 +93,8 @@ The replacement uses JavaScript regular expressions and capture substitutions.
   Subdirectory `.npmignore` files, or `.gitignore` when absent, still apply;
   they can exclude that target. Upstream can use the nested package's metadata
   with a path relative to the outer package and incorrectly skip the check.
+  For a package directory named `Pkg`, a converted path `../pkg/lib/a.js`
+  remains inside the package on a case-insensitive filesystem.
 - **Unusual filename patterns.** In `files`, `.npmignore`, and `.gitignore`,
   `[!b]oo.js` matches `foo.js` but not `boo.js`, and `cli\?` matches a literal
   question mark. Upstream can select different files for these patterns. Each

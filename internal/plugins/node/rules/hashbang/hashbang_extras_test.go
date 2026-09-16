@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -93,6 +94,33 @@ func TestHashbangPaths(t *testing.T) {
 			t.Errorf("accepted invalid options %#v", options)
 		}
 	}
+}
+
+type caseInsensitiveFS struct{ vfs.FS }
+
+func (caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
+
+func TestHashbangPublicationPathCasing(t *testing.T) {
+	root := hashbangRoot(t)
+	options := map[string]any{"ignoreUnpublished": true, "convertPath": map[string]any{
+		"lib/**": []any{"^lib/", "../STRING-BIN/lib/"},
+	}}
+	const code = "#!/usr/bin/env node\nhello();"
+	// On a sensitive filesystem this conversion leaves the source package.
+	t.Run("sensitive", func(t *testing.T) {
+		rule_tester.RunRuleTester(root, "tsconfig.json", t, &HashbangRule,
+			[]rule_tester.ValidTestCase{{FileName: "string-bin/lib/test.js", Code: code, Options: options}}, nil)
+	})
+	t.Run("insensitive", func(t *testing.T) {
+		insensitiveRoot := root
+		insensitiveRoot.FS = caseInsensitiveFS{root.FS}
+		rule_tester.RunRuleTester(insensitiveRoot, "tsconfig.json", t, &HashbangRule, nil,
+			[]rule_tester.InvalidTestCase{{
+				FileName: "string-bin/lib/test.js", Code: code, Options: options,
+				Output: []string{"hello();"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "expectedHashbang", Line: 1, Column: 1, EndLine: 1, EndColumn: 20}},
+			}})
+	})
 }
 
 func TestHashbangUnpublished(t *testing.T) {

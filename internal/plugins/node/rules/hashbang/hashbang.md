@@ -92,6 +92,8 @@ a different `bin` entry or publication pattern. **Use the array form of
   `.npmignore` files, or `.gitignore` when absent, still apply. Upstream can
   incorrectly skip the hashbang check by mixing nested package metadata with
   a path relative to the outer package.
+  For a package directory named `Pkg`, a converted path `../pkg/lib/a.js`
+  remains inside the package on a case-insensitive filesystem.
 - **Excluding or escaping filename characters.** With
   `additionalExecutables: ["[!b]oo.js"]` or `["[^b]oo.js"]`, rslint selects
   `foo.js` as an executable and excludes `boo.js`; upstream misses `foo.js`.

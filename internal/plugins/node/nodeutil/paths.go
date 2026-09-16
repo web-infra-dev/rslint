@@ -167,10 +167,11 @@ type publication struct {
 // pkg is the source's publishing package; absolute is the converted target.
 // Nested package metadata cannot change what the publishing package includes.
 func IsUnpublished(p *program.Program, pkg *PackageJSON, absolute string) bool {
-	if !tspath.ContainsPath(pkg.directory, absolute, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}) {
+	comparison := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: p.FS().UseCaseSensitiveFileNames()}
+	if !tspath.ContainsPath(pkg.directory, absolute, comparison) {
 		return true
 	}
-	relative := tspath.GetRelativePathFromDirectory(pkg.directory, absolute, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+	relative := tspath.GetRelativePathFromDirectory(pkg.directory, absolute, comparison)
 	published := program.Cached(p, publicationKey(pkg.directory), func() *publication {
 		return compilePublication(p, pkg)
 	})

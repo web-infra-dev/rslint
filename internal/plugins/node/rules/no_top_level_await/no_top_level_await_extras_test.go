@@ -3,8 +3,16 @@ package no_top_level_await_test
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_top_level_await"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Expected diagnostics were checked against eslint-plugin-n v18.3.0 with
@@ -98,6 +106,56 @@ func TestNoTopLevelAwaitExtras(t *testing.T) {
 			{Code: "await load();", FileName: "main/index.js", Errors: []rule_tester.InvalidTestCaseError{forbiddenAt(1, 1, 1, 13)}},
 		},
 	)
+}
+
+type caseInsensitiveFS struct{ vfs.FS }
+
+func (caseInsensitiveFS) UseCaseSensitiveFileNames() bool { return false }
+
+func TestNoTopLevelAwaitPathCasing(t *testing.T) {
+	root := awaitRoot(t, "testdata/extras.txtar")
+	first := tspath.ResolvePath(root.Dir, "files/src/first.mjs")
+	second := tspath.ResolvePath(root.Dir, "FILES/src/second.mjs")
+	metadata, ok := root.FS.ReadFile(tspath.ResolvePath(root.Dir, "files/package.json"))
+	if !ok {
+		t.Fatal("missing package fixture")
+	}
+	// Model both spellings in the overlay, and share the resolver's package cache
+	// as an insensitive filesystem does. The first source primes that cache.
+	fs := caseInsensitiveFS{utils.NewOverlayVFS(root.FS, map[string]string{
+		first: "await load();", second: "await load();",
+		tspath.ResolvePath(root.Dir, "FILES/package.json"): metadata,
+	})}
+	p, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames: []string{first, second}, Host: utils.CreateCompilerHost(root.Dir, fs),
+		CompilerOptions: &core.CompilerOptions{AllowJs: core.TSTrue, NoLib: core.TSTrue}, SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, replacement := range []string{"lib/", "../FILES/lib/"} {
+		t.Run(replacement, func(t *testing.T) {
+			options := []any{map[string]any{"convertPath": map[string]any{"src/**": []any{"^src/", replacement}}}}
+			count := 0
+			testutil.LintProgram(t, testutil.LintProgramOptions{
+				Program: p,
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{Name: no_top_level_await.NoTopLevelAwaitRule.Name, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return no_top_level_await.NoTopLevelAwaitRule.Run(ctx, options)
+					}}}
+				},
+				OnDiagnostic: func(d rule.RuleDiagnostic) {
+					if d.Message.Id != "forbidden" {
+						t.Errorf("unexpected diagnostic: %v", d.Message)
+					}
+					count++
+				},
+			})
+			if count != 2 {
+				t.Errorf("got %d diagnostics, want one for each package spelling", count)
+			}
+		})
+	}
 }
 
 // These cases retain nodeutil's established, documented differences from upstream.

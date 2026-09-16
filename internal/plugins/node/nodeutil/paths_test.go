@@ -3,10 +3,13 @@ package nodeutil
 
 import (
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
@@ -229,6 +232,74 @@ func TestIsAbsolutePath(t *testing.T) {
 		}
 		if got := IsAbsolutePath(tc.name); got != want {
 			t.Errorf("IsAbsolutePath(%q) = %v, want %v", tc.name, got, want)
+		}
+	}
+}
+
+// Publication only reads metadata; keep filesystem casing independent of the host.
+type publicationFS struct {
+	vfs.FS
+	files         map[string]string
+	caseSensitive bool
+}
+
+func (fs *publicationFS) UseCaseSensitiveFileNames() bool { return fs.caseSensitive }
+
+func (fs *publicationFS) ReadFile(name string) (string, bool) {
+	text, ok := fs.files[tspath.GetCanonicalFileName(name, fs.caseSensitive)]
+	return text, ok
+}
+
+func TestPublicationCrossPlatformPaths(t *testing.T) {
+	for _, directory := range []string{"/Work/Pkg", "C:/Work/Pkg", "//Server/Share/Work/Pkg"} {
+		for _, caseSensitive := range []bool{true, false} {
+			name := directory + "/insensitive"
+			if caseSensitive {
+				name = directory + "/sensitive"
+			}
+			t.Run(name, func(t *testing.T) {
+				fs := &publicationFS{caseSensitive: caseSensitive, files: map[string]string{}}
+				for relative, text := range map[string]string{
+					".npmignore":                 "lib/ignored.js\r\nlib/nested/restored.js\r\nlib/blocked/\r\n",
+					"lib/nested/.npmignore":      "ignored.js\r\n!restored.js\r\n",
+					"lib/blocked/.npmignore":     "!restored.js\r\n",
+					"lib/中文 space[1]/.npmignore": "ignored.js\r\n",
+				} {
+					fs.files[tspath.GetCanonicalFileName(tspath.ResolvePath(directory, relative), caseSensitive)] = text
+				}
+				p, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+					Host: utils.CreateCompilerHost(directory, fs), CompilerOptions: &core.CompilerOptions{},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				pkg := &PackageJSON{directory: directory, data: map[string]any{"files": []any{"lib", "..hidden.js"}, "main": "main.js"}}
+				for _, test := range []struct {
+					path string
+					want bool
+				}{
+					{"lib/a.js", false}, {`lib\nested\..\a.js`, false},
+					{"lib/ignored.js", true}, {"lib/nested/ignored.js", true},
+					{"lib/nested/restored.js", false}, {"lib/blocked/restored.js", true},
+					{"lib/NESTED/ignored.js", !caseSensitive},
+					{"lib/中文 space[1]/ignored.js", true}, {"lib/中文 space[1]/a.js", false},
+					{"main.js", false}, {"README.js", false}, {"..hidden.js", false},
+					{"../Pkg/lib/a.js", false}, {"../Pkg-other/lib/a.js", true},
+					{`..\outside.js`, true}, {"lib/../../outside.js", true},
+					{"D:/Work/Pkg/lib/a.js", true}, {"//Other/Share/Work/Pkg/lib/a.js", true},
+					{"//Server/Other/Work/Pkg/lib/a.js", true},
+					{strings.Replace(directory, "C:", "c:", 1) + "/lib/a.js", false},
+					{strings.Replace(directory, "Server", "server", 1) + "/lib/a.js", false},
+					{strings.Replace(directory, "Share", "share", 1) + "/lib/a.js", caseSensitive && strings.Contains(directory, "/Share/")},
+					{strings.Replace(directory, "Pkg", "pkg", 1) + "/lib/a.js", caseSensitive},
+					{strings.Replace(directory, "Pkg", "pkg", 1) + "/lib/nested/restored.js", caseSensitive},
+					{strings.Replace(directory, "Pkg", "pkg", 1) + "/lib/nested/ignored.js", true},
+				} {
+					if got := IsUnpublished(p, pkg, tspath.ResolvePath(directory, test.path)); got != test.want {
+						t.Errorf("IsUnpublished(%q) = %v, want %v", test.path, got, test.want)
+					}
+				}
+			})
 		}
 	}
 }
