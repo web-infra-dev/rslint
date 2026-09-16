@@ -32,10 +32,6 @@ function useLoader(require) {
 
 This rule has no options and does not provide automatic fixes or suggestions.
 
-## Differences from upstream
-
-Enable this rule as `node/global-require` with the `node` plugin in rslint. The upstream configuration uses `n/global-require`.
-
 ## Original Documentation
 
 - [eslint-plugin-n: global-require](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/global-require.md)
