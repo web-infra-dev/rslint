@@ -21,7 +21,7 @@ globalThis.setInterval(callback, 1000);
 ```
 
 Optional calls, computed method names, locally declared timer functions, calls
-without arguments, and a lone spread argument are not reported.
+without arguments, and a spread first argument are not reported.
 
 ## Options
 
@@ -44,6 +44,21 @@ allowed. Signed and parenthesized zero literals are recognized.
 ```
 
 With `"never"`, `setTimeout(callback, 0)` becomes `setTimeout(callback)`.
+
+## Differences from upstream
+
+Calls with a spread first argument are left unchanged in both modes. In
+`"never"` mode, upstream v75.0.0 can mistake a later zero for the delay even
+when the spread already supplies the callback and delay:
+
+```javascript
+const args = [callback, 1000];
+setTimeout(...args, 0);
+```
+
+Here `0` is passed to the callback. Removing it changes behavior, so this rule
+does not report the call. Pass the callback and delay explicitly to make their
+positions clear and enable checking.
 
 ## Original Documentation
 
