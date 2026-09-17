@@ -231,3 +231,15 @@ func TestNoArraySortEditDemand(t *testing.T) {
 		})
 	}
 }
+
+// Dynamic imports are ESTree ImportExpressions, not ordinary callback calls.
+func TestNoArraySortImportComparator(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_array_sort.NoArraySortRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "const sorted = array.sort(import(\"x\"));", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error", Message: "Use `Array#toSorted()` instead of `Array#sort()`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion-apply-replacement", Output: "const sorted = array.toSorted(import(\"x\"));"}}},
+		}},
+		{Code: "const sorted = array.sort(import(\"x\"));", FileName: "probe.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error", Message: "Use `Array#toSorted()` instead of `Array#sort()`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion-apply-replacement", Output: "const sorted = array.toSorted(import(\"x\"));"}}},
+		}},
+	})
+}

@@ -44,9 +44,9 @@ func IsNodeValueNotFunction(node *ast.Node) bool {
 		operator := node.AsBinaryExpression().OperatorToken.Kind
 		return isImpossibleBinaryOperator(operator)
 	case ast.KindCallExpression:
-		// ESTree wraps optional calls in ChainExpression; the call heuristic
-		// must not classify those unknown values as non-functions.
-		if ast.IsOptionalChain(node) {
+		// ESTree exposes optional calls and dynamic imports as separate node
+		// kinds. Neither belongs to the ordinary-call callback heuristic.
+		if ast.IsOptionalChain(node) || ast.IsImportCall(node) {
 			return false
 		}
 		// For ordinary calls, upstream only accepts a `.bind()` result as a callback.
