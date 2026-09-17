@@ -337,3 +337,63 @@ func TestSpaceAroundKeywordFixesUsesESTreeTokenClasses(t *testing.T) {
 		})
 	}
 }
+
+func TestNeedsSemicolonBeforeExpressionBoundary(t *testing.T) {
+	for _, test := range []struct {
+		previous string
+		want     bool
+	}{
+		{"const value = function() {}", true},
+		{"const value = () => {}", true},
+		{"const value = class {}", true},
+		{"value = {}", true},
+		{"function value() {}", false},
+		{"class Value {}", false},
+		{"{}", false},
+	} {
+		t.Run(test.previous, func(t *testing.T) {
+			source := parseTestJavaScript(test.previous + "\n1.0.toString()")
+			node := findTestNode(t, source, "1.0")
+			if got := NeedsSemicolonBefore(source, node, "(1)"); got != test.want {
+				t.Fatalf("NeedsSemicolonBefore numeric receiver = %v, want %v", got, test.want)
+			}
+		})
+	}
+	for _, code := range []string{
+		"if (ready) 1.0.toString()", "while (ready) 1.0.toString()",
+		"result = 1.0.toString()", "consume(1.0.toString())", "(1.0).toString()",
+	} {
+		source := parseTestJavaScript(code)
+		if NeedsSemicolonBefore(source, findTestNode(t, source, "1.0"), "(1)") {
+			t.Errorf("unexpected statement separator in %q", code)
+		}
+	}
+}
+
+func TestNeedsSemicolonBeforeTypeScriptBoundary(t *testing.T) {
+	for _, test := range []struct {
+		previous string
+		want     bool
+	}{
+		{"value<string>", true},
+		{"value<Array<string>>", true},
+		{"value<Map<string, Array<number>>>", true},
+		{"value!", true},
+		{"value!.property!", true},
+		{"value<string>;", false},
+		{"value!;", false},
+		{"type Value = Box<string>", false},
+		{"interface Value<T> {}", false},
+		{"function value<T>() {}", false},
+	} {
+		t.Run(test.previous, func(t *testing.T) {
+			source := parseTestSource(test.previous + "\n1.0.toString()")
+			node := findTestNode(t, source, "1.0")
+			for _, replacement := range []string{"(1)", "<number>1"} {
+				if got := NeedsSemicolonBefore(source, node, replacement); got != test.want {
+					t.Errorf("NeedsSemicolonBefore(%q) = %v, want %v", replacement, got, test.want)
+				}
+			}
+		})
+	}
+}

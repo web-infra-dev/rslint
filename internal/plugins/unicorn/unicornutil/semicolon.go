@@ -8,7 +8,7 @@ import (
 )
 
 func startsWithSemicolonHazard(text string) bool {
-	return text != "" && strings.ContainsRune("[(/`+-*,.", rune(text[0]))
+	return text != "" && strings.ContainsRune("[(/`+-*,.<", rune(text[0]))
 }
 
 func isEmbeddedStatement(statement *ast.Node) bool {
@@ -45,15 +45,20 @@ func NeedsSemicolonBefore(
 	node *ast.Node,
 	replacement string,
 ) bool {
-	if sourceFile == nil || node == nil ||
-		!startsWithSemicolonHazard(replacement) ||
-		utils.OutermostParenthesizedExpression(node) != node ||
-		node.Parent == nil || !ast.IsExpressionStatement(node.Parent) ||
-		isEmbeddedStatement(node.Parent) {
+	if sourceFile == nil || node == nil || !startsWithSemicolonHazard(replacement) {
 		return false
 	}
 
+	// A replaced receiver or left operand can lead a larger expression. Keep
+	// the source start fixed so parentheses and embedded expressions stop us.
 	nodeRange := utils.TrimNodeTextRange(sourceFile, node)
+	for node.Parent != nil && !ast.IsExpressionStatement(node.Parent) &&
+		utils.TrimNodeTextRange(sourceFile, node.Parent).Pos() == nodeRange.Pos() {
+		node = node.Parent
+	}
+	if node.Parent == nil || !ast.IsExpressionStatement(node.Parent) || isEmbeddedStatement(node.Parent) {
+		return false
+	}
 	previous, ok := utils.TokenBeforePosition(sourceFile, nodeRange.Pos())
 	if !ok {
 		return false
@@ -73,13 +78,19 @@ func NeedsSemicolonBefore(
 		ast.KindFalseKeyword,
 		ast.KindNullKeyword:
 		return true
-	case ast.KindCloseBraceToken:
-		// `value = {}` can be followed by an identifier-starting statement,
-		// but a replacement beginning with `[` would instead index the object.
-		// Blocks, classes, and function bodies ending in `}` do not need this.
-		return ast.IsObjectLiteralExpression(
-			ast.GetNodeAtPosition(sourceFile, previous.Start, false),
-		)
+	case ast.KindCloseBraceToken, ast.KindGreaterThanToken, ast.KindExclamationToken:
+		// These tokens can end a declaration or a runtime value, including
+		// TypeScript instantiations and non-null assertions. Only values can
+		// absorb a following expression across the statement boundary.
+		for previousNode := ast.GetNodeAtPosition(sourceFile, previous.Start, false); previousNode != nil && previousNode.End() == previous.End; previousNode = previousNode.Parent {
+			switch previousNode.Kind {
+			case ast.KindObjectLiteralExpression, ast.KindFunctionExpression,
+				ast.KindArrowFunction, ast.KindClassExpression,
+				ast.KindExpressionWithTypeArguments, ast.KindNonNullExpression:
+				return true
+			}
+		}
+		return false
 	default:
 		return false
 	}
