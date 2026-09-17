@@ -91,6 +91,13 @@ func TestNoDeprecatedAPIExtras(t *testing.T) {
 		},
 	}
 	invalid := []rule_tester.InvalidTestCase{
+		// A shorthand assignment property is not a variable declaration.
+		{Code: "({Buffer} = globalThis); new Buffer();",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "deprecated", Message: "'new Buffer()' was deprecated since v6.0.0. Use 'Buffer.alloc()' or 'Buffer.from()' instead.", Line: 1, Column: 26, EndLine: 1, EndColumn: 38},
+			},
+		},
 		// tsgo unwraps template literal property names in binding patterns.
 		{Code: "const {[`Buffer`]: B} = require('buffer'); new B(); const {[`require`]: load} = global; load('fs').exists;",
 			Errors: []rule_tester.InvalidTestCaseError{

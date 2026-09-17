@@ -183,13 +183,21 @@ filesystem paths for restrictions,
 including lexical paths for unresolved local imports and requires. Restrictions
 compare host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
 Rules select their exemptions and report on the collected source nodes.
-Node API reference tracking also lives
-in `nodeutil`: require collection and API rules share static property, alias,
-destructuring and module traversal, reusing tsgo's binding helpers,
-`RuleContext.Refs` and a name index cached by `RuleContext` per file. Require
-targets also share constant argument evaluation and loader-parameter removal.
+API reference tracking lives in `internal/utils/referencetracker`. Node rules
+and Unicorn's document-cookie rule share static property, alias and
+destructuring traversal, reusing tsgo's binding helpers, `RuleContext.Refs`
+and a name index cached by `RuleContext` per file. Symbols are resolved within
+the linted file; shorthand assignment properties do not introduce bindings.
+Each tracker owns its callbacks and active recursion stacks, so independent
+paths retain upstream duplicate reports without sharing rule state. Node
+module entry points, builtin aliases, and strict versus legacy ESM behavior
+remain in `nodeutil`. Require targets also share constant argument evaluation
+and loader-parameter removal there.
 The shared constant evaluator reuses compiler number operations through
 `shim/jsnum`; JavaScript coercion and bounded BigInt evaluation stay in `internal/utils`.
+Its property-name adapters extend literal-name queries with computed-expression
+evaluation. Reference tracking uses the no-scope evaluator, so a constant key
+identifier is not resolved even when a TypeChecker is available.
 Rules own API metadata, ignore options and diagnostic messages. Node version configuration
 and range comparisons use package metadata here and the compiler semver parser
 through `shim/semver`; rules own their feature availability thresholds.

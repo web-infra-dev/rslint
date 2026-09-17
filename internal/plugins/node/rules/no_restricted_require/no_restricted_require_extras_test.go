@@ -131,6 +131,9 @@ func TestNoRestrictedRequireExtras(t *testing.T) {
 		// empty conditions disable conditional entries
 		{Code: "require('pkg');", Options: []any{[]any{filepath.Join(root.Dir, "node_modules/pkg/index.js")}}, Settings: map[string]any{"node": map[string]any{"resolverConfig": map[string]any{"conditionNames": []any{}}}}},
 	}, []rule_tester.InvalidTestCase{
+		// Recover the configured require global through a shorthand assignment.
+		{Code: "({require} = globalThis); require('fs');", Options: []any{[]any{"fs"}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'fs' module is restricted from being used.", Line: 1, Column: 35, EndLine: 1, EndColumn: 39}}},
 		// later positive restores a match
 		{Code: "require('foo/bar');", Options: []any{[]any{map[string]any{"name": []any{"foo/*", "!foo/bar", "foo/bar"}, "message": "Use public API."}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restricted", Message: "'foo/bar' module is restricted from being used. Use public API.", Line: 1, Column: 9, EndLine: 1, EndColumn: 18}}},
 		// first matching restriction and independent groups

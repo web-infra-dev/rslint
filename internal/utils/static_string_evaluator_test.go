@@ -16,6 +16,60 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func TestStaticStringEvaluatorPropertyNames(t *testing.T) {
+	for _, test := range []struct {
+		key   string
+		want  string
+		known bool
+	}{
+		{`fn`, "fn", true},
+		{`["f" + "n"]`, "fn", true},
+		{"[`f${\"n\"}`]", "fn", true},
+		{`[["fn"]]`, "fn", true},
+		{`[""]`, "", true},
+		{`[-0]`, "0", true},
+		{`[true]`, "true", true},
+		{`[null]`, "null", true},
+		{`[1n + 2n]`, "3", true},
+		{`[key]`, "", false},
+		{`[undefined]`, "", false},
+		{`[String("fn")]`, "", false},
+		{`#fn`, "", false},
+	} {
+		t.Run(test.key, func(t *testing.T) {
+			evaluator := NewStaticStringEvaluatorWithoutScope()
+			access := "." + test.key
+			kind := ast.KindPropertyAccessExpression
+			if strings.HasPrefix(test.key, "[") {
+				access = test.key
+				kind = ast.KindElementAccessExpression
+			}
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/property.ts", Path: "/property.ts",
+			}, `const key = "fn"; class C { #fn; method() { object`+access+`; } }`, core.ScriptKindTS)
+			member := findFirstNodeOfKind(t, source, kind)
+			if got, known := evaluator.EvalAccessExpressionName(member); got != test.want || known != test.known {
+				t.Fatalf("member name = (%q, %v), want (%q, %v)", got, known, test.want, test.known)
+			}
+			source = parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/property.ts", Path: "/property.ts",
+			}, `const key = "fn"; class C { `+test.key+` = 0; }`, core.ScriptKindTS)
+			property := findFirstNodeOfKind(t, source, ast.KindPropertyDeclaration)
+			if got, known := evaluator.EvalPropertyName(property.Name()); got != test.want || known != test.known {
+				t.Fatalf("property name = (%q, %v), want (%q, %v)", got, known, test.want, test.known)
+			}
+		})
+	}
+	// The existing literal-only helper retains its narrower contract.
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/property.ts", Path: "/property.ts",
+	}, `({["f" + "n"]: 0})`, core.ScriptKindTS)
+	property := findFirstNodeOfKind(t, source, ast.KindPropertyAssignment)
+	if _, known := GetStaticPropertyName(property.Name()); known {
+		t.Fatal("literal-only helper unexpectedly folded a computed expression")
+	}
+}
+
 func TestStaticStringEvaluator(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
 	filePath := tspath.ResolvePath(rootDir.Dir, "file.ts")
