@@ -421,10 +421,11 @@ enumTypes := utils.GetEnumTypes(typeChecker, t)
 
 ## `internal/rule/ref_store.go` - Reference Index (ctx.Refs)
 
-The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`. Two methods: `Resolve(node)` (identifier → symbol, binder scope walk first, falling back to the checker for symbols declared outside this file when a TypeChecker is available) and `References(sym)` (symbol → every referencing identifier in this file, same fallback trigger, plus one checker call per top-level symbol of a global script file to reconcile it with its checker-merged identity).
+The lazily built per-file identifier-reference index — rslint's stand-in for ESLint's `variable.references`. `Resolve(node)` uses the binder first and can fall back to the checker; `ResolveInFile(node)` uses only the file's lexical bindings. `References(sym)` returns references in this file and reconciles binder/checker identities when needed. Use `IsGlobalReference(node)` for the file's global-reference semantics rather than reconstructing shadowing from symbol declarations.
 
 ```go
-// Guard first: ctx.Refs is nil when no program is available (JS-only runs).
+// The linter provides ctx.Refs for source-only runs too.
+// Manually assembled contexts may leave it nil.
 if ctx.Refs == nil {
     return
 }
@@ -442,6 +443,52 @@ refs := ctx.Refs.References(decl.Symbol()) // []*ast.Node, source order, read-on
 - For built-in **value** shadowing specifically, use `utils.IsValueSymbolDeclaredInFile` instead: it narrows that to the declarations that bind a **value** name. Any `namespace`/`module` declaration counts, whatever it contains; interfaces and type aliases don't, because they merge into the ambient global's symbol (`interface Map {}` in a global script attaches to the same symbol as lib.d.ts's `Map`, and a call to `Map()` still reaches the global).
 
 See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_PATTERNS.md#resolving-identifiers-and-collecting-references-ctxrefs) for the full semantics and worked examples.
+
+---
+
+## `internal/utils/referencetracker/` - API Reference Tracking
+
+Use this for the alias and property propagation performed by eslint-utils'
+`ReferenceTracker`. For a symbol lookup or its references alone, use `ctx.Refs`.
+
+```go
+tracker := referencetracker.New(ctx)
+tracker.TrackGlobals(map[string]*referencetracker.Trace{
+    "Api": {Properties: map[string]*referencetracker.Trace{
+        "method": {Call: func(call *ast.Node) { /* rule policy */ }},
+    }},
+})
+```
+
+- `Trace` selects property paths and `Read`, `Call`, or `Construct` callbacks.
+  `Read` mirrors upstream's event: it includes member occurrences used as
+  assignment targets and destructuring elements. Callers filter the node shape
+  when only ordinary reads or direct assignments are relevant.
+- `TrackGlobals` starts from configured globals and the standard `global`,
+  `globalThis`, `self`, and `window` roots. `TrackGlobal` selects one root,
+  allowing a caller to choose its own roots and traversal order.
+- A write to a global disables that root throughout the file. Local aliases
+  are flow insensitive; a later assignment does not prove the earlier value
+  stopped reaching a use. Active variable guards prevent cycles, while separate
+  paths may intentionally emit the same diagnostic more than once.
+- `TrackExpression` and `TrackBinding` seed values discovered by a module
+  adapter. They do not report a read for the seed itself. Node's module loader,
+  builtin aliases, and ESM modes remain in `nodeutil`.
+- The tracker reuses `ctx.Refs`, tsgo binding helpers and a per-file cached
+  `ReferenceIndex`. Callbacks and active traversal state stay per tracker.
+  Identifier resolution is file-local and does not require a TypeChecker.
+- Rest/array patterns, dynamic properties, and JSX tag paths are not propagated.
+  Do not use the tracker as a general dataflow or module-resolution engine.
+
+The existing `StaticStringEvaluator` exposes `EvalAccessExpressionName` for a
+member access and `EvalPropertyName` for a property/binding key. Computed keys
+use its existing JavaScript evaluation and string conversion. Create it with
+`NewStaticStringEvaluatorWithoutScope` to match the tracker's key semantics:
+`object["a" + "b"]` is known, but `const key = "ab"; object[key]` is not.
+The `(string, bool)` result distinguishes an empty key from an unknown key;
+private names have no string key. Existing `GetStaticPropertyName`,
+`AccessExpressionStaticName`, and `IsSameReference` retain their narrower
+contracts; do not substitute them solely because their names sound similar.
 
 ---
 

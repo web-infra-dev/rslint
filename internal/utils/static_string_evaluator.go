@@ -171,6 +171,38 @@ func (staticEvaluator *StaticStringEvaluator) EvalToString(node *ast.Node) (stri
 	return staticValueToString(result.value)
 }
 
+// EvalAccessExpressionName returns the string property name of a member access.
+// Computed keys use this evaluator's scope and JavaScript String conversion;
+// private names and unknown keys have no string name. Use a no-scope evaluator
+// for eslint-utils ReferenceTracker semantics, which never resolves key identifiers.
+func (staticEvaluator *StaticStringEvaluator) EvalAccessExpressionName(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	if node.Kind == ast.KindElementAccessExpression {
+		return staticEvaluator.EvalToString(node.AsElementAccessExpression().ArgumentExpression)
+	}
+	return AccessExpressionStaticName(node)
+}
+
+// EvalPropertyName returns the string name of an object/class property or
+// binding key. It extends GetStaticPropertyName with computed-expression
+// evaluation and the template keys unwrapped by tsgo's binding helpers.
+// Non-computed identifiers are names, never variable references.
+func (staticEvaluator *StaticStringEvaluator) EvalPropertyName(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindComputedPropertyName:
+		return staticEvaluator.EvalToString(node.AsComputedPropertyName().Expression)
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return GetStaticExpressionValue(node)
+	default:
+		return GetStaticPropertyName(node)
+	}
+}
+
 // EvalValue returns the static value of node if it can be determined, regardless
 // of its type. It allows rules to check if a value is statically known to be a
 // non-string (like a boolean or number).

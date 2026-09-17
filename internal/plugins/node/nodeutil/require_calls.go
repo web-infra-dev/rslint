@@ -87,7 +87,7 @@ func CollectModulePropertyReads(ctx rule.RuleContext, moduleName, propertyName s
 		if len(args) > 0 {
 			if name, ok := tracker.constantString(args[0]); ok && name == moduleName {
 				// Recurse while require aliases remain on the cycle guard stack.
-				tracker.trackExpression(call, moduleValue)
+				tracker.TrackExpression(call, moduleValue)
 			}
 		}
 	}}})
@@ -114,7 +114,7 @@ func CollectModulePropertyReads(ctx rule.RuleContext, moduleName, propertyName s
 					continue
 				}
 			}
-			tracker.trackIdentifier(binding, value)
+			tracker.TrackBinding(binding, value)
 		}
 	}
 	return reads

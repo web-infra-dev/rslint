@@ -80,6 +80,9 @@ func TestNoExtraneousRequireExtras(t *testing.T) {
 		{Code: "require('workspace-dep');", FileName: "workspace-range/packages/2/input.js"},
 	}
 	invalid := []rule_tester.InvalidTestCase{
+		// The assignment's property symbol must not hide the configured global.
+		{Code: "({require} = globalThis); require('runtime');", FileName: "input.js",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"runtime" is extraneous.`, Line: 1, Column: 35, EndLine: 1, EndColumn: 44}}},
 		// Resolver aliases and BigInt values follow the upstream behavior.
 		{Code: "require('virtual');", FileName: "input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./local.js"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"virtual" is extraneous.`, Line: 1, Column: 9, EndLine: 1, EndColumn: 18}}},
 		{Code: "require(40n + 2n);", FileName: "input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "extraneous", Message: `"42" is extraneous.`, Line: 1, Column: 9, EndLine: 1, EndColumn: 17}}},

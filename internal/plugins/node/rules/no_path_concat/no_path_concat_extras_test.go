@@ -94,6 +94,8 @@ func TestNoPathConcatExtras(t *testing.T) {
 		// require and module in destructuring defaults.
 		{Code: "let p; ({p = require} = source); p = p(\"path\"); __dirname + p.sep;"},
 	}, []rule_tester.InvalidTestCase{
+		// A shorthand require assignment still reaches the path module.
+		{Code: "({require} = globalThis); __dirname + require('path').sep;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 27, 1, 58)}},
 		// independent global writes.
 		{Code: "__dirname + \"/x\"; __filename + \"/y\"; __dirname = other;", Errors: []rule_tester.InvalidTestCaseError{concatErrorAt("usePathFunctions", 1, 19, 1, 36)}},
 		// independent filename writes.

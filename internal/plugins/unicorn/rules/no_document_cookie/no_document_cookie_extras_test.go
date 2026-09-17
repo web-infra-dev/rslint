@@ -85,6 +85,7 @@ func TestNoDocumentCookieExtras(t *testing.T) {
 			extraInvalid(`let doc; doc = document; doc.cookie = "foo=bar"`, `doc.cookie`),
 
 			// Locks in ReferenceTracker's object-pattern alias branch.
+			extraInvalid("const {[`document`]: doc} = globalThis; doc.cookie = \"foo=bar\"", `doc.cookie`),
 			extraInvalid(`const {document: doc} = globalThis; doc.cookie = "foo=bar"`, `doc.cookie`),
 			extraInvalid(`const {[["document"]]: doc} = globalThis; doc.cookie = "foo=bar"`, `doc.cookie`),
 			extraInvalid(`let doc; ({document: doc} = globalThis); doc.cookie = "foo=bar"`, `doc.cookie`),
@@ -123,6 +124,30 @@ func TestNoDocumentCookieExtras(t *testing.T) {
 			extraInvalid(`window["document"]["cookie"] = "foo=bar"`, `window["document"]["cookie"]`),
 		},
 	)
+}
+
+// Checked against Unicorn and typescript-eslint's parser. A type-only local
+// name, an authored value declaration, and an ambient augmentation differ.
+func TestNoDocumentCookieTypedBindings(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		extraValid(`declare const document: Document; const doc = document; doc.cookie = "x";`),
+		extraValid(`namespace document { export const cookie = "x"; } document.cookie = "x";`),
+		extraValid(`import type {document} from "x"; document.cookie = "x";`),
+	}
+	invalid := []rule_tester.InvalidTestCase{
+		extraInvalid(`type document = string; const doc = document; doc.cookie = "x";`, "doc.cookie"),
+		extraInvalid(`declare global { var document: Document; } export {}; const doc = document; doc.cookie = "x";`, "doc.cookie"),
+		extraInvalid(`const doc = document; namespace doc {} doc.cookie = "x";`, "doc.cookie"),
+	}
+	for index := range valid {
+		valid[index].FileName = "file.ts"
+		valid[index].LanguageOptions.SourceType = "module"
+	}
+	for index := range invalid {
+		invalid[index].FileName = "file.ts"
+		invalid[index].LanguageOptions.SourceType = "module"
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_document_cookie.NoDocumentCookieRule, valid, invalid)
 }
 
 func extraValid(code string) rule_tester.ValidTestCase {
