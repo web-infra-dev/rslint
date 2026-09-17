@@ -79,8 +79,13 @@ func evalStaticBigIntBinary(operator ast.Kind, left, right any) (staticEvalResul
 			value.Rem(l, r)
 		}
 	case ast.KindAsteriskAsteriskToken:
-		if r.Sign() < 0 || !r.IsUint64() || r.Uint64() > maxStaticBigIntBits ||
-			uint64(l.BitLen())*r.Uint64() > maxStaticBigIntBits {
+		if r.Sign() < 0 {
+			return staticEvalResult{}, true
+		}
+		// math/big handles bases 0 and +/-1 without growing the result,
+		// including exponents that cannot fit in a machine integer.
+		if l.BitLen() > 1 && (!r.IsUint64() || r.Uint64() > maxStaticBigIntBits ||
+			uint64(l.BitLen())*r.Uint64() > maxStaticBigIntBits) {
 			return staticEvalResult{}, true
 		}
 		value.Exp(l, r, nil)

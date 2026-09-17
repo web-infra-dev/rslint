@@ -186,6 +186,8 @@ in `nodeutil`: require collection and API rules share static property, alias,
 destructuring and module traversal, reusing tsgo's binding helpers,
 `RuleContext.Refs` and a name index cached by `RuleContext` per file. Require
 targets also share constant argument evaluation and loader-parameter removal.
+The shared constant evaluator reuses compiler number operations through
+`shim/jsnum`; JavaScript coercion and bounded BigInt evaluation stay in `internal/utils`.
 Rules own API metadata, ignore options and diagnostic messages. Node version configuration
 and range comparisons use package metadata here and the compiler semver parser
 through `shim/semver`; rules own their feature availability thresholds.

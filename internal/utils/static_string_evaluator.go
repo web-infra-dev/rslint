@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/evaluator"
+	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -71,14 +72,8 @@ func NewStaticStringEvaluatorWithoutScope() *StaticStringEvaluator {
 type staticNullValue struct{}
 type staticUndefinedValue struct{}
 
-// staticNumberValue is a number this evaluator computed itself. tsgo hands
-// numbers back as jsnum.Number, a type internal/utils cannot import; the IsNaN
-// method both types carry is what tells a folded number from a folded bigint.
-type staticNumberValue float64
-
-func (value staticNumberValue) IsNaN() bool {
-	return math.IsNaN(float64(value))
-}
+// Keep folded numbers in tsgo's representation, including its JS arithmetic.
+type staticNumberValue = jsnum.Number
 
 // staticStringNode keeps literal strings backed by their existing AST node so
 // nested aggregate evaluation doesn't allocate an interface box per literal.
@@ -515,22 +510,7 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 		if !left.ok || !right.ok {
 			return staticEvalResult{}
 		}
-		if staticValueIsString(left.value) {
-			return staticEvaluator.concatStaticValues(left.value, right.value)
-		}
-		if staticValueIsString(right.value) {
-			return staticEvaluator.concatStaticValues(left.value, right.value)
-		}
-		_, leftBigInt := left.value.(*big.Int)
-		_, rightBigInt := right.value.(*big.Int)
-		if leftBigInt && staticValueIsAggregate(right.value) || rightBigInt && staticValueIsAggregate(left.value) {
-			// These supported objects convert to strings before addition.
-			return staticEvaluator.concatStaticValues(left.value, right.value)
-		}
-		if result, handled := evalStaticBigIntBinary(binary.OperatorToken.Kind, left.value, right.value); handled {
-			return result
-		}
-		return staticEvaluator.evalWithTsgo(node)
+		return staticEvaluator.evalBinaryValues(binary.OperatorToken.Kind, left.value, right.value)
 	}
 
 	if result := staticEvaluator.evalWithTsgo(node); result.ok {
@@ -539,9 +519,7 @@ func (staticEvaluator *StaticStringEvaluator) evalBinaryExpression(node *ast.Nod
 	left := staticEvaluator.evalValue(binary.Left)
 	right := staticEvaluator.evalValue(binary.Right)
 	if left.ok && right.ok {
-		if result, handled := evalStaticBigIntBinary(binary.OperatorToken.Kind, left.value, right.value); handled {
-			return result
-		}
+		return staticEvaluator.evalBinaryValues(binary.OperatorToken.Kind, left.value, right.value)
 	}
 	return staticEvalResult{}
 }

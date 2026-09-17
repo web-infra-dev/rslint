@@ -638,6 +638,12 @@ func TestStaticStringEvaluatorBigInt(t *testing.T) {
 		{"[40n + 2n, 40n].join('/')", "42/40", true},
 		{"(7n - 1n) * 7n", "42", true}, {"-43n / 2n", "-21", true}, {"-43n % 2n", "-1", true},
 		{"2n ** 5n", "32", true}, {"0n ** 0n", "1", true}, {"(-2n) ** 3n", "-8", true},
+		{"0n ** 999999999999999999999n", "0", true},
+		{"1n ** 999999999999999999999n", "1", true},
+		{"(-1n) ** 999999999999999999999n", "-1", true},
+		{"(-1n) ** 999999999999999999998n", "1", true},
+		{"(-1n) ** (1n << 1048575n)", "1", true},
+		{"(-1n) ** ((1n << 1048575n) + 1n)", "-1", true},
 		{"6n | 3n", "7", true}, {"6n & 3n", "2", true}, {"6n ^ 3n", "5", true}, {"~42n", "-43", true},
 		{"42n << 2n", "168", true}, {"42n << -1n", "21", true}, {"42n >> -1n", "84", true},
 		{"-43n >> 1n", "-22", true}, {"-1n >> 999999999999999999999n", "-1", true},
@@ -660,6 +666,7 @@ func TestStaticStringEvaluatorBigInt(t *testing.T) {
 		{"2n > -1/0", "true", true}, {"1n == [1]", "true", true},
 		{"40n + 2", "", false}, {"+42n", "", false}, {"1n / 0n", "", false}, {"1n % 0n", "", false},
 		{"2n ** -1n", "", false}, {"42n >>> 1n", "", false}, {"2n ** 999999999999n", "", false},
+		{"0n ** -1n", "", false}, {"1n ** -1n", "", false}, {"(-1n) ** -1n", "", false},
 		{"1n << 999999999999n", "", false}, {"'x'.charAt(0n)", "", false},
 	} {
 		t.Run(test.expression, func(t *testing.T) {
@@ -668,6 +675,39 @@ func TestStaticStringEvaluatorBigInt(t *testing.T) {
 			got, known := NewStaticStringEvaluatorWithoutScope().EvalToString(node)
 			if known != test.known || known && got != test.want {
 				t.Fatalf("EvalToString = (%q, %v), want (%q, %v)", got, known, test.want, test.known)
+			}
+		})
+	}
+}
+
+func TestStaticStringEvaluatorBinaryExpressions(t *testing.T) {
+	for _, test := range []struct{ expression, want string }{
+		{"0 < 1 ? 'fs' : 'path'", "fs"}, {"0 + true", "1"}, {"0 - '1'", "-1"},
+		{"true + false", "1"}, {"null + false", "0"}, {"void 0 + 1", "NaN"},
+		{"'6' * true", "6"}, {"'6' / '2'", "3"}, {"'-7' % '2'", "-1"},
+		{"'2' ** true", "2"}, {"'1' ** (1/0)", "NaN"}, {"'1' ** (0/0)", "NaN"},
+		{"1 / ('-0' - 0)", "-Infinity"}, {"'bad' - false", "NaN"},
+		{"true << 33", "2"}, {"'-8' >> true", "-4"}, {"'-1' >>> false", "4294967295"},
+		{"'4294967295' >>> 32", "4294967295"}, {"(1/0) | false", "0"},
+		{"'6' & true", "0"}, {"'6' ^ true", "7"},
+		{"'2' < '10'", "false"}, {"'2' < 10", "true"}, {"'2' <= '2'", "true"},
+		{"'10' > '2'", "false"}, {"'2' >= '2'", "true"},
+		{"'\U00010000' < '\uE000'", "true"},
+		{"null < 1", "true"}, {"void 0 >= 0", "false"}, {"void 0 <= 0", "false"},
+		{"0 == false", "true"}, {"0 != false", "false"}, {"'0' == false", "true"},
+		{"null == 0", "false"}, {"null == void 0", "true"}, {"void 0 == false", "false"},
+		{"'fs' == 'fs'", "true"}, {"'fs' != 'path'", "true"},
+		{"[] == false", "true"}, {"[1] == true", "true"}, {"({}) == '[object Object]'", "true"},
+		{"[1] + 2", "12"}, {"1 + [2]", "12"}, {"[] + []", ""},
+		{"({}) + 1", "[object Object]1"}, {"/fs/ + 1", "/fs/1"},
+		{"[1] - 2", "-1"}, {"[] < 1", "true"},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/binary.js", Path: "/binary.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			node := findVariableInitializer(t, source, "value")
+			got, known := NewStaticStringEvaluatorWithoutScope().EvalToString(node)
+			if !known || got != test.want {
+				t.Fatalf("EvalToString = (%q, %v), want %q", got, known, test.want)
 			}
 		})
 	}
