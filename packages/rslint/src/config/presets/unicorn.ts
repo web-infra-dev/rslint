@@ -233,7 +233,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-default-parameters': 'error', // not implemented
     // 'unicorn/prefer-direct-iteration': 'error', // not implemented
     // 'unicorn/prefer-dispose': 'off', // not implemented
-    // 'unicorn/prefer-dom-node-append': 'error', // not implemented
+    'unicorn/prefer-dom-node-append': 'error',
     // 'unicorn/prefer-dom-node-html-methods': 'error', // not implemented
     // 'unicorn/prefer-dom-node-remove': 'error', // not implemented
     // 'unicorn/prefer-dom-node-replace-children': 'error', // not implemented
