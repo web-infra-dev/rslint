@@ -1,128 +1,89 @@
 package no_unneeded_async_expect_function
 
 import (
-	"slices"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/no_unneeded_async_expect_function"
 )
 
-func buildNoAsyncWrapperForExpectedPromiseMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "noAsyncWrapperForExpectedPromise",
-		Description: "Avoid wrapping asynchronous expectations in an unnecessary async function.",
-	}
-}
-
-func isAsyncFunction(node *ast.Node) bool {
-	if node == nil {
+func isAsyncNonGenerator(node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || !ast.IsFunctionLike(node) || !ast.IsAsyncFunction(node) {
 		return false
 	}
-	node = ast.SkipParentheses(node)
-	return node != nil &&
-		ast.IsFunctionExpressionOrArrowFunction(node) &&
-		ast.IsAsyncFunction(node)
+	return ast.GetFunctionFlags(node)&ast.FunctionFlagsGenerator == 0 &&
+		len(node.Parameters()) == 0
 }
 
-func functionBody(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
+func symbolIsLocalConstAsyncArrow(ctx rule.RuleContext, symbol *ast.Symbol, use *ast.Node) bool {
+	if symbol == nil || len(symbol.Declarations) != 1 {
+		return false
 	}
-	node = ast.SkipParentheses(node)
+	declaration := symbol.Declarations[0]
+	if declaration == nil || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile ||
+		use == nil || declaration.Pos() >= use.Pos() {
+		return false
+	}
 
-	switch node.Kind {
-	case ast.KindArrowFunction:
-		return node.AsArrowFunction().Body
-	case ast.KindFunctionExpression:
-		return node.AsFunctionExpression().Body
-	default:
-		return nil
+	if declaration.Kind != ast.KindVariableDeclaration || !ast.IsVarConst(declaration) {
+		return false
 	}
+	initializer := utils.SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
+	return initializer != nil && initializer.Kind == ast.KindArrowFunction &&
+		isAsyncNonGenerator(initializer)
 }
 
-func singleStatementExpression(body *ast.Node) *ast.Node {
-	if body == nil || body.Kind != ast.KindBlock {
-		return body
+func isKnownAsyncCall(ctx rule.RuleContext, call *shared.ExpectCall, awaited *ast.Node) bool {
+	if call == nil || call.Head == nil || len(call.Head.Arguments()) == 0 ||
+		!isAsyncNonGenerator(call.Head.Arguments()[0]) ||
+		awaited == nil || awaited.Kind != ast.KindCallExpression ||
+		ast.IsOptionalChainRoot(awaited) {
+		return false
 	}
-
-	block := body.AsBlock()
-	if block == nil || block.Statements == nil || len(block.Statements.Nodes) != 1 {
-		return nil
+	callExpression := awaited.AsCallExpression()
+	if callExpression == nil || len(callExpression.Arguments.Nodes) != 0 ||
+		callExpression.TypeArguments != nil {
+		return false
 	}
-
-	stmt := block.Statements.Nodes[0]
-	if stmt == nil || stmt.Kind != ast.KindExpressionStatement {
-		return nil
+	callee := utils.SkipAssertionsAndParens(callExpression.Expression)
+	if callee == nil || callee.Kind != ast.KindIdentifier || ctx.Refs == nil {
+		return false
 	}
-
-	return stmt.AsExpressionStatement().Expression
+	if !symbolIsLocalConstAsyncArrow(ctx, ctx.Refs.ResolveInFile(callee), callee) {
+		return false
+	}
+	// A block wrapper discards the fulfilled value: async () => { await f() }
+	// resolves to undefined even when f() resolves to another value. That also
+	// changes Jest's failure output for rejects when f() unexpectedly resolves.
+	// Only a concise arrow returns the inner result unchanged.
+	wrapper := utils.SkipAssertionsAndParens(call.Head.Arguments()[0])
+	if wrapper == nil || wrapper.Kind != ast.KindArrowFunction {
+		return false
+	}
+	body := ast.SkipParentheses(wrapper.AsArrowFunction().Body)
+	return body != nil && body.Kind == ast.KindAwaitExpression
 }
 
-func getUnwrappedAwaitedExpression(fn *ast.Node) *ast.Node {
-	expr := singleStatementExpression(functionBody(fn))
-	if expr == nil {
-		return nil
-	}
-	expr = ast.SkipParentheses(expr)
-	if expr == nil || expr.Kind != ast.KindAwaitExpression {
-		return nil
-	}
-
-	awaited := expr.AsAwaitExpression().Expression
-	if awaited == nil {
-		return nil
-	}
-	awaited = ast.SkipParentheses(awaited)
-	if awaited == nil || awaited.Kind != ast.KindCallExpression {
-		return nil
-	}
-
-	return awaited
-}
-
-func hasPromiseExpectModifier(jestFnCall *jestUtils.ParsedJestFnCall) bool {
-	return slices.Contains(jestFnCall.Modifiers, "resolves") ||
-		slices.Contains(jestFnCall.Modifiers, "rejects")
-}
-
-var NoUnneededAsyncExpectFunctionRule = rule.Rule{
-	Name:   "jest/no-unneeded-async-expect-function",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil ||
-					jestFnCall.Kind != jestUtils.JestFnTypeExpect ||
-					!hasPromiseExpectModifier(jestFnCall) {
-					return
-				}
-
-				expectCall := jestFnCall.Head.Local.Node.Parent
-				if expectCall == nil || expectCall.Kind != ast.KindCallExpression {
-					return
-				}
-
-				args := expectCall.Arguments()
-				if len(args) == 0 || !isAsyncFunction(args[0]) {
-					return
-				}
-
-				awaited := getUnwrappedAwaitedExpression(args[0])
-				if awaited == nil {
-					return
-				}
-
-				sourceFile := ctx.SourceFile
-				replacement := rslintUtils.TrimmedNodeText(sourceFile, awaited)
-				ctx.ReportNodeWithFixes(
-					args[0],
-					buildNoAsyncWrapperForExpectedPromiseMessage(),
-					rule.RuleFixReplace(sourceFile, args[0], replacement),
-				)
-			},
-		}
+var NoUnneededAsyncExpectFunctionRule = shared.NewRule(shared.Config{
+	Name: "jest/no-unneeded-async-expect-function",
+	ReportModifiers: map[string]bool{
+		"resolves": true,
+		"rejects":  true,
 	},
-}
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{ParseExpectCall: func(node *ast.Node) *shared.ExpectCall {
+			parsed := jestUtils.ParseJestFnCall(node, ctx)
+			if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect {
+				return nil
+			}
+			head := parsed.Head.Local.Node.Parent
+			if head == nil || head.Kind != ast.KindCallExpression {
+				return nil
+			}
+			return &shared.ExpectCall{Head: head, Modifiers: parsed.Modifiers}
+		}}
+	},
+	ShouldReportAwaitedCall: isKnownAsyncCall,
+})

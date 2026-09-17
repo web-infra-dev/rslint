@@ -1,0 +1,148 @@
+// Package no_unneeded_async_expect_function holds the framework-neutral rule
+// body shared by jest/no-unneeded-async-expect-function and
+// rstest/no-unneeded-async-expect-function.
+package no_unneeded_async_expect_function
+
+import (
+	"slices"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+type ExpectCall struct {
+	Head      *ast.Node
+	Modifiers []string
+}
+
+type Runtime struct {
+	ParseExpectCall func(node *ast.Node) *ExpectCall
+}
+
+type Config struct {
+	Name                    string
+	Prepare                 func(rule.RuleContext) Runtime
+	ReportModifiers         map[string]bool
+	ShouldReportAwaitedCall func(rule.RuleContext, *ExpectCall, *ast.Node) bool
+}
+
+func noAsyncWrapperForExpectedPromiseMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "noAsyncWrapperForExpectedPromise",
+		Description: "Avoid wrapping asynchronous expectations in an unnecessary async function.",
+	}
+}
+
+func isAsyncFunction(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = utils.SkipAssertionsAndParens(node)
+	return node != nil &&
+		ast.IsFunctionExpressionOrArrowFunction(node) &&
+		ast.IsAsyncFunction(node) &&
+		ast.GetFunctionFlags(node)&ast.FunctionFlagsGenerator == 0
+}
+
+func functionBody(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	node = utils.SkipAssertionsAndParens(node)
+
+	switch node.Kind {
+	case ast.KindArrowFunction:
+		return node.AsArrowFunction().Body
+	case ast.KindFunctionExpression:
+		return node.AsFunctionExpression().Body
+	default:
+		return nil
+	}
+}
+
+func singleStatementExpression(body *ast.Node) *ast.Node {
+	if body == nil || body.Kind != ast.KindBlock {
+		return body
+	}
+
+	block := body.AsBlock()
+	if block == nil || block.Statements == nil || len(block.Statements.Nodes) != 1 {
+		return nil
+	}
+
+	stmt := block.Statements.Nodes[0]
+	if stmt == nil || stmt.Kind != ast.KindExpressionStatement {
+		return nil
+	}
+
+	return stmt.AsExpressionStatement().Expression
+}
+
+func getUnwrappedAwaitedCall(fn *ast.Node) *ast.Node {
+	if !isAsyncFunction(fn) {
+		return nil
+	}
+	expr := singleStatementExpression(functionBody(fn))
+	if expr == nil {
+		return nil
+	}
+	expr = ast.SkipParentheses(expr)
+	if expr == nil || expr.Kind != ast.KindAwaitExpression {
+		return nil
+	}
+
+	awaited := expr.AsAwaitExpression().Expression
+	if awaited == nil {
+		return nil
+	}
+	awaited = ast.SkipParentheses(awaited)
+	if awaited == nil || awaited.Kind != ast.KindCallExpression {
+		return nil
+	}
+	return awaited
+}
+
+func hasReportablePromiseModifier(call *ExpectCall, reportModifiers map[string]bool) bool {
+	if call == nil {
+		return false
+	}
+	for modifier := range reportModifiers {
+		if slices.Contains(call.Modifiers, modifier) {
+			return true
+		}
+	}
+	return false
+}
+
+func NewRule(config Config) rule.Rule {
+	return rule.Rule{
+		Name:   config.Name,
+		Schema: rule.EmptyArraySchema,
+		Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+			runtime := config.Prepare(ctx)
+			return rule.RuleListeners{
+				ast.KindCallExpression: func(node *ast.Node) {
+					call := runtime.ParseExpectCall(node)
+					if !hasReportablePromiseModifier(call, config.ReportModifiers) || call.Head == nil {
+						return
+					}
+
+					args := call.Head.Arguments()
+					if len(args) == 0 {
+						return
+					}
+					awaited := getUnwrappedAwaitedCall(args[0])
+					if awaited == nil {
+						return
+					}
+					if config.ShouldReportAwaitedCall != nil &&
+						!config.ShouldReportAwaitedCall(ctx, call, awaited) {
+						return
+					}
+					ctx.ReportNode(args[0], noAsyncWrapperForExpectedPromiseMessage())
+				},
+			}
+		},
+	}
+}

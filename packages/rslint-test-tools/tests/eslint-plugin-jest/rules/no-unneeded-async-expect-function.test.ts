@@ -120,112 +120,97 @@ ruleTester.run('no-unneeded-async-expect-function', {} as never, {
       })
     `,
     },
-  ],
-  invalid: [
     {
-      code: `
-        it('should be fixed', async () => {
-          await expect(async () => {
-            await doSomethingAsync();
-          }).rejects.toThrow(); 
-        })
-      `,
-      output: `
-        it('should be fixed', async () => {
-          await expect(doSomethingAsync()).rejects.toThrow(); 
-        })
-      `,
-      errors: [
-        {
-          endColumn: 4,
-          column: 16,
-          messageId: 'noAsyncWrapperForExpectedPromise',
-        },
-      ],
+      code: `expect(async () => { /* preserve why */ await doSomethingAsync(); }).rejects.toThrow();`,
+    },
+    {
+      code: `expect(async () => { await doSomethingAsync(); }, makeMessage()).rejects.toThrow();`,
+    },
+    {
+      code: `expect(async function () { await client.arguments(); }).rejects.toThrow();`,
+    },
+    {
+      code: `function returnsPlainValue() { return 1; }
+expect(async () => { await returnsPlainValue(); }).resolves.toBe(1);`,
+    },
+    {
+      code: `function throwsSynchronously() { throw new Error('sync failure'); }
+expect(async () => { await throwsSynchronously(); }).rejects.toThrow('sync failure');`,
+    },
+    {
+      code: `expect(async () => { await doSomethingAsync(1, 2); }).rejects.toThrow();`,
+    },
+    {
+      code: `const operation = async (value) => value;
+expect(async () => { await operation(1); }).resolves.toBe(1);`,
+    },
+    {
+      code: `let operation = async () => 1;
+expect(async () => { await operation(); }).resolves.toBe(1);`,
+    },
+    {
+      code: `async function operation() { return 1; }
+operation = () => 1;
+expect(async () => { await operation(); }).resolves.toBe(1);`,
+    },
+    {
+      code: `async function operation() { return 1; }
+expect(async (value = 1) => { await operation(); }).resolves.toBe(1);`,
+    },
+    {
+      code: `async function operation() { return 1; }
+expect(async () => { await operation(); }).resolves.toBeUndefined();`,
+    },
+    {
+      code: `async function operation() { return 1; }
+expect(async () => { await operation(); }).rejects.toThrow();`,
+    },
+    {
+      code: `async function operation() { return 1; }
+expect(async () => await operation()).resolves.toBe(1);`,
+    },
+    {
+      code: `const operation = async () => 1;
+expect(operation).resolves.toBe(1);`,
+    },
+    {
+      code: `const operation = async () => { throw new Error('failure'); };
+expect(operation).rejects.toThrow('failure');`,
+    },
+    {
+      code: `expect(async () => await operation()).resolves.toBe(1);
+const operation = async () => 1;`,
+    },
+    {
+      code: `const operation = async <Value,>() => undefined as Value;
+expect(async () => await operation<number>()).resolves.toBe(1);`,
     },
     {
       code: `
-        it('should be fixed', async () => {
-          await expect(async function () {
-            await doSomethingAsync();
-          }).rejects.toThrow(); 
-        })
-      `,
-      output: `
-        it('should be fixed', async () => {
-          await expect(doSomethingAsync()).rejects.toThrow(); 
-        })
-    `,
-      errors: [
-        {
-          endColumn: 4,
-          column: 16,
-          messageId: 'noAsyncWrapperForExpectedPromise',
-        },
-      ],
-    },
-    {
-      code: `
-        it('should be fixed for async arrow function', async () => {
+        it('keeps calls with arguments', async () => {
           await expect(async () => {
             await doSomethingAsync(1, 2);
-          }).rejects.toThrow(); 
+          }).rejects.toThrow();
         })
       `,
-      output: `
-        it('should be fixed for async arrow function', async () => {
-          await expect(doSomethingAsync(1, 2)).rejects.toThrow(); 
-        })
-      `,
-      errors: [
-        {
-          endColumn: 4,
-          column: 16,
-          messageId: 'noAsyncWrapperForExpectedPromise',
-        },
-      ],
     },
     {
       code: `
-        it('should be fixed for async normal function', async () => {
+        it('keeps function calls with arguments', async () => {
           await expect(async function () {
             await doSomethingAsync(1, 2);
-          }).rejects.toThrow(); 
+          }).rejects.toThrow();
         })
       `,
-      output: `
-        it('should be fixed for async normal function', async () => {
-          await expect(doSomethingAsync(1, 2)).rejects.toThrow(); 
-        })
-      `,
-      errors: [
-        {
-          endColumn: 4,
-          column: 16,
-          messageId: 'noAsyncWrapperForExpectedPromise',
-        },
-      ],
     },
     {
       code: `
-        it('should be fixed for Promise.all', async () => {
+        it('keeps member calls', async () => {
           await expect(async function () {
             await Promise.all([doSomethingAsync(1, 2), doSomethingAsync()]);
-          }).rejects.toThrow(); 
+          }).rejects.toThrow();
         })
       `,
-      output: `
-        it('should be fixed for Promise.all', async () => {
-          await expect(Promise.all([doSomethingAsync(1, 2), doSomethingAsync()])).rejects.toThrow(); 
-        })
-      `,
-      errors: [
-        {
-          endColumn: 4,
-          column: 16,
-          messageId: 'noAsyncWrapperForExpectedPromise',
-        },
-      ],
     },
     {
       code: `
@@ -236,19 +221,63 @@ ruleTester.run('no-unneeded-async-expect-function', {} as never, {
           }).rejects.toThrow();
         })
       `,
-      output: `
-        it('should be fixed for async ref to expect', async () => {
-          const a = async () => { await doSomethingAsync() };
-          await expect(a()).rejects.toThrow();
+    },
+    {
+      code: `expect(async () => await doSomethingAsync()).rejects.toThrow();`,
+    },
+    {
+      code: `expect((async () => { await doSomethingAsync(); })).rejects.toThrow();`,
+    },
+    {
+      code: `expect(async function* () { await operation(); }).resolves.toBe(1);`,
+    },
+    // Keep every original upstream-aligned input verbatim. These calls are
+    // unresolved, so the current rule cannot prove that the wrapper is
+    // unnecessary and must leave them alone.
+    {
+      code: `
+        it('should be fixed', async () => {
+          await expect(async () => {
+            await doSomethingAsync();
+          }).rejects.toThrow();
         })
       `,
-      errors: [
-        {
-          endColumn: 4,
-          column: 16,
-          messageId: 'noAsyncWrapperForExpectedPromise',
-        },
-      ],
+    },
+    {
+      code: `
+        it('should be fixed', async () => {
+          await expect(async function () {
+            await doSomethingAsync();
+          }).rejects.toThrow();
+        })
+      `,
+    },
+    {
+      code: `
+        it('should be fixed for async arrow function', async () => {
+          await expect(async () => {
+            await doSomethingAsync(1, 2);
+          }).rejects.toThrow();
+        })
+      `,
+    },
+    {
+      code: `
+        it('should be fixed for async normal function', async () => {
+          await expect(async function () {
+            await doSomethingAsync(1, 2);
+          }).rejects.toThrow(); 
+        })
+      `,
+    },
+    {
+      code: `
+        it('should be fixed for Promise.all', async () => {
+          await expect(async function () {
+            await Promise.all([doSomethingAsync(1, 2), doSomethingAsync()]);
+          }).rejects.toThrow(); 
+        })
+      `,
     },
     {
       code: `
@@ -258,18 +287,28 @@ ruleTester.run('no-unneeded-async-expect-function', {} as never, {
           }).resolves.toBe(1);
         })
       `,
-      output: `
-        it('should be fixed for resolves', async () => {
-          await expect(doSomethingAsync()).resolves.toBe(1);
-        })
-      `,
-      errors: [
-        {
-          endColumn: 4,
-          column: 16,
-          messageId: 'noAsyncWrapperForExpectedPromise',
-        },
-      ],
+    },
+  ],
+  invalid: [
+    {
+      code: `const operation = async () => 1;
+expect(async () => /* preserve why */ await operation()).resolves.toBe(1);`,
+      errors: [{ messageId: 'noAsyncWrapperForExpectedPromise' }],
+    },
+    {
+      code: `const operation = async () => 1;
+expect(async () => await operation(), 'custom message').resolves.toBe(1);`,
+      errors: [{ messageId: 'noAsyncWrapperForExpectedPromise' }],
+    },
+    {
+      code: `const operation = async () => 1;
+expect(async () => await operation()).resolves.toBe(1);`,
+      errors: [{ messageId: 'noAsyncWrapperForExpectedPromise' }],
+    },
+    {
+      code: `const operation = async () => { throw new Error('failure'); };
+expect(async () => await operation()).rejects.toThrow('failure');`,
+      errors: [{ messageId: 'noAsyncWrapperForExpectedPromise' }],
     },
   ],
 });
