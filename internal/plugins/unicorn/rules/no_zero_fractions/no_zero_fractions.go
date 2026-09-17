@@ -47,7 +47,7 @@ var NoZeroFractionsRule = rule.Rule{
 					if fraction == "" && parts[3] == "" && parent != nil &&
 						(ast.IsPropertyAccessExpression(parent) || ast.IsElementAccessExpression(parent)) && parent.Expression() == node {
 						fixed = "(" + fixed + ")"
-						if unicornutil.NeedsSemicolonBefore(ctx.SourceFile, leadingExpression(ctx.SourceFile, node), fixed) {
+						if unicornutil.NeedsSemicolonBefore(ctx.SourceFile, node, fixed) {
 							fixed = ";" + fixed
 						}
 					}
@@ -56,17 +56,4 @@ var NoZeroFractionsRule = rule.Rule{
 			},
 		}
 	},
-}
-
-// A numeric member receiver can lead a larger call or access expression. Pass
-// that complete expression to the shared statement-level ASI check.
-func leadingExpression(sourceFile *ast.SourceFile, node *ast.Node) *ast.Node {
-	start := utils.TrimNodeTextRange(sourceFile, node).Pos()
-	for node.Parent != nil && !ast.IsExpressionStatement(node.Parent) {
-		if utils.TrimNodeTextRange(sourceFile, node.Parent).Pos() != start {
-			break
-		}
-		node = node.Parent
-	}
-	return node
 }

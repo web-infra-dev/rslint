@@ -184,3 +184,33 @@ func TestNoZeroFractionsEditDemand(t *testing.T) {
 		})
 	}
 }
+
+// A newly parenthesized receiver must not call the preceding function or class.
+func TestNoZeroFractionsStatementBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_zero_fractions.NoZeroFractionsRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "const foo = function() {}\n1.0.toString()", FileName: "probe.js", Output: []string{"const foo = function() {}\n;(1).toString()"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 4, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "const foo = () => {}\n1.0[0]", FileName: "probe.js", Output: []string{"const foo = () => {}\n;(1)[0]"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 4, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "const foo = class {}\n1.0?.[0]", FileName: "probe.js", Output: []string{"const foo = class {}\n;(1)?.[0]"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 4, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "foo = function() {}\n.0.toString()", FileName: "probe.js", Output: []string{"foo = function() {}\n;(0).toString()"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "foo = () => {}\n1.0.toString()", FileName: "probe.js", Output: []string{"foo = () => {}\n;(1).toString()"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 4, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "foo = class {}\n1.0[0]", FileName: "probe.js", Output: []string{"foo = class {}\n;(1)[0]"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 4, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "class Foo {}\n1.0.toString()", FileName: "probe.js", Output: []string{"class Foo {}\n(1).toString()"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 4, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "foo = {bar(){}}\n1.0.toString()", FileName: "probe.js", Output: []string{"foo = {bar(){}}\n;(1).toString()"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero-fraction", Message: "Don't use a zero fraction in the number.", Line: 2, Column: 2, EndLine: 2, EndColumn: 4, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+	})
+}
