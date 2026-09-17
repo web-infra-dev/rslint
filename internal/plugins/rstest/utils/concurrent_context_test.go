@@ -2,15 +2,22 @@ package utils_test
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
 	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
+	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // TestRstestConcurrentContextIsSharedPerFile covers the part only this test
@@ -125,9 +132,8 @@ func TestRstestExecutionModeSurvivesAliasesAndUsesRuntimePriority(t *testing.T) 
 }
 
 var concurrentOwnershipProbe = rule.Rule{
-	Name:             "rstest/concurrent-ownership-probe",
-	RequiresTypeInfo: true,
-	Schema:           rule.EmptyArraySchema,
+	Name:   "rstest/concurrent-ownership-probe",
+	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		concurrentContext := rstestUtils.GetRstestConcurrentContext(ctx, analysis)
@@ -153,6 +159,8 @@ func TestRstestConcurrentCallbackOwnership(t *testing.T) {
 			{Code: `test("x", () => marker());`},
 			{Code: `describe.concurrent("s", () => test.sequential("x", () => marker()));`},
 			{Code: `function helper() { marker(); } test.concurrent("x", () => helper());`},
+			{Code: `let callback = () => marker(); callback = () => {}; test.concurrent("x", callback);`},
+			{Code: `function callback() { marker(); } callback = () => {}; test.concurrent("x", callback);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: `test.concurrent("x", () => marker());`, Errors: reported},
@@ -162,6 +170,11 @@ func TestRstestConcurrentCallbackOwnership(t *testing.T) {
 			{Code: `test.concurrent("x", callback); function callback() { marker(); }`, Errors: reported},
 			{Code: `describe.concurrent("s", suite); function suite() { test("x", callback); } function callback() { marker(); }`, Errors: reported},
 			{Code: `test.sequential("a", callback); test.concurrent("b", callback); function callback() { marker(); }`, Errors: reported},
+			{Code: `function register() { const callback = () => marker(); test.concurrent("x", callback); } register();`, Errors: reported},
+			{Code: `{ const callback = () => marker(); test.concurrent("x", callback); }`, Errors: reported},
+			{Code: `class C { static { const callback = () => marker(); test.concurrent("x", callback); } }`, Errors: reported},
+			{Code: `let callback = () => marker(); test.concurrent("x", callback);`, Errors: reported},
+			{Code: `var callback = () => marker(); test.concurrent("x", callback);`, Errors: reported},
 			// A closure declared inside a concurrent callback runs as part of
 			// that concurrent test whenever it runs at all.
 			{Code: `test.concurrent("x", () => { const helper = () => marker(); });`, Errors: reported},
@@ -191,12 +204,10 @@ func findCallByCalleeName(sourceFile *ast.SourceFile, name string) *ast.Node {
 	return found
 }
 
-// TestRstestCallbackOwnershipRejectsUnresolvableNames covers the callback name
-// index, which is file-wide and carries no scope information. Without a type
-// checker every callback passed by name reaches that index, so these cases
-// exercise the guards that keep it from attributing a registration to a
-// function it never runs.
-func TestRstestCallbackOwnershipRejectsUnresolvableNames(t *testing.T) {
+// TestRstestCallbackOwnershipSourceOnlyScopesAndWrites verifies that the
+// binder resolves callback references without a TypeChecker, while bindings
+// with assignment or update references are not treated as stable ownership.
+func TestRstestCallbackOwnershipSourceOnlyScopesAndWrites(t *testing.T) {
 	for _, testCase := range []struct {
 		name       string
 		code       string
@@ -213,18 +224,53 @@ func TestRstestCallbackOwnershipRejectsUnresolvableNames(t *testing.T) {
 			concurrent: true,
 		},
 		{
-			name:       "nested declaration is not attributed",
-			code:       `describe("s", () => { function cb() { marker(); } }); test.concurrent("x", cb);`,
-			concurrent: false,
+			name:       "function scoped declaration is attributed",
+			code:       `function register() { function cb() { marker(); } test.concurrent("x", cb); } register();`,
+			concurrent: true,
 		},
 		{
-			name:       "nested arrow initializer is not attributed",
-			code:       `describe("s", () => { const cb = () => { marker(); }; }); test.concurrent("x", cb);`,
-			concurrent: false,
+			name:       "block scoped arrow initializer is attributed",
+			code:       `{ const cb = () => { marker(); }; test.concurrent("x", cb); }`,
+			concurrent: true,
 		},
 		{
-			name:       "redeclared name is not attributed",
+			name:       "class static block arrow initializer is attributed",
+			code:       `class C { static { const cb = () => { marker(); }; test.concurrent("x", cb); } }`,
+			concurrent: true,
+		},
+		{
+			name:       "nested shadow does not hide top level declaration",
 			code:       `function cb() { marker(); } function other() { function cb() {} } test.concurrent("x", cb);`,
+			concurrent: true,
+		},
+		{
+			name:       "unwritten let initializer is attributed",
+			code:       `let cb = () => { marker(); }; test.concurrent("x", cb);`,
+			concurrent: true,
+		},
+		{
+			name:       "unwritten var initializer is attributed",
+			code:       `var cb = () => { marker(); }; test.concurrent("x", cb);`,
+			concurrent: true,
+		},
+		{
+			name:       "reassigned function declaration is not attributed",
+			code:       `function cb() { marker(); } cb = () => {}; test.concurrent("x", cb);`,
+			concurrent: false,
+		},
+		{
+			name:       "write after registration conservatively rejects attribution",
+			code:       `function cb() { marker(); } test.concurrent("x", cb); cb = () => {};`,
+			concurrent: false,
+		},
+		{
+			name:       "destructuring write is not attributed",
+			code:       `function cb() { marker(); } ({ cb } = replacements); test.concurrent("x", cb);`,
+			concurrent: false,
+		},
+		{
+			name:       "satisfies wrapped write is not attributed",
+			code:       `function cb() { marker(); } (cb satisfies (() => void)) = () => {}; test.concurrent("x", cb);`,
 			concurrent: false,
 		},
 	} {
@@ -237,7 +283,12 @@ func TestRstestCallbackOwnershipRejectsUnresolvableNames(t *testing.T) {
 				testCase.code,
 				core.ScriptKindTS,
 			)
-			ctx := rule.RuleContext{SourceFile: sourceFile}.WithFileCache(rule.NewFileCache())
+			binder.BindSourceFile(sourceFile)
+			_, refsInit, _ := rule.ResolveLanguageDefaults(sourceFile.FileName(), rule.LanguageOptions{})
+			ctx := rule.RuleContext{
+				SourceFile: sourceFile,
+				Refs:       rule.NewRefStore(sourceFile, &core.CompilerOptions{}, nil, refsInit),
+			}.WithFileCache(rule.NewFileCache())
 			context := rstestUtils.GetRstestConcurrentContext(ctx, rstestUtils.GetRstestCallAnalysis(ctx))
 			marker := findCallByCalleeName(sourceFile, "marker")
 			if marker == nil {
@@ -247,5 +298,88 @@ func TestRstestCallbackOwnershipRejectsUnresolvableNames(t *testing.T) {
 				t.Fatalf("IsInConcurrentTest = %t, want %t", got, testCase.concurrent)
 			}
 		})
+	}
+}
+
+func TestRstestConcurrentCallbackOwnershipSourceOnlyProgram(t *testing.T) {
+	code := `function register() {
+  const callback = () => marker();
+  test.concurrent("function", callback);
+}
+register();
+{
+  const callback = () => marker();
+  test.concurrent("block", callback);
+}
+class C {
+  static {
+    const callback = () => marker();
+    test.concurrent("static", callback);
+  }
+}
+let reassigned = () => marker();
+reassigned = () => {};
+test.concurrent("reassigned", reassigned);
+function replaced() { marker(); }
+replaced = () => {};
+test.concurrent("replaced", replaced);
+var unwritten = () => marker();
+test.concurrent("unwritten", unwritten);
+function destructured() { marker(); }
+({ destructured } = replacements);
+test.concurrent("destructured", destructured);`
+
+	root := fixtures.GetRootDir()
+	fileName := tspath.ResolvePath(root.Dir, "concurrent-ownership-source-only.ts")
+	fs := internalUtils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	host := internalUtils.CreateCompilerHost(root.Dir, fs)
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            host,
+		CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("NewFromRoots: %v", err)
+	}
+	if sourceProgram.CanProvideTypeChecker(sourceProgram.SourceFiles()[0]) {
+		t.Fatal("expected a source-only Program with no TypeChecker")
+	}
+
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceProgram},
+		TargetsByProgram: [][]string{{fileName}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     concurrentOwnershipProbe.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					return concurrentOwnershipProbe.Run(ctx, nil)
+				},
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+
+	var lines []int
+	if _, err := linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+			line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(
+				diagnostic.SourceFile,
+				diagnostic.Range.Pos(),
+			)
+			lines = append(lines, line+1)
+		}},
+	}); err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	want := []int{2, 7, 12, 22}
+	if !slices.Equal(lines, want) {
+		t.Fatalf("reported lines %v, want %v", lines, want)
 	}
 }

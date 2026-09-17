@@ -41,8 +41,6 @@ func TestConsistentTestItExtras(t *testing.T) {
 			// Dimension 4: unrelated bindings, unsupported APIs, factories, dynamic keys, and TS wrappers.
 			{Code: "it[method]('case'); it[1]('case'); it[/skip/]('case');"},
 			// Dimension 4: unrelated bindings, unsupported APIs, factories, dynamic keys, and TS wrappers.
-			{Code: "(it as any)('case'); it!('case'); (it satisfies Function)('case');"},
-			// Dimension 4: unrelated bindings, unsupported APIs, factories, dynamic keys, and TS wrappers.
 			{Code: "suite('group', () => { test('case'); });"},
 			// Dimension 4: unrelated bindings, unsupported APIs, factories, dynamic keys, and TS wrappers.
 			{Code: "rs.test('case'); rstest.it('case');"},
@@ -75,6 +73,11 @@ func TestConsistentTestItExtras(t *testing.T) {
 			// Real-user: Vitest #884 fixture factory is not a registration.
 			{Code: "import { test as base } from '@rstest/core'; const test = base.extend({}); test('case');"},
 		}, []rule_tester.InvalidTestCase{
+			// TypeScript erases these wrappers, so each call registers the same
+			// Rstest `it` API and follows the configured naming convention.
+			{Code: "(it as any)('case');", Output: []string{"(test as any)('case');"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 1, EndLine: 1, EndColumn: 12}}},
+			{Code: "it!('case');", Output: []string{"test!('case');"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 1, EndLine: 1, EndColumn: 4}}},
+			{Code: "(it satisfies Function)('case');", Output: []string{"(test satisfies Function)('case');"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 1, EndLine: 1, EndColumn: 24}}},
 			// Rstest registration chains preserve all modifiers and fixtures.
 			{Code: "it('registers a case', () => {});", Output: []string{"test('registers a case', () => {});"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "consistentMethod", Message: "Prefer using 'test' instead of 'it'", Line: 1, Column: 1, EndLine: 1, EndColumn: 3}}},
 			// Inside suite registration chain.

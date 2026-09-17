@@ -79,6 +79,53 @@ func stackedTypeWrapperWriteExpression(node *ast.Node) *ast.Node {
 	return nil
 }
 
+// satisfiesWrappedDirectWriteExpression returns the direct assignment or
+// update expression whose target reaches node through a satisfies expression.
+// The shared write classifier follows the runtime semantics — satisfies is
+// erased and the underlying binding is written — while this rule separately
+// preserves ESLint scope-manager compatibility, which records no write for
+// such a direct target. An assignment nested inside a satisfies expression is
+// not returned: that inner assignment remains visible to ESLint.
+func satisfiesWrappedDirectWriteExpression(node *ast.Node) *ast.Node {
+	hasSatisfies := false
+	current := node
+	for parent := current.Parent; parent != nil; parent = current.Parent {
+		switch parent.Kind {
+		case ast.KindSatisfiesExpression:
+			hasSatisfies = true
+		case ast.KindParenthesizedExpression,
+			ast.KindAsExpression,
+			ast.KindTypeAssertionExpression,
+			ast.KindNonNullExpression:
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary != nil && binary.OperatorToken != nil && binary.Left == current &&
+				hasSatisfies && ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+				return parent
+			}
+			return nil
+		case ast.KindPrefixUnaryExpression:
+			prefix := parent.AsPrefixUnaryExpression()
+			if prefix != nil && prefix.Operand == current && hasSatisfies &&
+				(prefix.Operator == ast.KindPlusPlusToken || prefix.Operator == ast.KindMinusMinusToken) {
+				return parent
+			}
+			return nil
+		case ast.KindPostfixUnaryExpression:
+			postfix := parent.AsPostfixUnaryExpression()
+			if postfix != nil && postfix.Operand == current && hasSatisfies &&
+				(postfix.Operator == ast.KindPlusPlusToken || postfix.Operator == ast.KindMinusMinusToken) {
+				return parent
+			}
+			return nil
+		default:
+			return nil
+		}
+		current = parent
+	}
+	return nil
+}
+
 // isVisitedByEnclosingWritePattern mirrors the child edges followed by
 // typescript-eslint's PatternVisitor. A stacked direct write is still a write
 // when an enclosing destructuring pattern visits it. Right-hand values,
@@ -214,6 +261,10 @@ var NoGlobalAssignRule = rule.Rule{
 				}
 
 				if write := stackedTypeWrapperWriteExpression(node); write != nil &&
+					!isVisitedByEnclosingWritePattern(write) {
+					return
+				}
+				if write := satisfiesWrappedDirectWriteExpression(node); write != nil &&
 					!isVisitedByEnclosingWritePattern(write) {
 					return
 				}

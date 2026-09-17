@@ -726,6 +726,14 @@ func TestNoGlobalAssignRule(t *testing.T) {
 					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 3},
 				},
 			},
+			// An assignment inside a satisfies expression remains visible to
+			// ESLint; only a satisfies expression used as the outer target is skipped.
+			{
+				Code: `(Object = 0) satisfies any;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "globalShouldNotBeModified", Line: 1, Column: 2},
+				},
+			},
 			{
 				Code: `[[Object!! = 0] as any] = arr;`,
 				Errors: []rule_tester.InvalidTestCaseError{

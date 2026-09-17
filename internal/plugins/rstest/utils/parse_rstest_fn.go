@@ -175,7 +175,7 @@ func parseRstestChain(node *ast.Node) (*ast.Node, []rstestChainPart, bool, bool)
 	if node == nil {
 		return nil, nil, false, false
 	}
-	node = ast.SkipParentheses(node)
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return nil, nil, false, false
 	}
@@ -258,7 +258,7 @@ func parseImportMetaRstestChainOptions(
 	if node == nil {
 		return nil, nil, false, false
 	}
-	node = ast.SkipParentheses(node)
+	node = internalUtils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return nil, nil, false, false
 	}
