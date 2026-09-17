@@ -74,23 +74,6 @@ func isImportURL(specifier string) bool {
 	return strings.HasPrefix(specifier, "data:") || strings.HasPrefix(specifier, "http://") || strings.HasPrefix(specifier, "https://")
 }
 
-// These inverse maps are immutable. tsgo owns the emitted extension table;
-// the Node plugin selects preserve mode when no JSX setting is configured.
-var (
-	preservedExtensionAliases = typescriptExtensionAliases(core.JsxEmitPreserve)
-	emittedExtensionAliases   = typescriptExtensionAliases(core.JsxEmitReact)
-)
-
-func typescriptExtensionAliases(jsx core.JsxEmit) map[string][]string {
-	options := &core.CompilerOptions{Jsx: jsx}
-	aliases := map[string][]string{}
-	for _, extension := range tspath.SupportedTSImplementationExtensions {
-		emitted := module.TryGetJSExtensionForFile("index"+extension, options)
-		aliases[emitted] = append(aliases[emitted], extension)
-	}
-	return aliases
-}
-
 // ImportModuleName returns the npm package root after removing loader params.
 // Builtins, relative/absolute paths, import maps and URL imports have no npm name.
 func ImportModuleName(specifier string) (name, resource string) {
@@ -142,7 +125,7 @@ func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool
 	return resolveImport(p, name, fileName, typeOnly, options).resolveError
 }
 
-// ImportFilePath supplies the target for absolute-path restrictions. Missing
+// ImportFilePath supplies the target for import rules. Missing
 // local imports retain their lexical path; unresolved packages have no path.
 func ImportFilePath(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
 	resolved := resolveImport(p, name, fileName, typeOnly, options)
@@ -234,7 +217,6 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 	if cwd == "" {
 		cwd = p.CurrentDirectory()
 	}
-	processDirectory := cwd
 	if configured, ok := settings["cwd"].(string); ok {
 		cwd = tspath.ResolvePath(cwd, configured)
 	}
@@ -247,25 +229,11 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 			if result.Extensions == nil {
 				result.Extensions = []string{".js", ".ts", ".mjs", ".mts", ".cjs", ".cts", ".json", ".node"}
 			}
-		} else {
-			result.ExtensionAliases = preservedExtensionAliases
-			if config != nil && config.Jsx != core.JsxEmitPreserve && config.Jsx != core.JsxEmitNone {
-				result.ExtensionAliases = emittedExtensionAliases
-			}
 		}
-		// Unlike the independent shared lists, upstream selects settings.n as
-		// a whole before settings.node for these extension-mapping settings.
-		sharedValue := settings["n"]
-		if sharedValue == nil {
-			sharedValue = settings["node"]
-		}
-		shared, _ := sharedValue.(map[string]any)
-		for _, value := range []map[string]any{options, shared} {
-			if aliases, ok := configuredExtensionAliases(p, processDirectory, value); ok {
-				result.ExtensionAliases = aliases
-				break
-			}
-		}
+		result.ExtensionAliases = importExtensionMapping(ctx, options).aliases
+	}
+	if result.Extensions == nil {
+		result.Extensions = defaultExtensions
 	}
 	for _, value := range settingValues("resolverConfig", options, settings) {
 		if config, ok := value.(map[string]any); ok {
@@ -274,40 +242,6 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 		}
 	}
 	return result
-}
-
-func configuredExtensionAliases(p *program.Program, cwd string, options map[string]any) (map[string][]string, bool) {
-	if pairs, ok := options["typescriptExtensionMap"].([]any); ok {
-		aliases := map[string][]string{}
-		for _, pair := range pairs {
-			values := stringArray(pair)
-			if len(values) == 2 && values[0] != "" {
-				aliases[values[1]] = append(aliases[values[1]], values[0])
-			}
-		}
-		return aliases, true
-	}
-	preset, _ := options["typescriptExtensionMap"].(string)
-	switch preset {
-	case "preserve":
-		return preservedExtensionAliases, true
-	case "react", "react-jsx", "react-jsxdev", "react-native":
-		return emittedExtensionAliases, true
-	}
-	if configPath, ok := options["tsconfigPath"].(string); ok && configPath != "" {
-		if config := readCompilerOptions(p, tspath.ResolvePath(cwd, configPath)); config != nil {
-			if config.AllowImportingTsExtensions == core.TSTrue {
-				return nil, true
-			}
-			if config.Jsx == core.JsxEmitPreserve {
-				return preservedExtensionAliases, true
-			}
-			if config.Jsx != core.JsxEmitNone {
-				return emittedExtensionAliases, true
-			}
-		}
-	}
-	return nil, false
 }
 
 // RequireResolutionOptions uses the same lookup and TypeScript settings as

@@ -1,0 +1,13 @@
+{
+  "type": "array",
+  "items": [
+    { "enum": ["always", "never"] },
+    {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": { "enum": ["always", "never"] }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 2
+}

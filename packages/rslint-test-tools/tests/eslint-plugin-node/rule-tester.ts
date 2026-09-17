@@ -10,6 +10,7 @@ interface ExpectedError {
   column: number;
   endLine: number;
   endColumn: number;
+  fix?: { range: [number, number]; text: string };
 }
 
 interface LanguageOptions {
@@ -134,7 +135,15 @@ export class RuleTester {
                   start: { line: expected.line, column: expected.column },
                   end: { line: expected.endLine, column: expected.endColumn },
                 });
-                if (item.output === undefined) {
+                if (expected.fix) {
+                  expect(diagnostic.fixes).toEqual([
+                    {
+                      startPos: expected.fix.range[0],
+                      endPos: expected.fix.range[1],
+                      text: expected.fix.text,
+                    },
+                  ]);
+                } else if (item.output === undefined) {
                   expect(diagnostic.fixes).toBeUndefined();
                 } else {
                   expect(diagnostic.fixes?.length).toBeGreaterThan(0);

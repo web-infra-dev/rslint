@@ -1,0 +1,48 @@
+Fixtures from eslint-plugin-n v18.3.0 tests/fixtures/file-extension-in-import,
+plus files used by its documentation examples.
+
+-- a.js --
+
+-- b.json --
+
+-- c.mjs --
+
+-- d.ts --
+
+-- e.tsx --
+
+-- logo.png --
+fixture
+-- multi.js --
+
+-- multi.json --
+
+-- my-folder/index.js --
+export const util = () => {}
+-- my-things.client/index.js --
+// Fixture: directory with dot in name (my-things.client/index.js)
+-- my-things.client/index.ts --
+// Fixture: directory with dot in name (my-things.client/index.ts)
+export const bar = "baz"
+-- path/to/a/file.js --
+export default {};
+-- script.js --
+export default {};
+-- styles.css --
+body {}
+-- ts-allow-extension/file.ts --
+
+-- ts-allow-extension/tsconfig.json --
+{
+    "compilerOptions": {
+        "noEmit": true,
+        "allowImportingTsExtensions": true
+    }
+}
+-- util.client.js --
+// Fixture file with dot in basename (util.client.js)
+-- util.client.ts --
+// Fixture file with dot in basename (util.client.ts)
+-- utils.client.ts --
+// Fixture file with dot in basename (utils.client.ts)
+export const foo = "bar"

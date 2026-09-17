@@ -1,0 +1,54 @@
+Additional extension, directory and TypeScript configuration fixtures.
+
+-- .env --
+fixture
+-- .hidden.js --
+export {};
+-- allow/lib.ts --
+export {};
+-- allow/tsconfig.json --
+{"compilerOptions":{"allowImportingTsExtensions":true}}
+-- allow/view.tsx --
+export {};
+-- ambiguous/index.js --
+export {};
+-- ambiguous/index.json --
+{}
+-- café.js --
+export {};
+-- coffee/index.coffee --
+fixture
+-- coffee/index.css --
+fixture
+-- custom/no-jsx.json --
+{"compilerOptions":{}}
+-- custom/react.json --
+{"compilerOptions":{"jsx":"react"}}
+-- custom/tsconfig.json --
+{"compilerOptions":{"jsx":"preserve"}}
+-- custom/view.tsx --
+export {};
+-- empty/marker --
+fixture
+-- has-dir.js --
+export {};
+-- has-dir.other/child.js --
+export {};
+-- lib.cts --
+export {};
+-- lib.mts --
+export {};
+-- native/component.tsx --
+export {};
+-- native/tsconfig.json --
+{"compilerOptions":{"jsx":"react-native"}}
+-- react/component.tsx --
+export {};
+-- react/tsconfig.json --
+{"compilerOptions":{"jsx":"react-jsx"}}
+-- search/a.js --
+export {};
+-- search/only.js --
+export {};
+-- 😀.js --
+export {};
