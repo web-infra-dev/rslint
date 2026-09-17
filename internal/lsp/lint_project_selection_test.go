@@ -1495,17 +1495,18 @@ func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
 }
 
 func TestDocumentProjectPolicyKeepsProjectOriginAfterMerging(t *testing.T) {
-	const directory = "/workspace"
+	directory := tspath.NormalizePath(t.TempDir())
 	base := "packages/app"
 	root := directory
+	sharedDirectory := tspath.ResolvePath(directory, "shared")
 	for _, test := range []struct {
 		name       string
 		suffix     config.ConfigEntry
 		wantConfig string
 	}{
-		{name: "unrelated options keep basePath", suffix: config.ConfigEntry{Rules: config.Rules{"no-var": "error"}}, wantConfig: "/workspace/packages/app/tsconfig.json"},
-		{name: "later project uses its own origin", suffix: config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}}}, wantConfig: "/workspace/shared/tsconfig.json"},
-		{name: "explicit root rebases surviving project", suffix: config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{TsconfigRootDir: &root}}}, wantConfig: "/workspace/tsconfig.json"},
+		{name: "unrelated options keep basePath", suffix: config.ConfigEntry{Rules: config.Rules{"no-var": "error"}}, wantConfig: tspath.ResolvePath(directory, "packages/app/tsconfig.json")},
+		{name: "later project uses its own origin", suffix: config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}}}, wantConfig: tspath.ResolvePath(sharedDirectory, "tsconfig.json")},
+		{name: "explicit root rebases surviving project", suffix: config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{TsconfigRootDir: &root}}}, wantConfig: tspath.ResolvePath(directory, "tsconfig.json")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			server := newTestServer()
@@ -1518,9 +1519,9 @@ func TestDocumentProjectPolicyKeepsProjectOriginAfterMerging(t *testing.T) {
 					Project: config.ProjectPaths{"./tsconfig.json"},
 				}},
 			}}
-			entries = append(entries, config.ConfigWithAuthoredPathBase(config.RslintConfig{test.suffix}, "/workspace/shared")...)
+			entries = append(entries, config.ConfigWithAuthoredPathBase(config.RslintConfig{test.suffix}, sharedDirectory)...)
 			installJSConfigsForTest(server, map[string]config.RslintConfig{directory: entries})
-			snapshot := server.documentLintSnapshot("file:///workspace/packages/app/source.ts")
+			snapshot := server.documentLintSnapshot(documentURIFromPath(tspath.ResolvePath(directory, "packages/app/source.ts")))
 			if snapshot.projectPolicyError != nil || len(snapshot.typeScriptConfigPaths) != 1 || snapshot.typeScriptConfigPaths[0] != test.wantConfig {
 				t.Fatalf("project paths = %v, error = %v, want %q", snapshot.typeScriptConfigPaths, snapshot.projectPolicyError, test.wantConfig)
 			}

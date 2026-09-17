@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"runtime"
@@ -125,11 +126,20 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		delete(s.diagnostics, uri)
+		diagnostics := []*lsproto.Diagnostic{}
+		var projectErr *documentProjectConfigError
+		if ctx.Err() == nil && errors.As(err, &projectErr) {
+			diagnostics = append(diagnostics, &lsproto.Diagnostic{
+				Severity: ptrTo(lsproto.DiagnosticSeverityError),
+				Source:   ptrTo("rslint"),
+				Message:  lsproto.StringOrMarkupContent{String: ptrTo(fmt.Sprintf("Project configuration error: %v", projectErr))},
+			})
+		}
 		if publishErr := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
 			Uri:         uri,
-			Diagnostics: []*lsproto.Diagnostic{},
+			Diagnostics: diagnostics,
 		}); publishErr != nil {
-			log.Printf("Error clearing diagnostics after lint failure: %v", publishErr)
+			log.Printf("Error publishing diagnostics after lint failure: %v", publishErr)
 		}
 		return
 	}

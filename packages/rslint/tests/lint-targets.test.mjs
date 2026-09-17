@@ -340,7 +340,7 @@ describe('CLI lint target contracts', () => {
     }
   });
 
-  test('projectService migration preserves disabled and default project modes in mutually exclusive file scopes', async () => {
+  test('projectService migration preserves disabled, explicit, and unconfigured file scopes', async () => {
     const root = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-cli-service-migrate-scopes-'),
     );
@@ -359,6 +359,17 @@ describe('CLI lint target contracts', () => {
           {
             files: ['src/**/*.ts'],
             plugins: ['@typescript-eslint'],
+            languageOptions: {
+              parserOptions: { project: ['./tsconfig.json'] },
+            },
+            rules: {
+              '@typescript-eslint/no-for-in-array': 'error',
+              'no-console': 'error',
+            },
+          },
+          {
+            files: ['gap/**/*.ts'],
+            plugins: ['@typescript-eslint'],
             rules: {
               '@typescript-eslint/no-for-in-array': 'error',
               'no-console': 'error',
@@ -366,11 +377,13 @@ describe('CLI lint target contracts', () => {
           },
         ]),
         'tsconfig.json': JSON.stringify({
-          files: ['tools/probe.ts', 'src/probe.ts'],
+          files: ['tools/probe.ts', 'src/probe.ts', 'gap/probe.ts'],
         }),
         'tools/probe.ts':
           'export const values = [1]; for (const key in values) { console.log(key); }\n',
         'src/probe.ts':
+          'export const values = [1]; for (const key in values) { console.log(key); }\n',
+        'gap/probe.ts':
           'export const values = [1]; for (const key in values) { console.log(key); }\n',
         'node_modules/@rslint/core/package.json': JSON.stringify({
           name: '@rslint/core',
@@ -384,8 +397,15 @@ describe('CLI lint target contracts', () => {
       });
       const migration = await runCLI(root, ['--init']);
       expect(migration.code, migration.stderr).toBe(0);
+      const migrated = await readFile(
+        path.join(root, 'rslint.config.ts'),
+        'utf8',
+      );
+      expect(migrated).toContain('projectService: false');
+      expect(migrated).toContain("project: ['./tsconfig.json']");
+      expect(migrated).not.toContain('projectService: true');
 
-      const result = await runCLI(root, ['tools', 'src']);
+      const result = await runCLI(root, ['tools', 'src', 'gap']);
       expect(result.code, result.stderr).toBe(1);
       expect(
         normalizedDiagnostics(root, parseDiagnostics(result.stdout)),
@@ -393,6 +413,10 @@ describe('CLI lint target contracts', () => {
         {
           filePath: path.join(root, 'src', 'probe.ts'),
           ruleName: '@typescript-eslint/no-for-in-array',
+        },
+        {
+          filePath: path.join(root, 'gap', 'probe.ts'),
+          ruleName: 'no-console',
         },
         {
           filePath: path.join(root, 'src', 'probe.ts'),

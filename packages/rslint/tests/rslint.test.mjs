@@ -2983,7 +2983,7 @@ module.exports = config;`
       })),
     ),
   )(
-    'unmatched $option preserves owner project declarations (declared=$declared)',
+    'unmatched $option does not change matching project settings (declared=$declared)',
     async ({ declared, option }) => {
       const tmp = await mkdtemp(
         path.join(os.tmpdir(), 'rslint-matched-policy-'),
@@ -2991,7 +2991,7 @@ module.exports = config;`
       const cwd = path.join(tmp, 'literal[owner]');
       await mkdir(cwd);
       const source =
-        'export const result = value.member;\nfor (const key in [1]) {}';
+        'export const result = value.member;\nfor (const key in [1]) {}\ndebugger;';
       const unusedOptions = {
         none: {},
         service: { projectService: true },
@@ -3009,6 +3009,7 @@ module.exports = config;`
             rules: {
               '@typescript-eslint/no-unsafe-member-access': 'error',
               '@typescript-eslint/no-for-in-array': 'error',
+              'no-debugger': 'error',
             },
           },
           ...(declared
@@ -3044,23 +3045,28 @@ module.exports = config;`
       });
       try {
         await writeFile(path.join(cwd, 'target.ts'), source);
-        if (option === 'project paths') {
-          await expect(instance.lintFiles(['target.ts'])).rejects.toThrow(
-            /missing\.json/,
-          );
-          await expect(
-            instance.lintText(source, { filePath: 'target.ts' }),
-          ).rejects.toThrow(/missing\.json/);
-          return;
-        }
         for (const results of [
           await instance.lintFiles(['target.ts']),
           await instance.lintText(source, { filePath: 'target.ts' }),
         ]) {
+          expect(results).toHaveLength(1);
+          expect(path.resolve(results[0].filePath)).toBe(
+            path.join(cwd, 'target.ts'),
+          );
           expect(results[0].messages.map(({ ruleId }) => ruleId)).toEqual([
-            '@typescript-eslint/no-unsafe-member-access',
-            '@typescript-eslint/no-for-in-array',
+            ...(declared ? ['@typescript-eslint/no-for-in-array'] : []),
+            'no-debugger',
           ]);
+        }
+        if (option === 'project paths') {
+          // The same missing declaration must still fail when it matches.
+          await writeFile(path.join(cwd, 'unused.ts'), source);
+          await expect(instance.lintFiles(['unused.ts'])).rejects.toThrow(
+            /missing\.json/,
+          );
+          await expect(
+            instance.lintText(source, { filePath: 'unused.ts' }),
+          ).rejects.toThrow(/missing\.json/);
         }
       } finally {
         await instance.close();
@@ -3069,55 +3075,64 @@ module.exports = config;`
     },
   );
 
-  test.each([true, false])(
-    'projectService false preserves scoped owner declarations but disables the implicit default (declared=%s)',
-    async (declared) => {
-      const tmp = await mkdtemp(
-        path.join(os.tmpdir(), 'rslint-service-disabled-'),
-      );
-      const instance = new Rslint({
-        cwd: tmp,
-        overrideConfigFile: true,
-        overrideConfig: [
-          {
-            plugins: ['@typescript-eslint'],
-            languageOptions: { parserOptions: { projectService: false } },
-            rules: {
-              '@typescript-eslint/no-for-in-array': 'error',
-              'no-debugger': 'error',
-            },
-          },
-          ...(declared
-            ? [
-                {
-                  files: ['unused.ts'],
-                  languageOptions: {
-                    parserOptions: { project: './custom.json' },
-                  },
-                },
-              ]
-            : []),
-        ],
-        virtualFiles: {
-          'tsconfig.json': JSON.stringify({ files: ['target.ts'] }),
-          'custom.json': JSON.stringify({ files: ['target.ts'] }),
-        },
-      });
-      try {
-        const [result] = await instance.lintText(
-          'const values = [1];\nfor (const key in values) {}\ndebugger;\n',
-          { filePath: 'target.ts' },
-        );
-        expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
-          ...(declared ? ['@typescript-eslint/no-for-in-array'] : []),
-          'no-debugger',
-        ]);
-      } finally {
-        await instance.close();
-        await cleanupTempDir(tmp);
-      }
+  test.each([
+    { name: 'no explicit project', projectFiles: null, typed: false },
+    {
+      name: 'an unmatched explicit project',
+      projectFiles: ['unused.ts'],
+      typed: false,
     },
-  );
+    {
+      name: 'a matching explicit project',
+      projectFiles: ['target.ts'],
+      typed: true,
+    },
+  ])('projectService false respects $name', async ({ projectFiles, typed }) => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-service-disabled-'),
+    );
+    const instance = new Rslint({
+      cwd: tmp,
+      overrideConfigFile: true,
+      overrideConfig: [
+        {
+          plugins: ['@typescript-eslint'],
+          languageOptions: { parserOptions: { projectService: false } },
+          rules: {
+            '@typescript-eslint/no-for-in-array': 'error',
+            'no-debugger': 'error',
+          },
+        },
+        ...(projectFiles
+          ? [
+              {
+                files: projectFiles,
+                languageOptions: {
+                  parserOptions: { project: './custom.json' },
+                },
+              },
+            ]
+          : []),
+      ],
+      virtualFiles: {
+        'tsconfig.json': JSON.stringify({ files: ['target.ts'] }),
+        'custom.json': JSON.stringify({ files: ['target.ts'] }),
+      },
+    });
+    try {
+      const [result] = await instance.lintText(
+        'const values = [1];\nfor (const key in values) {}\ndebugger;\n',
+        { filePath: 'target.ts' },
+      );
+      expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
+        ...(typed ? ['@typescript-eslint/no-for-in-array'] : []),
+        'no-debugger',
+      ]);
+    } finally {
+      await instance.close();
+      await cleanupTempDir(tmp);
+    }
+  });
 
   test.each(['./custom.json', './custom*.json'])(
     'explicit project policy keeps the config directory literal for %s',
@@ -3275,7 +3290,14 @@ module.exports = config;`
       overrides: [{ project: ['./second.json'] }],
       typed: true,
     },
-    { name: 'later empty array', overrides: [{ project: [] }], typed: true },
+    {
+      name: 'later array project',
+      firstProject: './second.json',
+      overrides: [{ project: ['./first.json'] }],
+      typed: true,
+      array: true,
+    },
+    { name: 'later empty array', overrides: [{ project: [] }], typed: false },
     {
       name: 'empty array without paths',
       overrides: [{ project: [] }],
@@ -3295,8 +3317,14 @@ module.exports = config;`
       typed: true,
     },
   ])(
-    'explicit lintText preserves declaration order with $name',
-    async ({ overrides, typed, declared = true }) => {
+    'explicit lintText uses the final project with $name',
+    async ({
+      overrides,
+      typed,
+      array = false,
+      declared = true,
+      firstProject = './first.json',
+    }) => {
       const tmp = await mkdtemp(
         path.join(os.tmpdir(), 'rslint-project-array-override-'),
       );
@@ -3307,13 +3335,14 @@ module.exports = config;`
           {
             plugins: ['@typescript-eslint'],
             languageOptions: {
-              parserOptions: declared ? { project: ['./first.json'] } : {},
+              parserOptions: declared ? { project: [firstProject] } : {},
             },
           },
           {
             files: ['**/*.ts'],
             rules: {
               '@typescript-eslint/no-for-in-array': 'error',
+              '@typescript-eslint/no-unsafe-member-access': 'error',
               'no-debugger': 'error',
             },
           },
@@ -3340,11 +3369,12 @@ module.exports = config;`
       });
       try {
         const [result] = await rslint.lintText(
-          "import { values } from 'values';\nfor (const key in values) {}\ndebugger;\n",
+          "import { values } from 'values';\nfor (const key in values) {}\ndeclare const unsafeValue: any;\nunsafeValue.member;\ndebugger;\n",
           { filePath: 'probe.ts' },
         );
         expect(result.messages.map(({ ruleId }) => ruleId)).toEqual([
-          ...(typed ? ['@typescript-eslint/no-for-in-array'] : []),
+          ...(array ? ['@typescript-eslint/no-for-in-array'] : []),
+          ...(typed ? ['@typescript-eslint/no-unsafe-member-access'] : []),
           'no-debugger',
         ]);
       } finally {
