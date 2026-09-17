@@ -66,7 +66,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-array-front-mutation': 'off',
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented
     // 'unicorn/no-array-reduce': 'error', // not implemented
-    // 'unicorn/no-array-reverse': 'error', // not implemented
+    'unicorn/no-array-reverse': 'error',
     // 'unicorn/no-array-sort': 'error', // not implemented
     // 'unicorn/no-array-sort-for-min-max': 'error', // not implemented
     // 'unicorn/no-array-splice': 'error', // not implemented
