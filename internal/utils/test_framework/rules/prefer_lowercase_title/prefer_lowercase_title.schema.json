@@ -1,0 +1,36 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "properties": {
+        "ignore": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["describe", "test", "it"]
+          },
+          "additionalItems": false
+        },
+        "allowedPrefixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "additionalItems": false
+        },
+        "ignoreTopLevelDescribe": {
+          "type": "boolean",
+          "default": false
+        },
+        "ignoreTodos": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
