@@ -21,6 +21,16 @@ type RstestCallAnalysis struct {
 	// cannot protect it. This fact is collected during the analysis's existing
 	// file walk so every expect consumer shares one linear-time check.
 	globalExpectWritten bool
+	// Expect customization is computed lazily from calls because only rules
+	// whose safety depends on the built-in matcher implementations need it. The
+	// source-file call index is already shared by every Rstest rule, so this never
+	// adds another AST walk.
+	overriddenExpectMatchers    map[string]bool
+	allExpectMatchersOverridden bool
+	hasCustomEqualityTesters    bool
+	expectCustomizationOK       bool
+	expectConfigAliases         map[*ast.Symbol]string
+	hasImportMetaRstestWrites   bool
 	// functions indexes named function declarations by name so a callback
 	// passed by an identifier the checker could not resolve still has a
 	// candidate. The index is file-wide and carries no scope information, so
@@ -202,6 +212,185 @@ func (analysis *RstestCallAnalysis) ParseExpectCallThroughTransparentExpressions
 	return parseRstestExpectCallThroughTransparentExpressions(node, analysis)
 }
 
+// IsExpectMatcherOverridden reports whether an Rstest expect.extend call in
+// this file may replace matcher. A dynamic matcher object or spread may replace
+// any name, so it conservatively answers true for every matcher.
+func (analysis *RstestCallAnalysis) IsExpectMatcherOverridden(matcher string) bool {
+	analysis.collectExpectCustomization()
+	return analysis.allExpectMatchersOverridden || analysis.overriddenExpectMatchers[matcher]
+}
+
+// HasCustomEqualityTesters reports whether this file installs Rstest equality
+// testers, which may execute user code from equality-based built-in matchers.
+func (analysis *RstestCallAnalysis) HasCustomEqualityTesters() bool {
+	analysis.collectExpectCustomization()
+	return analysis.hasCustomEqualityTesters
+}
+
+func (analysis *RstestCallAnalysis) collectExpectCustomization() {
+	if analysis.expectCustomizationOK {
+		return
+	}
+	analysis.expectCustomizationOK = true
+	if analysis.ctx.SourceFile == nil ||
+		(!analysis.ctx.SourceFile.HasIdentifier("extend") &&
+			!analysis.ctx.SourceFile.HasIdentifier("addEqualityTesters")) {
+		return
+	}
+	for _, call := range analysis.calls {
+		parsed := analysis.ParseExpectCall(call)
+		matcher := ""
+		if parsed != nil && parsed.Entry == RstestExpectEntryStatic {
+			matcher = parsed.Matcher
+		} else {
+			matcher = analysis.expectConfigMember(call.Expression())
+		}
+		switch matcher {
+		case "addEqualityTesters":
+			arguments := call.Arguments()
+			if len(arguments) == 0 {
+				continue
+			}
+			testers := internalUtils.SkipAssertionsAndParens(arguments[0])
+			if testers != nil && testers.Kind == ast.KindArrayLiteralExpression && len(testers.AsArrayLiteralExpression().Elements.Nodes) == 0 {
+				continue
+			}
+			analysis.hasCustomEqualityTesters = true
+		case "extend":
+			arguments := call.Arguments()
+			if len(arguments) == 0 {
+				continue
+			}
+			matchers := internalUtils.SkipAssertionsAndParens(arguments[0])
+			if matchers == nil || matchers.Kind != ast.KindObjectLiteralExpression {
+				analysis.allExpectMatchersOverridden = true
+				continue
+			}
+			for _, property := range matchers.AsObjectLiteralExpression().Properties.Nodes {
+				name := property.Name()
+				if name == nil {
+					analysis.allExpectMatchersOverridden = true
+					continue
+				}
+				matcher, ok := internalUtils.GetStaticPropertyName(name)
+				if !ok {
+					analysis.allExpectMatchersOverridden = true
+					continue
+				}
+				if analysis.overriddenExpectMatchers == nil {
+					analysis.overriddenExpectMatchers = map[string]bool{}
+				}
+				analysis.overriddenExpectMatchers[matcher] = true
+			}
+		}
+	}
+}
+
+func (analysis *RstestCallAnalysis) expectConfigMember(node *ast.Node) string {
+	node = internalUtils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return ""
+	}
+	if ast.IsAccessExpression(node) {
+		member, ok := internalUtils.AccessExpressionStaticName(node)
+		if !ok {
+			return ""
+		}
+		if member == "extend" || member == "addEqualityTesters" {
+			if analysis.expectConfigMember(node.Expression()) == "expect" {
+				return member
+			}
+			return ""
+		}
+	}
+	if _, parts, rootInvoked, ok := parseImportMetaRstestChain(node); ok {
+		if !rootInvoked && len(parts) == 1 && parts[0].name == "expect" && parts[0].invocation == rstestNotInvoked {
+			return "expect"
+		}
+		return ""
+	}
+	entries := testFramework.GetMemberEntries(node)
+	if len(entries) == 0 || entries[0].Node == nil || !ast.IsIdentifier(entries[0].Node) {
+		return ""
+	}
+	for _, entry := range entries {
+		if entry.Call != nil || isComputedDynamicMemberName(entry.Node) {
+			return ""
+		}
+	}
+	secondName := ""
+	if len(entries) > 1 {
+		secondName = entries[1].Name
+	}
+	match := rstestExpectRootMatch(entries[0].Node, secondName, len(entries) > 1, analysis)
+	if match.ok && match.index == len(entries)-1 {
+		return "expect"
+	}
+	if !ast.IsIdentifier(node) {
+		return ""
+	}
+	symbol := analysis.ctx.Refs.Resolve(node)
+	if symbol == nil {
+		return ""
+	}
+	if member, ok := analysis.expectConfigAliases[symbol]; ok {
+		return member
+	}
+	if analysis.expectConfigAliases == nil {
+		analysis.expectConfigAliases = map[*ast.Symbol]string{}
+	}
+	// Cache misses before following initializers to break cyclic aliases.
+	analysis.expectConfigAliases[symbol] = ""
+	if analysis.expectConfigAliasIsReassigned(symbol) {
+		return ""
+	}
+	for _, declaration := range symbol.Declarations {
+		member := ""
+		if declaration != nil && declaration.Kind == ast.KindBindingElement {
+			member = analysis.destructuredExpectConfigMember(declaration)
+		} else if declaration != nil && declaration.Kind == ast.KindVariableDeclaration {
+			member = analysis.expectConfigMember(declaration.AsVariableDeclaration().Initializer)
+		}
+		if member != "" {
+			analysis.expectConfigAliases[symbol] = member
+			return member
+		}
+	}
+	return ""
+}
+
+func (analysis *RstestCallAnalysis) expectConfigAliasIsReassigned(symbol *ast.Symbol) bool {
+	for _, reference := range analysis.ctx.Refs.References(symbol) {
+		if internalUtils.IsWriteReference(reference) {
+			return true
+		}
+	}
+	return false
+}
+
+func (analysis *RstestCallAnalysis) destructuredExpectConfigMember(declaration *ast.Node) string {
+	binding := declaration.AsBindingElement()
+	if binding == nil || binding.Name() == nil || binding.Name().Kind != ast.KindIdentifier || binding.DotDotDotToken != nil {
+		return ""
+	}
+	member := RequireBindingImportedName(declaration)
+	if member != "extend" && member != "addEqualityTesters" {
+		return ""
+	}
+	variable := internalUtils.EnclosingVariableDeclarationOfBindingElement(declaration)
+	if variable == nil || variable.Kind != ast.KindVariableDeclaration || variable.AsVariableDeclaration().Initializer == nil {
+		return ""
+	}
+	if analysis.expectConfigMember(variable.AsVariableDeclaration().Initializer) == "expect" {
+		return member
+	}
+	return ""
+}
+
+func (analysis *RstestCallAnalysis) HasImportMetaRstestWrites() bool {
+	return analysis.hasImportMetaRstestWrites
+}
+
 func (analysis *RstestCallAnalysis) Callbacks() RstestTestCallbacks {
 	return *analysis.callbacksRef()
 }
@@ -334,6 +523,26 @@ func (analysis *RstestCallAnalysis) indexSourceFile() {
 			analysis.recordFunction(node)
 		case ast.KindCallExpression:
 			analysis.calls = append(analysis.calls, node)
+		case ast.KindMetaProperty:
+			if !analysis.hasImportMetaRstestWrites && isImportMeta(node) {
+				reference := node
+				for reference.Parent != nil && internalUtils.SkipAssertionsAndParens(reference.Parent) == node {
+					reference = reference.Parent
+				}
+				access := reference.Parent
+				if access != nil && ast.IsAccessExpression(access) && access.Expression() == reference {
+					name, known := internalUtils.AccessExpressionStaticName(access)
+					if !known || name == "rstest" {
+						reference = access
+						for reference.Parent != nil && (internalUtils.SkipAssertionsAndParens(reference.Parent) == internalUtils.SkipAssertionsAndParens(reference) ||
+							(ast.IsAccessExpression(reference.Parent) && reference.Parent.Expression() == reference)) {
+							reference = reference.Parent
+						}
+						analysis.hasImportMetaRstestWrites = internalUtils.IsWriteReference(reference) ||
+							(reference.Parent != nil && reference.Parent.Kind == ast.KindDeleteExpression)
+					}
+				}
+			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
 			visit(child)

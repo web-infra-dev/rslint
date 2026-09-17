@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -213,4 +214,85 @@ func sourceOnlyParsedExpectCount(t *testing.T, code string) int {
 		Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}},
 	})
 	return count
+}
+
+func TestRstestExpectCustomizationResolvesInSourceOnlyProgram(t *testing.T) {
+	code := `
+import { expect as check } from '@rstest/core';
+import * as core from 'rstack/test';
+
+const verify = check;
+const again = verify;
+again.extend({ toBe() {} });
+const checkEquality = core.expect;
+const { addEqualityTesters: add } = checkEquality;
+add([tester]);
+probe();
+`
+
+	probe := rule.Rule{
+		Name: "rstest/source-only-expect-customization-probe",
+		Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+			analysis := rstestUtils.GetRstestCallAnalysis(ctx)
+			return rule.RuleListeners{
+				ast.KindCallExpression: func(node *ast.Node) {
+					callee := node.Expression()
+					if callee == nil || callee.Kind != ast.KindIdentifier || callee.Text() != "probe" {
+						return
+					}
+					ctx.ReportNode(node, probeMessage("customization", fmt.Sprintf(
+						"toBe=%t equality=%t",
+						analysis.IsExpectMatcherOverridden("toBe"),
+						analysis.HasCustomEqualityTesters(),
+					)))
+				},
+			}
+		},
+	}
+
+	root := fixtures.GetRootDir()
+	fileName := tspath.ResolvePath(root.Dir, "expect-customization-source-only.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	sourceProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            host,
+		CompilerOptions: &core.CompilerOptions{Module: core.ModuleKindESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("NewFromRoots: %v", err)
+	}
+	if sourceProgram.CanProvideTypeChecker(sourceProgram.SourceFiles()[0]) {
+		t.Fatal("expected a source-only Program with no TypeChecker")
+	}
+
+	lintPlan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{sourceProgram},
+		TargetsByProgram: [][]string{{fileName}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     probe.Name,
+				Severity: rule.SeverityError,
+				Run:      func(ctx rule.RuleContext) rule.RuleListeners { return probe.Run(ctx, nil) },
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatalf("PrepareLintPlan: %v", err)
+	}
+	var got []rule.RuleDiagnostic
+	if _, err := linter.RunLinter(linter.RunLinterOptions{
+		SingleThreaded: true,
+		LintPlan:       lintPlan,
+		Consumer: rule.DiagnosticConsumer{Report: func(diagnostic rule.RuleDiagnostic) {
+			got = append(got, diagnostic)
+		}},
+	}); err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	if len(got) != 1 || got[0].Message.Description != "toBe=true equality=true" {
+		t.Fatalf("source-only customization = %+v", got)
+	}
 }

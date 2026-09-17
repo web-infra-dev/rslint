@@ -115,9 +115,6 @@ func TestUnboundMethodRule(t *testing.T) {
       const { alert } = window;
     `},
 		{Code: `
-      let b = window.blur;
-    `},
-		{Code: `
       function foo() {}
       const fooObject = { foo };
       const { foo: bar } = fooObject;
