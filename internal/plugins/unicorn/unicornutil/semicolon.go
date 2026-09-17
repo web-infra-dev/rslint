@@ -8,7 +8,7 @@ import (
 )
 
 func startsWithSemicolonHazard(text string) bool {
-	return text != "" && strings.ContainsRune("[(/`+-*,.", rune(text[0]))
+	return text != "" && strings.ContainsRune("[(/`+-*,.<", rune(text[0]))
 }
 
 func isEmbeddedStatement(statement *ast.Node) bool {
@@ -78,13 +78,15 @@ func NeedsSemicolonBefore(
 		ast.KindFalseKeyword,
 		ast.KindNullKeyword:
 		return true
-	case ast.KindCloseBraceToken:
-		// The same closing brace can end a block/declaration or a value.
-		// Only values can absorb a following call, index, or template literal.
+	case ast.KindCloseBraceToken, ast.KindGreaterThanToken, ast.KindExclamationToken:
+		// These tokens can end a declaration or a runtime value, including
+		// TypeScript instantiations and non-null assertions. Only values can
+		// absorb a following expression across the statement boundary.
 		for previousNode := ast.GetNodeAtPosition(sourceFile, previous.Start, false); previousNode != nil && previousNode.End() == previous.End; previousNode = previousNode.Parent {
 			switch previousNode.Kind {
 			case ast.KindObjectLiteralExpression, ast.KindFunctionExpression,
-				ast.KindArrowFunction, ast.KindClassExpression:
+				ast.KindArrowFunction, ast.KindClassExpression,
+				ast.KindExpressionWithTypeArguments, ast.KindNonNullExpression:
 				return true
 			}
 		}
