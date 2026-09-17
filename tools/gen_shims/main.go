@@ -54,6 +54,7 @@ func main() {
 		"core",
 		"diagnostics",
 		"evaluator",
+		"jsnum",
 		"jsonrpc",
 		"parser",
 		"scanner",

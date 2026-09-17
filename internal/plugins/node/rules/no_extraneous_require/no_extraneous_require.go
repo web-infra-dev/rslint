@@ -1,14 +1,12 @@
 package no_extraneous_require
 
 import (
-	"cmp"
 	_ "embed"
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_extraneous_require.schema.json
@@ -19,16 +17,7 @@ var NoExtraneousRequireRule = rule.Rule{
 	Name:   "node/no-extraneous-require",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		// tsgo records normalized identifiers, including escaped spellings.
-		// Include global objects because their require property can be computed.
-		mayRequire := false
-		for _, name := range []string{"require", "global", "globalThis", "self", "window"} {
-			if ctx.SourceFile.HasIdentifier(name) {
-				mayRequire = true
-				break
-			}
-		}
-		if !mayRequire {
+		if !nodeutil.MayHaveRequire(ctx.SourceFile) {
 			return nil
 		}
 		p := ctx.Program()
@@ -46,32 +35,11 @@ var NoExtraneousRequireRule = rule.Rule{
 		}
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
-				calls := nodeutil.CollectRequireCalls(ctx)
-				// ESLint presents diagnostics in source order, including when
-				// alias traversal reaches a later call before a direct call.
-				slices.SortStableFunc(calls, func(a, b *ast.Node) int { return cmp.Compare(a.Pos(), b.Pos()) })
 				allowed := nodeutil.StringListSetting("allowModules", opts, ctx.Settings)
-				var evaluator *utils.StaticStringEvaluator
 				var resolution *nodeutil.ResolutionOptions
 				targets := map[string]string{}
-				for _, node := range calls {
-					args := node.AsCallExpression().Arguments
-					if args == nil || len(args.Nodes) == 0 {
-						continue
-					}
-					source := utils.ESTreeRuntimeExpression(args.Nodes[0])
-					specifier, ok := utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(source))
-					if !ok {
-						if evaluator == nil {
-							evaluator = utils.NewStaticStringEvaluatorWithoutScope()
-						}
-						specifier, ok = evaluator.EvalToString(source)
-					}
-					// The shared evaluator cannot fold compound BigInt values;
-					// this uncommon module-name form is documented in the rule.
-					if !ok {
-						continue
-					}
+				for _, target := range nodeutil.CollectRequireTargets(ctx) {
+					specifier := target.Name
 					name, found := targets[specifier]
 					if !found {
 						var resource string
@@ -84,8 +52,6 @@ var NoExtraneousRequireRule = rule.Rule{
 								value := nodeutil.RequireResolutionOptions(ctx, opts)
 								resolution = &value
 							}
-							// As with no-extraneous-import, only resolverConfig.modules
-							// is supported; other overrides have documented differences.
 							if nodeutil.ResolveModule(p, resource, fileName, *resolution) == "" {
 								name = ""
 							}
@@ -93,7 +59,7 @@ var NoExtraneousRequireRule = rule.Rule{
 						targets[specifier] = name
 					}
 					if name != "" {
-						ctx.ReportNode(source, rule.RuleMessage{
+						ctx.ReportNode(target.Node, rule.RuleMessage{
 							Id: "extraneous", Description: `"` + name + `" is extraneous.`,
 							Data: map[string]string{"moduleName": name},
 						})

@@ -79,8 +79,35 @@ Unresolved relative imports use their lexical absolute path; unresolved package
 names have no file path to match.
 
 Resolution uses the Node plugin's shared `settings.node` options, including
-`resolvePaths`, `tryExtensions`, and `resolverConfig.modules`, and TypeScript
-path aliases. Legacy `settings.n` is also recognized, as in the other Node rules.
+`resolvePaths`, `tryExtensions`, and the `modules`, `alias`, `extensions`,
+`extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields` properties of `resolverConfig`, and
+TypeScript path aliases. Legacy `settings.n` is also recognized, as in the other Node rules.
+
+`resolverConfig.mainFields` selects package entry fields in order, for example
+`['browser', 'module', 'main']`. `mainFiles` selects directory entry filenames,
+such as `['api', 'index']`. `aliasFields: ['browser']` applies package mappings
+including `false` to ignore a target. Field names can be nested arrays, such as
+`[['build', 'main'], 'main']`. Empty entry lists disable that lookup.
+
+## Differences from upstream
+
+Other `resolverConfig` properties, including `fallback`, `symlinks`, and
+`fullySpecified`, are ignored. For example, `fallback: { virtual: './shim.js' }`
+does not redirect an unresolved `virtual` request. Use `alias` if the redirect
+should apply to every matching request.
+
+Package entry names containing literal backslashes are not resolved on POSIX;
+use `/` for portable directory separators. On Windows, rslint accepts relative
+paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
+
+When object-form aliases overlap, rslint tries their names in sorted order;
+upstream uses declaration order. Use an alias array to specify priority, such as
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
+
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 

@@ -14,6 +14,7 @@ replace (
 	github.com/microsoft/TypeScript/tsc/shim/core => ./shim/core
 	github.com/microsoft/TypeScript/tsc/shim/diagnostics => ./shim/diagnostics
 	github.com/microsoft/TypeScript/tsc/shim/evaluator => ./shim/evaluator
+	github.com/microsoft/TypeScript/tsc/shim/jsnum => ./shim/jsnum
 	github.com/microsoft/TypeScript/tsc/shim/jsonrpc => ./shim/jsonrpc
 	github.com/microsoft/TypeScript/tsc/shim/locale => ./shim/locale
 	github.com/microsoft/TypeScript/tsc/shim/ls => ./shim/ls
@@ -47,6 +48,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/core v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/diagnostics v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/evaluator v0.0.0-00010101000000-000000000000
+	github.com/microsoft/TypeScript/tsc/shim/jsnum v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/jsonrpc v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/locale v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto v0.0.0

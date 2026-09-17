@@ -87,14 +87,29 @@ These options can also be configured in `settings.node`. Rule options take
 precedence, including explicitly empty arrays. Legacy `settings.n` is accepted
 for compatibility and takes precedence over `settings.node` when both are set.
 
+Supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
+`extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields`.
+
+`resolverConfig.mainFields` selects package entry fields in order, for example
+`['browser', 'module', 'main']`. `mainFiles` selects directory entry filenames,
+such as `['api', 'index']`. `aliasFields: ['browser']` applies package mappings
+including `false` to ignore a target. Field names can be nested arrays, such as
+`[['build', 'main'], 'main']`. Empty entry lists disable that lookup.
+
 ## Differences from upstream
 
-Only `resolverConfig.modules` changes package resolution in rslint; other
-resolver overrides are ignored. For example, with an existing `local.js` and
-`resolverConfig: { alias: { virtual: './local.js' } }`, upstream reports
-`require('virtual')` as extraneous. If `virtual` is not installed, rslint reports
-nothing. Use TypeScript `compilerOptions.paths` for local aliases, or
-`allowModules` to permit undeclared packages.
+Other `resolverConfig` properties, including `fallback`, `symlinks`, and
+`fullySpecified`, are ignored. For example, `fallback: { virtual: './shim.js' }`
+does not redirect an unresolved `virtual` request. Use `alias` if the redirect
+should apply to every matching request.
+
+Package entry names containing literal backslashes are not resolved on POSIX;
+use `/` for portable directory separators. On Windows, rslint accepts relative
+paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
+
+When object-form aliases overlap, rslint tries their names in sorted order;
+upstream uses declaration order. Use an alias array to specify priority, such as
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
 
 With `workspaces: ['packages/{1..3}']`, rslint includes `packages/1`, `packages/2`,
 and `packages/3`; upstream matches the literal directory `packages/1..3`.
@@ -107,10 +122,10 @@ rslint excludes it. A dependency declared only at the workspace root is therefor
 reported by rslint in that child package but accepted upstream. Use
 `packages/[!a]*` to exclude names starting with `a` in both tools.
 
-Compound BigInt expressions are not evaluated. For example, if the package `42`
-is installed but undeclared, upstream reports `require(40n + 2n)` and rslint does
-not. Use a string argument such as `require('42')`. Direct BigInt literals such
-as `require(42n)` are supported.
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 

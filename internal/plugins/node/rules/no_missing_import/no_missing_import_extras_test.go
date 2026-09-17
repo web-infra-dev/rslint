@@ -13,6 +13,9 @@ func TestNoMissingImportExtras(t *testing.T) {
 	message := func(text string) string { return strings.ReplaceAll(text, "{{root}}", root.Dir) }
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &NoMissingImportRule,
 		[]rule_tester.ValidTestCase{
+			// Resolver aliases and BigInt values follow the upstream behavior.
+			{Code: "import 'virtual';", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./present.js"}}}}},
+
 			// self reference entry
 			{Code: "import 'self';", FileName: "maps/input.js"},
 			// imports #query
@@ -132,9 +135,6 @@ func TestNoMissingImportExtras(t *testing.T) {
 			{Code: "import './alias-file.js';", FileName: "src/input.ts", Options: []any{map[string]any{"tsconfigPath": "./config/explicit.json"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve './alias-file.js' in '{{root}}/src'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 25}}},
 			// Imports-map targets keep the import rule's no-directory behavior.
 			{Code: "import '#directory';", FileName: "maps/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve '#directory' in '{{root}}/maps'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 20}}},
-			// Upstream documents support for resolverConfig.modules only. Its
-			// undocumented alias passthrough resolves this file; rslint ignores it.
-			{Code: "import 'virtual';", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"virtual": "./present.js"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve 'virtual' in '{{root}}/src'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 17}}},
 			// empty allowed list overrides shared settings
 			{Code: "import 'missing';", FileName: "src/input.js", Options: []any{map[string]any{"allowModules": []any{}}}, Settings: map[string]any{"node": map[string]any{"allowModules": []any{"missing"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: message("Can't resolve 'missing' in '{{root}}/src'"), Line: 1, Column: 8, EndLine: 1, EndColumn: 17}}},
 			// tryExtensions default and explicit empty list

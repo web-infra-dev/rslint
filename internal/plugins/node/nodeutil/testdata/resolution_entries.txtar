@@ -1,0 +1,137 @@
+Package entry fields and browser mappings.
+-- input.js --
+require('pkg-entry');
+-- sub/input.js --
+require('bare');
+-- package.json --
+{"name":"entry-app","browser":{"bare":"./src/browser.js","disabled":"./src/browser.js","fs":"./src/browser.js","./src/server.js":"./src/browser.js","src/server.js":"./src/alternate.js","./src/without-extension":"./src/browser.js","./src/disabled.js":false,"./src/identical.js":"./src/identical.js","./src/missing-mapping.js":"./not-found.js","loop-a":"loop-b","loop-b":"loop-a","./src/absent.js":false,"query":"./src/browser.js?mapped","./src/entry.js":"./src/from-root.js"},"alternate":{"./src/server.js":"./src/alternate.js","./src/missing-mapping.js":"./src/alternate.js"},"nested":{"aliases":{"bare":"./src/alternate.js"}},"imports":{"#dir":"./plain","#entry":"./src/server.js","#dep":"pkg-entry"}}
+-- src/server.js --
+module.exports = 1;
+-- src/browser.js --
+module.exports = 2;
+-- src/alternate.js --
+module.exports = 3;
+-- src/disabled.js --
+module.exports = 4;
+-- src/identical.js --
+module.exports = 5;
+-- src/missing-mapping.js --
+module.exports = 6;
+-- src/entry.js --
+module.exports = 7;
+-- src/from-root.js --
+module.exports = 8;
+-- plain/api.js --
+module.exports = 1;
+-- plain/index.js --
+module.exports = 2;
+-- plain/nested/entry.js --
+module.exports = 3;
+-- main/package.json --
+{"browser":"browser.js","module":"module.js","main":"main.js","nested":{"entry":"nested.js"},"missing":"not-there.js","directory":"./lib","parent":"../src/browser.js","invalid":7,"self":".","selfSlash":"./","absolute":"@ROOT@/src/browser.js","query":"module.js?main#entry","backslash":"lib\\deep.js"}
+-- main/index.js --
+module.exports = 1;
+-- main/main.js --
+module.exports = 2;
+-- main/browser.js --
+module.exports = 3;
+-- main/module.js --
+module.exports = 4;
+-- main/nested.js --
+module.exports = 5;
+-- main/lib/package.json --
+{"main":"deep.js","module":"deep-module.js"}
+-- main/lib/deep.js --
+module.exports = 6;
+-- main/lib/deep-module.js --
+module.exports = 7;
+-- main/lib/index.js --
+module.exports = 8;
+-- node_modules/pkg-entry/package.json --
+{"main":"./index.js","browser":{"./index.js":"./browser.js","dep":"./dep-browser.js"}}
+-- node_modules/pkg-entry/index.js --
+module.exports = 1;
+-- node_modules/pkg-entry/browser.js --
+module.exports = 2;
+-- node_modules/pkg-entry/browser.ts --
+export default 2;
+-- node_modules/pkg-entry/dep-browser.js --
+module.exports = 3;
+-- node_modules/pkg-entry/sub/input.js --
+require('dep');
+-- node_modules/pkg-exports/package.json --
+{"exports":{".":"./node.js","./dir":"./lib","./index":"."},"module":"./module.js","main":"./index.js","browser":{"./node.js":"./browser.js","./lib/api.js":"./browser.js"}}
+-- node_modules/pkg-exports/node.js --
+module.exports = 1;
+-- node_modules/pkg-exports/browser.js --
+module.exports = 2;
+-- node_modules/pkg-exports/module.js --
+module.exports = 3;
+-- node_modules/pkg-exports/index.js --
+module.exports = 4;
+-- node_modules/pkg-exports/lib/api.js --
+module.exports = 5;
+-- node_modules/pkg-exports/lib/index.js --
+module.exports = 6;
+-- node_modules/index/package.json --
+{}
+-- node_modules/index/api.js --
+module.exports = 1;
+-- node_modules/index/index.js --
+module.exports = 2;
+-- cycle-a/package.json --
+{"main":"../cycle-b"}
+-- cycle-a/index.js --
+module.exports = 1;
+-- cycle-b/package.json --
+{"main":"../cycle-a"}
+-- extension-directory.js/api.js --
+module.exports = 1;
+-- extension-directory.js/index.js --
+module.exports = 2;
+-- nested-owner/package.json --
+{"browser":{"./local.js":"./mapped.js","dep":"./mapped.js"}}
+-- nested-owner/input.js --
+require('dep');
+-- nested-owner/local.js --
+module.exports = 1;
+-- nested-owner/mapped.js --
+module.exports = 2;
+-- maps/package.json --
+{"browser":{"a":"b","b":"./mapped.js","./one.js":"./two.js","./two.js":"./one.js","./dir":"./mapped.js","invalid":true,"self":"self","empty":"","./missing":false,"backslash":".\\mapped.js"},"alternate":{"invalid":"./mapped.js"}}
+-- maps/input.js --
+require('a');
+-- maps/mapped.js --
+module.exports = 1;
+-- maps/one.js --
+module.exports = 2;
+-- maps/two.js --
+module.exports = 3;
+-- maps/dir/index.js --
+module.exports = 5;
+-- maps/index.js --
+module.exports = 6;
+-- search/package.json --
+{"browser":{"lookup":"./lookup.js","disabled":false}}
+-- search/lookup.js --
+module.exports = 1;
+-- invalid-owner/package.json --
+{ invalid json }
+-- invalid-owner/input.js --
+require('a');
+-- entry-cycle/package.json --
+{"module":"module.js","main":"main.js","browser":{"./module.js":"a","a":"b","b":"a"}}
+-- entry-cycle/module.js --
+module.exports = 1;
+-- entry-cycle/main.js --
+module.exports = 2;
+-- search/node_modules/fallback-pkg/package.json --
+{"main":"../fallback-other"}
+-- search/node_modules/fallback-other/package.json --
+{"main":"../fallback-pkg"}
+-- node_modules/fallback-pkg/index.js --
+module.exports = 1;
+-- search/node_modules/ignored-file/package.json --
+{"main":"index.js","browser":{"./index.js":false}}
+-- node_modules/ignored-file/index.js --
+module.exports = 1;

@@ -92,12 +92,29 @@ in React modes. With `allowImportingTsExtensions`, the default extension list
 also includes `.ts`, `.mts`, and `.cts`, and emitted extensions are not
 substituted. Type-only imports also activate the `types` export condition.
 
+Supported `resolverConfig` properties are `modules`, `alias`, `extensions`,
+`extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields`.
+
+`resolverConfig.mainFields` selects package entry fields in order, for example
+`['browser', 'module', 'main']`. `mainFiles` selects directory entry filenames,
+such as `['api', 'index']`. `aliasFields: ['browser']` applies package mappings
+including `false` to ignore a target. Field names can be nested arrays, such as
+`[['build', 'main'], 'main']`. Empty entry lists disable that lookup.
+
 ## Differences from upstream
 
-Only `resolverConfig.modules` is supported. If you map `virtual` to
-`./local.js` with `resolverConfig.alias`, rslint may report `import 'virtual'`
-as missing even when the target file exists. For local aliases in TypeScript
-files, use `compilerOptions.paths` instead.
+Other `resolverConfig` properties, including `fallback`, `symlinks`, and
+`fullySpecified`, are ignored. For example, `fallback: { virtual: './shim.js' }`
+does not redirect an unresolved `virtual` request. Use `alias` if the redirect
+should apply to every matching request.
+
+Package entry names containing literal backslashes are not resolved on POSIX;
+use `/` for portable directory separators. On Windows, rslint accepts relative
+paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
+
+When object-form aliases overlap, rslint tries their names in sorted order;
+upstream uses declaration order. Use an alias array to specify priority, such as
+`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
 
 Some invalid `package.json#imports` mappings, such as
 `"#entry": [null, "./entry.js"]`, produce different error messages. Both
@@ -106,6 +123,11 @@ linters report an error; rslint reports that the import cannot be resolved.
 An unpaired Unicode surrogate in a module name, such as `import('\uD800')`,
 may appear as replacement characters in the reported name. File lookup still
 matches Node.js: `import './\uD800.js'` resolves an existing file named `�.js`.
+
+Disabling a wildcard alias affects only matching requests. For example,
+`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
+resolves `pkg` and unrelated packages. Upstream can ignore those other requests
+as well. Use exact alias names when identical behavior is required.
 
 ## References
 
