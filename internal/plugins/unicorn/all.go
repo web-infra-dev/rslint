@@ -20,8 +20,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_nested_ternary"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_null"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_object_as_default_parameter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"
@@ -29,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_outside_of_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_flat_depth"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
@@ -57,6 +58,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule,
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
 		consistent_tuple_labels.ConsistentTupleLabelsRule,

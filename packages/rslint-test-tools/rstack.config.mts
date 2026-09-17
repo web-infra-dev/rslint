@@ -752,6 +752,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/consistent-tuple-labels.test.ts',
     './tests/eslint-plugin-unicorn/rules/empty-brace-spaces.test.ts',
     './tests/eslint-plugin-unicorn/rules/error-message.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-unnecessary-array-splice-count.test.ts',
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-concat-in-loop.test.ts',
