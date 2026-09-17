@@ -182,3 +182,33 @@ func TestNoNegationInEqualityCheckArtifactsFollowDemand(t *testing.T) {
 		})
 	}
 }
+
+// Removing negation must preserve the boundary after a function or class expression.
+func TestNoNegationInEqualityCheckStatementBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_negation_in_equality_check.NoNegationInEqualityCheckRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "const foo = function() {}\n!(array) === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "const foo = function() {}\n;(array) !== expected"}}},
+		}},
+		{Code: "const foo = () => {}\n![1].length === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "const foo = () => {}\n;[1].length !== expected"}}},
+		}},
+		{Code: "const foo = class {}\n!+value === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "const foo = class {}\n;+value !== expected"}}},
+		}},
+		{Code: "foo = function() {}\n!/x/.test(x) === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "foo = function() {}\n;/x/.test(x) !== expected"}}},
+		}},
+		{Code: "foo = () => {}\n!`x` === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "foo = () => {}\n;`x` !== expected"}}},
+		}},
+		{Code: "foo = class {}\n!(array) === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "foo = class {}\n;(array) !== expected"}}},
+		}},
+		{Code: "{}\n!(array) === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "{}\n(array) !== expected"}}},
+		}},
+		{Code: "function foo() {}\n!(array) === expected", FileName: "probe.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-negation-in-equality-check/error", Message: "Negated expression is not allowed in equality check.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-negation-in-equality-check/suggestion", Output: "function foo() {}\n(array) !== expected"}}},
+		}},
+	})
+}

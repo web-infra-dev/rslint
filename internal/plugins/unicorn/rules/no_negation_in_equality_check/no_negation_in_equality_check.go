@@ -43,11 +43,7 @@ var NoNegationInEqualityCheckRule = rule.Rule{
 					afterBang, _ := utils.TokenAtOrAfter(ctx.SourceFile, bang.End())
 					fixes = append(fixes, returnOrThrowParentheses(ctx.SourceFile, node, afterBang.Start)...)
 					prefix := ""
-					leading := node
-					for leading.Parent != nil && !ast.IsExpressionStatement(leading.Parent) && utils.TrimNodeTextRange(ctx.SourceFile, leading.Parent).Pos() == start {
-						leading = leading.Parent
-					}
-					if unicornutil.NeedsSemicolonBefore(ctx.SourceFile, leading, afterBang.Text) {
+					if unicornutil.NeedsSemicolonBefore(ctx.SourceFile, node, afterBang.Text) {
 						prefix = ";"
 					}
 					fixes = append(fixes, rule.RuleFixReplaceRange(bang, prefix), rule.RuleFixReplace(ctx.SourceFile, binary.OperatorToken, replacement))
