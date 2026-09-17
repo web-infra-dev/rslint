@@ -369,3 +369,31 @@ func TestNeedsSemicolonBeforeExpressionBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestNeedsSemicolonBeforeTypeScriptBoundary(t *testing.T) {
+	for _, test := range []struct {
+		previous string
+		want     bool
+	}{
+		{"value<string>", true},
+		{"value<Array<string>>", true},
+		{"value<Map<string, Array<number>>>", true},
+		{"value!", true},
+		{"value!.property!", true},
+		{"value<string>;", false},
+		{"value!;", false},
+		{"type Value = Box<string>", false},
+		{"interface Value<T> {}", false},
+		{"function value<T>() {}", false},
+	} {
+		t.Run(test.previous, func(t *testing.T) {
+			source := parseTestSource(test.previous + "\n1.0.toString()")
+			node := findTestNode(t, source, "1.0")
+			for _, replacement := range []string{"(1)", "<number>1"} {
+				if got := NeedsSemicolonBefore(source, node, replacement); got != test.want {
+					t.Errorf("NeedsSemicolonBefore(%q) = %v, want %v", replacement, got, test.want)
+				}
+			}
+		})
+	}
+}
