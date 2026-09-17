@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_from_fill"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_reverse"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_expression_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
@@ -20,8 +21,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_nested_ternary"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_null"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_object_as_default_parameter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"
@@ -68,6 +69,7 @@ func GetAllRules() []rule.Rule {
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
 		no_array_from_fill.NoArrayFromFillRule,
 		no_array_front_mutation.NoArrayFrontMutationRule,
+		no_array_reverse.NoArrayReverseRule,
 		no_await_expression_member.NoAwaitExpressionMemberRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
 		no_document_cookie.NoDocumentCookieRule,
