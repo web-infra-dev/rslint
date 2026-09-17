@@ -29,7 +29,11 @@ var ExplicitTimerDelayRule = rule.Rule{
 					return
 				}
 				args := node.Arguments()
-				if !removeZero && len(args) == 1 && args[0].Kind != ast.KindSpreadElement {
+				// Runtime argument positions are unknown after a leading spread.
+				if len(args) == 0 || args[0].Kind == ast.KindSpreadElement {
+					return
+				}
+				if !removeZero && len(args) == 1 {
 					ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{
 						Id: "missing-delay", Description: "`" + name + "` should have an explicit delay argument.", Data: map[string]string{"name": name},
 					}, func() []rule.RuleFix {

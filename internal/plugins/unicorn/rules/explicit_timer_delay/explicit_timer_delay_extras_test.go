@@ -49,6 +49,10 @@ func TestExplicitTimerDelayExtras(t *testing.T) {
 		{Code: "interface setTimeout {} setTimeout(callback)", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "script"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly", "window": "readonly", "globalThis": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "setTimeout(callback);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"setTimeout": "off", "setInterval": "off", "window": "readonly", "globalThis": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "window.setTimeout(callback);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly", "window": "off", "globalThis": "readonly", "global": "readonly", "self": "readonly"}},
+		// A leading spread can already contain the delay; zero may be a callback argument.
+		{Code: "setTimeout(...args,0)", FileName: "case.js", Options: []any{"never"}, LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly", "window": "readonly", "globalThis": "readonly", "global": "readonly", "self": "readonly"}},
+		{Code: "const args = [() => {}, 1000]; setTimeout(...args, 0);", FileName: "case.js", Options: []any{"never"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly"}},
+		{Code: "setInterval(...args, -0)", FileName: "case.js", Options: []any{"never"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly"}},
 	}, []rule_tester.InvalidTestCase{
 		{Code: "setTimeout(callback,)", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly", "window": "readonly", "globalThis": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"setTimeout(callback, 0,)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "missing-delay", Message: "`setTimeout` should have an explicit delay argument.", Line: 1, Column: 1, EndLine: 1, EndColumn: 22, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
@@ -101,9 +105,7 @@ func TestExplicitTimerDelayExtras(t *testing.T) {
 		{Code: "setTimeout(callback, 0e3)", FileName: "case.js", Options: []any{"never"}, LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly", "window": "readonly", "globalThis": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"setTimeout(callback)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "redundant-delay", Message: "`setTimeout` should not have an explicit delay of `0`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 25, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
-		{Code: "setTimeout(...args,0)", FileName: "case.js", Options: []any{"never"}, LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly", "window": "readonly", "globalThis": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"setTimeout(...args)"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "redundant-delay", Message: "`setTimeout` should not have an explicit delay of `0`.", Line: 1, Column: 20, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
-		}},
+
 		{Code: "window?.setTimeout(callback,0)", FileName: "case.js", Options: []any{"never"}, LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"setTimeout": "readonly", "setInterval": "readonly", "window": "readonly", "globalThis": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"window?.setTimeout(callback)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "redundant-delay", Message: "`setTimeout` should not have an explicit delay of `0`.", Line: 1, Column: 29, EndLine: 1, EndColumn: 30, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
