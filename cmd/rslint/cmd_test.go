@@ -892,7 +892,7 @@ func TestHandleLintCommandTypeCheckProjectConstructionOrder(t *testing.T) {
 				if code != 1 || !strings.Contains(stderr, "missing.json") {
 					t.Fatalf("declared project error: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
 				}
-				if got, want := fsys.callCount(targetPath) > 0, selection.options != nil; got != want {
+				if got, want := fsys.callCount(targetPath) > 0, !typeCheckOnly || selection.options != nil; got != want {
 					t.Fatalf("target identity resolved before project error = %t, want %t", got, want)
 				}
 			})
@@ -926,7 +926,7 @@ func TestHandleLintCommandProjectSelectionTypeCheckScope(t *testing.T) {
 					TypeCheck:     mode != "lint", TypeCheckOnly: mode == "type-check-only",
 					Format: "jsonline", NoColor: true, SingleThreaded: true,
 				})
-				if selection == "scoped explicit" {
+				if selection == "scoped explicit" && mode != "lint" {
 					if code != 1 || !strings.Contains(stderr, "missing.json") {
 						t.Fatalf("raw project declarations must retain validation: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
 					}

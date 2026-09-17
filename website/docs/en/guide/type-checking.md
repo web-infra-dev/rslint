@@ -40,7 +40,7 @@ With service enabled and no explicit project declarations, `rslint --type-check-
 
 Unowned service targets use source-only gap linting. TypeScript presets do not enable service; if another matching entry enables it, set `projectService: false` to use ordinary explicit projects. An effective project string or array, including [], conflicts with enabled service. Effective conflicts, service/root options and false/null clears are evaluated from the same matching config used for lint rules.
 
-A matching `projectService: false` overrides earlier service settings and disables the target's implicit default binding. It preserves explicit owner declarations, including declarations from entries that do not match the target. JavaScript also accepts null for this service reset; the public type is boolean. Unmatched service/root/clear settings do not affect another target. Program-wide checking of an owner with no targets follows the separate scope rules below.
+A matching `projectService: false` overrides earlier service settings. An explicit `project` from the file's final merged configuration still applies; declarations from unmatched entries do not. JavaScript also accepts null for this service reset; the public type is boolean. Unmatched service/root/clear settings do not affect another target. Program-wide checking of an owner with no targets follows the separate scope rules below.
 
 ## What gets type-checked
 
@@ -56,23 +56,27 @@ parserOptions: {
 }
 ```
 
-Rslint collects the governing owner's explicit project strings and arrays in declaration order, even from entries whose files/ignores do not match a lint target. `--type-check` and `--type-check-only` build every project in that list for each applicable root context. A later project array or [] does not remove an earlier declaration. Target binding prefers direct roots across the list, then import membership.
+For linting, Rslint uses each target file's final merged `parserOptions`. Only entries matching that file contribute settings. A later `project` replaces the earlier list; `[]`, `false`, or JavaScript `null` clears it. Relative project paths keep the authored base of the entry supplying that value, unless an effective absolute `tsconfigRootDir` overrides it. Resetting `tsconfigRootDir` to JavaScript `null` restores that authored base. Target binding prefers direct roots across the effective list, then import membership.
+
+If neither `project` nor `projectService` is enabled for a target, ordinary lint uses source-only gap linting, even when a `tsconfig.json` exists beside the Rslint config. Enable `projectService: true` to discover projects automatically, or set `project` explicitly. These options provide type information; they do not select additional lint files.
+
+Program-wide checking is separate. `--type-check` and `--type-check-only` retain the governing owner's complete explicit declaration list, including entries that do not match a lint target and earlier declarations replaced for linting. Each applicable root context checks that entire list. In combined `--type-check` mode, lint rules still use each target's effective project settings.
 
 The construction scope depends on the operation:
 
 | Operation                                      | Project scope                                                             |
 | ---------------------------------------------- | ------------------------------------------------------------------------- |
-| Plain CLI lint of the whole cwd                | Eagerly build explicit projects for active ordinary owners                |
+| Plain CLI lint of the whole cwd                | Validate effective candidates and select projects using target membership |
 | Focused file/subdirectory CLI lint or API lint | Select needed projects using root and import membership                   |
 | `--type-check` or `--type-check-only`          | Check complete explicit declaration lists, plus service-selected Programs |
 
 When service/root/clear options require target discovery, all actual targets contribute their effective `tsconfigRootDir` contexts to program-wide explicit checking, including service and clear targets. Each context checks the whole declaration list. Without an explicit root, the declarations keep their authored bases. A per-target clear changes lint binding; it does not remove these type-check projects.
 
-When there are no explicit paths, only ordinary targets that allow the default can request the implicit owner tsconfig. If an owner has no selected targets at all, program-wide checking retains its original declaration/default lookup without guessing effective scoped options. An empty service-only scope therefore builds no Programs in plain lint, but type-check-only can still check the owner's default tsconfig. These scope rules belong to Rslint; ESLint has no corresponding type-check flags.
+For program-wide type checking only, when there are no explicit paths, targets whose effective service/clear settings allow the historical default can request the owner tsconfig. If an owner has no selected targets at all, program-wide checking retains its original declaration/default lookup without guessing effective scoped options. An empty service-only scope therefore builds no Programs in plain lint, but type-check-only can still check the owner's default tsconfig. These scope rules belong to Rslint; ESLint has no corresponding type-check flags.
 
 Shared explicit projects are constructed once per invocation. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Explicit and service modes can require separate Programs for the same tsconfig because reference source and declaration-output behavior differs. Ordinary explicit-project ownership probes may construct complete candidates to inspect import membership even when the target ultimately uses gap linting.
 
-**Every checked Program includes its tsconfig root files and dependencies loaded through imports and references.** These filters affect lint targets and service/root context discovery, but do not trim a checked Program or the owner's ordinary explicit declaration list:
+**Every checked Program includes its tsconfig root files and dependencies loaded through imports and references.** These filters affect lint targets and service/root context discovery, but do not trim a checked Program or the owner's program-wide type-check declaration list:
 
 - rslint config's `files` patterns
 - rslint config's `ignores` patterns (root-level or per-entry)

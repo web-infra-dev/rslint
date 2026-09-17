@@ -263,7 +263,7 @@ func TestResolverLiteralOwnerWinsCanonicalAlias(t *testing.T) {
 				t.Fatalf("canonical alias changed literal owner: real=%v alias=%v", configuredRuleNameSet(realResolved.EnabledRules), configuredRuleNameSet(alias.EnabledRules))
 			}
 			policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget})
-			if err != nil || len(policies) != 1 || policies[aliasTarget].ServiceRootDirectory != root+"/symlink" {
+			if err != nil || len(policies) != 2 || policies[realTarget] != (config.ProjectPolicy{}) || policies[aliasTarget].ServiceRootDirectory != root+"/symlink" {
 				t.Fatalf("policy gate used an alias instead of its literal owner: %v, %v", policies, err)
 			}
 		})
@@ -276,11 +276,11 @@ func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
 		want        config.ProjectPolicy
 		error       string
 	}{
-		{name: "ordinary project declarations do not project", input: `[{"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"project":["second.json"]}}}]`},
+		{name: "ordinary project uses final declaration", input: `[{"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"project":["second.json"]}}}]`, want: config.ProjectPolicy{ExplicitProject: &config.ProjectDeclaration{Patterns: config.ProjectPaths{"second.json"}, BaseDirectory: "/repo"}}},
 		{name: "unmatched options are neutral", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":"relative","project":true}}}]`},
 		{name: "empty match remains zero", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":false}}}]`},
 		{name: "matched service", input: `[{"languageOptions":{"parserOptions":{"projectService":true}}}]`, want: config.ProjectPolicy{ServiceRootDirectory: "/repo"}},
-		{name: "service false retains explicit declarations", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"projectService":false}}}]`, want: config.ProjectPolicy{DefaultProjectDisabled: true}},
+		{name: "service false does not resurrect unmatched declaration", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"projectService":false}}}]`, want: config.ProjectPolicy{DefaultProjectDisabled: true}},
 		{name: "matched reset", input: `[{"languageOptions":{"parserOptions":{"project":null}}}]`, want: config.ProjectPolicy{ProjectDisabled: true}},
 		{name: "root error includes target", input: `[{"languageOptions":{"parserOptions":{"tsconfigRootDir":"relative"}}}]`, error: "absolute path"},
 	} {
@@ -298,8 +298,68 @@ func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || policies[file] != test.want || (test.want == (config.ProjectPolicy{}) && len(policies) != 0) {
+			_, present := policies[file]
+			if err != nil || !present || len(policies) != 1 || !reflect.DeepEqual(policies[file], test.want) {
 				t.Fatalf("policies=%v error=%v, want %+v", policies, err, test.want)
+			}
+		})
+	}
+}
+
+func TestResolverProjectPoliciesKeepsExplicitGapsPerTarget(t *testing.T) {
+	var entries config.RslintConfig
+	if err := json.Unmarshal([]byte(`[
+		{"rules":{"no-debugger":"error"}},
+		{"files":["typed.ts"],"languageOptions":{"parserOptions":{"project":"project.json"}}},
+		{"files":["cleared.ts"],"languageOptions":{"parserOptions":{"project":null}}}
+	]`), &entries); err != nil {
+		t.Fatal(err)
+	}
+	resolver := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: "/repo"})
+	files := []target.File{
+		targetForTest("/repo/typed.ts", "/repo"),
+		targetForTest("/repo/cleared.ts", "/repo"),
+		targetForTest("/repo/gap.ts", "/repo"),
+	}
+	policies, err := resolver.ProjectPolicies(files)
+	want := map[target.File]config.ProjectPolicy{
+		files[0]: {ExplicitProject: &config.ProjectDeclaration{Patterns: config.ProjectPaths{"project.json"}, BaseDirectory: "/repo"}},
+		files[1]: {ProjectDisabled: true},
+		files[2]: {},
+	}
+	if err != nil || !reflect.DeepEqual(policies, want) {
+		t.Fatalf("policies=%v error=%v, want explicit policies for all targets: %v", policies, err, want)
+	}
+}
+
+func TestResolverProjectPoliciesKeepsComposedOrigins(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	module, invocation := root+"/module", root+"/invocation"
+	for _, replace := range []bool{false, true} {
+		t.Run(strconv.FormatBool(replace), func(t *testing.T) {
+			entries := config.ConfigWithAuthoredPathBase(config.RslintConfig{{
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+			}}, module)
+			inline := config.ConfigEntry{Rules: config.Rules{"no-debugger": "error"}}
+			if replace {
+				inline.LanguageOptions = &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}}
+			}
+			entries = append(entries, config.ConfigWithAuthoredPathBase(config.RslintConfig{inline}, invocation)...)
+			resolver := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: module, DefaultRootDirectory: invocation})
+			file := targetForTest(tspath.ResolvePath(invocation, "target.ts"), module)
+			policies, err := resolver.ProjectPolicies([]target.File{file})
+			wantBase := module
+			if replace {
+				wantBase = invocation
+			}
+			want := config.ProjectPolicy{ExplicitProject: &config.ProjectDeclaration{Patterns: config.ProjectPaths{"./tsconfig.json"}, BaseDirectory: wantBase}}
+			if err != nil || !reflect.DeepEqual(policies[file], want) {
+				t.Fatalf("policy=%+v error=%v, want %+v", policies[file], err, want)
+			}
+			bound := resolver.WithSourceMappings(map[string]target.File{tspath.ResolvePath(root, "source-alias.ts"): file}, nil, true)
+			boundPolicies, err := bound.ProjectPolicies([]target.File{file})
+			if err != nil || !reflect.DeepEqual(boundPolicies, policies) {
+				t.Fatalf("source binding changed project origin: %v, %v; want %v", boundPolicies, err, policies)
 			}
 		})
 	}

@@ -36,9 +36,10 @@ type configTargetCacheKey struct {
 // It interns files with the same exact matched-entry shape for the resolver's
 // lifetime and is safe for concurrent use by native and plugin lint workers.
 type FileConfigResolver struct {
-	config         RslintConfig
-	catalog        *rule.Catalog
-	targetResolver *configTargetResolver
+	config          RslintConfig
+	configDirectory string
+	catalog         *rule.Catalog
+	targetResolver  *configTargetResolver
 
 	filePlans  publishOnceCache[configTargetCacheKey, *configTargetResolution]
 	shapePlans publishOnceCache[configMatchKey, *effectiveConfigPlan]
@@ -63,6 +64,7 @@ func NewFileConfigResolverWithFS(
 ) *FileConfigResolver {
 	return newFileConfigResolver(
 		config,
+		cwd,
 		catalog,
 		newConfigTargetResolver(config, cwd, fsys),
 	)
@@ -89,6 +91,7 @@ func NewFileConfigResolverWithPathSpaces(
 	}
 	return newFileConfigResolver(
 		config,
+		configDirectory,
 		catalog,
 		matcher.resolver,
 	), nil
@@ -96,6 +99,7 @@ func NewFileConfigResolverWithPathSpaces(
 
 func newFileConfigResolver(
 	config RslintConfig,
+	configDirectory string,
 	catalog *rule.Catalog,
 	targetResolver *configTargetResolver,
 ) *FileConfigResolver {
@@ -103,9 +107,10 @@ func newFileConfigResolver(
 		panic("rule catalog is required")
 	}
 	return &FileConfigResolver{
-		config:         config,
-		catalog:        catalog,
-		targetResolver: targetResolver,
+		config:          config,
+		configDirectory: configDirectory,
+		catalog:         catalog,
+		targetResolver:  targetResolver,
 	}
 }
 
@@ -198,7 +203,7 @@ func (r *FileConfigResolver) resolutionForTarget(
 		}
 
 		resolution.plan = r.shapePlans.getOrInit(decision.key, func() *effectiveConfigPlan {
-			mergedConfig := r.config.mergeConfigEntries(decision.key)
+			mergedConfig := r.config.mergeConfigEntries(decision.key, r.configDirectory)
 			return &effectiveConfigPlan{
 				mergedConfig: mergedConfig,
 				enabledRules: ConfiguredRules(r.catalog, mergedConfig),

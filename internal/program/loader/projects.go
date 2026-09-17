@@ -29,6 +29,8 @@ const (
 )
 
 type ProjectBuildRequest struct {
+	// Configs retains the program-wide declaration range for AllDeclared.
+	// Ordinary lint candidates come exclusively from Policies.
 	Configs        map[string]rslintconfig.RslintConfig
 	Targets        target.Plan
 	Policies       map[target.File]rslintconfig.ProjectPolicy
@@ -81,10 +83,62 @@ func exactPathID(filePath string) string {
 }
 
 func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
-	configMap := request.Configs
-	if request.Scope != AllDeclared {
-		configMap = configsForActiveOwners(configMap, request.Targets)
+	plan := projectPlan{}
+	if request.Scope == AllDeclared {
+		plan = buildDeclaredProjectPlan(request, fsys)
+		if plan.terminalErr != nil {
+			return plan
+		}
 	}
+	if len(request.Targets.Files) == 0 {
+		return plan
+	}
+	// The complete type-check set and a lint target's candidates are distinct.
+	// Reuse an existing explicit project when present, but always publish an
+	// override (including empty) so unrelated targets cannot borrow its types.
+	programByTsconfig := make(map[string]int, len(plan.specs))
+	for index, spec := range plan.specs {
+		programByTsconfig[exactPathID(spec.tsconfigPath)] = index
+	}
+	plan.targetProjects = make(map[target.File][]int, len(request.Targets.Files))
+	indexesByPolicy := make(map[rslintconfig.ProjectPolicy][]int)
+	for _, file := range request.Targets.Files {
+		policy, resolved := request.Policies[file]
+		if !resolved {
+			plan.terminalErr = fmt.Errorf("missing effective project policy for %q", file.Path)
+			return plan
+		}
+		indexes, cached := indexesByPolicy[policy]
+		if !cached {
+			paths, err := rslintconfig.ResolveProjectPaths(policy, fsys)
+			if err != nil {
+				plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", file.Path, err)
+				return plan
+			}
+			for _, path := range paths {
+				pathID := exactPathID(path)
+				index, exists := programByTsconfig[pathID]
+				if !exists {
+					index = len(plan.specs)
+					programByTsconfig[pathID] = index
+					plan.specs = append(plan.specs, projectSpec{
+						tsconfigPath: path, programCwd: tspath.GetDirectoryPath(path),
+					})
+				}
+				indexes = append(indexes, index)
+			}
+			indexesByPolicy[policy] = indexes
+		}
+		plan.targetProjects[file] = indexes
+	}
+	return plan
+}
+
+// buildDeclaredProjectPlan preserves the program-wide checking range. Raw
+// declarations and its historical default project are intentionally independent
+// of the effective per-file candidates added by buildProjectPlan.
+func buildDeclaredProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
+	configMap := request.Configs
 	if len(configMap) == 0 {
 		return projectPlan{}
 	}
@@ -97,14 +151,9 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 
 	plan := projectPlan{}
 	programByTsconfig := make(map[string]int)
-	addPaths := func(owner string, paths []string, ordinary bool) []int {
-		var indexes []int
-		if !ordinary {
-			indexes = make([]int, 0, len(paths))
-		}
+	addPaths := func(owner string, paths []string) {
 		ownerID := exactPathID(owner)
 		for order, path := range paths {
-			path = tspath.NormalizePath(path)
 			pathID := exactPathID(path)
 			index, exists := programByTsconfig[pathID]
 			if !exists {
@@ -114,31 +163,11 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 					tsconfigPath: path, programCwd: tspath.GetDirectoryPath(path), configOrders: configOrders{},
 				})
 			}
-			if ordinary {
-				if _, associated := plan.specs[index].configOrders[ownerID]; !associated {
-					plan.specs[index].configOrders[ownerID] = order
-				}
-			}
-			if !ordinary {
-				indexes = append(indexes, index)
+			if _, associated := plan.specs[index].configOrders[ownerID]; !associated {
+				plan.specs[index].configOrders[ownerID] = order
 			}
 		}
-		return indexes
 	}
-	// No new project options need no per-target preparation. In particular,
-	// AllDeclared keeps its original path when no target discovery was needed.
-	if len(request.Policies) == 0 {
-		for _, owner := range configDirs {
-			paths, err := rslintconfig.ResolveTsConfigPaths(configMap[owner], owner, fsys)
-			if err != nil {
-				plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", owner, err)
-				return plan
-			}
-			addPaths(owner, paths, true)
-		}
-		return plan
-	}
-
 	type pathContext struct {
 		root            string
 		defaultDisabled bool
@@ -147,29 +176,20 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 	for _, file := range request.Targets.Files {
 		targetsByOwner[file.ConfigDirectory] = append(targetsByOwner[file.ConfigDirectory], file)
 	}
-	plan.targetProjects = make(map[target.File][]int, len(request.Policies))
 	for _, configDir := range configDirs {
-		contexts := make(map[pathContext][]target.File)
+		contexts := make(map[pathContext]struct{})
 		for _, file := range targetsByOwner[configDir] {
 			policy := request.Policies[file]
 			key := pathContext{root: policy.TSConfigRootDirOverride, defaultDisabled: policy.DefaultProjectDisabled}
 			if policy.ServiceRootDirectory != "" || policy.ProjectDisabled {
-				plan.targetProjects[file] = nil
-				if request.Scope != AllDeclared {
-					continue
-				}
 				// Type checking retains raw explicit declarations at this target's
 				// root, but a service/clear target never requests an implicit project.
 				key.defaultDisabled = true
-				if _, exists := contexts[key]; !exists {
-					contexts[key] = nil
-				}
-				continue
 			}
-			contexts[key] = append(contexts[key], file)
+			contexts[key] = struct{}{}
 		}
-		if len(targetsByOwner[configDir]) == 0 && request.Scope == AllDeclared {
-			contexts[pathContext{}] = nil
+		if len(contexts) == 0 {
+			contexts[pathContext{}] = struct{}{}
 		}
 		keys := make([]pathContext, 0, len(contexts))
 		for key := range contexts {
@@ -189,13 +209,7 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 				plan.terminalErr = fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
 				return plan
 			}
-			ordinary := key == (pathContext{})
-			indexes := addPaths(configDir, paths, ordinary)
-			if !ordinary {
-				for _, file := range contexts[key] {
-					plan.targetProjects[file] = indexes
-				}
-			}
+			addPaths(configDir, paths)
 		}
 	}
 	return plan

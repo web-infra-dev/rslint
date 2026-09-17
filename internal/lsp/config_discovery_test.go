@@ -664,6 +664,42 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	}
 }
 
+func TestPrepareDiscoveredConfigSnapshotDefersProjectPathsUntilDocumentMatch(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	fsys := bundled.WrapFS(osvfs.FS())
+	catalog := &discovery.ConfigCatalog{
+		TransactionID: "document-projects",
+		Configs: map[string]config.RslintConfig{root: {
+			{Rules: config.Rules{"no-var": "error"}},
+			{
+				Files: []string{"**/*.ts"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+					Project: config.ProjectPaths{"./missing.json"},
+				}},
+			},
+		}},
+	}
+	s := newTestServer()
+	s.cwd, s.fs = root, fsys
+	prepared, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
+	if err != nil {
+		t.Fatalf("unmatched project prevented config preparation: %v", err)
+	}
+	completed, err := completeDiscoveredConfigSnapshot(prepared, nil, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.commitDiscoveredConfigSnapshot(context.Background(), completed)
+	javascript := s.documentLintSnapshot(documentURIFromPath(tspath.ResolvePath(root, "script.js")))
+	if !javascript.configResolved || javascript.unavailable || javascript.projectPolicyError != nil || len(javascript.typeScriptConfigPaths) != 0 {
+		t.Fatalf("unmatched project affected JavaScript snapshot: %+v", javascript)
+	}
+	typescript := s.documentLintSnapshot(documentURIFromPath(tspath.ResolvePath(root, "source.ts")))
+	if typescript.projectPolicyError == nil || !strings.Contains(typescript.projectPolicyError.Error(), "missing.json") {
+		t.Fatalf("matched missing project error = %v", typescript.projectPolicyError)
+	}
+}
+
 func TestCompleteDiscoveredConfigSnapshotBuildsOneResolverPerOwner(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	child := tspath.NormalizePath(filepath.Join(root, "packages", "app"))

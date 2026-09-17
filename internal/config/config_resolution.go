@@ -96,9 +96,10 @@ func entryIgnorePatternsAt(patterns [][]IgnorePattern, index int, entry ConfigEn
 	return ParseIgnorePatterns(entry.Ignores)
 }
 
-// mergeConfigEntries performs only the path-independent half of flat-config
-// resolution. key must come from matchConfigEntries for this config.
-func (config RslintConfig) mergeConfigEntries(key configMatchKey) *MergedConfig {
+// mergeConfigEntries merges the matched entries and retains the authored base
+// of the effective project value. It does not expand or read project paths.
+// key must come from matchConfigEntries for this config.
+func (config RslintConfig) mergeConfigEntries(key configMatchKey, configDirectory string) *MergedConfig {
 	merged := &MergedConfig{
 		Rules:   make(map[string]*RuleConfig),
 		Plugins: make(map[string]struct{}),
@@ -136,6 +137,16 @@ func (config RslintConfig) mergeConfigEntries(key configMatchKey) *MergedConfig 
 		}
 
 		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
+		if entry.LanguageOptions != nil && entry.LanguageOptions.ParserOptions != nil {
+			options := entry.LanguageOptions.ParserOptions
+			if options.Project != nil {
+				merged.project = &ProjectDeclaration{
+					Patterns: options.Project, BaseDirectory: configEntryBaseDirectory(entry, configDirectory),
+				}
+			} else if options.ProjectDisabled || options.projectAutomatic {
+				merged.project = nil
+			}
+		}
 	}
 
 	return merged
