@@ -82,6 +82,26 @@ func exactPathID(filePath string) string {
 	return rslintconfig.ExactPathID(filePath)
 }
 
+type projectPolicyID struct {
+	options       rslintconfig.ProjectPolicy
+	baseDirectory string
+	firstPattern  *string
+	patternCount  int
+}
+
+func projectPolicyIdentity(policy rslintconfig.ProjectPolicy) projectPolicyID {
+	key := projectPolicyID{options: policy}
+	key.options.ExplicitProject = nil
+	if declaration := policy.ExplicitProject; declaration != nil {
+		key.baseDirectory = declaration.BaseDirectory
+		key.patternCount = len(declaration.Patterns)
+		if key.patternCount > 0 {
+			key.firstPattern = &declaration.Patterns[0]
+		}
+	}
+	return key
+}
+
 func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 	plan := projectPlan{}
 	if request.Scope == AllDeclared {
@@ -101,14 +121,18 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 		programByTsconfig[exactPathID(spec.tsconfigPath)] = index
 	}
 	plan.targetProjects = make(map[target.File][]int, len(request.Targets.Files))
-	indexesByPolicy := make(map[rslintconfig.ProjectPolicy][]int)
+	// Different rule matches can wrap the same immutable authored project
+	// patterns in separate declarations. Reuse their expansion and candidate
+	// slice within this request, while retaining every path/policy context.
+	indexesByPolicy := make(map[projectPolicyID][]int)
 	for _, file := range request.Targets.Files {
 		policy, resolved := request.Policies[file]
 		if !resolved {
 			plan.terminalErr = fmt.Errorf("missing effective project policy for %q", file.Path)
 			return plan
 		}
-		indexes, cached := indexesByPolicy[policy]
+		key := projectPolicyIdentity(policy)
+		indexes, cached := indexesByPolicy[key]
 		if !cached {
 			paths, err := rslintconfig.ResolveProjectPaths(policy, fsys)
 			if err != nil {
@@ -127,7 +151,7 @@ func buildProjectPlan(request ProjectBuildRequest, fsys vfs.FS) projectPlan {
 				}
 				indexes = append(indexes, index)
 			}
-			indexesByPolicy[policy] = indexes
+			indexesByPolicy[key] = indexes
 		}
 		plan.targetProjects[file] = indexes
 	}

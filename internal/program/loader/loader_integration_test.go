@@ -493,6 +493,119 @@ func TestBuildProjectsDeduplicatesExplicitProjectsAcrossOwners(t *testing.T) {
 	}
 }
 
+func TestBuildProjectPlanReusesCandidatesAcrossRuleConfigs(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	for _, separateRules := range []bool{false, true} {
+		t.Run(strconv.FormatBool(separateRules), func(t *testing.T) {
+			config := projectConfig("a/tsconfig*.json")
+			if separateRules {
+				config = append(config, rslintconfig.ConfigEntry{
+					Files: []string{"**/disabled.ts"}, Rules: rslintconfig.Rules{"no-debugger": "error"},
+				})
+			}
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			plan, err := target.Resolve(target.Request{
+				Config: config, ConfigDirectory: dir, FS: fsys,
+				Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "a/src/disabled.ts")},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			resolver := configLint.NewResolver(configLint.ResolverOptions{
+				Config: config, ConfigDirectory: dir, FS: fsys, PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+			})
+			policies, err := resolver.ProjectPolicies(plan.Files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			counting := &projectGlobCountingFS{FS: fsys}
+			projects := buildProjectPlan(ProjectBuildRequest{Targets: plan, Policies: policies, Scope: Targeted}, counting)
+			if projects.terminalErr != nil || len(projects.specs) != 1 {
+				t.Fatalf("project plan: count=%d, error=%v", len(projects.specs), projects.terminalErr)
+			}
+			if counting.calls != 1 {
+				t.Errorf("expanded one declaration %d times across rule configs, want 1", counting.calls)
+			}
+			groups := groupTargetsByProjects(plan.Files, projects.targetProjects, func(string) []int {
+				t.Fatal("effective candidates must not fall back to owner declarations")
+				return nil
+			})
+			if len(groups) != 1 || len(groups[0].targetIndexes) != 2 {
+				t.Fatalf("one project request split into target groups: %+v", groups)
+			}
+		})
+	}
+}
+
+type projectGlobCountingFS struct {
+	vfs.FS
+	calls int
+}
+
+func (fsys *projectGlobCountingFS) DirectoryExists(path string) bool {
+	fsys.calls++
+	return fsys.FS.DirectoryExists(path)
+}
+
+func TestBuildProjectPlanKeepsProjectPathContextsSeparate(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	patterns := rslintconfig.ProjectPaths{"tsconfig*.json"}
+	base := tspath.ResolvePath(dir, "a")
+	otherBase := tspath.ResolvePath(dir, "b")
+	first := rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: patterns, BaseDirectory: base}}
+	longerPatterns := rslintconfig.ProjectPaths{"a/tsconfig.json", "b/tsconfig.json"}
+	for _, test := range []struct {
+		name          string
+		first, second rslintconfig.ProjectPolicy
+		wantSecond    []string
+	}{
+		{
+			name: "authored base", first: first,
+			second:     rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: patterns, BaseDirectory: otherBase}},
+			wantSecond: []string{tspath.ResolvePath(otherBase, "tsconfig.json")},
+		},
+		{
+			name: "root override", first: first,
+			second:     rslintconfig.ProjectPolicy{ExplicitProject: first.ExplicitProject, TSConfigRootDirOverride: otherBase},
+			wantSecond: []string{tspath.ResolvePath(otherBase, "tsconfig.json")},
+		},
+		{
+			name: "disabled", first: first,
+			second: rslintconfig.ProjectPolicy{ExplicitProject: first.ExplicitProject, ProjectDisabled: true},
+		},
+		{
+			name:       "shared patterns with different lengths",
+			first:      rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: longerPatterns[:1], BaseDirectory: dir}},
+			second:     rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: longerPatterns, BaseDirectory: dir}},
+			wantSecond: []string{tspath.ResolvePath(base, "tsconfig.json"), tspath.ResolvePath(otherBase, "tsconfig.json")},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			files := []target.File{
+				testLintTarget(fsys, dir, tspath.ResolvePath(base, "src/file.ts")),
+				testLintTarget(fsys, dir, tspath.ResolvePath(otherBase, "src/file.ts")),
+			}
+			plan := buildProjectPlan(ProjectBuildRequest{
+				Targets: target.Plan{Files: files}, Scope: Targeted,
+				Policies: map[target.File]rslintconfig.ProjectPolicy{files[0]: test.first, files[1]: test.second},
+			}, fsys)
+			if plan.terminalErr != nil {
+				t.Fatal(plan.terminalErr)
+			}
+			for i, want := range [][]string{{tspath.ResolvePath(base, "tsconfig.json")}, test.wantSecond} {
+				var paths []string
+				for _, index := range plan.targetProjects[files[i]] {
+					paths = append(paths, plan.specs[index].tsconfigPath)
+				}
+				if !slices.Equal(paths, want) {
+					t.Errorf("target %d projects=%v, want %v", i, paths, want)
+				}
+			}
+		})
+	}
+}
+
 func TestBuildProjectsPreservesRawDeclarationsAfterEmptyArray(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
 	config := rslintconfig.RslintConfig{
