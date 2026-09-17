@@ -246,7 +246,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-export-from': 'error', // not implemented
     // 'unicorn/prefer-flat-math-min-max': 'error', // not implemented
     // 'unicorn/prefer-get-or-insert-computed': 'error', // not implemented
-    // 'unicorn/prefer-global-number-constants': 'error', // not implemented
+    'unicorn/prefer-global-number-constants': 'error',
     // 'unicorn/prefer-global-this': 'error', // not implemented
     // 'unicorn/prefer-group-by': 'error', // not implemented
     // 'unicorn/prefer-has-check': 'error', // not implemented
@@ -278,7 +278,11 @@ const recommended: RslintConfigEntry = {
     'unicorn/prefer-node-protocol': 'error',
     // 'unicorn/prefer-number-coercion': 'error', // not implemented
     // 'unicorn/prefer-number-is-safe-integer': 'error', // not implemented
-    'unicorn/prefer-number-properties': 'error',
+    // Avoid reversing the global numeric-constant preference on the next fix pass.
+    'unicorn/prefer-number-properties': [
+      'error',
+      { checkNaN: false, checkInfinity: false },
+    ],
     // 'unicorn/prefer-object-define-properties': 'error', // not implemented
     // 'unicorn/prefer-object-destructuring-defaults': 'error', // not implemented
     // 'unicorn/prefer-object-from-entries': 'error', // not implemented
