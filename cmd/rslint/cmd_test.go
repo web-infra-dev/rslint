@@ -1142,10 +1142,14 @@ func TestHandleLintCommandConfigCatalogSelection(t *testing.T) {
 	})
 }
 
-func TestHandleLintCommandPreservesProjectConstructionScope(t *testing.T) {
-	dir := t.TempDir()
+func TestHandleLintCommandBuildsOnlySelectedProjects(t *testing.T) {
+	parent := tspath.NormalizePath(t.TempDir())
+	dir := tspath.ResolvePath(parent, "pkg")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	files := map[string]string{
-		"target.ts":            `export const target = 1;`,
+		"target.ts":            "debugger;\nexport const target = 1;\n",
 		"import-main.ts":       `import "./target";`,
 		"unrelated.ts":         `export const unrelated = 1;`,
 		"tsconfig-import.json": `{"files":["import-main.ts"]}`,
@@ -1157,7 +1161,6 @@ func TestHandleLintCommandPreservesProjectConstructionScope(t *testing.T) {
 			t.Fatalf("write %s: %v", name, err)
 		}
 	}
-	dir = tspath.NormalizePath(dir)
 	targetPath := tspath.ResolvePath(dir, "target.ts")
 	config := rslintconfig.RslintConfig{{Ignores: []string{"import-main.ts", "unrelated.ts"}}, {
 		Files: []string{"**/*.ts"},
@@ -1168,34 +1171,62 @@ func TestHandleLintCommandPreservesProjectConstructionScope(t *testing.T) {
 				"./tsconfig-later.json",
 			},
 		}},
+		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
-	for _, broad := range []bool{false, true} {
-		t.Run(fmt.Sprintf("broad=%t", broad), func(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		cwd             string
+		allowFiles      []string
+		allowDirs       []string
+		wantLaterConfig bool
+	}{
+		{name: "implicit cwd", cwd: dir, wantLaterConfig: true},
+		{name: "explicit cwd", cwd: dir, allowDirs: []string{dir}, wantLaterConfig: true},
+		{name: "file", cwd: dir, allowFiles: []string{targetPath}},
+		{name: "directory from parent", cwd: parent, allowDirs: []string{dir}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			fsys := &commandReadCountingFS{
 				FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 				reads: make(map[string]int),
 			}
 			args := lintArgs{
 				ConfigCatalog:  explicitConfigCatalogForTest(dir, config),
-				Format:         "default",
+				AllowFiles:     test.allowFiles,
+				AllowDirs:      test.allowDirs,
+				Format:         "jsonline",
 				NoColor:        true,
 				SingleThreaded: true,
 				FS:             fsys,
 			}
-			if !broad {
-				args.AllowFiles = []string{targetPath}
+			code, stdout, stderr := runLintCommandForTest(t, test.cwd, args)
+			if code != 1 || stderr != "" {
+				t.Fatalf("lint result: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 			}
-			code, stdout, stderr := runLintCommandForTest(t, dir, args)
-			if code != 0 {
-				t.Fatalf("lint failed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			relativeTarget, err := filepath.Rel(test.cwd, targetPath)
+			if err != nil {
+				t.Fatal(err)
 			}
-			// Both scopes lint only target.ts. Broad loading retains its eager
-			// project strategy; focused loading screens roots before imports.
-			for _, name := range []string{"import-main.ts", "tsconfig-later.json"} {
-				got := fsys.readCount(tspath.ResolvePath(dir, name))
-				if (got > 0) != broad {
-					t.Fatalf("%s reads=%d, broad=%t", name, got, broad)
+			want := fmt.Sprintf(`{"ruleName":"no-debugger","message":"Unexpected 'debugger' statement.","filePath":%q,"range":{"start":{"line":1,"column":1},"end":{"line":1,"column":10}},"severity":"error"}`+"\n", tspath.NormalizePath(relativeTarget))
+			if stdout != want {
+				t.Fatalf("selected target diagnostics = %q, want %q", stdout, want)
+			}
+			// All invocations lint target.ts through its directly owning project,
+			// without building projects whose sources are outside the lint scope.
+			for _, name := range []string{"target.ts", "tsconfig-direct.json"} {
+				if got := fsys.readCount(tspath.ResolvePath(dir, name)); got == 0 {
+					t.Fatalf("%s was not read", name)
 				}
+			}
+			for _, name := range []string{"import-main.ts", "unrelated.ts"} {
+				if got := fsys.readCount(tspath.ResolvePath(dir, name)); got != 0 {
+					t.Fatalf("unselected source %s reads=%d, want 0", name, got)
+				}
+			}
+			// Broad invocations still validate all declared project metadata;
+			// focused invocations stop once the target has a direct owner.
+			if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); (got > 0) != test.wantLaterConfig {
+				t.Fatalf("later project config reads=%d, want read=%t", got, test.wantLaterConfig)
 			}
 		})
 	}
