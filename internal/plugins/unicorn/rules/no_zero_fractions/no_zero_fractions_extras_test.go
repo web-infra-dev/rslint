@@ -109,7 +109,6 @@ func TestNoZeroFractionsExtras(t *testing.T) {
 func TestNoZeroFractionsEditDemand(t *testing.T) {
 	for _, testCase := range []struct {
 		source, output string
-		suggestions    []struct{ messageID, description, output string }
 	}{
 		{source: "const foo = 1.0", output: "const foo = 1"},
 		{source: "function foo(){return.0}", output: "function foo(){return 0}"},
@@ -152,6 +151,15 @@ func TestNoZeroFractionsEditDemand(t *testing.T) {
 				if wantFix && !reflect.DeepEqual(diagnostic.FixesPtr, all.FixesPtr) {
 					t.Errorf("demand %d changed autofix artifacts", demand)
 				}
+				if diagnostic.Suggestions != nil {
+					t.Errorf("demand %d produced suggestions for an autofix-only rule", demand)
+				}
+			}
+
+			// ApplyRuleFixes sorts fix slices in place. Finish every artifact
+			// comparison first so map iteration cannot change the baseline.
+			for demand, diagnostic := range diagnostics {
+				wantFix := demand == rule.EditDemandAutofix || demand == rule.EditDemandAll
 				expectedOutput := testCase.source
 				if wantFix {
 					expectedOutput = testCase.output
@@ -159,26 +167,6 @@ func TestNoZeroFractionsEditDemand(t *testing.T) {
 				output, _, fixed := linter.ApplyRuleFixes(testCase.source, []rule.RuleDiagnostic{diagnostic})
 				if output != expectedOutput || fixed != wantFix {
 					t.Errorf("demand %d: unexpected autofix %q", demand, output)
-				}
-				wantSuggestions := len(testCase.suggestions) > 0 && (demand == rule.EditDemandSuggestion || demand == rule.EditDemandAll)
-				if !wantSuggestions {
-					if diagnostic.Suggestions != nil {
-						t.Errorf("demand %d produced suggestions without demand", demand)
-					}
-					continue
-				}
-				if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != len(testCase.suggestions) || !reflect.DeepEqual(diagnostic.Suggestions, all.Suggestions) {
-					t.Fatalf("demand %d: inconsistent suggestions", demand)
-				}
-				for index, expected := range testCase.suggestions {
-					suggestion := (*diagnostic.Suggestions)[index]
-					if suggestion.Message.Id != expected.messageID || suggestion.Message.Description != expected.description {
-						t.Errorf("demand %d: wrong suggestion message", demand)
-					}
-					output, _, fixed := linter.ApplyRuleFixes(testCase.source, (*diagnostic.Suggestions)[index:index+1])
-					if !fixed || output != expected.output {
-						t.Errorf("demand %d: unexpected suggestion %q", demand, output)
-					}
 				}
 			}
 		})
