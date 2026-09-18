@@ -284,7 +284,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-object-from-entries': 'error', // not implemented
     // 'unicorn/prefer-object-iterable-methods': 'error', // not implemented
     // 'unicorn/prefer-observer-apis': 'error', // not implemented
-    // 'unicorn/prefer-optional-catch-binding': 'error', // not implemented
+    'unicorn/prefer-optional-catch-binding': 'error',
     // 'unicorn/prefer-path2d': 'error', // not implemented
     // 'unicorn/prefer-private-class-fields': 'error', // not implemented
     // 'unicorn/prefer-promise-try': 'error', // not implemented
