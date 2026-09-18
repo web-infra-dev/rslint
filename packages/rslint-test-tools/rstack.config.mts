@@ -676,6 +676,7 @@ define.test({
     './tests/rstest/rules/no-conditional-in-test.test.ts',
     './tests/rstest/rules/no-conditional-tests.test.ts',
     './tests/rstest/rules/no-disabled-tests.test.ts',
+    './tests/rstest/rules/no-duplicate-hooks.test.ts',
     './tests/rstest/rules/no-focused-tests.test.ts',
     './tests/rstest/rules/no-hooks.test.ts',
     './tests/rstest/rules/no-identical-title.test.ts',
