@@ -16,6 +16,11 @@ var NoUnnecessarySliceEndRule = rule.Rule{
 			if !ok {
 				return
 			}
+			if ctx.TypeChecker != nil &&
+				unicornutil.IsKnownNonStringType(ctx, call.Object) &&
+				unicornutil.IsKnownNonIndexedCollection(ctx, call.Object) {
+				return
+			}
 			argumentName := "end"
 			unicornutil.ReportUnnecessaryLengthArgument(ctx, call, "no-unnecessary-slice-end", argumentName)
 		}}

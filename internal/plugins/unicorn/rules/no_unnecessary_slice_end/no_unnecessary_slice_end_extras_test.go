@@ -30,6 +30,7 @@ func TestNoUnnecessarySliceEndExtras(t *testing.T) {
 		{Code: "function f(Infinity) { return a.slice(1, Infinity); }", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "function f(Number) { return a.slice(1, Number.POSITIVE_INFINITY); }", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "a.slice(1, Infinity);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly", "Infinity": "off"}},
+		{Code: "function f(a: Set<number>) { return a.slice(1, Infinity); }", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 	}, []rule_tester.InvalidTestCase{
 		{Code: "const x = a.slice(1, (a.length));", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"const x = a.slice(1);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-unnecessary-slice-end", Message: "Passing `a.length` as the `end` argument is unnecessary.", Line: 1, Column: 23, EndLine: 1, EndColumn: 31, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
@@ -63,9 +64,6 @@ func TestNoUnnecessarySliceEndExtras(t *testing.T) {
 		}},
 		{Code: "function f(a: string) { return a.slice(1, a.length); }", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"function f(a: string) { return a.slice(1); }"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-unnecessary-slice-end", Message: "Passing `a.length` as the `end` argument is unnecessary.", Line: 1, Column: 43, EndLine: 1, EndColumn: 51, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
-		}},
-		{Code: "function f(a: Set<number>) { return a.slice(1, Infinity); }", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"function f(a: Set<number>) { return a.slice(1); }"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "no-unnecessary-slice-end", Message: "Passing `Infinity` as the `end` argument is unnecessary.", Line: 1, Column: 48, EndLine: 1, EndColumn: 56, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
 		{Code: "(a satisfies number[]).slice(1, (a satisfies number[]).length);", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"(a satisfies number[]).slice(1);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-unnecessary-slice-end", Message: "Passing `….length` as the `end` argument is unnecessary.", Line: 1, Column: 33, EndLine: 1, EndColumn: 62, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
@@ -133,4 +131,43 @@ func TestNoUnnecessarySliceEndArtifactsFollowDemand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNoUnnecessarySliceEndReviewRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_unnecessary_slice_end.NoUnnecessarySliceEndRule, []rule_tester.ValidTestCase{
+		{
+			Code:     "class Box { length = 2; slice(start: number, end = 99) { return end; } } const value = new Box(); value.slice(1, value.length);",
+			FileName: "review.ts",
+		},
+		{
+			Code:     "Number = {POSITIVE_INFINITY: 2}; [0, 1, 2].slice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "let i = 0; const first = [0,1,2], second = [0]; const obj = { get a() { return i++ ? second : first; } }; obj.a.slice(1, obj.a.length);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "let a = [0,1,2], b = [0]; a.slice((a = b, 1), a.length);",
+			FileName: "review.js",
+		},
+	}, []rule_tester.InvalidTestCase{
+
+		{
+			Code:     "foo[-0].slice(1, foo[0].length)",
+			FileName: "review.js",
+			Output:   []string{"foo[-0].slice(1)"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "no-unnecessary-slice-end",
+			}},
+		},
+		{
+			Code:     `foo["a" + "b"].slice(1, foo.ab.length)`,
+			FileName: "review.js",
+			Output:   []string{`foo["a" + "b"].slice(1)`},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "no-unnecessary-slice-end",
+			}},
+		},
+	})
 }
