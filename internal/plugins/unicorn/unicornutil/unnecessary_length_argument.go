@@ -131,7 +131,10 @@ func isRepeatableReference(ctx rule.RuleContext, node *ast.Node) bool {
 	case ast.KindIdentifier, ast.KindThisKeyword:
 		return true
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		if accessHasGetter(ctx, node) {
+		// Without type information we cannot distinguish a data property from a
+		// getter. Re-evaluating a member chain can therefore change which object
+		// receives the splice, so only checker-backed member paths are repeatable.
+		if ctx.TypeChecker == nil || accessHasGetter(ctx, node) {
 			return false
 		}
 		return isRepeatableReference(ctx, utils.AccessExpressionObject(node))

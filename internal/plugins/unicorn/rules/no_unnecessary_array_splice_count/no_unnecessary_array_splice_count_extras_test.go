@@ -3,13 +3,20 @@
 package no_unnecessary_array_splice_count_test
 
 import (
+	"path/filepath"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"reflect"
 	"testing"
 )
@@ -198,4 +205,57 @@ func TestNoUnnecessaryArraySpliceCountReviewRegressions(t *testing.T) {
 			FileName: "review.js",
 		},
 	}, []rule_tester.InvalidTestCase{})
+}
+
+func TestNoUnnecessaryArraySpliceCountProjectFalseGetterReceiver(t *testing.T) {
+	code := "let i = 0; const first = [0,1,2], second = [0]; const obj = { get a() { return i++ ? second : first; } }; obj.a.splice(1, obj.a.length);"
+	diagnostics := lintNoUnnecessaryArraySpliceCountSourceOnly(t, code)
+	if len(diagnostics) != 0 {
+		t.Fatalf("project:false diagnostics = %d, want 0: %+v", len(diagnostics), diagnostics)
+	}
+}
+
+func lintNoUnnecessaryArraySpliceCountSourceOnly(t *testing.T, code string) []rule.RuleDiagnostic {
+	t.Helper()
+	dir := tspath.NormalizePath(t.TempDir())
+	fileName := tspath.NormalizePath(filepath.Join(dir, "file.js"))
+	fs := utils.NewOverlayVFS(bundled.WrapFS(osvfs.FS()), map[string]string{fileName: code})
+	program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames:   []string{fileName},
+		Host:            utils.CreateCompilerHost(dir, fs),
+		CompilerOptions: &core.CompilerOptions{Target: core.ScriptTargetESNext},
+		SingleThreaded:  true,
+	})
+	if err != nil {
+		t.Fatalf("create project:false program: %v", err)
+	}
+
+	if program.CanProvideTypeChecker(program.SourceFiles()[0]) {
+		t.Fatal("project:false fixture unexpectedly received a TypeChecker")
+	}
+
+	diagnostics := []rule.RuleDiagnostic{}
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program: program,
+		File:    fileName,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name:     no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule.Name,
+				Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != nil {
+						t.Fatal("project:false fixture unexpectedly received a TypeChecker")
+					}
+					return no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule.Run(ctx, nil)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{
+			Demand: rule.EditDemandAutofix,
+			Report: func(diagnostic rule.RuleDiagnostic) {
+				diagnostics = append(diagnostics, diagnostic)
+			},
+		},
+	})
+	return diagnostics
 }
