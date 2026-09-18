@@ -185,7 +185,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-continue': 'error', // not implemented
     // 'unicorn/no-useless-delete-check': 'error', // not implemented
     // 'unicorn/no-useless-else': 'error', // not implemented
-    // 'unicorn/no-useless-error-capture-stack-trace': 'error', // not implemented
+    'unicorn/no-useless-error-capture-stack-trace': 'error',
     // 'unicorn/no-useless-fallback-in-spread': 'error', // not implemented
     // 'unicorn/no-useless-iterator-to-array': 'error', // not implemented
     // 'unicorn/no-useless-length-check': 'error', // not implemented
