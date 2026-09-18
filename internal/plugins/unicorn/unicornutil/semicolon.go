@@ -88,6 +88,15 @@ func NeedsSemicolonBefore(
 				ast.KindArrowFunction, ast.KindClassExpression,
 				ast.KindExpressionWithTypeArguments, ast.KindNonNullExpression:
 				return true
+			case ast.KindNewExpression:
+				// tsgo stores explicit type arguments directly on NewExpression.
+				// A generic construction without an argument list can therefore end
+				// at the closing `>` and absorb a following parenthesized line.
+				newExpression := previousNode.AsNewExpression()
+				if newExpression != nil && newExpression.TypeArguments != nil &&
+					len(newExpression.TypeArguments.Nodes) > 0 {
+					return true
+				}
 			}
 		}
 		return false
