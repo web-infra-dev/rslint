@@ -42,6 +42,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
@@ -58,6 +59,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
