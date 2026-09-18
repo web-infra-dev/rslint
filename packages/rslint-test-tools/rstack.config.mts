@@ -720,6 +720,9 @@ define.test({
     './tests/eslint-plugin-jest/rules/valid-mock-module-path.test.ts',
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
+    // rslim
+    './tests/rslim/rules/require-dynamic-import-entry.test.ts',
+
     // rstest
     './tests/rstest/rules/consistent-each-for.test.ts',
     './tests/rstest/rules/consistent-rstest-namespace.test.ts',

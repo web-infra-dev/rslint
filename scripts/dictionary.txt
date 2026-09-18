@@ -551,6 +551,7 @@ rozaj
 rsbuild
 rsdoctor
 rslib
+rslim
 rslint
 rslintconfig
 rslog
