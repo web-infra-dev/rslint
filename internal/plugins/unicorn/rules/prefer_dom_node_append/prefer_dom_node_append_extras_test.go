@@ -20,6 +20,7 @@ func TestPreferDomNodeAppendExtras(t *testing.T) {
 		{Code: "node?.appendChild?.(child);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild(undefined);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild(null);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
+		{Code: "node.appendChild(void 0);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild(() => child);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild({});", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild(`text`);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
@@ -55,9 +56,6 @@ func TestPreferDomNodeAppendExtras(t *testing.T) {
 		{Code: "node.appendChild(child), node.appendChild(other);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-dom-node-append", Message: "Prefer `Element#append()` over `Node#appendChild()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 			{MessageId: "prefer-dom-node-append", Message: "Prefer `Element#append()` over `Node#appendChild()`.", Line: 1, Column: 26, EndLine: 1, EndColumn: 49, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
-		}},
-		{Code: "node.appendChild(void 0);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"node.append(void 0);"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-dom-node-append", Message: "Prefer `Element#append()` over `Node#appendChild()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
 		{Code: "node.appendChild(child?.element);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}, Output: []string{"node.append(child?.element);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-dom-node-append", Message: "Prefer `Element#append()` over `Node#appendChild()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 33, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
@@ -143,4 +141,21 @@ func TestPreferDomNodeAppendArtifactsFollowDemand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPreferDomNodeAppendReviewRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_dom_node_append.PreferDomNodeAppendRule, []rule_tester.ValidTestCase{
+		{Code: "node.appendChild(void 0);", FileName: "review.js"},
+		{Code: "node.appendChild((sideEffect(), null));", FileName: "review.js"},
+		{Code: "node.appendChild(null as unknown as Node);", FileName: "review.ts"},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:     "function f(undefined) { node.appendChild(undefined); }",
+			FileName: "review.js",
+			Output:   []string{"function f(undefined) { node.append(undefined); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "prefer-dom-node-append",
+			}},
+		},
+	})
 }

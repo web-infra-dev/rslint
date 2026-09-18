@@ -4,7 +4,7 @@
 
 Prefer `Element#append()` over `Node#appendChild()`.
 
-An automatic fix is offered only for expression statements. Other uses are reported without a fix because `appendChild` returns the appended child, whereas `append` returns undefined. Computed names, optional calls, and values that cannot be DOM nodes are excluded.
+An automatic fix is offered only for expression statements. Other uses are reported without a fix because `appendChild` returns the appended child, whereas `append` returns undefined. Computed names and optional calls are excluded. Arguments that are statically impossible DOM nodes, including `null`, `void` expressions, and equivalent wrapped or sequence expressions, are ignored; a locally shadowed identifier named `undefined` is not mistaken for the global value.
 
 Examples of **incorrect** code:
 

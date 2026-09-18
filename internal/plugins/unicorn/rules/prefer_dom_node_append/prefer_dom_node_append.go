@@ -14,7 +14,7 @@ var PreferDomNodeAppendRule = rule.Rule{
 		argumentCount := 1
 		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) {
 			call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{Method: "appendChild", ArgumentsLength: &argumentCount, RejectSpreadElement: true, AllowOptionalMember: true})
-			if !ok || isNotDOMNode(call.Object) || isNotDOMNode(node.Arguments()[0]) {
+			if !ok || isDefinitelyNotDOMNode(ctx, call.Object) || isDefinitelyNotDOMNode(ctx, node.Arguments()[0]) {
 				return
 			}
 			ctx.ReportNodeWithDeferredFixes(node, rule.RuleMessage{Id: "prefer-dom-node-append", Description: "Prefer `Element#append()` over `Node#appendChild()`."}, func() []rule.RuleFix {
@@ -28,8 +28,17 @@ var PreferDomNodeAppendRule = rule.Rule{
 	},
 }
 
-func isNotDOMNode(node *ast.Node) bool {
-	node = utils.ESTreeRuntimeExpression(node)
+func isDefinitelyNotDOMNode(ctx rule.RuleContext, node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	if utils.IsCommaOperator(node) {
+		return isDefinitelyNotDOMNode(ctx, node.AsBinaryExpression().Right)
+	}
+	if node.Kind == ast.KindVoidExpression {
+		return true
+	}
 	switch node.Kind {
 	case ast.KindArrayLiteralExpression, ast.KindArrowFunction, ast.KindClassExpression, ast.KindFunctionExpression,
 		ast.KindObjectLiteralExpression, ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral,
@@ -37,5 +46,9 @@ func isNotDOMNode(node *ast.Node) bool {
 		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
 	}
-	return utils.IsUndefinedIdentifier(node)
+	if utils.IsUndefinedIdentifier(node) {
+		return ctx.Refs != nil && ctx.Globals.Access("undefined").IsDeclared() &&
+			ctx.Refs.IsGlobalReference(node)
+	}
+	return false
 }
