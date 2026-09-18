@@ -378,6 +378,7 @@ func TestNeedsSemicolonBeforeTypeScriptBoundary(t *testing.T) {
 		{"value<string>", true},
 		{"value<Array<string>>", true},
 		{"value<Map<string, Array<number>>>", true},
+		{"new Foo<string>", true},
 		{"value!", true},
 		{"value!.property!", true},
 		{"value<string>;", false},
