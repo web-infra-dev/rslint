@@ -182,3 +182,20 @@ func TestNoUnnecessaryArraySpliceCountArtifactsFollowDemand(t *testing.T) {
 		})
 	}
 }
+
+func TestNoUnnecessaryArraySpliceCountReviewRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule, []rule_tester.ValidTestCase{
+		{
+			Code:     "Number = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "let i = 0; const first = [0,1,2], second = [0]; const obj = { get a() { return i++ ? second : first; } }; obj.a.splice(1, obj.a.length);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "let a = [0,1,2], b = [0]; a.splice((a = b, 1), a.length);",
+			FileName: "review.js",
+		},
+	}, []rule_tester.InvalidTestCase{})
+}

@@ -8,13 +8,21 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+type unnecessaryLengthReferenceIndexKey struct{}
+type unnecessaryLengthStaticEvaluatorKey struct{}
+
 // ReportUnnecessaryLengthArgument checks the second argument of an already
 // matched two-argument slice/splice call. Callers own receiver restrictions.
 func ReportUnnecessaryLengthArgument(ctx rule.RuleContext, call DotMethodCall, messageID, argumentName string) {
 	raw := call.Call.Arguments()[1]
 	argument := utils.ESTreeRuntimeExpression(raw)
-	description := lengthOrInfinityDescription(ctx, argument, utils.ESTreeRuntimeExpression(call.Object))
+	object := utils.ESTreeRuntimeExpression(call.Object)
+	description := lengthOrInfinityDescription(ctx, argument, object)
 	if description == "" {
+		return
+	}
+	if lengthMember(argument) != nil &&
+		(!isRepeatableReference(ctx, object) || !isSideEffectFreeArgument(call.Call.Arguments()[0])) {
 		return
 	}
 	message := rule.RuleMessage{Id: messageID, Description: "Passing `" + description + "` as the `" + argumentName + "` argument is unnecessary.", Data: map[string]string{"description": description, "argumentName": argumentName}}
@@ -28,21 +36,21 @@ func ReportUnnecessaryLengthArgument(ctx rule.RuleContext, call DotMethodCall, m
 	})
 }
 func lengthOrInfinityDescription(ctx rule.RuleContext, argument, object *ast.Node) string {
-	if ast.IsIdentifier(argument) && argument.Text() == "Infinity" && ctx.Globals.Access("Infinity").IsDeclared() && ctx.Refs.IsGlobalReference(argument) {
+	if ast.IsIdentifier(argument) && argument.Text() == "Infinity" &&
+		isPristineGlobalReference(ctx, argument, "Infinity") {
 		return "Infinity"
 	}
-	if !ast.IsPropertyAccessExpression(argument) {
+	member := lengthMember(argument)
+	if member == nil {
 		return ""
 	}
-	member := argument.AsPropertyAccessExpression()
 	receiver := utils.ESTreeRuntimeExpression(member.Expression)
-	if !ast.IsIdentifier(member.Name()) {
-		return ""
-	}
-	if member.Name().Text() == "POSITIVE_INFINITY" && !ast.IsOptionalChain(argument) && ast.IsIdentifier(receiver) && receiver.Text() == "Number" && ctx.Globals.Access("Number").IsDeclared() && ctx.Refs.IsGlobalReference(receiver) {
+	if member.Name().Text() == "POSITIVE_INFINITY" && !ast.IsOptionalChain(argument) &&
+		ast.IsIdentifier(receiver) && receiver.Text() == "Number" &&
+		isPristineGlobalReference(ctx, receiver, "Number") {
 		return "Number.POSITIVE_INFINITY"
 	}
-	if member.Name().Text() != "length" || !utils.IsSameReference(object, receiver, false) {
+	if member.Name().Text() != "length" || !sameStaticReference(ctx, object, receiver) {
 		return ""
 	}
 	name := "…"
@@ -53,4 +61,130 @@ func lengthOrInfinityDescription(ctx rule.RuleContext, argument, object *ast.Nod
 		return name + "?.length"
 	}
 	return name + ".length"
+}
+
+func lengthMember(node *ast.Node) *ast.PropertyAccessExpression {
+	if node == nil || !ast.IsPropertyAccessExpression(node) {
+		return nil
+	}
+	member := node.AsPropertyAccessExpression()
+	if member == nil || member.Name() == nil || !ast.IsIdentifier(member.Name()) {
+		return nil
+	}
+	return member
+}
+
+func isPristineGlobalReference(ctx rule.RuleContext, node *ast.Node, name string) bool {
+	if node == nil || ctx.Refs == nil || !ctx.Globals.Access(name).IsDeclared() ||
+		!ctx.Refs.IsGlobalReference(node) {
+		return false
+	}
+	index := rule.CachedByFile(ctx, unnecessaryLengthReferenceIndexKey{}, func() *utils.ReferenceIndex {
+		return utils.NewReferenceIndex(ctx.SourceFile, ctx.TypeChecker)
+	})
+	pristine := true
+	index.ForEachReferenceByName(name, nil, func(reference *ast.Node) bool {
+		if reference.Pos() >= node.Pos() {
+			return true
+		}
+		if ctx.Refs.IsGlobalReference(reference) && utils.IsWriteReference(reference) {
+			pristine = false
+			return true
+		}
+		return false
+	})
+	return pristine
+}
+
+func sameStaticReference(ctx rule.RuleContext, left, right *ast.Node) bool {
+	left = utils.SkipAssertionsAndParens(left)
+	right = utils.SkipAssertionsAndParens(right)
+	if left == nil || right == nil {
+		return left == right
+	}
+	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
+		evaluator := rule.CachedByFile(ctx, unnecessaryLengthStaticEvaluatorKey{}, func() *utils.StaticStringEvaluator {
+			return utils.NewStaticStringEvaluatorWithReferenceResolver(
+				ctx.TypeChecker, ctx.SourceFile, ctx.Refs,
+			)
+		})
+		leftName, leftOK := evaluator.EvalAccessExpressionName(left)
+		rightName, rightOK := evaluator.EvalAccessExpressionName(right)
+		if !leftOK || !rightOK || leftName != rightName {
+			return false
+		}
+		return sameStaticReference(
+			ctx,
+			utils.AccessExpressionObject(left),
+			utils.AccessExpressionObject(right),
+		)
+	}
+	return utils.IsSameReference(left, right, false)
+}
+
+func isRepeatableReference(ctx rule.RuleContext, node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindThisKeyword:
+		return true
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if accessHasGetter(ctx, node) {
+			return false
+		}
+		return isRepeatableReference(ctx, utils.AccessExpressionObject(node))
+	default:
+		return false
+	}
+}
+
+func accessHasGetter(ctx rule.RuleContext, node *ast.Node) bool {
+	if ctx.TypeChecker == nil || node == nil {
+		return false
+	}
+	var location *ast.Node
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		location = node.AsPropertyAccessExpression().Name()
+	case ast.KindElementAccessExpression:
+		location = node
+	default:
+		return false
+	}
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(location)
+	if symbol == nil {
+		return false
+	}
+
+	for _, declaration := range symbol.Declarations {
+		if declaration.Kind == ast.KindGetAccessor ||
+			ast.HasSyntacticModifier(declaration, ast.ModifierFlagsAccessor) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSideEffectFreeArgument(node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindThisKeyword,
+		ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral,
+		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		prefix := node.AsPrefixUnaryExpression()
+		switch prefix.Operator {
+		case ast.KindPlusToken, ast.KindMinusToken, ast.KindExclamationToken,
+			ast.KindTildeToken, ast.KindTypeOfKeyword, ast.KindVoidKeyword:
+			return isSideEffectFreeArgument(prefix.Operand)
+		}
+	}
+	return false
 }
