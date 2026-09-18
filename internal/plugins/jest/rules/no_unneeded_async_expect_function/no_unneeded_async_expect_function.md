@@ -2,50 +2,29 @@
 
 ## Rule Details
 
-Disallow wrapping an expected promise in an unnecessary async function when
-using Jest promise assertions.
+Disallow an async function wrapper around a single awaited call to a locally declared async function passed to Jest `.resolves` or `.rejects` assertions.
 
-Jest promise assertions can receive the promise directly:
-`await expect(doSomethingAsync()).rejects.toThrow()` or
-`await expect(doSomethingAsync()).resolves.toBe(value)`. Wrapping that call in
-`async () => { await doSomethingAsync(); }` is more verbose and makes the test
-harder to read without changing the assertion.
+The rule recognizes global `expect` and renamed imports from `@jest/globals`. It reports only a concise wrapper without parameters, such as `async () => await operation()`, where the zero-argument call resolves to an earlier local `const` initialized with an async arrow function. A block wrapper can intentionally discard a fulfilled value, and a normal function can depend on its dynamic `this` or `arguments`, so neither is reported. Calls with unknown behavior, arguments, explicit type arguments, mutable bindings or member receivers are also not reported.
 
-This rule reports `expect()` calls whose first argument is an async function
-with a single awaited call expression. It is fixable: the async wrapper is
-replaced with the awaited call. Renamed `expect` bindings imported from
-`@jest/globals` are also recognized.
+No option or autofix is available. Reported wrappers can contain comments whose intended placement cannot be preserved reliably by replacing the wrapper with the referenced function.
 
-Examples of **incorrect** code for this rule:
+## Incorrect
 
 ```js
-it('wrong1', async () => {
-  await expect(async () => {
-    await doSomethingAsync();
-  }).rejects.toThrow();
-});
+const loadUser = async () => ({ name: 'Ada' });
 
-it('wrong2', async () => {
-  await expect(async function () {
-    await doSomethingAsync();
-  }).rejects.toThrow();
+it('loads a user', async () => {
+  await expect(async () => await loadUser()).resolves.toEqual({ name: 'Ada' });
 });
 ```
 
-Examples of **correct** code for this rule:
+## Correct
 
 ```js
-it('right1', async () => {
-  await expect(doSomethingAsync()).rejects.toThrow();
+it('loads a user', async () => {
+  await expect(loadUser).resolves.toEqual({ name: 'Ada' });
 });
 ```
-
-## Differences from ESLint
-
-rslint also fixes equivalent concise arrow functions and parenthesized async
-function arguments, such as `expect(async () => await doSomethingAsync())` and
-`expect((async () => { await doSomethingAsync(); }))`. These shapes are handled
-as the same safe unwrap because tsgo preserves them explicitly in the AST.
 
 ## Original Documentation
 

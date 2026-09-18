@@ -112,164 +112,147 @@ func TestNoUnneededAsyncExpectFunctionRule(t *testing.T) {
         }).toThrow();
       })
     `},
-		},
-		[]rule_tester.InvalidTestCase{
-			{
-				Code: `
-        it('should be fixed', async () => {
-          await expect(async () => {
-            await doSomethingAsync();
-          }).rejects.toThrow(); 
-        })
-      `,
-				Output: []string{`
-        it('should be fixed', async () => {
-          await expect(doSomethingAsync()).rejects.toThrow(); 
-        })
-      `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				Code: `
-        it('should be fixed', async () => {
-          await expect(async function () {
-            await doSomethingAsync();
-          }).rejects.toThrow(); 
-        })
-      `,
-				Output: []string{`
-        it('should be fixed', async () => {
-          await expect(doSomethingAsync()).rejects.toThrow(); 
-        })
-      `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				Code: `
-        it('should be fixed for async arrow function', async () => {
+			{Code: `expect(async () => { /* preserve why */ await doSomethingAsync(); }).rejects.toThrow();`},
+			{Code: `expect(async () => { await doSomethingAsync(); }, makeMessage()).rejects.toThrow();`},
+			{Code: `expect(async function () { await client.arguments(); }).rejects.toThrow();`},
+			{Code: `function returnsPlainValue() { return 1; }
+expect(async () => { await returnsPlainValue(); }).resolves.toBe(1);`},
+			{Code: `function throwsSynchronously() { throw new Error('sync failure'); }
+expect(async () => { await throwsSynchronously(); }).rejects.toThrow('sync failure');`},
+			{Code: `expect(async () => { await doSomethingAsync(1, 2); }).rejects.toThrow();`},
+			{Code: `const operation = async (value) => value;
+expect(async () => { await operation(1); }).resolves.toBe(1);`},
+			{Code: `let operation = async () => 1;
+expect(async () => { await operation(); }).resolves.toBe(1);`},
+			{Code: `async function operation() { return 1; }
+operation = () => 1;
+expect(async () => { await operation(); }).resolves.toBe(1);`},
+			{Code: `async function operation() { return 1; }
+expect(async (value = 1) => { await operation(); }).resolves.toBe(1);`},
+			{Code: `async function operation() { return 1; }
+expect(async () => { await operation(); }).resolves.toBeUndefined();`},
+			{Code: `async function operation() { return 1; }
+expect(async () => { await operation(); }).rejects.toThrow();`},
+			{Code: `async function operation() { return 1; }
+expect(async () => await operation()).resolves.toBe(1);`},
+			{Code: `const operation = async () => 1;
+expect(operation).resolves.toBe(1);`},
+			{Code: `const operation = async () => { throw new Error('failure'); };
+expect(operation).rejects.toThrow('failure');`},
+			{Code: `expect(async () => await operation()).resolves.toBe(1);
+const operation = async () => 1;`},
+			{Code: `const operation = async <Value,>() => undefined as Value;
+expect(async () => await operation<number>()).resolves.toBe(1);`},
+			{Code: `
+        it('keeps calls with arguments', async () => {
           await expect(async () => {
             await doSomethingAsync(1, 2);
-          }).rejects.toThrow(); 
-        })
-      `,
-				Output: []string{`
-        it('should be fixed for async arrow function', async () => {
-          await expect(doSomethingAsync(1, 2)).rejects.toThrow(); 
+          }).rejects.toThrow();
         })
       `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				Code: `
-        it('should be fixed for async normal function', async () => {
+			{Code: `
+        it('keeps function calls with arguments', async () => {
           await expect(async function () {
             await doSomethingAsync(1, 2);
-          }).rejects.toThrow(); 
-        })
-      `,
-				Output: []string{`
-        it('should be fixed for async normal function', async () => {
-          await expect(doSomethingAsync(1, 2)).rejects.toThrow(); 
+          }).rejects.toThrow();
         })
       `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				Code: `
-        it('should be fixed for Promise.all', async () => {
+			{Code: `
+        it('keeps member calls', async () => {
           await expect(async function () {
             await Promise.all([doSomethingAsync(1, 2), doSomethingAsync()]);
-          }).rejects.toThrow(); 
-        })
-      `,
-				Output: []string{`
-        it('should be fixed for Promise.all', async () => {
-          await expect(Promise.all([doSomethingAsync(1, 2), doSomethingAsync()])).rejects.toThrow(); 
+          }).rejects.toThrow();
         })
       `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				Code: `
+			{Code: `
         it('should be fixed for async ref to expect', async () => {
           const a = async () => { await doSomethingAsync() };
           await expect(async () => {
             await a();
           }).rejects.toThrow();
         })
-      `,
-				Output: []string{`
-        it('should be fixed for async ref to expect', async () => {
-          const a = async () => { await doSomethingAsync() };
-          await expect(a()).rejects.toThrow();
+      `},
+			{Code: `expect(async () => await doSomethingAsync()).rejects.toThrow();`},
+			{Code: `expect((async () => { await doSomethingAsync(); })).rejects.toThrow();`},
+			{Code: `expect(async function* () { await operation(); }).resolves.toBe(1);`},
+			// Keep every original upstream-aligned input verbatim. These calls are
+			// unresolved, so the current rule cannot prove that the wrapper is
+			// unnecessary and must leave them alone.
+			{Code: `
+        it('should be fixed', async () => {
+          await expect(async () => {
+            await doSomethingAsync();
+          }).rejects.toThrow();
         })
       `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				Code: `
+			{Code: `
+        it('should be fixed', async () => {
+          await expect(async function () {
+            await doSomethingAsync();
+          }).rejects.toThrow();
+        })
+      `},
+			{Code: `
+        it('should be fixed for async arrow function', async () => {
+          await expect(async () => {
+            await doSomethingAsync(1, 2);
+          }).rejects.toThrow(); 
+        })
+      `},
+			{Code: `
+        it('should be fixed for async normal function', async () => {
+          await expect(async function () {
+            await doSomethingAsync(1, 2);
+          }).rejects.toThrow(); 
+        })
+      `},
+			{Code: `
+        it('should be fixed for Promise.all', async () => {
+          await expect(async function () {
+            await Promise.all([doSomethingAsync(1, 2), doSomethingAsync()]);
+          }).rejects.toThrow(); 
+        })
+      `},
+			{Code: `
         it('should be fixed for resolves', async () => {
           await expect(async () => {
             await doSomethingAsync();
           }).resolves.toBe(1);
         })
-      `,
-				Output: []string{`
-        it('should be fixed for resolves', async () => {
-          await expect(doSomethingAsync()).resolves.toBe(1);
-        })
       `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				// rslint enhancement: tsgo exposes concise arrow bodies directly,
-				// so the same safe unwrap can be applied without a block body.
-				Code: `
+			{Code: `
         it('fixes concise async arrow functions', async () => {
           await expect(async () => await doSomethingAsync()).rejects.toThrow();
         })
-      `,
-				Output: []string{`
-        it('fixes concise async arrow functions', async () => {
-          await expect(doSomethingAsync()).rejects.toThrow();
-        })
       `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
-			},
-			{
-				// rslint enhancement: parenthesized async function arguments are
-				// matched even though ESTree-based upstream tests do not cover them.
-				Code: `
+			{Code: `
         it('fixes parenthesized async functions', async () => {
           await expect((async () => {
             await doSomethingAsync();
           })).rejects.toThrow();
         })
-      `,
-				Output: []string{`
-        it('fixes parenthesized async functions', async () => {
-          await expect(doSomethingAsync()).rejects.toThrow();
-        })
       `},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noAsyncWrapperForExpectedPromise"},
-				},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `const operation = async () => 1;
+expect(async () => /* preserve why */ await operation()).resolves.toBe(1);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				Code: `const operation = async () => 1;
+expect(async () => await operation(), 'custom message').resolves.toBe(1);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				Code: `const operation = async () => 1;
+expect(async () => await operation()).resolves.toBe(1);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
+			},
+			{
+				Code: `const operation = async () => { throw new Error('failure'); };
+expect(async () => await operation()).rejects.toThrow('failure');`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noAsyncWrapperForExpectedPromise"}},
 			},
 		},
 	)
