@@ -27,7 +27,9 @@ This rule has no options. It is enabled at `error` severity in `unicornPlugin.co
 Locally shadowed, disabled, or previously reassigned `Infinity` and `Number`
 globals are not assumed to be built-ins. For `.length` rewrites, known
 getter-backed receiver paths or a first argument that can change the receiver
-are skipped. These guards avoid semantics-changing autofixes that Unicorn
+are skipped. In checker-less source-only runs, member-chain receivers are also
+left unchanged because the rule cannot prove that their properties are
+getter-free. These guards avoid semantics-changing autofixes that Unicorn
 v75.0.0 can still offer.
 
 ## Original Documentation
