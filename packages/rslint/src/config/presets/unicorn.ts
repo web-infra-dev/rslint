@@ -161,7 +161,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-unnecessary-global-this': 'error', // not implemented
     // 'unicorn/no-unnecessary-nested-ternary': 'error', // not implemented
     // 'unicorn/no-unnecessary-polyfills': 'error', // not implemented
-    // 'unicorn/no-unnecessary-slice-end': 'error', // not implemented
+    'unicorn/no-unnecessary-slice-end': 'error',
     // 'unicorn/no-unnecessary-splice': 'error', // not implemented
     // 'unicorn/no-unnecessary-string-trim': 'error', // not implemented
     // 'unicorn/no-unreadable-array-destructuring': 'error', // not implemented
