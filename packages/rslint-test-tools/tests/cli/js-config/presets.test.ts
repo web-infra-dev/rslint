@@ -185,6 +185,9 @@ describe('defineConfig and config presets', () => {
     expect(rec.rules?.['unicorn/no-unnecessary-array-splice-count']).toBe(
       'error',
     );
+    expect(rec.rules?.['unicorn/no-useless-error-capture-stack-trace']).toBe(
+      'error',
+    );
     expect(rec.rules?.['unicorn/empty-brace-spaces']).toBe('error');
     expect(rec.rules?.['unicorn/no-exports-in-scripts']).toBe('error');
     expect(rec.rules?.['unicorn/no-await-expression-member']).toBe('error');
