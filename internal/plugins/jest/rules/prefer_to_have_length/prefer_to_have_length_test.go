@@ -28,6 +28,15 @@ func TestPreferToHaveLengthRule(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				Code: `expect(files[length]).toBe(1);`,
+				Output: []string{
+					`expect(files).toHaveLength(1);`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToHaveLength", Column: 23, Line: 1},
+				},
+			},
+			{
 				Code: `expect(files["length"]).toBe(1);`,
 				Output: []string{
 					`expect(files).toHaveLength(1);`,

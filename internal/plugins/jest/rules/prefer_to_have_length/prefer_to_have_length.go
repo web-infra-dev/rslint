@@ -7,131 +7,85 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
+	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_to_have_length"
 )
 
-func buildErrorUseToHaveLengthMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "useToHaveLength",
-		Description: "Use `toHaveLength()` instead",
-	}
-}
-
-func checkIsEqualityMethod(members []string) bool {
-	for _, member := range members {
-		if jestUtils.EQUALITY_METHOD_NAMES[member] {
-			return true
-		}
-	}
-	return false
-}
-
-func unwrapLengthAccessProperty(arg *ast.Node) *ast.Node {
+func parseLengthAccessor(arg *ast.Node) (*ast.Node, testFramework.MemberEntry, bool) {
 	if arg == nil {
-		return nil
+		return nil, testFramework.MemberEntry{}, false
 	}
 	arg = ast.SkipParentheses(arg)
+	if arg == nil || ast.IsOptionalChain(arg) {
+		return nil, testFramework.MemberEntry{}, false
+	}
+
+	var receiver, name *ast.Node
 	switch arg.Kind {
 	case ast.KindElementAccessExpression:
-		if ast.IsOptionalChain(arg) {
-			return nil
-		}
-		el := arg.AsElementAccessExpression()
-		if !jestUtils.IsNamedMember(ast.SkipParentheses(el.ArgumentExpression), "length") {
-			return nil
-		}
-		return el.Expression
+		element := arg.AsElementAccessExpression()
+		receiver, name = element.Expression, ast.SkipParentheses(element.ArgumentExpression)
 	case ast.KindPropertyAccessExpression:
-		if ast.IsOptionalChain(arg) {
-			return nil
-		}
-		pa := arg.AsPropertyAccessExpression()
-		if !jestUtils.IsNamedMember(pa.Name(), "length") {
-			return nil
-		}
-		return pa.Expression
+		property := arg.AsPropertyAccessExpression()
+		receiver, name = property.Expression, property.Name()
 	default:
+		return nil, testFramework.MemberEntry{}, false
+	}
+	if !jestUtils.IsNamedMember(name, "length") || receiver == nil {
+		return nil, testFramework.MemberEntry{}, false
+	}
+	return receiver, testFramework.MemberEntry{Name: "length", Node: name}, true
+}
+
+func buildFixes(ctx rule.RuleContext, match shared.Match) []rule.RuleFix {
+	parsed := match.Expect
+	if !parsed.CanFix || len(parsed.MatcherCall.Arguments()) != 1 {
 		return nil
 	}
+	beforeMatcher := jestUtils.ReceiverBeforeInvocation(parsed.MatcherCall)
+	if beforeMatcher == nil {
+		return nil
+	}
+
+	argList := parsed.MatcherCall.AsCallExpression().Arguments
+	if argList == nil {
+		return nil
+	}
+	fileText := ctx.SourceFile.Text()
+	innerText := utils.TrimmedNodeText(ctx.SourceFile, match.Receiver)
+	expectedText := fileText[argList.Pos():argList.End()]
+	middleText := fileText[parsed.HeadCall.End():beforeMatcher.End()]
+	newText := fmt.Sprintf("expect(%s)%s.toHaveLength(%s)", innerText, middleText, expectedText)
+	trimmedExpectCall := utils.TrimNodeTextRange(ctx.SourceFile, parsed.HeadCall)
+	return []rule.RuleFix{rule.RuleFixReplaceRange(
+		core.NewTextRange(trimmedExpectCall.Pos(), parsed.MatcherCall.End()),
+		newText,
+	)}
 }
 
-var PreferToHaveLengthRule = rule.Rule{
-	Name:   "jest/prefer-to-have-length",
-	Schema: rule.EmptyArraySchema,
-	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil {
-					return
-				}
-
-				if jestFnCall.Kind != jestUtils.JestFnTypeExpect {
-					return
-				}
-
-				members := jestFnCall.Members
-				if len(members) == 0 || !checkIsEqualityMethod(members) {
-					return
-				}
-
-				expectCall := jestFnCall.Head.Local.Node.Parent
-				if expectCall == nil || expectCall.Kind != ast.KindCallExpression {
-					return
-				}
-
-				args := expectCall.Arguments()
-				if len(args) == 0 {
-					return
-				}
-
-				inner := unwrapLengthAccessProperty(args[0])
-				if inner == nil {
-					return
-				}
-
-				matcherCall := node.AsCallExpression()
-				if matcherCall == nil {
-					return
-				}
-
-				argList := matcherCall.Arguments
-				if argList == nil || len(argList.Nodes) != 1 {
-					return
-				}
-
-				beforeMatcher := jestUtils.ReceiverBeforeInvocation(node)
-				if beforeMatcher == nil {
-					return
-				}
-
-				sourceFile := ast.GetSourceFileOfNode(node)
-				if sourceFile == nil {
-					return
-				}
-
-				fileText := sourceFile.Text()
-				innerText := rslintUtils.TrimmedNodeText(sourceFile, inner)
-				expectedText := fileText[argList.Pos():argList.End()]
-				middleText := fileText[expectCall.End():beforeMatcher.End()]
-
-				newText := fmt.Sprintf("expect(%s)%s.toHaveLength(%s)", innerText, middleText, expectedText)
-				trimmedExpectCall := rslintUtils.TrimNodeTextRange(sourceFile, expectCall)
-				fixRange := core.NewTextRange(trimmedExpectCall.Pos(), node.End())
-				reportNode := node
-
-				if n := len(jestFnCall.MemberEntries); n > 0 {
-					if entry := jestFnCall.MemberEntries[n-1].Node; entry != nil {
-						reportNode = entry
-					}
-				}
-
-				ctx.ReportNodeWithFixes(
-					reportNode,
-					buildErrorUseToHaveLengthMessage(),
-					rule.RuleFixReplaceRange(fixRange, newText),
-				)
-			},
-		}
+var PreferToHaveLengthRule = shared.NewRule(shared.Config{
+	Name:                "jest/prefer-to-have-length",
+	ParseLengthAccessor: parseLengthAccessor,
+	BuildFixes:          buildFixes,
+	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		return shared.Runtime{Parse: func(node *ast.Node) []*shared.ExpectCall {
+			parsed := jestUtils.ParseJestFnCall(node, ctx)
+			if parsed == nil || parsed.Kind != jestUtils.JestFnTypeExpect || parsed.MatcherEntry == nil ||
+				len(node.Arguments()) != 1 {
+				return nil
+			}
+			headCall := parsed.Head.Local.Node.Parent
+			if headCall == nil || headCall.Kind != ast.KindCallExpression || jestUtils.ReceiverBeforeInvocation(node) == nil {
+				return nil
+			}
+			return []*shared.ExpectCall{{
+				HeadCall:     headCall,
+				MatcherCall:  node,
+				MatcherEntry: *parsed.MatcherEntry,
+				Matcher:      parsed.Matcher,
+				CanFix:       true,
+			}}
+		}}
 	},
-}
+})
