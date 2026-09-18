@@ -24,10 +24,11 @@ This rule has no options. It is enabled at `error` severity in `unicornPlugin.co
 
 ## Differences from upstream
 
-Locally shadowed or explicitly disabled `Infinity` and `Number` globals are
-not assumed to be the built-in constants. For example, a parameter named
-`Infinity` can be a finite number; removing it would change the result.
-Unicorn v75.0.0 checks only the spelling here. This rule preserves the call.
+Locally shadowed, disabled, or previously reassigned `Infinity` and `Number`
+globals are not assumed to be built-ins. For `.length` rewrites, known
+getter-backed receiver paths or a first argument that can change the receiver
+are skipped. These guards avoid semantics-changing autofixes that Unicorn
+v75.0.0 can still offer.
 
 ## Original Documentation
 
