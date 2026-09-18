@@ -182,6 +182,11 @@ describe('defineConfig and config presets', () => {
     expect(rec.rules?.['unicorn/no-array-fill-with-reference-type']).toBe(
       'error',
     );
+    expect(rec.rules?.['unicorn/prefer-global-number-constants']).toBe('error');
+    expect(rec.rules?.['unicorn/prefer-number-properties']).toEqual([
+      'error',
+      { checkNaN: false, checkInfinity: false },
+    ]);
     expect(rec.rules?.['unicorn/no-useless-error-capture-stack-trace']).toBe(
       'error',
     );
