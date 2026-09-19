@@ -116,3 +116,32 @@ func TestContextWithoutReferences(t *testing.T) {
 		t.Fatalf("events = %q, want %q", got, want)
 	}
 }
+
+func TestReplacementReferences(t *testing.T) {
+	for _, test := range []struct {
+		code string
+		want []string
+	}{
+		{
+			"const target = api; target.fn();",
+			[]string{"read: target.fn", "call: target.fn()"},
+		},
+		{
+			"const {api: target} = globalThis; target.fn();",
+			[]string{"read: target.fn", "call: target.fn()"},
+		},
+		{"let target = api; target = other; target.fn();", nil},
+		{"const target = flag ? api : other; target.fn();", nil},
+		{"function f(target = api) { target.fn(); }", nil},
+		{"const {api: target = other} = globalThis; target.fn();", nil},
+		{"(sideEffect(), api).fn();", nil},
+		{"(target = api).fn();", nil},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			ctx := trackerContext(test.code)
+			if got := collectEvents(ctx, NewForReplacement(ctx)); !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("events = %q, want %q", got, test.want)
+			}
+		})
+	}
+}

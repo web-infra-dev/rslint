@@ -33,6 +33,14 @@ Unicorn v75.0.0 offers a fix for `const {NaN: value} = Number` that removes the
 Loop assignment targets, such as `for (Number.NaN of values) {}`, are left
 unchanged, consistently with other assignment targets.
 
+Unlike upstream's flow-insensitive tracking, this rule follows only aliases
+initialized in a variable declaration and never reassigned. Conditional and
+logical receivers, default parameters, assignment expressions, and comma
+expressions are skipped. For example, after `let N = Number; N = {NaN: 42};`,
+`N.NaN` must not be replaced with `NaN`. This also preserves side effects in
+expressions such as `(sideEffect(), Number).NaN`. Stable aliases such as
+`const N = Number; N.NaN` still receive fixes.
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: prefer-global-number-constants](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/docs/rules/prefer-global-number-constants.md)

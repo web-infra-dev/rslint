@@ -32,6 +32,7 @@ type Tracker struct {
 	propertyEvaluator *utils.StaticStringEvaluator
 	variableStack     map[*ast.Symbol]bool
 	globalStack       map[string]bool
+	stableOnly        bool
 }
 
 type referenceNamesKey struct{}
@@ -44,6 +45,15 @@ func New(ctx rule.RuleContext) *Tracker {
 	})
 	return &Tracker{ctx: ctx, names: names,
 		variableStack: make(map[*ast.Symbol]bool), globalStack: make(map[string]bool)}
+}
+
+// NewForReplacement follows declaration-initialized, unwritten aliases only.
+// Replacing a whole receiver requires a definite value, so conditional/default
+// values and side-effecting pass-through expressions stop tracking.
+func NewForReplacement(ctx rule.RuleContext) *Tracker {
+	tracker := New(ctx)
+	tracker.stableOnly = true
+	return tracker
 }
 
 // TrackGlobals follows unmodified configured globals and their global-object properties.
@@ -92,6 +102,9 @@ func (tracker *Tracker) TrackExpression(node *ast.Node, value *Trace) {
 		return
 	}
 	for node.Parent != nil && referenceValuePassesThrough(node, node.Parent) {
+		if tracker.stableOnly && !ast.IsOuterExpression(node.Parent, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments) {
+			return
+		}
 		node = node.Parent
 	}
 	parent := node.Parent
@@ -121,6 +134,9 @@ func (tracker *Tracker) TrackExpression(node *ast.Node, value *Trace) {
 			value.Construct(parent)
 		}
 	case ast.KindBinaryExpression:
+		if tracker.stableOnly {
+			return
+		}
 		binary := parent.AsBinaryExpression()
 		if binary != nil && binary.Right == node && binary.OperatorToken != nil && ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
 			tracker.TrackBinding(binary.Left, value)
@@ -129,10 +145,16 @@ func (tracker *Tracker) TrackExpression(node *ast.Node, value *Trace) {
 			}
 		}
 	case ast.KindVariableDeclaration, ast.KindParameter, ast.KindBindingElement:
+		if tracker.stableOnly && parent.Kind != ast.KindVariableDeclaration {
+			return
+		}
 		if parent.Initializer() == node {
 			tracker.TrackBinding(parent.Name(), value)
 		}
 	case ast.KindShorthandPropertyAssignment:
+		if tracker.stableOnly {
+			return
+		}
 		property := parent.AsShorthandPropertyAssignment()
 		if property != nil && property.ObjectAssignmentInitializer == node {
 			tracker.TrackBinding(property.Name(), value)
@@ -180,13 +202,44 @@ func (tracker *Tracker) trackIdentifier(identifier *ast.Node, value *Trace) {
 		symbol = utils.BindingNameSymbol(identifier)
 	}
 	if symbol != nil {
+		if tracker.stableOnly && !tracker.isStableBinding(identifier, symbol) {
+			return
+		}
 		tracker.trackVariable(symbol, value)
+		return
+	}
+	if tracker.stableOnly {
 		return
 	}
 	name := identifier.AsIdentifier().Text
 	if tracker.ctx.Globals.Access(name).IsDeclared() && tracker.isGlobalReference(identifier) {
 		tracker.trackGlobalVariable(name, value)
 	}
+}
+
+func (tracker *Tracker) isStableBinding(identifier *ast.Node, symbol *ast.Symbol) bool {
+	if len(symbol.Declarations) != 1 {
+		return false
+	}
+	declaration := symbol.Declarations[0]
+	if declaration.Name() != identifier {
+		return false
+	}
+	for declaration.Kind == ast.KindBindingElement {
+		if declaration.Initializer() != nil || declaration.Parent == nil || declaration.Parent.Parent == nil {
+			return false
+		}
+		declaration = declaration.Parent.Parent
+	}
+	if declaration.Kind != ast.KindVariableDeclaration || declaration.Initializer() == nil {
+		return false
+	}
+	for _, reference := range tracker.ctx.Refs.References(symbol) {
+		if utils.IsWriteReference(reference) || reference.Pos() < declaration.End() {
+			return false
+		}
+	}
+	return true
 }
 
 func (tracker *Tracker) trackVariable(symbol *ast.Symbol, value *Trace) {

@@ -12,9 +12,14 @@ var PreferGlobalNumberConstantsRule = rule.Rule{
 	Name: "unicorn/prefer-global-number-constants", Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
+			reported := make(map[*ast.Node]bool)
 			properties := make(map[string]*referencetracker.Trace, 3)
 			for _, constant := range []struct{ property, replacement, global string }{{"NaN", "NaN", "NaN"}, {"POSITIVE_INFINITY", "Infinity", "Infinity"}, {"NEGATIVE_INFINITY", "-Infinity", "Infinity"}} {
 				properties[constant.property] = &referencetracker.Trace{Read: func(node *ast.Node) {
+					if reported[node] {
+						return
+					}
+					reported[node] = true
 					parent := utils.ESTreeParent(node)
 					if (parent != nil && parent.Kind == ast.KindDeleteExpression) || utils.IsWriteReference(node) || !ctx.Refs.IsGlobalNameReference(node, constant.global, ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) {
 						return
@@ -27,7 +32,7 @@ var PreferGlobalNumberConstantsRule = rule.Rule{
 					})
 				}}
 			}
-			referencetracker.New(ctx).TrackGlobals(map[string]*referencetracker.Trace{"Number": {Properties: properties}})
+			referencetracker.NewForReplacement(ctx).TrackGlobals(map[string]*referencetracker.Trace{"Number": {Properties: properties}})
 		}}
 	},
 }

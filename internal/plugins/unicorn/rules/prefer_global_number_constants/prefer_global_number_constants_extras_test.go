@@ -98,6 +98,53 @@ func TestPreferGlobalNumberConstantsExtras(t *testing.T) {
 	})
 }
 
+func TestPreferGlobalNumberConstantsStableReferences(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	for _, code := range []string{
+		"let N = Number; N = {NaN: 42}; const x = N.NaN;",
+		"let N = Number; const x = N.NaN; N = other;",
+		"let N = Number; N ||= other; const x = N.NaN;",
+		"let N = Number; ({N} = other); const x = N.NaN;",
+		"let N = Number; for (N of values) {} const x = N.NaN;",
+		"let N = Number; function change() { N = other; } const x = N.NaN;",
+		"const x = (false ? Number : {NaN: 42}).NaN;",
+		"const x = (flag && Number).NaN;",
+		"const x = (other ?? Number).NaN;",
+		"const N = flag ? Number : other; const x = N.NaN;",
+		"function f(N = Number) { return N.NaN; }",
+		"const {Number: N = other} = globalThis; const x = N.NaN;",
+		"const {N = Number} = object; const x = N.NaN;",
+		"let N; N = Number; const x = N.NaN;",
+		"const x = (N = Number).NaN;",
+		"const x = (sideEffect(), Number).NaN;",
+		"const N = (sideEffect(), Number); const x = N.NaN;",
+		"const x = N.NaN; var N = Number;",
+		"var N = Number; var N = other; const x = N.NaN;",
+		"const N = flag ? Number : Number; const x = N.NaN;",
+		"const N = flag ? Number : globalThis.Number; const x = N.NaN;",
+		"let N; N = Number; N = Number; const x = N.NaN;",
+		"let {Number: N} = globalThis; N = other; const x = N.NaN;",
+	} {
+		valid = append(valid, rule_tester.ValidTestCase{Code: code, FileName: "case.js"})
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct{ code, output string }{
+		{"const N = Number; N.NaN;", "const N = Number; NaN;"},
+		{"let N = Number; N.NaN;", "let N = Number; NaN;"},
+		{"var N = Number; N.NaN;", "var N = Number; NaN;"},
+		{"const N = Number; const M = N; M.NaN;", "const N = Number; const M = N; NaN;"},
+		{"const {Number: N} = globalThis; N.NaN;", "const {Number: N} = globalThis; NaN;"},
+		{"const g = globalThis; const {Number: N} = g; N.NaN;", "const g = globalThis; const {Number: N} = g; NaN;"},
+		{"const N = Number; function f(N) { N = other; } N.NaN;", "const N = Number; function f(N) { N = other; } NaN;"},
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: test.code, FileName: "case.js", Output: []string{test.output},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-global-number-constants", Message: "Prefer `NaN` over `Number.NaN`."}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_global_number_constants.PreferGlobalNumberConstantsRule, valid, invalid)
+}
+
 func TestPreferGlobalNumberConstantsArtifactsFollowDemand(t *testing.T) {
 	for _, testCase := range []struct{ source, output string }{{source: "const foo = Number.NaN;", output: "const foo = NaN;"},
 		{source: "const foo = Number.NEGATIVE_INFINITY;", output: "const foo = Number.NEGATIVE_INFINITY;"}} {
