@@ -10,6 +10,14 @@ import (
 
 type unnecessaryLengthReferenceIndexKey struct{}
 type unnecessaryLengthStaticEvaluatorKey struct{}
+type unnecessaryLengthGlobalObjectWritesKey struct{}
+
+var unnecessaryLengthGlobalObjectNames = map[string]bool{
+	"global":     true,
+	"globalThis": true,
+	"self":       true,
+	"window":     true,
+}
 
 // ReportUnnecessaryLengthArgument checks the second argument of an already
 // matched two-argument slice/splice call. Callers own receiver restrictions.
@@ -93,7 +101,53 @@ func isPristineGlobalReference(ctx rule.RuleContext, node *ast.Node, name string
 		}
 		return false
 	})
-	return pristine
+	return pristine && !hasEarlierGlobalObjectPropertyWrite(ctx, name, node.Pos())
+}
+
+func hasEarlierGlobalObjectPropertyWrite(ctx rule.RuleContext, name string, before int) bool {
+	firstWrites := rule.CachedByFile(ctx, unnecessaryLengthGlobalObjectWritesKey{}, func() map[string]int {
+		writes := map[string]int{}
+		evaluator := rule.CachedByFile(ctx, unnecessaryLengthStaticEvaluatorKey{}, func() *utils.StaticStringEvaluator {
+			return utils.NewStaticStringEvaluatorWithReferenceResolver(
+				ctx.TypeChecker, ctx.SourceFile, ctx.Refs,
+			)
+		})
+		var visit func(*ast.Node)
+		visit = func(node *ast.Node) {
+			if ast.IsAccessExpression(node) && isGlobalObjectPropertyWrite(ctx, node) {
+				property, ok := evaluator.EvalAccessExpressionName(node)
+				if ok {
+					if previous, exists := writes[property]; !exists || node.Pos() < previous {
+						writes[property] = node.Pos()
+					}
+				}
+			}
+			node.ForEachChild(func(child *ast.Node) bool {
+				visit(child)
+				return false
+			})
+		}
+		visit(ctx.SourceFile.AsNode())
+		return writes
+	})
+	position, ok := firstWrites[name]
+	return ok && position < before
+}
+
+func isGlobalObjectPropertyWrite(ctx rule.RuleContext, node *ast.Node) bool {
+	if !utils.IsWriteReference(node) {
+		parent := node.Parent
+		if parent == nil || parent.Kind != ast.KindDeleteExpression ||
+			parent.AsDeleteExpression().Expression != node {
+			return false
+		}
+	}
+	root := utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
+	if !ast.IsIdentifier(root) || !unnecessaryLengthGlobalObjectNames[root.Text()] ||
+		ctx.Refs == nil || !ctx.Globals.Access(root.Text()).IsDeclared() {
+		return false
+	}
+	return ctx.Refs.IsGlobalReference(root)
 }
 
 func sameStaticReference(ctx rule.RuleContext, left, right *ast.Node) bool {

@@ -197,6 +197,33 @@ func TestNoUnnecessaryArraySpliceCountReviewRegressions(t *testing.T) {
 			FileName: "review.js",
 		},
 		{
+			Code:     "globalThis.Number = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "window['Number'] = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+			Globals:  map[string]any{"window": "readonly"},
+		},
+		{
+			Code:     "globalThis['Num' + 'ber'] = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "self.Number = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+			Globals:  map[string]any{"self": "readonly"},
+		},
+		{
+			Code:     "global.Number = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+			Globals:  map[string]any{"global": "readonly"},
+		},
+		{
+			Code:     "delete globalThis.Number; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+		},
+		{
 			Code:     "let i = 0; const first = [0,1,2], second = [0]; const obj = { get a() { return i++ ? second : first; } }; obj.a.splice(1, obj.a.length);",
 			FileName: "review.js",
 		},
@@ -204,14 +231,61 @@ func TestNoUnnecessaryArraySpliceCountReviewRegressions(t *testing.T) {
 			Code:     "let a = [0,1,2], b = [0]; a.splice((a = b, 1), a.length);",
 			FileName: "review.js",
 		},
-	}, []rule_tester.InvalidTestCase{})
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:     "const globalThis = {Number: {POSITIVE_INFINITY: 1}}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+			FileName: "review.js",
+			Output:   []string{"const globalThis = {Number: {POSITIVE_INFINITY: 1}}; const array = [0,1,2]; array.splice(1);"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "no-unnecessary-array-splice-count",
+			}},
+		},
+		{
+			Code:     "const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY); globalThis.Number = {POSITIVE_INFINITY: 1};",
+			FileName: "review.js",
+			Output:   []string{"const array = [0,1,2]; array.splice(1); globalThis.Number = {POSITIVE_INFINITY: 1};"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "no-unnecessary-array-splice-count",
+			}},
+		},
+	})
 }
 
-func TestNoUnnecessaryArraySpliceCountProjectFalseGetterReceiver(t *testing.T) {
-	code := "let i = 0; const first = [0,1,2], second = [0]; const obj = { get a() { return i++ ? second : first; } }; obj.a.splice(1, obj.a.length);"
-	diagnostics := lintNoUnnecessaryArraySpliceCountSourceOnly(t, code)
-	if len(diagnostics) != 0 {
-		t.Fatalf("project:false diagnostics = %d, want 0: %+v", len(diagnostics), diagnostics)
+func TestNoUnnecessaryArraySpliceCountProjectFalseSafety(t *testing.T) {
+	for _, testCase := range []struct {
+		name            string
+		code            string
+		wantDiagnostics int
+	}{
+		{
+			name: "getter receiver",
+			code: "let i = 0; const first = [0,1,2], second = [0]; const obj = { get a() { return i++ ? second : first; } }; obj.a.splice(1, obj.a.length);",
+		},
+		{
+			name: "global object Number write",
+			code: "globalThis.Number = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+		},
+		{
+			name: "computed global object Number write",
+			code: "globalThis['Num' + 'ber'] = {POSITIVE_INFINITY: 1}; const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY);",
+		},
+		{
+			name:            "identifier receiver",
+			code:            "const array = [0,1,2]; array.splice(1, array.length);",
+			wantDiagnostics: 1,
+		},
+		{
+			name:            "later global object Number write",
+			code:            "const array = [0,1,2]; array.splice(1, Number.POSITIVE_INFINITY); globalThis.Number = {POSITIVE_INFINITY: 1};",
+			wantDiagnostics: 1,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := lintNoUnnecessaryArraySpliceCountSourceOnly(t, testCase.code)
+			if len(diagnostics) != testCase.wantDiagnostics {
+				t.Fatalf("project:false diagnostics = %d, want %d: %+v", len(diagnostics), testCase.wantDiagnostics, diagnostics)
+			}
+		})
 	}
 }
 
