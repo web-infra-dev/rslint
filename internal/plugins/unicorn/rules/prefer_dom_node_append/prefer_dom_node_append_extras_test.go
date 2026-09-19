@@ -19,6 +19,8 @@ func TestPreferDomNodeAppendExtras(t *testing.T) {
 		{Code: "(node?.appendChild)(child);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node?.appendChild?.(child);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild(undefined);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
+		{Code: "node.appendChild(undefined);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"undefined": "off"}},
+		{Code: "/* global undefined: off */ node.appendChild(undefined);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
 		{Code: "node.appendChild(null);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild(void 0);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},
 		{Code: "node.appendChild(() => child);", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Globals: map[string]any{"window": "readonly", "global": "readonly", "self": "readonly"}},

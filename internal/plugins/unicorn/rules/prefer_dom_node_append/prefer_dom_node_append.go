@@ -47,8 +47,7 @@ func isDefinitelyNotDOMNode(ctx rule.RuleContext, node *ast.Node) bool {
 		return true
 	}
 	if utils.IsUndefinedIdentifier(node) {
-		return ctx.Refs != nil && ctx.Globals.Access("undefined").IsDeclared() &&
-			ctx.Refs.IsGlobalReference(node)
+		return unicornutil.IsGlobalReference(ctx, node)
 	}
 	return false
 }
