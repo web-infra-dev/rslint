@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_fill_with_reference_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_from_fill"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_reverse"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_sort"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_expression_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
@@ -70,6 +71,7 @@ func GetAllRules() []rule.Rule {
 		no_array_fill_with_reference_type.NoArrayFillWithReferenceTypeRule,
 		no_array_from_fill.NoArrayFromFillRule,
 		no_array_front_mutation.NoArrayFrontMutationRule,
+		no_array_reverse.NoArrayReverseRule,
 		no_array_sort.NoArraySortRule,
 		no_await_expression_member.NoAwaitExpressionMemberRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,

@@ -1,0 +1,16 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowExpressionStatement": {
+          "type": "boolean"
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
