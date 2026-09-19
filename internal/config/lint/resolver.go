@@ -131,45 +131,33 @@ func (resolver *Resolver) ResolveTarget(file target.File) (config.ResolvedFileCo
 	return fileResolver.ResolveTarget(file.Identity()), true
 }
 
-// ProjectPolicies resolves only owners with service/root/reset options. The
-// returned values carry no project lists, and zero policies need no override.
+// ProjectPolicies projects the same final config used by lint rules. Every
+// target has an entry: a zero policy requests no project and must not inherit
+// another target's declarations during Program binding.
 func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]config.ProjectPolicy, error) {
-	type ownerProjectContext struct {
-		hasOptions    bool
-		rootDirectory string
+	ownerRoots := make(map[*config.FileConfigResolver]string, len(resolver.configsByOwner))
+	for owner := range resolver.configsByOwner {
+		ownerRoots[resolver.resolversByOwnerPath[config.ExactPathID(owner)]] = owner
 	}
-	ownerContexts := make(map[*config.FileConfigResolver]ownerProjectContext, len(resolver.configsByOwner))
-	for owner, entries := range resolver.configsByOwner {
-		ownerContexts[resolver.resolversByOwnerPath[config.ExactPathID(owner)]] = ownerProjectContext{
-			hasOptions: config.HasProjectOptions(entries), rootDirectory: owner,
-		}
-	}
-	singleHasOptions := config.HasProjectOptions(resolver.config)
-	var policies map[target.File]config.ProjectPolicy
+	policies := make(map[target.File]config.ProjectPolicy, len(files))
+	resolvedPolicies := make(map[*config.MergedConfig]config.ProjectPolicy)
 	for _, file := range files {
-		hasOptions := singleHasOptions
 		defaultRootDirectory := resolver.defaultRootDirectory
 		if resolver.configsByOwner != nil {
-			context := ownerContexts[resolver.resolversByOwnerPath[config.ExactPathID(file.ConfigDirectory)]]
-			hasOptions = context.hasOptions
-			defaultRootDirectory = context.rootDirectory
-		}
-		if !hasOptions {
-			continue
+			defaultRootDirectory = ownerRoots[resolver.resolversByOwnerPath[config.ExactPathID(file.ConfigDirectory)]]
 		}
 		resolved, ok := resolver.ResolveTarget(file)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("%s: missing governing configuration", file.Path)
 		}
-		policy, err := config.ResolveProjectPolicy(resolved, defaultRootDirectory)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", file.Path, err)
-		}
-		if policy == (config.ProjectPolicy{}) {
-			continue
-		}
-		if policies == nil {
-			policies = make(map[target.File]config.ProjectPolicy)
+		policy, cached := resolvedPolicies[resolved.MergedConfig]
+		if !cached {
+			var err error
+			policy, err = config.ResolveProjectPolicy(resolved, defaultRootDirectory)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", file.Path, err)
+			}
+			resolvedPolicies[resolved.MergedConfig] = policy
 		}
 		policies[file] = policy
 	}

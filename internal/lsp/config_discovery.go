@@ -300,7 +300,6 @@ func decodeConfigTransactionResult(raw any, target any, method string) error {
 
 type preparedLSPConfigSnapshot struct {
 	configs                  map[string]config.RslintConfig
-	tsConfigPaths            map[string][]string
 	ownerIndex               *target.OwnerIndex
 	unavailableConfigs       map[string]struct{}
 	fallbackConfig           config.RslintConfig
@@ -600,7 +599,6 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 	ruleCatalog := rules.All()
 	snapshot := &preparedLSPConfigSnapshot{
 		configs:            make(map[string]config.RslintConfig, len(configCatalog.Configs)),
-		tsConfigPaths:      make(map[string][]string, len(configCatalog.Configs)),
 		unavailableConfigs: make(map[string]struct{}),
 		transactionID:      configCatalog.TransactionID,
 		// An empty catalog is a successfully committed absence of a module
@@ -629,13 +627,6 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			)
 		}
 		seenConfigDirs[configID] = configDir
-		if !config.HasProjectOptions(entries) {
-			paths, err := resolveTsConfigPathsWithFS(entries, configDir, fsys)
-			if err != nil {
-				return nil, fmt.Errorf("resolve tsconfig paths for %q: %w", configDir, err)
-			}
-			snapshot.tsConfigPaths[configDir] = paths
-		}
 		snapshot.configs[configDir] = append(config.RslintConfig(nil), entries...)
 	}
 
@@ -650,7 +641,6 @@ func (s *Server) prepareDiscoveredConfigSnapshot(
 			continue
 		}
 		snapshot.configs[configDir] = config.RslintConfig{}
-		snapshot.tsConfigPaths[configDir] = nil
 		snapshot.unavailableConfigs[configDir] = struct{}{}
 	}
 	// Build the owner index only after all successful and unavailable
@@ -826,7 +816,6 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.invalidateOpenDocumentDiagnostics()
 	s.invalidateLintProjectCaches()
 	s.jsConfigs = snapshot.configs
-	s.tsConfigPathsByConfig = snapshot.tsConfigPaths
 	s.jsConfigOwnerIndex = snapshot.ownerIndex
 	s.jsFileConfigResolvers = snapshot.fileConfigResolvers
 	s.jsUnavailableConfigs = snapshot.unavailableConfigs
@@ -848,15 +837,4 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	if err := s.RefreshDiagnostics(ctx); err != nil {
 		log.Printf("[rslint] Failed to refresh diagnostics after config refresh: %v", err)
 	}
-}
-
-func resolveTsConfigPathsWithFS(cfg config.RslintConfig, cwd string, fsys vfs.FS) ([]string, error) {
-	paths, err := config.ResolveTsConfigPaths(cfg, cwd, fsys)
-	if err != nil {
-		return nil, err
-	}
-	for index, projectPath := range paths {
-		paths[index] = tspath.NormalizePath(projectPath)
-	}
-	return paths, nil
 }

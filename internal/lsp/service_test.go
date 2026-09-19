@@ -65,7 +65,6 @@ func TestNewServerInitializesRuleCatalog(t *testing.T) {
 }
 
 func installJSConfigsForTest(s *Server, configs map[string]config.RslintConfig) {
-	clear(s.tsConfigPathsByConfig)
 	s.jsConfigs = configs
 	s.jsConfigOwnerIndex = target.NewOwnerIndex(configs, s.fs)
 	s.jsUnavailableConfigs = make(map[string]struct{})
@@ -1448,11 +1447,13 @@ func TestCloseAndReopen(t *testing.T) {
 
 func TestDocumentProjectPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 	s := newTestServer()
-	s.fs = &mockFS{files: map[string]bool{"/project-a/tsconfig.json": true}}
+	s.fs = &mockFS{files: map[string]bool{
+		"/project-a/tsconfig.json": true,
+		"/project-b/tsconfig.json": true,
+	}}
 
-	// Config A has a project that resolves; Config B has neither a project
-	// nor an auto-detectable tsconfig. The two must be tracked independently
-	// so B's missing tsconfig does not disable filtering for A's files.
+	// Config A enables a project; Config B has a tsconfig but does not request
+	// it. Each document must use only its own effective project declaration.
 	installJSConfigsForTest(s, map[string]config.RslintConfig{
 		"/project-a": {
 			{
@@ -1561,11 +1562,11 @@ func TestDocumentProjectPaths_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.
 
 func TestDocumentProjectPaths_NoConfig(t *testing.T) {
 	s := newTestServer()
-	s.fs = &mockFS{files: map[string]bool{}}
+	s.fs = &mockFS{files: map[string]bool{"/project/tsconfig.json": true}}
 
 	s.cwd = "/project"
 	if paths := s.documentLintSnapshot("file:///project/target.ts").typeScriptConfigPaths; paths != nil {
-		t.Errorf("expected no project paths when no config or tsconfig exists, got %v", paths)
+		t.Errorf("expected no implicit project paths when no config exists, got %v", paths)
 	}
 }
 

@@ -39,16 +39,28 @@ func (s *Session) buildProjectsWithOptionsForTest(
 	singleThreaded bool,
 ) (ProjectSet, error) {
 	t.Helper()
-	resolver := configLint.NewResolver(configLint.ResolverOptions{
-		ConfigsByOwner: configs, FS: s.FS(), PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+	return s.buildProjectsForTest(t, ProjectBuildRequest{
+		Configs: configs, Targets: plan, Scope: scope, SingleThreaded: singleThreaded,
 	})
-	policies, err := resolver.ProjectPolicies(plan.Files)
-	if err != nil {
-		return ProjectSet{}, err
+}
+
+func (s *Session) buildProjectsForTest(t *testing.T, request ProjectBuildRequest) (ProjectSet, error) {
+	t.Helper()
+	if len(request.Targets.Files) > 0 && request.Policies == nil {
+		pathSpaces := request.Targets.PathSpaces()
+		if pathSpaces == nil {
+			pathSpaces = rslintconfig.NewPathSpaceSnapshot(request.Configs, s.FS())
+		}
+		resolver := configLint.NewResolver(configLint.ResolverOptions{
+			ConfigsByOwner: request.Configs, FS: s.FS(), PathSpaces: pathSpaces, Catalog: rule.NewCatalog(),
+		})
+		var err error
+		request.Policies, err = resolver.ProjectPolicies(request.Targets.Files)
+		if err != nil {
+			return ProjectSet{}, err
+		}
 	}
-	return s.BuildProjects(ProjectBuildRequest{
-		Configs: configs, Targets: plan, Policies: policies, Scope: scope, SingleThreaded: singleThreaded,
-	})
+	return s.BuildProjects(request)
 }
 
 func TestBuildProjectsSeparatesProjectPolicies(t *testing.T) {
@@ -402,31 +414,49 @@ func TestBuildProjectsSkipsOwnersWithoutTargets(t *testing.T) {
 	}
 }
 
-func TestBuildProjectsPreservesOwnerDeclarationsAcrossTargets(t *testing.T) {
+func TestBuildProjectsKeepsEffectiveCandidatesSeparateFromTypeCheckScope(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
 	config := rslintconfig.RslintConfig{
 		{Files: []string{"**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(false)}}},
 		{Files: []string{"b/**"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"a/tsconfig.json", "b/custom.json"}}}},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{dir + "/a/src/file.ts", dir + "/b/src/file.ts"}})
+	files := []string{dir + "/a/src/file.ts", dir + "/b/src/file.ts"}
+	plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: files})
 	if err != nil {
 		t.Fatal(err)
 	}
-	session := NewSession(fsys)
-	projects, err := session.buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, Targeted, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if projects.Len() != 2 {
-		t.Fatalf("raw declarations did not retain both target owners: %d", projects.Len())
-	}
-	binding, err := session.LoadAPI(projects, plan, dir, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(binding.Programs) != 2 || len(binding.TargetsByProgram[0]) != 1 || len(binding.TargetsByProgram[1]) != 1 {
-		t.Fatalf("raw declarations lost a target: %v", binding.TargetsByProgram)
+	for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
+		t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
+			session := NewSession(fsys)
+			projects, err := session.buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, scope, true)
+			wantProjects := 1
+			if scope == AllDeclared {
+				wantProjects = 2
+			}
+			if err != nil || projects.Len() != wantProjects {
+				t.Fatalf("projects=%d, want %d; error=%v", projects.Len(), wantProjects, err)
+			}
+			for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
+				binding, err := load(projects, plan, dir, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				seen := 0
+				for index, boundFiles := range binding.TargetsByProgram {
+					for _, file := range boundFiles {
+						seen++
+						typed := index < projects.Len()
+						if typed != (file == files[1]) {
+							t.Fatalf("target %s borrowed an inapplicable project: %v", file, binding.TargetsByProgram)
+						}
+					}
+				}
+				if seen != len(files) {
+					t.Fatalf("project selection changed lint targets: %v", binding.TargetsByProgram)
+				}
+			}
+		})
 	}
 }
 
@@ -463,6 +493,119 @@ func TestBuildProjectsDeduplicatesExplicitProjectsAcrossOwners(t *testing.T) {
 	}
 }
 
+func TestBuildProjectPlanReusesCandidatesAcrossRuleConfigs(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	for _, separateRules := range []bool{false, true} {
+		t.Run(strconv.FormatBool(separateRules), func(t *testing.T) {
+			config := projectConfig("a/tsconfig*.json")
+			if separateRules {
+				config = append(config, rslintconfig.ConfigEntry{
+					Files: []string{"**/disabled.ts"}, Rules: rslintconfig.Rules{"no-debugger": "error"},
+				})
+			}
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			plan, err := target.Resolve(target.Request{
+				Config: config, ConfigDirectory: dir, FS: fsys,
+				Files: []string{tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "a/src/disabled.ts")},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			resolver := configLint.NewResolver(configLint.ResolverOptions{
+				Config: config, ConfigDirectory: dir, FS: fsys, PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+			})
+			policies, err := resolver.ProjectPolicies(plan.Files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			counting := &projectGlobCountingFS{FS: fsys}
+			projects := buildProjectPlan(ProjectBuildRequest{Targets: plan, Policies: policies, Scope: Targeted}, counting)
+			if projects.terminalErr != nil || len(projects.specs) != 1 {
+				t.Fatalf("project plan: count=%d, error=%v", len(projects.specs), projects.terminalErr)
+			}
+			if counting.calls != 1 {
+				t.Errorf("expanded one declaration %d times across rule configs, want 1", counting.calls)
+			}
+			groups := groupTargetsByProjects(plan.Files, projects.targetProjects, func(string) []int {
+				t.Fatal("effective candidates must not fall back to owner declarations")
+				return nil
+			})
+			if len(groups) != 1 || len(groups[0].targetIndexes) != 2 {
+				t.Fatalf("one project request split into target groups: %+v", groups)
+			}
+		})
+	}
+}
+
+type projectGlobCountingFS struct {
+	vfs.FS
+	calls int
+}
+
+func (fsys *projectGlobCountingFS) DirectoryExists(path string) bool {
+	fsys.calls++
+	return fsys.FS.DirectoryExists(path)
+}
+
+func TestBuildProjectPlanKeepsProjectPathContextsSeparate(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	patterns := rslintconfig.ProjectPaths{"tsconfig*.json"}
+	base := tspath.ResolvePath(dir, "a")
+	otherBase := tspath.ResolvePath(dir, "b")
+	first := rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: patterns, BaseDirectory: base}}
+	longerPatterns := rslintconfig.ProjectPaths{"a/tsconfig.json", "b/tsconfig.json"}
+	for _, test := range []struct {
+		name          string
+		first, second rslintconfig.ProjectPolicy
+		wantSecond    []string
+	}{
+		{
+			name: "authored base", first: first,
+			second:     rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: patterns, BaseDirectory: otherBase}},
+			wantSecond: []string{tspath.ResolvePath(otherBase, "tsconfig.json")},
+		},
+		{
+			name: "root override", first: first,
+			second:     rslintconfig.ProjectPolicy{ExplicitProject: first.ExplicitProject, TSConfigRootDirOverride: otherBase},
+			wantSecond: []string{tspath.ResolvePath(otherBase, "tsconfig.json")},
+		},
+		{
+			name: "disabled", first: first,
+			second: rslintconfig.ProjectPolicy{ExplicitProject: first.ExplicitProject, ProjectDisabled: true},
+		},
+		{
+			name:       "shared patterns with different lengths",
+			first:      rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: longerPatterns[:1], BaseDirectory: dir}},
+			second:     rslintconfig.ProjectPolicy{ExplicitProject: &rslintconfig.ProjectDeclaration{Patterns: longerPatterns, BaseDirectory: dir}},
+			wantSecond: []string{tspath.ResolvePath(base, "tsconfig.json"), tspath.ResolvePath(otherBase, "tsconfig.json")},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			files := []target.File{
+				testLintTarget(fsys, dir, tspath.ResolvePath(base, "src/file.ts")),
+				testLintTarget(fsys, dir, tspath.ResolvePath(otherBase, "src/file.ts")),
+			}
+			plan := buildProjectPlan(ProjectBuildRequest{
+				Targets: target.Plan{Files: files}, Scope: Targeted,
+				Policies: map[target.File]rslintconfig.ProjectPolicy{files[0]: test.first, files[1]: test.second},
+			}, fsys)
+			if plan.terminalErr != nil {
+				t.Fatal(plan.terminalErr)
+			}
+			for i, want := range [][]string{{tspath.ResolvePath(base, "tsconfig.json")}, test.wantSecond} {
+				var paths []string
+				for _, index := range plan.targetProjects[files[i]] {
+					paths = append(paths, plan.specs[index].tsconfigPath)
+				}
+				if !slices.Equal(paths, want) {
+					t.Errorf("target %d projects=%v, want %v", i, paths, want)
+				}
+			}
+		})
+	}
+}
+
 func TestBuildProjectsPreservesRawDeclarationsAfterEmptyArray(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
 	config := rslintconfig.RslintConfig{
@@ -474,9 +617,22 @@ func TestBuildProjectsPreservesRawDeclarationsAfterEmptyArray(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	projects, err := NewSession(fsys).buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, Targeted, true)
-	if err != nil || projects.Len() != 1 {
-		t.Fatalf("an empty later array changed the raw declaration list: count=%d error=%v", projects.Len(), err)
+	for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
+		t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
+			session := NewSession(fsys)
+			projects, err := session.buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, scope, true)
+			wantProjects := 0
+			if scope == AllDeclared {
+				wantProjects = 1
+			}
+			if err != nil || projects.Len() != wantProjects {
+				t.Fatalf("cleared lint candidate changed type-check scope: count=%d error=%v", projects.Len(), err)
+			}
+			binding, err := session.LoadAPI(projects, plan, dir, true)
+			if err != nil || len(binding.TargetsByProgram[wantProjects]) != 1 {
+				t.Fatalf("cleared target did not use gap lint: %v, %v", binding.TargetsByProgram, err)
+			}
+		})
 	}
 }
 
@@ -489,20 +645,20 @@ func TestBuildProjectsPreservesProjectDeclarationOrder(t *testing.T) {
 		restore    bool
 		wantConfig string
 	}{
-		{"baseline", `{}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched service true", `{"projectService":true}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched service false", `{"projectService":false}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched service null", `{"projectService":null}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched root", `{"tsconfigRootDir":"."}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched root null", `{"tsconfigRootDir":null}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched project false", `{"project":false}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched project null", `{"project":null}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched missing project", `{"project":"missing.json"}`, false, false, "tsconfig.unsafe.json"},
-		{"unmatched project and service", `{"projectService":false,"project":"missing.json"}`, false, false, "tsconfig.unsafe.json"},
+		{"baseline", `{}`, false, false, "tsconfig.safe.json"},
+		{"unmatched service true", `{"projectService":true}`, false, false, "tsconfig.safe.json"},
+		{"unmatched service false", `{"projectService":false}`, false, false, "tsconfig.safe.json"},
+		{"unmatched service null", `{"projectService":null}`, false, false, "tsconfig.safe.json"},
+		{"unmatched root", `{"tsconfigRootDir":"."}`, false, false, "tsconfig.safe.json"},
+		{"unmatched root null", `{"tsconfigRootDir":null}`, false, false, "tsconfig.safe.json"},
+		{"unmatched project false", `{"project":false}`, false, false, "tsconfig.safe.json"},
+		{"unmatched project null", `{"project":null}`, false, false, "tsconfig.safe.json"},
+		{"unmatched missing project", `{"project":"missing.json"}`, false, false, "tsconfig.safe.json"},
+		{"unmatched project and service", `{"projectService":false,"project":"missing.json"}`, false, false, "tsconfig.safe.json"},
 		{"matched project array order", `{"project":["./tsconfig.unsafe.json","./tsconfig.safe.json"]}`, true, false, "tsconfig.unsafe.json"},
 		{"matched reversed project array order", `{"project":["./tsconfig.safe.json","./tsconfig.unsafe.json"]}`, true, false, "tsconfig.safe.json"},
-		{"matched false then restore", `{"project":false}`, true, true, "tsconfig.unsafe.json"},
-		{"matched null then restore", `{"project":null}`, true, true, "tsconfig.unsafe.json"},
+		{"matched false then restore", `{"project":false}`, true, true, "tsconfig.safe.json"},
+		{"matched null then restore", `{"project":null}`, true, true, "tsconfig.safe.json"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := tspath.ResolvePath(archive.Materialize(t, "legacy-policy"), "pkg[1]")
@@ -526,46 +682,50 @@ func TestBuildProjectsPreservesProjectDeclarationOrder(t *testing.T) {
 			wantConfig := test.wantConfig
 			if test.restore {
 				config = append(config, rslintconfig.ConfigEntry{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"./tsconfig.safe.json"}}}})
-				wantConfig = "tsconfig.unsafe.json"
+				wantConfig = "tsconfig.safe.json"
 			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 			plan, err := target.Resolve(target.Request{Config: config, ConfigDirectory: dir, FS: fsys, Files: []string{file}})
 			if err != nil {
 				t.Fatal(err)
 			}
-			session := NewSession(fsys)
-			projects, err := session.buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, Targeted, true)
-			if strings.Contains(test.name, "unmatched missing project") || strings.Contains(test.name, "unmatched project and service") {
-				if err == nil || !strings.Contains(err.Error(), "missing.json") {
-					t.Fatalf("unmatched new fields changed the original declaration error: %v", err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadAPI, session.LoadCLI} {
-				binding, err := load(projects, plan, dir, true)
-				if err != nil {
-					t.Fatal(err)
-				}
-				selected := -1
-				for index, files := range binding.TargetsByProgram {
-					if slices.Contains(files, file) {
-						selected = index
+			for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
+				t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
+					session := NewSession(fsys)
+					projects, err := session.buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, scope, true)
+					if scope == AllDeclared && strings.Contains(test.options, "missing.json") {
+						if err == nil || !strings.Contains(err.Error(), "missing.json") {
+							t.Fatalf("type checking lost raw declaration validation: %v", err)
+						}
+						return
 					}
-				}
-				if selected < 0 || selected >= projects.Len() {
-					t.Fatal("target lost its configured Program")
-				}
-				program := projects.compilerPrograms[selected]
-				if program.Options().ConfigFilePath != tspath.ResolvePath(dir, wantConfig) {
-					t.Fatalf("target selected %q, want %s", program.Options().ConfigFilePath, wantConfig)
-				}
-				codes := program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(file))
-				if wantConfig == "tsconfig.safe.json" && (len(codes) != 1 || codes[0].Code() != 2322) || wantConfig == "tsconfig.unsafe.json" && len(codes) != 0 {
-					t.Fatalf("wrong typed context after policy merge: %v", codes)
-				}
+					if err != nil {
+						t.Fatal(err)
+					}
+					for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadAPI, session.LoadCLI} {
+						binding, err := load(projects, plan, dir, true)
+						if err != nil {
+							t.Fatal(err)
+						}
+						selected := -1
+						for index, files := range binding.TargetsByProgram {
+							if slices.Contains(files, file) {
+								selected = index
+							}
+						}
+						if selected < 0 || selected >= projects.Len() {
+							t.Fatal("target lost its configured Program")
+						}
+						program := projects.compilerPrograms[selected]
+						if program.Options().ConfigFilePath != tspath.ResolvePath(dir, wantConfig) {
+							t.Fatalf("target selected %q, want %s", program.Options().ConfigFilePath, wantConfig)
+						}
+						codes := program.GetSemanticDiagnostics(context.Background(), program.GetSourceFile(file))
+						if wantConfig == "tsconfig.safe.json" && (len(codes) != 1 || codes[0].Code() != 2322) || wantConfig == "tsconfig.unsafe.json" && len(codes) != 0 {
+							t.Fatalf("wrong typed context after policy merge: %v", codes)
+						}
+					}
+				})
 			}
 		})
 	}
@@ -680,10 +840,10 @@ func TestBuildProjectsRootContextsShareExecution(t *testing.T) {
 	}
 }
 
-func TestBuildProjectsKeepsDefaultDisabledTargetsUnbound(t *testing.T) {
+func TestBuildProjectsWithoutEffectiveProjectsKeepTargetsUnbound(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
-		for _, options := range []string{`{"projectService":false}`, `{"projectService":null}`, `{"project":false}`, `{"project":null}`} {
+		for _, options := range []string{`{}`, `{"project":[]}`, `{"projectService":false}`, `{"projectService":null}`, `{"project":false}`, `{"project":null}`} {
 			t.Run(strconv.Itoa(int(scope))+"/"+options, func(t *testing.T) {
 				dir := tspath.NormalizePath(archive.Materialize(t, "a"))
 				var disabled rslintconfig.ParserOptions
@@ -699,10 +859,17 @@ func TestBuildProjectsKeepsDefaultDisabledTargetsUnbound(t *testing.T) {
 				}
 				session := NewSession(fsys)
 				projects, err := session.buildProjectsWithOptionsForTest(t, map[string]rslintconfig.RslintConfig{dir: config}, plan, scope, true)
-				if err != nil || projects.Len() != 1 {
-					t.Fatalf("ordinary target lost default project: %d, %v", projects.Len(), err)
+				wantProjects := 0
+				if scope == AllDeclared {
+					wantProjects = 1
+					if options == `{"project":[]}` {
+						wantProjects = 0
+					}
 				}
-				if projects.compilerPrograms[0].GetSourceFile(files[1]) == nil {
+				if err != nil || projects.Len() != wantProjects {
+					t.Fatalf("implicit project scope: count=%d, want %d, error=%v", projects.Len(), wantProjects, err)
+				}
+				if wantProjects > 0 && projects.compilerPrograms[0].GetSourceFile(files[1]) == nil {
 					t.Fatal("fixture must contain the disabled target in the ordinary Program")
 				}
 				for _, load := range []func(ProjectSet, target.Plan, string, bool) (LoadResult, error){session.LoadCLI, session.LoadAPI} {
@@ -710,7 +877,7 @@ func TestBuildProjectsKeepsDefaultDisabledTargetsUnbound(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if len(binding.Programs) != 2 || !slices.Equal(binding.TargetsByProgram[0], files[:1]) || !slices.Equal(binding.TargetsByProgram[1], files[1:]) {
+					if len(binding.Programs) != wantProjects+1 || len(binding.TargetsByProgram[wantProjects]) != len(files) || !slices.Contains(binding.TargetsByProgram[wantProjects], files[0]) || !slices.Contains(binding.TargetsByProgram[wantProjects], files[1]) {
 						t.Fatalf("disabled target borrowed the default Program: %v", binding.TargetsByProgram)
 					}
 				}
@@ -826,7 +993,7 @@ func TestBuildProjectsRootContextsDeduplicateSharedPath(t *testing.T) {
 	}
 }
 
-func TestLoadProgramsSingleCandidateSkipsRootRanking(t *testing.T) {
+func TestLoadProgramsSingleCandidateRequiresRootMembership(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service_modes.txtar").Materialize(t, ""))
 	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}}}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -848,8 +1015,12 @@ func TestLoadProgramsSingleCandidateSkipsRootRanking(t *testing.T) {
 			set.targetProjects = map[target.File][]int{file: {0}}
 			counting := &targetPlanRealpathCountingFS{FS: fsys, calls: make(map[string]int)}
 			owners := directRootProgramOwners(set, []target.File{file}, counting, true)
-			if !slices.Equal(owners, []int{0}) || len(counting.calls) != 0 {
-				t.Fatalf("single candidate performed root ranking: owners=%v Realpath=%v", owners, counting.calls)
+			wantOwner := -1
+			if name == "a.ts" {
+				wantOwner = 0
+			}
+			if !slices.Equal(owners, []int{wantOwner}) {
+				t.Fatalf("single candidate bypassed root membership: owners=%v, want %d", owners, wantOwner)
 			}
 			plan := target.Plan{Files: []target.File{file}}
 			binding, err := session.LoadAPI(set, plan, dir, true)
@@ -1967,7 +2138,7 @@ func TestLoadProgramsUsesGoverningConfigProjectOrder(t *testing.T) {
 		t.Fatalf("overlapping target must bind to the first declared project, got %v", binding.TargetsByProgram)
 	}
 	targetedContext := newBuildContext(fsys)
-	targeted, err := sessionForTest(targetedContext).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: true})
+	targeted, err := sessionForTest(targetedContext).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: true})
 	if err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
 	}
@@ -2003,7 +2174,7 @@ func TestLoadProgramsPrefersLaterDirectRootOverEarlierImport(t *testing.T) {
 		testLintTarget(fsys, dir, filepath.Join(dir, "target.ts")),
 	}}
 
-	set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
+	set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
 	if err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
 	}
@@ -2033,7 +2204,7 @@ func TestLoadProgramsPrefersLaterDirectRootOverEarlierImport(t *testing.T) {
 	// The same ownership rule must also hold when broad loading has already
 	// materialized every configured Program.
 	broadContext := newBuildContext(fsys)
-	all, err := sessionForTest(broadContext).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Scope: AllDeclared, SingleThreaded: true})
+	all, err := sessionForTest(broadContext).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Scope: AllDeclared, SingleThreaded: true})
 	if err != nil {
 		t.Fatalf("BuildProject: %v", err)
 	}
@@ -2059,7 +2230,7 @@ func TestBuildTargetProjectPredictionCannotOverrideEarlierDirectRoot(t *testing.
 		testLintTarget(fsys, dir, filepath.Join(dir, "nested/target.ts")),
 	}}
 
-	set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-first.json", "./nested/tsconfig.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
+	set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-first.json", "./nested/tsconfig.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
 	if err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
 	}
@@ -2089,7 +2260,7 @@ func TestBuildTargetProjectIgnoresUnreachedPredictedConfigError(t *testing.T) {
 		testLintTarget(fsys, dir, filepath.Join(dir, "nested/target.ts")),
 	}}
 
-	set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-first.json", "./nested/unreadable.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
+	set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-first.json", "./nested/unreadable.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
 	if err != nil {
 		t.Fatalf("unreached speculative parse became observable: %v", err)
 	}
@@ -2108,7 +2279,7 @@ func TestBuildTargetProjectIgnoresUnreachedPredictedConfigError(t *testing.T) {
 				broadPlan.Files = append(append([]target.File(nil), plan.Files...),
 					testLintTarget(fsys, laterOwner, tspath.ResolvePath(laterOwner, "target.ts")))
 			}
-			_, err := NewSession(fsys).BuildProjects(ProjectBuildRequest{
+			_, err := NewSession(fsys).buildProjectsForTest(t, ProjectBuildRequest{
 				Configs: configs, Targets: broadPlan, Scope: ActiveOwners, SingleThreaded: singleThreaded,
 			})
 			if err == nil || !strings.Contains(err.Error(), "unreadable.json") || !strings.Contains(err.Error(), "no parsed config returned") {
@@ -2188,7 +2359,7 @@ func TestBuildProjectsPreservesBroadRootFallback(t *testing.T) {
 			for _, scope := range []ProjectScope{AllDeclared, ActiveOwners} {
 				for _, singleThreaded := range []bool{false, true} {
 					session := NewSession(fsys)
-					projects, err := session.BuildProjects(ProjectBuildRequest{
+					projects, err := session.buildProjectsForTest(t, ProjectBuildRequest{
 						Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(test.projects...)},
 						Targets: plan, Scope: scope, SingleThreaded: singleThreaded,
 					})
@@ -2246,7 +2417,7 @@ func TestBuildProjectsPreservesBroadImportedSourceAliases(t *testing.T) {
 			plan := target.Plan{Files: []target.File{file}}
 			for _, scope := range []ProjectScope{AllDeclared, ActiveOwners} {
 				session := NewSession(fsys)
-				projects, err := session.BuildProjects(ProjectBuildRequest{
+				projects, err := session.buildProjectsForTest(t, ProjectBuildRequest{
 					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig.json")},
 					Targets: plan, Scope: scope, SingleThreaded: singleThreaded,
 				})
@@ -2291,7 +2462,7 @@ func TestBuildTargetProjectFallsBackToFirstImportOnlyAfterRootScan(t *testing.T)
 		testLintTarget(fsys, dir, filepath.Join(dir, "target.ts")),
 	}}
 
-	set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
+	set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
 	if err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
 	}
@@ -2337,7 +2508,7 @@ func TestBuildTargetProjectSkipsImportFallbackWithUnsupportedExtension(t *testin
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			context := newBuildContext(fsys)
-			set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(test.project)}, Targets: plan, Scope: Targeted, SingleThreaded: false})
+			set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(test.project)}, Targets: plan, Scope: Targeted, SingleThreaded: false})
 			if err != nil {
 				t.Fatalf("BuildTargetProject: %v", err)
 			}
@@ -2363,7 +2534,7 @@ func TestBuildTargetProjectKeepsDirectAndImportFallbackTiersPerTarget(t *testing
 		testLintTarget(fsys, dir, filepath.Join(dir, "direct.ts")),
 		testLintTarget(fsys, dir, filepath.Join(dir, "fallback.ts")),
 	}}
-	set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
+	set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
 	if err != nil {
 		t.Fatalf("BuildTargetProject: %v", err)
 	}
@@ -2412,7 +2583,7 @@ func TestBuildTargetProjectBuildsMultipleDirectWinnersInParallel(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
+		set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
 		done <- result{set: set, err: err}
 	}()
 
@@ -2449,15 +2620,15 @@ func TestBuildTargetProjectsDeduplicatesSharedDirectWinnerAcrossOwners(t *testin
 		testLintTarget(fsys, rootDir, filepath.Join(rootDir, "root.ts")),
 		testLintTarget(fsys, childDir, filepath.Join(childDir, "child.ts")),
 	}}
-	set, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{
+	set, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{
 		rootDir:  projectConfig("./tsconfig.json"),
 		childDir: projectConfig("../tsconfig.json"),
 	}, Targets: plan, Scope: Targeted, SingleThreaded: false})
 	if err != nil {
 		t.Fatalf("BuildTargetProjects: %v", err)
 	}
-	if set.Len() != 1 || len(set.configOrders[0]) != 2 {
-		t.Fatalf("shared direct winner was not deduplicated: Programs=%d orders=%v", set.Len(), set.configOrders)
+	if set.Len() != 1 || !slices.Equal(set.targetProjects[plan.Files[0]], []int{0}) || !slices.Equal(set.targetProjects[plan.Files[1]], []int{0}) {
+		t.Fatalf("shared direct winner was not deduplicated: Programs=%d candidates=%v", set.Len(), set.targetProjects)
 	}
 	binding, err := sessionForTest(context).LoadAPI(set, plan, rootDir, false)
 	if err != nil {
@@ -2495,7 +2666,7 @@ func TestBuildTargetProjectStreamsConfirmedBuildsDuringRootScan(t *testing.T) {
 	}}
 	done := make(chan error, 1)
 	go func() {
-		_, err := sessionForTest(context).BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
+		_, err := sessionForTest(context).buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-a.json", "./tsconfig-b.json")}, Targets: plan, Scope: Targeted, SingleThreaded: false})
 		done <- err
 	}()
 
@@ -2568,7 +2739,7 @@ func TestBuildTargetProjectUsesFrozenTargetIdentityForMembership(t *testing.T) {
 			}}}
 
 			session := sessionForTest(newBuildContext(fsys))
-			set, err := session.BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{projectDir: projectConfig("./tsconfig.json")}, Targets: plan, Scope: Targeted, SingleThreaded: true})
+			set, err := session.buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{projectDir: projectConfig("./tsconfig.json")}, Targets: plan, Scope: Targeted, SingleThreaded: true})
 			if err != nil {
 				t.Fatalf("BuildTargetProject: %v", err)
 			}
@@ -2652,7 +2823,7 @@ func TestBuildTargetProjectRecomputesImportFallbackAfterFix(t *testing.T) {
 		testLintTarget(fsys, dir, filepath.Join(dir, "target.ts")),
 	}}
 
-	initialSet, err := session.BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
+	initialSet, err := session.buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
 	if err != nil {
 		t.Fatalf("initial BuildTargetProject: %v", err)
 	}
@@ -2668,7 +2839,7 @@ func TestBuildTargetProjectRecomputesImportFallbackAfterFix(t *testing.T) {
 		t.Fatalf("rewrite main.ts: %v", err)
 	}
 	session.InvalidateSourceSnapshots()
-	afterFixSet, err := session.BuildProjects(ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
+	afterFixSet, err := session.buildProjectsForTest(t, ProjectBuildRequest{Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: Targeted, SingleThreaded: true})
 	if err != nil {
 		t.Fatalf("post-fix BuildTargetProject: %v", err)
 	}
@@ -2767,24 +2938,6 @@ func TestTargetResolve_RejectsCanonicalTargetWithDifferentOwners(t *testing.T) {
 	}
 }
 
-func TestTargetPlanActiveOwnersSelectOnlyGoverningConfigs(t *testing.T) {
-	configMap := map[string]rslintconfig.RslintConfig{
-		"/repo/a": {{Rules: rslintconfig.Rules{"no-debugger": "error"}}},
-		"/repo/b": {{LanguageOptions: &rslintconfig.LanguageOptions{
-			ParserOptions: &rslintconfig.ParserOptions{Project: []string{"./missing.json"}},
-		}}},
-	}
-	active := configsForActiveOwners(configMap, target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: "/repo/a/index.ts",
-		CanonicalPath: "/repo/a/index.ts"}, ConfigDirectory: "/repo/a",
-	}}})
-	if len(active) != 1 || active["/repo/a"] == nil {
-		t.Fatalf("expected only the governing config, got %v", active)
-	}
-	if _, present := active["/repo/b"]; present {
-		t.Fatalf("inactive config unexpectedly selected: %v", active)
-	}
-}
-
 func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
 	root := t.TempDir()
 	activeDir := filepath.Join(root, "active")
@@ -2806,7 +2959,7 @@ func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
 		CanonicalPath: tspath.ResolvePath(activeDir, "index.ts")}, ConfigDirectory: activeDir,
 	}}}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	emptySet, err := sessionForTest(newBuildContext(fsys)).BuildProjects(ProjectBuildRequest{Configs: configMap, Targets: target.Plan{}, Scope: ActiveOwners, SingleThreaded: true})
+	emptySet, err := sessionForTest(newBuildContext(fsys)).buildProjectsForTest(t, ProjectBuildRequest{Configs: configMap, Targets: target.Plan{}, Scope: ActiveOwners, SingleThreaded: true})
 	if err != nil || len(emptySet.compilerPrograms) != 0 {
 		t.Fatalf("an empty target plan must not build config projects: programs=%d err=%v", len(emptySet.compilerPrograms), err)
 	}
@@ -2818,13 +2971,13 @@ func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
 		{
 			name: "all projects from active owners",
 			build: func(session *Session) (ProjectSet, error) {
-				return session.BuildProjects(ProjectBuildRequest{Configs: configMap, Targets: plan, Scope: ActiveOwners, SingleThreaded: true})
+				return session.buildProjectsForTest(t, ProjectBuildRequest{Configs: configMap, Targets: plan, Scope: ActiveOwners, SingleThreaded: true})
 			},
 		},
 		{
 			name: "targeted projects from active owners",
 			build: func(session *Session) (ProjectSet, error) {
-				return session.BuildProjects(ProjectBuildRequest{Configs: configMap, Targets: plan, Scope: Targeted, SingleThreaded: true})
+				return session.buildProjectsForTest(t, ProjectBuildRequest{Configs: configMap, Targets: plan, Scope: Targeted, SingleThreaded: true})
 			},
 		},
 	}
@@ -2836,7 +2989,7 @@ func TestPlainProgramSetSkipsInactiveConfigProjects(t *testing.T) {
 			}
 		})
 	}
-	if _, err := sessionForTest(newBuildContext(fsys)).BuildProjects(ProjectBuildRequest{Configs: configMap, Scope: AllDeclared, SingleThreaded: true}); err == nil || !strings.Contains(err.Error(), "missing.json") {
+	if _, err := sessionForTest(newBuildContext(fsys)).buildProjectsForTest(t, ProjectBuildRequest{Configs: configMap, Scope: AllDeclared, SingleThreaded: true}); err == nil || !strings.Contains(err.Error(), "missing.json") {
 		t.Fatalf("the all-project type-check scope must still reject the inactive missing project, got %v", err)
 	}
 }

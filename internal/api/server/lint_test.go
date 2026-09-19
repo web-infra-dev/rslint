@@ -386,9 +386,12 @@ func TestHandleLint_ProjectServiceUsesTargetConfigAndOverlay(t *testing.T) {
 	}{
 		{name: "nearest service", projectEntries: `{"languageOptions":{"parserOptions":{"projectService":true}}}`},
 		{name: "explicit root", projectEntries: `{"languageOptions":{"parserOptions":{"projectService":false,"project":"tsconfig.json"}}}`, wantDiagnostics: 1},
-		{name: "first declared project is root", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}}`, wantDiagnostics: 1},
-		{name: "first declared project is nested", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}}`},
-		{name: "unmatched project remains declared", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":"missing.json"}}}`, wantError: "missing.json"},
+		{name: "later project selects nested", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}}`},
+		{name: "later project selects root", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}}`, wantDiagnostics: 1},
+		{name: "unmatched missing project is unused", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":"missing.json"}}}`},
+		{name: "effective missing project fails", projectEntries: `{"languageOptions":{"parserOptions":{"project":"missing.json"}}}`, wantError: "missing.json"},
+		{name: "omitted project does not use root tsconfig", projectEntries: `{}`},
+		{name: "empty project clears prior project", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":[]}}}`},
 		{name: "unmatched service is neutral", projectEntries: `{"languageOptions":{"parserOptions":{"project":"pkg/tsconfig.json"}}},{"files":["unused.ts"],"languageOptions":{"parserOptions":{"projectService":true}}}`},
 		{name: "matched project false is gap", projectEntries: `{"languageOptions":{"parserOptions":{"project":"tsconfig.json"}}},{"languageOptions":{"parserOptions":{"project":false}}}`},
 	} {

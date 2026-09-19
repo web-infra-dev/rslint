@@ -148,6 +148,14 @@ export const other = value;
 {"compilerOptions":{"noLib":true},"files":["unowned.ts"]}
 -- disabled-binding/unowned.ts --
 export const unowned = 1;
+-- disabled-binding-js/tsconfig.json --
+{"compilerOptions":{"noLib":true,"allowJs":true,"module":"esnext","moduleResolution":"bundler"},"files":["target.js","other.js"]}
+-- disabled-binding-js/target.js --
+import { other } from './other';
+export const value = (() => { var local = other; return local; })();
+-- disabled-binding-js/other.js --
+import { value } from './target';
+export const other = value;
 -- snapshot-options/tsconfig.json --
 {"compilerOptions":{"noLib":true,"module":"esnext","moduleResolution":"bundler","paths":{"payload":["./unsafe.d.ts"]}},"files":["target.ts"]}
 -- snapshot-options/target.ts --

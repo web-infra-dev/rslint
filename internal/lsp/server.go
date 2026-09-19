@@ -215,11 +215,8 @@ type Server struct {
 	// JS/TS config boundaries. They participate in ownership but suppress lint.
 	jsUnavailableConfigs map[string]struct{}
 	fallbackConfig       config.RslintConfig
-	// Ordinary project declarations are expanded once per owner generation.
-	// Service/root/reset options instead use the document's effective config.
-	tsConfigPathsByConfig map[string][]string
-	documents             map[lsproto.DocumentUri]string                // URI -> content
-	diagnostics           map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
+	documents            map[lsproto.DocumentUri]string                // URI -> content
+	diagnostics          map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 	// ruleCatalog is the immutable Go-plus-object-plugin catalog committed with
 	// the current configuration generation.
 	ruleCatalog *rule.Catalog

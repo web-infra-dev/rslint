@@ -664,6 +664,208 @@ func TestPrepareDiscoveredConfigSnapshotUsesChildGitignoreSourceBoundaries(t *te
 	}
 }
 
+func TestPrepareDiscoveredConfigSnapshotDefersProjectPathsUntilDocumentMatch(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	fsys := bundled.WrapFS(osvfs.FS())
+	catalog := &discovery.ConfigCatalog{
+		TransactionID: "document-projects",
+		Configs: map[string]config.RslintConfig{root: {
+			{Rules: config.Rules{"no-var": "error"}},
+			{
+				Files: []string{"**/*.ts"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+					Project: config.ProjectPaths{"./missing.json"},
+				}},
+			},
+		}},
+	}
+	s := newTestServer()
+	s.cwd, s.fs = root, fsys
+	prepared, err := s.prepareDiscoveredConfigSnapshot(fsys, catalog)
+	if err != nil {
+		t.Fatalf("unmatched project prevented config preparation: %v", err)
+	}
+	completed, err := completeDiscoveredConfigSnapshot(prepared, nil, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.commitDiscoveredConfigSnapshot(context.Background(), completed)
+	javascript := s.documentLintSnapshot(documentURIFromPath(tspath.ResolvePath(root, "script.js")))
+	if !javascript.configResolved || javascript.unavailable || javascript.projectPolicyError != nil || len(javascript.typeScriptConfigPaths) != 0 {
+		t.Fatalf("unmatched project affected JavaScript snapshot: %+v", javascript)
+	}
+	typescript := s.documentLintSnapshot(documentURIFromPath(tspath.ResolvePath(root, "source.ts")))
+	if typescript.projectPolicyError == nil || !strings.Contains(typescript.projectPolicyError.Error(), "missing.json") {
+		t.Fatalf("matched missing project error = %v", typescript.projectPolicyError)
+	}
+}
+
+func TestHandleConfigRefreshPublishesEffectiveProjectErrors(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		options *config.ParserOptions
+		message string
+	}{
+		{
+			name:    "missing project",
+			options: &config.ParserOptions{Project: config.ProjectPaths{"./missing.json"}},
+			message: "missing.json",
+		},
+		{
+			name:    "unmatched project glob",
+			options: &config.ParserOptions{Project: config.ProjectPaths{"./missing-*.json"}},
+			message: "matched no files",
+		},
+		{
+			name: "conflicting project options",
+			options: &config.ParserOptions{
+				Project: config.ProjectPaths{"./tsconfig.json"}, ProjectService: config.BoolPtr(true),
+			},
+			message: "projectService",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			s, outgoing, root := newConfigRefreshTestServer(t)
+			const source = "export function read() { var value = 1; return value; }\n"
+			files := []string{"source.ts", "script.js", "ignored.ts", "node_modules/dependency/index.ts"}
+			for _, name := range files {
+				filePath := tspath.ResolvePath(root, name)
+				if err := os.MkdirAll(tspath.GetDirectoryPath(filePath), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filePath, []byte(source), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(tspath.ResolvePath(root, "tsconfig.json"), []byte(`{"compilerOptions":{"noLib":true},"files":["source.ts"]}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			s.defaultLibraryPath = bundled.LibPath()
+			if _, err := s.handleInitialize(context.Background(), &lsproto.InitializeParams{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+				t.Fatal(err)
+			}
+			defer s.session.Close()
+			for _, name := range files {
+				uri := documentURIFromPath(tspath.ResolvePath(root, name))
+				s.documents[uri] = source
+				language := lsproto.LanguageKindTypeScript
+				if strings.HasSuffix(name, ".js") {
+					language = lsproto.LanguageKindJavaScript
+				}
+				s.session.DidOpenFile(context.Background(), uri, 1, source, language)
+			}
+			refresh := func(reason string, options *config.ParserOptions) {
+				t.Helper()
+				entries := config.RslintConfig{
+					{Ignores: []string{"ignored.ts"}},
+					{Rules: config.Rules{"no-var": "error"}},
+					{
+						Files:           []string{"**/*.ts"},
+						LanguageOptions: &config.LanguageOptions{ParserOptions: options},
+					},
+				}
+				data, err := json.Marshal(entries)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(tspath.ResolvePath(root, "rslint.config.mjs"), []byte("export default "+string(data)+";\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				result := startConfigRefreshForTest(s, reason)
+				completeSuccessfulConfigRefreshForTest(t, s, outgoing, entries)
+				if completed := awaitConfigRefreshResult(t, result); completed.err != nil {
+					t.Fatalf("refresh failed instead of isolating the document error: %v", completed.err)
+				}
+			}
+			publish := func(name string) []*lsproto.Diagnostic {
+				t.Helper()
+				uri := documentURIFromPath(tspath.ResolvePath(root, name))
+				s.pushDiagnostics(uri)
+				select {
+				case message := <-outgoing:
+					request := message.AsRequest()
+					params, ok := request.Params.(*lsproto.PublishDiagnosticsParams)
+					if request.Method != "textDocument/publishDiagnostics" || !ok || params.Uri != uri {
+						t.Fatalf("unexpected publication: %+v", request)
+					}
+					return params.Diagnostics
+				case <-time.After(5 * time.Second):
+					t.Fatal("timed out waiting for diagnostics")
+					return nil
+				}
+			}
+			assertRuleDiagnostic := func(name string) {
+				t.Helper()
+				diagnostics := publish(name)
+				if len(diagnostics) != 1 || diagnostics[0].Message.String == nil || !strings.HasPrefix(*diagnostics[0].Message.String, "[no-var]") {
+					t.Fatalf("%s: expected no-var diagnostic, got %+v", name, diagnostics)
+				}
+			}
+			valid := &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}
+			refresh("initial", valid)
+			assertRuleDiagnostic("source.ts")
+			uri := documentURIFromPath(tspath.ResolvePath(root, "source.ts"))
+			if len(s.diagnostics[uri]) != 1 {
+				t.Fatal("initial rule diagnostic was not cached")
+			}
+			previousDiagnostics := s.diagnostics[uri]
+			generation := s.eslintPluginConfigGeneration
+			refresh("config-change", test.options)
+			if generation == s.eslintPluginConfigGeneration {
+				t.Fatal("document project error prevented the new config generation from committing")
+			}
+			// Exercise publication's own stale-fix cleanup, independently of the
+			// config refresh transaction's diagnostic invalidation.
+			s.diagnostics[uri] = previousDiagnostics
+			diagnostics := publish("source.ts")
+			if len(diagnostics) != 1 || diagnostics[0].Message.String == nil ||
+				!strings.Contains(*diagnostics[0].Message.String, test.message) ||
+				!strings.HasPrefix(*diagnostics[0].Message.String, "Project configuration error:") ||
+				diagnostics[0].Source == nil || *diagnostics[0].Source != "rslint" ||
+				diagnostics[0].Severity == nil || *diagnostics[0].Severity != lsproto.DiagnosticSeverityError ||
+				diagnostics[0].Range != (lsproto.Range{}) {
+				t.Fatalf("expected a visible project configuration error, got %+v", diagnostics)
+			}
+			if _, stale := s.diagnostics[uri]; stale {
+				t.Fatal("project error retained stale rule diagnostics and fixes")
+			}
+			actions, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
+				TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+				Range:        lsproto.Range{End: lsproto.Position{Character: uint32(len(source))}},
+			})
+			if err != nil || actions.CommandOrCodeActionArray == nil || len(*actions.CommandOrCodeActionArray) != 0 {
+				t.Fatalf("configuration error offered rule actions: %+v, %v", actions, err)
+			}
+			fixes, err := s.handleFixAllCodeAction(context.Background(), uri)
+			if err != nil || fixes.CommandOrCodeActionArray == nil || len(*fixes.CommandOrCodeActionArray) != 0 {
+				t.Fatalf("invalid project offered fixes: %+v, %v", fixes, err)
+			}
+			assertRuleDiagnostic("script.js")
+			for _, name := range files[2:] {
+				if diagnostics := publish(name); len(diagnostics) != 0 {
+					t.Fatalf("excluded %s received project diagnostics: %+v", name, diagnostics)
+				}
+			}
+			canceled, cancel := context.WithCancel(context.Background())
+			cancel()
+			s.backgroundCtx = canceled
+			if diagnostics := publish("source.ts"); len(diagnostics) != 0 {
+				t.Fatalf("cancellation was mislabeled as a project error: %+v", diagnostics)
+			}
+			s.backgroundCtx = context.Background()
+			refresh("config-change", valid)
+			assertRuleDiagnostic("source.ts")
+			fixes, err = s.handleFixAllCodeAction(context.Background(), uri)
+			if err != nil || fixes.CommandOrCodeActionArray == nil || len(*fixes.CommandOrCodeActionArray) == 0 {
+				t.Fatalf("correcting the project did not restore fixes: %+v, %v", fixes, err)
+			}
+		})
+	}
+}
+
 func TestCompleteDiscoveredConfigSnapshotBuildsOneResolverPerOwner(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	child := tspath.NormalizePath(filepath.Join(root, "packages", "app"))

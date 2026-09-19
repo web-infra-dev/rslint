@@ -52,7 +52,7 @@ func acquireSpeculativeGeneration(
 		return emptyLintGeneration(environment.processCwd), nil, nil
 	}
 	if snapshot.projectPolicyError != nil {
-		return linter.Generation{}, nil, snapshot.projectPolicyError
+		return linter.Generation{}, nil, &documentProjectConfigError{cause: snapshot.projectPolicyError}
 	}
 
 	files := make(map[string]string, len(environment.openFiles)+2)

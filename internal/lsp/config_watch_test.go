@@ -97,7 +97,7 @@ func TestHandleDidChangeWatchedFilesInvalidatesTypeInfoForTSConfigVariants(t *te
 	}
 }
 
-func TestHandleDidChangeWatchedFilesInvalidatesOrdinaryProjectPathsWithoutOpenDocuments(t *testing.T) {
+func TestHandleDidChangeWatchedFilesReevaluatesProjectPathsWithoutOpenDocuments(t *testing.T) {
 	s := newTestServer()
 	fsys := &mockFS{files: map[string]bool{"/project/custom.json": true}}
 	s.fs = fsys
@@ -111,19 +111,13 @@ func TestHandleDidChangeWatchedFilesInvalidatesOrdinaryProjectPathsWithoutOpenDo
 		t.Fatalf("initial paths=%v error=%v", initial.typeScriptConfigPaths, initial.projectPolicyError)
 	}
 	delete(fsys.files, "/project/custom.json")
-	if cached := s.documentLintSnapshot(uri); cached.projectPolicyError != nil || len(cached.typeScriptConfigPaths) != 1 {
-		t.Fatalf("ordinary owner paths were expanded again before invalidation: %+v", cached)
-	}
 	if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
 		Changes: []*lsproto.FileEvent{{Uri: "file:///project/custom.json", Type: lsproto.FileChangeTypeDeleted}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if missing := s.documentLintSnapshot(uri); missing.projectPolicyError == nil {
-		t.Fatal("closed-document config deletion retained cached project paths")
-	}
-	if _, cached := s.tsConfigPathsByConfig[s.cwd]; cached {
-		t.Fatal("failed path resolution was cached")
+		t.Fatal("closed-document config deletion retained project paths")
 	}
 	fsys.files["/project/custom.json"] = true
 	if restored := s.documentLintSnapshot(uri); restored.projectPolicyError != nil || len(restored.typeScriptConfigPaths) != 1 {

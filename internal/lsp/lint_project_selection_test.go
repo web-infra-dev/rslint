@@ -421,7 +421,7 @@ func TestLintSessionProjectRootCacheTracksServiceProgramGeneration(t *testing.T)
 	}
 }
 
-func TestResolveTsConfigPathsPreservesSymlinkDeclarationPath(t *testing.T) {
+func TestDocumentProjectPolicyPreservesSymlinkDeclarationPath(t *testing.T) {
 	root := t.TempDir()
 	realDir := filepath.Join(root, "real")
 	aliasDir := filepath.Join(root, "alias")
@@ -447,14 +447,19 @@ func TestResolveTsConfigPathsPreservesSymlinkDeclarationPath(t *testing.T) {
 	}
 
 	fs := bundled.WrapFS(osvfs.FS())
-	paths, err := resolveTsConfigPathsWithFS(config.RslintConfig{{
+	server := newTestServer()
+	server.fs = fs
+	entries := config.RslintConfig{{
 		LanguageOptions: &config.LanguageOptions{
 			ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
 		},
-	}}, aliasDir, fs)
-	if err != nil {
-		t.Fatal(err)
+	}}
+	installJSConfigsForTest(server, map[string]config.RslintConfig{tspath.NormalizePath(aliasDir): entries})
+	snapshot := server.documentLintSnapshot(documentURIFromPath(aliasSource))
+	if snapshot.projectPolicyError != nil {
+		t.Fatal(snapshot.projectPolicyError)
 	}
+	paths := snapshot.typeScriptConfigPaths
 	if len(paths) != 1 || paths[0] != tspath.NormalizePath(aliasConfig) {
 		t.Fatalf("resolved project paths = %v, want lexical %q", paths, aliasConfig)
 	}
@@ -1074,7 +1079,13 @@ func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
 		project    string
 		wantCycles int
 		cold       bool
+		javascript bool
 	}{
+		{name: "no project"},
+		{name: "cold no project", cold: true},
+		{name: "JavaScript without project", javascript: true},
+		{name: "cold JavaScript without project", javascript: true, cold: true},
+		{name: "JavaScript configured control", javascript: true, project: `["tsconfig.json"]`, wantCycles: 1},
 		{name: "false", project: "false"},
 		{name: "null", project: "null"},
 		{name: "cold false", project: "false", cold: true},
@@ -1084,8 +1095,12 @@ func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
 		{name: "configured control", project: `["tsconfig.json"]`, wantCycles: 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			directory := tspath.NormalizePath(archive.Materialize(t, "disabled-binding"))
-			fileName := tspath.ResolvePath(directory, "target.ts")
+			fixture, source, language := "disabled-binding", "target.ts", lsproto.LanguageKindTypeScript
+			if test.javascript {
+				fixture, source, language = "disabled-binding-js", "target.js", lsproto.LanguageKindJavaScript
+			}
+			directory := tspath.NormalizePath(archive.Materialize(t, fixture))
+			fileName := tspath.ResolvePath(directory, source)
 			server := newTestServer()
 			server.cwd = directory
 			server.fs = bundled.WrapFS(osvfs.FS())
@@ -1103,10 +1118,14 @@ func TestLSPDisabledProjectKeepsDiagnosticAndFixContext(t *testing.T) {
 			uri := documentURIFromPath(fileName)
 			server.documents[uri] = content
 			if !test.cold {
-				server.session.DidOpenFile(context.Background(), uri, 1, content, lsproto.LanguageKindTypeScript)
+				server.session.DidOpenFile(context.Background(), uri, 1, content, language)
+			}
+			options := `{}`
+			if test.project != "" {
+				options = `{"project":` + test.project + `}`
 			}
 			var entries config.RslintConfig
-			if err := json.Unmarshal([]byte(`[{"plugins":["import"],"languageOptions":{"parserOptions":{"project":`+test.project+`}},"rules":{"import/no-cycle":"error","no-var":"error"}}]`), &entries); err != nil {
+			if err := json.Unmarshal([]byte(`[{"plugins":["import"],"languageOptions":{"parserOptions":`+options+`},"rules":{"import/no-cycle":"error","no-var":"error"}}]`), &entries); err != nil {
 				t.Fatal(err)
 			}
 			snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
@@ -1475,7 +1494,42 @@ func TestDocumentProjectPolicyUsesMatchingEntries(t *testing.T) {
 	}
 }
 
-func TestDocumentProjectPolicyUsesFlatConfigAndRawBases(t *testing.T) {
+func TestDocumentProjectPolicyKeepsProjectOriginAfterMerging(t *testing.T) {
+	directory := tspath.NormalizePath(t.TempDir())
+	base := "packages/app"
+	root := directory
+	sharedDirectory := tspath.ResolvePath(directory, "shared")
+	for _, test := range []struct {
+		name       string
+		suffix     config.ConfigEntry
+		wantConfig string
+	}{
+		{name: "unrelated options keep basePath", suffix: config.ConfigEntry{Rules: config.Rules{"no-var": "error"}}, wantConfig: tspath.ResolvePath(directory, "packages/app/tsconfig.json")},
+		{name: "later project uses its own origin", suffix: config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}}}, wantConfig: tspath.ResolvePath(sharedDirectory, "tsconfig.json")},
+		{name: "explicit root rebases surviving project", suffix: config.ConfigEntry{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{TsconfigRootDir: &root}}}, wantConfig: tspath.ResolvePath(directory, "tsconfig.json")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := newTestServer()
+			server.cwd = directory
+			server.fs = &mockFS{files: map[string]bool{test.wantConfig: true}}
+			entries := config.RslintConfig{{
+				BasePath: &base,
+				Files:    []string{"**/*.ts"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+					Project: config.ProjectPaths{"./tsconfig.json"},
+				}},
+			}}
+			entries = append(entries, config.ConfigWithAuthoredPathBase(config.RslintConfig{test.suffix}, sharedDirectory)...)
+			installJSConfigsForTest(server, map[string]config.RslintConfig{directory: entries})
+			snapshot := server.documentLintSnapshot(documentURIFromPath(tspath.ResolvePath(directory, "packages/app/source.ts")))
+			if snapshot.projectPolicyError != nil || len(snapshot.typeScriptConfigPaths) != 1 || snapshot.typeScriptConfigPaths[0] != test.wantConfig {
+				t.Fatalf("project paths = %v, error = %v, want %q", snapshot.typeScriptConfigPaths, snapshot.projectPolicyError, test.wantConfig)
+			}
+		})
+	}
+}
+
+func TestDocumentProjectPolicyUsesFlatConfigAndAuthoredBases(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	for _, test := range []struct {
 		name         string
@@ -1489,24 +1543,26 @@ func TestDocumentProjectPolicyUsesFlatConfigAndRawBases(t *testing.T) {
 		wantError    string
 		rootOverride bool
 	}{
-		{name: "ordinary declarations keep original order", options: `{}`, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched service true", options: `{"projectService":true}`, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched service false", options: `{"projectService":false}`, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched service null", options: `{"projectService":null}`, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched root", options: `{"tsconfigRootDir":"."}`, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched root null", options: `{"tsconfigRootDir":null}`, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched project false", options: `{"project":false}`, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched project null", options: `{"project":null}`, wantConfig: "tsconfig.unsafe.json"},
+		{name: "last matching project wins", options: `{}`, wantConfig: "tsconfig.safe.json"},
+		{name: "unmatched service true", options: `{"projectService":true}`, wantConfig: "tsconfig.safe.json"},
+		{name: "unmatched service false", options: `{"projectService":false}`, wantConfig: "tsconfig.safe.json"},
+		{name: "unmatched service null", options: `{"projectService":null}`, wantConfig: "tsconfig.safe.json"},
+		{name: "unmatched root", options: `{"tsconfigRootDir":"."}`, wantConfig: "tsconfig.safe.json"},
+		{name: "unmatched root null", options: `{"tsconfigRootDir":null}`, wantConfig: "tsconfig.safe.json"},
+		{name: "unmatched project false", options: `{"project":false}`, wantConfig: "tsconfig.safe.json"},
+		{name: "unmatched project null", options: `{"project":null}`, wantConfig: "tsconfig.safe.json"},
 		{name: "unmatched project", options: `{"project":"./tsconfig.safe.json"}`, omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
 		{name: "unmatched project and service", options: `{"projectService":false,"project":"./tsconfig.safe.json"}`, omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
-		{name: "unmatched project still validates declaration", options: `{"project":"./missing.json"}`, wantError: "doesn't exist"},
-		{name: "matched service false retains declarations", options: `{"projectService":false}`, matched: true, wantConfig: "tsconfig.unsafe.json"},
-		{name: "matched root retains declaration order", options: `{}`, matched: true, rootOverride: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "unmatched missing project", options: `{"project":"./missing.json"}`, wantConfig: "tsconfig.safe.json"},
+		{name: "overridden missing project", options: `{}`, firstProject: "./missing.json", wantConfig: "tsconfig.safe.json"},
+		{name: "matched missing project", options: `{"project":"./missing.json"}`, matched: true, wantError: "doesn't exist"},
+		{name: "matched service false retains project", options: `{"projectService":false}`, matched: true, wantConfig: "tsconfig.safe.json"},
+		{name: "matched root retains project", options: `{}`, matched: true, rootOverride: true, wantConfig: "tsconfig.safe.json"},
 		{name: "matched false", options: `{"project":false}`, matched: true, gap: true},
 		{name: "matched null", options: `{"project":null}`, matched: true, gap: true},
-		{name: "matched empty array keeps earlier declarations", options: `{"project":[]}`, matched: true, wantConfig: "tsconfig.unsafe.json"},
-		{name: "matched false then restore", options: `{"project":false}`, matched: true, restore: true, wantConfig: "tsconfig.unsafe.json"},
-		{name: "matched null then restore", options: `{"project":null}`, matched: true, restore: true, wantConfig: "tsconfig.unsafe.json"},
+		{name: "matched empty array clears project", options: `{"project":[]}`, matched: true, gap: true},
+		{name: "matched false then restore", options: `{"project":false}`, matched: true, restore: true, wantConfig: "tsconfig.safe.json"},
+		{name: "matched null then restore", options: `{"project":null}`, matched: true, restore: true, wantConfig: "tsconfig.safe.json"},
 		{name: "literal project in literal directory", options: `{}`, omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
 		{name: "glob project in literal directory", options: `{}`, firstProject: "./tsconfig.u*.json", omitSecond: true, wantConfig: "tsconfig.unsafe.json"},
 	} {
@@ -1559,7 +1615,7 @@ func TestDocumentProjectPolicyUsesFlatConfigAndRawBases(t *testing.T) {
 			snapshot := server.documentLintSnapshot(uri)
 			if test.wantError != "" {
 				if snapshot.projectPolicyError == nil || !strings.Contains(snapshot.projectPolicyError.Error(), test.wantError) {
-					t.Fatalf("expected raw declaration error %q, got %v", test.wantError, snapshot.projectPolicyError)
+					t.Fatalf("expected effective declaration error %q, got %v", test.wantError, snapshot.projectPolicyError)
 				}
 				return
 			}

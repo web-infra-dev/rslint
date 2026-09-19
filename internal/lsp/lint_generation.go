@@ -50,6 +50,15 @@ type documentGenerationProvider struct {
 	buildGeneration documentGenerationBuilder
 }
 
+// documentProjectConfigError identifies an admitted document's invalid effective
+// project settings so presentation can distinguish them from other lint failures.
+type documentProjectConfigError struct {
+	cause error
+}
+
+func (e *documentProjectConfigError) Error() string { return e.cause.Error() }
+func (e *documentProjectConfigError) Unwrap() error { return e.cause }
+
 type documentProgramRequest func(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
@@ -108,7 +117,7 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		return emptyLintGeneration(server.cwd), nil, nil
 	}
 	if snapshot.projectPolicyError != nil {
-		return linter.Generation{}, nil, snapshot.projectPolicyError
+		return linter.Generation{}, nil, &documentProjectConfigError{cause: snapshot.projectPolicyError}
 	}
 
 	request := newStandaloneLintProjectRequest(
