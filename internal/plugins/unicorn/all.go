@@ -45,6 +45,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
@@ -103,6 +104,7 @@ func GetAllRules() []rule.Rule {
 		prefer_date_now.PreferDateNowRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
+		prefer_reflect_apply.PreferReflectApplyRule,
 		prefer_set_has.PreferSetHasRule,
 		prefer_set_size.PreferSetSizeRule,
 		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
