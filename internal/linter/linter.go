@@ -183,6 +183,10 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// answering means going back to whatever produced that text; a file no
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
+		// One lazy view of the Vue component behind this file, shared by every
+		// rule on it. A file that is not a component, and a component no rule
+		// asks about, never read anything.
+		component := rule.NewComponent(sourceProgram.FS(), file.FileName())
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
@@ -193,6 +197,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			Comments:        comments,
 			Refs:            refs,
 			BOM:             sourceBOM,
+			Component:       component,
 			TypeChecker:     fileChecker,
 			DisableManager:  disableManager,
 		}).WithProgram(sourceProgram).WithFileCache(fileCache)

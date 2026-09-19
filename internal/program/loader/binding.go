@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/vue/vuesfc"
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
@@ -24,17 +25,6 @@ type LoadResult struct {
 	Programs               []*lintprogram.Program
 	TargetsByProgram       [][]string
 	LintTargetBySourcePath map[string]target.File
-}
-
-func sourceOnlyCompilerOptions() *core.CompilerOptions {
-	return &core.CompilerOptions{
-		Target:    core.ScriptTargetESNext,
-		Module:    core.ModuleKindESNext,
-		Jsx:       core.JsxEmitPreserve,
-		AllowJs:   core.TSTrue,
-		NoLib:     core.TSTrue,
-		NoResolve: core.TSTrue,
-	}
 }
 
 func authoritativePath(filePath string, fsys vfs.FS) string {
@@ -437,7 +427,7 @@ func (s *Session) appendCompatibilityPrograms(
 		compilerProgram, err := s.context.createCompatibilityProgram(
 			singleThreaded,
 			currentDirectory,
-			sourceOnlyCompilerOptions(),
+			lintprogram.SourceOnlyCompilerOptions(),
 			rootFileNames,
 		)
 		if err != nil {
@@ -478,6 +468,11 @@ func finalizeResult(binding *LoadResult) {
 
 // LoadAPI preserves the API's compatibility Program admission behavior while
 // returning only unified Programs to the caller.
+//
+// A Vue single file component is the one exception: no compiler Program can
+// admit one, so components are split out and parsed as roots. Every other
+// unbound target keeps the admission behavior it had, which is what makes this
+// exception safe to carve out of a compatibility path.
 func (s *Session) LoadAPI(
 	set ProjectSet,
 	plan target.Plan,
@@ -488,21 +483,55 @@ func (s *Session) LoadAPI(
 		return LoadResult{}, err
 	}
 	binding, unbound := s.bindTargetsToProjects(set, plan, singleThreaded)
-	if err := s.appendCompatibilityPrograms(&binding, unbound, currentDirectory, singleThreaded); err != nil {
+	components, rest := partitionComponents(unbound)
+	if err := s.appendCompatibilityPrograms(&binding, rest, currentDirectory, singleThreaded); err != nil {
 		return LoadResult{}, err
+	}
+	if len(components) > 0 {
+		useCaseSensitive := true
+		if fsys := s.FS(); fsys != nil {
+			useCaseSensitive = fsys.UseCaseSensitiveFileNames()
+		}
+		groups := groupUnboundTargets(components, currentDirectory, useCaseSensitive)
+		s.retainCompilerPrograms(binding.compilerPrograms)
+		if err := s.appendRootPrograms(&binding, groups, currentDirectory, singleThreaded); err != nil {
+			return LoadResult{}, err
+		}
 	}
 	finalizeResult(&binding)
 	return binding, nil
 }
 
+// partitionComponents splits Vue single file components out of a target set,
+// preserving order within each half.
+func partitionComponents(targets []target.File) (components, rest []target.File) {
+	for _, candidate := range targets {
+		if vuesfc.IsFile(candidate.Path) {
+			components = append(components, candidate)
+			continue
+		}
+		rest = append(rest, candidate)
+	}
+	return components, rest
+}
+
 func allRootsSupportedByParser(targets []target.File, useCaseSensitive bool) bool {
-	options := sourceOnlyCompilerOptions()
+	options := lintprogram.SourceOnlyCompilerOptions()
 	supportedExtensions := tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule(options, tspath.AllSupportedExtensions)
 	for _, target := range targets {
 		if !tspath.HasExtension(target.Path) {
 			return false
 		}
+		// A Vue Single File Component is admitted by the root parser even
+		// though TypeScript knows no such extension: the caching compiler
+		// host hands the parser the component's projected <script> text (see
+		// utils.sourceForParse). It is deliberately not added to the
+		// extensions a tsconfig can admit, so a component never joins a
+		// project program and is always linted without a checker.
 		fileName := tspath.GetCanonicalFileName(target.Path, useCaseSensitive)
+		if vuesfc.IsFile(fileName) {
+			continue
+		}
 		supported := false
 		for _, extensions := range supportedExtensions {
 			if tspath.FileExtensionIsOneOf(fileName, extensions) {
@@ -534,7 +563,7 @@ func (s *Session) appendRootPrograms(
 		rootProgram, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
 			RootFileNames:   rootFileNames,
 			Host:            s.context.newTransientCompilerHost(currentDirectory),
-			CompilerOptions: sourceOnlyCompilerOptions(),
+			CompilerOptions: lintprogram.SourceOnlyCompilerOptions(),
 			SingleThreaded:  singleThreaded,
 		})
 		if err != nil {
