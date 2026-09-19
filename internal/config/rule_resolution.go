@@ -73,9 +73,8 @@ func ConfiguredRules(
 			RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
 			IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
 			Options:            options,
-			Run: func(ctx rule.RuleContext) rule.RuleListeners {
-				return ruleImpl.Run(ctx, options)
-			},
+			Run:                scriptRunner(ruleImpl, options),
+			RunTemplate:        templateRunner(ruleImpl, options),
 		})
 	}
 
@@ -97,4 +96,34 @@ func CloneSettings(settings map[string]interface{}) map[string]interface{} {
 		cloned[k] = v
 	}
 	return cloned
+}
+
+// templateRunner adapts a rule's template half to the configured shape,
+// preserving nil so the linter can tell that a rule has nothing to say about
+// markup without calling it.
+func templateRunner(
+	ruleImpl rule.Rule,
+	options []any,
+) func(ctx rule.RuleContext) rule.TemplateListeners {
+	if ruleImpl.RunTemplate == nil {
+		return nil
+	}
+	return func(ctx rule.RuleContext) rule.TemplateListeners {
+		return ruleImpl.RunTemplate(ctx, options)
+	}
+}
+
+// scriptRunner adapts a rule's script half to the configured shape. A rule
+// that only inspects a Vue template has none, and preserving nil lets the
+// linter skip it rather than call through a nil function.
+func scriptRunner(
+	ruleImpl rule.Rule,
+	options []any,
+) func(ctx rule.RuleContext) rule.RuleListeners {
+	if ruleImpl.Run == nil {
+		return nil
+	}
+	return func(ctx rule.RuleContext) rule.RuleListeners {
+		return ruleImpl.Run(ctx, options)
+	}
 }

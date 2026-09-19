@@ -17,6 +17,7 @@ export {
   rstestPlugin,
   unicornPlugin,
   jsxA11yPlugin,
+  vuePlugin,
 } from './config/presets/index.js';
 
 // The ESLint v10-aligned programmatic JavaScript API (issue #1106). This `Rslint`

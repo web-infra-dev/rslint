@@ -10,6 +10,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	vuetemplate "github.com/web-infra-dev/rslint/internal/vue/template"
+	"github.com/web-infra-dev/rslint/internal/vue/vast"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -94,6 +96,39 @@ func (r *listenerRegistry) listeners(kind ast.Kind) []func(node *ast.Node) {
 // reset releases every listener closure from the completed file while
 // retaining the sparse registry's backing storage for the next file in the
 // same checker-shard task.
+// templateListenerRegistry is the listenerRegistry of the Vue template pass.
+// It is built only for a file some enabled rule actually asks about, so its
+// backing maps stay unallocated in every project without components.
+type templateListenerRegistry struct {
+	byKind      map[vast.Kind][]func(node *vast.Node)
+	activeKinds []vast.Kind
+}
+
+func newTemplateListenerRegistry() templateListenerRegistry {
+	return templateListenerRegistry{
+		byKind:      make(map[vast.Kind][]func(node *vast.Node), 4),
+		activeKinds: make([]vast.Kind, 0, 4),
+	}
+}
+
+func (r *templateListenerRegistry) add(kind vast.Kind, listener func(node *vast.Node)) {
+	listeners := r.byKind[kind]
+	if len(listeners) == 0 {
+		r.activeKinds = append(r.activeKinds, kind)
+	}
+	r.byKind[kind] = append(listeners, listener)
+}
+
+func (r *templateListenerRegistry) empty() bool {
+	return len(r.activeKinds) == 0
+}
+
+func (r *templateListenerRegistry) run(kind vast.Kind, node *vast.Node) {
+	for _, listener := range r.byKind[kind] {
+		listener(node)
+	}
+}
+
 func (r *listenerRegistry) reset() {
 	for _, kind := range r.activeKinds {
 		listeners := r.byKind[kind]
@@ -183,6 +218,10 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// answering means going back to whatever produced that text; a file no
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
+		// One lazy view of the Vue component behind this file, shared by every
+		// rule on it. A file that is not a component, and a component no rule
+		// asks about, never read anything.
+		component := rule.NewComponent(sourceProgram.FS(), file.FileName())
 		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
@@ -193,9 +232,13 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			Comments:        comments,
 			Refs:            refs,
 			BOM:             sourceBOM,
+			Component:       component,
 			TypeChecker:     fileChecker,
 			DisableManager:  disableManager,
 		}).WithProgram(sourceProgram).WithFileCache(fileCache)
+
+		// Built on demand: nil until some rule registers a template listener.
+		var templateListeners *templateListenerRegistry
 
 		for ruleIndex, r := range rules {
 			ctx := baseContext
@@ -209,7 +252,11 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			if ruleDurations != nil {
 				runStart = time.Now()
 			}
-			ruleListeners := r.Run(ctx)
+			// A rule that only inspects a Vue template has no script half.
+			var ruleListeners rule.RuleListeners
+			if r.Run != nil {
+				ruleListeners = r.Run(ctx)
+			}
 			if ruleDurations != nil {
 				ruleDurations[ruleIndex] += time.Since(runStart)
 			}
@@ -224,6 +271,27 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 					}
 				}
 				registeredListeners.add(kind, listener)
+			}
+
+			// The template half of a rule, if it has one. Only a Vue rule
+			// sets this, so every other rule pays one nil comparison.
+			if r.RunTemplate == nil {
+				continue
+			}
+			if templateListeners == nil {
+				registry := newTemplateListenerRegistry()
+				templateListeners = &registry
+			}
+			for kind, listener := range r.RunTemplate(ctx) {
+				if ruleDurations != nil {
+					inner := listener
+					listener = func(node *vast.Node) {
+						start := time.Now()
+						inner(node)
+						ruleDurations[ruleIndex] += time.Since(start)
+					}
+				}
+				templateListeners.add(kind, listener)
 			}
 		}
 
@@ -321,6 +389,21 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			return false
 		}
 		file.Node.ForEachChild(childVisitor)
+
+		// The Vue template pass. A template is a second syntax tree over the
+		// same file, so it gets its own traversal after the script's, and it
+		// is parsed only now, only for a component, and only because a rule
+		// asked.
+		if templateListeners != nil && !templateListeners.empty() {
+			if content, ok := component.TemplateRange(); ok {
+				root := vuetemplate.Parse(component.Text(), content)
+				vast.Walk(root, func(node *vast.Node) bool {
+					templateListeners.run(node.Kind, node)
+					return true
+				})
+			}
+		}
+
 		if opts.Timing != nil {
 			opts.Timing.addFile(file.FileName(), rules, ruleDurations)
 		}

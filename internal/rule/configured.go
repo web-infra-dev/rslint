@@ -17,6 +17,10 @@ type ConfiguredRule struct {
 	// rules capture it in Run; the Node worker consumes it directly.
 	Options []any
 	Run     func(ctx RuleContext) RuleListeners
+	// RunTemplate is set only for a rule that inspects a Vue `<template>`.
+	// nil means this rule has nothing to say about markup, so the linter never
+	// parses a template on its account.
+	RunTemplate func(ctx RuleContext) TemplateListeners
 }
 
 // RuleEnvironment is the immutable file-level configuration shared by every
