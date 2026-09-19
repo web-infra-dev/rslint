@@ -22,7 +22,7 @@ func ReportUnnecessaryLengthArgument(ctx rule.RuleContext, call DotMethodCall, m
 		return
 	}
 	if lengthMember(argument) != nil &&
-		(!isRepeatableReference(ctx, object) || !isSideEffectFreeArgument(call.Call.Arguments()[0])) {
+		(!isRepeatableReference(ctx, object) || hasSideEffect(call.Call.Arguments()[0], true)) {
 		return
 	}
 	message := rule.RuleMessage{Id: messageID, Description: "Passing `" + description + "` as the `" + argumentName + "` argument is unnecessary.", Data: map[string]string{"description": description, "argumentName": argumentName}}
@@ -167,24 +167,52 @@ func accessHasGetter(ctx rule.RuleContext, node *ast.Node) bool {
 	return false
 }
 
-func isSideEffectFreeArgument(node *ast.Node) bool {
+// TODO: Extract this together with prefer_ternary.hasSideEffect into
+// internal/utils once the shared contract includes configurable getter handling.
+func hasSideEffect(node *ast.Node, considerGetters bool) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
 	}
 	switch node.Kind {
-	case ast.KindIdentifier, ast.KindThisKeyword,
-		ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
-		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral,
-		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
+	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration:
+		// Function bodies are deferred until invocation.
+		return false
+	case ast.KindCallExpression, ast.KindNewExpression, ast.KindAwaitExpression,
+		ast.KindYieldExpression, ast.KindDeleteExpression, ast.KindPostfixUnaryExpression,
+		ast.KindTaggedTemplateExpression:
 		return true
 	case ast.KindPrefixUnaryExpression:
 		prefix := node.AsPrefixUnaryExpression()
-		switch prefix.Operator {
-		case ast.KindPlusToken, ast.KindMinusToken, ast.KindExclamationToken,
-			ast.KindTildeToken, ast.KindTypeOfKeyword, ast.KindVoidKeyword:
-			return isSideEffectFreeArgument(prefix.Operand)
+		if prefix != nil && (prefix.Operator == ast.KindPlusPlusToken || prefix.Operator == ast.KindMinusMinusToken) {
+			return true
+		}
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary != nil && binary.OperatorToken != nil &&
+			ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
+			return true
+		}
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if considerGetters {
+			return true
+		}
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		return deferredMemberHasSideEffect(node, considerGetters)
+	}
+	return node.ForEachChild(func(child *ast.Node) bool {
+		return hasSideEffect(child, considerGetters)
+	})
+}
+
+func deferredMemberHasSideEffect(node *ast.Node, considerGetters bool) bool {
+	for _, decorator := range node.Decorators() {
+		if hasSideEffect(decorator, considerGetters) {
+			return true
 		}
 	}
-	return false
+	if node.Kind == ast.KindConstructor {
+		return false
+	}
+	return hasSideEffect(node.Name(), considerGetters)
 }
