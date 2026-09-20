@@ -1,0 +1,45 @@
+# Focused CommonJS, package-map and TypeScript resolution fixtures.
+-- tsconfig.json --
+{"compilerOptions": {"allowJs": true, "noEmit": true, "target": "esnext", "module": "nodenext", "jsx": "preserve", "paths": {"@local/*": ["./src/*"], "@broken/*": ["./absent/*"]}}, "include": ["**/*"]}
+-- package.json --
+{"name": "self-package", "exports": {".": "./src/present.js", "./missing": "./src/absent.js"}, "imports": {"#entry": "./src/present.js", "#builtin": "fs", "#absent": "./src/absent.js", "#invalid": [null, "./src/present.js"]}, "dependencies": {"missing": "*"}}
+-- src/present.js --
+module.exports = {};
+-- src/present.ts --
+export const value = 1;
+-- src/view.tsx --
+export const value = 1;
+-- src/custom.ext --
+content
+-- src/dir/index.js --
+module.exports = {};
+-- src/dir/package.json --
+{"main":"missing.js","browser":"../present.js"}
+-- src/entry/api.js --
+module.exports = {};
+-- src/�.js --
+module.exports = {};
+-- vendor/remote.js --
+module.exports = {};
+-- custom_modules/custom/index.js --
+module.exports = {};
+-- node_modules/pkg/package.json --
+{"exports": {".": {"require": "./index.js", "import": "./missing.js"}, "./private": null, "./missing": "./absent.js"}}
+-- node_modules/pkg/index.js --
+module.exports = {};
+-- node_modules/import-only/package.json --
+{"exports":{"import":"./index.js"}}
+-- node_modules/import-only/index.js --
+export {};
+-- node_modules/types-only/package.json --
+{"exports":{"types":"./index.d.ts"}}
+-- node_modules/types-only/index.d.ts --
+export {};
+-- node_modules/@types/absent/index.d.ts --
+export {};
+-- node_modules/alias-field/package.json --
+{"main":"./index.js","browser":{"./index.js":false}}
+-- direct/tsconfig.json --
+{"compilerOptions":{"allowJs":true,"allowImportingTsExtensions":true,"noEmit":true}}
+-- direct/present.ts --
+export {};

@@ -1,0 +1,78 @@
+# eslint-plugin-n v18.3.0 tests/fixtures/no-missing.
+# Installed dependencies and the rule itself need only resolvable entry files.
+-- node_modules/eslint/index.js --
+module.exports = {};
+-- node_modules/existing-module/index.js --
+module.exports = {};
+-- node_modules/mocha/index.js --
+module.exports = {};
+-- node_modules/rimraf/package.json --
+{"name":"rimraf","version":"0.0.0"}
+-- tests/fixtures/no-missing/a.config.js --
+console.log("hello!")
+-- tests/fixtures/no-missing/a.js --
+console.log("hello!")
+-- tests/fixtures/no-missing/b.json --
+{
+    "hello": "world"
+}
+-- tests/fixtures/no-missing/bar/main.js --
+console.log("hello!")
+-- tests/fixtures/no-missing/c.coffee --
+console.log "hello"
+-- tests/fixtures/no-missing/d.ts --
+
+-- tests/fixtures/no-missing/e.tsx --
+
+-- tests/fixtures/no-missing/existing-file.js --
+module.exports = {};
+-- tests/fixtures/no-missing/foo/main.js --
+console.log("hello!")
+-- tests/fixtures/no-missing/foo/package.json --
+{
+    "main": "main.js"
+}
+-- tests/fixtures/no-missing/index.js --
+console.log("hello!")
+-- tests/fixtures/no-missing/my_modules/my-module/a-file.js --
+
+-- tests/fixtures/no-missing/my_modules/my-module/package.json --
+{
+    "main": "./a-file.js"
+}
+-- tests/fixtures/no-missing/ts-extends/base.tsconfig.json --
+{
+    "compilerOptions": {
+        "jsx": "react"
+    }
+}
+-- tests/fixtures/no-missing/ts-extends/d.ts --
+
+-- tests/fixtures/no-missing/ts-extends/e.tsx --
+
+-- tests/fixtures/no-missing/ts-extends/tsconfig.json --
+{
+    "extends": ["./base.tsconfig.json"]
+}
+-- tests/fixtures/no-missing/ts-preserve/d.ts --
+
+-- tests/fixtures/no-missing/ts-preserve/e.tsx --
+
+-- tests/fixtures/no-missing/ts-preserve/tsconfig.json --
+{
+    "compilerOptions": {
+        "jsx": "preserve"
+    }
+}
+-- tests/fixtures/no-missing/ts-react/d.ts --
+
+-- tests/fixtures/no-missing/ts-react/e.tsx --
+
+-- tests/fixtures/no-missing/ts-react/tsconfig.json --
+{
+    "compilerOptions": {
+        "jsx": "react"
+    }
+}
+-- tests/lib/rules/no-missing-require.js --
+module.exports = {};

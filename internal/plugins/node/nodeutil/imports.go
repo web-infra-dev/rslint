@@ -117,6 +117,15 @@ func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool
 	return resolveImport(p, name, fileName, typeOnly, options).Error
 }
 
+// RequireResolveError checks CommonJS targets, including directory entries and
+// TypeScript aliases. Builtins are exempt even when resolver aliases are set.
+func RequireResolveError(p *program.Program, name, fileName string, options moduleresolver.Options) string {
+	if modules.IsNodeBuiltin(name) {
+		return ""
+	}
+	return resolveWithTypeScriptAliases(p, name, fileName, options).Error
+}
+
 // ImportFilePath supplies the target for import rules. Missing
 // local imports retain their lexical path; unresolved packages have no path.
 func ImportFilePath(p *program.Program, name, fileName string, typeOnly bool, options moduleresolver.Options) string {
