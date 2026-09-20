@@ -125,7 +125,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-negated-array-predicate': 'error', // not implemented
     // 'unicorn/no-negated-comparison': 'error', // not implemented
     // 'unicorn/no-negated-condition': 'error', // not implemented
-    // 'unicorn/no-negation-in-equality-check': 'error', // not implemented
+    'unicorn/no-negation-in-equality-check': 'error',
     // 'unicorn/no-nested-ternary': 'error', // not implemented
     // 'unicorn/no-new-array': 'error', // not implemented
     'unicorn/no-new-buffer': 'error',
