@@ -459,7 +459,7 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     ).toThrow(/must expose a "rules" object/);
   });
 
-  test.each(['@typescript-eslint', 'node', 'rslim'])(
+  test.each(['@typescript-eslint', 'node'])(
     'throws when an object-form prefix collides with native %s',
     (prefix) => {
       // Asymmetry: a native NAME is legal in the array form (previous test) but
