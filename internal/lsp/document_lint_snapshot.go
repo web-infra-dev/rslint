@@ -70,21 +70,12 @@ func resolveDocumentLintSnapshotProjects(
 	snapshot documentLintSnapshot,
 	fs vfs.FS,
 ) documentLintSnapshot {
-	if config.HasProjectOptions(snapshot.config) {
-		snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.target.ConfigDirectory)
-	}
+	snapshot.projectPolicy, snapshot.projectPolicyError = config.ResolveProjectPolicy(snapshot.resolvedConfig, snapshot.target.ConfigDirectory)
 	snapshot.typeScriptConfigPaths = nil
-	if snapshot.projectPolicyError != nil || snapshot.projectPolicy.ServiceRootDirectory != "" || snapshot.projectPolicy.ProjectDisabled {
+	if snapshot.projectPolicyError != nil {
 		return snapshot
 	}
-	// Preserve the owner's declaration order and authored bases. Matched root
-	// options can rebase those declarations without another config matcher.
-	snapshot.typeScriptConfigPaths, snapshot.projectPolicyError = config.ResolveTsConfigPathsWithPolicy(
-		snapshot.config,
-		snapshot.target.ConfigDirectory,
-		fs,
-		snapshot.projectPolicy,
-	)
+	snapshot.typeScriptConfigPaths, snapshot.projectPolicyError = config.ResolveProjectPaths(snapshot.projectPolicy, fs)
 	return snapshot
 }
 
@@ -308,21 +299,7 @@ func (s *Server) documentLintSnapshot(uri lsproto.DocumentUri) documentLintSnaps
 		unavailable:      selection.configKey != "" && unavailable,
 	}
 	if snapshot.configResolved {
-		if config.HasProjectOptions(snapshot.config) {
-			snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
-		} else if snapshot.configKey != "" {
-			paths, cached := s.tsConfigPathsByConfig[snapshot.configKey]
-			if !cached {
-				paths, snapshot.projectPolicyError = resolveTsConfigPathsWithFS(snapshot.config, snapshot.target.ConfigDirectory, s.fs)
-				if snapshot.projectPolicyError == nil {
-					if s.tsConfigPathsByConfig == nil {
-						s.tsConfigPathsByConfig = make(map[string][]string)
-					}
-					s.tsConfigPathsByConfig[snapshot.configKey] = paths
-				}
-			}
-			snapshot.typeScriptConfigPaths = paths
-		}
+		snapshot = resolveDocumentLintSnapshotProjects(snapshot, s.fs)
 	}
 	return snapshot
 }

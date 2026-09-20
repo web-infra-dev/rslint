@@ -24,29 +24,56 @@ func resolveDeclaredProjectPaths(fsys vfs.FS, rslintConfig RslintConfig, configD
 			entryBaseDirectory = rootOverride
 		}
 
-		for _, config := range entry.LanguageOptions.ParserOptions.Project {
-			if containsGlobPattern(config) {
-				matches, err := expandProjectGlob(fsys, entryBaseDirectory, config)
-				if err != nil {
-					return nil, err
-				}
-				if len(matches) == 0 {
-					return nil, fmt.Errorf("glob pattern %q matched no files", config)
-				}
-				for _, match := range matches {
-					tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, match)
-				}
-				continue
-			}
-
-			tsconfigPath := tspath.ResolvePath(entryBaseDirectory, config)
-
-			if !fsys.FileExists(tsconfigPath) {
-				return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
-			}
-
-			tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, tsconfigPath)
+		paths, err := resolveProjectPatterns(fsys, entry.LanguageOptions.ParserOptions.Project, entryBaseDirectory)
+		if err != nil {
+			return nil, err
 		}
+		for _, path := range paths {
+			tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, path)
+		}
+	}
+	return tsConfigs, nil
+}
+
+// ResolveProjectPaths expands only the effective explicit project declaration.
+// No declaration (including a cleared value) requests no project. Automatic
+// discovery belongs to projectService and never falls back through this path.
+func ResolveProjectPaths(policy ProjectPolicy, fsys vfs.FS) ([]string, error) {
+	if fsys == nil || policy.ExplicitProject == nil || policy.ServiceRootDirectory != "" || policy.ProjectDisabled {
+		return nil, nil
+	}
+	base := policy.ExplicitProject.BaseDirectory
+	if policy.TSConfigRootDirOverride != "" {
+		base = policy.TSConfigRootDirOverride
+	}
+	return resolveProjectPatterns(fsys, policy.ExplicitProject.Patterns, base)
+}
+
+func resolveProjectPatterns(fsys vfs.FS, patterns ProjectPaths, base string) ([]string, error) {
+	var tsConfigs []string
+	seenPaths := make(map[string]struct{})
+	for _, config := range patterns {
+		if containsGlobPattern(config) {
+			matches, err := expandProjectGlob(fsys, base, config)
+			if err != nil {
+				return nil, err
+			}
+			if len(matches) == 0 {
+				return nil, fmt.Errorf("glob pattern %q matched no files", config)
+			}
+			for _, match := range matches {
+				tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, match)
+			}
+			continue
+		}
+
+		tsconfigPath := tspath.ResolvePath(base, config)
+
+		if !fsys.FileExists(tsconfigPath) {
+			return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
+		}
+
+		tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, tsconfigPath)
 	}
 
 	return tsConfigs, nil

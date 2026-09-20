@@ -146,23 +146,13 @@ func directRootOwners(
 	var rankedPrograms []bool
 	if len(targetProjects) > 0 {
 		rankedPrograms = make([]bool, len(roots))
-		rankedGroups := groups[:0]
 		for _, group := range groups {
-			_, overridden := targetProjects[targets[group.targetIndexes[0]]]
-			if overridden && len(group.projectIndexes) == 1 {
-				// A single candidate has no root/import ranking to
-				// decide. Binding still checks its actual source and identity.
-				for _, targetIndex := range group.targetIndexes {
-					owners[targetIndex] = group.projectIndexes[0]
-				}
-				continue
-			}
-			rankedGroups = append(rankedGroups, group)
+			// An explicit candidate, even a sole one, is not proof that the
+			// target is a root. Import-only and gap targets still need ranking.
 			for _, index := range group.projectIndexes {
 				rankedPrograms[index] = true
 			}
 		}
-		groups = rankedGroups
 		if len(groups) == 0 {
 			return owners
 		}

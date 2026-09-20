@@ -3,12 +3,17 @@ package lsp
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -225,4 +230,74 @@ func TestDocumentGenerationProviderFinalizesBeforePublication(t *testing.T) {
 	if releases != 1 {
 		t.Fatalf("resident Program finalizer calls = %d, want 1", releases)
 	}
+}
+
+func TestLSPProjectConfigErrorClassification(t *testing.T) {
+	const content = "export const value = 1;\n"
+	directory := tspath.NormalizePath(t.TempDir())
+	sourcePath := tspath.ResolvePath(directory, "source.ts")
+	configPath := tspath.ResolvePath(directory, "tsconfig.json")
+	for path, text := range map[string]string{
+		sourcePath: content,
+		configPath: `{"files":["source.ts"]}`,
+	} {
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	server := newTestServer()
+	server.cwd = directory
+	server.fs = bundled.WrapFS(osvfs.FS())
+	uri := documentURIFromPath(sourcePath)
+	server.documents[uri] = content
+	snapshot := documentLintSnapshotForTest(server, uri, nil, directory, false, []string{"./missing.json"})
+	if snapshot.configResolved || snapshot.projectPolicyError != nil {
+		t.Fatal("expected unresolved project settings")
+	}
+	for name, provider := range map[string]linter.GenerationProvider{
+		"diagnostics": &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot},
+		"fix all":     server.newSpeculativeGenerationProvider(uri, content, snapshot),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := linter.RunPipeline(context.Background(), linter.NewLintRequest(provider, linter.ObservationPolicy{}, nil))
+			var projectErr *documentProjectConfigError
+			if !errors.As(err, &projectErr) || !strings.Contains(err.Error(), "missing.json") {
+				t.Fatalf("lazy project error = %v, want document project configuration error", err)
+			}
+			if !errors.Is(err, projectErr.cause) {
+				t.Fatal("project configuration wrapper must preserve its cause")
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			_, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})
+			if !errors.Is(err, context.Canceled) || errors.As(err, &projectErr) || release != nil {
+				t.Fatalf("canceled acquisition = %v, release = %v, want unclassified cancellation", err, release != nil)
+			}
+		})
+	}
+
+	t.Run("loader failure", func(t *testing.T) {
+		loadErr := errors.New("project metadata loader failed")
+		loads, releases := 0, 0
+		provider := &documentGenerationProvider{
+			server: server,
+			uri:    uri,
+			snapshot: documentLintSnapshotForTest(
+				server, uri, nil, directory, false, []string{configPath},
+			),
+			requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
+				return lintProjectLoaders{
+					metadata: func(string) (*lintProjectMetadata, bool, error) {
+						loads++
+						return nil, false, loadErr
+					},
+				}, func() { releases++ }
+			},
+		}
+		_, err := linter.RunPipeline(context.Background(), linter.NewLintRequest(provider, linter.ObservationPolicy{}, nil))
+		var projectErr *documentProjectConfigError
+		if !errors.Is(err, loadErr) || errors.As(err, &projectErr) || loads != 1 || releases != 1 {
+			t.Fatalf("error/loads/releases = %v/%d/%d, want unclassified loader error/1/1", err, loads, releases)
+		}
+	})
 }

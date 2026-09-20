@@ -90,7 +90,6 @@ func fileURIFromPath(filePath string) lsproto.URI {
 }
 
 func (s *Server) invalidateLintProjectCaches() {
-	clear(s.tsConfigPathsByConfig)
 	if s.lintPrograms != nil {
 		s.lintPrograms.Invalidate()
 	}
@@ -120,18 +119,8 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 	if params == nil {
 		return nil
 	}
-	for _, change := range params.Changes {
-		if s.lintPrograms == nil || !s.lintPrograms.isOpenSourceOverlayWatchChange(change) {
-			// Project globs can change even with no open documents or resident
-			// Program. Reuse the owner cache only until the next disk generation.
-			clear(s.tsConfigPathsByConfig)
-			break
-		}
-	}
-
 	if s.lintPrograms != nil &&
 		s.lintPrograms.DidChangeWatchedFiles(params.Changes) {
-		clear(s.tsConfigPathsByConfig)
 		s.invalidateOpenDocumentDiagnostics()
 		_ = s.RefreshDiagnostics(ctx)
 	}
@@ -184,8 +173,7 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		return nil
 	}
 	if needsTypeInfoRebuild {
-		// Re-expand ordinary project paths on the next document snapshot and
-		// discard project contents, including projects outside the Session.
+		// Discard project contents, including projects outside the Session.
 		s.invalidateLintProjectCaches()
 		s.invalidateOpenDocumentDiagnostics()
 		return s.RefreshDiagnostics(ctx)

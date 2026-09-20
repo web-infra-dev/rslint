@@ -343,9 +343,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		Scope:          projectScope,
 		SingleThreaded: singleThreaded,
 	}
-	// Ordinary project type checking builds declarations before lint-target
-	// discovery. Only per-target project options need the target plan first.
-	buildBeforeTargets := projectScope == loader.AllDeclared && !hasProjectOptions
+	// Type-check-only needs no lint targets for plain explicit declarations.
+	// Combined lint/type-check keeps the full declaration range, but resolves
+	// target policies first so lint binding cannot borrow unrelated projects.
+	buildBeforeTargets := typeCheckOnly && !hasProjectOptions
 	var projectSet loader.ProjectSet
 	if buildBeforeTargets {
 		projectSet, err = programSession.BuildProjects(projectRequest)
@@ -384,11 +385,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			PathSpaces:           targetPlan.PathSpaces(),
 			FS:                   fs,
 		})
-		if hasProjectOptions {
-			projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files)
-			if err != nil {
-				return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-			}
+		projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files, singleThreaded)
+		if err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
 	}
 	projectRequest.Targets = targetPlan

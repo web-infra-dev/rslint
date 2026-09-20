@@ -9,10 +9,18 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
-// ProjectPolicy projects project-service options from an already resolved
-// target config. Ordinary project declarations remain owned by the raw config.
-// The zero value preserves ordinary project loading and its default fallback.
+// ProjectDeclaration is an immutable explicit project value together with the
+// literal directory where its patterns were authored. It contains no expanded
+// paths or Program state and is shared by targets with the same merged config.
+type ProjectDeclaration struct {
+	Patterns      ProjectPaths
+	BaseDirectory string
+}
+
+// ProjectPolicy projects project options from an already resolved target
+// config. The zero value requests no project for ordinary lint.
 type ProjectPolicy struct {
+	ExplicitProject *ProjectDeclaration
 	// ServiceRootDirectory is the resolved absolute root for an enabled
 	// project service. An empty value means service discovery is disabled.
 	ServiceRootDirectory   string
@@ -24,8 +32,9 @@ type ProjectPolicy struct {
 	TSConfigRootDirOverride string
 }
 
-// HasProjectOptions identifies configs that need per-target project policy.
-// Ordinary project strings and arrays continue through the existing loader.
+// HasProjectOptions identifies options that make program-wide type checking
+// depend on selected targets. Plain project declarations need no target scan
+// for that mode; ordinary lint always resolves each target's ProjectPolicy.
 func HasProjectOptions(entries RslintConfig) bool {
 	for _, entry := range entries {
 		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
@@ -50,7 +59,7 @@ func ResolveProjectPolicy(resolved ResolvedFileConfig, defaultRootDirectory stri
 		return ProjectPolicy{}, nil
 	}
 	options := merged.LanguageOptions.ParserOptions
-	policy := ProjectPolicy{}
+	policy := ProjectPolicy{ExplicitProject: merged.project}
 	serviceEnabled := options.ProjectService != nil && *options.ProjectService
 	if options.ProjectService != nil {
 		policy.DefaultProjectDisabled = !serviceEnabled

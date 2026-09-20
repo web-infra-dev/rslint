@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -393,23 +392,6 @@ func orderedProjectIndexesForConfig(plan projectPlan, configDir string) []int {
 		return indexes[left] < indexes[right]
 	})
 	return indexes
-}
-
-func configsForActiveOwners(
-	configs map[string]rslintconfig.RslintConfig,
-	targetPlan target.Plan,
-) map[string]rslintconfig.RslintConfig {
-	owners := targetPlan.ActiveOwners()
-	if len(configs) == 0 || len(owners) == 0 {
-		return nil
-	}
-	active := make(map[string]rslintconfig.RslintConfig, len(owners))
-	for _, owner := range owners {
-		if entries, ok := configs[owner]; ok {
-			active[owner] = entries
-		}
-	}
-	return active
 }
 
 // executeTargetProjectPlan retains the existing direct-root and import

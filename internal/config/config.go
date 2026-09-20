@@ -918,6 +918,9 @@ type MergedConfig struct {
 	Settings        Settings
 	LanguageOptions *LanguageOptions
 	Plugins         map[string]struct{}
+	// project retains the path origin of the entry that supplied the effective
+	// project value. Later rule or root overrides must not replace that origin.
+	project *ProjectDeclaration
 }
 
 func extractConfigIgnores(config RslintConfig) []IgnorePattern {
@@ -983,7 +986,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 		if !decision.matched || !decision.selected || decision.globallyIgnored {
 			return nil
 		}
-		return config.mergeConfigEntries(decision.key)
+		return config.mergeConfigEntries(decision.key, cwd)
 	}
 	// Collect all global ignore patterns and evaluate once. This allows `!`
 	// negation patterns in separate entries to work correctly, aligned with
@@ -1003,7 +1006,7 @@ func (config RslintConfig) getConfigForFileWithIgnores(filePath string, cwd stri
 	if !matched {
 		return nil
 	}
-	return config.mergeConfigEntries(key)
+	return config.mergeConfigEntries(key, cwd)
 }
 
 // isGlobalIgnoreEntry returns true if the entry has only ignores plus optional

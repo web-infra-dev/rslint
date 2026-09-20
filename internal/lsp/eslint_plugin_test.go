@@ -1185,11 +1185,17 @@ func TestComputeFixAllContentSharesFrozenTargetWithNativeAndPlugin(t *testing.T)
 			Files:   []string{"**/*.ts"},
 			Plugins: []string{"tpfrozentarget"},
 			Rules:   config.Rules{"tpfrozentarget/owner-a": "error"},
+			LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+				Project: config.ProjectPaths{"./tsconfig.json"},
+			}},
 		}},
 		"/owner-b": {{
 			Files:   []string{"**/*.ts"},
 			Plugins: []string{"tpfrozentarget"},
 			Rules:   config.Rules{"tpfrozentarget/owner-b": "error"},
+			LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{
+				Project: config.ProjectPaths{"./tsconfig.json"},
+			}},
 		}},
 	})
 	const source = "const value = 1;"

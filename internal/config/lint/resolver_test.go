@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -262,8 +266,8 @@ func TestResolverLiteralOwnerWinsCanonicalAlias(t *testing.T) {
 				len(alias.EnabledRules) != 1 || alias.EnabledRules[0].Name != "no-console" {
 				t.Fatalf("canonical alias changed literal owner: real=%v alias=%v", configuredRuleNameSet(realResolved.EnabledRules), configuredRuleNameSet(alias.EnabledRules))
 			}
-			policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget})
-			if err != nil || len(policies) != 1 || policies[aliasTarget].ServiceRootDirectory != root+"/symlink" {
+			policies, err := resolver.ProjectPolicies([]target.File{realTarget, aliasTarget}, false)
+			if err != nil || len(policies) != 2 || policies[realTarget] != (config.ProjectPolicy{}) || policies[aliasTarget].ServiceRootDirectory != root+"/symlink" {
 				t.Fatalf("policy gate used an alias instead of its literal owner: %v, %v", policies, err)
 			}
 		})
@@ -276,11 +280,11 @@ func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
 		want        config.ProjectPolicy
 		error       string
 	}{
-		{name: "ordinary project declarations do not project", input: `[{"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"project":["second.json"]}}}]`},
+		{name: "ordinary project uses final declaration", input: `[{"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"project":["second.json"]}}}]`, want: config.ProjectPolicy{ExplicitProject: &config.ProjectDeclaration{Patterns: config.ProjectPaths{"second.json"}, BaseDirectory: "/repo"}}},
 		{name: "unmatched options are neutral", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"projectService":true,"tsconfigRootDir":"relative","project":true}}}]`},
 		{name: "empty match remains zero", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":false}}}]`},
 		{name: "matched service", input: `[{"languageOptions":{"parserOptions":{"projectService":true}}}]`, want: config.ProjectPolicy{ServiceRootDirectory: "/repo"}},
-		{name: "service false retains explicit declarations", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"projectService":false}}}]`, want: config.ProjectPolicy{DefaultProjectDisabled: true}},
+		{name: "service false does not resurrect unmatched declaration", input: `[{"files":["unused.ts"],"languageOptions":{"parserOptions":{"project":["first.json"]}}},{"languageOptions":{"parserOptions":{"projectService":false}}}]`, want: config.ProjectPolicy{DefaultProjectDisabled: true}},
 		{name: "matched reset", input: `[{"languageOptions":{"parserOptions":{"project":null}}}]`, want: config.ProjectPolicy{ProjectDisabled: true}},
 		{name: "root error includes target", input: `[{"languageOptions":{"parserOptions":{"tsconfigRootDir":"relative"}}}]`, error: "absolute path"},
 	} {
@@ -291,15 +295,75 @@ func TestResolverProjectPoliciesUsesEffectiveConfig(t *testing.T) {
 			}
 			file := targetForTest("/repo/target.ts", "/repo")
 			resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: map[string]config.RslintConfig{"/repo": entries}})
-			policies, err := resolver.ProjectPolicies([]target.File{file})
+			policies, err := resolver.ProjectPolicies([]target.File{file}, false)
 			if test.error != "" {
 				if err == nil || !strings.Contains(err.Error(), file.Path) || !strings.Contains(err.Error(), test.error) {
 					t.Fatalf("target policy error=%v", err)
 				}
 				return
 			}
-			if err != nil || policies[file] != test.want || (test.want == (config.ProjectPolicy{}) && len(policies) != 0) {
+			_, present := policies[file]
+			if err != nil || !present || len(policies) != 1 || !reflect.DeepEqual(policies[file], test.want) {
 				t.Fatalf("policies=%v error=%v, want %+v", policies, err, test.want)
+			}
+		})
+	}
+}
+
+func TestResolverProjectPoliciesKeepsExplicitGapsPerTarget(t *testing.T) {
+	var entries config.RslintConfig
+	if err := json.Unmarshal([]byte(`[
+		{"rules":{"no-debugger":"error"}},
+		{"files":["typed.ts"],"languageOptions":{"parserOptions":{"project":"project.json"}}},
+		{"files":["cleared.ts"],"languageOptions":{"parserOptions":{"project":null}}}
+	]`), &entries); err != nil {
+		t.Fatal(err)
+	}
+	resolver := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: "/repo"})
+	files := []target.File{
+		targetForTest("/repo/typed.ts", "/repo"),
+		targetForTest("/repo/cleared.ts", "/repo"),
+		targetForTest("/repo/gap.ts", "/repo"),
+	}
+	policies, err := resolver.ProjectPolicies(files, false)
+	want := map[target.File]config.ProjectPolicy{
+		files[0]: {ExplicitProject: &config.ProjectDeclaration{Patterns: config.ProjectPaths{"project.json"}, BaseDirectory: "/repo"}},
+		files[1]: {ProjectDisabled: true},
+		files[2]: {},
+	}
+	if err != nil || !reflect.DeepEqual(policies, want) {
+		t.Fatalf("policies=%v error=%v, want explicit policies for all targets: %v", policies, err, want)
+	}
+}
+
+func TestResolverProjectPoliciesKeepsComposedOrigins(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	module, invocation := root+"/module", root+"/invocation"
+	for _, replace := range []bool{false, true} {
+		t.Run(strconv.FormatBool(replace), func(t *testing.T) {
+			entries := config.ConfigWithAuthoredPathBase(config.RslintConfig{{
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+			}}, module)
+			inline := config.ConfigEntry{Rules: config.Rules{"no-debugger": "error"}}
+			if replace {
+				inline.LanguageOptions = &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}}
+			}
+			entries = append(entries, config.ConfigWithAuthoredPathBase(config.RslintConfig{inline}, invocation)...)
+			resolver := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: module, DefaultRootDirectory: invocation})
+			file := targetForTest(tspath.ResolvePath(invocation, "target.ts"), module)
+			policies, err := resolver.ProjectPolicies([]target.File{file}, false)
+			wantBase := module
+			if replace {
+				wantBase = invocation
+			}
+			want := config.ProjectPolicy{ExplicitProject: &config.ProjectDeclaration{Patterns: config.ProjectPaths{"./tsconfig.json"}, BaseDirectory: wantBase}}
+			if err != nil || !reflect.DeepEqual(policies[file], want) {
+				t.Fatalf("policy=%+v error=%v, want %+v", policies[file], err, want)
+			}
+			bound := resolver.WithSourceMappings(map[string]target.File{tspath.ResolvePath(root, "source-alias.ts"): file}, nil, true)
+			boundPolicies, err := bound.ProjectPolicies([]target.File{file}, false)
+			if err != nil || !reflect.DeepEqual(boundPolicies, policies) {
+				t.Fatalf("source binding changed project origin: %v, %v; want %v", boundPolicies, err, policies)
 			}
 		})
 	}
@@ -327,13 +391,13 @@ func TestResolverServiceRootUsesConfigSource(t *testing.T) {
 					Config: entries, ConfigDirectory: test.matchingDirectory, DefaultRootDirectory: test.defaultRootDirectory,
 				})
 				file := targetForTest(test.matchingDirectory+"/file.ts", test.matchingDirectory)
-				policies, err := resolver.ProjectPolicies([]target.File{file})
+				policies, err := resolver.ProjectPolicies([]target.File{file}, false)
 				want := config.ProjectPolicy{ServiceRootDirectory: test.defaultRootDirectory}
 				if err != nil || policies[file] != want {
 					t.Fatalf("policy=%+v error=%v, want %+v", policies[file], err, want)
 				}
 				bound := resolver.WithSourceMappings(map[string]target.File{file.Path: file}, nil, true)
-				boundPolicies, err := bound.ProjectPolicies([]target.File{file})
+				boundPolicies, err := bound.ProjectPolicies([]target.File{file}, false)
 				if err != nil || !reflect.DeepEqual(boundPolicies, policies) {
 					t.Fatalf("source binding changed config defaults: %v, %v", boundPolicies, err)
 				}
@@ -349,7 +413,7 @@ func TestResolverServiceRootUsesEachModuleOwner(t *testing.T) {
 		DefaultRootDirectory: "/unrelated-invocation",
 	})
 	files := []target.File{targetForTest("/repo/file.ts", "/repo"), targetForTest("/repo/pkg/file.ts", "/repo/pkg")}
-	policies, err := resolver.ProjectPolicies(files)
+	policies, err := resolver.ProjectPolicies(files, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +431,7 @@ func TestResolverServiceRootKeepsModuleOriginForCanonicalAlias(t *testing.T) {
 		FS:             &ownerAliasResolverFS{FS: osvfs.FS()},
 	})
 	file := targetForTest("/real/file.ts", "/real")
-	policies, err := resolver.ProjectPolicies([]target.File{file})
+	policies, err := resolver.ProjectPolicies([]target.File{file}, false)
 	if err != nil || policies[file].ServiceRootDirectory != "/symlink" {
 		t.Fatalf("canonical lookup replaced the loaded module's origin: %v, %v", policies, err)
 	}
@@ -381,7 +445,7 @@ func TestResolverRuleOverridePreservesProjectOptions(t *testing.T) {
 	}, {Files: []string{"unused/*.ts"}, LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"unused.json"}}}}}
 	file := targetForTest("/repo/src/file.ts", "/repo")
 	before := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: "/repo"})
-	want, err := before.ProjectPolicies([]target.File{file})
+	want, err := before.ProjectPolicies([]target.File{file}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,13 +459,226 @@ func TestResolverRuleOverridePreservesProjectOptions(t *testing.T) {
 		t.Fatal(optionsErrors)
 	}
 	after := newBaseResolver(ResolverOptions{Config: entries, ConfigDirectory: "/repo"})
-	got, err := after.ProjectPolicies([]target.File{file})
+	got, err := after.ProjectPolicies([]target.File{file}, false)
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("rule override changed parser policy or entry matching: %v, %v; want %v", got, err, want)
 	}
 	resolved, _ := after.ResolveTarget(file)
 	if len(resolved.EnabledRules) != 1 || resolved.EnabledRules[0].Severity != rule.SeverityError {
 		t.Fatalf("rule override was not applied: %v", resolved.EnabledRules)
+	}
+}
+
+type projectPolicyResolverFS struct {
+	vfs.FS
+	realpath func(string) string
+}
+
+func (fs *projectPolicyResolverFS) Realpath(path string) string {
+	if fs.realpath != nil {
+		return fs.realpath(path)
+	}
+	return path
+}
+
+func TestResolverProjectPoliciesParallelProjection(t *testing.T) {
+	previous := runtime.GOMAXPROCS(4)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
+	root := tspath.NormalizePath(t.TempDir())
+	owner, serviceOwner := root+"/explicit", root+"/service"
+	configs := map[string]config.RslintConfig{
+		owner: {
+			{Rules: config.Rules{"no-debugger": "error"}},
+			{Files: []string{"src/*.ts"}, LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"project.json"}}}},
+			{Files: []string{"cleared.ts"}, LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectDisabled: true}}},
+		},
+		serviceOwner: {
+			{Ignores: []string{"ignored.ts"}},
+			{LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)}}},
+		},
+	}
+	files := []target.File{
+		targetForTest(owner+"/src/a.ts", owner),
+		targetForTest(owner+"/src/b.ts", owner),
+		targetForTest(owner+"/cleared.ts", owner),
+		targetForTest(owner+"/gap.js", owner),
+		targetForTest(serviceOwner+"/source.ts", serviceOwner),
+		targetForTest(serviceOwner+"/ignored.ts", serviceOwner),
+	}
+	for index := range files {
+		files[index].CanonicalParentPath = tspath.GetDirectoryPath(files[index].Path)
+	}
+	files = append(files, files[0])
+	declaration := &config.ProjectDeclaration{Patterns: config.ProjectPaths{"project.json"}, BaseDirectory: owner}
+	want := map[target.File]config.ProjectPolicy{
+		files[0]: {ExplicitProject: declaration}, files[1]: {ExplicitProject: declaration},
+		files[2]: {ProjectDisabled: true}, files[3]: {},
+		files[4]: {ServiceRootDirectory: serviceOwner}, files[5]: {},
+	}
+	for _, singleThreaded := range []bool{false, true} {
+		t.Run("singleThreaded="+strconv.FormatBool(singleThreaded), func(t *testing.T) {
+			fsys := &projectPolicyResolverFS{FS: osvfs.FS()}
+			resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: configs, FS: fsys})
+			fsys.realpath = func(string) string { panic("frozen target required another Realpath") }
+			got, err := resolver.ProjectPolicies(files, singleThreaded)
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Fatalf("policies=%v error=%v, want %v", got, err, want)
+			}
+			first, _ := resolver.ResolveTarget(files[0])
+			second, _ := resolver.ResolveTarget(files[1])
+			if first.MergedConfig != second.MergedConfig || got[files[0]].ExplicitProject != got[files[1]].ExplicitProject {
+				t.Fatal("same config shape was not reused")
+			}
+			empty, err := resolver.ProjectPolicies(nil, singleThreaded)
+			if err != nil || empty == nil || len(empty) != 0 {
+				t.Fatalf("empty input = %v, %v, want an empty policy map", empty, err)
+			}
+		})
+	}
+}
+
+func TestResolverProjectPoliciesConcurrency(t *testing.T) {
+	for _, mode := range []struct {
+		name           string
+		singleThreaded bool
+		processors     int
+		concurrent     int
+	}{
+		{name: "parallel", processors: 2, concurrent: 2},
+		{name: "single threaded", singleThreaded: true, processors: 2, concurrent: 1},
+		{name: "one processor", processors: 1, concurrent: 1},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			previous := runtime.GOMAXPROCS(mode.processors)
+			t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
+			root := tspath.NormalizePath(t.TempDir())
+			fsys := &projectPolicyResolverFS{FS: osvfs.FS()}
+			resolver := newBaseResolver(ResolverOptions{ConfigDirectory: root, Config: config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}, FS: fsys})
+			files := make([]target.File, 5)
+			for index := range files {
+				files[index] = targetForTest(fmt.Sprintf("%s/target-%d/file.ts", root, index), root)
+				files[index].CanonicalPath = fmt.Sprintf("%s/physical-%d/file.ts", root, index)
+			}
+			entered, release := make(chan string, len(files)), make(chan struct{})
+			var unblock sync.Once
+			t.Cleanup(func() { unblock.Do(func() { close(release) }) })
+			var active, maximum atomic.Int32
+			var mu sync.Mutex
+			var calls []string
+			fsys.realpath = func(path string) string {
+				current := active.Add(1)
+				defer active.Add(-1)
+				for old := maximum.Load(); current > old && !maximum.CompareAndSwap(old, current); old = maximum.Load() {
+				}
+				mu.Lock()
+				calls = append(calls, path)
+				mu.Unlock()
+				entered <- path
+				<-release
+				return path
+			}
+			done := make(chan error, 1)
+			go func() {
+				_, err := resolver.ProjectPolicies(files, mode.singleThreaded)
+				done <- err
+			}()
+			for range mode.concurrent {
+				select {
+				case <-entered:
+				case <-time.After(10 * time.Second):
+					t.Fatal("first config resolutions did not reach the concurrency barrier")
+				}
+			}
+			select {
+			case path := <-entered:
+				t.Fatalf("unexpected concurrent resolution of %s", path)
+			case <-time.After(20 * time.Millisecond):
+			}
+			unblock.Do(func() { close(release) })
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			if maximum.Load() != int32(mode.concurrent) || len(calls) != len(files) {
+				t.Fatalf("maximum/calls = %d/%d, want %d/%d", maximum.Load(), len(calls), mode.concurrent, len(files))
+			}
+			if mode.concurrent == 1 {
+				for index, file := range files {
+					if calls[index] != tspath.GetDirectoryPath(file.Path) {
+						t.Fatalf("serial resolution order = %v", calls)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestResolverProjectPoliciesFailureOrder(t *testing.T) {
+	previous := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
+	firstPanic, secondPanic := &struct{ name string }{"first"}, &struct{ name string }{"second"}
+	for _, test := range []struct {
+		name, first, second, errorText string
+		trailing                       int
+		panicValue                     any
+	}{
+		{name: "policy before panic", first: "z-bad", second: "panic", errorText: "absolute path"},
+		{name: "policy before panic in same worker", first: "z-bad", second: "panic", errorText: "absolute path", trailing: 2},
+		{name: "missing owner before panic", first: "missing", second: "panic", errorText: "missing governing configuration"},
+		{name: "panic before policy", first: "panic", second: "z-bad", panicValue: firstPanic},
+		{name: "panic before panic", first: "panic", second: "later-panic", panicValue: firstPanic},
+		{name: "policy before policy", first: "z-bad", second: "a-bad", errorText: "absolute path"},
+	} {
+		for _, singleThreaded := range []bool{false, true} {
+			t.Run(test.name+"/singleThreaded="+strconv.FormatBool(singleThreaded), func(t *testing.T) {
+				root, relative := tspath.NormalizePath(t.TempDir()), "relative"
+				fsys := &projectPolicyResolverFS{FS: osvfs.FS()}
+				resolver := newBaseResolver(ResolverOptions{ConfigsByOwner: map[string]config.RslintConfig{root: {
+					{Rules: config.Rules{"no-debugger": "error"}},
+					{Files: []string{"*-bad/*.ts"}, LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{TsconfigRootDir: &relative}}},
+				}}, FS: fsys})
+				files := []target.File{targetForTest(root+"/"+test.first+"/file.ts", root), targetForTest(root+"/"+test.second+"/file.ts", root)}
+				for index := range test.trailing {
+					files = append(files, targetForTest(fmt.Sprintf("%s/safe-%d/file.ts", root, index), root))
+				}
+				for index := range files {
+					files[index].CanonicalParentPath = tspath.GetDirectoryPath(files[index].Path)
+					if strings.Contains(files[index].Path, "panic/") {
+						files[index].CanonicalParentPath = ""
+						files[index].CanonicalPath += ".physical"
+					}
+				}
+				if test.first == "missing" {
+					files[0].ConfigDirectory = root + "/missing"
+				}
+				var panicCalls atomic.Int32
+				fsys.realpath = func(path string) string {
+					panicCalls.Add(1)
+					if path == root+"/panic" {
+						panic(firstPanic)
+					}
+					panic(secondPanic)
+				}
+				var gotPanic any
+				var err error
+				func() {
+					defer func() { gotPanic = recover() }()
+					_, err = resolver.ProjectPolicies(files, singleThreaded)
+				}()
+				if gotPanic != test.panicValue {
+					t.Fatalf("panic = %#v, want original value %#v (error %v)", gotPanic, test.panicValue, err)
+				}
+				if test.errorText != "" {
+					if err == nil || !strings.HasPrefix(err.Error(), files[0].Path+": ") || !strings.Contains(err.Error(), test.errorText) {
+						t.Fatalf("error = %v, want first input's %s", err, test.errorText)
+					}
+					if singleThreaded && panicCalls.Load() != 0 {
+						t.Fatal("serial projection resolved beyond the first error")
+					}
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
 	}
 }
 
