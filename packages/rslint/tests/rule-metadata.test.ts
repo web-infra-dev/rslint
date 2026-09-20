@@ -3,17 +3,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { compileRuleOptionTypes } from '../plugins/generate-rule-option-types.js';
 import { writeRuleDocsToDir } from '../../../website/plugin-rule-manifest.js';
-
-const require = createRequire(import.meta.url);
-const { buildManifest } = require('../../../scripts/gen-rule-manifest.js');
-const {
+import { buildManifest } from '../../../scripts/gen-rule-manifest.js';
+import {
   getCurrentRuleIds,
   getRuleIdsAtRef,
-} = require('../../../scripts/sync-version-info/release.js');
+} from '../../../scripts/sync-version-info/release.js';
 
 function withFixture<T>(
   run: (root: string, write: (file: string, content: string) => void) => T,
