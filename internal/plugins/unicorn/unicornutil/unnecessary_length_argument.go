@@ -10,6 +10,14 @@ import (
 
 type unnecessaryLengthReferenceIndexKey struct{}
 type unnecessaryLengthStaticEvaluatorKey struct{}
+type unnecessaryLengthGlobalObjectWritesKey struct{}
+
+var unnecessaryLengthGlobalObjectNames = map[string]bool{
+	"global":     true,
+	"globalThis": true,
+	"self":       true,
+	"window":     true,
+}
 
 // ReportUnnecessaryLengthArgument checks the second argument of an already
 // matched two-argument slice/splice call. Callers own receiver restrictions.
@@ -22,7 +30,7 @@ func ReportUnnecessaryLengthArgument(ctx rule.RuleContext, call DotMethodCall, m
 		return
 	}
 	if lengthMember(argument) != nil &&
-		(!isRepeatableReference(ctx, object) || hasSideEffect(call.Call.Arguments()[0], true)) {
+		(!isRepeatableReference(ctx, object) || !isSideEffectFreeArgument(call.Call.Arguments()[0])) {
 		return
 	}
 	message := rule.RuleMessage{Id: messageID, Description: "Passing `" + description + "` as the `" + argumentName + "` argument is unnecessary.", Data: map[string]string{"description": description, "argumentName": argumentName}}
@@ -93,7 +101,53 @@ func isPristineGlobalReference(ctx rule.RuleContext, node *ast.Node, name string
 		}
 		return false
 	})
-	return pristine
+	return pristine && !hasEarlierGlobalObjectPropertyWrite(ctx, name, node.Pos())
+}
+
+func hasEarlierGlobalObjectPropertyWrite(ctx rule.RuleContext, name string, before int) bool {
+	firstWrites := rule.CachedByFile(ctx, unnecessaryLengthGlobalObjectWritesKey{}, func() map[string]int {
+		writes := map[string]int{}
+		evaluator := rule.CachedByFile(ctx, unnecessaryLengthStaticEvaluatorKey{}, func() *utils.StaticStringEvaluator {
+			return utils.NewStaticStringEvaluatorWithReferenceResolver(
+				ctx.TypeChecker, ctx.SourceFile, ctx.Refs,
+			)
+		})
+		var visit func(*ast.Node)
+		visit = func(node *ast.Node) {
+			if ast.IsAccessExpression(node) && isGlobalObjectPropertyWrite(ctx, node) {
+				property, ok := evaluator.EvalAccessExpressionName(node)
+				if ok {
+					if previous, exists := writes[property]; !exists || node.Pos() < previous {
+						writes[property] = node.Pos()
+					}
+				}
+			}
+			node.ForEachChild(func(child *ast.Node) bool {
+				visit(child)
+				return false
+			})
+		}
+		visit(ctx.SourceFile.AsNode())
+		return writes
+	})
+	position, ok := firstWrites[name]
+	return ok && position < before
+}
+
+func isGlobalObjectPropertyWrite(ctx rule.RuleContext, node *ast.Node) bool {
+	if !utils.IsWriteReference(node) {
+		parent := node.Parent
+		if parent == nil || parent.Kind != ast.KindDeleteExpression ||
+			parent.AsDeleteExpression().Expression != node {
+			return false
+		}
+	}
+	root := utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
+	if !ast.IsIdentifier(root) || !unnecessaryLengthGlobalObjectNames[root.Text()] ||
+		ctx.Refs == nil || !ctx.Globals.Access(root.Text()).IsDeclared() {
+		return false
+	}
+	return ctx.Refs.IsGlobalReference(root)
 }
 
 func sameStaticReference(ctx rule.RuleContext, left, right *ast.Node) bool {
@@ -131,7 +185,10 @@ func isRepeatableReference(ctx rule.RuleContext, node *ast.Node) bool {
 	case ast.KindIdentifier, ast.KindThisKeyword:
 		return true
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		if accessHasGetter(ctx, node) {
+		// Without type information we cannot distinguish a data property from a
+		// getter. Re-evaluating a member chain can therefore change which object
+		// receives the splice, so only checker-backed member paths are repeatable.
+		if ctx.TypeChecker == nil || accessHasGetter(ctx, node) {
 			return false
 		}
 		return isRepeatableReference(ctx, utils.AccessExpressionObject(node))
@@ -167,52 +224,24 @@ func accessHasGetter(ctx rule.RuleContext, node *ast.Node) bool {
 	return false
 }
 
-// TODO: Extract this together with prefer_ternary.hasSideEffect into
-// internal/utils once the shared contract includes configurable getter handling.
-func hasSideEffect(node *ast.Node, considerGetters bool) bool {
+func isSideEffectFreeArgument(node *ast.Node) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if node == nil {
 		return false
 	}
 	switch node.Kind {
-	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration:
-		// Function bodies are deferred until invocation.
-		return false
-	case ast.KindCallExpression, ast.KindNewExpression, ast.KindAwaitExpression,
-		ast.KindYieldExpression, ast.KindDeleteExpression, ast.KindPostfixUnaryExpression,
-		ast.KindTaggedTemplateExpression:
+	case ast.KindIdentifier, ast.KindThisKeyword,
+		ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral,
+		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
 	case ast.KindPrefixUnaryExpression:
 		prefix := node.AsPrefixUnaryExpression()
-		if prefix != nil && (prefix.Operator == ast.KindPlusPlusToken || prefix.Operator == ast.KindMinusMinusToken) {
-			return true
-		}
-	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
-		if binary != nil && binary.OperatorToken != nil &&
-			ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
-			return true
-		}
-	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		if considerGetters {
-			return true
-		}
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return deferredMemberHasSideEffect(node, considerGetters)
-	}
-	return node.ForEachChild(func(child *ast.Node) bool {
-		return hasSideEffect(child, considerGetters)
-	})
-}
-
-func deferredMemberHasSideEffect(node *ast.Node, considerGetters bool) bool {
-	for _, decorator := range node.Decorators() {
-		if hasSideEffect(decorator, considerGetters) {
-			return true
+		switch prefix.Operator {
+		case ast.KindPlusToken, ast.KindMinusToken, ast.KindExclamationToken,
+			ast.KindTildeToken, ast.KindTypeOfKeyword, ast.KindVoidKeyword:
+			return isSideEffectFreeArgument(prefix.Operand)
 		}
 	}
-	if node.Kind == ast.KindConstructor {
-		return false
-	}
-	return hasSideEffect(node.Name(), considerGetters)
+	return false
 }

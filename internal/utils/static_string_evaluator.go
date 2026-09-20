@@ -1275,6 +1275,8 @@ func (staticEvaluator *StaticStringEvaluator) evalBuiltinStaticCall(node *ast.No
 	}
 
 	switch method {
+	case "toString":
+		return staticEvalResult{value: text, ok: true}
 	case "indexOf":
 		return staticStringIndexOf(text, arguments)
 	case "toUpperCase":

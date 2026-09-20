@@ -36,8 +36,9 @@ func collectEvents(ctx rule.RuleContext, tracker *Tracker) []string {
 		}
 	}
 	tracker.TrackGlobals(map[string]*Trace{"api": {Properties: map[string]*Trace{
-		"fn":   {Read: collect("read"), Call: collect("call")},
-		"Ctor": {Construct: collect("new")},
+		"fn":    {Read: collect("read"), Call: collect("call")},
+		"Ctor":  {Construct: collect("new")},
+		"value": {Read: collect("read")},
 	}}})
 	return events
 }
@@ -49,6 +50,8 @@ func TestGlobalReferences(t *testing.T) {
 		want []string
 	}{
 		{"calls and constructors", `api.fn(); new api.Ctor();`, []string{"read: api.fn", "call: api.fn()", "new: new api.Ctor()"}},
+		{"terminal read through aliases", `const value = api.value; const alias = value; consume(alias);`, []string{"read: api.value"}},
+		{"terminal read before destructuring", `const {x} = api.value; consume(x);`, []string{"read: api.value"}},
 		{"computed alias", `const {["f" + "n"]: run} = api; const invoke = run; invoke();`, []string{`read: ["f" + "n"]: run`, "call: invoke()"}},
 		{"template binding key", "const {[`fn`]: run} = api; run();", []string{"read: [`fn`]: run", "call: run()"}},
 		{"assignment default", `let run; ({fn: run = fallback} = api); run();`, []string{"read: fn: run = fallback", "call: run()"}},
