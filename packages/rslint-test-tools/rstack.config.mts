@@ -195,6 +195,7 @@ define.test({
     './tests/eslint-plugin-node/rules/no-top-level-await.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-bin.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-import.test.ts',
+    './tests/eslint-plugin-node/rules/prefer-global/process.test.ts',
     './tests/eslint-plugin-node/rules/prefer-node-protocol.test.ts',
 
     // eslint-plugin-import
