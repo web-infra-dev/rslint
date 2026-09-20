@@ -50,9 +50,10 @@ func TestRequireDynamicImportEntry(t *testing.T) {
 		{Code: `consume(await import('./declarations'));`},
 		{Code: `consume(await import('dependency'));`},
 		{Code: `consume(await import('./inline'));`},
+		// Any comment containing @entry counts, including prose and inline comments.
+		{Code: `consume(await import('./same-line'));`},
+		{Code: `consume(await import('./misleading'));`},
 		{Code: `consume(await import('./overload'));`},
-		// Rslim also accepts trailing trivia at the declaration's full start.
-		{Code: `consume(await import('./trailing'));`},
 		{Code: `consume(await import('./empty'));`},
 		{Code: `import('./feature');`},
 		{Code: `await import('./feature');`},
@@ -77,6 +78,8 @@ func TestRequireDynamicImportEntry(t *testing.T) {
 		})
 	}
 	invalid = append(invalid,
+		rule_tester.InvalidTestCase{Code: "const path = './feature'; consume(await import(path));", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unresolvedImport"}}},
+		rule_tester.InvalidTestCase{Code: "async function load(path: string) { return import(path); }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unresolvedImport"}}},
 		rule_tester.InvalidTestCase{Code: "import(path);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unresolvedImport"}}},
 		rule_tester.InvalidTestCase{Code: "consume(await import(\n  path\n));", Errors: []rule_tester.InvalidTestCaseError{{
 			MessageId: "unresolvedImport", Line: 2, Column: 3, EndLine: 2, EndColumn: 7,
@@ -115,9 +118,8 @@ func TestRequireDynamicImportEntry(t *testing.T) {
 	add(`const { run } = await import('./missing-reexport'); run();`, "./missing-reexport", "run")
 	add(`const { start } = await import('./star'); start();`, "./star", "start")
 	add(`const { default: run } = await import('./default'); run();`, "./default", "default")
-	add(`consume(await import('./same-line'));`, "./same-line", "start")
-	add(`consume(await import('./misleading'));`, "./misleading", "start, value")
 	add(`consume(await import('./misplaced'));`, "./misplaced", "start")
+	add(`consume(await import('./trailing'));`, "./trailing", "start")
 	add("// @entry\nconst { start } = await import('./feature'); start();", "./feature", "start")
 	add("const { start } = await import(\n  './feature'\n); start();", "./feature", "start")
 	add(`const { start } = await import('./feature', { with: { type: 'javascript' } }); start();`, "./feature", "start")

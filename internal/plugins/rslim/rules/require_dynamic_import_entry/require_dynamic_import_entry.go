@@ -9,7 +9,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 var RequireDynamicImportEntryRule = rule.Rule{
@@ -24,17 +23,15 @@ var RequireDynamicImportEntryRule = rule.Rule{
 					return
 				}
 				specifier := call.Arguments.Nodes[0]
-				var module *ast.Symbol
-				if ast.IsStringLiteralLike(specifier) {
-					module = ctx.TypeChecker.GetSymbolAtLocation(specifier)
-				}
-				if module == nil {
+				module := ctx.TypeChecker.GetSymbolAtLocation(specifier)
+				if !ast.IsStringLiteralLike(specifier) || module == nil {
 					ctx.ReportNode(specifier, rule.RuleMessage{
 						Id:          "unresolvedImport",
 						Description: "Cannot resolve this dynamic import. Manually check that the imported declarations used at runtime have @entry, then add // rslint-disable-next-line rslim/require-dynamic-import-entry before this argument's line to ignore this diagnostic.",
 					})
 					return
 				}
+
 				used := exportUsage{ctx: &ctx, names: map[string]bool{}, seen: map[*ast.Node]bool{}}
 				used.expression(node, true)
 				var missing []string
@@ -42,17 +39,7 @@ var RequireDynamicImportEntryRule = rule.Rule{
 					if !used.all && !used.names[exported.Name] {
 						continue
 					}
-					symbol := exported
-					if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-						if ctx.TypeChecker.GetTypeOnlyAliasDeclaration(symbol) != nil {
-							continue
-						}
-						symbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
-					}
-					if symbol == nil || symbol.Flags&ast.SymbolFlagsValue == 0 {
-						continue
-					}
-					if needsEntry(ctx, symbol) {
+					if needsEntry(ctx, exported, map[*ast.Symbol]bool{}) {
 						missing = append(missing, exported.Name)
 					}
 				}
@@ -101,11 +88,7 @@ func (u *exportUsage) binding(declaration *ast.Node, promise bool) {
 		}
 		return
 	}
-	if ast.GetCombinedModifierFlags(declaration)&ast.ModifierFlagsExport != 0 {
-		u.all = true
-		return
-	}
-	if name.Kind != ast.KindIdentifier || declaration.Symbol() == nil || u.ctx.Refs == nil {
+	if ast.GetCombinedModifierFlags(declaration)&ast.ModifierFlagsExport != 0 || name.Kind != ast.KindIdentifier || declaration.Symbol() == nil || u.ctx.Refs == nil {
 		u.all = true
 		return
 	}
@@ -115,7 +98,7 @@ func (u *exportUsage) binding(declaration *ast.Node, promise bool) {
 }
 
 func (u *exportUsage) expression(node *ast.Node, promise bool) {
-	if u.seen[node] {
+	if u.all || u.seen[node] {
 		return
 	}
 	u.seen[node] = true
@@ -149,19 +132,21 @@ func (u *exportUsage) expression(node *ast.Node, promise bool) {
 			}
 			return
 		}
-		if known && name == "then" && parent.Parent != nil && parent.Parent.Kind == ast.KindCallExpression {
-			call := parent.Parent.AsCallExpression()
-			if call.Expression == parent && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-				callback := ast.SkipOuterExpressions(call.Arguments.Nodes[0], ast.OEKAll)
-				if ast.IsArrowFunction(callback) || ast.IsFunctionExpression(callback) {
-					parameters := callback.Parameters()
-					if len(parameters) > 0 {
-						u.binding(parameters[0], false)
-					}
-					return
-				}
-			}
+		if !known || name != "then" || parent.Parent == nil || parent.Parent.Kind != ast.KindCallExpression {
+			break
 		}
+		call := parent.Parent.AsCallExpression()
+		if call.Expression != parent || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+			break
+		}
+		callback := ast.SkipOuterExpressions(call.Arguments.Nodes[0], ast.OEKAll)
+		if !ast.IsArrowFunction(callback) && !ast.IsFunctionExpression(callback) {
+			break
+		}
+		if parameters := callback.Parameters(); len(parameters) > 0 {
+			u.binding(parameters[0], false)
+		}
+		return
 	case ast.KindExpressionStatement, ast.KindVoidExpression:
 		// A discarded import result only requests module side effects.
 		return
@@ -169,12 +154,14 @@ func (u *exportUsage) expression(node *ast.Node, promise bool) {
 	u.all = true
 }
 
-func needsEntry(ctx rule.RuleContext, symbol *ast.Symbol) bool {
-	return needsEntrySeen(ctx, symbol, map[*ast.Symbol]bool{})
-}
-
-func needsEntrySeen(ctx rule.RuleContext, symbol *ast.Symbol, seen map[*ast.Symbol]bool) bool {
-	if seen[symbol] {
+func needsEntry(ctx rule.RuleContext, symbol *ast.Symbol, seen map[*ast.Symbol]bool) bool {
+	if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
+		if ctx.TypeChecker.GetTypeOnlyAliasDeclaration(symbol) != nil {
+			return false
+		}
+		symbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
+	}
+	if symbol == nil || symbol.Flags&ast.SymbolFlagsValue == 0 || seen[symbol] {
 		return false
 	}
 	seen[symbol] = true
@@ -188,13 +175,7 @@ func needsEntrySeen(ctx rule.RuleContext, symbol *ast.Symbol, seen map[*ast.Symb
 		// placing @entry on a source file cannot preserve that namespace.
 		if declaration.Kind == ast.KindSourceFile {
 			for _, exported := range ctx.TypeChecker.GetExportsOfModule(symbol) {
-				if exported.Flags&ast.SymbolFlagsAlias != 0 {
-					if ctx.TypeChecker.GetTypeOnlyAliasDeclaration(exported) != nil {
-						continue
-					}
-					exported = ctx.TypeChecker.GetAliasedSymbol(exported)
-				}
-				if exported != nil && exported.Flags&ast.SymbolFlagsValue != 0 && needsEntrySeen(ctx, exported, seen) {
+				if needsEntry(ctx, exported, seen) {
 					return true
 				}
 			}
@@ -213,35 +194,11 @@ func needsEntrySeen(ctx rule.RuleContext, symbol *ast.Symbol, seen map[*ast.Symb
 	return hasSource
 }
 
-// Rslim accepts an annotation only when it occupies a complete comment line.
-// Match Rslim's leading-trivia lookup followed by its trailing-trivia fallback
-// at the declaration's full start.
 func hasEntry(file *ast.SourceFile, node *ast.Node) bool {
 	factory := &ast.NodeFactory{}
 	text := file.Text()
-	var comments []ast.CommentRange
 	for comment := range scanner.GetLeadingCommentRanges(factory, text, node.Pos()) {
-		comments = append(comments, comment)
-	}
-	if len(comments) == 0 {
-		for comment := range scanner.GetTrailingCommentRanges(factory, text, node.Pos()) {
-			if comment.End() <= node.End() {
-				comments = append(comments, comment)
-			}
-		}
-	}
-	if len(comments) == 0 {
-		return false
-	}
-	// Preserve the entire comment group: two block comments on the same line
-	// are not two separate annotation lines in Rslim.
-	for _, line := range strings.Split(text[comments[0].Pos():comments[len(comments)-1].End()], "\n") {
-		line = ecmascript.StringTrim(line)
-		line = strings.TrimPrefix(line, "/*")
-		line = strings.TrimSuffix(line, "*/")
-		line = strings.Trim(ecmascript.StringTrim(line), "*")
-		line = strings.Trim(line, "/")
-		if strings.TrimLeftFunc(line, ecmascript.IsWhiteSpaceOrLineTerminator) == "@entry" {
+		if strings.Contains(text[comment.Pos():comment.End()], "@entry") {
 			return true
 		}
 	}
