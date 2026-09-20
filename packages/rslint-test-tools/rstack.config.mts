@@ -197,6 +197,7 @@ define.test({
     './tests/eslint-plugin-node/rules/no-unpublished-import.test.ts',
     './tests/eslint-plugin-node/rules/prefer-global/process.test.ts',
     './tests/eslint-plugin-node/rules/prefer-node-protocol.test.ts',
+    './tests/eslint-plugin-node/rules/prefer-promises/dns.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
