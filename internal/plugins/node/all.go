@@ -29,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/process"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/text_decoder"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_node_protocol"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_promises/dns"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -62,5 +63,6 @@ func GetAllRules() []rule.Rule {
 		process.ProcessRule,
 		text_decoder.TextDecoderRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
+		dns.PreferPromisesDNSRule,
 	}
 }
