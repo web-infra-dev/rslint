@@ -188,7 +188,7 @@ jobs:
           node scripts/binary-size.mjs record "${RUNNER_TEMP}/rslint-release" "${RUNNER_TEMP}/binary-size.json"
 
       # Uploaded on every run, main included: a pull request's baseline is the
-      # artifact of the main run for its base commit.
+      # artifact of the run that measured the commit its build was merged onto.
       - name: Upload rslint binary size
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -259,7 +259,7 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/binary-size.mjs base-run
+        run: node scripts/binary-size.mjs base-run head-size/binary-size.json
 
       - name: Download the base measurement
         if: steps.base.outputs.run-id != ''

@@ -3,7 +3,7 @@
  * Binary size monitoring for the `rslint` executable.
  *
  *   node scripts/binary-size.mjs record <binary> <out.json>
- *   node scripts/binary-size.mjs base-run                    # -> $GITHUB_OUTPUT
+ *   node scripts/binary-size.mjs base-run <head.json>       # -> $GITHUB_OUTPUT
  *   node scripts/binary-size.mjs report <head.json> [base.json]
  *   node scripts/binary-size.mjs comment <report.md>
  *
@@ -11,9 +11,10 @@
  * job, which has already compiled every package behind ./cmd/rslint — so the
  * release relink it measures is a link-only action off a warm Go build cache
  * rather than a second build. Each run stores its number as a workflow
- * artifact; a pull request reads back the artifact of the main run for its
- * base commit. That keeps the whole system on the built-in GITHUB_TOKEN: no
- * data branch, no personal access token, no repository writes.
+ * artifact; a pull request reads back the artifact of the run that measured
+ * the commit its build was merged onto. That keeps the whole system on the
+ * built-in GITHUB_TOKEN: no data branch, no personal access token, no
+ * repository writes.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -130,18 +131,68 @@ function record(binary, out) {
 }
 
 /**
- * Locate the workflow run that measured the pull request's base commit.
+ * The commit the measured binary was built on top of.
  *
- * The base commit is on main, so its own CI run holds its measurement.
- * A miss is not an error: the base may predate this workflow, its run may
- * still be going, or its artifact may have expired. The report then just
- * states the current size.
+ * CI compiles the merge commit GitHub generates for a pull request, so what
+ * gets measured is `base branch at build time + this branch`. The first parent
+ * of that merge commit is exactly that base, and subtracting it isolates the
+ * pull request's own contribution.
+ *
+ * The event's `base.sha` cannot do that job: it is a snapshot stored on the
+ * pull request and is not refreshed when the base branch moves on, while the
+ * merge commit is rebuilt against the current tip for every run. Once the two
+ * drift apart, a comparison against `base.sha` also counts everything that
+ * landed on the base branch in between and bills it to the pull request.
  */
-async function findBaseRun() {
-  const baseSha = readEvent().pull_request?.base?.sha;
+async function resolveBaseCommit(headPath) {
+  const measuredSha = measuredCommitSha(headPath);
+  if (measuredSha) {
+    try {
+      const commit = await api(`/repos/${repository}/commits/${measuredSha}`);
+      const parents = commit.parents || [];
+      if (parents.length > 1) {
+        const sha = parents[0].sha;
+        return { sha, subject: await commitSubject(sha) };
+      }
+    } catch {
+      // Fall through: an unreachable commit is no reason to skip the report.
+    }
+  }
+
+  // Not a merge build — the run measured a commit that stands on its own, so
+  // the pull request's recorded base is the best answer available.
+  const fallback = readEvent().pull_request?.base?.sha || '';
+  if (!fallback) return { sha: '', subject: '' };
+  return { sha: fallback, subject: await commitSubject(fallback) };
+}
+
+/** The commit this run measured, as the measurement itself recorded it. */
+function measuredCommitSha(headPath) {
+  if (headPath) {
+    try {
+      const measurement = JSON.parse(fs.readFileSync(headPath, 'utf8'));
+      if (measurement.sha) return measurement.sha;
+    } catch {
+      // Missing or unreadable: fall back to this job's own checkout.
+    }
+  }
+  return process.env.GITHUB_SHA || '';
+}
+
+/**
+ * Locate the workflow run that measured the base commit.
+ *
+ * The base commit is on the base branch, so its own CI run holds its
+ * measurement. A miss is not an error: the base may predate this workflow, its
+ * run may still be going, or its artifact may have expired. The report then
+ * just states the current size.
+ */
+async function findBaseRun(headPath) {
+  const base = await resolveBaseCommit(headPath);
+  const baseSha = base.sha;
   if (!baseSha) return { baseSha: '', runId: '' };
 
-  await writeBaseCommit(baseSha);
+  writeBaseCommit(base);
 
   const runs = await api(
     `/repos/${repository}/actions/runs?head_sha=${baseSha}&per_page=100`,
@@ -163,20 +214,23 @@ async function findBaseRun() {
   return { baseSha, runId: '' };
 }
 
+/** A commit's subject line, or an empty string when it cannot be read. */
+async function commitSubject(sha) {
+  try {
+    const commit = await api(`/repos/${repository}/commits/${sha}`);
+    return (commit.commit?.message || '').split('\n')[0];
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Record the base commit's identity next to its measurement.
  *
- * Looked up rather than read off the base measurement so the report can name
- * the base commit even when no measurement for it exists.
+ * Written whether or not a measurement for it turned up, so the report can
+ * always name the commit the comparison is against.
  */
-async function writeBaseCommit(sha) {
-  let subject;
-  try {
-    const commit = await api(`/repos/${repository}/commits/${sha}`);
-    subject = (commit.commit?.message || '').split('\n')[0];
-  } catch {
-    subject = '';
-  }
+function writeBaseCommit({ sha, subject }) {
   fs.writeFileSync(
     BASE_COMMIT_FILE,
     `${JSON.stringify({ sha, subject }, null, 2)}\n`,
@@ -339,7 +393,8 @@ async function main() {
       break;
     }
     case 'base-run': {
-      const { baseSha, runId } = await findBaseRun();
+      const [headPath] = args;
+      const { baseSha, runId } = await findBaseRun(headPath);
       appendOutput('run-id', runId);
       process.stdout.write(
         runId
