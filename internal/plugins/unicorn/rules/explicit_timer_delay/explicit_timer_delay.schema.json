@@ -1,0 +1,11 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "enum": ["always", "never"],
+      "description": "Require an explicit delay, or disallow an explicit zero delay."
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

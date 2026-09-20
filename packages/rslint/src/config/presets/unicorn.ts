@@ -45,7 +45,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/escape-case': 'error', // not implemented
     // 'unicorn/expiring-todo-comments': 'error', // not implemented
     // 'unicorn/explicit-length-check': 'error', // not implemented
-    // 'unicorn/explicit-timer-delay': 'error', // not implemented
+    'unicorn/explicit-timer-delay': 'error',
     'unicorn/filename-case': 'error',
     // 'unicorn/id-match': 'off', // not implemented
     // 'unicorn/import-style': 'error', // not implemented
@@ -125,7 +125,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-negated-array-predicate': 'error', // not implemented
     // 'unicorn/no-negated-comparison': 'error', // not implemented
     // 'unicorn/no-negated-condition': 'error', // not implemented
-    // 'unicorn/no-negation-in-equality-check': 'error', // not implemented
+    'unicorn/no-negation-in-equality-check': 'error',
     // 'unicorn/no-nested-ternary': 'error', // not implemented
     // 'unicorn/no-new-array': 'error', // not implemented
     'unicorn/no-new-buffer': 'error',
@@ -154,7 +154,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-undeclared-class-members': 'error', // not implemented
     'unicorn/no-unnecessary-array-flat-depth': 'error',
     // 'unicorn/no-unnecessary-array-flat-map': 'error', // not implemented
-    // 'unicorn/no-unnecessary-array-splice-count': 'error', // not implemented
+    'unicorn/no-unnecessary-array-splice-count': 'error',
     // 'unicorn/no-unnecessary-await': 'error', // not implemented
     // 'unicorn/no-unnecessary-boolean-comparison': 'error', // not implemented
     // 'unicorn/no-unnecessary-fetch-options': 'error', // not implemented
@@ -233,7 +233,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-default-parameters': 'error', // not implemented
     // 'unicorn/prefer-direct-iteration': 'error', // not implemented
     // 'unicorn/prefer-dispose': 'off', // not implemented
-    // 'unicorn/prefer-dom-node-append': 'error', // not implemented
+    'unicorn/prefer-dom-node-append': 'error',
     // 'unicorn/prefer-dom-node-html-methods': 'error', // not implemented
     // 'unicorn/prefer-dom-node-remove': 'error', // not implemented
     // 'unicorn/prefer-dom-node-replace-children': 'error', // not implemented
