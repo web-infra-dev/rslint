@@ -46,6 +46,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_expect_type_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_import_in_mock"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_lowercase_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_importing_rstest_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_rs_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_strict_boolean_matchers"
@@ -116,6 +117,7 @@ func GetAllRules() []rule.Rule {
 		prefer_equality_matcher.PreferEqualityMatcherRule,
 		prefer_expect_type_of.PreferExpectTypeOfRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
+		prefer_lowercase_title.PreferLowercaseTitleRule,
 		prefer_import_in_mock.PreferImportInMockRule,
 		prefer_importing_rstest_globals.PreferImportingRstestGlobalsRule,
 		prefer_rs_mocked.PreferRsMockedRule,
