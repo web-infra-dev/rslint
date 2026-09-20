@@ -219,12 +219,12 @@ func importMetaRstestBindingName(symbol *ast.Symbol) (string, bool) {
 		}
 		binding := declaration.AsBindingElement()
 		if binding.PropertyName != nil {
-			if name, ok := internalUtils.GetStaticStringLiteralValue(binding.PropertyName); ok {
+			// The property names the API, so an unreadable key resolves to
+			// nothing rather than falling through to the local alias below.
+			if name, ok := internalUtils.GetStaticPropertyName(binding.PropertyName); ok {
 				return name, true
 			}
-			if binding.PropertyName.Kind == ast.KindIdentifier {
-				return binding.PropertyName.Text(), true
-			}
+			return "", false
 		}
 		if binding.Name() != nil && binding.Name().Kind == ast.KindIdentifier {
 			return binding.Name().Text(), true

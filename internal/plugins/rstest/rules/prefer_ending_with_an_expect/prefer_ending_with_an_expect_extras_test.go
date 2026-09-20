@@ -52,6 +52,12 @@ test('places the order', () => { check(checkout()).toBe('ok'); });`},
     import.meta.rstest.expect(checkout()).toBe('ok');
   });
 }`},
+			// A computed key that folds to a constant names the same API as the
+			// plain key, so the destructured local still asserts.
+			{Code: `const { ['expect']: check } = import.meta.rstest;
+test('places the order', () => { check(checkout()).toBe('ok'); });`},
+			{Code: `const { [` + "`expect`" + `]: check } = import.meta.rstest;
+test('places the order', () => { check(checkout()).toBe('ok'); });`},
 			// Chai's `assert` is an Rstest global, so it asserts by default.
 			{Code: `test('places the order', () => { assert.equal(checkout(), 'ok'); });`},
 			{Code: `test('places the order', () => { expect.soft(checkout()).toBe('ok'); });`},

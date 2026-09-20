@@ -636,7 +636,21 @@ func (analysis *RstestCallAnalysis) collectVariableCandidates(
 			}
 			importedName := binding.Name().Text()
 			if binding.PropertyName != nil {
-				importedName = binding.PropertyName.Text()
+				// A computed key carries no text of its own, so the name has to
+				// be folded from the expression. `{ ['expect']: check }` names
+				// the same API as `{ expect: check }`.
+				resolved, known := internalUtils.GetStaticPropertyName(binding.PropertyName)
+				if !known {
+					// A genuinely dynamic key binds one Rstest API without
+					// saying which. Narrowing it to no candidate would make
+					// every rule treat the local as foreign — an assertion
+					// through it would read as no assertion at all. This is the
+					// same unknown a namespace import leaves behind, so it gets
+					// the same answer.
+					analysis.candidates[binding.Name().Text()] |= rstestCandidateAll
+					continue
+				}
+				importedName = resolved
 			}
 			analysis.candidates[binding.Name().Text()] |=
 				rstestImportedCandidateKind(importedName)
