@@ -2,17 +2,18 @@ package prefer_hooks_on_top
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
+	rstestUtils "github.com/web-infra-dev/rslint/internal/plugins/rstest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	shared "github.com/web-infra-dev/rslint/internal/utils/test_framework/rules/prefer_hooks_on_top"
 )
 
 var PreferHooksOnTopRule = shared.NewRule(shared.Config{
-	Name: "jest/prefer-hooks-on-top",
+	Name: "rstest/prefer-hooks-on-top",
 	Prepare: func(ctx rule.RuleContext) shared.Runtime {
+		analysis := rstestUtils.GetRstestCallAnalysis(ctx)
 		return shared.Runtime{
 			Parse: func(node *ast.Node) *shared.ParsedCall {
-				parsed := jestUtils.ParseJestFnCall(node, ctx)
+				parsed := analysis.ParseFnCall(node)
 				if parsed == nil {
 					return nil
 				}
