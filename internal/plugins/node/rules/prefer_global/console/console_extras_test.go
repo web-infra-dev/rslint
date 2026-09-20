@@ -26,6 +26,9 @@ func TestPreferGlobalConsoleExtras(t *testing.T) {
 		// Source variable is not a literal.
 		{Code: "const name = 'console'; require(name); process.getBuiltinModule(name);",
 			FileName: "input.js", TSConfig: "tsconfig.allowJs.json"},
+		// Constant method calls are not evaluated as module names.
+		{Code: "require('console'.toString()); process.getBuiltinModule('node:console'.toString());",
+			FileName: "input.js", TSConfig: "tsconfig.allowJs.json"},
 		// Local module bindings with never.
 		{Code: "import console from 'console'; console.log(); export { Console } from 'console';",
 			Options:         []any{"never"},
@@ -75,6 +78,14 @@ func TestPreferGlobalConsoleExtras(t *testing.T) {
 			FileName:        "input.ts"},
 		// Import equals is not an ESM load.
 		{Code: "import console = require('console'); console.log();",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			FileName:        "input.ts"},
+		// Explicit type-only imports and exports do not load a module at runtime.
+		{Code: "import type { Console } from 'console'; export type { Console as Logger } from 'node:console';",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			FileName:        "input.ts"},
+		{Code: "import type ConsoleModule from 'console'; import type * as NodeConsole from 'node:console'; export type * from 'console'; export type * as Logger from 'node:console';",
+			Options:         []any{"always"},
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 			FileName:        "input.ts"},
 	}, []rule_tester.InvalidTestCase{
@@ -219,13 +230,29 @@ func TestPreferGlobalConsoleExtras(t *testing.T) {
 				consoleError("preferModule", 1, 22, 1, 29),
 				consoleError("preferModule", 1, 66, 1, 73),
 			}},
-		// Type-only imports still load the module for this rule.
-		{Code: "import type { Console } from 'console'; export type { Console as Logger } from 'node:console';",
+		// Type-only declarations do not hide neighboring runtime module loads.
+		{Code: "import type { Console } from 'console';\nimport 'node:console';\nexport type { Console } from 'console';\nexport { log } from 'console';",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			FileName:        "input.ts",
+			Errors: []rule_tester.InvalidTestCaseError{
+				consoleError("preferGlobal", 2, 1, 2, 23),
+				consoleError("preferGlobal", 4, 1, 4, 31),
+			}},
+		// Inline type specifiers retain module loading with verbatimModuleSyntax.
+		{Code: "import { type Console } from 'console';\nexport { type Console as Logger } from 'node:console';",
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 			FileName:        "input.ts",
 			Errors: []rule_tester.InvalidTestCaseError{
 				consoleError("preferGlobal", 1, 1, 1, 40),
-				consoleError("preferGlobal", 1, 41, 1, 95),
+				consoleError("preferGlobal", 2, 1, 2, 55),
+			}},
+		// Mixed type and value specifiers still load the module.
+		{Code: "import { type Console, log } from 'console';\nexport { type Console as Logger, log } from 'node:console';",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			FileName:        "input.ts",
+			Errors: []rule_tester.InvalidTestCaseError{
+				consoleError("preferGlobal", 1, 1, 1, 45),
+				consoleError("preferGlobal", 2, 1, 2, 60),
 			}},
 		// Type assertions around global reads.
 		{Code: "(console as any).log(); console!.warn(); (console satisfies unknown).error();",

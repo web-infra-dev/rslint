@@ -35,7 +35,7 @@ var PreferGlobalConsoleRule = rule.Rule{
 			trace := map[string]*nodeutil.ReferenceTrace{
 				"console": {Read: func(node *ast.Node) {
 					// JSDoc types are comments in ESLint, not global reads.
-					if !utils.IsJSDocSyntaxNode(node) {
+					if !utils.IsJSDocSyntaxNode(node) && !ast.IsExclusivelyTypeOnlyImportOrExport(node) {
 						references = append(references, node)
 					}
 				}},
