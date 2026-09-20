@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/empty_brace_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
@@ -22,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_negation_in_equality_check"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_null"
@@ -31,6 +33,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_this_outside_of_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_flat_depth"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
@@ -45,11 +48,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_optional_catch_binding"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
@@ -70,6 +74,7 @@ func GetAllRules() []rule.Rule {
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
 		empty_brace_spaces.EmptyBraceSpacesRule,
 		error_message.ErrorMessageRule,
+		explicit_timer_delay.ExplicitTimerDelayRule,
 		filename_case.FilenameCaseRule,
 		new_for_builtins.NewForBuiltinsRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
@@ -86,6 +91,7 @@ func GetAllRules() []rule.Rule {
 		no_invalid_fetch_options.NoInvalidFetchOptionsRule,
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
 		no_magic_array_flat_depth.NoMagicArrayFlatDepthRule,
+		no_negation_in_equality_check.NoNegationInEqualityCheckRule,
 		no_new_buffer.NoNewBufferRule,
 		no_nested_ternary.NoNestedTernaryRule,
 		no_null.NoNullRule,
@@ -95,6 +101,7 @@ func GetAllRules() []rule.Rule {
 		no_this_assignment.NoThisAssignmentRule,
 		no_this_outside_of_class.NoThisOutsideOfClassRule,
 		no_unnecessary_array_flat_depth.NoUnnecessaryArrayFlatDepthRule,
+		no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule,
 		no_unreadable_iife.NoUnreadableIifeRule,
 		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
@@ -109,6 +116,7 @@ func GetAllRules() []rule.Rule {
 		prefer_array_some.PreferArraySomeRule,
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
 		prefer_date_now.PreferDateNowRule,
+		prefer_dom_node_append.PreferDomNodeAppendRule,
 		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
