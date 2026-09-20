@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/process"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/text_decoder"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/text_encoder"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -61,6 +62,7 @@ func GetAllRules() []rule.Rule {
 		buffer.PreferGlobalBufferRule,
 		process.ProcessRule,
 		text_decoder.TextDecoderRule,
+		text_encoder.TextEncoderRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 	}
 }

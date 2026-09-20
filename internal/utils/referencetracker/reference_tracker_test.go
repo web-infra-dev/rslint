@@ -66,6 +66,9 @@ func TestGlobalReferences(t *testing.T) {
 		{"array patterns are not aliases", `const [run] = api; run();`, nil},
 		{"comma keeps final value", `const target = (api, other); target.fn();`, nil},
 		{"JSX tag is not a property read", `const element = <api.fn />;`, nil},
+		{"heritage names are member reads", `interface I extends api.fn {} class C implements globalThis.api.fn {}`,
+			[]string{"read: api.fn", "read: globalThis.api.fn"}},
+		{"ordinary type names are not member reads", `type T = api.fn; type U = typeof api.fn; interface I extends Other<api.fn> {}`, nil},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := trackerContext(test.code)
