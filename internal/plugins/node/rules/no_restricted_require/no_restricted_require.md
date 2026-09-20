@@ -103,24 +103,13 @@ entry points and alias redirects retain their normal lookup behavior.
 
 ## Differences from upstream
 
-Unlisted `resolverConfig` properties are ignored. For example,
-`symlinks: false` does not preserve a symlink path; checks still use its real target.
-
-Overlapping object-form entries in `alias` and `fallback` are matched in
-alphabetical order. Upstream uses declaration order; for example,
-`{ '@app/special': './present.js', '@app': './absent' }` resolves
-`@app/special` upstream but fails in rslint when only `present.js` exists.
-Use an array to specify priority explicitly:
-`[{ name: '@app/special', alias: './present.js' }, { name: '@app', alias: './absent' }]`.
-
-Package entry names containing literal backslashes are not resolved on POSIX;
-use `/` for portable directory separators. On Windows, rslint accepts relative
-paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
-
-Disabling a wildcard alias affects only matching requests. For example,
-`alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still
-resolves `pkg` and unrelated packages. Upstream can ignore those other requests
-as well. Use exact alias names when identical behavior is required.
+- `resolverConfig` options not listed above, including `symlinks`, are not supported.
+- Overlapping object-form `alias` and `fallback` entries use alphabetical priority
+  instead of declaration order. Use arrays to set priority.
+- Package entry paths containing backslashes are unsupported on Linux and macOS.
+  On Windows, relative paths containing backslashes can resolve in rslint but fail upstream.
+- Disabled wildcard aliases only ignore matching modules; upstream may also ignore
+  unrelated modules. Use exact alias names for consistent results.
 
 ## References
 

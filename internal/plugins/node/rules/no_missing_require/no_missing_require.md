@@ -98,24 +98,11 @@ entry points and alias redirects retain their normal lookup behavior.
 
 ## Differences from upstream
 
-Unlisted `resolverConfig` properties are ignored. For example,
-`symlinks: false` does not preserve a symlink path; checks still use its real target.
-
-Overlapping object-form entries in `alias` and `fallback` are matched in
-alphabetical order. Upstream uses declaration order; for example,
-`{ '@app/special': './present.js', '@app': './absent' }` resolves
-`@app/special` upstream but fails in rslint when only `present.js` exists.
-Use an array to specify priority explicitly:
-`[{ name: '@app/special', alias: './present.js' }, { name: '@app', alias: './absent' }]`.
-
-Some invalid package imports mappings produce different diagnostic text.
-For example, `"#entry": [null, "./entry.js"]` produces an unresolved-import
-message in rslint and `Invalid value used as weak map key` upstream.
-
-Circular aliases such as `alias: { a: 'b', b: 'a' }` are reported by both
-linters. Rslint reports `Recursive alias while resolving 'a'`; the upstream
-message starts with `Recursion in resolving`. Correct the circular mapping
-to resolve the error.
+- `resolverConfig` options not listed above, including `symlinks`, are not supported.
+- Overlapping object-form `alias` and `fallback` entries use alphabetical priority
+  instead of declaration order. Use arrays to set priority.
+- Error messages for invalid `package.json#imports` mappings and circular aliases
+  may differ.
 
 ## References
 
