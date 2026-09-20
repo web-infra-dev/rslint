@@ -62,6 +62,26 @@ describe('foo', () => {
     });
   });
 })`},
+			// A function body is a scope of its own: a hook in a function that
+			// is never called registers nothing, so the suite's cases cannot
+			// make it report.
+			{Code: `describe('foo', () => {
+  test('bar', () => {});
+
+  function unused() {
+    beforeEach(() => {});
+  }
+})`},
+			// A function passed to describe by name is that suite's body, so the
+			// cases registered above it do not count against it.
+			{Code: `test('bar', () => {});
+
+function foo() {
+  beforeEach(() => {});
+  test('baz', () => {});
+}
+
+describe('foo', foo)`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

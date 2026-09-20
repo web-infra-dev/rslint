@@ -83,6 +83,58 @@ appTest("charges the card", async ({ page }) => {});`},
   beforeEach(() => {});
   test("charges the card", () => {});
 });`},
+			// ---- A function body is its own scope: a hook in a function that is
+			// never called registers nothing, so the suite's cases cannot make it
+			// report ----
+			{Code: `describe("checkout", () => {
+  test("charges the card", () => {});
+  function unused() {
+    beforeEach(() => {});
+  }
+});`},
+			// ---- and a test in such a function registers nothing either, so it
+			// cannot close the scope for the hooks that follow ----
+			{Code: `describe("checkout", () => {
+  function unused() {
+    test("charges the card", () => {});
+  }
+  beforeEach(() => {});
+});`},
+			// ---- A function passed to describe by name is that suite's body, not
+			// a continuation of the file: the cases registered above it do not
+			// count against it ----
+			{Code: `test("refunds the card", () => {});
+function checkout() {
+  beforeEach(() => {});
+  test("charges the card", () => {});
+}
+describe("checkout", checkout);`},
+			// ---- and the same holds for a function expression bound to a name ----
+			{Code: `test("refunds the card", () => {});
+const checkout = function () {
+  beforeEach(() => {});
+  test("charges the card", () => {});
+};
+describe("checkout", checkout);`},
+			// ---- A hook reached through a helper the suite calls is judged
+			// against the helper, so it is not reported ----
+			{Code: `test("refunds the card", () => {});
+function setUp() {
+  beforeEach(() => {});
+}
+describe("checkout", () => {
+  setUp();
+  test("charges the card", () => {});
+});`},
+			// ---- A method body is a scope of its own too ----
+			{Code: `describe("checkout", () => {
+  test("charges the card", () => {});
+  const helpers = {
+    setUp() {
+      beforeEach(() => {});
+    },
+  };
+});`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- The file body is a scope of its own ----
@@ -174,6 +226,18 @@ test.beforeEach(async ({ page }) => {});`,
   test("charges the card", () => {});
   beforeEach(() => {});
 });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noHookOnTop", Line: 3, Column: 3},
+				},
+			},
+			// ---- A named suite body is judged on its own order, so a hook after
+			// its own first case still reports ----
+			{
+				Code: `function checkout() {
+  test("charges the card", () => {});
+  beforeEach(() => {});
+}
+describe("checkout", checkout);`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noHookOnTop", Line: 3, Column: 3},
 				},
