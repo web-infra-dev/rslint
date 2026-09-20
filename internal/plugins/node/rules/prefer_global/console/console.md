@@ -47,12 +47,6 @@ The rule recognizes CommonJS loads, `process.getBuiltinModule()`, static imports
 and re-exports, including the `node:` prefix. Local bindings that shadow globals
 are respected. The rule provides no automatic fixes or suggestions.
 
-## Differences from upstream
-
-With `"never"`, `export type { console as Logger };` does not produce a
-diagnostic. Upstream reports this type-only export. Direct uses of `console`
-and `typeof console` type queries are still checked.
-
 ## Original documentation
 
 - [eslint-plugin-n: prefer-global/console](https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/prefer-global/console.md)

@@ -42,8 +42,6 @@ var PreferGlobalConsoleRule = rule.Rule{
 			}
 			tracker := nodeutil.NewReferenceTracker(ctx)
 			if preferModule {
-				// Type-only export lists do not count as global reads (documented
-				// difference); runtime references and typeof queries are tracked.
 				tracker.TrackGlobals(trace)
 			} else {
 				tracker.TrackModules(trace)

@@ -311,7 +311,7 @@ func TestPreferGlobalConsoleReferenceEdges(t *testing.T) {
 			Options:         []any{"never"},
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 			FileName:        "input.ts"},
-		// Documented difference: type-only exports do not read the global value.
+		// TypeScript rejects exporting a global declaration (TS2661).
 		{Code: "export type { console as Logger };",
 			Options:         []any{"never"},
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
