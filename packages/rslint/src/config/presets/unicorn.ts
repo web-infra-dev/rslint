@@ -199,7 +199,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-template-literals': 'error', // not implemented
     // 'unicorn/no-useless-undefined': 'error', // not implemented
     'unicorn/no-xor-as-exponentiation': 'error',
-    // 'unicorn/no-zero-fractions': 'error', // not implemented
+    'unicorn/no-zero-fractions': 'error',
     'unicorn/number-literal-case': 'error',
     // 'unicorn/numeric-separators-style': 'error', // not implemented
     // 'unicorn/operator-assignment': 'error', // not implemented
