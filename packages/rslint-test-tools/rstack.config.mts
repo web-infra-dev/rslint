@@ -795,6 +795,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/prefer-date-now.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-reflect-apply.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-size.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-string-trim-start-end.test.ts',

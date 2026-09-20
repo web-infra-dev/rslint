@@ -292,7 +292,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-prototype-methods': 'error', // not implemented
     // 'unicorn/prefer-query-selector': 'error', // not implemented
     // 'unicorn/prefer-queue-microtask': 'error', // not implemented
-    // 'unicorn/prefer-reflect-apply': 'error', // not implemented
+    'unicorn/prefer-reflect-apply': 'error',
     // 'unicorn/prefer-regexp-escape': 'off', // not implemented
     // 'unicorn/prefer-regexp-test': 'error', // not implemented
     // 'unicorn/prefer-response-static-json': 'error', // not implemented
