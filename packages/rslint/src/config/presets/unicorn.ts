@@ -67,7 +67,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-array-method-this-argument': 'error', // not implemented
     // 'unicorn/no-array-reduce': 'error', // not implemented
     'unicorn/no-array-reverse': 'error',
-    // 'unicorn/no-array-sort': 'error', // not implemented
+    'unicorn/no-array-sort': 'error',
     // 'unicorn/no-array-sort-for-min-max': 'error', // not implemented
     // 'unicorn/no-array-splice': 'error', // not implemented
     // 'unicorn/no-asterisk-prefix-in-documentation-comments': 'off', // not implemented
@@ -199,7 +199,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/no-useless-template-literals': 'error', // not implemented
     // 'unicorn/no-useless-undefined': 'error', // not implemented
     'unicorn/no-xor-as-exponentiation': 'error',
-    // 'unicorn/no-zero-fractions': 'error', // not implemented
+    'unicorn/no-zero-fractions': 'error',
     'unicorn/number-literal-case': 'error',
     // 'unicorn/numeric-separators-style': 'error', // not implemented
     // 'unicorn/operator-assignment': 'error', // not implemented
@@ -284,7 +284,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-object-from-entries': 'error', // not implemented
     // 'unicorn/prefer-object-iterable-methods': 'error', // not implemented
     // 'unicorn/prefer-observer-apis': 'error', // not implemented
-    // 'unicorn/prefer-optional-catch-binding': 'error', // not implemented
+    'unicorn/prefer-optional-catch-binding': 'error',
     // 'unicorn/prefer-path2d': 'error', // not implemented
     // 'unicorn/prefer-private-class-fields': 'error', // not implemented
     // 'unicorn/prefer-promise-try': 'error', // not implemented

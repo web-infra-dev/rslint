@@ -307,3 +307,15 @@ func lintPreferArraySomeWithDemand(program *compiler.Program, sourceFile *ast.So
 	})
 	return diagnostics
 }
+
+// Optional comparator calls are ESTree ChainExpressions, not ordinary calls.
+func TestPreferArraySomeOptionalComparator(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_array_some.PreferArraySomeRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "if (array.filter(compare?.bind(null)).length > 0) {}", FileName: "case.js", Output: []string{"if (array.some(compare?.bind(null))) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "filter", Message: "Prefer `.some(…)` over non-zero length check from `.filter(…)`.", Line: 1, Column: 11, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.filter(compare.bind?.(null)).length > 0) {}", FileName: "case.js", Output: []string{"if (array.some(compare.bind?.(null))) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "filter", Message: "Prefer `.some(…)` over non-zero length check from `.filter(…)`.", Line: 1, Column: 11, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+	})
+}

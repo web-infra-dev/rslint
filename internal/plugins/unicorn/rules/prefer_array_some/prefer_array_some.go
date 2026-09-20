@@ -404,7 +404,7 @@ func checkFilterLength(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	filterArgs := filterCall.Call.Arguments()
-	if len(filterArgs) == 0 || isNodeValueNotFunction(filterArgs[0]) {
+	if len(filterArgs) == 0 || unicornutil.IsNodeValueNotFunction(filterArgs[0]) {
 		return
 	}
 
@@ -440,65 +440,6 @@ func isRawZeroLiteral(sourceFile *ast.SourceFile, node *ast.Node) bool {
 		return false
 	}
 	return scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false) == "0"
-}
-
-// isNodeValueNotFunction mirrors upstream's is-node-value-not-function helper.
-// It rejects `.filter` arguments that cannot be a callback (literals, objects,
-// arrays, etc.), while treating `.bind()` calls as possible functions.
-func isNodeValueNotFunction(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindArrayLiteralExpression,
-		ast.KindObjectLiteralExpression,
-		ast.KindClassExpression,
-		ast.KindTemplateExpression,
-		ast.KindNoSubstitutionTemplateLiteral,
-		// ESTree's UnaryExpression covers `!x` / `-x` as well as `typeof x`,
-		// `void x` and `delete x`; tsgo splits the last three into their own
-		// kinds, so all five have to be listed here.
-		ast.KindPrefixUnaryExpression,
-		ast.KindPostfixUnaryExpression,
-		ast.KindTypeOfExpression,
-		ast.KindVoidExpression,
-		ast.KindDeleteExpression,
-		// Literals (ESTree collapses these into one `Literal` node type).
-		ast.KindStringLiteral,
-		ast.KindNumericLiteral,
-		ast.KindBigIntLiteral,
-		ast.KindRegularExpressionLiteral,
-		ast.KindTrueKeyword,
-		ast.KindFalseKeyword,
-		ast.KindNullKeyword,
-		// mostLikelyNotNodeTypes
-		ast.KindAwaitExpression,
-		ast.KindNewExpression,
-		ast.KindTaggedTemplateExpression,
-		ast.KindThisKeyword:
-		return true
-	case ast.KindBinaryExpression:
-		// ESTree splits BinaryExpression / LogicalExpression / AssignmentExpression;
-		// upstream lists BinaryExpression and AssignmentExpression as impossible,
-		// LogicalExpression is not. Match by operator.
-		operator := node.AsBinaryExpression().OperatorToken.Kind
-		return isImpossibleBinaryOperator(operator)
-	case ast.KindCallExpression:
-		// A call could return a function only via `.bind()`.
-		_, isBind := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{Method: "bind"})
-		return !isBind
-	}
-	return utils.IsUndefinedIdentifier(node)
-}
-
-// isImpossibleBinaryOperator returns true for arithmetic / comparison / bitwise
-// operators (ESTree BinaryExpression) and assignment operators (ESTree
-// AssignmentExpression), but false for `&&` / `||` / `??` (ESTree
-// LogicalExpression), matching upstream's impossible / most-likely-not sets.
-func isImpossibleBinaryOperator(operator ast.Kind) bool {
-	switch operator {
-	case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken,
-		ast.KindCommaToken:
-		return false
-	}
-	return true
 }
 
 // ---- boolean / control-flow position (upstream utils/boolean.js) ----

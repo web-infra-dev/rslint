@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_from_fill"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_front_mutation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_reverse"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_sort"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_expression_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
@@ -36,6 +37,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_error_capture_stack_trace"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_zero_fractions"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/number_literal_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_add_event_listener_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
@@ -46,6 +48,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_optional_catch_binding"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
@@ -60,6 +63,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		prefer_optional_catch_binding.PreferOptionalCatchBindingRule,
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
@@ -72,6 +76,7 @@ func GetAllRules() []rule.Rule {
 		no_array_from_fill.NoArrayFromFillRule,
 		no_array_front_mutation.NoArrayFrontMutationRule,
 		no_array_reverse.NoArrayReverseRule,
+		no_array_sort.NoArraySortRule,
 		no_await_expression_member.NoAwaitExpressionMemberRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
 		no_document_cookie.NoDocumentCookieRule,
@@ -95,6 +100,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_error_capture_stack_trace.NoUselessErrorCaptureStackTraceRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,
+		no_zero_fractions.NoZeroFractionsRule,
 		number_literal_case.NumberLiteralCaseRule,
 		prefer_add_event_listener_options.PreferAddEventListenerOptionsRule,
 		prefer_array_flat.PreferArrayFlatRule,

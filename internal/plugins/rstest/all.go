@@ -16,6 +16,7 @@ import (
 	no_conditional_in "github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_in_test"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_conditional_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_disabled_tests"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_duplicate_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/no_identical_title"
@@ -86,6 +87,7 @@ func GetAllRules() []rule.Rule {
 		no_conditional_in.NoConditionalInTestRule,
 		no_conditional_tests.NoConditionalTestsRule,
 		no_disabled_tests.NoDisabledTestsRule,
+		no_duplicate_hooks.NoDuplicateHooksRule,
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
 		no_identical_title.NoIdenticalTitleRule,
