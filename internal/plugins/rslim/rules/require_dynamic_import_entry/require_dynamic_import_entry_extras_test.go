@@ -60,11 +60,28 @@ func TestRequireDynamicImportEntry(t *testing.T) {
 		{Code: `import('./feature').then(() => {});`},
 		{Code: `import { start } from './feature'; start();`},
 		{Code: `type Module = typeof import('./feature');`},
-		{Code: `consume(await import('./missing'));`},
-		{Code: `consume(await import(path));`},
-		{Code: "consume(await import(`./${path}`));"},
+		// The rule tester registers the rule under the name "test".
+		{Code: "// rslint-disable-next-line test -- Manually checked @entry.\nconsume(await import(path));"},
+		{Code: "// rslint-disable-next-line test -- Manually checked @entry.\nconsume(await import('./missing'));"},
+		{Code: "consume(await import(\n// rslint-disable-next-line test -- Manually checked @entry.\npath\n));"},
 	}
 	invalid := []rule_tester.InvalidTestCase{}
+	for _, specifier := range []string{"'./missing'", "`./missing`", "path", "`./${path}`", "'./' + path", "getPath()"} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: "consume(await import(" + specifier + "));",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unresolvedImport",
+				Message:   "Cannot resolve this dynamic import. Manually check that the imported declarations used at runtime have @entry, then add // rslint-disable-next-line rslim/require-dynamic-import-entry before this argument's line to ignore this diagnostic.",
+				Line:      1, Column: 22, EndLine: 1, EndColumn: 22 + len(specifier),
+			}},
+		})
+	}
+	invalid = append(invalid,
+		rule_tester.InvalidTestCase{Code: "import(path);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unresolvedImport"}}},
+		rule_tester.InvalidTestCase{Code: "consume(await import(\n  path\n));", Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "unresolvedImport", Line: 2, Column: 3, EndLine: 2, EndColumn: 7,
+		}}},
+	)
 	add := func(code, module, missing string) {
 		t.Helper()
 		start := strings.Index(code, "'"+module+"'")
