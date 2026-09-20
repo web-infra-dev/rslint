@@ -71,9 +71,9 @@ export default [
   `settings.cwd` when configured.
 - `tryExtensions` defaults to `['.js', '.json', '.node', '.mjs', '.cjs']`.
   An empty array disables extension guessing.
-- `resolverConfig` supports `modules`, `alias`, `extensions`, `extensionAlias`,
-  `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields`, as described
-  for [no-missing-import](../no_missing_import/no_missing_import.md).
+- `resolverConfig` supports `modules`, `alias`, `fallback`, `fullySpecified`,
+  `extensions`, `extensionAlias`, `conditionNames`, `mainFields`, `mainFiles`, and
+  `aliasFields`, as described for [no-missing-import](../no_missing_import/no_missing_import.md).
 
 Except for `ignoreTypeImport` and `ignorePrivate`, these options can also be
 supplied through `settings.node`. Rule options take precedence over shared
@@ -105,11 +105,9 @@ Compared with `eslint-plugin-n` v18.3.0:
   outside the package are reported; use relative replacements for package
   files. An invalid conversion regex in shared settings skips the check
   instead of failing lint.
-- `resolverConfig.fallback`, `symlinks`, and `fullySpecified` are ignored.
-  For example, `fallback: { './missing': './helper.js' }` does not redirect
-  the import. Use `alias` when a redirect should apply to every matching
-  request. Overlapping object-form aliases also use alphabetical priority;
-  use an alias array to preserve your intended order. See
+- Unlisted `resolverConfig` properties are ignored. For example,
+  `symlinks: false` does not preserve a symlink path; checks still use its real
+  target. See
   [no-missing-import](../no_missing_import/no_missing_import.md#differences-from-upstream)
   for further unusual filename and alias cases.
 

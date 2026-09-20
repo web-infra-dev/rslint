@@ -59,6 +59,7 @@ func TestNoMissingRequireExtras(t *testing.T) {
 		{Code: "require('./remote.js');", FileName: "src/input.js", Options: []any{map[string]any{"resolvePaths": []any{"."}}}, Settings: map[string]any{"cwd": tspath.ResolvePath(root.Dir, "vendor")}},
 		// alias fallback and disabled alias
 		{Code: "require('alias'); require('disabled');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"alias": []any{"./absent.js", "./present.js"}, "disabled": false}}}}},
+		{Code: "require('virtual');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"virtual": "./present.js"}}}}},
 		// explicit aliases override TypeScript paths
 		{Code: "require('@broken/present');", FileName: "src/input.ts", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"@broken/present": "./present.js"}}}}},
 		// custom export conditions
@@ -131,14 +132,10 @@ func TestNoMissingRequireExtras(t *testing.T) {
 		{Code: "require('./dir');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"mainFiles": []any{}, "mainFields": []any{}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve './dir' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 16}}},
 		// documented recursive alias diagnostic omits the upstream resolver stack
 		{Code: "require('loop');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"loop": "other", "other": "loop"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: "Recursive alias while resolving 'loop'", Line: 1, Column: 9, EndLine: 1, EndColumn: 15}}},
-		// documented unsupported fallback option
-		{Code: "require('virtual');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"virtual": "./present.js"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'virtual' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 18}}},
 		// disabled wildcard aliases leave unrelated requests checked
 		{Code: "require('unrelated');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg/*": false}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'unrelated' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 20}}},
 		// documented invalid imports target diagnostic
 		{Code: "require('#invalid');", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve '#invalid' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 19}}},
-		// documented object alias priority uses sorted keys
-		{Code: "require('@app/special');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"@app/special": "./present.js", "@app": "./absent"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve '@app/special' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 23}}},
 		// body declarations do not shadow parameter initializers
 		{Code: "function load(value = require('missing')) { var require = other; }", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'missing' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 31, EndLine: 1, EndColumn: 40}}},
 		// computed global require and method aliases

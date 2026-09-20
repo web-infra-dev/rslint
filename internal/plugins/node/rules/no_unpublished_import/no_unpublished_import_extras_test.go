@@ -40,6 +40,8 @@ func TestNoUnpublishedImportExtras(t *testing.T) {
 			{Code: "import './target.js';", FileName: "public/src/input.ts"},
 			// A resolver alias changes a local target before publication checks.
 			{Code: "import './hidden.js';", FileName: "public/src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"./hidden.js": "./public.js"}}}}},
+			// Fallback redirects missing local targets before publication checks.
+			{Code: "import './hidden-missing.js';", FileName: "public/src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"./hidden-missing.js": "./public.js"}}}}},
 			// Additional resolution paths are tried before the source directory.
 			{Code: "import './hidden';", FileName: "public/src/input.js", Options: []any{map[string]any{"resolvePaths": []any{"public/dist"}}}},
 			// Shared resolvePaths use the same resolution.
@@ -103,6 +105,8 @@ func TestNoUnpublishedImportExtras(t *testing.T) {
 			{Code: "import 'dev';", FileName: "main/index.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notPublished", Message: "\"dev\" is not published.", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}}},
 			// Missing relative targets retain their lexical path.
 			{Code: "import './hidden-missing.js';", FileName: "public/src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notPublished", Message: "\"./hidden-missing.js\" is not published.", Line: 1, Column: 8, EndLine: 1, EndColumn: 29}}},
+			// Fallback cannot replace an existing unpublished target.
+			{Code: "import './hidden.js';", FileName: "public/src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"fallback": map[string]any{"./hidden.js": "./public.js"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notPublished", Message: "\"./hidden.js\" is not published.", Line: 1, Column: 8, EndLine: 1, EndColumn: 21}}},
 			// Package import maps resolve to the publication target.
 			{Code: "import '#public'; import '#hidden';", FileName: "public/src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notPublished", Message: "\"#hidden\" is not published.", Line: 1, Column: 26, EndLine: 1, EndColumn: 35}}},
 			// Type-only imports activate the types export condition.

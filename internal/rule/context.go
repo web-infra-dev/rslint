@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/jsonorder"
 )
 
 // EditDemand is a native diagnostic consumer's demand for optional edit
@@ -39,6 +40,10 @@ type DiagnosticConsumer struct {
 type RuleContext struct {
 	SourceFile *ast.SourceFile
 	Settings   map[string]interface{}
+	// Config object order accompanies ordinary option/settings maps for rules
+	// whose matching priority depends on authored property order.
+	OptionKeyOrder   []*jsonorder.Order
+	SettingsKeyOrder *jsonorder.Order
 	// LanguageOptions is the normalized, effective per-file language config.
 	// Rules should use its Effective methods when they need ESLint defaults.
 	LanguageOptions LanguageOptions

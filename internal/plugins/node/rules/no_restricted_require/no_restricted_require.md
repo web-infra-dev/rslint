@@ -84,7 +84,7 @@ Use `node:path` to construct absolute patterns with the host's separators.
 Patterns are matched as written, including literal backslashes on Windows.
 
 Resolution uses `settings.node.resolvePaths`, `settings.node.tryExtensions`,
-and the `modules`, `alias`, `extensions`, `extensionAlias`, `conditionNames`,
+and the `modules`, `alias`, `fallback`, `fullySpecified`, `extensions`, `extensionAlias`, `conditionNames`,
 `mainFields`, `mainFiles`, and `aliasFields` properties of `settings.node.resolverConfig`. TypeScript files also use tsconfig
 path aliases and extension settings. Explicit `alias` and `extensionAlias`
 settings replace those TypeScript mappings, including when set to empty objects.
@@ -95,21 +95,22 @@ such as `['api', 'index']`. `aliasFields: ['browser']` applies package mappings
 including `false` to ignore a target. Field names can be nested arrays, such as
 `[['build', 'main'], 'main']`. Empty entry lists disable that lookup.
 
+`resolverConfig.fallback` redirects unresolved requests, for example
+`{ fallback: { virtual: './shim.js' } }`. Existing targets take precedence.
+Object-form `alias` and `fallback` entries use declaration order, so place a
+specific alias before a broader prefix when both can match.
+`fullySpecified: true` disables extension and directory-entry guessing for
+ordinary requests: `./helper.js` can resolve while `./helper` cannot. Package
+entry points and alias redirects retain their normal lookup behavior.
+
 ## Differences from upstream
 
-Other `resolverConfig` properties, including `fallback`, `symlinks`, and
-`fullySpecified`, are ignored. For example, `fallback: { virtual: './shim.js' }`
-does not redirect an unresolved `virtual` request. Use `alias` if the redirect
-should apply to every matching request.
+Unlisted `resolverConfig` properties are ignored. For example,
+`symlinks: false` does not preserve a symlink path; checks still use its real target.
 
 Package entry names containing literal backslashes are not resolved on POSIX;
 use `/` for portable directory separators. On Windows, rslint accepts relative
 paths such as `require('.\\entry.js')`; upstream can treat these as package names instead.
-
-When multiple aliases in an object match the same request, rslint tries their
-names in sorted order; upstream uses their declaration order. Use the array form
-of `resolverConfig.alias` to specify priority explicitly, for example
-`[{ name: 'pkg/entry', alias: './entry.js' }, { name: 'pkg', alias: './fallback' }]`.
 
 Disabling a wildcard alias affects only matching requests. For example,
 `alias: { 'pkg/*': false }` disables resolution of `pkg/sub`, but rslint still

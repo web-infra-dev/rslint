@@ -74,6 +74,8 @@ func ConfiguredRules(
 			IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
 			Options:            options,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				ctx.OptionKeyOrder = ruleConfigCopy.optionKeyOrder
+				ctx.SettingsKeyOrder = mergedConfig.settingsKeyOrder
 				return ruleImpl.Run(ctx, options)
 			},
 		})

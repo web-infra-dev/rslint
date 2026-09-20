@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/jsonorder"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 )
 
@@ -236,7 +237,7 @@ func TestResolverOverrides(t *testing.T) {
 			config := func(alias any) map[string]any { return map[string]any{"alias": alias} }
 			if root != "/alias-project" {
 				var options moduleresolver.Options
-				applyResolverConfig(&options, config(map[string]any{"native": strings.ReplaceAll(local, "/", `\`)}))
+				applyResolverConfig(&options, config(map[string]any{"native": strings.ReplaceAll(local, "/", `\`)}), nil)
 				if got := moduleresolver.ResolveModule(p, "native", fileName, options); got != local {
 					t.Errorf("native path = %q, want %q", got, local)
 				}
@@ -256,7 +257,7 @@ func TestResolverOverrides(t *testing.T) {
 				{"virtual?raw#source", local + "#", "?raw#"},
 			} {
 				var options moduleresolver.Options
-				applyResolverConfig(&options, config(map[string]any{"virtual": query.target}))
+				applyResolverConfig(&options, config(map[string]any{"virtual": query.target}), nil)
 				if got := RequireFilePath(p, query.request, fileName, options); got != filepath.FromSlash(local)+query.suffix {
 					t.Errorf("alias query = %q", got)
 				}
@@ -312,6 +313,61 @@ func TestResolverEntryFields(t *testing.T) {
 		missing                           bool
 	}{
 		{"default", "./main", "input.js", `{}`, "main/main.js", false},
+		{"alias-object-order", "@app/special", "input.js", `{"alias":{"@app/special":"./src/server.js","@app":"./absent"}}`, "src/server.js", false},
+		{"alias-object-order-reversed", "@app/special", "input.js", `{"alias":{"@app":"./absent","@app/special":"./src/server.js"}}`, "", true},
+		{"alias-object-exact-order", "@app/special", "input.js", `{"alias":{"@app/special$":"./src/server.js","@app":"./absent"}}`, "src/server.js", false},
+		{"alias-object-wildcard-order", "@app/special", "input.js", `{"alias":{"@app/special":"./src/server.js","@app/*":"./absent/*"}}`, "src/server.js", false},
+		{"fallback-object-order", "@app/special", "input.js", `{"fallback":{"@app/special":"./src/server.js","@app":"./absent"}}`, "src/server.js", false},
+		{"fallback-object-order-reversed", "@app/special", "input.js", `{"fallback":{"@app":"./absent","@app/special":"./src/server.js"}}`, "", true},
+		{"fallback-missing", "virtual", "input.js", `{"fallback":{"virtual":"./src/server.js"}}`, "src/server.js", false},
+		{"fallback-existing", "pkg-entry", "input.js", `{"fallback":{"pkg-entry":"./src/server.js"}}`, "node_modules/pkg-entry/index.js", false},
+		{"fallback-after-alias", "virtual", "input.js", `{"alias":{"virtual":"absent"},"fallback":{"virtual":"./src/server.js"}}`, "src/server.js", false},
+		{"fallback-in-alias", "virtual", "input.js", `{"alias":{"virtual":"absent"},"fallback":{"absent":"./src/server.js"}}`, "src/server.js", false},
+		{"fallback-ignore", "virtual", "input.js", `{"fallback":{"virtual":false}}`, "", false},
+		{"fallback-ignored-alias", "virtual", "input.js", `{"alias":{"virtual":false},"fallback":{"virtual":"absent"}}`, "", false},
+		{"fallback-targets", "virtual", "input.js", `{"fallback":{"virtual":["absent","./src/server.js"]}}`, "src/server.js", false},
+		{"fallback-terminal-target", "virtual", "input.js", `{"fallback":{"virtual":["pkg-exports/private","./src/server.js"]}}`, "", true},
+		{"fallback-exact", "virtual/sub", "input.js", `{"fallback":{"virtual$":"./src"}}`, "", true},
+		{"fallback-prefix", "virtual/server", "input.js", `{"fallback":{"virtual":"./src"}}`, "src/server.js", false},
+		{"fallback-wildcard", "virtual/server", "input.js", `{"fallback":{"virtual/*":"./src/*"}}`, "src/server.js", false},
+		{"fallback-array", "virtual", "input.js", `{"fallback":[{"name":"virtual","alias":"./src/server.js","onlyModule":true}]}`, "src/server.js", false},
+		{"fallback-cycle", "virtual", "input.js", `{"fallback":{"virtual":"other","other":"virtual"}}`, "", true},
+		{"fallback-alias-cycle", "virtual", "input.js", `{"alias":{"virtual":"other","other":"virtual"},"fallback":{"virtual":"./src/server.js"}}`, "", true},
+		{"fallback-blocked-export", "pkg-exports/private", "input.js", `{"fallback":{"pkg-exports/private":"./src/server.js"}}`, "", true},
+		{"fallback-blocked-import", "#private", "input.js", `{"fallback":{"#private":"./src/server.js"}}`, "", true},
+		{"fullySpecified-extensionless", "./src/server", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-explicit", "./src/server.js", "input.js", `{"fullySpecified":true}`, "src/server.js", false},
+		{"fullySpecified-no-extension", "./src/no-extension", "input.js", `{"fullySpecified":true}`, "src/no-extension", false},
+		{"fullySpecified-false", "./src/server", "input.js", `{"fullySpecified":false}`, "src/server.js", false},
+		{"fullySpecified-directory", "./plain", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-directory-slash", "./plain/", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-main", "./main", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-mainFields", "./main", "input.js", `{"fullySpecified":true,"mainFields":["module","main"]}`, "", true},
+		{"fullySpecified-mainFiles", "./plain", "input.js", `{"fullySpecified":true,"mainFiles":["api"]}`, "", true},
+		{"fullySpecified-package", "pkg-entry", "input.js", `{"fullySpecified":true}`, "node_modules/pkg-entry/index.js", false},
+		{"fullySpecified-package-slash", "pkg-entry/", "input.js", `{"fullySpecified":true}`, "node_modules/pkg-entry/index.js", false},
+		{"fullySpecified-self-reference", "self", "self/input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-self-reference-explicit", "self/entry", "self/input.js", `{"fullySpecified":true}`, "self/entry.js", false},
+		{"fullySpecified-self-reference-default", "self", "self/input.js", `{}`, "self/entry.js", false},
+		{"fullySpecified-disabled-self-reference", "pkg-entry", "self-disabled/input.js", `{"fullySpecified":true}`, "node_modules/pkg-entry/index.js", false},
+		{"fullySpecified-scoped-package", "@scope/pkg", "input.js", `{"fullySpecified":true}`, "node_modules/@scope/pkg/index.js", false},
+		{"fullySpecified-scoped-subpath", "@scope/pkg/index", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-package-index", "index", "input.js", `{"fullySpecified":true}`, "node_modules/index/index.js", false},
+		{"fullySpecified-subpath", "pkg-entry/index", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-subpath-directory", "pkg-exports/lib", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-subpath-explicit", "pkg-entry/index.js", "input.js", `{"fullySpecified":true}`, "node_modules/pkg-entry/index.js", false},
+		{"fullySpecified-exports", "pkg-exports", "input.js", `{"fullySpecified":true}`, "node_modules/pkg-exports/node.js", false},
+		{"fullySpecified-directory-export", "pkg-exports/dir", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-import", "#entry", "input.js", `{"fullySpecified":true}`, "src/server.js", false},
+		{"fullySpecified-directory-import", "#dir", "input.js", `{"fullySpecified":true}`, "", true},
+		{"fullySpecified-package-import", "#dep", "input.js", `{"fullySpecified":true}`, "node_modules/pkg-entry/index.js", false},
+		{"fullySpecified-alias", "virtual", "input.js", `{"fullySpecified":true,"alias":{"virtual":"./src/server"}}`, "src/server.js", false},
+		{"fullySpecified-alias-directory", "virtual", "input.js", `{"fullySpecified":true,"alias":{"virtual":"./plain"}}`, "plain/index.js", false},
+		{"fullySpecified-aliasFields", "bare", "input.js", `{"fullySpecified":true,"aliasFields":["browser"]}`, "src/browser.js", false},
+		{"fullySpecified-fallback", "virtual", "input.js", `{"fullySpecified":true,"fallback":{"virtual":"./src/server"}}`, "src/server.js", false},
+		{"fullySpecified-fallback-relative", "./src/server", "input.js", `{"fullySpecified":true,"fallback":{"./src/server":"./src/server.js"}}`, "src/server.js", false},
+		{"fullySpecified-fallback-export", "pkg-exports/dir", "input.js", `{"fullySpecified":true,"fallback":{"pkg-exports/dir":"./src/server.js"}}`, "", true},
+		{"fullySpecified-extensionAlias", "./src/server.js", "input.js", `{"fullySpecified":true,"extensionAlias":{".js":[".ts",".js"]}}`, "src/server.js", false},
 		{"mainFiles-api", "./plain", "input.js", `{"mainFiles":["api"]}`, "plain/api.js", false},
 		{"mainFiles-fallback", "./plain", "input.js", `{"mainFiles":["absent","api","index"]}`, "plain/api.js", false},
 		{"mainFiles-empty", "./plain", "input.js", `{"mainFiles":[]}`, "", true},
@@ -429,7 +485,11 @@ func TestResolverEntryFields(t *testing.T) {
 						t.Fatal(err)
 					}
 					var options moduleresolver.Options
-					applyResolverConfig(&options, config)
+					order, err := jsonorder.Parse([]byte(tc.config))
+					if err != nil {
+						t.Fatal(err)
+					}
+					applyResolverConfig(&options, config, order)
 					// Windows entry filenames accept either separator. Requests using
 					// backslashes follow Node's path semantics; enhanced-resolve treats
 					// .\\ as a package and may resolve ..\\ through node_modules.
@@ -474,7 +534,7 @@ func TestResolverEntryFields(t *testing.T) {
 					{"./plain", map[string]any{"aliasFields": []string{"browser"}}, ""},
 				} {
 					var options moduleresolver.Options
-					applyResolverConfig(&options, tc.config)
+					applyResolverConfig(&options, tc.config, nil)
 					result := resolveImport(p, tc.request, tspath.ResolvePath(root, "input.js"), false, options)
 					want := tc.want
 					if want != "" {
@@ -545,7 +605,7 @@ func TestResolverEntryFieldSymlinks(t *testing.T) {
 		{"./linked-plain", map[string]any{"mainFiles": []string{"api"}}, "plain/api.js"},
 	} {
 		var options moduleresolver.Options
-		applyResolverConfig(&options, tc.config)
+		applyResolverConfig(&options, tc.config, nil)
 		want := osvfs.FS().Realpath(tspath.ResolvePath(root, tc.want))
 		if got, err := moduleresolver.ResolveModuleWithError(p, tc.request, fileName, options); got != want || err != "" {
 			t.Errorf("symlink %q (%v) = %q, %s; want %q", tc.request, tc.config, got, err, want)

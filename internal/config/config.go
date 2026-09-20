@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/jsonorder"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -37,6 +38,8 @@ type ConfigEntry struct {
 	Rules    Rules    `json:"rules,omitempty"`
 	Plugins  []string `json:"plugins,omitempty"`
 	Settings Settings `json:"settings,omitempty"`
+	// propertyOrder retains JSON object order without changing option types.
+	propertyOrder *jsonorder.Order
 
 	// collectedGitignore marks the process-local synthetic entry prepended by
 	// ConfigWithGitignore and retains its once-compiled directory-node
@@ -170,7 +173,7 @@ func (entry ConfigEntry) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	if entry.Rules != nil {
-		rulesJSON, err := json.Marshal(entry.Rules)
+		rulesJSON, err := jsonorder.Marshal(entry.Rules, entry.propertyOrder.At("rules"))
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +192,7 @@ func (entry ConfigEntry) MarshalJSON() ([]byte, error) {
 		object["plugins"] = pluginsJSON
 	}
 	if entry.Settings != nil {
-		settingsJSON, err := json.Marshal(entry.Settings)
+		settingsJSON, err := jsonorder.Marshal(entry.Settings, entry.propertyOrder.At("settings"))
 		if err != nil {
 			return nil, err
 		}
@@ -288,6 +291,11 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 		if err := validateConfigRules(decoded.Rules); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
 		}
+		order, err := jsonorder.Parse(rawEntry)
+		if err != nil {
+			return err
+		}
+		decoded.propertyOrder = order
 		// Global-ignore semantics depend on object shape, not on whether a
 		// present field decodes to a non-nil Go value. Preserve the non-global
 		// shape of entries such as {ignores, rules: null} or entries carrying a
@@ -639,8 +647,9 @@ type Rules map[string]interface{}
 
 // RuleConfig represents individual rule configuration
 type RuleConfig struct {
-	Level   string        `json:"level,omitempty"`   // "error", "warn", "off"
-	Options []interface{} `json:"options,omitempty"` // ESLint's context.options array (post-severity elements)
+	Level          string        `json:"level,omitempty"`   // "error", "warn", "off"
+	Options        []interface{} `json:"options,omitempty"` // ESLint's context.options array (post-severity elements)
+	optionKeyOrder []*jsonorder.Order
 }
 
 // IsEnabled returns true if the rule is enabled (not "off")
@@ -914,10 +923,11 @@ func (path *fileMatchPath) normalizedPaths() (string, string) {
 
 // MergedConfig is the final computed configuration for a single file
 type MergedConfig struct {
-	Rules           map[string]*RuleConfig
-	Settings        Settings
-	LanguageOptions *LanguageOptions
-	Plugins         map[string]struct{}
+	Rules            map[string]*RuleConfig
+	Settings         Settings
+	settingsKeyOrder *jsonorder.Order
+	LanguageOptions  *LanguageOptions
+	Plugins          map[string]struct{}
 	// project retains the path origin of the entry that supplied the effective
 	// project value. Later rule or root overrides must not replace that origin.
 	project *ProjectDeclaration

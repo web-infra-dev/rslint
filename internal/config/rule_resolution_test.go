@@ -1,12 +1,93 @@
 package config
 
 import (
+	"encoding/json"
+	"slices"
 	"sync"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestResolveEnabledRules_PropertyOrder(t *testing.T) {
+	const input = `[
+		{"rules":{"ordered":["error",{"aliases":{"z":"old","a":"a"}}]},
+		 "settings":{"shared":{"aliases":{"z":"old","a":"a"},"items":[{"z":1,"a":2}]}}},
+		{"rules":{"ordered":"warn"},"settings":{"shared":{"aliases":{"z":"new","b":"b"}}}}
+	]`
+	for _, tc := range []struct {
+		name  string
+		flags []string
+		want  []string
+	}{
+		{"severity inherits options", nil, []string{"z", "a"}},
+		{"CLI replaces options", []string{`ordered: ["error", {"aliases":{"y":1,"x":2}}]`}, []string{"y", "x"}},
+		{"last CLI severity inherits original options", []string{`ordered: ["error", {"aliases":{"y":1,"x":2}}]`, "ordered: warn"}, []string{"z", "a"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var entries RslintConfig
+			if err := json.Unmarshal([]byte(input), &entries); err != nil {
+				t.Fatal(err)
+			}
+			if len(tc.flags) != 0 {
+				entry, err := BuildCLIRuleEntry(tc.flags)
+				if err != nil {
+					t.Fatal(err)
+				}
+				entries = append(entries, *entry)
+			}
+			calls := 0
+			catalog := rule.NewCatalog(rule.Rule{
+				Name:   "ordered",
+				Schema: rule.NewSchema([]byte(`{"type":"array","items":[{"type":"object","properties":{"defaulted":{"type":"boolean","default":true}}}]}`)),
+				Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+					calls++
+					object := options[0].(map[string]any)
+					if object["defaulted"] != true {
+						t.Fatal("schema defaults were lost")
+					}
+					got := ctx.OptionKeyOrder[0].At("aliases").PropertyKeys(object["aliases"].(map[string]any))
+					if !slices.Equal(got, tc.want) {
+						t.Fatalf("option keys = %v, want %v", got, tc.want)
+					}
+					shared := ctx.Settings["shared"].(map[string]any)
+					aliases := shared["aliases"].(map[string]any)
+					got = ctx.SettingsKeyOrder.At("shared", "aliases").PropertyKeys(aliases)
+					if !slices.Equal(got, []string{"z", "a", "b"}) || aliases["z"] != "new" {
+						t.Fatalf("merged setting keys = %v, values = %v", got, aliases)
+					}
+					item := shared["items"].([]any)[0].(map[string]any)
+					if got := ctx.SettingsKeyOrder.At("shared", "items", "0").PropertyKeys(item); !slices.Equal(got, []string{"z", "a"}) {
+						t.Fatalf("array item keys = %v", got)
+					}
+					return nil
+				},
+			})
+			for range 2 {
+				normalized, errors := ValidateRuleOptions(entries, catalog)
+				if len(errors) != 0 {
+					t.Fatal(errors)
+				}
+				configured, _ := ResolveEnabledRules(catalog, normalized, "/project/input.js", "/project")
+				if len(configured) != 1 {
+					t.Fatalf("configured rules = %v", configured)
+				}
+				configured[0].Run(rule.RuleContext{Settings: configured[0].Environment.Settings})
+				encoded, err := json.Marshal(normalized)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := json.Unmarshal(encoded, &entries); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if calls != 2 {
+				t.Fatalf("rule ran %d times", calls)
+			}
+		})
+	}
+}
 
 func TestResolveEnabledRules_MultiSlashNames(t *testing.T) {
 	for _, tc := range []struct {
