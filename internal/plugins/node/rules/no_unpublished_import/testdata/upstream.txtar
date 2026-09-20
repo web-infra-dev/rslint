@@ -1,0 +1,141 @@
+Fixtures from eslint-plugin-n v18.3.0, tests/fixtures/no-unpublished.
+-- 1/ignore1.js --
+
+-- 1/ignore2.js --
+
+-- 1/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0",
+        "foo": "0.0.0"
+    }
+}
+-- 2/.npmignore --
+ignore1.js
+ignore2.js
+-- 2/ignore1.js --
+
+-- 2/ignore2.js --
+
+-- 2/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- 3/.npmignore --
+ignore1.js
+ignore2.js
+*.json
+-- 3/ignore1.js --
+
+-- 3/ignore2.js --
+
+-- 3/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "files": [
+        "pub"
+    ],
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- 3/pub/abc.json --
+{
+    "hello": "world"
+}
+-- 3/pub/ignore1.js --
+
+-- 3/pub/ignore2.js --
+
+-- 3/src/a.jsx --
+
+-- 3/src/pub/a.js --
+
+-- 3/src/readme.js --
+
+-- 4/abc.jsx --
+
+-- 4/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "files": [
+        "index.jsx",
+        "abc.jsx"
+    ]
+}
+-- negative-in-files/lib/__test__/index.js --
+
+-- negative-in-files/lib/index.js --
+
+-- negative-in-files/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "files": [
+        "lib",
+        "!**/__test__"
+    ],
+    "dependencies": {
+        "aaa": "0.0.0"
+    },
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- private-package/package.json --
+{
+    "private": true,
+    "name": "test",
+    "version": "0.0.0",
+    "devDependencies": {
+        "bbb": "0.0.0"
+    }
+}
+-- tsconfig-paths-wildcard/.npmignore --
+node_modules/*
+-- tsconfig-paths-wildcard/index.ts --
+// File needs to exists
+-- tsconfig-paths-wildcard/node_modules/@test/dev/index.js --
+
+-- tsconfig-paths-wildcard/node_modules/@test/dev/package.json --
+{
+    "main": "./index.js",
+    "exports": {
+      ".": {
+        "default": "./index.js"
+      }
+    }
+  }
+-- tsconfig-paths-wildcard/package.json --
+{
+    "name": "test",
+    "version": "0.0.0",
+    "devDependencies": {
+        "@test/dev": "0.0.0"
+    }
+}
+-- tsconfig-paths-wildcard/tsconfig.json --
+{
+    "compilerOptions": {
+        "paths": {
+            "*": ["./node_modules/*"]
+        }
+    }
+}
