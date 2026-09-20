@@ -1,0 +1,10 @@
+-- a.ts --
+export const a = 1;
+-- b.ts --
+export const b = 1;
+-- first.json --
+{"files":["a.ts"],"compilerOptions":{"noLib":true}}
+-- alias.json --
+{"files":["alias.ts"],"compilerOptions":{"noLib":true}}
+-- second.json --
+{"files":["a.ts","b.ts"],"compilerOptions":{"noLib":true}}

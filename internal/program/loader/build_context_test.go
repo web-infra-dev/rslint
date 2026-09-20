@@ -283,8 +283,25 @@ func TestProgramMetadataFSPanicReleasesEntry(t *testing.T) {
 
 type programReadCountingFS struct {
 	vfs.FS
-	mu    sync.Mutex
-	reads map[string]int
+	mu          sync.Mutex
+	reads       map[string]int
+	directories map[string]int
+}
+
+func (f *programReadCountingFS) GetAccessibleEntries(path string) vfs.Entries {
+	f.mu.Lock()
+	if f.directories == nil {
+		f.directories = make(map[string]int)
+	}
+	f.directories[path]++
+	f.mu.Unlock()
+	return f.FS.GetAccessibleEntries(path)
+}
+
+func (f *programReadCountingFS) directoryCount(path string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.directories[path]
 }
 
 func (f *programReadCountingFS) ReadFile(path string) (string, bool) {

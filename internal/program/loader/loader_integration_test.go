@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -2226,6 +2227,43 @@ func TestBuildTargetProjectPrefersEarlierDirectRoot(t *testing.T) {
 	}
 }
 
+func TestBuildTargetProjectValidatesWithoutExpandingLaterRoots(t *testing.T) {
+	for _, disableCache := range []bool{false, true} {
+		for _, singleThreaded := range []bool{false, true} {
+			t.Run(fmt.Sprintf("cache-disabled=%t/serial=%t", disableCache, singleThreaded), func(t *testing.T) {
+				t.Setenv("RSLINT_DISABLE_PROGRAM_METADATA_CACHE", "")
+				if disableCache {
+					t.Setenv("RSLINT_DISABLE_PROGRAM_METADATA_CACHE", "1")
+				}
+				dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_root_prefix.txtar").Materialize(t, ""))
+				fsys := &programReadCountingFS{FS: bundled.WrapFS(osvfs.FS()), reads: make(map[string]int)}
+				plan := target.Plan{Files: []target.File{testLintTarget(fsys, dir, tspath.ResolvePath(dir, "target.ts"))}}
+				set, err := NewSession(fsys).buildProjectsForTest(t, ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(
+						"./tsconfig.json", "./later/tsconfig.json", "./empty.json", "./invalid.json",
+					)},
+					Targets: plan, Scope: LintTargets, SingleThreaded: singleThreaded,
+				})
+				if err != nil || set.Len() != 1 {
+					t.Fatalf("selected project: count=%d err=%v", set.Len(), err)
+				}
+				for _, config := range []string{"tsconfig.json", "later/tsconfig.json", "empty.json", "invalid.json"} {
+					if got := fsys.readCount(tspath.ResolvePath(dir, config)); got != 1 {
+						t.Fatalf("config %q read %d times, want one snapshot", config, got)
+					}
+				}
+				if !disableCache && (fsys.readCount(tspath.ResolvePath(dir, "later/base.json")) != 0 ||
+					fsys.directoryCount(tspath.ResolvePath(dir, "later/src")) != 0) {
+					t.Fatal("a later candidate expanded includes or extended configs after an exact root was found")
+				}
+				if fsys.readCount(tspath.ResolvePath(dir, "later/src/other.ts")) != 0 {
+					t.Fatal("an unselected project constructed a source graph")
+				}
+			})
+		}
+	}
+}
+
 func TestBuildTargetProjectValidatesEveryEffectiveCandidate(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
 	writeProgramTestFiles(t, dir, map[string]string{
@@ -2611,6 +2649,53 @@ func TestBuildTargetProjectsDeduplicatesSharedDirectWinnerAcrossOwners(t *testin
 	}
 	if len(binding.TargetsByProgram) != 1 || len(binding.TargetsByProgram[0]) != 2 {
 		t.Fatalf("shared direct winner lost an owner's target: %v", binding.TargetsByProgram)
+	}
+}
+
+func TestBuildTargetProjectsKeepsCandidateOrderAcrossGroups(t *testing.T) {
+	for _, firstConfig := range []string{"first.json", "alias.json"} {
+		for _, singleThreaded := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/serial=%t", firstConfig, singleThreaded), func(t *testing.T) {
+				dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_order_groups.txtar").Materialize(t, ""))
+				if firstConfig == "alias.json" {
+					if err := os.Symlink("a.ts", tspath.ResolvePath(dir, "alias.ts")); err != nil {
+						t.Skipf("symlinks unavailable: %v", err)
+					}
+				}
+				config := projectConfig("./"+firstConfig, "./second.json")
+				other := projectConfig("./second.json", "./"+firstConfig)[0]
+				other.Files = []string{"b.ts"}
+				config = append(config, other)
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				session := NewSession(fsys)
+				plan := target.Plan{Files: []target.File{
+					testLintTarget(fsys, dir, tspath.ResolvePath(dir, "a.ts")),
+					testLintTarget(fsys, dir, tspath.ResolvePath(dir, "b.ts")),
+				}}
+				projects, err := session.buildProjectsForTest(t, ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: config},
+					Targets: plan, Scope: LintTargets, SingleThreaded: singleThreaded,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding, err := session.LoadAPI(projects, plan, dir, singleThreaded)
+				if err != nil {
+					t.Fatal(err)
+				}
+				bound := make(map[string]string)
+				for index, sources := range binding.TargetsByProgram {
+					for _, source := range sources {
+						file := binding.LintTargetBySourcePath[exactPathID(source)]
+						bound[file.Path] = binding.Programs[index].Options().ConfigFilePath
+					}
+				}
+				if len(bound) != 2 || bound[plan.Files[0].Path] != tspath.ResolvePath(dir, firstConfig) ||
+					bound[plan.Files[1].Path] != tspath.ResolvePath(dir, "second.json") {
+					t.Fatalf("shared candidates changed per-target order: %v", bound)
+				}
+			})
+		}
 	}
 }
 

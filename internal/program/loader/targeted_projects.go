@@ -289,6 +289,35 @@ func orderedProjectIndexesForConfig(plan projectPlan, configDir string) []int {
 	return indexes
 }
 
+// parseRootCandidates stops each candidate list after every target has an
+// exact root. Earlier physical aliases can still outrank that root; the shared
+// root-ranking pass resolves them after these declaration prefixes are ready.
+// Targets without an exact root require the complete list.
+func (execution *targetedProjectExecution) parseRootCandidates(groups []projectTargetGroup) error {
+	if !execution.singleThreaded && len(groups) > 1 {
+		execution.session.context.enableConcurrentProgramQueries()
+	}
+	return runTargetProjectTasks(groups, execution.singleThreaded, func(group projectTargetGroup) error {
+		pending := make(map[string]struct{}, len(group.targetIndexes))
+		for _, targetIndex := range group.targetIndexes {
+			pending[exactPathID(execution.targets[targetIndex].Path)] = struct{}{}
+		}
+		for _, projectIndex := range group.projectIndexes {
+			if len(pending) == 0 {
+				break
+			}
+			parsed, err := execution.parse(projectIndex)
+			if err != nil {
+				return err
+			}
+			for _, root := range parsed.config.FileNames() {
+				delete(pending, exactPathID(root))
+			}
+		}
+		return nil
+	})
+}
+
 // executeTargetProjectPlan uses one ownership and validation policy for every
 // ordinary lint request. Invocation spelling never changes project selection.
 func (s *Session) executeTargetProjectPlan(
@@ -300,15 +329,30 @@ func (s *Session) executeTargetProjectPlan(
 	execution := newTargetedProjectExecution(s, plan, targetPlan.Files, singleThreaded)
 
 	// Validate every effective candidate before constructing source graphs.
+	// Includes are expanded only when root selection reaches the candidate.
 	// Stable plan order also preserves the precedence of an earlier metadata
 	// failure over a later owner's project-path resolution failure.
 	indexes := make([]int, len(plan.specs))
 	for index := range indexes {
 		indexes[index] = index
 	}
-	execution.forEachProject(indexes, func(index int) { _, _ = execution.parse(index) })
+	validationErrors := make([]error, len(indexes))
+	execution.forEachProject(indexes, func(index int) {
+		spec := plan.specs[index]
+		if spec.parsed != nil {
+			return
+		}
+		if s.context.metadataFS == nil {
+			// The diagnostic cache escape hatch must not add a second read of
+			// a mutable VFS. Keep the parsed result instead of probing first.
+			_, _ = execution.parse(index)
+			validationErrors[index] = execution.slots[index].parseErr
+			return
+		}
+		validationErrors[index] = s.context.validateConfigRead(spec.programCwd, spec.tsconfigPath)
+	})
 	for index := range indexes {
-		if err := execution.slots[index].parseErr; err != nil {
+		if err := validationErrors[index]; err != nil {
 			return ProjectSet{}, fmt.Errorf("create TypeScript Program from %q: %w", plan.specs[index].tsconfigPath, err)
 		}
 	}
@@ -322,9 +366,14 @@ func (s *Session) executeTargetProjectPlan(
 	groups := groupTargetsByProjects(targetPlan.Files, plan.targetProjects, func(owner string) []int {
 		return orderedProjectIndexesForConfig(plan, owner)
 	})
+	if err := execution.parseRootCandidates(groups); err != nil {
+		return ProjectSet{}, err
+	}
 	roots := make([][]string, len(plan.specs))
 	for index := range roots {
-		roots[index] = execution.slots[index].config.FileNames()
+		if config := execution.slots[index].config; config != nil {
+			roots[index] = config.FileNames()
+		}
 	}
 	// Root ranking filters its input groups; source fallback still needs all
 	// targets, including ones whose metadata root the compiler cannot admit.

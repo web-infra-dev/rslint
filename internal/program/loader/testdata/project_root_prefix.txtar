@@ -1,0 +1,13 @@
+-- target.ts --
+export const target = 1;
+-- tsconfig.json --
+{"files":["target.ts"],"compilerOptions":{"noLib":true}}
+-- later/tsconfig.json --
+{"extends":"./base.json","include":["src/**/*.ts"]}
+-- later/base.json --
+{"compilerOptions":{"noLib":true}}
+-- later/src/other.ts --
+export const other = 1;
+-- empty.json --
+-- invalid.json --
+{
