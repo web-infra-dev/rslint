@@ -188,6 +188,35 @@ func TestPreferLowercaseTitleRule(t *testing.T) {
 					{MessageId: "unexpectedCase", Line: 1, Column: 4},
 				},
 			},
+			// Preserve the source spelling of all characters after the one changed.
+			{
+				Code:   `test('Doesn\'t mutate', () => {})`,
+				Output: []string{`test('doesn\'t mutate', () => {})`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCase", Line: 1, Column: 6},
+				},
+			},
+			{
+				Code:   `test("First\nSecond", () => {})`,
+				Output: []string{`test("first\nSecond", () => {})`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCase", Line: 1, Column: 6},
+				},
+			},
+			{
+				Code:   "test(`Value: \\${name}`, () => {})",
+				Output: []string{"test(`value: \\${name}`, () => {})"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCase", Line: 1, Column: 6},
+				},
+			},
+			{
+				Code:   `test('\x44oes work', () => {})`,
+				Output: []string{`test('does work', () => {})`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCase", Line: 1, Column: 6},
+				},
+			},
 			// extras: parenthesized string argument
 			{
 				Code:   "it(('Foo'), function () {})",
@@ -346,11 +375,11 @@ func TestPreferLowercaseTitleIgnoreTopLevelDescribe(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: `describe("MyClass", () => {});`, Options: opts},
 			{
-				Code: "describe('MyClass', () => {\n  describe('#myMethod', () => {\n    it('does things', () => {});\n  });\n});",
+				Code:    "describe('MyClass', () => {\n  describe('#myMethod', () => {\n    it('does things', () => {});\n  });\n});",
 				Options: opts,
 			},
 			{
-				Code: "describe('Strings', () => {\n  it('are strings', () => { expect('abc').toBe('abc'); });\n});\n\ndescribe('Booleans', () => {\n  it('are booleans', () => { expect(true).toBe(true); });\n});",
+				Code:    "describe('Strings', () => {\n  it('are strings', () => { expect('abc').toBe('abc'); });\n});\n\ndescribe('Booleans', () => {\n  it('are booleans', () => { expect(true).toBe(true); });\n});",
 				Options: opts,
 			},
 		},
@@ -364,8 +393,8 @@ func TestPreferLowercaseTitleIgnoreTopLevelDescribe(t *testing.T) {
 				},
 			},
 			{
-				Code: "describe('MyClass', () => {\n  describe('MyMethod', () => {\n    it('Does things', () => {});\n  });\n});",
-				Output: []string{"describe('MyClass', () => {\n  describe('myMethod', () => {\n    it('does things', () => {});\n  });\n});"},
+				Code:    "describe('MyClass', () => {\n  describe('MyMethod', () => {\n    it('Does things', () => {});\n  });\n});",
+				Output:  []string{"describe('MyClass', () => {\n  describe('myMethod', () => {\n    it('does things', () => {});\n  });\n});"},
 				Options: opts,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCase", Line: 2, Column: 12},
@@ -373,8 +402,8 @@ func TestPreferLowercaseTitleIgnoreTopLevelDescribe(t *testing.T) {
 				},
 			},
 			{
-				Code: "import { describe, describe as context } from '@jest/globals';\n\ndescribe('MyClass', () => {\n  context('MyMethod', () => {\n    it('Does things', () => {});\n  });\n});",
-				Output: []string{"import { describe, describe as context } from '@jest/globals';\n\ndescribe('MyClass', () => {\n  context('myMethod', () => {\n    it('does things', () => {});\n  });\n});"},
+				Code:    "import { describe, describe as context } from '@jest/globals';\n\ndescribe('MyClass', () => {\n  context('MyMethod', () => {\n    it('Does things', () => {});\n  });\n});",
+				Output:  []string{"import { describe, describe as context } from '@jest/globals';\n\ndescribe('MyClass', () => {\n  context('myMethod', () => {\n    it('does things', () => {});\n  });\n});"},
 				Options: opts,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCase", Line: 4, Column: 11},
@@ -395,8 +424,8 @@ func TestPreferLowercaseTitleIgnoreTopLevelDescribeFalse(t *testing.T) {
 		nil,
 		[]rule_tester.InvalidTestCase{
 			{
-				Code: "describe('MyClass', () => {\n  describe('MyMethod', () => {\n    it('Does things', () => {});\n  });\n});",
-				Output: []string{"describe('myClass', () => {\n  describe('myMethod', () => {\n    it('does things', () => {});\n  });\n});"},
+				Code:    "describe('MyClass', () => {\n  describe('MyMethod', () => {\n    it('Does things', () => {});\n  });\n});",
+				Output:  []string{"describe('myClass', () => {\n  describe('myMethod', () => {\n    it('does things', () => {});\n  });\n});"},
 				Options: opts,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCase", Line: 1, Column: 10},

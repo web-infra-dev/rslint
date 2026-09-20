@@ -25,10 +25,12 @@ type Config struct {
 	Prepare         func(rule.RuleContext) Runtime
 }
 
-// Runtime supplies the framework-specific parse function to the shared rule.
+// Runtime supplies framework-specific call semantics to the shared rule.
 type Runtime struct {
-	Parse func(*ast.Node) *testFramework.ParsedCall
-	Skip  bool
+	Parse         func(*ast.Node) *testFramework.ParsedCall
+	IsTodo        func(*ast.Node) bool
+	DescribeDepth func(*ast.Node) int
+	Skip          bool
 }
 
 type resolvedOptions struct {
@@ -130,15 +132,27 @@ func NewRule(config Config) rule.Rule {
 
 					if parsed.Kind == testFramework.FnKindDescribe {
 						numberOfDescribeBlocks++
-						if opts.ignoreTopLevelDescribe && numberOfDescribeBlocks == 1 {
-							return
+						if opts.ignoreTopLevelDescribe {
+							describeDepth := numberOfDescribeBlocks
+							if runtime.DescribeDepth != nil {
+								describeDepth = runtime.DescribeDepth(node)
+							}
+							if describeDepth == 1 {
+								return
+							}
 						}
 					} else if parsed.Kind != testFramework.FnKindTest {
 						return
 					}
 
-					if opts.ignoreTodos && slices.Contains(parsed.Members, "todo") {
-						return
+					if opts.ignoreTodos {
+						isTodo := slices.Contains(parsed.Members, "todo")
+						if runtime.IsTodo != nil {
+							isTodo = isTodo || runtime.IsTodo(node)
+						}
+						if isTodo {
+							return
+						}
 					}
 
 					call := node.AsCallExpression()
@@ -172,7 +186,7 @@ func NewRule(config Config) rule.Rule {
 						return
 					}
 
-					newDescription := ecmascript.StringToLowerCase(firstChar) + string(runes[1:])
+					lowercaseFirstChar := ecmascript.StringToLowerCase(firstChar)
 
 					ctx.ReportNodeWithDeferredFixes(inner, rule.RuleMessage{
 						Id:          "unexpectedCase",
@@ -180,9 +194,17 @@ func NewRule(config Config) rule.Rule {
 						Data:        map[string]string{"method": parsed.Name},
 					}, func() []rule.RuleFix {
 						r := internalUtils.TrimNodeTextRange(ctx.SourceFile, inner)
-						fixRange := r.WithPos(r.Pos() + 1).WithEnd(r.End() - 1)
+						raw := ctx.SourceFile.Text()[r.Pos():r.End()]
+						units := internalUtils.ParseJSStringLiteralSource(raw)
+						if inner.Kind == ast.KindNoSubstitutionTemplateLiteral {
+							units = internalUtils.ParseJSTemplateLiteralSource(raw)
+						}
+						if len(units) == 0 {
+							return nil
+						}
+						fixRange := r.WithPos(r.Pos() + units[0].Start).WithEnd(r.Pos() + units[0].End)
 						return []rule.RuleFix{
-							rule.RuleFixReplaceRange(fixRange, newDescription),
+							rule.RuleFixReplaceRange(fixRange, lowercaseFirstChar),
 						}
 					})
 				},

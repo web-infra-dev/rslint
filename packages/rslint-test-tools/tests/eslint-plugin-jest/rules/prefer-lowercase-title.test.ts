@@ -99,5 +99,15 @@ ruleTester.run('prefer-lowercase-title', {} as never, {
       output: "it.each(['green', 'black'])('should return %', () => {})",
       errors: [{ messageId: 'unexpectedCase', line: 1, column: 29 }],
     },
+    {
+      code: "test('Doesn\\'t mutate', () => {})",
+      output: "test('doesn\\'t mutate', () => {})",
+      errors: [{ messageId: 'unexpectedCase', line: 1, column: 6 }],
+    },
+    {
+      code: 'test(`Value: \\${name}`, () => {})',
+      output: 'test(`value: \\${name}`, () => {})',
+      errors: [{ messageId: 'unexpectedCase', line: 1, column: 6 }],
+    },
   ],
 });

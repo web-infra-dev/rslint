@@ -86,6 +86,20 @@ func TestPreferLowercaseTitleRstest(t *testing.T) {
 				},
 			},
 			{
+				Code:   `test('Doesn\'t mutate', () => {})`,
+				Output: []string{`test('doesn\'t mutate', () => {})`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCase", Line: 1, Column: 6},
+				},
+			},
+			{
+				Code:   `const todoTest = test.todo; todoTest('Should work');`,
+				Output: []string{`const todoTest = test.todo; todoTest('should work');`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCase", Line: 1, Column: 38},
+				},
+			},
+			{
 				Code:   "import { test } from 'rstack/test';\ntest('Foo', () => {});",
 				Output: []string{"import { test } from 'rstack/test';\ntest('foo', () => {});"},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -113,6 +127,7 @@ func TestPreferLowercaseTitleRstestIgnoreTodos(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: "test.todo(`Foo`, function () {})", Options: opts},
 			{Code: `test.todo("Foo", () => {})`, Options: opts},
+			{Code: `const todoTest = test.todo; todoTest('Should work');`, Options: opts},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -139,12 +154,20 @@ func TestPreferLowercaseTitleRstestIgnoreTopLevelDescribe(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{
-				Code: "describe('MyClass', () => {\n  describe('MyMethod', () => {\n    test('Does things', () => {});\n  });\n});",
-				Output: []string{"describe('MyClass', () => {\n  describe('myMethod', () => {\n    test('does things', () => {});\n  });\n});"},
+				Code:    "describe('MyClass', () => {\n  describe('MyMethod', () => {\n    test('Does things', () => {});\n  });\n});",
+				Output:  []string{"describe('MyClass', () => {\n  describe('myMethod', () => {\n    test('does things', () => {});\n  });\n});"},
 				Options: opts,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedCase", Line: 2, Column: 12},
 					{MessageId: "unexpectedCase", Line: 3, Column: 10},
+				},
+			},
+			{
+				Code:    "describe('Outer', suiteBody);\n\nfunction suiteBody() {\n  describe('Inner', () => {});\n}",
+				Output:  []string{"describe('Outer', suiteBody);\n\nfunction suiteBody() {\n  describe('inner', () => {});\n}"},
+				Options: opts,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedCase", Line: 4, Column: 12},
 				},
 			},
 		},

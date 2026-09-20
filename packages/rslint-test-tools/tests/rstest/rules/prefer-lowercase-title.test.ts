@@ -20,6 +20,10 @@ ruleTester.run('prefer-lowercase-title', {} as never, {
     { code: 'it()' },
     { code: 'randomFunction()' },
     { code: 'foo.bar()' },
+    {
+      code: `const todoTest = test.todo; todoTest('Should work');`,
+      options: [{ ignoreTodos: true }],
+    },
   ],
   invalid: [
     {
@@ -51,6 +55,30 @@ ruleTester.run('prefer-lowercase-title', {} as never, {
       code: `it('Foo', function () {})`,
       output: `it('foo', function () {})`,
       errors: [{ messageId: 'unexpectedCase', line: 1, column: 4 }],
+    },
+    {
+      code: "test('Doesn\\'t mutate', () => {})",
+      output: "test('doesn\\'t mutate', () => {})",
+      errors: [{ messageId: 'unexpectedCase', line: 1, column: 6 }],
+    },
+    {
+      code: `const todoTest = test.todo; todoTest('Should work');`,
+      output: `const todoTest = test.todo; todoTest('should work');`,
+      errors: [{ messageId: 'unexpectedCase', line: 1, column: 38 }],
+    },
+    {
+      code: `describe('Outer', suiteBody);
+
+function suiteBody() {
+  describe('Inner', () => {});
+}`,
+      output: `describe('Outer', suiteBody);
+
+function suiteBody() {
+  describe('inner', () => {});
+}`,
+      options: [{ ignoreTopLevelDescribe: true }],
+      errors: [{ messageId: 'unexpectedCase', line: 4, column: 12 }],
     },
   ],
 });
