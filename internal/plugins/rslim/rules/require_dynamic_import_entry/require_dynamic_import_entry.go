@@ -24,11 +24,15 @@ var RequireDynamicImportEntryRule = rule.Rule{
 					return
 				}
 				specifier := call.Arguments.Nodes[0]
-				if !ast.IsStringLiteralLike(specifier) {
-					return
+				var module *ast.Symbol
+				if ast.IsStringLiteralLike(specifier) {
+					module = ctx.TypeChecker.GetSymbolAtLocation(specifier)
 				}
-				module := ctx.TypeChecker.GetSymbolAtLocation(specifier)
 				if module == nil {
+					ctx.ReportNode(specifier, rule.RuleMessage{
+						Id:          "unresolvedImport",
+						Description: "Cannot resolve this dynamic import. Manually check that the imported declarations used at runtime have @entry, then add // rslint-disable-next-line rslim/require-dynamic-import-entry before this argument's line to ignore this diagnostic.",
+					})
 					return
 				}
 				used := exportUsage{ctx: &ctx, names: map[string]bool{}, seen: map[*ast.Node]bool{}}
