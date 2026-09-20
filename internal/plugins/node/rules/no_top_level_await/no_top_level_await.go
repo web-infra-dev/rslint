@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 //go:embed no_top_level_await.schema.json
@@ -32,7 +33,7 @@ var NoTopLevelAwaitRule = rule.Rule{
 		if program == nil || fileName == "<input>" {
 			return nil
 		}
-		pkg := nodeutil.FindPackage(program, fileName)
+		pkg := packagejson.FindNearestValid(program, fileName)
 		if pkg == nil {
 			return nil
 		}
@@ -42,7 +43,7 @@ var NoTopLevelAwaitRule = rule.Rule{
 			return nil
 		}
 		absolute := tspath.ResolvePath(pkg.Directory(), converted)
-		if ignoreBin && pkg.IsBinFile(program, absolute) || nodeutil.IsUnpublished(program, pkg, absolute) {
+		if ignoreBin && nodeutil.IsBinFile(program, pkg, absolute) || nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
 

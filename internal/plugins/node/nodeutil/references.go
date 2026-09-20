@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 	"github.com/web-infra-dev/rslint/internal/utils/referencetracker"
 )
 
@@ -42,15 +43,15 @@ func readReference(trace *ReferenceTrace, node *ast.Node) {
 
 // TrackModules follows CommonJS, process.getBuiltinModule and legacy ESM imports.
 // Builtin node: aliases use the same trace, retaining canonical callback names.
-func (tracker *ReferenceTracker) TrackModules(modules map[string]*ReferenceTrace) {
+func (tracker *ReferenceTracker) TrackModules(traces map[string]*ReferenceTrace) {
 	lookup := func(name string) *ReferenceTrace {
 		if strings.HasPrefix(name, "node:") {
-			if !isNodeBuiltin(name) {
+			if !modules.IsNodeBuiltin(name) {
 				return nil
 			}
 			name = strings.TrimPrefix(name, "node:")
 		}
-		return modules[name]
+		return traces[name]
 	}
 	load := func(node *ast.Node) {
 		args := node.AsCallExpression().Arguments

@@ -32,3 +32,20 @@ func TestModuleGraphRejectsForeignSourceGeneration(t *testing.T) {
 		t.Fatalf("owned source module references = %+v", references)
 	}
 }
+
+func TestModuleGraphFiltersUnresolvedExpressionShapes(t *testing.T) {
+	files := specifierCacheFiles(false)
+	files[specifierCacheImporter] = "import(('./target')); import(`./target`); import('./target' as string); import(1); import(dynamic); require(dynamic); define(['./target', dynamic]);"
+	raw, _ := specifierCacheProgram(t, files)
+	file := specifierCacheFile(t, raw)
+	graph := lintprogram.NewFromCompiler(raw).ModuleGraph()
+	references := graph.References(file, lintprogram.AllModuleReferences)
+	if len(references) != 3 {
+		t.Fatalf("module graph retained non-string sources: %+v", references)
+	}
+	for _, reference := range references {
+		if reference.Text() != "./target" || reference.Target == nil || reference.Target.FileName() != specifierCacheTarget {
+			t.Fatalf("unexpected module reference: %+v", reference)
+		}
+	}
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 )
 
 //go:embed file_extension_in_import.schema.json
@@ -98,8 +99,8 @@ var FileExtensionInImportRule = rule.Rule{
 		if len(options) > 1 {
 			overrides, _ = options[1].(map[string]any)
 		}
-		var resolutions [2]*nodeutil.ResolutionOptions
-		return nodeutil.VisitImports(nodeutil.ImportVisitorOptions{}, func(source *ast.Node, name string, typeOnly bool) {
+		var resolutions [2]*moduleresolver.Options
+		return nodeutil.VisitImports(ctx, nodeutil.ImportVisitorOptions{}, func(source *ast.Node, name string, typeOnly bool) {
 			if !tspath.PathIsRelative(name) && !strings.HasPrefix(name, "/") && !strings.HasPrefix(name, `\`) {
 				return
 			}

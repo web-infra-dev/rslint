@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 //go:embed hashbang.schema.json
@@ -71,7 +72,7 @@ var HashbangRule = rule.Rule{
 			return nil
 		}
 		fileName := ctx.SourceFile.FileName()
-		pkg := nodeutil.FindPackage(program, fileName)
+		pkg := packagejson.FindNearestValid(program, fileName)
 		if pkg == nil {
 			return nil
 		}
@@ -89,7 +90,7 @@ var HashbangRule = rule.Rule{
 		if ignore, _ := opts["ignoreUnpublished"].(bool); ignore && !additional && nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
-		needsShebang := additional || pkg.IsBinFile(program, absolute)
+		needsShebang := additional || nodeutil.IsBinFile(program, pkg, absolute)
 		executable := "node"
 		if mapping, ok := opts["executableMap"].(map[string]any); ok {
 			if value, ok := mapping[fileExtension(fileName)].(string); ok {

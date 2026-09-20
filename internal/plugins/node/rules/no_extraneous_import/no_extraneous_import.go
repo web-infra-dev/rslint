@@ -8,6 +8,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 //go:embed no_extraneous_import.schema.json
@@ -23,7 +25,7 @@ var NoExtraneousImportRule = rule.Rule{
 		if p == nil || fileName == "<input>" {
 			return nil
 		}
-		pkg := nodeutil.FindPackage(p, fileName)
+		pkg := packagejson.FindNearestValid(p, fileName)
 		if pkg == nil {
 			return nil
 		}
@@ -32,11 +34,11 @@ var NoExtraneousImportRule = rule.Rule{
 			opts, _ = options[0].(map[string]any)
 		}
 		allowed := nodeutil.StringListSetting("allowModules", opts, ctx.Settings)
-		var resolutionOptions [2]*nodeutil.ResolutionOptions
+		var resolutionOptions [2]*moduleresolver.Options
 		extraneousName := func(specifier string, typeOnly bool) string {
 			name, resource := nodeutil.ImportModuleName(specifier)
-			if name == "" || pkg.AllowsDependency(p, name) || slices.Contains(allowed, name) ||
-				typeOnly && pkg.AllowsDependency(p, module.GetTypesPackageName(name)) ||
+			if name == "" || nodeutil.AllowsDependency(p, pkg, name) || slices.Contains(allowed, name) ||
+				typeOnly && nodeutil.AllowsDependency(p, pkg, module.GetTypesPackageName(name)) ||
 				nodeutil.HasTypeScriptAlias(p, fileName, resource) {
 				return ""
 			}
@@ -48,7 +50,7 @@ var NoExtraneousImportRule = rule.Rule{
 				resolution := nodeutil.ImportResolutionOptions(ctx, typeOnly, opts)
 				resolutionOptions[index] = &resolution
 			}
-			if nodeutil.ResolveModule(p, resource, fileName, *resolutionOptions[index]) != "" {
+			if moduleresolver.ResolveModule(p, resource, fileName, *resolutionOptions[index]) != "" {
 				return name
 			}
 			return ""
@@ -60,7 +62,7 @@ var NoExtraneousImportRule = rule.Rule{
 		// Resolution is immutable within a file, but every occurrence still
 		// needs its own diagnostic. Type-only and runtime imports may differ.
 		targets := map[targetKey]string{}
-		return nodeutil.VisitImports(nodeutil.ImportVisitorOptions{}, func(source *ast.Node, specifier string, typeOnly bool) {
+		return nodeutil.VisitImports(ctx, nodeutil.ImportVisitorOptions{}, func(source *ast.Node, specifier string, typeOnly bool) {
 			key := targetKey{specifier, typeOnly}
 			name, found := targets[key]
 			if !found {

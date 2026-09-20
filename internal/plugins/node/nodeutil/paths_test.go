@@ -14,6 +14,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 func packageRoot(t testing.TB) rule_tester.Root {
@@ -23,46 +24,6 @@ func packageRoot(t testing.TB) rule_tester.Root {
 	return rule_tester.Root{Dir: directory, FS: utils.NewOverlayVFS(base.FS, map[string]string{
 		tspath.ResolvePath(directory, "tsconfig.json"): `{"compilerOptions":{"allowJs":true,"noEmit":true},"include":["**/*"]}`,
 	})}
-}
-
-func TestPackageGeneration(t *testing.T) {
-	base := packageRoot(t)
-	create := func(metadata string) *lintprogram.Program {
-		t.Helper()
-		root := base
-		root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
-			tspath.ResolvePath(root.Dir, "string-bin/package.json"):        metadata,
-			tspath.ResolvePath(root.Dir, "string-bin/nested/package.json"): "null",
-		})
-		raw, _, err := rule_tester.NewProgramHelper(root).CreateTestProgram("hello();", "string-bin/nested/a.js", "tsconfig.json")
-		if err != nil {
-			t.Fatal(err)
-		}
-		return lintprogram.NewFromCompiler(raw)
-	}
-	first := create(`{"bin":"bin/first.js"}`)
-	name := tspath.ResolvePath(base.Dir, "string-bin/nested/a.js")
-	var packages [16]*PackageJSON
-	var group sync.WaitGroup
-	for index := range packages {
-		group.Go(func() {
-			packages[index] = FindPackage(first, name)
-		})
-	}
-	group.Wait()
-	pkg := packages[0]
-	if pkg == nil || pkg.data["bin"] != "bin/first.js" {
-		t.Fatalf("invalid nested metadata did not fall back to parent: %#v", pkg)
-	}
-	for _, got := range packages {
-		if got != pkg {
-			t.Error("package decoding was not shared within the Program")
-		}
-	}
-	second := create(`{"bin":"bin/second.js"}`)
-	if got := FindPackage(second, name); got == nil || got == pkg || got.data["bin"] != "bin/second.js" {
-		t.Fatalf("package metadata leaked between Programs: %#v", got)
-	}
 }
 
 func TestBinAliases(t *testing.T) {
@@ -200,7 +161,7 @@ func TestPublicationGenerationAndConfiguration(t *testing.T) {
 	file := tspath.ResolvePath(base.Dir, "pkg/lib/a.js")
 	directory := tspath.GetDirectoryPath(tspath.GetDirectoryPath(file))
 	unpublished := func(p *lintprogram.Program, relative string) bool {
-		return IsUnpublished(p, FindPackage(p, file), tspath.ResolvePath(directory, relative))
+		return IsUnpublished(p, packagejson.FindNearestValid(p, file), tspath.ResolvePath(directory, relative))
 	}
 	var group sync.WaitGroup
 	for range 16 {
@@ -233,7 +194,7 @@ func TestPublicationGenerationAndConfiguration(t *testing.T) {
 			if unpublished(first, "../pkg/lib/nested/private.js") || !unpublished(first, "../pkg-other/lib/a.js") || !unpublished(first, "D:/outside.js") {
 				t.Error("converted target escaped the publishing package boundary")
 			}
-			if IsUnpublished(first, FindPackage(first, tspath.ResolvePath(base.Dir, "empty/..hidden.js")), tspath.ResolvePath(base.Dir, "empty/..hidden.js")) || !unpublished(first, "../lib/a.js") || !unpublished(first, "dir/../../lib/a.js") {
+			if IsUnpublished(first, packagejson.FindNearestValid(first, tspath.ResolvePath(base.Dir, "empty/..hidden.js")), tspath.ResolvePath(base.Dir, "empty/..hidden.js")) || !unpublished(first, "../lib/a.js") || !unpublished(first, "dir/../../lib/a.js") {
 				t.Error("ancestor detection did not respect path components")
 			}
 		})
@@ -288,6 +249,7 @@ func TestPublicationCrossPlatformPaths(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				fs := &publicationFS{caseSensitive: caseSensitive, files: map[string]string{}}
 				for relative, text := range map[string]string{
+					"package.json":               `{"files":["lib","..hidden.js"],"main":"main.js"}`,
 					".npmignore":                 "lib/ignored.js\r\nlib/nested/restored.js\r\nlib/blocked/\r\n",
 					"lib/nested/.npmignore":      "ignored.js\r\n!restored.js\r\n",
 					"lib/blocked/.npmignore":     "!restored.js\r\n",
@@ -301,7 +263,10 @@ func TestPublicationCrossPlatformPaths(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				pkg := &PackageJSON{directory: directory, data: map[string]any{"files": []any{"lib", "..hidden.js"}, "main": "main.js"}}
+				pkg := packagejson.Read(p, directory)
+				if pkg == nil {
+					t.Fatal("missing package fixture")
+				}
 				for _, test := range []struct {
 					path string
 					want bool

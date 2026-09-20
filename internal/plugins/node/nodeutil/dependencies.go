@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 type dependenciesKey string
@@ -16,15 +17,15 @@ type dependenciesKey string
 // AllowsDependency includes the package itself, all four dependency fields and
 // the nearest ancestor workspace that includes this package (eslint-plugin-n
 // v18.3.0). A negative workspace pattern takes precedence over positive ones.
-func (pkg *PackageJSON) AllowsDependency(p *program.Program, name string) bool {
-	names := program.Cached(p, dependenciesKey(pkg.directory), func() map[string]bool {
+func AllowsDependency(p *program.Program, pkg *packagejson.Package, name string) bool {
+	names := program.Cached(p, dependenciesKey(pkg.Directory()), func() map[string]bool {
 		names := map[string]bool{}
-		add := func(current *PackageJSON) {
-			if name, ok := current.data["name"].(string); ok {
+		add := func(current *packagejson.Package) {
+			if name, ok := current.Field("name").(string); ok {
 				names[name] = true
 			}
 			for _, field := range []string{"dependencies", "devDependencies", "peerDependencies", "optionalDependencies"} {
-				if dependencies, ok := current.data[field].(map[string]any); ok {
+				if dependencies, ok := current.Field(field).(map[string]any); ok {
 					for name := range dependencies {
 						names[name] = true
 					}
@@ -32,18 +33,18 @@ func (pkg *PackageJSON) AllowsDependency(p *program.Program, name string) bool {
 			}
 		}
 		add(pkg)
-		for directory := tspath.GetDirectoryPath(pkg.directory); directory != ""; {
-			ancestor := FindPackage(p, tspath.ResolvePath(directory, "__workspace__.js"))
+		for directory := tspath.GetDirectoryPath(pkg.Directory()); directory != ""; {
+			ancestor := packagejson.FindNearestValid(p, tspath.ResolvePath(directory, "__workspace__.js"))
 			if ancestor == nil {
 				break
 			}
-			relative := tspath.GetRelativePathFromDirectory(ancestor.directory, pkg.directory, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
-			if matchesWorkspace(relative, ancestor.data["workspaces"]) {
+			relative := tspath.GetRelativePathFromDirectory(ancestor.Directory(), pkg.Directory(), tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
+			if matchesWorkspace(relative, ancestor.Field("workspaces")) {
 				add(ancestor)
 				break
 			}
-			parent := tspath.GetDirectoryPath(ancestor.directory)
-			if parent == ancestor.directory {
+			parent := tspath.GetDirectoryPath(ancestor.Directory())
+			if parent == ancestor.Directory() {
 				break
 			}
 			directory = parent

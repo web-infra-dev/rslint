@@ -1,4 +1,4 @@
-package program
+package modules
 
 import (
 	"testing"
@@ -17,12 +17,12 @@ func parseModuleSpecifierCacheFile(source string) *ast.SourceFile {
 
 func TestModuleSpecifierCachePublishesOneResultPerSyntaxSet(t *testing.T) {
 	file := parseModuleSpecifierCacheFile("import './target'; const value = require('./target');")
-	esm := cachedModuleSpecifiers(file, ESModuleReferences)
-	all := cachedModuleSpecifiers(file, ESModuleReferences|CommonJSReferences)
+	esm := Collect(file, ESModuleReferences)
+	all := Collect(file, ESModuleReferences|CommonJSReferences)
 	if len(esm) != 1 || len(all) != 2 {
 		t.Fatalf("cached module specifiers = (%d, %d), want (1, 2)", len(esm), len(all))
 	}
-	if again := cachedModuleSpecifiers(file, ESModuleReferences); &again[0] != &esm[0] {
+	if again := Collect(file, ESModuleReferences); &again[0] != &esm[0] {
 		t.Fatal("the same syntax set published more than one result")
 	}
 }
@@ -31,8 +31,8 @@ func TestModuleSpecifierCacheUsesExactSourceFileIdentity(t *testing.T) {
 	original := parseModuleSpecifierCacheFile("import './target';")
 	edited := parseModuleSpecifierCacheFile("import './target'; const value = require('./target');")
 	kinds := ESModuleReferences | CommonJSReferences
-	before := cachedModuleSpecifiers(original, kinds)
-	after := cachedModuleSpecifiers(edited, kinds)
+	before := Collect(original, kinds)
+	after := Collect(edited, kinds)
 	if len(before) != 1 || len(after) != 2 {
 		t.Fatalf("distinct source generations returned %d and %d references", len(before), len(after))
 	}
@@ -43,11 +43,11 @@ func TestModuleSpecifierCachePublishesConcurrentResult(t *testing.T) {
 	kinds := ESModuleReferences | CommonJSReferences
 	const callers = 32
 	start := make(chan struct{})
-	results := make(chan []moduleSpecifier, callers)
+	results := make(chan []Source, callers)
 	for range callers {
 		go func() {
 			<-start
-			results <- cachedModuleSpecifiers(file, kinds)
+			results <- Collect(file, kinds)
 		}()
 	}
 	close(start)

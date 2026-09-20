@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 )
 
 //go:embed no_restricted_import.schema.json
@@ -20,8 +21,8 @@ var NoRestrictedImportRule = rule.Rule{
 		if len(restrictions) == 0 {
 			return nil
 		}
-		var resolutionOptions [2]*nodeutil.ResolutionOptions
-		return nodeutil.VisitImports(nodeutil.ImportVisitorOptions{IncludeCore: true}, func(source *ast.Node, name string, typeOnly bool) {
+		var resolutionOptions [2]*moduleresolver.Options
+		return nodeutil.VisitImports(ctx, nodeutil.ImportVisitorOptions{IncludeCore: true}, func(source *ast.Node, name string, typeOnly bool) {
 			message := restrictions.Match(name, func() string {
 				if ctx.Program() == nil {
 					return ""

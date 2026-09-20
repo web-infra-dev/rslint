@@ -159,30 +159,47 @@ collector's existing glob projection, while `NewMatcher` and
 JavaScript matching engine. Explicit matching keeps array entries intact,
 including embedded newlines; configuration collection retains its existing Git
 character-class and case behavior. No matcher discovers files or imports config.
-Node package metadata, `bin` aliases, path conversion and npm publication policy
-belong to `internal/plugins/node/nodeutil`, which reads through `Program` and
-caches immutable compiled publication data per package and source generation.
-Configured pattern caches include the complete ordered list in their key.
-Publication paths and metadata exemptions are interpreted relative to the
-containing package, independently of the process working directory.
-`nodeutil` also owns workspace dependency checks, literal import collection,
-runtime import resolution and the Node rules' TypeScript config lookups. Its
-extension mapping supplies both source lookup aliases and emitted import
-extensions; rules keep extension style, ambiguity checks and edits local. Its
-small non-extended glob adapter is shared by path conversion and module
-restrictions. The import and require restriction rules share ordered matching
-and message construction in `nodeutil`; rules select their source nodes and
-resolution mode, then report the matching diagnostic. Runtime resolution
-reuses tsgo's resolver and config parser through the Program's existing
-filesystem and generation-scoped cache. Shared resolver options select aliases,
-extensions, export conditions, package entry fields and directory entry names.
-Package alias fields reuse cached package metadata; all aliases reuse the same
-file probes before symlink resolution. Resolution results retain failure
-details for missing-module diagnostics and separate resource suffixes from
-filesystem paths for restrictions,
-including lexical paths for unresolved local imports and requires. Restrictions
-compare host filesystem spellings; normalized paths stay at the resolver/VFS boundary.
-Rules select their exemptions and report on the collected source nodes.
+Shared package metadata queries live in `internal/utils/packagejson`. `Read`
+decodes one package object; `FindNearest` preserves the nearest package boundary,
+while `FindNearestValid` explicitly skips invalid objects for Node's policy.
+Node and Jest share this Program-scoped metadata cache but keep their own field
+validation, configuration priority and invalid-package behavior.
+Node `bin` aliases, path conversion, workspace dependency checks and npm
+publication policy remain in `internal/plugins/node/nodeutil`. Publication paths
+and metadata exemptions are relative to the containing package; compiled
+publication data is cached per package and Program generation. Configured pattern
+caches include the complete ordered list in their key.
+
+`internal/utils/modules` collects import/export, dynamic import, CommonJS and AMD
+source expressions without evaluating them or resolving targets. It reuses the
+parser's module list when complete and otherwise walks the AST, including empty
+sources. A single syntax cache belongs to each exact immutable SourceFile.
+`Program.ModuleGraph()` adds compiler resolution and Program-scoped targets;
+Node's import adapter applies its own literal coercion, loader-parameter removal,
+builtin filtering and type-only policy to the same collection. The shared
+collector does not depend on Program, rule configuration or a TypeChecker.
+
+`internal/utils/moduleresolver` provides runtime lookup through the Program's
+filesystem and generation-scoped cache, reusing tsgo's resolver for package
+traversal and export-path validation. It selects runtime files independently of
+compiler declaration lookup and does not load resolved files into the Program.
+Explicit options select aliases, extensions, export conditions, package entry
+fields and directory entry names. Package alias fields reuse shared package
+metadata; all aliases reuse the same file probes before symlink resolution.
+Results retain failure details and separate resource suffixes from filesystem
+paths. `internal/utils/tsconfig` shares explicit and nearest config queries using
+tsgo's parser, including `extends`, without creating another Program.
+Node's option precedence, TypeScript alias policy and extension mapping remain
+in `nodeutil`. Restrictions retain lexical paths for unresolved local sources
+and compare host filesystem spellings; normalized paths stay at the resolver/VFS
+boundary. The import and require restriction rules still share ordered matching
+and message construction there. Rules select exemptions, diagnostic nodes and edits.
+
+`internal/utils/npmsemver` shares npm range parsing, minimum-version queries and
+subset checks. It reuses tsgo's range expansion and prerelease comparison while
+adapting JavaScript whitespace, safe integers and npm's generated bounds.
+`nodeutil` retains the priority of rule options, plugin settings and package
+engine constraints, plus Node's default version range.
 API reference tracking lives in `internal/utils/referencetracker`. Node rules
 and Unicorn's document-cookie rule share static property, alias and
 destructuring traversal, reusing tsgo's binding helpers, `RuleContext.Refs`
