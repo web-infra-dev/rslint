@@ -88,7 +88,9 @@ func (tracker *Tracker) globalReferences(name string) []*ast.Node {
 // TrackExpression follows a known value from an expression. It does not emit
 // a Read for the seed itself; module adapters own those import/load events.
 func (tracker *Tracker) TrackExpression(node *ast.Node, value *Trace) {
-	if node == nil {
+	// Read belongs to the entry point. Without child properties or invocation
+	// events, following this value and its aliases cannot produce more reports.
+	if node == nil || len(value.Properties) == 0 && value.Call == nil && value.Construct == nil {
 		return
 	}
 	for node.Parent != nil && referenceValuePassesThrough(node, node.Parent) {
@@ -144,7 +146,7 @@ func (tracker *Tracker) TrackExpression(node *ast.Node, value *Trace) {
 // Import adapters may seed a declaration name through this same entry point.
 func (tracker *Tracker) TrackBinding(node *ast.Node, value *Trace) {
 	node = ast.SkipParentheses(node)
-	if node == nil {
+	if node == nil || len(value.Properties) == 0 && value.Call == nil && value.Construct == nil {
 		return
 	}
 	switch node.Kind {
