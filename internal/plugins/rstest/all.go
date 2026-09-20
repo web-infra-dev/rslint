@@ -62,6 +62,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_mock_type_parameters"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_test_timeout"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_to_throw_message"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_top_level_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/unbound_method"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/valid_expect_in_promise"
@@ -134,6 +135,7 @@ func GetAllRules() []rule.Rule {
 		require_mock_type_parameters.RequireMockTypeParametersRule,
 		require_test_timeout.RequireTestTimeoutRule,
 		require_to_throw_message.RequireToThrowMessageRule,
+		require_top_level_describe.RequireTopLevelDescribeRule,
 		unbound_method.UnboundMethodRule,
 		valid_expect.ValidExpectRule,
 		valid_expect_in_promise.ValidExpectInPromiseRule,
