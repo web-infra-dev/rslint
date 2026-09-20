@@ -153,6 +153,9 @@ expect([].length).toEqual(1);`,
 		// so a later equality matcher no longer checks the original length.
 		{Code: `expect(values.length).to.have.property('x').and.toBe(2);`},
 		{Code: `expect(values.length).to.have.ownPropertyDescriptor('x').and.toEqual(2);`},
+		{Code: `expect([].length).not.toContain(1).and.toEqual(0);`},
+		{Code: `expect({ length: () => { throw 2; } }.length).toThrow().and.toBe(2);`},
+		{Code: `expect({ length: () => { throw 2; } }.length).toThrowError().and.toStrictEqual(2);`},
 		{
 			Code: `expect(values.length).toBe(2).and.toStrictEqual(2);`,
 			Errors: []rule_tester.InvalidTestCaseError{

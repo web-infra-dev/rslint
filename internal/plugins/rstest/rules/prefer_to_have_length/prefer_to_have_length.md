@@ -6,7 +6,7 @@ This rule requires `toHaveLength()` when `toBe()`, `toEqual()` or `toStrictEqual
 
 The rule recognizes Rstest globals, imports and aliases, namespace and `require` bindings, `rstack/test`, `import.meta.rstest`, `expect.soft()`, Playwright's ordinary value assertions, and the `expect` supplied by a [test context](https://rstest.rs/api/runtime-api/test-api/test#testcontext). Dot, string-literal and template-literal accessors are recognized, including negated assertions. It does not require type information.
 
-Optional `.length` access, promise modifiers, `expect.poll()`, browser-only `expect.element()` assertions, dynamic property or matcher names, and Chai-style matchers are left unchanged. When an assertion chain contains multiple matchers or continues into another member access, each `toBe()`, `toEqual()` and `toStrictEqual()` matcher is reported without a fix, unless an earlier Chai matcher such as `property()` has changed the assertion value.
+Optional `.length` access, promise modifiers, `expect.poll()`, browser-only `expect.element()` assertions, dynamic property or matcher names, and Chai-style matchers are left unchanged. When an assertion chain contains multiple matchers or continues into another member access, each `toBe()`, `toEqual()` and `toStrictEqual()` matcher is reported without a fix, unless an earlier matcher such as `property()`, `toContain()` or `toThrow()` has changed the assertion value.
 
 ## Incorrect
 
