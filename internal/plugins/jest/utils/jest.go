@@ -7,9 +7,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 	testFramework "github.com/web-infra-dev/rslint/internal/utils/test_framework"
 )
 
@@ -346,25 +346,11 @@ func readJestVersionFromPackageJson(ctx rule.RuleContext) string {
 	if !ctx.Program().IsValid() {
 		return ""
 	}
-	sourceProgram := ctx.Program()
-	dir := tspath.GetDirectoryPath(ctx.SourceFile.FileName())
-	pkgDir := sourceProgram.NearestPackageJSONDirectory(dir)
-	if pkgDir == "" {
+	pkg := packagejson.FindNearest(ctx.Program(), ctx.SourceFile.FileName())
+	if pkg == nil {
 		return ""
 	}
-	pkgPath := tspath.CombinePaths(pkgDir, "package.json")
-	if !sourceProgram.FileExists(pkgPath) {
-		return ""
-	}
-	fileSystem := sourceProgram.FS()
-	if fileSystem == nil {
-		return ""
-	}
-	text, ok := fileSystem.ReadFile(pkgPath)
-	if !ok {
-		return ""
-	}
-	return jestVersionFromPackageJSONText(text)
+	return jestVersionFromPackageJSONText(pkg.Text())
 }
 
 // GetJestVersion returns the effective Jest version: explicit settings, then the nearest package.json,

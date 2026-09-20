@@ -237,6 +237,7 @@ func TestPreferNodeProtocolAst(t *testing.T) {
 func TestPreferNodeProtocolOptions(t *testing.T) {
 	runProtocolTests(t, []rule_tester.ValidTestCase{
 		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{"version": ">=12.20.0"}},
+		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{"version": ">=16.0.0-0 <17"}},
 		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{"version": ">=10"}, Settings: map[string]any{"node": map[string]any{"version": ">=16"}}},
 		{Code: "import \"fs\"; require(\"fs\");", Settings: map[string]any{"node": map[string]any{"version": ">=10"}}},
 		{Code: "import \"fs\"; require(\"fs\");", Settings: map[string]any{"n": map[string]any{"version": ">=10"}, "node": map[string]any{"version": ">=16"}}},
@@ -246,6 +247,8 @@ func TestPreferNodeProtocolOptions(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{
 		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{}, Output: []string{"import \"node:fs\"; require(\"node:fs\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26}}},
 		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{"version": ">=16.0.0"}, Output: []string{"import \"node:fs\"; require(\"node:fs\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26}}},
+		// A wildcard lower bound must not inherit -0 from another term.
+		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{"version": "16.x >=16.0.0-0"}, Output: []string{"import \"node:fs\"; require(\"node:fs\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}, {MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 26}}},
 		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{"version": "^12.20.0 || ^14.18.0 || >=16"}, Output: []string{"import \"node:fs\"; require(\"fs\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}}},
 		{Code: "import \"fs\"; require(\"fs\"); process.getBuiltinModule(\"fs\");", Options: map[string]any{"version": "*"}, Output: []string{"import \"fs\"; require(\"fs\"); process.getBuiltinModule(\"node:fs\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 54, EndLine: 1, EndColumn: 58}}},
 		{Code: "import \"fs\"; require(\"fs\");", Options: map[string]any{"version": ">=14.18.0"}, Output: []string{"import \"node:fs\"; require(\"fs\");"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferNodeProtocol", Message: "Prefer `node:fs` over `fs`.", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}}},

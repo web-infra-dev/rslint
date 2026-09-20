@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/npmsemver"
 )
 
 //go:embed no_deprecated_api.schema.json
@@ -31,7 +32,7 @@ var NoDeprecatedAPIRule = rule.Rule{
 			opts, _ = options[0].(map[string]any)
 		}
 		return rule.RuleListeners{rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
-			var version nodeutil.NodeVersion
+			var version npmsemver.Range
 			versionReady := false
 			globals, modules := map[string]*nodeutil.ReferenceTrace{}, map[string]*nodeutil.ReferenceTrace{}
 			type diagnostic struct {
@@ -103,7 +104,7 @@ var NoDeprecatedAPIRule = rule.Rule{
 	},
 }
 
-func (api deprecatedAPI) message(name string, version nodeutil.NodeVersion) rule.RuleMessage {
+func (api deprecatedAPI) message(name string, version npmsemver.Range) rule.RuleMessage {
 	label := "'" + name + "'"
 	if !api.global && !strings.Contains(api.path, ".") {
 		label += " module"
@@ -115,7 +116,7 @@ func (api deprecatedAPI) message(name string, version nodeutil.NodeVersion) rule
 	if len(api.alternatives) > 0 {
 		var available []string
 		for _, alternative := range api.alternatives {
-			if version.Supports(alternative.supported) {
+			if version.IsAtLeast(alternative.supported) {
 				available = append(available, alternative.name)
 			}
 		}

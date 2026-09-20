@@ -2,39 +2,24 @@ package program
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
-// ModuleReferenceKind names the syntax a module reference was written in.
-type ModuleReferenceKind uint8
+// ModuleReferenceKind and ModuleReferenceKinds use the shared syntax collector.
+type ModuleReferenceKind = modules.ReferenceKind
+type ModuleReferenceKinds = modules.ReferenceKinds
 
 const (
-	// ModuleReferenceImport is an import declaration, in TypeScript or JavaScript.
-	ModuleReferenceImport ModuleReferenceKind = iota
-	// ModuleReferenceExport is an export declaration carrying a module specifier.
-	ModuleReferenceExport
-	// ModuleReferenceDynamicImport is an `import()` call.
-	ModuleReferenceDynamicImport
-	// ModuleReferenceRequire is a `require()` call.
-	ModuleReferenceRequire
-	// ModuleReferenceAMD is one entry of a `define([…])` or `require([…])` list.
-	ModuleReferenceAMD
+	ModuleReferenceImport        = modules.ModuleReferenceImport
+	ModuleReferenceExport        = modules.ModuleReferenceExport
+	ModuleReferenceDynamicImport = modules.ModuleReferenceDynamicImport
+	ModuleReferenceRequire       = modules.ModuleReferenceRequire
+	ModuleReferenceAMD           = modules.ModuleReferenceAMD
+	ESModuleReferences           = modules.ESModuleReferences
+	CommonJSReferences           = modules.CommonJSReferences
+	AMDReferences                = modules.AMDReferences
+	AllModuleReferences          = modules.AllModuleReferences
 )
-
-// ModuleReferenceKinds is a set of module-reference syntaxes.
-type ModuleReferenceKinds uint8
-
-const (
-	ESModuleReferences ModuleReferenceKinds = 1<<ModuleReferenceImport |
-		1<<ModuleReferenceExport |
-		1<<ModuleReferenceDynamicImport
-	CommonJSReferences  ModuleReferenceKinds = 1 << ModuleReferenceRequire
-	AMDReferences       ModuleReferenceKinds = 1 << ModuleReferenceAMD
-	AllModuleReferences                      = ESModuleReferences | CommonJSReferences | AMDReferences
-)
-
-func (kinds ModuleReferenceKinds) includes(kind ModuleReferenceKind) bool {
-	return kinds&(1<<kind) != 0
-}
 
 // ModuleReference is one module specifier written in a file, with the file it
 // names already resolved.
@@ -134,237 +119,28 @@ func (graph ModuleGraph) References(file *ast.SourceFile, kinds ModuleReferenceK
 
 	key := moduleReferencesCacheKey{file: file, kinds: kinds}
 	return Cached(graph.program, key, func() []ModuleReference {
-		return graph.resolveAll(file, cachedModuleSpecifiers(file, kinds))
+		return graph.resolveAll(file, modules.Collect(file, kinds))
 	})
 }
 
 // resolveAll turns what a file writes into what it references, which is the
 // half of the answer only this Program can give.
-func (graph ModuleGraph) resolveAll(file *ast.SourceFile, specifiers []moduleSpecifier) []ModuleReference {
+func (graph ModuleGraph) resolveAll(file *ast.SourceFile, specifiers []modules.Source) []ModuleReference {
 	if len(specifiers) == 0 {
 		return nil
 	}
-	references := make([]ModuleReference, len(specifiers))
-	for i := range specifiers {
-		references[i] = ModuleReference{
-			Specifier:   specifiers[i].specifier,
-			Declaration: specifiers[i].declaration,
-			From:        file,
-			Kind:        specifiers[i].kind,
-			TypeOnly:    specifiers[i].typeOnly,
+	var references []ModuleReference
+	for _, source := range specifiers {
+		specifier := ast.SkipParentheses(source.Specifier)
+		if specifier == nil || !ast.IsStringLiteralLike(specifier) {
+			continue
 		}
-		references[i].ResolvedPath, references[i].Target, _ =
-			graph.program.ResolveModule(file, specifiers[i].specifier)
+		reference := ModuleReference{
+			Specifier: specifier, Declaration: source.Declaration,
+			From: file, Kind: source.Kind, TypeOnly: source.TypeOnly,
+		}
+		reference.ResolvedPath, reference.Target, _ = graph.program.ResolveModule(file, specifier)
+		references = append(references, reference)
 	}
 	return references
-}
-
-// moduleSpecifier is the half of a ModuleReference that a file's own syntax
-// decides: which string literal names a module, what syntax it was written
-// in, and whether that syntax survives into emitted JavaScript. What the
-// specifier resolves to is deliberately absent — that is the Program's answer,
-// and two Programs holding the same unchanged file can disagree about it.
-type moduleSpecifier struct {
-	specifier   *ast.Node
-	declaration *ast.Node
-	kind        ModuleReferenceKind
-	typeOnly    bool
-}
-
-func collectSpecifiers(file *ast.SourceFile, kinds ModuleReferenceKinds) []moduleSpecifier {
-	// SourceFile.Imports is populated by the parser and avoids walking every
-	// AST node in the usual static-ESM case. The generic collector remains
-	// necessary for call-based references, parser recovery, and imports
-	// inside module bodies.
-	if kinds&(CommonJSReferences|AMDReferences) != 0 || needsFullModuleScan(file) {
-		return collectByWalk(file, kinds)
-	}
-	return collectStaticImports(file, kinds)
-}
-
-// collectStaticImports reads the module specifiers the parser already
-// recorded. It handles the shapes those specifiers can take in a file with no
-// dynamic import, no module declaration and no parse error, which is what
-// needsFullModuleScan checks for.
-func collectStaticImports(file *ast.SourceFile, kinds ModuleReferenceKinds) []moduleSpecifier {
-	imports := file.Imports()
-	specifiers := make([]moduleSpecifier, 0, len(imports))
-	for _, specifier := range imports {
-		declaration := ast.TryGetImportFromModuleSpecifier(specifier)
-		if declaration == nil {
-			continue
-		}
-
-		var kind ModuleReferenceKind
-		typeOnly := false
-		switch declaration.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			kind = ModuleReferenceImport
-			typeOnly = importDeclarationOnlyImportsTypes(declaration.AsImportDeclaration())
-		case ast.KindExportDeclaration:
-			kind = ModuleReferenceExport
-			typeOnly = ast.IsTypeOnlyImportOrExportDeclaration(declaration)
-		default:
-			continue
-		}
-
-		if kinds.includes(kind) {
-			specifiers = append(specifiers, moduleSpecifier{
-				specifier:   specifier,
-				declaration: declaration,
-				kind:        kind,
-				typeOnly:    typeOnly,
-			})
-		}
-	}
-	return specifiers
-}
-
-// needsFullModuleScan reports whether file can hold module specifiers that are
-// not reachable from the parser's own list in the shapes collectStaticImports
-// understands.
-func needsFullModuleScan(file *ast.SourceFile) bool {
-	if file.Flags&ast.NodeFlagsPossiblyContainsDynamicImport != 0 || len(file.Diagnostics()) != 0 {
-		return true
-	}
-	for _, statement := range file.Statements.Nodes {
-		if statement != nil && statement.Kind == ast.KindModuleDeclaration {
-			return true
-		}
-	}
-	return false
-}
-
-func collectByWalk(file *ast.SourceFile, kinds ModuleReferenceKinds) []moduleSpecifier {
-	var specifiers []moduleSpecifier
-	// A module specifier can appear anywhere a call can, so every subtree is
-	// walked; no node accounts for its own children here.
-	visitModuleReferenceNodes(file.AsNode(), func(node *ast.Node) bool {
-		switch node.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			if !kinds.includes(ModuleReferenceImport) {
-				return true
-			}
-			importDecl := node.AsImportDeclaration()
-			appendSpecifier(&specifiers, importDecl.ModuleSpecifier, node, ModuleReferenceImport, importDeclarationOnlyImportsTypes(importDecl))
-		case ast.KindExportDeclaration:
-			if !kinds.includes(ModuleReferenceExport) {
-				return true
-			}
-			exportDecl := node.AsExportDeclaration()
-			// tsgo matches eslint-plugin-import here: only `export type * from`
-			// is exclusively type-only; named type re-exports stay references.
-			appendSpecifier(&specifiers, exportDecl.ModuleSpecifier, node, ModuleReferenceExport, ast.IsTypeOnlyImportOrExportDeclaration(node))
-		case ast.KindCallExpression:
-			appendCallSpecifiers(&specifiers, node.AsCallExpression(), kinds)
-		}
-		return true
-	})
-	return specifiers
-}
-
-func visitModuleReferenceNodes(node *ast.Node, visit func(*ast.Node) bool) {
-	if node == nil || !visit(node) {
-		return
-	}
-	node.ForEachChild(func(child *ast.Node) bool {
-		visitModuleReferenceNodes(child, visit)
-		return false
-	})
-}
-
-func appendCallSpecifiers(specifiers *[]moduleSpecifier, call *ast.CallExpression, kinds ModuleReferenceKinds) {
-	if call == nil {
-		return
-	}
-
-	callee := ast.SkipParentheses(call.Expression)
-	if callee == nil {
-		return
-	}
-
-	if kinds.includes(ModuleReferenceDynamicImport) && callee.Kind == ast.KindImportKeyword {
-		if len(call.Arguments.Nodes) == 0 {
-			return
-		}
-		appendSpecifier(specifiers, ast.SkipParentheses(call.Arguments.Nodes[0]), call.AsNode(), ModuleReferenceDynamicImport, false)
-		return
-	}
-
-	if callee.Kind != ast.KindIdentifier {
-		return
-	}
-
-	calleeName := callee.AsIdentifier().Text
-	if kinds.includes(ModuleReferenceRequire) && ast.IsRequireCall(call.AsNode(), false) {
-		arg := ast.SkipParentheses(call.Arguments.Nodes[0])
-		if arg != nil && ast.IsStringLiteralLike(arg) {
-			appendSpecifier(specifiers, arg, call.AsNode(), ModuleReferenceRequire, false)
-		}
-		return
-	}
-
-	if kinds.includes(ModuleReferenceAMD) && (calleeName == "require" || calleeName == "define") {
-		if len(call.Arguments.Nodes) == 0 {
-			return
-		}
-		arg := ast.SkipParentheses(call.Arguments.Nodes[0])
-		if arg == nil || arg.Kind != ast.KindArrayLiteralExpression {
-			return
-		}
-		for _, element := range arg.AsArrayLiteralExpression().Elements.Nodes {
-			element = ast.SkipParentheses(element)
-			if element == nil || !ast.IsStringLiteralLike(element) {
-				continue
-			}
-			appendSpecifier(specifiers, element, call.AsNode(), ModuleReferenceAMD, false)
-		}
-	}
-}
-
-func appendSpecifier(specifiers *[]moduleSpecifier, specifier *ast.Node, declaration *ast.Node, kind ModuleReferenceKind, typeOnly bool) {
-	if specifier == nil {
-		return
-	}
-	specifier = ast.SkipParentheses(specifier)
-	if specifier == nil || !ast.IsStringLiteralLike(specifier) {
-		return
-	}
-	*specifiers = append(*specifiers, moduleSpecifier{
-		specifier:   specifier,
-		declaration: declaration,
-		kind:        kind,
-		typeOnly:    typeOnly,
-	})
-}
-
-func importDeclarationOnlyImportsTypes(importDecl *ast.ImportDeclaration) bool {
-	if importDecl == nil || importDecl.ImportClause == nil {
-		return false
-	}
-
-	importClause := importDecl.ImportClause
-	if importClause.IsTypeOnly() {
-		return true
-	}
-
-	clause := importClause.AsImportClause()
-	if clause == nil || clause.Name() != nil || clause.NamedBindings == nil {
-		return false
-	}
-
-	if clause.NamedBindings.Kind != ast.KindNamedImports {
-		return false
-	}
-	namedImports := clause.NamedBindings.AsNamedImports()
-	if namedImports == nil || namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0 {
-		return false
-	}
-
-	for _, specifier := range namedImports.Elements.Nodes {
-		if specifier == nil || specifier.Kind != ast.KindImportSpecifier || !ast.IsTypeOnlyImportDeclaration(specifier) {
-			return false
-		}
-	}
-	return true
 }

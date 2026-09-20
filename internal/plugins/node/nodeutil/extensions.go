@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/tsconfig"
 )
 
 // Keep both directions: resolution can try several source extensions, while
@@ -49,7 +50,7 @@ func importExtensionMapping(ctx rule.RuleContext, options map[string]any) extens
 			return mapping
 		}
 	}
-	if mapping, ok := compilerExtensions(nearestCompilerOptions(p, ctx.SourceFile.FileName())); ok {
+	if mapping, ok := compilerExtensions(tsconfig.FindNearest(p, ctx.SourceFile.FileName())); ok {
 		return mapping
 	}
 	return preservedExtensions
@@ -92,7 +93,7 @@ func configuredExtensions(p *program.Program, cwd string, options map[string]any
 		return emittedExtensions, true
 	}
 	if configPath, ok := options["tsconfigPath"].(string); ok && configPath != "" {
-		return compilerExtensions(readCompilerOptions(p, tspath.ResolvePath(cwd, configPath)))
+		return compilerExtensions(tsconfig.Read(p, tspath.ResolvePath(cwd, configPath)))
 	}
 	return extensionMapping{}, false
 }

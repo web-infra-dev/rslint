@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 )
 
 //go:embed no_missing_import.schema.json
@@ -31,9 +32,9 @@ var NoMissingImportRule = rule.Rule{
 		}
 		ignoreTypeImport, _ := opts["ignoreTypeImport"].(bool)
 		allowed := nodeutil.StringListSetting("allowModules", opts, ctx.Settings)
-		var resolutionOptions [2]*nodeutil.ResolutionOptions
+		var resolutionOptions [2]*moduleresolver.Options
 		var resolveErrors [2]map[string]string
-		return nodeutil.VisitImports(nodeutil.ImportVisitorOptions{IgnoreTypeImport: ignoreTypeImport}, func(source *ast.Node, specifier string, typeOnly bool) {
+		return nodeutil.VisitImports(ctx, nodeutil.ImportVisitorOptions{IgnoreTypeImport: ignoreTypeImport}, func(source *ast.Node, specifier string, typeOnly bool) {
 			index := 0
 			if typeOnly {
 				index = 1

@@ -1,4 +1,4 @@
-package program
+package modules
 
 import (
 	"sync"
@@ -10,7 +10,7 @@ import (
 // carries no files or values itself, so an entry becomes unreachable with the
 // exact AST it describes instead of requiring a Server or Program lifecycle
 // event to evict it.
-var moduleSpecifierCacheKey = ast.NewSourceFileDataKey[*sourceFileModuleSpecifierCache]()
+var sourceCacheKey = ast.NewSourceFileDataKey[*sourceFileModuleSpecifierCache]()
 
 // sourceFileModuleSpecifierCache separates the syntax combinations requested
 // for one immutable SourceFile. Its values may contain only scalar data and
@@ -18,18 +18,22 @@ var moduleSpecifierCacheKey = ast.NewSourceFileDataKey[*sourceFileModuleSpecifie
 // state, and other SourceFiles belong to shorter or independent lifetimes.
 type sourceFileModuleSpecifierCache struct {
 	mu      sync.Mutex
-	byKinds map[ModuleReferenceKinds][]moduleSpecifier
+	byKinds map[ReferenceKinds][]Source
 }
 
 func newSourceFileModuleSpecifierCache(*ast.SourceFile) *sourceFileModuleSpecifierCache {
 	return &sourceFileModuleSpecifierCache{}
 }
 
-// cachedModuleSpecifiers returns what file writes in these syntaxes. Programs
+// Collect returns module source expressions in source order. The returned
+// slice and nodes are read-only. It performs no resolution. Programs
 // that reuse this exact SourceFile share the collection; distinct SourceFile
 // objects, including ones with the same path, own independent answers.
-func cachedModuleSpecifiers(file *ast.SourceFile, kinds ModuleReferenceKinds) []moduleSpecifier {
-	cache := ast.GetOrComputeSourceFileData(file, moduleSpecifierCacheKey, newSourceFileModuleSpecifierCache)
+func Collect(file *ast.SourceFile, kinds ReferenceKinds) []Source {
+	if file == nil || kinds == 0 {
+		return nil
+	}
+	cache := ast.GetOrComputeSourceFileData(file, sourceCacheKey, newSourceFileModuleSpecifierCache)
 	cache.mu.Lock()
 	specifiers, ok := cache.byKinds[kinds]
 	cache.mu.Unlock()
@@ -48,7 +52,7 @@ func cachedModuleSpecifiers(file *ast.SourceFile, kinds ModuleReferenceKinds) []
 		return existing
 	}
 	if cache.byKinds == nil {
-		cache.byKinds = make(map[ModuleReferenceKinds][]moduleSpecifier)
+		cache.byKinds = make(map[ReferenceKinds][]Source)
 	}
 	cache.byKinds[kinds] = specifiers
 	return specifiers

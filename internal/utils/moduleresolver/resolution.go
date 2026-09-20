@@ -1,4 +1,4 @@
-package nodeutil
+package moduleresolver
 
 import (
 	"encoding/json"
@@ -11,67 +11,72 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
-	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/tailscale/hujson"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
-// ResolutionOptions selects runtime files independently of the compiler's
+// Options selects runtime files independently of the compiler's
 // declaration-file preference. Nil search lists use Node defaults; empty lists
 // disable that search. Conditions selects active export conditions. Package
 // traversal and export-path validation stay with tsgo.
-type ResolutionOptions struct {
-	Extensions        []string            `json:"extensions"`
-	Modules           []string            `json:"modules"`
-	Paths             []string            `json:"paths"`
-	Conditions        []string            `json:"conditions"`
-	ExtensionAliases  map[string][]string `json:"extensionAliases"`
-	Aliases           []moduleAlias       `json:"aliases"`
-	AliasesConfigured bool                `json:"aliasesConfigured"`
-	MainFields        []nodeMainField     `json:"mainFields"`
-	MainFiles         []string            `json:"mainFiles"`
-	AliasFields       [][]string          `json:"aliasFields"`
+type Options struct {
+	Extensions       []string            `json:"extensions"`
+	Modules          []string            `json:"modules"`
+	Paths            []string            `json:"paths"`
+	Conditions       []string            `json:"conditions"`
+	ExtensionAliases map[string][]string `json:"extensionAliases"`
+	Aliases          []Alias             `json:"aliases"`
+	MainFields       []MainField         `json:"mainFields"`
+	MainFiles        []string            `json:"mainFiles"`
+	AliasFields      [][]string          `json:"aliasFields"`
 	// Local imports disable directory lookup unless entry options enable it.
 	// Require callers retain the ordinary Node directory lookup.
 	NoDirectory bool `json:"noDirectory"`
 }
 
-var defaultExtensions = []string{".js", ".json", ".node", ".mjs", ".cjs"}
+// DefaultExtensions returns the runtime lookup defaults in search order.
+func DefaultExtensions() []string { return []string{".js", ".json", ".node", ".mjs", ".cjs"} }
 
-type nodeResolutionKey struct{ name, file, options string }
-type nodeResolution struct {
-	path, resourceSuffix, resolveError string
-	recursive                          bool
+type resolutionKey struct{ name, file, options string }
+
+// Result separates the filesystem path from resource suffixes and failures.
+// Empty Path and Error can represent a builtin or an explicitly ignored alias.
+type Result struct {
+	Path, ResourceSuffix, Error string
+	recursive                   bool
 }
 
 // ResolveModule resolves a runtime package through this generation's FS.
 // It does not load the result into the Program or fall back to @types packages.
-func ResolveModule(p *program.Program, name, containingFile string, options ResolutionOptions) string {
+func ResolveModule(p *program.Program, name, containingFile string, options Options) string {
 	resolved, _ := ResolveModuleWithError(p, name, containingFile, options)
 	return resolved
 }
 
 // ResolveModuleWithError also preserves the resolution failure for missing
 // module diagnostics. Package traversal and exports selection still use tsgo.
-func ResolveModuleWithError(p *program.Program, name, containingFile string, options ResolutionOptions) (string, string) {
-	result := resolveModuleCached(p, name, containingFile, options)
-	return result.path, result.resolveError
+func ResolveModuleWithError(p *program.Program, name, containingFile string, options Options) (string, string) {
+	result := Resolve(p, name, containingFile, options)
+	return result.Path, result.Error
 }
 
-func resolveModuleCached(p *program.Program, name, containingFile string, options ResolutionOptions) nodeResolution {
+// Resolve caches runtime lookup within the immutable Program generation.
+// It neither loads source files nor consults plugin settings.
+func Resolve(p *program.Program, name, containingFile string, options Options) Result {
 	if p.FS() == nil {
-		return nodeResolution{}
+		return Result{}
 	}
 	encoded, err := json.Marshal(options)
 	if err != nil {
-		return nodeResolution{}
+		return Result{}
 	}
-	result := program.Cached(p, nodeResolutionKey{name, containingFile, string(encoded)}, func() nodeResolution {
+	result := program.Cached(p, resolutionKey{name, containingFile, string(encoded)}, func() Result {
 		if options.Extensions == nil {
-			options.Extensions = defaultExtensions
+			options.Extensions = DefaultExtensions()
 		}
 		if options.Modules == nil {
 			options.Modules = []string{"node_modules"}
@@ -86,7 +91,7 @@ func resolveModuleCached(p *program.Program, name, containingFile string, option
 }
 
 // resolveRequest keeps package traversal and file probes in tsgo.
-func (resolver *nodeResolver) resolveRequest(name string) nodeResolution {
+func (resolver *nodeResolver) resolveRequest(name string) Result {
 	p, containingFile, options := resolver.program, resolver.fileName, resolver.options
 	originalName := name
 	// enhanced-resolve separates resource queries/fragments from the path.
@@ -112,10 +117,10 @@ bases:
 		recursive = false
 		if !resolver.mainTarget {
 			if result, matched := resolver.aliasField(name, base, false); matched {
-				if result.resolveError == "" && result.path != "" {
+				if result.Error == "" && result.Path != "" {
 					return result
 				}
-				resolveError = result.resolveError
+				resolveError = result.Error
 				recursive = result.recursive
 				continue
 			}
@@ -125,7 +130,7 @@ bases:
 		if strings.Contains(name, `\`) && tspath.GetRootLength(base) == 1 && !tspath.IsRootedDiskPath(name) {
 			continue
 		}
-		if isNodeBuiltin(name) {
+		if modules.IsNodeBuiltin(name) {
 			resolveError = ""
 			continue
 		}
@@ -150,7 +155,7 @@ bases:
 					resolveError = ""
 					continue bases
 				}
-				return nodeResolution{path: view.Realpath(result.ResolvedFileName), resourceSuffix: view.resourceSuffix}
+				return Result{Path: view.Realpath(result.ResolvedFileName), ResourceSuffix: view.resourceSuffix}
 			}
 			if view.exportsFile != "" {
 				request := name
@@ -161,7 +166,7 @@ bases:
 				subpath := "." + strings.TrimPrefix(request, packageName)
 				conditions, err := json.Marshal(options.Conditions)
 				if err != nil {
-					return nodeResolution{resolveError: err.Error()}
+					return Result{Error: err.Error()}
 				}
 				resolveError = `"` + subpath + `" is not exported under the conditions ` + string(conditions) + " from package " + tspath.GetDirectoryPath(view.exportsFile) + " (see exports field in " + view.exportsFile + ")"
 				if view.unresolved {
@@ -182,7 +187,7 @@ bases:
 			}
 		}
 	}
-	return nodeResolution{resolveError: resolveError, recursive: recursive}
+	return Result{Error: resolveError, recursive: recursive}
 }
 
 // The private view projects runtime candidates onto tsgo's file probes.
@@ -202,7 +207,7 @@ type nodeResolutionFS struct {
 	vfs.FS
 	folder            string
 	base              string
-	options           ResolutionOptions
+	options           Options
 	resolver          *nodeResolver
 	resourceSuffix    string
 	recursiveError    string
@@ -287,19 +292,19 @@ func (f *nodeResolutionFS) aliasFile(name string) (string, bool) {
 	return f.redirectedFile(name, result), true
 }
 
-func (f *nodeResolutionFS) redirectedFile(name string, result nodeResolution) string {
+func (f *nodeResolutionFS) redirectedFile(name string, result Result) string {
 	if result.recursive {
-		f.recursiveError = result.resolveError
+		f.recursiveError = result.Error
 	}
-	if result.resolveError != "" {
+	if result.Error != "" {
 		return ""
 	}
-	if result.path == "" {
+	if result.Path == "" {
 		f.builtin = true
 		return name
 	}
-	f.resourceSuffix = result.resourceSuffix
-	return result.path
+	f.resourceSuffix = result.ResourceSuffix
+	return result.Path
 }
 
 func (f *nodeResolutionFS) probeFile(name string) string {
@@ -328,7 +333,7 @@ func (f *nodeResolutionFS) FileExists(name string) bool {
 	case strings.HasSuffix(physical, "/"+nodeMainTarget+nodeTargetSuffix):
 		result := f.resolver.mainEntry(tspath.GetDirectoryPath(physical))
 		if result.recursive {
-			f.recursiveError = result.resolveError
+			f.recursiveError = result.Error
 			return true
 		}
 		resolved = f.redirectedFile(physical, result)
@@ -521,7 +526,7 @@ func markNodeImportTargets(value *hujson.Value, conditions []string) {
 				target = target[:index]
 				value.Value = hujson.String(target)
 			}
-			if isNodeBuiltin(target) {
+			if modules.IsNodeBuiltin(target) {
 				value.Value = hujson.String("./" + nodeBuiltinTarget)
 			} else if strings.HasPrefix(target, "./") {
 				markNodeTargets(value, nodeExportSuffix)
@@ -649,45 +654,6 @@ func markNodeTargets(value *hujson.Value, suffix string) {
 			markNodeTargets(&v.Elements[i], suffix)
 		}
 	}
-}
-
-type nearestConfigKey string
-type compilerOptionsKey string
-
-// readCompilerOptions parses an explicit config through this generation's FS.
-// Returned options are cached and must be treated as immutable.
-func readCompilerOptions(p *program.Program, fileName string) *core.CompilerOptions {
-	if p.FS() == nil {
-		return nil
-	}
-	fileName = tspath.ResolvePath(p.CurrentDirectory(), fileName)
-	return program.Cached(p, compilerOptionsKey(fileName), func() *core.CompilerOptions {
-		host := compiler.NewCompilerHost(p.CurrentDirectory(), p.FS(), p.DefaultLibraryPath(), nil, nil, nil)
-		parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(fileName, &core.CompilerOptions{}, nil, host, nil)
-		if parsed != nil {
-			return parsed.CompilerOptions()
-		}
-		return nil
-	})
-}
-
-// nearestCompilerOptions reads the nearest tsconfig using the same immutable
-// FS and tsgo config parser, including extends. It does not create a Program.
-func nearestCompilerOptions(p *program.Program, fileName string) *core.CompilerOptions {
-	directory := tspath.GetDirectoryPath(fileName)
-	if p.FS() == nil || directory == "" {
-		return nil
-	}
-	return program.Cached(p, nearestConfigKey(directory), func() *core.CompilerOptions {
-		config, found := tspath.ForEachAncestorDirectory(directory, func(directory string) (string, bool) {
-			config := tspath.ResolvePath(directory, "tsconfig.json")
-			return config, p.FS().FileExists(config)
-		})
-		if found {
-			return readCompilerOptions(p, config)
-		}
-		return nil
-	})
 }
 
 // tsgo activates the require condition for CommonJS internally. Remove inactive

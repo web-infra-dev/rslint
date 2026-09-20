@@ -431,6 +431,7 @@ NOTMATCHED
 notunique
 NOTX
 npmignore
+npmsemver
 nsec
 nullary
 Nullishness
@@ -746,6 +747,7 @@ alternatex
 basefont
 bgsound
 modulepreload
+moduleresolver
 noframes
 nobr
 pingback

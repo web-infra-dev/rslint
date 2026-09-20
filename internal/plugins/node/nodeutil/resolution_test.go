@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 )
 
 func programForResolution(t *testing.T, files map[string]string, fileName string) *program.Program {
@@ -72,46 +73,46 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 	p := create()
 	for _, test := range []struct {
 		name    string
-		options ResolutionOptions
+		options moduleresolver.Options
 		want    string
 	}{
-		{"pkg", ResolutionOptions{}, "/node-runtime/node_modules/pkg/index.js"},
-		{"pkg", ResolutionOptions{Modules: []string{}}, ""},
-		{"pkg", ResolutionOptions{Modules: []string{"/node-runtime/vendor"}}, "/node-runtime/vendor/pkg/index.js"},
+		{"pkg", moduleresolver.Options{}, "/node-runtime/node_modules/pkg/index.js"},
+		{"pkg", moduleresolver.Options{Modules: []string{}}, ""},
+		{"pkg", moduleresolver.Options{Modules: []string{"/node-runtime/vendor"}}, "/node-runtime/vendor/pkg/index.js"},
 		// Module directories may themselves contain a node_modules component.
-		{"pkg", ResolutionOptions{Modules: []string{"node_modules/custom"}}, "/node-runtime/node_modules/custom/pkg/index.js"},
-		{"pkg", ResolutionOptions{Modules: []string{"/node-runtime/node_modules/custom"}}, "/node-runtime/node_modules/custom/pkg/index.js"},
-		{"directory", ResolutionOptions{Modules: []string{"node_modules/custom"}}, "/node-runtime/node_modules/custom/directory/lib/index.js"},
-		{"directory", ResolutionOptions{Modules: []string{"/node-runtime/node_modules/custom"}}, "/node-runtime/node_modules/custom/directory/lib/index.js"},
-		{"directory", ResolutionOptions{Modules: []string{"vendor/node_modules"}}, "/node-runtime/vendor/node_modules/directory/lib/index.js"},
-		{"directory", ResolutionOptions{Modules: []string{"node_modules/custom/node_modules"}}, "/node-runtime/node_modules/custom/node_modules/directory/lib/index.js"},
-		{"only-types", ResolutionOptions{}, ""},
-		{"custom", ResolutionOptions{}, ""},
-		{"custom", ResolutionOptions{Extensions: []string{".custom"}}, "/node-runtime/node_modules/custom/index.custom"},
-		{"conditional", ResolutionOptions{}, "/node-runtime/node_modules/conditional/import.js"},
-		{"conditional", ResolutionOptions{Conditions: []string{"types"}}, "/node-runtime/node_modules/conditional/index.d.ts"},
+		{"pkg", moduleresolver.Options{Modules: []string{"node_modules/custom"}}, "/node-runtime/node_modules/custom/pkg/index.js"},
+		{"pkg", moduleresolver.Options{Modules: []string{"/node-runtime/node_modules/custom"}}, "/node-runtime/node_modules/custom/pkg/index.js"},
+		{"directory", moduleresolver.Options{Modules: []string{"node_modules/custom"}}, "/node-runtime/node_modules/custom/directory/lib/index.js"},
+		{"directory", moduleresolver.Options{Modules: []string{"/node-runtime/node_modules/custom"}}, "/node-runtime/node_modules/custom/directory/lib/index.js"},
+		{"directory", moduleresolver.Options{Modules: []string{"vendor/node_modules"}}, "/node-runtime/vendor/node_modules/directory/lib/index.js"},
+		{"directory", moduleresolver.Options{Modules: []string{"node_modules/custom/node_modules"}}, "/node-runtime/node_modules/custom/node_modules/directory/lib/index.js"},
+		{"only-types", moduleresolver.Options{}, ""},
+		{"custom", moduleresolver.Options{}, ""},
+		{"custom", moduleresolver.Options{Extensions: []string{".custom"}}, "/node-runtime/node_modules/custom/index.custom"},
+		{"conditional", moduleresolver.Options{}, "/node-runtime/node_modules/conditional/import.js"},
+		{"conditional", moduleresolver.Options{Conditions: []string{"types"}}, "/node-runtime/node_modules/conditional/index.d.ts"},
 	} {
-		if got := ResolveModule(p, test.name, "/node-runtime/input.js", test.options); got != test.want {
-			t.Errorf("ResolveModule(%s, %#v) = %q, want %q", test.name, test.options, got, test.want)
+		if got := moduleresolver.ResolveModule(p, test.name, "/node-runtime/input.js", test.options); got != test.want {
+			t.Errorf("moduleresolver.ResolveModule(%s, %#v) = %q, want %q", test.name, test.options, got, test.want)
 		}
 	}
 	var group sync.WaitGroup
 	for range 8 {
 		group.Go(func() {
-			if got := ResolveModule(p, "pkg", "/node-runtime/input.js", ResolutionOptions{}); got != "/node-runtime/node_modules/pkg/index.js" {
+			if got := moduleresolver.ResolveModule(p, "pkg", "/node-runtime/input.js", moduleresolver.Options{}); got != "/node-runtime/node_modules/pkg/index.js" {
 				t.Errorf("concurrent cached resolution = %q", got)
 			}
 		})
 	}
 	group.Wait()
 	files["/node-runtime/node_modules/new-package/index.js"] = "export default 1;"
-	if got := ResolveModule(p, "new-package", "/node-runtime/input.js", ResolutionOptions{}); got != "" {
+	if got := moduleresolver.ResolveModule(p, "new-package", "/node-runtime/input.js", moduleresolver.Options{}); got != "" {
 		t.Errorf("previous generation saw a new file: %q", got)
 	}
-	if got := ResolveModule(create(), "new-package", "/node-runtime/input.js", ResolutionOptions{}); got != "/node-runtime/node_modules/new-package/index.js" {
+	if got := moduleresolver.ResolveModule(create(), "new-package", "/node-runtime/input.js", moduleresolver.Options{}); got != "/node-runtime/node_modules/new-package/index.js" {
 		t.Errorf("new generation did not resolve the new file: %q", got)
 	}
-	if got := ResolveModule(nil, "pkg", "/input.js", ResolutionOptions{}); got != "" {
+	if got := moduleresolver.ResolveModule(nil, "pkg", "/input.js", moduleresolver.Options{}); got != "" {
 		t.Errorf("invalid Program resolved %q", got)
 	}
 	t.Run("symlinked directory export", func(t *testing.T) {
@@ -127,17 +128,17 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 		p := programForResolution(t, map[string]string{fileName: "import 'linked';"}, fileName)
 		want := osvfs.FS().Realpath(tspath.ResolvePath(target, "lib/index.js"))
 
-		options := ResolutionOptions{Modules: []string{"node_modules/custom"}, Aliases: []moduleAlias{{Name: "virtual", Targets: []string{"linked"}}}}
-		if got := ResolveModule(p, "virtual", fileName, options); got != want {
+		options := moduleresolver.Options{Modules: []string{"node_modules/custom"}, Aliases: []moduleresolver.Alias{{Name: "virtual", Targets: []string{"linked"}}}}
+		if got := moduleresolver.ResolveModule(p, "virtual", fileName, options); got != want {
 			t.Errorf("alias symlink = %q, want %q", got, want)
 		}
 		replacement := tspath.ResolvePath(root, "node_modules/pkg/index.js")
-		options.Aliases = []moduleAlias{{Name: tspath.ResolvePath(root, "node_modules/custom/linked/lib/index.js"), Targets: []string{replacement}}}
-		if got := ResolveModule(p, "linked", fileName, options); got != osvfs.FS().Realpath(replacement) {
+		options.Aliases = []moduleresolver.Alias{{Name: tspath.ResolvePath(root, "node_modules/custom/linked/lib/index.js"), Targets: []string{replacement}}}
+		if got := moduleresolver.ResolveModule(p, "linked", fileName, options); got != osvfs.FS().Realpath(replacement) {
 			t.Errorf("alias before symlink resolution = %q", got)
 		}
 
-		if got := ResolveModule(p, "linked", fileName, ResolutionOptions{Modules: []string{"node_modules/custom"}}); got != want {
+		if got := moduleresolver.ResolveModule(p, "linked", fileName, moduleresolver.Options{Modules: []string{"node_modules/custom"}}); got != want {
 			t.Errorf("symlinked directory export = %q, want %q", got, want)
 		}
 	})
@@ -161,9 +162,9 @@ func TestImportResolutionProcessDirectory(t *testing.T) {
 			if cwd != "" {
 				ctx.Settings["cwd"] = cwd
 			}
-			for _, resolution := range []ResolutionOptions{ImportResolutionOptions(ctx, false, options), RequireResolutionOptions(ctx, options)} {
+			for _, resolution := range []moduleresolver.Options{ImportResolutionOptions(ctx, false, options), RequireResolutionOptions(ctx, options)} {
 				want := tspath.ResolvePath("/process", cwd, "deps/node_modules/pkg/index.js")
-				if got := ResolveModule(p, "pkg", fileName, resolution); got != want {
+				if got := moduleresolver.ResolveModule(p, "pkg", fileName, resolution); got != want {
 					t.Errorf("process-relative lookup = %q, want %q", got, want)
 				}
 				// tsconfigPath uses process.cwd even when settings.cwd redirects
@@ -173,30 +174,6 @@ func TestImportResolutionProcessDirectory(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestNearestCompilerOptionsGeneration(t *testing.T) {
-	files := map[string]string{
-		"/nearest-config/input.ts":      "import 'pkg';",
-		"/nearest-config/base.json":     `{"compilerOptions":{"allowImportingTsExtensions":true,"paths":{"alias/*":["src/*"]}}}`,
-		"/nearest-config/tsconfig.json": `{"extends":"./base.json","files":["input.ts"]}`,
-	}
-	p := programForResolution(t, files, "/nearest-config/input.ts")
-	options := nearestCompilerOptions(p, "/nearest-config/deep/input.ts")
-	if options == nil || options.AllowImportingTsExtensions != core.TSTrue || options.Paths == nil || options.Paths.Size() != 1 {
-		t.Fatalf("inherited options were not parsed: %#v", options)
-	}
-	if nearestCompilerOptions(p, "/nearest-config/deep/input.ts") != options {
-		t.Error("nearest config was not cached")
-	}
-	files["/nearest-config/tsconfig.json"] = `{"compilerOptions":{"allowImportingTsExtensions":false},"files":["input.ts"]}`
-	updated := programForResolution(t, files, "/nearest-config/input.ts")
-	if got := nearestCompilerOptions(updated, "/nearest-config/deep/input.ts"); got == nil || got.AllowImportingTsExtensions != core.TSFalse {
-		t.Fatalf("config leaked between generations: %#v", got)
-	}
-	if nearestCompilerOptions(nil, "/input.ts") != nil {
-		t.Fatal("invalid Program returned options")
 	}
 }
 
@@ -225,12 +202,12 @@ func TestImportFilePathLexicalFallback(t *testing.T) {
 		if runtime.GOOS == "windows" {
 			want = tc.windows
 		}
-		if got := ImportFilePath(nil, tc.name, fileName, false, ResolutionOptions{}); got != want {
+		if got := ImportFilePath(nil, tc.name, fileName, false, moduleresolver.Options{}); got != want {
 			t.Errorf("ImportFilePath(%q) = %q, want %q", tc.name, got, want)
 		}
 	}
 	if runtime.GOOS == "windows" {
-		got := ImportFilePath(nil, "../../missing", "//server/share/client/input.js", false, ResolutionOptions{})
+		got := ImportFilePath(nil, "../../missing", "//server/share/client/input.js", false, moduleresolver.Options{})
 		if got != `\\server\share\missing` {
 			t.Errorf("UNC fallback = %q", got)
 		}
@@ -258,13 +235,13 @@ func TestResolverOverrides(t *testing.T) {
 			local := tspath.ResolvePath(root, "vendor/pkg/index.js")
 			config := func(alias any) map[string]any { return map[string]any{"alias": alias} }
 			if root != "/alias-project" {
-				var options ResolutionOptions
+				var options moduleresolver.Options
 				applyResolverConfig(&options, config(map[string]any{"native": strings.ReplaceAll(local, "/", `\`)}))
-				if got := ResolveModule(p, "native", fileName, options); got != local {
+				if got := moduleresolver.ResolveModule(p, "native", fileName, options); got != local {
 					t.Errorf("native path = %q, want %q", got, local)
 				}
 			}
-			options := ResolutionOptions{Aliases: []moduleAlias{{Name: tspath.ResolvePath(root, "node_modules/pkg/index.js"), Targets: []string{local + "?from-alias"}}}}
+			options := moduleresolver.Options{Aliases: []moduleresolver.Alias{{Name: tspath.ResolvePath(root, "node_modules/pkg/index.js"), Targets: []string{local + "?from-alias"}}}}
 			if got := RequireFilePath(p, "pkg", fileName, options); got != filepath.FromSlash(local)+"?from-alias" {
 				t.Errorf("file alias query = %q", got)
 			}
@@ -278,12 +255,12 @@ func TestResolverOverrides(t *testing.T) {
 				{"virtual?raw#source", local + "?", "?#source"},
 				{"virtual?raw#source", local + "#", "?raw#"},
 			} {
-				var options ResolutionOptions
+				var options moduleresolver.Options
 				applyResolverConfig(&options, config(map[string]any{"virtual": query.target}))
 				if got := RequireFilePath(p, query.request, fileName, options); got != filepath.FromSlash(local)+query.suffix {
 					t.Errorf("alias query = %q", got)
 				}
-				if got := ResolveModule(p, query.request, fileName, options); got != local {
+				if got := moduleresolver.ResolveModule(p, query.request, fileName, options); got != local {
 					t.Errorf("filesystem path includes a query: %q", got)
 				}
 			}
@@ -320,8 +297,8 @@ func TestResolverOverrides(t *testing.T) {
 				t.Run(test.name, func(t *testing.T) {
 					ctx := (rule.RuleContext{SourceFile: p.SourceFiles()[0], Settings: map[string]any{"node": map[string]any{"resolverConfig": test.config}}}).WithProgram(p)
 					options := RequireResolutionOptions(ctx, nil)
-					if got := ResolveModule(p, test.name, fileName, options); got != test.want {
-						t.Errorf("ResolveModule(%q, %#v) = %q, want %q", test.name, test.config, got, test.want)
+					if got := moduleresolver.ResolveModule(p, test.name, fileName, options); got != test.want {
+						t.Errorf("moduleresolver.ResolveModule(%q, %#v) = %q, want %q", test.name, test.config, got, test.want)
 					}
 				})
 			}
@@ -451,7 +428,7 @@ func TestResolverEntryFields(t *testing.T) {
 					if err := json.Unmarshal([]byte(strings.ReplaceAll(tc.config, "@ROOT@", root)), &config); err != nil {
 						t.Fatal(err)
 					}
-					var options ResolutionOptions
+					var options moduleresolver.Options
 					applyResolverConfig(&options, config)
 					// Windows entry filenames accept either separator. Requests using
 					// backslashes follow Node's path semantics; enhanced-resolve treats
@@ -472,12 +449,12 @@ func TestResolverEntryFields(t *testing.T) {
 					} else if tc.name == "aliasFields-backslash-subdir" {
 						want, missing = "", true
 					}
-					got, resolveError := ResolveModuleWithError(p, strings.ReplaceAll(tc.request, "@ROOT@", root), tspath.ResolvePath(root, tc.file), options)
+					got, resolveError := moduleresolver.ResolveModuleWithError(p, strings.ReplaceAll(tc.request, "@ROOT@", root), tspath.ResolvePath(root, tc.file), options)
 					if want != "" {
 						want = tspath.ResolvePath(root, want)
 					}
 					if got != want || (resolveError != "") != missing {
-						t.Errorf("ResolveModule(%q, %s) = (%q, %q), want (%q, missing=%v)", tc.request, tc.config, got, resolveError, want, missing)
+						t.Errorf("moduleresolver.ResolveModule(%q, %s) = (%q, %q), want (%q, missing=%v)", tc.request, tc.config, got, resolveError, want, missing)
 					}
 				})
 			}
@@ -496,22 +473,22 @@ func TestResolverEntryFields(t *testing.T) {
 					{"bare", map[string]any{"aliasFields": []string{"browser"}}, "src/browser.js"},
 					{"./plain", map[string]any{"aliasFields": []string{"browser"}}, ""},
 				} {
-					var options ResolutionOptions
+					var options moduleresolver.Options
 					applyResolverConfig(&options, tc.config)
 					result := resolveImport(p, tc.request, tspath.ResolvePath(root, "input.js"), false, options)
 					want := tc.want
 					if want != "" {
 						want = tspath.ResolvePath(root, want)
 					}
-					if result.path != want || (result.resolveError != "") != (want == "") {
+					if result.Path != want || (result.Error != "") != (want == "") {
 						t.Errorf("import %q (%v) = %+v, want %q", tc.request, tc.config, result, want)
 					}
 				}
 			})
 			t.Run("package context and resource suffix", func(t *testing.T) {
-				options := ResolutionOptions{Paths: []string{tspath.ResolvePath(root, "search")}, AliasFields: [][]string{{"browser"}}}
+				options := moduleresolver.Options{Paths: []string{tspath.ResolvePath(root, "search")}, AliasFields: [][]string{{"browser"}}}
 				fileName := tspath.ResolvePath(root, "input.js")
-				if got := ResolveModule(p, "lookup", fileName, options); got != tspath.ResolvePath(root, "search/lookup.js") {
+				if got := moduleresolver.ResolveModule(p, "lookup", fileName, options); got != tspath.ResolvePath(root, "search/lookup.js") {
 					t.Errorf("resolvePaths package alias = %q", got)
 				}
 				// Ignored targets and builtins do not prevent a later lookup
@@ -521,20 +498,20 @@ func TestResolverEntryFields(t *testing.T) {
 					if request == "ignored-file" {
 						want = "node_modules/ignored-file/index.js"
 					}
-					if got := ResolveModule(p, request, fileName, options); got != tspath.ResolvePath(root, want) {
+					if got := moduleresolver.ResolveModule(p, request, fileName, options); got != tspath.ResolvePath(root, want) {
 						t.Errorf("resolvePaths after ignored %q = %q", request, got)
 					}
 				}
 
 				// Each resolvePaths directory is an independent lookup, even if
 				// an earlier directory contains a package with cyclic entries.
-				fallback := ResolutionOptions{Paths: options.Paths, MainFields: []nodeMainField{{Name: []string{"main"}, ForceRelative: true}}}
-				if got := ResolveModule(p, "fallback-pkg", fileName, fallback); got != tspath.ResolvePath(root, "node_modules/fallback-pkg/index.js") {
+				fallback := moduleresolver.Options{Paths: options.Paths, MainFields: []moduleresolver.MainField{{Name: []string{"main"}, ForceRelative: true}}}
+				if got := moduleresolver.ResolveModule(p, "fallback-pkg", fileName, fallback); got != tspath.ResolvePath(root, "node_modules/fallback-pkg/index.js") {
 					t.Errorf("resolvePaths after cyclic entry = %q", got)
 				}
 
-				result := resolveModuleCached(p, "query?raw#source", fileName, options)
-				if result.path != tspath.ResolvePath(root, "src/browser.js") || result.resourceSuffix != "?mapped#source" {
+				result := moduleresolver.Resolve(p, "query?raw#source", fileName, options)
+				if result.Path != tspath.ResolvePath(root, "src/browser.js") || result.ResourceSuffix != "?mapped#source" {
 					t.Errorf("package alias resource suffix = %+v", result)
 				}
 			})
@@ -567,17 +544,17 @@ func TestResolverEntryFieldSymlinks(t *testing.T) {
 		{"linked", map[string]any{"mainFields": []string{"main"}, "alias": map[string]any{tspath.ResolvePath(root, "node_modules/linked/index.js"): tspath.ResolvePath(root, "src/alternate.js")}}, "src/alternate.js"},
 		{"./linked-plain", map[string]any{"mainFiles": []string{"api"}}, "plain/api.js"},
 	} {
-		var options ResolutionOptions
+		var options moduleresolver.Options
 		applyResolverConfig(&options, tc.config)
 		want := osvfs.FS().Realpath(tspath.ResolvePath(root, tc.want))
-		if got, err := ResolveModuleWithError(p, tc.request, fileName, options); got != want || err != "" {
+		if got, err := moduleresolver.ResolveModuleWithError(p, tc.request, fileName, options); got != want || err != "" {
 			t.Errorf("symlink %q (%v) = %q, %s; want %q", tc.request, tc.config, got, err, want)
 		}
 	}
 	if !osvfs.FS().UseCaseSensitiveFileNames() {
-		options := ResolutionOptions{MainFields: []nodeMainField{{Name: []string{"module"}, ForceRelative: true}}}
+		options := moduleresolver.Options{MainFields: []moduleresolver.MainField{{Name: []string{"module"}, ForceRelative: true}}}
 		want := osvfs.FS().Realpath(tspath.ResolvePath(root, "main/module.js"))
-		if got := ResolveModule(p, "./MAIN", fileName, options); tspath.GetCanonicalFileName(got, false) != tspath.GetCanonicalFileName(want, false) {
+		if got := moduleresolver.ResolveModule(p, "./MAIN", fileName, options); tspath.GetCanonicalFileName(got, false) != tspath.GetCanonicalFileName(want, false) {
 			t.Errorf("case-insensitive package entry = %q, want %q", got, want)
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 func TestHashbangSourceBoundaries(t *testing.T) {
@@ -181,7 +182,7 @@ func TestHashbangUnpublished(t *testing.T) {
 			}
 			p := lintprogram.NewFromCompiler(program)
 			absolute := tspath.ResolvePath(root.Dir, test.file)
-			pkg := nodeutil.FindPackage(p, absolute)
+			pkg := packagejson.FindNearestValid(p, absolute)
 			if pkg == nil {
 				t.Fatal("package not found")
 			}

@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 )
 
 //go:embed no_restricted_require.schema.json
@@ -25,7 +26,7 @@ var NoRestrictedRequireRule = rule.Rule{
 		}
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
-				var resolution *nodeutil.ResolutionOptions
+				var resolution *moduleresolver.Options
 				for _, target := range nodeutil.CollectRequireTargets(ctx) {
 					message := restrictions.Match(target.Name, func() string {
 						if ctx.Program() == nil {

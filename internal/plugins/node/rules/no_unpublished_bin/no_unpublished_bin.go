@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 //go:embed no_unpublished_bin.schema.json
@@ -21,7 +22,7 @@ var NoUnpublishedBinRule = rule.Rule{
 			return nil
 		}
 		fileName := ctx.SourceFile.FileName()
-		pkg := nodeutil.FindPackage(program, fileName)
+		pkg := packagejson.FindNearestValid(program, fileName)
 		if pkg == nil {
 			return nil
 		}
@@ -40,7 +41,7 @@ var NoUnpublishedBinRule = rule.Rule{
 		if converted != relative {
 			absolute = tspath.ResolvePath(pkg.Directory(), converted)
 		}
-		if !pkg.IsBinFile(program, absolute) || !nodeutil.IsUnpublished(program, pkg, absolute) {
+		if !nodeutil.IsBinFile(program, pkg, absolute) || !nodeutil.IsUnpublished(program, pkg, absolute) {
 			return nil
 		}
 

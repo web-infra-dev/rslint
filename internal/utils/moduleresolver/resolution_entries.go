@@ -1,12 +1,15 @@
-package nodeutil
+package moduleresolver
 
 import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
-type nodeMainField struct {
+// MainField selects a package property path for an entry point.
+// ForceRelative interprets a bare target relative to its package directory.
+type MainField struct {
 	Name          []string `json:"name"`
 	ForceRelative bool     `json:"forceRelative"`
 }
@@ -15,18 +18,7 @@ type nodeMainField struct {
 // consulting configured entry fields. It never enters the Program filesystem.
 const nodeMainTarget = ".__rslint_node_main__"
 
-func packageField(data any, names []string) any {
-	for _, name := range names {
-		object, ok := data.(map[string]any)
-		if !ok {
-			return nil
-		}
-		data = object[name]
-	}
-	return data
-}
-
-func (resolver *nodeResolver) resolveAt(name, directory string, mainTarget bool) nodeResolution {
+func (resolver *nodeResolver) resolveAt(name, directory string, mainTarget bool) Result {
 	child := *resolver
 	child.mainTarget = mainTarget
 	child.fileName = tspath.ResolvePath(directory, "__import__.js")
@@ -35,11 +27,11 @@ func (resolver *nodeResolver) resolveAt(name, directory string, mainTarget bool)
 	return child.resolve(name)
 }
 
-func (resolver *nodeResolver) mainEntry(directory string) nodeResolution {
-	pkg := FindPackage(resolver.program, tspath.ResolvePath(directory, "__import__.js"))
-	if pkg != nil && pkg.directory == directory {
+func (resolver *nodeResolver) mainEntry(directory string) Result {
+	pkg := packagejson.Read(resolver.program, directory)
+	if pkg != nil {
 		for _, field := range resolver.options.MainFields {
-			target, ok := packageField(pkg.data, field.Name).(string)
+			target, ok := pkg.Field(field.Name...).(string)
 			if !ok || target == "" || target == "." || target == "./" {
 				continue
 			}
@@ -51,29 +43,29 @@ func (resolver *nodeResolver) mainEntry(directory string) nodeResolution {
 				continue
 			}
 			result := resolver.resolveAt(tspath.ResolvePath(directory, target), directory, true)
-			if result.resolveError == "" || result.recursive {
+			if result.Error == "" || result.recursive {
 				return result
 			}
 		}
 	}
-	return nodeResolution{resolveError: "No matching package entry"}
+	return Result{Error: "No matching package entry"}
 }
 
-func (resolver *nodeResolver) aliasField(request, directory string, file bool) (nodeResolution, bool) {
+func (resolver *nodeResolver) aliasField(request, directory string, file bool) (Result, bool) {
 	if len(resolver.options.AliasFields) == 0 {
-		return nodeResolution{}, false
+		return Result{}, false
 	}
-	pkg := FindPackage(resolver.program, tspath.ResolvePath(directory, "__import__.js"))
-	if pkg == nil || pkg.directory != resolver.program.NearestPackageJSONDirectory(directory) {
-		return nodeResolution{}, false
+	pkg := packagejson.FindNearest(resolver.program, tspath.ResolvePath(directory, "__import__.js"))
+	if pkg == nil {
+		return Result{}, false
 	}
 	inner := request
 	if file || tspath.PathIsRelative(request) {
 		if !file && strings.Contains(request, `\`) && tspath.GetRootLength(directory) == 1 {
-			return nodeResolution{}, false
+			return Result{}, false
 		}
 		absolute := tspath.ResolvePath(directory, request)
-		inner = tspath.GetRelativePathFromDirectory(pkg.directory, absolute, tspath.ComparePathsOptions{
+		inner = tspath.GetRelativePathFromDirectory(pkg.Directory(), absolute, tspath.ComparePathsOptions{
 			UseCaseSensitiveFileNames: resolver.program.FS().UseCaseSensitiveFileNames(),
 		})
 		if file {
@@ -81,7 +73,7 @@ func (resolver *nodeResolver) aliasField(request, directory string, file bool) (
 		}
 	}
 	for _, field := range resolver.options.AliasFields {
-		aliases, ok := packageField(pkg.data, field).(map[string]any)
+		aliases, ok := pkg.Field(field...).(map[string]any)
 		if !ok {
 			continue
 		}
@@ -93,17 +85,17 @@ func (resolver *nodeResolver) aliasField(request, directory string, file bool) (
 			continue
 		}
 		if target == false {
-			return nodeResolution{}, true
+			return Result{}, true
 		}
 		if name, ok := target.(string); ok {
 			if name == "" {
 				name = "."
 			}
-			return resolver.resolveAt(name, pkg.directory, false), true
+			return resolver.resolveAt(name, pkg.Directory(), false), true
 		}
-		return nodeResolution{resolveError: "Invalid package alias for '" + inner + "'"}, true
+		return Result{Error: "Invalid package alias for '" + inner + "'"}, true
 	}
-	return nodeResolution{}, false
+	return Result{}, false
 }
 
 // Only implicit index probes represent mainFiles. A request for index or

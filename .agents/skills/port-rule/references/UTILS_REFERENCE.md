@@ -446,6 +446,49 @@ See [AST_PATTERNS.md — Resolving Identifiers and Collecting References](./AST_
 
 ---
 
+## Package, module and version queries
+
+Use these shared packages before adding another plugin-local filesystem query,
+module collector or range parser. They do not import plugin implementations.
+
+| Package                | Entry points                                         | Contract                                                                                                                                                                           |
+| ---------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `utils/packagejson`    | `Read`, `FindNearest`, `FindNearestValid`            | Program-scoped, immutable package objects. `FindNearest` stops at an invalid nearest file; `FindNearestValid` skips invalid objects. Choose the rule's upstream policy explicitly. |
+| `utils/modules`        | `Collect`, `IsNodeBuiltin`                           | Raw source expressions and syntax context; no evaluation or resolution. Select `ESModuleReferences`, `CommonJSReferences`, `AMDReferences`, or their union.                        |
+| `utils/moduleresolver` | `Resolve`, `ResolveModule`, `ResolveModuleWithError` | Runtime files using explicit `Options`, through the Program's FS. Does not prefer declarations or load a resolved file into the Program.                                           |
+| `utils/tsconfig`       | `Read`, `FindNearest`                                | Cached compiler options from tsgo's config parser, including `extends`. Does not create a Program.                                                                                 |
+| `utils/npmsemver`      | `Parse`, `Range.IsAtLeast`, `Range.IsSubsetOf`       | npm range operations using tsgo expansion and prerelease comparison. Check `Parse`'s boolean result before using the range.                                                        |
+
+Package metadata exposes `Directory()`, `Field("engines", "node")` and original
+`Text()` for callers with a typed schema. Returned objects, arrays, compiler
+options and source collections are read-only. Filesystem queries use the passed
+Program's generation; no process-global cache holds metadata or resolved targets.
+
+`modules.Collect` shares one syntax cache with `Program.ModuleGraph()` on the
+exact SourceFile. A `Source` retains its `Specifier` expression, `Declaration`,
+`Kind` and `TypeOnly` flag. Dynamic expressions, templates, TS assertions and
+empty strings remain available for the caller to accept or reject. `TypeOnly`
+uses emitted-dependency semantics, including all-type named imports; rules that
+care about explicit `import type` syntax inspect the declaration instead.
+CommonJS and AMD collection recognizes call syntax, not lexical bindings. Use
+`ctx.Refs` or the reference tracker when shadowing matters.
+
+Use `Program.ModuleGraph().References` for compiler-resolved dependency edges.
+Use `moduleresolver.Resolve` for runtime lookup, preserving `Result.Path`,
+`ResourceSuffix` and `Error` separately. Resolver options support aliases,
+conditions, extensions and package entry fields; nil search lists use defaults,
+while explicit empty lists disable the corresponding search. Node's settings,
+TypeScript alias fallback, source coercion and diagnostic policy remain in
+`nodeutil` and are not implicit behavior of the shared resolver.
+
+`IsAtLeast` mirrors the npm intersection query used for deprecated-API
+replacement selection. `IsSubsetOf` checks each nonempty alternative against a
+supported alternative, including gaps between supported releases and prerelease
+admission. These operations are not interchangeable. Node engine selection and
+Jest's dependency/version precedence remain with their callers.
+
+---
+
 ## `internal/utils/referencetracker/` - API Reference Tracking
 
 Use this for the alias and property propagation performed by eslint-utils'

@@ -15,6 +15,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
+	"github.com/web-infra-dev/rslint/internal/utils/tsconfig"
 )
 
 var npmSpecifier = esregexp.MustCompile(`^(@[\w~-][\w.~-]*/)?[\w~-][\w.~-]*`, "")
@@ -27,7 +30,7 @@ type ImportVisitorOptions struct {
 }
 
 // VisitImports shares the literal import/export shapes used by the Node rules.
-func VisitImports(options ImportVisitorOptions, check func(*ast.Node, string, bool)) rule.RuleListeners {
+func VisitImports(ctx rule.RuleContext, options ImportVisitorOptions, check func(*ast.Node, string, bool)) rule.RuleListeners {
 	visit := func(source *ast.Node, typeOnly bool) {
 		if source == nil {
 			return
@@ -42,28 +45,32 @@ func VisitImports(options ImportVisitorOptions, check func(*ast.Node, string, bo
 		}
 		specifier, _ := utils.GetStaticExpressionValue(source)
 		specifier, _, _ = strings.Cut(specifier, "!")
-		if !options.IncludeCore && isNodeBuiltin(specifier) {
+		if !options.IncludeCore && modules.IsNodeBuiltin(specifier) {
 			return
 		}
 		check(source, specifier, typeOnly)
 	}
 	return rule.RuleListeners{
-		ast.KindImportDeclaration: func(node *ast.Node) {
-			declaration := node.AsImportDeclaration()
-			typeOnly := declaration.ImportClause != nil && declaration.ImportClause.AsImportClause().IsTypeOnly()
-			if !options.IgnoreTypeImport || !typeOnly {
-				visit(declaration.ModuleSpecifier, typeOnly)
-			}
-		},
-		ast.KindExportDeclaration: func(node *ast.Node) {
-			declaration := node.AsExportDeclaration()
-			visit(declaration.ModuleSpecifier, declaration.IsTypeOnly)
-		},
-		ast.KindCallExpression: func(node *ast.Node) {
-			call := node.AsCallExpression()
-			if call.Expression.Kind == ast.KindImportKeyword && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-				// ESTree strips parentheses, but retains templates and TS wrappers.
-				visit(utils.ESTreeRuntimeExpression(call.Arguments.Nodes[0]), false)
+		rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
+			for _, source := range modules.Collect(ctx.SourceFile, modules.ESModuleReferences) {
+				node, specifier := source.Declaration, source.Specifier
+				typeOnly := false
+				switch node.Kind {
+				case ast.KindImportDeclaration:
+					declaration := node.AsImportDeclaration()
+					typeOnly = declaration.ImportClause != nil && declaration.ImportClause.AsImportClause().IsTypeOnly()
+					if options.IgnoreTypeImport && typeOnly {
+						continue
+					}
+				case ast.KindExportDeclaration:
+					typeOnly = node.AsExportDeclaration().IsTypeOnly
+				case ast.KindCallExpression:
+					// ESTree removes parentheses and JSDoc casts, but retains TS wrappers.
+					specifier = utils.ESTreeRuntimeExpression(specifier)
+				default:
+					continue
+				}
+				visit(specifier, typeOnly)
 			}
 		},
 	}
@@ -78,26 +85,11 @@ func isImportURL(specifier string) bool {
 // Builtins, relative/absolute paths, import maps and URL imports have no npm name.
 func ImportModuleName(specifier string) (name, resource string) {
 	resource, _, _ = strings.Cut(specifier, "!")
-	if strings.HasPrefix(resource, ".") || strings.HasPrefix(resource, "/") || strings.HasPrefix(resource, `\`) || isNodeBuiltin(resource) || isImportURL(resource) || !npmSpecifier.Test(resource) {
+	if strings.HasPrefix(resource, ".") || strings.HasPrefix(resource, "/") || strings.HasPrefix(resource, `\`) || modules.IsNodeBuiltin(resource) || isImportURL(resource) || !npmSpecifier.Test(resource) {
 		return "", resource
 	}
 	name, _ = module.ParsePackageName(resource)
 	return name, resource
-}
-
-func isNodeBuiltin(specifier string) bool {
-	if core.NodeCoreModules()[specifier] {
-		return true
-	}
-	// tsgo intentionally filters out underscore-prefixed internal modules.
-	// Node's isBuiltin still includes these legacy names (verified on Node 22).
-	switch strings.TrimPrefix(specifier, "node:") {
-	case "_http_agent", "_http_client", "_http_common", "_http_incoming", "_http_outgoing", "_http_server",
-		"_stream_duplex", "_stream_passthrough", "_stream_readable", "_stream_transform", "_stream_wrap", "_stream_writable",
-		"_tls_common", "_tls_wrap":
-		return true
-	}
-	return false
 }
 
 // HasTypeScriptAlias preserves upstream's prefix exemption for compiler paths.
@@ -106,7 +98,7 @@ func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
 	if !tspath.HasTSFileExtension(fileName) {
 		return false
 	}
-	options := nearestCompilerOptions(p, fileName)
+	options := tsconfig.FindNearest(p, fileName)
 	if options == nil || options.Paths == nil {
 		return false
 	}
@@ -121,31 +113,31 @@ func HasTypeScriptAlias(p *program.Program, fileName, name string) bool {
 // ImportResolveError checks actual targets, including TypeScript path aliases.
 // Extraneous-dependency rules intentionally use HasTypeScriptAlias instead:
 // their upstream contract exempts an alias even when its target is missing.
-func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
-	return resolveImport(p, name, fileName, typeOnly, options).resolveError
+func ImportResolveError(p *program.Program, name, fileName string, typeOnly bool, options moduleresolver.Options) string {
+	return resolveImport(p, name, fileName, typeOnly, options).Error
 }
 
 // ImportFilePath supplies the target for import rules. Missing
 // local imports retain their lexical path; unresolved packages have no path.
-func ImportFilePath(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) string {
+func ImportFilePath(p *program.Program, name, fileName string, typeOnly bool, options moduleresolver.Options) string {
 	resolved := resolveImport(p, name, fileName, typeOnly, options)
 	return moduleFilePath(name, fileName, resolved)
 }
 
 // RequireFilePath uses CommonJS directory and alias resolution for restrictions.
 // Missing local targets share the import rule's lexical-path fallback.
-func RequireFilePath(p *program.Program, name, fileName string, options ResolutionOptions) string {
+func RequireFilePath(p *program.Program, name, fileName string, options moduleresolver.Options) string {
 	resolved := resolveWithTypeScriptAliases(p, name, fileName, options)
 	return moduleFilePath(name, fileName, resolved)
 }
 
-func moduleFilePath(name, fileName string, resolved nodeResolution) string {
-	if resolved.path != "" {
+func moduleFilePath(name, fileName string, resolved moduleresolver.Result) string {
+	if resolved.Path != "" {
 		if isImportURL(name) {
-			return resolved.path
+			return resolved.Path
 		}
 		// Only diagnostic matching uses host paths, never VFS lookups.
-		return filepath.FromSlash(resolved.path) + resolved.resourceSuffix
+		return filepath.FromSlash(resolved.Path) + resolved.ResourceSuffix
 	}
 	if tspath.PathIsRelative(name) || strings.HasPrefix(name, "/") || strings.HasPrefix(name, `\`) {
 		// Only the lexical fallback uses host paths, never VFS lookup keys.
@@ -162,14 +154,14 @@ func moduleFilePath(name, fileName string, resolved nodeResolution) string {
 	return ""
 }
 
-func resolveImport(p *program.Program, name, fileName string, typeOnly bool, options ResolutionOptions) nodeResolution {
+func resolveImport(p *program.Program, name, fileName string, typeOnly bool, options moduleresolver.Options) moduleresolver.Result {
 	if !typeOnly && isImportURL(name) {
-		return nodeResolution{path: name}
+		return moduleresolver.Result{Path: name}
 	}
 	moduleName, _ := ImportModuleName(name)
 	if moduleName == "" {
 		if options.MainFields == nil {
-			options.MainFields = []nodeMainField{}
+			options.MainFields = []moduleresolver.MainField{}
 		}
 		if options.MainFiles == nil {
 			options.MainFiles = []string{}
@@ -179,11 +171,11 @@ func resolveImport(p *program.Program, name, fileName string, typeOnly bool, opt
 	return resolveWithTypeScriptAliases(p, name, fileName, options)
 }
 
-func resolveWithTypeScriptAliases(p *program.Program, name, fileName string, options ResolutionOptions) nodeResolution {
-	if !options.AliasesConfigured && tspath.HasTSFileExtension(fileName) {
-		if config := nearestCompilerOptions(p, fileName); config != nil && config.Paths != nil {
+func resolveWithTypeScriptAliases(p *program.Program, name, fileName string, options moduleresolver.Options) moduleresolver.Result {
+	if options.Aliases == nil && tspath.HasTSFileExtension(fileName) {
+		if config := tsconfig.FindNearest(p, fileName); config != nil && config.Paths != nil {
 			for name, targets := range config.Paths.Entries() {
-				alias := moduleAlias{Name: strings.TrimRight(name, `/\*`)}
+				alias := moduleresolver.Alias{Name: strings.TrimRight(name, `/\*`)}
 				for _, target := range targets {
 					alias.Targets = append(alias.Targets, tspath.ResolvePath(tspath.GetDirectoryPath(config.ConfigFilePath), strings.TrimRight(target, `/\*`)))
 				}
@@ -191,13 +183,13 @@ func resolveWithTypeScriptAliases(p *program.Program, name, fileName string, opt
 			}
 		}
 	}
-	return resolveModuleCached(p, name, fileName, options)
+	return moduleresolver.Resolve(p, name, fileName, options)
 }
 
 // ImportResolutionOptions implements the documented resolverConfig.modules
 // option and the shared Node extension/lookup settings. convertPath is accepted
 // by the extraneous rules' schemas but, as upstream, does not affect these checks.
-func ImportResolutionOptions(ctx rule.RuleContext, typeOnly bool, options map[string]any) ResolutionOptions {
+func ImportResolutionOptions(ctx rule.RuleContext, typeOnly bool, options map[string]any) moduleresolver.Options {
 	conditions := []string{"node", "require", "import"}
 	if typeOnly {
 		conditions = append(conditions, "types")
@@ -205,9 +197,9 @@ func ImportResolutionOptions(ctx rule.RuleContext, typeOnly bool, options map[st
 	return importResolutionOptions(ctx, conditions, options)
 }
 
-func importResolutionOptions(ctx rule.RuleContext, conditions []string, options map[string]any) ResolutionOptions {
+func importResolutionOptions(ctx rule.RuleContext, conditions []string, options map[string]any) moduleresolver.Options {
 	p, fileName, settings := ctx.Program(), ctx.SourceFile.FileName(), ctx.Settings
-	result := ResolutionOptions{
+	result := moduleresolver.Options{
 		Extensions: StringListSetting("tryExtensions", options, settings),
 		Paths:      StringListSetting("resolvePaths", options, settings),
 		Conditions: conditions,
@@ -224,7 +216,7 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 		result.Paths[i] = tspath.ResolvePath(cwd, base)
 	}
 	if tspath.HasTSFileExtension(fileName) {
-		config := nearestCompilerOptions(p, fileName)
+		config := tsconfig.FindNearest(p, fileName)
 		if config != nil && config.AllowImportingTsExtensions == core.TSTrue {
 			if result.Extensions == nil {
 				result.Extensions = []string{".js", ".ts", ".mjs", ".mts", ".cjs", ".cts", ".json", ".node"}
@@ -233,7 +225,7 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 		result.ExtensionAliases = importExtensionMapping(ctx, options).aliases
 	}
 	if result.Extensions == nil {
-		result.Extensions = defaultExtensions
+		result.Extensions = moduleresolver.DefaultExtensions()
 	}
 	for _, value := range settingValues("resolverConfig", options, settings) {
 		if config, ok := value.(map[string]any); ok {
@@ -246,13 +238,13 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 
 // RequireResolutionOptions uses the same lookup and TypeScript settings as
 // imports, but CommonJS does not activate the import or types export conditions.
-func RequireResolutionOptions(ctx rule.RuleContext, options map[string]any) ResolutionOptions {
+func RequireResolutionOptions(ctx rule.RuleContext, options map[string]any) moduleresolver.Options {
 	return importResolutionOptions(ctx, []string{"node", "require"}, options)
 }
 
 // Explicit resolver options replace the corresponding defaults, including
 // TypeScript aliases and extension mappings. An empty list remains meaningful.
-func applyResolverConfig(options *ResolutionOptions, config map[string]any) {
+func applyResolverConfig(options *moduleresolver.Options, config map[string]any) {
 	for key, destination := range map[string]*[]string{
 		"modules": &options.Modules, "extensions": &options.Extensions, "conditionNames": &options.Conditions,
 		"mainFiles": &options.MainFiles,
@@ -271,9 +263,9 @@ func applyResolverConfig(options *ResolutionOptions, config map[string]any) {
 		mainFields = utils.Map(names, func(name string) any { return name })
 	}
 	if fields, ok := mainFields.([]any); ok {
-		options.MainFields = []nodeMainField{}
+		options.MainFields = []moduleresolver.MainField{}
 		for _, value := range fields {
-			field := nodeMainField{ForceRelative: true}
+			field := moduleresolver.MainField{ForceRelative: true}
 			if object, ok := value.(map[string]any); ok {
 				value = object["name"]
 				field.ForceRelative, _ = object["forceRelative"].(bool)
@@ -313,9 +305,12 @@ func applyResolverConfig(options *ResolutionOptions, config map[string]any) {
 		}
 	}
 	value, present := config["alias"]
-	options.AliasesConfigured = present
+	if present {
+		// A configured empty list also disables the tsconfig fallback.
+		options.Aliases = []moduleresolver.Alias{}
+	}
 	appendAlias := func(name string, targets any, exact bool) {
-		alias := moduleAlias{Name: name, OnlyModule: exact}
+		alias := moduleresolver.Alias{Name: name, OnlyModule: exact}
 		switch targets := targets.(type) {
 		case string:
 			alias.Targets = []string{targets}

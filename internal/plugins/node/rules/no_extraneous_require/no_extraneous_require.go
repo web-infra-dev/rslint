@@ -7,6 +7,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/nodeutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 //go:embed no_extraneous_require.schema.json
@@ -25,7 +27,7 @@ var NoExtraneousRequireRule = rule.Rule{
 		if p == nil || fileName == "<input>" {
 			return nil
 		}
-		pkg := nodeutil.FindPackage(p, fileName)
+		pkg := packagejson.FindNearestValid(p, fileName)
 		if pkg == nil {
 			return nil
 		}
@@ -36,7 +38,7 @@ var NoExtraneousRequireRule = rule.Rule{
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
 				allowed := nodeutil.StringListSetting("allowModules", opts, ctx.Settings)
-				var resolution *nodeutil.ResolutionOptions
+				var resolution *moduleresolver.Options
 				targets := map[string]string{}
 				for _, target := range nodeutil.CollectRequireTargets(ctx) {
 					specifier := target.Name
@@ -44,7 +46,7 @@ var NoExtraneousRequireRule = rule.Rule{
 					if !found {
 						var resource string
 						name, resource = nodeutil.ImportModuleName(specifier)
-						if name != "" && (pkg.AllowsDependency(p, name) || slices.Contains(allowed, name) || nodeutil.HasTypeScriptAlias(p, fileName, resource)) {
+						if name != "" && (nodeutil.AllowsDependency(p, pkg, name) || slices.Contains(allowed, name) || nodeutil.HasTypeScriptAlias(p, fileName, resource)) {
 							name = ""
 						}
 						if name != "" {
@@ -52,7 +54,7 @@ var NoExtraneousRequireRule = rule.Rule{
 								value := nodeutil.RequireResolutionOptions(ctx, opts)
 								resolution = &value
 							}
-							if nodeutil.ResolveModule(p, resource, fileName, *resolution) == "" {
+							if moduleresolver.ResolveModule(p, resource, fileName, *resolution) == "" {
 								name = ""
 							}
 						}

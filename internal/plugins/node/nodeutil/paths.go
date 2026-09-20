@@ -4,7 +4,6 @@
 package nodeutil
 
 import (
-	"encoding/json"
 	"maps"
 	"os"
 	"path"
@@ -19,6 +18,7 @@ import (
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/gitignore"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
+	"github.com/web-infra-dev/rslint/internal/utils/packagejson"
 )
 
 // IsAbsolutePath follows Node's path.isAbsolute on the host. Unlike Go's
@@ -27,55 +27,10 @@ func IsAbsolutePath(name string) bool {
 	return len(name) > 0 && os.IsPathSeparator(name[0]) || tspath.IsRootedDiskPath(name) && filepath.IsAbs(name)
 }
 
-// PackageJSON is immutable package metadata from one Program generation.
-type PackageJSON struct {
-	directory string
-	data      map[string]any
-}
-
-type packageJSONKey string
-
-// FindPackage finds the nearest valid package object using the Program resolver.
-// Malformed package metadata falls back to the next parent package, as upstream does.
-func FindPackage(p *program.Program, fileName string) *PackageJSON {
-	if p.FS() == nil {
-		return nil
-	}
-	for directory := tspath.GetDirectoryPath(fileName); directory != ""; {
-		directory = p.NearestPackageJSONDirectory(directory)
-		if directory == "" {
-			return nil
-		}
-		// Package contents are immutable within this Program generation. Share
-		// decoding across its files without retaining the Program in the value.
-		pkg := program.Cached(p, packageJSONKey(directory), func() *PackageJSON {
-			if text, ok := p.FS().ReadFile(tspath.ResolvePath(directory, "package.json")); ok {
-				var data map[string]any
-				if json.Unmarshal([]byte(text), &data) == nil && data != nil {
-					return &PackageJSON{directory: directory, data: data}
-				}
-			}
-			return nil
-		})
-		if pkg != nil {
-			return pkg
-		}
-		parent := tspath.GetDirectoryPath(directory)
-		if parent == directory {
-			return nil
-		}
-		directory = parent
-	}
-	return nil
-}
-
-// Directory returns the normalized directory containing package.json.
-func (pkg *PackageJSON) Directory() string { return pkg.directory }
-
 // IsBinFile applies eslint-plugin-n's syntactic bin aliases (.js and /index).
 // This deliberately does not perform TypeScript module or exports resolution.
-func (pkg *PackageJSON) IsBinFile(p *program.Program, fileName string) bool {
-	return isBinFile(fileName, pkg.data["bin"], pkg.directory, p.FS().UseCaseSensitiveFileNames())
+func IsBinFile(p *program.Program, pkg *packagejson.Package, fileName string) bool {
+	return isBinFile(fileName, pkg.Field("bin"), pkg.Directory(), p.FS().UseCaseSensitiveFileNames())
 }
 
 func isBinFile(fileName string, bin any, directory string, caseSensitive bool) bool {
@@ -173,17 +128,17 @@ type publication struct {
 // npmignore/gitignore precedence, exclusions, and always-published metadata.
 // pkg is the source's publishing package; absolute is the converted target.
 // Nested package metadata cannot change what the publishing package includes.
-func IsUnpublished(p *program.Program, pkg *PackageJSON, absolute string) bool {
+func IsUnpublished(p *program.Program, pkg *packagejson.Package, absolute string) bool {
 	comparison := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: p.FS().UseCaseSensitiveFileNames()}
-	if !tspath.ContainsPath(pkg.directory, absolute, comparison) {
+	if !tspath.ContainsPath(pkg.Directory(), absolute, comparison) {
 		return true
 	}
-	relative := tspath.GetRelativePathFromDirectory(pkg.directory, absolute, comparison)
-	published := program.Cached(p, publicationKey(pkg.directory), func() *publication {
+	relative := tspath.GetRelativePathFromDirectory(pkg.Directory(), absolute, comparison)
+	published := program.Cached(p, publicationKey(pkg.Directory()), func() *publication {
 		return compilePublication(p, pkg)
 	})
-	if main, ok := pkg.data["main"].(string); ok {
-		mainPath := tspath.GetCanonicalFileName(tspath.ResolvePath(pkg.directory, main), comparison.UseCaseSensitiveFileNames)
+	if main, ok := pkg.Field("main").(string); ok {
+		mainPath := tspath.GetCanonicalFileName(tspath.ResolvePath(pkg.Directory(), main), comparison.UseCaseSensitiveFileNames)
 		filePath := tspath.GetCanonicalFileName(absolute, comparison.UseCaseSensitiveFileNames)
 		if tspath.ComparePaths(mainPath, filePath, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true}) == 0 {
 			return false
@@ -192,7 +147,7 @@ func IsUnpublished(p *program.Program, pkg *PackageJSON, absolute string) bool {
 	if relative == "package.json" || neverIgnored.Test(relative) {
 		return false
 	}
-	if publicationIgnored(p, pkg.directory, relative, published) {
+	if publicationIgnored(p, pkg.Directory(), relative, published) {
 		return true
 	}
 	if !published.hasFiles {
@@ -229,11 +184,11 @@ func publicationIgnored(p *program.Program, packageDirectory, relative string, p
 	return matcher.Match(relative)
 }
 
-func compilePublication(p *program.Program, pkg *PackageJSON) *publication {
-	files, hasFiles := pkg.data["files"].([]any)
-	ignoreText, hasIgnore := p.FS().ReadFile(tspath.ResolvePath(pkg.directory, ".npmignore"))
+func compilePublication(p *program.Program, pkg *packagejson.Package) *publication {
+	files, hasFiles := pkg.Field("files").([]any)
+	ignoreText, hasIgnore := p.FS().ReadFile(tspath.ResolvePath(pkg.Directory(), ".npmignore"))
 	if !hasIgnore && !hasFiles {
-		ignoreText, hasIgnore = p.FS().ReadFile(tspath.ResolvePath(pkg.directory, ".gitignore"))
+		ignoreText, hasIgnore = p.FS().ReadFile(tspath.ResolvePath(pkg.Directory(), ".gitignore"))
 	}
 	published := &publication{hasFiles: hasFiles}
 	if hasIgnore {

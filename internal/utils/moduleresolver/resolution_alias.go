@@ -1,4 +1,4 @@
-package nodeutil
+package moduleresolver
 
 import (
 	"strings"
@@ -6,9 +6,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
-type moduleAlias struct {
+// Alias maps a name to ordered fallbacks, or ignores it. OnlyModule requires
+// an exact name; otherwise package paths can match the name as a prefix.
+type Alias struct {
 	Name       string   `json:"name"`
 	Targets    []string `json:"targets"`
 	OnlyModule bool     `json:"onlyModule"`
@@ -20,18 +23,18 @@ type nodeResolutionRequest struct{ name, fileName string }
 type nodeResolver struct {
 	program    *program.Program
 	fileName   string
-	options    ResolutionOptions
+	options    Options
 	active     map[nodeResolutionRequest]bool
 	mainTarget bool
 }
 
-func (resolver *nodeResolver) resolve(name string) (result nodeResolution) {
+func (resolver *nodeResolver) resolve(name string) (result Result) {
 	// A target independently overrides query and fragment. Keep both separate
 	// from the filesystem path used by dependency and existence checks.
 	if index := strings.IndexAny(name, "?#"); index > 0 && !resolver.mainTarget {
 		defer func() {
-			if result.path != "" {
-				query, fragment, hasFragment := strings.Cut(result.resourceSuffix, "#")
+			if result.Path != "" {
+				query, fragment, hasFragment := strings.Cut(result.ResourceSuffix, "#")
 				originalQuery, originalFragment, hasOriginalFragment := strings.Cut(name[index:], "#")
 				if query == "" {
 					query = originalQuery
@@ -39,22 +42,22 @@ func (resolver *nodeResolver) resolve(name string) (result nodeResolution) {
 				if !hasFragment && hasOriginalFragment {
 					fragment, hasFragment = originalFragment, true
 				}
-				result.resourceSuffix = query
+				result.ResourceSuffix = query
 				if hasFragment {
-					result.resourceSuffix += "#" + fragment
+					result.ResourceSuffix += "#" + fragment
 				}
 			}
 		}()
 	}
 	if len(resolver.options.Aliases) == 0 && len(resolver.options.AliasFields) == 0 && len(resolver.options.MainFields) == 0 {
-		if isNodeBuiltin(name) {
-			return nodeResolution{}
+		if modules.IsNodeBuiltin(name) {
+			return Result{}
 		}
 		return resolver.resolveRequest(name)
 	}
 	key := nodeResolutionRequest{name, resolver.fileName}
 	if resolver.active[key] || len(resolver.active) >= 100 {
-		return nodeResolution{resolveError: "Recursive alias while resolving '" + name + "'", recursive: true}
+		return Result{Error: "Recursive alias while resolving '" + name + "'", recursive: true}
 	}
 	if resolver.active == nil {
 		resolver.active = map[nodeResolutionRequest]bool{}
@@ -71,14 +74,14 @@ func (resolver *nodeResolver) resolve(name string) (result nodeResolution) {
 		}
 	}
 
-	if isNodeBuiltin(request) && len(resolver.options.AliasFields) == 0 {
-		return nodeResolution{}
+	if modules.IsNodeBuiltin(request) && len(resolver.options.AliasFields) == 0 {
+		return Result{}
 	}
 	result = resolver.resolveRequest(name)
 	return result
 }
 
-func (resolver *nodeResolver) alias(request string) (nodeResolution, bool) {
+func (resolver *nodeResolver) alias(request string) (Result, bool) {
 	for _, alias := range resolver.options.Aliases {
 		name, candidate := alias.Name, request
 		if tspath.IsRootedDiskPath(name) && tspath.IsRootedDiskPath(candidate) {
@@ -91,9 +94,9 @@ func (resolver *nodeResolver) alias(request string) (nodeResolution, bool) {
 			continue
 		}
 		if alias.Ignore {
-			return nodeResolution{}, true
+			return Result{}, true
 		}
-		var last nodeResolution
+		var last Result
 		matched := false
 		for _, target := range alias.Targets {
 			if match && (candidate == target || strings.HasPrefix(candidate, target+"/")) {
@@ -108,16 +111,16 @@ func (resolver *nodeResolver) alias(request string) (nodeResolution, bool) {
 			child := *resolver
 			child.mainTarget = false
 			last = child.resolve(target)
-			if last.resolveError == "" || last.recursive {
+			if last.Error == "" || last.recursive {
 				return last, true
 			}
 		}
 		if matched {
-			if strings.HasPrefix(last.resolveError, "Can't resolve '") {
-				last.resolveError = "Can't resolve '" + request + "' in '" + tspath.GetDirectoryPath(resolver.fileName) + "'"
+			if strings.HasPrefix(last.Error, "Can't resolve '") {
+				last.Error = "Can't resolve '" + request + "' in '" + tspath.GetDirectoryPath(resolver.fileName) + "'"
 			}
 			return last, true
 		}
 	}
-	return nodeResolution{}, false
+	return Result{}, false
 }
