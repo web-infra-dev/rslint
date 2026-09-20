@@ -386,6 +386,19 @@ runtime context and reporting pipeline. `DiagnosticConsumer` and `EditDemand`
 are canonical rule-framework types; `internal/linter` consumes them directly
 instead of re-exporting aliases.
 
+Rule IDs remain complete strings throughout configuration, diagnostics and
+plugin dispatch. `rule.Namespace` owns their ESLint-compatible interpretation:
+unscoped IDs split at the first slash (`node/prefer-global/url` belongs to
+`node`), while IDs starting with `@` split at the last slash. Catalog assembly
+and the Node plugin loader accept only rules whose parsed namespace matches
+the declaring plugin, so alternative splits cannot shadow another plugin's
+rule. Config resolution checks that namespace against the merged declarations.
+
+For repository tooling, slashes in a plugin-local rule name correspond to
+subdirectories: `prefer_global/url/url.go` and `url.md` represent
+`prefer-global/url`. `scripts/rule-paths.js` owns this source-path convention
+for manifest generation and release indexing; it does not resolve runtime IDs.
+
 ### Rule Context
 
 `RuleContext` is the runtime environment passed to each rule. It includes:

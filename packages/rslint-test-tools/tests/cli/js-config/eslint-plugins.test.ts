@@ -101,6 +101,55 @@ async function lint(
 }
 
 describe('CLI community plugins (object-form) end-to-end', () => {
+  test.each([
+    ['n', 'prefer-global/url'],
+    ['custom', 'a/b/c'],
+    ['@scope/plugin', 'rule'],
+    ['@scope/plugin/a', 'b'],
+  ])(
+    'multi-slash ID %s/%s survives namespace collisions, flags, suppression and fixes',
+    async (prefix, name) => {
+      const fullName = `${prefix}/${name}`;
+      const wrongSlash = fullName.startsWith('@')
+        ? fullName.indexOf('/')
+        : fullName.lastIndexOf('/');
+      const wrongPrefix = fullName.slice(0, wrongSlash);
+      const wrongName = fullName.slice(wrongSlash + 1);
+      const { dir, exitCode, diags } = await lint(
+        {
+          'local-plugin.mjs': LOCAL_PLUGIN,
+          'rslint.config.mjs': `import base from './local-plugin.mjs';
+export default [{ files: ['**/*.ts'],
+  plugins: {
+    ${JSON.stringify(prefix)}: { rules: { ${JSON.stringify(name)}: base.rules['prefer-array-some'] } },
+    // This alternative split produces the same full ID but must not replace its owner.
+    ${JSON.stringify(wrongPrefix)}: { rules: { ${JSON.stringify(wrongName)}: base.rules['no-null'] } },
+  },
+  rules: { ${JSON.stringify(fullName)}: 'off' },
+}];`,
+          'a.ts': `[1].filter(Boolean);\n// rslint-disable-next-line ${fullName}\n[2].filter(Boolean);\n`,
+        },
+        ['--rule', `${fullName}: error`],
+      );
+      try {
+        expect(exitCode).toBe(1);
+        expect(diags).toHaveLength(1);
+        expect(diags[0].ruleName).toBe(fullName);
+        expect(diags[0].range.start.line).toBe(1);
+        const fixed = await runRslint(
+          ['--fix', '--rule', `${fullName}: error`],
+          dir,
+        );
+        expect(fixed.exitCode).toBe(0);
+        expect(await fs.readFile(path.join(dir, 'a.ts'), 'utf8')).toBe(
+          `[1].some(Boolean);\n// rslint-disable-next-line ${fullName}\n[2].filter(Boolean);\n`,
+        );
+      } finally {
+        await cleanupTempDir(dir);
+      }
+    },
+  );
+
   test('plugin rules produce diagnostics at precise locations', async () => {
     const { dir, diags } = await lint({
       'local-plugin.mjs': LOCAL_PLUGIN,

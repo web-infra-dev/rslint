@@ -62,6 +62,13 @@ Use package names with `--filter` and directories with `--dir`; they are not int
 
 Go rule directories and filenames use snake_case (`<rule_name>`); exported rule variables use PascalCase with a `Rule` suffix. Rule keys and JS test filenames use kebab-case (`<rule-name>`); preserve upstream message IDs.
 
+Preserve slashes inside a plugin-local rule name as subdirectories. For example,
+`node/prefer-global/url` uses `internal/plugins/node/rules/prefer_global/url/`,
+with `url.go`, `url.md`, and `url.schema.json` when needed. Its JS integration
+test is `tests/eslint-plugin-node/rules/prefer-global/url.test.ts`. Deeper names
+follow the same convention. Register the complete ID in Go and use the actual
+plugin prefix in config; do not flatten `/` into `-` or `_`.
+
 | Item                                           | Location                                                                                                |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Core rule source, documentation and Go tests   | `internal/rules/<rule_name>/`                                                                           |

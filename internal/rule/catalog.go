@@ -25,10 +25,16 @@ func NewCatalog(rules ...Rule) *Catalog {
 	return newCatalog(byName)
 }
 
-// Namespace returns the plugin namespace before a rule name's final slash.
-// Core rules have an empty namespace.
+// Namespace returns a rule's plugin namespace using ESLint's rule-ID syntax.
+// Unscoped IDs split at the first slash, leaving any further slashes in the
+// rule name. IDs starting with @ split at the last slash to support scoped
+// plugin namespaces. Core rules have an empty namespace.
 func Namespace(ruleName string) string {
-	if separator := strings.LastIndex(ruleName, "/"); separator >= 0 {
+	separator := strings.IndexByte(ruleName, '/')
+	if strings.HasPrefix(ruleName, "@") {
+		separator = strings.LastIndexByte(ruleName, '/')
+	}
+	if separator >= 0 {
 		return ruleName[:separator]
 	}
 	return ""
@@ -77,6 +83,11 @@ func (c *Catalog) ForESLintPlugins(plugins []ESLintPluginMetadata) (*Catalog, []
 		}
 		for _, ruleName := range plugin.RuleNames {
 			fullName := plugin.Prefix + "/" + ruleName
+			// A different split can produce the same full ID. Only its parsed
+			// namespace may supply the rule, matching ESLint's plugin lookup.
+			if Namespace(fullName) != plugin.Prefix {
+				continue
+			}
 			if existing, ok := byName[fullName]; ok {
 				if !existing.IsEslintPluginRule {
 					shadowed = append(shadowed, fullName)

@@ -47,10 +47,10 @@ async function collectRuleSchemas(): Promise<RuleSchemaEntry[] | null> {
 }
 
 /**
- * Converts a rule ID into a unique PascalCase TypeScript identifier, e.g.
+ * Converts a rule ID into a readable PascalCase TypeScript identifier, e.g.
  * `no-console` -> `NoConsole`, `@typescript-eslint/no-unused-vars` ->
- * `TypescriptEslintNoUnusedVars`. Rule IDs are unique, so the identifiers
- * derived from them are too.
+ * `TypescriptEslintNoUnusedVars`. Punctuation can collapse to the same name;
+ * compilation below disambiguates against all emitted declarations.
  */
 function ruleIdToTypeName(ruleId: string): string {
   return ruleId
@@ -152,11 +152,14 @@ function namespaceHelperTypes(ts: string, mainTypeName: string): string {
   return namespaced;
 }
 
-async function compileRuleOptionTypes(rules: RuleSchemaEntry[]) {
+export async function compileRuleOptionTypes(rules: RuleSchemaEntry[]) {
   const typeDeclarations: string[] = [];
   const recordProperties: string[] = [];
+  const usedTypeNames = new Set<string>();
 
-  for (const { name: ruleId, schema } of rules) {
+  for (const { name: ruleId, schema } of [...rules].sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+  )) {
     const url = getRuleDocUrl(ruleId);
     const comment = `/**\n * @see ${url}\n */\n`;
 
@@ -167,23 +170,31 @@ async function compileRuleOptionTypes(rules: RuleSchemaEntry[]) {
       continue;
     }
 
-    const requestedName = `${ruleIdToTypeName(ruleId)}Options`;
-    const ts = await compile(schema, requestedName, {
-      bannerComment: '',
-      style: { semi: true },
-    });
-    const typeName = findDeclaredTypeName(ts, requestedName);
-    if (typeName === null) {
-      throw new Error(
-        `generate-rule-option-types: json-schema-to-typescript declared no type ` +
-          `named like ${requestedName} for rule ${ruleId}; ` +
-          `it declared ${declaredTypeNames(ts).join(', ') || '<nothing>'}`,
+    const baseName = `${ruleIdToTypeName(ruleId)}Options`;
+    for (let suffix = 1; ; suffix++) {
+      const requestedName = suffix === 1 ? baseName : `${baseName}${suffix}`;
+      const ts = await compile(schema, requestedName, {
+        bannerComment: '',
+        style: { semi: true },
+      });
+      const typeName = findDeclaredTypeName(ts, requestedName);
+      if (typeName === null) {
+        throw new Error(
+          `generate-rule-option-types: json-schema-to-typescript declared no type ` +
+            `named like ${requestedName} for rule ${ruleId}; ` +
+            `it declared ${declaredTypeNames(ts).join(', ') || '<nothing>'}`,
+        );
+      }
+      const declaration = namespaceHelperTypes(ts.trim(), typeName);
+      const names = declaredTypeNames(declaration);
+      if (names.some((name) => usedTypeNames.has(name))) continue;
+      names.forEach((name) => usedTypeNames.add(name));
+      typeDeclarations.push(declaration);
+      recordProperties.push(
+        `${comment}${JSON.stringify(ruleId)}?: RuleEntry<${typeName}>;`,
       );
+      break;
     }
-    typeDeclarations.push(namespaceHelperTypes(ts.trim(), typeName));
-    recordProperties.push(
-      `${comment}${JSON.stringify(ruleId)}?: RuleEntry<${typeName}>;`,
-    );
   }
 
   return { typeDeclarations, recordProperties };

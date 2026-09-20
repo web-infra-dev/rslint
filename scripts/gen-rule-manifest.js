@@ -2,47 +2,37 @@
 // Generate rule-manifest.json, initially all marked as none, can be improved for auto detection
 const fs = require('fs');
 const path = require('path');
+const { getRuleDirectories } = require('./rule-paths');
 
 const REPO_ROOT = path.join(__dirname, '..');
 
-// Plugins root directory
-const PLUGINS_DIR = path.join(__dirname, '../internal/plugins');
-const CORE_RULES_DIR = path.join(__dirname, '../internal/rules');
-const TEST_CONFIG_PATH = path.join(
-  __dirname,
-  '../packages/rslint-test-tools/rstack.config.mts',
-);
-const TESTS_BASE_DIR = path.join(
-  __dirname,
-  '../packages/rslint-test-tools/tests',
-);
 const MANIFEST_PATH = path.join(
   __dirname,
   '../website/generated/rule-manifest.json',
 );
 
-function getCoreRuleEntries() {
+function getCoreRuleEntries(coreRulesDir) {
   // Collect rule directories from internal/rules/*
-  if (!fs.existsSync(CORE_RULES_DIR)) return [];
+  if (!fs.existsSync(coreRulesDir)) return [];
 
   return fs
-    .readdirSync(CORE_RULES_DIR, { withFileTypes: true })
+    .readdirSync(coreRulesDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
     .map((d) => ({ rule: d.name, group: 'eslint', pluginDir: null }));
 }
 
-function getPluginRuleEntries() {
+function getPluginRuleEntries(pluginsDir) {
   // Collect rule directories from internal/plugins/{plugin}/rules/*
-  if (!fs.existsSync(PLUGINS_DIR)) return [];
+  if (!fs.existsSync(pluginsDir)) return [];
   const plugins = fs
-    .readdirSync(PLUGINS_DIR, { withFileTypes: true })
+    .readdirSync(pluginsDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
     .map((d) => d.name);
   const entries = [];
   const pluginNameCache = new Map();
   function getPluginDisplayName(plugin) {
     if (pluginNameCache.has(plugin)) return pluginNameCache.get(plugin);
-    const pluginGo = path.join(PLUGINS_DIR, plugin, 'plugin.go');
+    const pluginGo = path.join(pluginsDir, plugin, 'plugin.go');
     let display = plugin; // fallback
     if (fs.existsSync(pluginGo)) {
       try {
@@ -57,17 +47,11 @@ function getPluginRuleEntries() {
     return display;
   }
   for (const plugin of plugins) {
-    const rulesDir = path.join(PLUGINS_DIR, plugin, 'rules');
+    const rulesDir = path.join(pluginsDir, plugin, 'rules');
     if (!fs.existsSync(rulesDir) || !fs.statSync(rulesDir).isDirectory())
       continue;
     const pluginDisplayName = getPluginDisplayName(plugin);
-    const ruleDirs = fs
-      .readdirSync(rulesDir, { withFileTypes: true })
-      .filter(
-        (d) =>
-          d.isDirectory() && d.name !== 'fixtures' && !d.name.startsWith('.'),
-      )
-      .map((d) => d.name);
+    const ruleDirs = getRuleDirectories(rulesDir);
     for (const rule of ruleDirs) {
       entries.push({ rule, group: pluginDisplayName, pluginDir: plugin });
     }
@@ -86,10 +70,14 @@ function ruleKey(group, rule) {
   return `${group}:${rule}`;
 }
 
-function getIncludedRuleTests(groups) {
+function getIncludedRuleTests(ruleEntries, configPath, testsBaseDir) {
   // Parse the Rstack test config's include list and associate each rule with its
   // enabled test files, including tests nested under a rule directory.
-  const config = fs.readFileSync(TEST_CONFIG_PATH, 'utf-8');
+  const config = fs.readFileSync(configPath, 'utf-8');
+  const groups = [...new Set(ruleEntries.map((entry) => entry.group))];
+  const knownRules = new Set(
+    ruleEntries.map(({ group, rule }) => ruleKey(group, rule)),
+  );
   // Translate the on-disk test directory back to its manifest group once here,
   // so the returned map lives entirely in the `group` namespace.
   const testDirToGroup = new Map(groups.map((g) => [groupToTestDir(g), g]));
@@ -98,7 +86,7 @@ function getIncludedRuleTests(groups) {
   // the manifest is gitignored and built at site-build time the flip would
   // never surface in a diff.
   for (const [testDir] of testDirToGroup) {
-    const dir = path.join(TESTS_BASE_DIR, testDir);
+    const dir = path.join(testsBaseDir, testDir);
     if (!fs.existsSync(dir)) {
       throw new Error(
         `Expected test directory not found: ${path.relative(REPO_ROOT, dir)} ` +
@@ -110,14 +98,20 @@ function getIncludedRuleTests(groups) {
   //   ./tests/{testDir}/rules/{rule}.test.ts
   //   ./tests/{testDir}/rules/{rule}/{test-file}.test.ts
   const includeRegex =
-    /^\s*'(\.(?:\/|\\)tests\/([\w-]+)\/rules\/([\w-]+)(?:\/[^']+)?\.test\.ts)'/gm;
+    /^\s*'(\.(?:\/|\\)tests\/([\w-]+)\/rules\/([^']+)\.test\.ts)'/gm;
   const included = new Map();
   let match;
   while ((match = includeRegex.exec(config))) {
     const group = testDirToGroup.get(match[2]);
     if (!group) continue; // test dir with no matching plugin group
-    const testPath = path.resolve(path.dirname(TEST_CONFIG_PATH), match[1]);
-    const rule = match[3].replace(/-/g, '_');
+    const testPath = path.resolve(path.dirname(configPath), match[1]);
+    // Prefer the complete nested rule name, then its owning rule directory
+    // for suites split into several test files (e.g. rule/edge-cases.test.ts).
+    let rule = match[3].replace(/-/g, '_');
+    while (!knownRules.has(ruleKey(group, rule)) && rule.includes('/')) {
+      rule = rule.slice(0, rule.lastIndexOf('/'));
+    }
+    if (!knownRules.has(ruleKey(group, rule))) continue;
     const key = ruleKey(group, rule);
     if (!included.has(key)) included.set(key, new Set());
     included.get(key).add(testPath);
@@ -126,7 +120,7 @@ function getIncludedRuleTests(groups) {
   // the config quoting drifted (e.g. a formatter switched to double quotes).
   if (included.size === 0) {
     throw new Error(
-      `No rule tests parsed from ${path.relative(REPO_ROOT, TEST_CONFIG_PATH)}; ` +
+      `No rule tests parsed from ${configPath}; ` +
         `the include-path regex is likely out of sync with the config format.`,
     );
   }
@@ -293,40 +287,42 @@ function getObjectSkipCases(content, relPath) {
   return skipCases;
 }
 
-function getSkipCases(testFile) {
+function getSkipCases(testFile, repoRoot) {
   // Return skip cases as [{name, url}] for a single enabled test file.
   if (!fs.existsSync(testFile)) return [];
   const content = fs.readFileSync(testFile, 'utf-8');
-  const relPath = path.relative(REPO_ROOT, testFile).split(path.sep).join('/');
+  const relPath = path.relative(repoRoot, testFile).split(path.sep).join('/');
   const skipCases = getObjectSkipCases(content, relPath);
   // Also collect top-level it.skip('name', ...) / describe.skip('name', ...).
   skipCases.push(...getStatementLevelSkipCases(content, relPath));
   return skipCases;
 }
 
-function getDocPath(rule, pluginDir) {
-  let mdFile;
-  let relPath;
-  if (pluginDir) {
-    mdFile = path.join(PLUGINS_DIR, pluginDir, 'rules', rule, `${rule}.md`);
-    relPath = `internal/plugins/${pluginDir}/rules/${rule}/${rule}.md`;
-  } else {
-    mdFile = path.join(CORE_RULES_DIR, rule, `${rule}.md`);
-    relPath = `internal/rules/${rule}/${rule}.md`;
-  }
-  return fs.existsSync(mdFile) ? relPath : null;
+function getDocPath(rule, pluginDir, repoRoot) {
+  const base = pluginDir
+    ? `internal/plugins/${pluginDir}/rules`
+    : 'internal/rules';
+  const relPath = `${base}/${rule}/${path.posix.basename(rule)}.md`;
+  return fs.existsSync(path.join(repoRoot, relPath)) ? relPath : null;
 }
 
-function buildManifest() {
-  const ruleEntries = [...getPluginRuleEntries(), ...getCoreRuleEntries()];
+function buildManifest(repoRoot = REPO_ROOT) {
+  const ruleEntries = [
+    ...getPluginRuleEntries(path.join(repoRoot, 'internal/plugins')),
+    ...getCoreRuleEntries(path.join(repoRoot, 'internal/rules')),
+  ];
   // Deduplicate by group + rule name, keeping first entry.
   const seen = new Map();
   for (const e of ruleEntries) {
     const key = ruleKey(e.group, e.rule);
     if (!seen.has(key)) seen.set(key, e);
   }
-  const groups = [...new Set(ruleEntries.map((e) => e.group))];
-  const included = getIncludedRuleTests(groups);
+  const testWorkspace = path.join(repoRoot, 'packages/rslint-test-tools');
+  const included = getIncludedRuleTests(
+    ruleEntries,
+    path.join(testWorkspace, 'rstack.config.mts'),
+    path.join(testWorkspace, 'tests'),
+  );
   const rules = Array.from(seen.values())
     .sort(
       (a, b) => a.rule.localeCompare(b.rule) || a.group.localeCompare(b.group),
@@ -340,13 +336,15 @@ function buildManifest() {
       if (!testFiles) {
         status = 'partial-test';
       } else {
-        const skipCases = Array.from(testFiles).flatMap(getSkipCases);
+        const skipCases = Array.from(testFiles).flatMap((file) =>
+          getSkipCases(file, repoRoot),
+        );
         if (skipCases.length > 0) {
           status = 'partial-impl';
           failing_case = skipCases;
         }
       }
-      const docPath = getDocPath(rule, entry.pluginDir);
+      const docPath = getDocPath(rule, entry.pluginDir, repoRoot);
       return {
         name: rule.replace(/_/g, '-'),
         group,
