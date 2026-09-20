@@ -26,8 +26,8 @@ func TestPreferGlobalConsoleExtras(t *testing.T) {
 		// Source variable is not a literal.
 		{Code: "const name = 'console'; require(name); process.getBuiltinModule(name);",
 			FileName: "input.js", TSConfig: "tsconfig.allowJs.json"},
-		// Constant method calls are not evaluated as module names.
-		{Code: "require('console'.toString()); process.getBuiltinModule('node:console'.toString());",
+		// Unknown method arguments do not produce constant module names.
+		{Code: "require('console'.toString(unknown)); process.getBuiltinModule(name.toString());",
 			FileName: "input.js", TSConfig: "tsconfig.allowJs.json"},
 		// Local module bindings with never.
 		{Code: "import console from 'console'; console.log(); export { Console } from 'console';",
@@ -80,15 +80,14 @@ func TestPreferGlobalConsoleExtras(t *testing.T) {
 		{Code: "import console = require('console'); console.log();",
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 			FileName:        "input.ts"},
-		// Explicit type-only imports and exports do not load a module at runtime.
-		{Code: "import type { Console } from 'console'; export type { Console as Logger } from 'node:console';",
-			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
-			FileName:        "input.ts"},
-		{Code: "import type ConsoleModule from 'console'; import type * as NodeConsole from 'node:console'; export type * from 'console'; export type * as Logger from 'node:console';",
-			Options:         []any{"always"},
-			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
-			FileName:        "input.ts"},
 	}, []rule_tester.InvalidTestCase{
+		// Constant string methods resolve the same module names as literals.
+		{Code: "require('console'.toString());\nprocess.getBuiltinModule('node:console'.toString());",
+			FileName: "input.js", TSConfig: "tsconfig.allowJs.json",
+			Errors: []rule_tester.InvalidTestCaseError{
+				consoleError("preferGlobal", 1, 1, 1, 30),
+				consoleError("preferGlobal", 2, 1, 2, 52),
+			}},
 		// Constant source expressions.
 		{Code: "require(`console`); require('con' + 'sole'); process.getBuiltinModule('node:' + 'console');",
 			FileName: "input.js", TSConfig: "tsconfig.allowJs.json",
@@ -230,12 +229,32 @@ func TestPreferGlobalConsoleExtras(t *testing.T) {
 				consoleError("preferModule", 1, 22, 1, 29),
 				consoleError("preferModule", 1, 66, 1, 73),
 			}},
-		// Type-only declarations do not hide neighboring runtime module loads.
+		// Type-only module declarations follow the same source preference.
+		{Code: "import type { Console } from 'console';\nexport type { Console as Logger } from 'node:console';",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			FileName:        "input.ts",
+			Errors: []rule_tester.InvalidTestCaseError{
+				consoleError("preferGlobal", 1, 1, 1, 40),
+				consoleError("preferGlobal", 2, 1, 2, 55),
+			}},
+		{Code: "import type ConsoleModule from 'console';\nimport type * as NodeConsole from 'node:console';\nexport type * from 'console';\nexport type * as Logger from 'node:console';",
+			Options:         []any{"always"},
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			FileName:        "input.ts",
+			Errors: []rule_tester.InvalidTestCaseError{
+				consoleError("preferGlobal", 1, 1, 1, 42),
+				consoleError("preferGlobal", 2, 1, 2, 50),
+				consoleError("preferGlobal", 3, 1, 3, 30),
+				consoleError("preferGlobal", 4, 1, 4, 45),
+			}},
+		// Type-only and runtime declarations both reference the module.
 		{Code: "import type { Console } from 'console';\nimport 'node:console';\nexport type { Console } from 'console';\nexport { log } from 'console';",
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 			FileName:        "input.ts",
 			Errors: []rule_tester.InvalidTestCaseError{
+				consoleError("preferGlobal", 1, 1, 1, 40),
 				consoleError("preferGlobal", 2, 1, 2, 23),
+				consoleError("preferGlobal", 3, 1, 3, 40),
 				consoleError("preferGlobal", 4, 1, 4, 31),
 			}},
 		// Inline type specifiers retain module loading with verbatimModuleSyntax.

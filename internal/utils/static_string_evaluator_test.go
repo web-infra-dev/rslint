@@ -25,6 +25,8 @@ func TestStaticStringEvaluatorPropertyNames(t *testing.T) {
 		{`fn`, "fn", true},
 		{`["f" + "n"]`, "fn", true},
 		{"[`f${\"n\"}`]", "fn", true},
+		{`['fn'.toString()]`, "fn", true},
+		{`[unknown.toString()]`, "", false},
 		{`[["fn"]]`, "fn", true},
 		{`[""]`, "", true},
 		{`[-0]`, "0", true},
@@ -92,6 +94,13 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const stringCall = String(\"then\");\n" +
 		"const stringNumberCall = String(1 + 2);\n" +
 		"const stringNoArgumentCall = String();\n" +
+		"const stringToString = \"GET\".toString();\n" +
+		"const emptyToString = \"\".toString();\n" +
+		"const computedToString = \"GET\"[\"to\" + \"String\"]();\n" +
+		"const optionalToString = \"GET\"?.toString?.();\n" +
+		"const stringToStringExtraArgument = \"GET\".toString(123);\n" +
+		"const stringToStringUnknownArgument = \"GET\".toString(unknown);\n" +
+		"const customToString = ({toString() { return \"GET\"; }}).toString();\n" +
 		"const uppercase = \"get\".toUpperCase();\n" +
 		"const uppercaseExpansion = \"ß\".toUpperCase();\n" +
 		"const uppercaseStaticExtraArgument = \"get\".toUpperCase(1);\n" +
@@ -269,6 +278,13 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "stringCall", want: "then", ok: true},
 		{name: "stringNumberCall", want: "3", ok: true},
 		{name: "stringNoArgumentCall", want: "", ok: true},
+		{name: "stringToString", want: "GET", ok: true},
+		{name: "emptyToString", want: "", ok: true},
+		{name: "computedToString", want: "GET", ok: true},
+		{name: "optionalToString", want: "GET", ok: true},
+		{name: "stringToStringExtraArgument", want: "GET", ok: true},
+		{name: "stringToStringUnknownArgument"},
+		{name: "customToString"},
 		{name: "uppercase", want: "GET", ok: true},
 		{name: "uppercaseExpansion", want: "SS", ok: true},
 		{name: "uppercaseStaticExtraArgument", want: "GET", ok: true},
@@ -445,6 +461,8 @@ func TestStaticStringEvaluatorUTF16Semantics(t *testing.T) {
 	filePath := tspath.ResolvePath(rootDir.Dir, "utf16.ts")
 	code := `
 const loneLength = String('\uD800'.length);
+const loneToString = '\uD83D'.toString();
+const astralToString = '😀'.toString();
 const indexAfterLone = String('\uD800x'.indexOf('x'));
 const astralHighIndex = String('😀'.indexOf('\uD83D'));
 const astralLowIndex = String('😀'.indexOf('\uDE00'));
@@ -491,6 +509,8 @@ const indexedLone = '\uD800'[0];
 		want string
 	}{
 		{name: "loneLength", want: "1"},
+		{name: "loneToString", want: high},
+		{name: "astralToString", want: "😀"},
 		{name: "indexAfterLone", want: "1"},
 		{name: "astralHighIndex", want: "0"},
 		{name: "astralLowIndex", want: "1"},
