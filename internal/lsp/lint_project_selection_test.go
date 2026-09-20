@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -27,110 +28,234 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func lintProjectMetadataForTest(
-	configPath string,
-	rootFiles []string,
-	options *core.CompilerOptions,
-	fs vfs.FS,
-) *lintProjectMetadata {
-	if options == nil {
-		options = &core.CompilerOptions{}
-	}
-	return newLintProjectMetadata(
-		configPath,
-		tsoptions.NewParsedCommandLine(options, rootFiles, nil, tspath.ComparePathsOptions{
-			CurrentDirectory:          tspath.GetDirectoryPath(configPath),
-			UseCaseSensitiveFileNames: true,
-		}),
-		fs,
-	)
-}
-
 func TestSelectConfiguredLintProjectDirectRootOutranksEarlierImport(t *testing.T) {
-	const (
-		firstConfig  = "/repo/tsconfig.import.json"
-		secondConfig = "/repo/tsconfig.direct.json"
-		targetPath   = "/repo/src/target.ts"
-	)
-	metadata := map[string]*lintProjectMetadata{
-		firstConfig:  lintProjectMetadataForTest(firstConfig, []string{"/repo/importer.ts"}, nil, nil),
-		secondConfig: lintProjectMetadataForTest(secondConfig, []string{targetPath}, nil, nil),
-	}
-	sourceFile := &ast.SourceFile{}
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "selection"))
+	fs := bundled.WrapFS(osvfs.FS())
+	file := lspConfigTarget(tspath.ResolvePath(dir, "target.ts"), dir, fs)
+	firstConfig := tspath.ResolvePath(dir, "tsconfig.import.json")
+	secondConfig := tspath.ResolvePath(dir, "tsconfig.direct.json")
+	request := newStandaloneLintProjectRequestWithFS(file, fs)
+	loaders := request.loaders()
 	var programCalls []string
-	selected, found, err := selectConfiguredLintProject(
-		[]string{firstConfig, secondConfig},
-		"",
-		target.File{PathIdentity: config.PathIdentity{Path: targetPath, CanonicalPath: targetPath}},
-		nil,
-		lintProjectLoaders{
-			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
-				return metadata[configPath], true, nil
-			},
-			program: func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
-				configPath := metadata.configPath
-				programCalls = append(programCalls, configPath)
-				return new(compiler.Program), sourceFile, nil
-			},
-		},
-	)
+	loaders.program = func(metadata *lintProjectMetadata) (*compiler.Program, error) {
+		programCalls = append(programCalls, metadata.configPath)
+		return request.program(metadata)
+	}
+	selected, found, err := selectConfiguredLintProject([]string{firstConfig, secondConfig}, "", file, fs, loaders)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !found || selected.configPath != secondConfig || !selected.directRoot {
+	if !found || selected.configPath != secondConfig || !selected.directRoot || selected.sourceFile == nil {
 		t.Fatalf("selected project = %+v, want direct %q", selected, secondConfig)
 	}
-	if len(programCalls) != 1 || programCalls[0] != secondConfig {
+	if !slices.Equal(programCalls, []string{secondConfig}) {
 		t.Fatalf("Program calls = %v, want only direct winner", programCalls)
 	}
 }
 
 func TestSelectConfiguredLintProjectFallbackOrderAndExtensionFilter(t *testing.T) {
-	const (
-		firstConfig  = "/repo/tsconfig.ts.json"
-		secondConfig = "/repo/tsconfig.js.json"
-		targetPath   = "/repo/src/target.js"
-	)
-	metadata := map[string]*lintProjectMetadata{
-		firstConfig: lintProjectMetadataForTest(
-			firstConfig,
-			[]string{"/repo/first.ts"},
-			&core.CompilerOptions{AllowJs: core.TSFalse},
-			nil,
-		),
-		secondConfig: lintProjectMetadataForTest(
-			secondConfig,
-			[]string{"/repo/second.ts"},
-			&core.CompilerOptions{AllowJs: core.TSTrue},
-			nil,
-		),
-	}
-	sourceFile := &ast.SourceFile{}
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "selection"))
+	fs := bundled.WrapFS(osvfs.FS())
+	file := lspConfigTarget(tspath.ResolvePath(dir, "script.js"), dir, fs)
+	firstConfig := tspath.ResolvePath(dir, "tsconfig.import.json")
+	secondConfig := tspath.ResolvePath(dir, "tsconfig.js.json")
+	request := newStandaloneLintProjectRequestWithFS(file, fs)
+	loaders := request.loaders()
 	var programCalls []string
-	selected, found, err := selectConfiguredLintProject(
-		[]string{firstConfig, secondConfig},
-		"",
-		target.File{PathIdentity: config.PathIdentity{Path: targetPath, CanonicalPath: targetPath}},
-		nil,
-		lintProjectLoaders{
-			metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
-				return metadata[configPath], true, nil
-			},
-			program: func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
-				configPath := metadata.configPath
-				programCalls = append(programCalls, configPath)
-				return new(compiler.Program), sourceFile, nil
-			},
-		},
-	)
+	loaders.program = func(metadata *lintProjectMetadata) (*compiler.Program, error) {
+		programCalls = append(programCalls, metadata.configPath)
+		return request.program(metadata)
+	}
+	selected, found, err := selectConfiguredLintProject([]string{firstConfig, secondConfig}, "", file, fs, loaders)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !found || selected.configPath != secondConfig || selected.directRoot {
+	if !found || selected.configPath != secondConfig || selected.directRoot || selected.sourceFile == nil {
 		t.Fatalf("selected project = %+v, want import fallback %q", selected, secondConfig)
 	}
-	if len(programCalls) != 1 || programCalls[0] != secondConfig {
+	if !slices.Equal(programCalls, []string{secondConfig}) {
 		t.Fatalf("Program calls = %v, want unsupported project skipped", programCalls)
+	}
+}
+
+func TestSelectConfiguredLintProjectDoesNotReadAfterDirectRoot(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "selection"))
+	firstConfig := tspath.ResolvePath(dir, "tsconfig.direct.json")
+	secondConfig := tspath.ResolvePath(dir, "tsconfig.import.json")
+	fs := &configReadCountingFS{FS: bundled.WrapFS(osvfs.FS()), target: secondConfig, unreadable: true}
+	file := lspConfigTarget(tspath.ResolvePath(dir, "target.ts"), dir, fs)
+	request := newStandaloneLintProjectRequestWithFS(file, fs)
+	selected, found, err := selectConfiguredLintProject([]string{firstConfig, secondConfig}, "", file, fs, request.loaders())
+	if err != nil || !found || selected.configPath != firstConfig || selected.sourceFile == nil {
+		t.Fatalf("direct selection=%+v found=%v error=%v", selected, found, err)
+	}
+	if fs.reads != 0 {
+		t.Fatalf("unneeded unreadable config was read %d times", fs.reads)
+	}
+}
+
+func TestSelectConfiguredLintProjectUsesActualMembershipAndFrozenIdentity(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "selection"))
+	baseFS := bundled.WrapFS(osvfs.FS())
+	physical := tspath.ResolvePath(dir, "target.ts")
+	alias := tspath.ResolvePath(dir, "target-alias.ts")
+	if err := os.Symlink("target.ts", alias); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	configPath := tspath.ResolvePath(dir, "tsconfig.direct.json")
+	metadata, err := parseStandaloneLintProject(configPath, baseFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := createStandaloneLintProgram(metadata, baseFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := lspConfigTarget(alias, dir, baseFS)
+	fs := &retargetingLintProgramFS{
+		FS: baseFS, targetPath: file.CanonicalPath, firstPath: file.CanonicalPath,
+		laterPath: tspath.ResolvePath(dir, "moved.ts"), targetCall: 1,
+	}
+	loaders := lintProjectLoaders{
+		metadata: func(string) (*lintProjectMetadata, bool, error) { return metadata, true, nil },
+		program: func(*lintProjectMetadata) (*compiler.Program, error) {
+			return program, nil
+		},
+	}
+	selected, found, err := selectConfiguredLintProject([]string{configPath}, "", file, fs, loaders)
+	if err != nil || !found || selected.sourceFile != program.GetSourceFile(physical) {
+		t.Fatalf("frozen selection=%+v found=%v error=%v", selected, found, err)
+	}
+	if fs.targetCall != 1 {
+		t.Fatalf("frozen physical identity was queried again: %d", fs.targetCall)
+	}
+
+	// A successfully acquired Program must still contain the target. Metadata
+	// availability and compiler construction alone do not establish membership.
+	otherConfig := tspath.ResolvePath(dir, "tsconfig.js.json")
+	otherMetadata, err := parseStandaloneLintProject(otherConfig, baseFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherProgram, err := createStandaloneLintProgram(otherMetadata, baseFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaders.metadata = func(string) (*lintProjectMetadata, bool, error) { return otherMetadata, true, nil }
+	loaders.program = func(*lintProjectMetadata) (*compiler.Program, error) {
+		return otherProgram, nil
+	}
+	if _, found, err := selectConfiguredLintProject([]string{otherConfig}, "", file, baseFS, loaders); err != nil || found {
+		t.Fatalf("unrelated Program replaced actual membership: found=%v error=%v", found, err)
+	}
+}
+
+func TestLSPProjectSelectionDiagnosticAndSpeculativeParity(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
+	for _, test := range []struct {
+		name, file, wantConfig string
+		projects               []string
+		service, unreadLater   bool
+	}{
+		{name: "direct stops before unreadable", file: "target.ts", projects: []string{"tsconfig.direct.json", "tsconfig.import.json"}, wantConfig: "tsconfig.direct.json", unreadLater: true},
+		{name: "later direct outranks import", file: "target.ts", projects: []string{"tsconfig.import.json", "tsconfig.direct.json"}, wantConfig: "tsconfig.direct.json"},
+		{name: "ordinary listed JS gap", file: "script.js", projects: []string{"tsconfig.json"}},
+		{name: "service listed JS typed", file: "script.js", service: true, wantConfig: "tsconfig.json"},
+		{name: "ordinary imported alias gap", file: "script.js", projects: []string{"tsconfig.import.json"}},
+		{name: "later eligible JS import", file: "script.js", projects: []string{"tsconfig.import.json", "tsconfig.js.json"}, wantConfig: "tsconfig.js.json"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := tspath.NormalizePath(archive.Materialize(t, "selection"))
+			if err := os.Symlink("script.js", tspath.ResolvePath(dir, "alias.ts")); err != nil {
+				t.Skipf("symlinks unavailable: %v", err)
+			}
+			fs := &configReadCountingFS{FS: bundled.WrapFS(osvfs.FS())}
+			if test.unreadLater {
+				fs.target = tspath.ResolvePath(dir, "tsconfig.import.json")
+				fs.unreadable = true
+			}
+			server := newTestServer()
+			server.cwd, server.fs = dir, fs
+			server.lintPrograms = newLintProgramStore(server)
+			server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			file := tspath.ResolvePath(dir, test.file)
+			uri := documentURIFromPath(file)
+			const content = "export function value() { var local = 1; return local; }\ndebugger;\n"
+			server.documents[uri] = content
+			options := &config.ParserOptions{Project: test.projects}
+			if test.service {
+				options.ProjectService = config.BoolPtr(true)
+			}
+			entries := config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: options},
+				Rules:           config.Rules{"no-debugger": "error", "no-var": "error", "@typescript-eslint/no-unsafe-member-access": "error"},
+			}}
+			snapshot := documentLintSnapshotForTest(server, uri, entries, dir, false, nil)
+			for _, speculative := range []bool{false, true} {
+				var generation linter.Generation
+				var release linter.ReleaseFunc
+				var err error
+				if speculative {
+					generation, release, err = acquireSpeculativeGeneration(context.Background(), content, snapshot,
+						server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+				} else {
+					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				}
+				if release != nil {
+					defer release()
+				}
+				if err != nil || len(generation.Native.Programs) != 1 {
+					t.Fatalf("speculative=%v Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+				}
+				program := generation.Native.Programs[0]
+				source := program.GetSourceFile(file)
+				wantConfig := ""
+				if test.wantConfig != "" {
+					wantConfig = tspath.ResolvePath(dir, test.wantConfig)
+				}
+				gotConfig := program.Options().ConfigFilePath
+				configMatches := gotConfig == ""
+				if wantConfig != "" {
+					configMatches = lintProgramLexicalPathID(gotConfig, fs) == lintProgramLexicalPathID(wantConfig, fs)
+				}
+				if source == nil || source.Text() != content || !configMatches {
+					t.Fatalf("speculative=%v wrong source/project/type capability: config=%s source=%v", speculative, program.Options().ConfigFilePath, source)
+				}
+				foundTyped := false
+				for _, configured := range generation.Native.RulesForFile(source) {
+					foundTyped = foundTyped || configured.RequiresTypeInfo
+				}
+				if foundTyped != (wantConfig != "") {
+					t.Fatalf("speculative=%v typed rules=%v, want %v", speculative, foundTyped, wantConfig != "")
+				}
+				result, err := runLSPGenerationForTest(context.Background(), generation, nil, linter.ArtifactDemand{Native: rule.EditDemandAutofix})
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics := result.Observation.Native.Diagnostics
+				if len(diagnostics) != 2 {
+					t.Fatalf("speculative=%v wrong diagnostic count: %+v", speculative, diagnostics)
+				}
+				seen := make(map[string]bool)
+				for _, diagnostic := range diagnostics {
+					seen[diagnostic.RuleName] = true
+					if diagnostic.RuleName == "no-var" && len(diagnostic.Fixes()) != 1 {
+						t.Fatalf("speculative=%v missing fix: %+v", speculative, diagnostic)
+					}
+				}
+				if !seen["no-var"] || !seen["no-debugger"] {
+					t.Fatalf("speculative=%v lost syntax rules: %v", speculative, seen)
+				}
+			}
+			if test.unreadLater && fs.reads != 0 {
+				t.Fatalf("unneeded config read %d times", fs.reads)
+			}
+			if server.documents[uri] != content {
+				t.Fatal("speculative lint changed the editor buffer")
+			}
+		})
 	}
 }
 
@@ -181,13 +306,17 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !metadata.Contains(firstSource, "") {
+	if !slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(firstSource)) {
 		t.Fatal("initial parsed metadata does not contain its configured root")
 	}
 	if err := os.WriteFile(configPath, []byte(`{"files":["second.ts"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	program, sourceFile, err := request.program(metadata)
+	program, err := request.program(metadata)
+	var sourceFile *ast.SourceFile
+	if program != nil {
+		sourceFile = program.GetSourceFile(tspath.NormalizePath(firstSource))
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +362,11 @@ func TestStandaloneLintProjectRequestKeepsReferenceSnapshot(t *testing.T) {
 	if err := os.WriteFile(refPath, []byte(strings.ReplaceAll(cyclic, "unsafe.d.ts", "safe.d.ts")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	program, source, err := request.program(metadata)
+	program, err := request.program(metadata)
+	var source *ast.SourceFile
+	if program != nil {
+		source = program.GetSourceFile(target.Path)
+	}
 	if err != nil || source == nil {
 		t.Fatalf("Program source=%v error=%v", source, err)
 	}
@@ -267,11 +400,11 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 		files[tspath.ResolvePath("c:/Repo", name)] = string(content)
 	}
 	fsys := utils.NewOverlayVFS(&caseInsensitiveLSPTestFS{}, files)
-	upper, err := parseStandaloneLintProject("C:/Repo/tsconfig.json", fsys, fsys)
+	upper, err := parseStandaloneLintProject("C:/Repo/tsconfig.json", fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lower, err := parseStandaloneLintProject("c:/Repo/tsconfig.json", fsys, fsys)
+	lower, err := parseStandaloneLintProject("c:/Repo/tsconfig.json", fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,10 +509,10 @@ func TestLintSessionProjectRootCacheUsesCommandLineGeneration(t *testing.T) {
 	configPath := filepath.Join(dir, "tsconfig.json")
 	first := cache.metadata(configPath, firstProgram.CommandLine(), fs)
 	if reused := cache.metadata(configPath, firstProgram.CommandLine(), fs); reused != first {
-		t.Fatal("unchanged Session command line rebuilt its root index")
+		t.Fatal("unchanged Session command line rebuilt its metadata")
 	}
 	second := cache.metadata(configPath, secondProgram.CommandLine(), fs)
-	if second == first || !second.Contains(secondSource, "") || second.Contains(firstSource, "") {
+	if second == first || !slices.Contains(second.commandLine.FileNames(), tspath.NormalizePath(secondSource)) || slices.Contains(second.commandLine.FileNames(), tspath.NormalizePath(firstSource)) {
 		t.Fatal("new Session command line did not replace cached root metadata")
 	}
 }
@@ -389,7 +522,7 @@ func TestLintSessionProjectRootCacheTracksServiceProgramGeneration(t *testing.T)
 	directory := tspath.NormalizePath(archive.Materialize(t, "javascript-reference"))
 	configPath := tspath.ResolvePath(directory, "tsconfig.json")
 	fsys := bundled.WrapFS(osvfs.FS())
-	metadata, err := parseStandaloneLintProject(configPath, fsys, fsys)
+	metadata, err := parseStandaloneLintProject(configPath, fsys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,11 +596,11 @@ func TestDocumentProjectPolicyPreservesSymlinkDeclarationPath(t *testing.T) {
 	if len(paths) != 1 || paths[0] != tspath.NormalizePath(aliasConfig) {
 		t.Fatalf("resolved project paths = %v, want lexical %q", paths, aliasConfig)
 	}
-	metadata, err := parseStandaloneLintProject(paths[0], fs, fs)
+	metadata, err := parseStandaloneLintProject(paths[0], fs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !metadata.Contains(aliasSource, "") || metadata.Contains(realSource, "") {
+	if !slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(aliasSource)) || slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(realSource)) {
 		t.Fatal("symlinked tsconfig did not resolve includes from its declared directory")
 	}
 }
@@ -500,8 +633,8 @@ func TestProjectServiceLSPGenerationParity(t *testing.T) {
 		{name: "imported target gap", fixture: "imported-gap", target: "target.ts", wantRoots: 1},
 		{name: "triple slash target gap", fixture: "triple-slash-gap", target: "target.js", wantRoots: 1},
 		{name: "overlapping reference chooses child", fixture: "overlapping-reference", target: "target.ts", wantConfig: "leaf.json", wantRoots: 1},
-		{name: "disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "configured project root"},
-		{name: "Session disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "configured project root", withSession: true},
+		{name: "disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "was absent"},
+		{name: "Session disabled source redirect remains an error", fixture: "disabled-source-redirect", target: "target.ts", wantError: "was absent", withSession: true},
 		{name: "explicit JS root without allowJs", fixture: "explicit-js", target: "target.js", wantConfig: "tsconfig.json", wantRoots: 1, withSession: true},
 		{name: "unreadable config remains an error", fixture: "unowned", target: "target.ts", failConfig: "tsconfig.json", wantError: "no parsed config returned"},
 		{name: "conflicting explicit project", fixture: "nested", target: "pkg/src/target.ts", project: []string{}, wantError: "enabling parserOptions.project"},
@@ -776,7 +909,7 @@ func TestSelectConfiguredLintProjectServiceDoesNotProbePrograms(t *testing.T) {
 			request.sourceReferences = true
 			loaders := request.loaders()
 			var built []string
-			loaders.program = func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+			loaders.program = func(metadata *lintProjectMetadata) (*compiler.Program, error) {
 				configPath := metadata.configPath
 				built = append(built, configPath)
 				return request.program(metadata)
@@ -827,9 +960,9 @@ func TestProjectServiceLSPDoesNotUseIndirectSessionMembership(t *testing.T) {
 		server: server, uri: uri, snapshot: snapshot,
 		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
 			return lintProjectLoaders{
-				program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+				program: func(*lintProjectMetadata) (*compiler.Program, error) {
 					t.Fatal("gap discovery attempted standalone Program construction")
-					return nil, nil, nil
+					return nil, nil
 				},
 				metadata: request.loadMetadata,
 			}, nil

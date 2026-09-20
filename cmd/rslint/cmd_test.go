@@ -1198,10 +1198,10 @@ func TestHandleLintCommandBuildsOnlySelectedProjects(t *testing.T) {
 					t.Fatalf("unselected source %s reads=%d, want 0", name, got)
 				}
 			}
-			// Every invocation validates the effective candidates without
-			// constructing the later project's source graph.
-			if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); got == 0 {
-				t.Fatal("later effective project config was not validated")
+			// Every invocation stops before reading the later candidate once
+			// the target's direct project is selected.
+			if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); got != 0 {
+				t.Fatal("later effective project config was unnecessarily read")
 			}
 		})
 	}

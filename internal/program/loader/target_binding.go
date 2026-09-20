@@ -88,9 +88,9 @@ type projectRootMembership struct {
 	pathIndex int
 }
 
-// directRootProgramOwners returns the first declared project that selects each
-// target as a tsconfig root. A targeted build supplies this result directly;
-// an eager build derives it in batches after all Programs are ready.
+// directRootProgramOwners reuses the selected owners from a targeted build,
+// including ordered import fallback. An eager AllDeclared build instead derives
+// the first declared root owners in batches after all Programs are ready.
 func directRootProgramOwners(
 	set ProjectSet,
 	targets []target.File,

@@ -181,3 +181,22 @@ export const value = payload;
 export declare const value: any;
 -- snapshot-references/lib/safe.d.ts --
 export declare const value: { member: number };
+-- selection/tsconfig.import.json --
+{"files":["importer.ts"],"compilerOptions":{"noLib":true,"allowJs":false}}
+-- selection/tsconfig.direct.json --
+{"files":["target.ts"],"compilerOptions":{"noLib":true}}
+-- selection/tsconfig.js.json --
+{"files":["js-importer.ts"],"compilerOptions":{"noLib":true,"allowJs":true}}
+-- selection/tsconfig.json --
+{"files":["script.js"],"compilerOptions":{"noLib":true,"allowJs":false}}
+-- selection/importer.ts --
+import "./target.ts";
+import "./alias.ts";
+-- selection/js-importer.ts --
+import "./script.js";
+-- selection/target.ts --
+export const value = 1;
+-- selection/script.js --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;

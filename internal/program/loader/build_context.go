@@ -1,7 +1,6 @@
 package loader
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -143,22 +142,10 @@ func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (*tsoptions.
 		host,
 		c.extendedConfigCacheInterface(),
 	)
+	if config == nil {
+		return nil, fmt.Errorf("no parsed config returned for %q", resolvedConfigPath)
+	}
 	return config, nil
-}
-
-// validateConfigRead checks the fatal conditions of lenient config parsing
-// without expanding includes or reading extended configs. Successful contents
-// are retained by the existing metadata snapshot for later parsing.
-func (c *buildContext) validateConfigRead(cwd string, tsconfigPath string) error {
-	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
-	if !c.compilerFS().FileExists(resolvedConfigPath) {
-		return fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
-	}
-	c.registerTSConfig(resolvedConfigPath)
-	if _, ok := c.compilerFS().ReadFile(resolvedConfigPath); !ok {
-		return errors.New("no parsed config returned")
-	}
-	return nil
 }
 
 // createCompatibilityProgram creates a source-only compiler Program using the

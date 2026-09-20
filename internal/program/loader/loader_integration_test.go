@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
@@ -2171,8 +2173,8 @@ func TestLoadProgramsPrefersLaterDirectRootOverEarlierImport(t *testing.T) {
 	if got := readCounter.readCount(implicitRoot); got != 0 {
 		t.Fatalf("earlier import-only project source was read %d time(s)", got)
 	}
-	if got := readCounter.readCount(laterConfig); got == 0 {
-		t.Fatal("effective project after the direct winner was not validated")
+	if got := readCounter.readCount(laterConfig); got != 0 {
+		t.Fatal("project after the direct winner was unnecessarily read")
 	}
 	if got := readCounter.readCount(tspath.ResolvePath(dir, "unrelated-main.ts")); got != 0 {
 		t.Fatalf("project after the direct winner read its source %d time(s)", got)
@@ -2227,7 +2229,7 @@ func TestBuildTargetProjectPrefersEarlierDirectRoot(t *testing.T) {
 	}
 }
 
-func TestBuildTargetProjectValidatesWithoutExpandingLaterRoots(t *testing.T) {
+func TestBuildTargetProjectStopsAfterSelectedRoot(t *testing.T) {
 	for _, disableCache := range []bool{false, true} {
 		for _, singleThreaded := range []bool{false, true} {
 			t.Run(fmt.Sprintf("cache-disabled=%t/serial=%t", disableCache, singleThreaded), func(t *testing.T) {
@@ -2248,12 +2250,16 @@ func TestBuildTargetProjectValidatesWithoutExpandingLaterRoots(t *testing.T) {
 					t.Fatalf("selected project: count=%d err=%v", set.Len(), err)
 				}
 				for _, config := range []string{"tsconfig.json", "later/tsconfig.json", "empty.json", "invalid.json"} {
-					if got := fsys.readCount(tspath.ResolvePath(dir, config)); got != 1 {
-						t.Fatalf("config %q read %d times, want one snapshot", config, got)
+					want := 0
+					if config == "tsconfig.json" {
+						want = 1
+					}
+					if got := fsys.readCount(tspath.ResolvePath(dir, config)); got != want {
+						t.Fatalf("config %q read %d times, want %d", config, got, want)
 					}
 				}
-				if !disableCache && (fsys.readCount(tspath.ResolvePath(dir, "later/base.json")) != 0 ||
-					fsys.directoryCount(tspath.ResolvePath(dir, "later/src")) != 0) {
+				if fsys.readCount(tspath.ResolvePath(dir, "later/base.json")) != 0 ||
+					fsys.directoryCount(tspath.ResolvePath(dir, "later/src")) != 0 {
 					t.Fatal("a later candidate expanded includes or extended configs after an exact root was found")
 				}
 				if fsys.readCount(tspath.ResolvePath(dir, "later/src/other.ts")) != 0 {
@@ -2264,48 +2270,75 @@ func TestBuildTargetProjectValidatesWithoutExpandingLaterRoots(t *testing.T) {
 	}
 }
 
-func TestBuildTargetProjectValidatesEveryEffectiveCandidate(t *testing.T) {
-	dir := tspath.NormalizePath(t.TempDir())
-	writeProgramTestFiles(t, dir, map[string]string{
-		"nested/target.ts":       `export const target = 1;`,
-		"nested/unreadable.json": `{}`,
-		"tsconfig-first.json":    `{"files":["nested/target.ts"],"compilerOptions":{"noLib":true}}`,
-	})
-	configPath := tspath.ResolvePath(dir, "nested/unreadable.json")
-	fsys := &unreadableProjectConfigFS{
-		FS:         bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		configPath: configPath,
-	}
-	plan := target.Plan{Files: []target.File{
-		testLintTarget(fsys, dir, filepath.Join(dir, "nested/target.ts")),
-	}}
-
-	// All effective declarations are validated before source construction,
-	// even when an earlier project would own every selected target.
-	for _, terminalError := range []bool{false, true} {
+func TestBuildTargetProjectReadsOnlyNeededCandidates(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		projects    []string
+		targets     []string
+		unreadable  string
+		alias       bool
+		allDeclared bool
+		wantConfig  string
+		wantError   bool
+		wantReads   int
+	}{
+		{name: "direct root skips unreadable later config", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "later/tsconfig.json", wantConfig: "tsconfig.json"},
+		{name: "physical root skips unreadable later config", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"alias.ts"}, unreadable: "later/tsconfig.json", alias: true, wantConfig: "tsconfig.json"},
+		{name: "imported target still finds later direct root", projects: []string{"./import.json", "./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "later/tsconfig.json", wantConfig: "tsconfig.json"},
+		{name: "imported target must read later candidate", projects: []string{"./import.json", "./tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "tsconfig.json", wantError: true, wantReads: 1},
+		{name: "another target needs later candidate", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts", "later/src/other.ts"}, unreadable: "later/tsconfig.json", wantError: true, wantReads: 1},
+		{name: "first candidate is unreadable", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "tsconfig.json", wantError: true, wantReads: 1},
+		{name: "program-wide checking still reads all declarations", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "later/tsconfig.json", allDeclared: true, wantError: true, wantReads: 1},
+	} {
 		for _, singleThreaded := range []bool{false, true} {
-			configs := map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig-first.json", "./nested/unreadable.json")}
-			broadPlan := plan
-			if terminalError {
-				laterOwner := tspath.ResolvePath(dir, "z")
-				configs[laterOwner] = projectConfig("./missing.json")
-				broadPlan.Files = append(append([]target.File(nil), plan.Files...),
-					testLintTarget(fsys, laterOwner, tspath.ResolvePath(laterOwner, "target.ts")))
-			}
-			_, err := NewSession(fsys).buildProjectsForTest(t, ProjectBuildRequest{
-				Configs: configs, Targets: broadPlan, Scope: LintTargets, SingleThreaded: singleThreaded,
+			t.Run(fmt.Sprintf("%s/serial=%t", test.name, singleThreaded), func(t *testing.T) {
+				dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_root_prefix.txtar").Materialize(t, ""))
+				if test.alias {
+					if err := os.Symlink(tspath.ResolvePath(dir, "target.ts"), tspath.ResolvePath(dir, "alias.ts")); err != nil {
+						t.Skipf("symlinks unavailable: %v", err)
+					}
+				}
+				configPath := tspath.ResolvePath(dir, test.unreadable)
+				fsys := &programReadCountingFS{
+					FS:    &unreadableProjectConfigFS{FS: bundled.WrapFS(osvfs.FS()), configPath: configPath},
+					reads: make(map[string]int),
+				}
+				var files []target.File
+				for _, name := range test.targets {
+					files = append(files, testLintTarget(fsys, dir, tspath.ResolvePath(dir, name)))
+				}
+				scope := LintTargets
+				if test.allDeclared {
+					scope = AllDeclared
+				}
+				projects, err := NewSession(fsys).buildProjectsForTest(t, ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(test.projects...)},
+					Targets: target.Plan{Files: files}, Scope: scope, SingleThreaded: singleThreaded,
+				})
+				if test.wantError {
+					if err == nil || !strings.Contains(err.Error(), test.unreadable) {
+						t.Fatalf("expected reached config error for %q, got %v", test.unreadable, err)
+					}
+				} else {
+					if err != nil || projects.Len() != 1 {
+						t.Fatalf("selected project: count=%d err=%v", projects.Len(), err)
+					}
+					if got := tspath.NormalizePath(projects.compilerPrograms[0].Options().ConfigFilePath); got != tspath.ResolvePath(dir, test.wantConfig) {
+						t.Fatalf("selected %q, want %q", got, test.wantConfig)
+					}
+				}
+				if got := fsys.readCount(configPath); got != test.wantReads {
+					t.Fatalf("unreadable config read %d times, want %d", got, test.wantReads)
+				}
 			})
-			if err == nil || !strings.Contains(err.Error(), "unreadable.json") || !strings.Contains(err.Error(), "no parsed config returned") {
-				t.Fatalf("terminal=%t serial=%t: lost active configuration failure: %v", terminalError, singleThreaded, err)
-			}
 		}
 	}
 }
 
-func TestBuildProjectsPreservesValidationPrecedence(t *testing.T) {
+func TestBuildProjectsReportsPathResolutionBeforeTargetSelection(t *testing.T) {
 	dir := tspath.NormalizePath(t.TempDir())
-	// Model a declared config disappearing after path collection. A later
-	// owner's path-resolution error must not hide that earlier build error.
+	// Path resolution is already unsuccessful. Target selection must return
+	// that error without reading configs solely to replace it with another one.
 	plan := projectPlan{
 		specs:       []projectSpec{{tsconfigPath: tspath.ResolvePath(dir, "removed.json"), programCwd: dir}},
 		terminalErr: os.ErrNotExist,
@@ -2316,9 +2349,77 @@ func TestBuildProjectsPreservesValidationPrecedence(t *testing.T) {
 		_, err := NewSession(fsys).executeTargetProjectPlan(plan, ProjectBuildRequest{
 			Scope: LintTargets, SingleThreaded: singleThreaded,
 		})
-		if eagerError == nil || err == nil || !strings.Contains(err.Error(), "removed.json") || err.Error() != eagerError.Error() {
-			t.Fatalf("broad validation precedence changed: got %v, want %v", err, eagerError)
+		if !errors.Is(err, plan.terminalErr) {
+			t.Fatalf("target selection did not preserve path-resolution error: %v", err)
 		}
+		if eagerError == nil || !strings.Contains(eagerError.Error(), "removed.json") {
+			t.Fatalf("program-wide validation changed: %v", eagerError)
+		}
+	}
+}
+
+func TestSelectProjectSourcesKeepsAuthoredEligibilityWithAdaptedProgram(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"keep.ts":       "export const keep = 1;",
+		"target.js":     "export const target = 1;",
+		"tsconfig.json": `{"files":["keep.ts","target.js"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
+	})
+	fsys := bundled.WrapFS(osvfs.FS())
+	context := newBuildContext(fsys)
+	configPath := tspath.ResolvePath(dir, "tsconfig.json")
+	parsed, err := context.parseConfig(dir, configPath)
+	if err != nil || parsed == nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	targets := []target.File{
+		testLintTarget(fsys, dir, tspath.ResolvePath(dir, "keep.ts")),
+		testLintTarget(fsys, dir, tspath.ResolvePath(dir, "target.js")),
+	}
+	indexes := []int{0}
+	for _, service := range []bool{false, true} {
+		var adapted *compiler.Program
+		selected, err := SelectProjectSources(ProjectSelectionRequest{
+			Targets: targets, CandidateIndexes: [][]int{indexes, indexes},
+			Candidates: []ProjectCandidate{{ConfigPath: configPath, SourceReferences: service}},
+			FS:         fsys, SingleThreaded: true,
+			Metadata: func(int) (*tsoptions.ParsedCommandLine, error) { return parsed, nil },
+			Program: func(_ int, metadata *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
+				var err error
+				adapted, err = context.createProjectProgramFromParsedConfig(true, dir, metadata, true)
+				return adapted, err
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if adapted == nil || adapted.GetSourceFile(targets[1].Path) == nil {
+			t.Fatal("fixture must provide JS through the adapter's internal options")
+		}
+		if selected[0].SourceFile == nil || (selected[1].SourceFile != nil) != service {
+			t.Fatalf("service=%t: selection borrowed an adapter's broader eligibility: %+v", service, selected)
+		}
+	}
+}
+
+func TestSelectProjectSourcesStopsSerialGroupsOnError(t *testing.T) {
+	firstError := errors.New("unreadable first config")
+	reachedSecond := false
+	_, err := SelectProjectSources(ProjectSelectionRequest{
+		Targets:          []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: "/a/target.ts"}, ConfigDirectory: "/a"}, {PathIdentity: rslintconfig.PathIdentity{Path: "/b/target.ts"}, ConfigDirectory: "/b"}},
+		CandidateIndexes: [][]int{{0}, {1}},
+		Candidates:       []ProjectCandidate{{ConfigPath: "/a/tsconfig.json"}, {ConfigPath: "/b/tsconfig.json"}},
+		SingleThreaded:   true,
+		Metadata: func(index int) (*tsoptions.ParsedCommandLine, error) {
+			if index == 0 {
+				return nil, firstError
+			}
+			reachedSecond = true
+			return nil, errors.New("unexpected later config read")
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), firstError.Error()) || reachedSecond {
+		t.Fatalf("serial selection continued after its first failure: err=%v second=%t", err, reachedSecond)
 	}
 }
 

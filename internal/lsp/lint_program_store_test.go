@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -81,18 +82,12 @@ func newLintProgramStoreFixture(t *testing.T, source string) *lintProgramStoreFi
 func (f *lintProgramStoreFixture) request(
 	uri lsproto.DocumentUri,
 ) (func(string) (*compiler.Program, *ast.SourceFile, error), lintProjectMetadataLoader, func()) {
-	loader, metadata, finalize := f.store.Request(
-		context.Background(),
-		uri,
-		lspConfigTarget(uriToPath(uri), f.server.cwd, f.server.fs),
-	)
+	file := lspConfigTarget(uriToPath(uri), f.server.cwd, f.server.fs)
+	loaders, finalize := f.store.Request(context.Background(), uri, file)
 	return func(path string) (*compiler.Program, *ast.SourceFile, error) {
-		selected, _, err := metadata(path)
-		if err != nil {
-			return nil, nil, err
-		}
-		return loader(selected)
-	}, metadata, finalize
+		selected, _, err := selectConfiguredLintProject([]string{path}, "", file, f.server.fs, loaders)
+		return selected.program, selected.sourceFile, err
+	}, loaders.metadata, finalize
 }
 
 func (f *lintProgramStoreFixture) load(t *testing.T) *compiler.Program {
@@ -141,9 +136,7 @@ func TestLintProgramStoreReusesAndUpdatesSource(t *testing.T) {
 
 func selectLintProgramRequestForTest(request *lintProgramRequest, rootDirectory string) (selectedLintProject, error) {
 	request.prepareOverlay()
-	selected, _, err := selectConfiguredLintProject(nil, rootDirectory, request.target, request.overlayFS, lintProjectLoaders{
-		program: request.load, metadata: request.loadMetadata,
-	})
+	selected, _, err := selectConfiguredLintProject(nil, rootDirectory, request.target, request.overlayFS, request.loaders())
 	return selected, err
 }
 
@@ -210,12 +203,11 @@ func TestLintProgramStoreProjectServiceIgnoresPreviouslyLoadedReferences(t *test
 	}
 	legacyTarget := tspath.ResolvePath(directory, "shared/first.ts")
 	legacyRequest := store.request(context.Background(), documentURIFromPath(legacyTarget), lspConfigTarget(legacyTarget, directory, server.fs), false)
-	legacyMetadata, err := legacyRequest.metadata(tspath.ResolvePath(directory, "shared/tsconfig.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := legacyRequest.load(legacyMetadata); err != nil {
-		t.Fatal(err)
+	legacyRequest.prepareOverlay()
+	if _, found, err := selectConfiguredLintProject(
+		[]string{tspath.ResolvePath(directory, "shared/tsconfig.json")}, "", legacyRequest.target, legacyRequest.overlayFS, legacyRequest.loaders(),
+	); err != nil || !found {
+		t.Fatalf("load legacy project: found=%v error=%v", found, err)
 	}
 	legacyRequest.finalize()
 	if program, err := load("app/second.ts"); err != nil || program != nil {
@@ -537,7 +529,7 @@ func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 		t.Fatal("project metadata was unavailable")
 	}
 	finalize()
-	if metadata == nil || !metadata.Contains(fixture.sourcePath, fixture.sourcePath) {
+	if metadata == nil || !slices.Contains(metadata.commandLine.FileNames(), fixture.sourcePath) {
 		t.Fatalf("project metadata did not contain the configured source: %v", metadata)
 	}
 	_, loadMetadata, finalize = fixture.request(fixture.sourceURI)
@@ -571,7 +563,7 @@ func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 		t.Fatal("reloaded project metadata was unavailable")
 	}
 	finalize()
-	if metadata == nil || metadata.Contains(fixture.sourcePath, fixture.sourcePath) {
+	if metadata == nil || slices.Contains(metadata.commandLine.FileNames(), fixture.sourcePath) {
 		t.Fatalf("invalidated project metadata leaked across requests: %v", metadata)
 	}
 }
@@ -609,7 +601,7 @@ func TestLintProgramStoreOpeningNewIncludedFileInvalidatesProjectMetadata(t *tes
 		t.Fatal("refreshed project metadata was unavailable")
 	}
 	finalize()
-	if after == before || !after.Contains(newPath, "") {
+	if after == before || !slices.Contains(after.commandLine.FileNames(), tspath.NormalizePath(newPath)) {
 		t.Fatal("newly included source was absent from refreshed project metadata")
 	}
 }
@@ -632,7 +624,7 @@ func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T)
 	if !available {
 		t.Fatal("project metadata was unavailable")
 	}
-	if metadata.Contains(outsidePath, "") {
+	if slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(outsidePath)) {
 		t.Fatal("outside target unexpectedly became a direct project root")
 	}
 	_, sourceFile, err := loadProgram(fixture.configPath)
@@ -648,6 +640,47 @@ func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T)
 	}
 	if len(fixture.store.projectMetadata) != 1 {
 		t.Fatalf("lightweight project metadata was not retained: %d", len(fixture.store.projectMetadata))
+	}
+}
+
+func TestLintProgramStoreConfirmsSharedProjectSelection(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "selection"))
+	if err := os.Symlink("script.js", tspath.ResolvePath(dir, "alias.ts")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	server := newTestServer()
+	server.cwd, server.fs = dir, bundled.WrapFS(osvfs.FS())
+	store := newLintProgramStore(server)
+	store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+	firstConfig := tspath.ResolvePath(dir, "tsconfig.import.json")
+	secondConfig := tspath.ResolvePath(dir, "tsconfig.js.json")
+	load := func(name string, projects []string) (selectedLintProject, *lintProgramRequest) {
+		t.Helper()
+		file := lspConfigTarget(tspath.ResolvePath(dir, name), dir, server.fs)
+		request := store.request(context.Background(), documentURIFromPath(file.Path), file, false)
+		request.prepareOverlay()
+		selected, _, err := selectConfiguredLintProject(projects, "", file, request.overlayFS, request.loaders())
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.finalize()
+		return selected, request
+	}
+	selectedTS, _ := load("target.ts", []string{firstConfig})
+	if selectedTS.program == nil || selectedTS.program.GetSourceFile(tspath.ResolvePath(dir, "alias.ts")) == nil || len(store.programs) != 1 {
+		t.Fatal("fixture did not retain a TS project containing the JS physical alias")
+	}
+	selectedJS, gapRequest := load("script.js", []string{firstConfig})
+	if selectedJS.program != nil || gapRequest.usedState != nil || len(store.programs) != 1 {
+		t.Fatal("ordinary JS borrowed types or residency from the previously selected TS project")
+	}
+	firstState := store.programs[lintProgramKey{configPath: firstConfig}]
+	if _, remembered := firstState.selectedSourceIdentities[lintProgramLexicalPathID(tspath.ResolvePath(dir, "script.js"), server.fs)]; remembered {
+		t.Fatal("unselected JS target was remembered by the resident TS Program")
+	}
+	selectedJS, typedRequest := load("script.js", []string{firstConfig, secondConfig})
+	if selectedJS.configPath != secondConfig || selectedJS.sourceFile == nil || typedRequest.usedState == nil || len(store.programs) != 2 {
+		t.Fatalf("later eligible project was not selected and confirmed: selected=%+v Programs=%d", selectedJS, len(store.programs))
 	}
 }
 
@@ -667,11 +700,11 @@ func TestLintProgramStoreDoesNotRetainProgramWithTransientProjectMetadata(t *tes
 			server.fs = bundled.WrapFS(osvfs.FS())
 			store := newLintProgramStore(server)
 			store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
-			metadata, err := parseStandaloneLintProject(configPath, server.fs, server.fs)
+			metadata, err := parseStandaloneLintProject(configPath, server.fs)
 			if err != nil {
 				t.Fatal(err)
 			}
-			reference, err := parseStandaloneLintProject(refPath, server.fs, server.fs)
+			reference, err := parseStandaloneLintProject(refPath, server.fs)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -684,8 +717,9 @@ func TestLintProgramStoreDoesNotRetainProgramWithTransientProjectMetadata(t *tes
 				transientPath = refPath
 			}
 			request.transientMetadata[transientPath] = struct{}{}
-			if _, sourceFile, err := request.load(metadata); err != nil || sourceFile == nil {
-				t.Fatalf("transient Program source=%v error=%v", sourceFile, err)
+			selected, err := selectLintProgramRequestForTest(request, server.cwd)
+			if err != nil || selected.sourceFile == nil {
+				t.Fatalf("transient Program source=%v error=%v", selected.sourceFile, err)
 			}
 			request.finalize()
 			if len(store.programs) != 0 {
@@ -1249,21 +1283,13 @@ func TestLintProgramStoreReusesFrozenTargetForResidentAndRebuild(t *testing.T) {
 
 	load := func() *ast.SourceFile {
 		t.Helper()
-		loader, loadMetadata, finalize := fixture.store.Request(
-			context.Background(),
-			fixture.sourceURI,
-			target,
-		)
+		loaders, finalize := fixture.store.Request(context.Background(), fixture.sourceURI, target)
 		defer finalize()
-		metadata, _, err := loadMetadata(fixture.configPath)
+		selected, _, err := selectConfiguredLintProject([]string{fixture.configPath}, "", target, fixture.server.fs, loaders)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, sourceFile, err := loader(metadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return sourceFile
+		return selected.sourceFile
 	}
 	if sourceFile := load(); sourceFile == nil || sourceFile.Text() != content {
 		t.Fatalf("resident Program source = %v", sourceFile)
@@ -1352,17 +1378,10 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 		return nil
 	}
 
-	loader, loadMetadata, finalize := store.Request(
-		context.Background(),
-		sourceURI,
-		lspConfigTarget(sourcePath, workspace, server.fs),
-	)
-	metadata, _, err := loadMetadata(configPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := loader(metadata); err != nil {
-		t.Fatal(err)
+	file := lspConfigTarget(sourcePath, workspace, server.fs)
+	loaders, finalize := store.Request(context.Background(), sourceURI, file)
+	if _, found, err := selectConfiguredLintProject([]string{configPath}, "", file, server.fs, loaders); err != nil || !found {
+		t.Fatalf("select project: found=%v error=%v", found, err)
 	}
 	finalize()
 	if realPath := server.fs.Realpath(shared); realPath != "" {

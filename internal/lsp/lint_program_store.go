@@ -54,6 +54,7 @@ type lintProgramRequest struct {
 	sourceReferences  bool
 	usedKey           lintProgramKey
 	usedState         *lintProgramState
+	pendingStates     map[*compiler.Program]*lintProgramState
 	projectMetadata   map[string]*lintProjectMetadata
 	transientMetadata map[string]struct{}
 }
@@ -76,9 +77,9 @@ func (s *lintProgramStore) Request(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
 	target target.File,
-) (lintProgramLoader, lintProjectMetadataLoader, func()) {
+) (lintProjectLoaders, func()) {
 	request := s.request(ctx, uri, target, false)
-	return request.load, request.loadMetadata, request.finalize
+	return request.loaders(), request.finalize
 }
 
 func (s *lintProgramStore) request(
@@ -102,6 +103,12 @@ func (s *lintProgramStore) request(
 		sourceReferences:  sourceReferences,
 		projectMetadata:   make(map[string]*lintProjectMetadata),
 		transientMetadata: make(map[string]struct{}),
+	}
+}
+
+func (r *lintProgramRequest) loaders() lintProjectLoaders {
+	return lintProjectLoaders{
+		program: r.load, metadata: r.loadMetadata, selected: r.confirmSelection,
 	}
 }
 
@@ -186,7 +193,6 @@ func (r *lintProgramRequest) parseProjectMetadata(
 		metadata, err := parseStandaloneLintProject(
 			configFileName,
 			r.overlayFS,
-			r.store.server.fs,
 		)
 		return metadata, false, err
 	}
@@ -196,7 +202,6 @@ func (r *lintProgramRequest) parseProjectMetadata(
 		metadata, err := parseStandaloneLintProject(
 			configFileName,
 			tracker,
-			r.store.server.fs,
 		)
 		if err != nil {
 			return nil, false, err
@@ -228,7 +233,7 @@ func (r *lintProgramRequest) parseProjectMetadata(
 
 func (r *lintProgramRequest) load(
 	metadata *lintProjectMetadata,
-) (*compiler.Program, *ast.SourceFile, error) {
+) (*compiler.Program, error) {
 	r.prepareOverlay()
 	configFileName := metadata.configPath
 	if r.freshOnly || !r.store.Usable() {
@@ -249,7 +254,7 @@ func (r *lintProgramRequest) load(
 	}
 	if len(state.dirtyFiles) == 0 {
 		state.tracker.Inner = r.overlayFS
-		return r.result(configFileName, state)
+		return r.result(state)
 	}
 
 	state.tracker.Inner = r.overlayFS
@@ -283,15 +288,12 @@ func (r *lintProgramRequest) load(
 	clear(state.dirtyFiles)
 	added, safe := r.cover(state)
 	if !safe {
-		return program, state.sources.SourceFileForTarget(
-			r.target.Path,
-			r.target.CanonicalPath,
-		), nil
+		return program, nil
 	}
 	if added {
 		return r.rebuild(configFileName, state.metadata)
 	}
-	return r.result(configFileName, state)
+	return r.result(state)
 }
 
 // matchesMetadata checks only snapshots this request has already observed.
@@ -317,24 +319,24 @@ func (r *lintProgramRequest) matchesMetadata(state *lintProgramState, root *lint
 
 func (r *lintProgramRequest) loadFresh(
 	metadata *lintProjectMetadata,
-) (*compiler.Program, *ast.SourceFile, error) {
+) (*compiler.Program, error) {
 	program, err := r.createProgram(metadata, r.overlayFS)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
+	return program, nil
 }
 
 func (r *lintProgramRequest) rebuild(
 	configFileName string,
 	metadata *lintProjectMetadata,
-) (*compiler.Program, *ast.SourceFile, error) {
+) (*compiler.Program, error) {
 	delete(r.store.programs, r.key(configFileName))
 	if metadata == nil {
 		var err error
 		metadata, err = r.metadata(configFileName)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	// A selected reference may also predate stable watcher coverage. The host
@@ -343,9 +345,9 @@ func (r *lintProgramRequest) rebuild(
 	if r.freshOnly || !r.store.Usable() || len(r.transientMetadata) != 0 {
 		program, err := r.createProgram(metadata, r.overlayFS)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
+		return program, nil
 	}
 
 	// Register every dependency discovered by the first build, then rebuild
@@ -354,7 +356,7 @@ func (r *lintProgramRequest) rebuild(
 		tracker := newLintTrackingFS(r.overlayFS)
 		program, err := r.createProgram(metadata, tracker)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		state := &lintProgramState{
 			program:                  program,
@@ -365,19 +367,9 @@ func (r *lintProgramRequest) rebuild(
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
 			metadata:                 metadata,
 		}
-		sourceFile := state.sources.SourceFileForTarget(
-			r.target.Path,
-			r.target.CanonicalPath,
-		)
-		if sourceFile == nil {
-			// A fallback probe that did not contain this target must not make an
-			// unrelated Program resident. Previously selected resident Programs
-			// are handled by load and remain available to their documents.
-			return program, nil, nil
-		}
 		added, safe := r.cover(state)
 		if !safe {
-			return program, sourceFile, nil
+			return program, nil
 		}
 		if added && attempt == 0 {
 			continue
@@ -385,29 +377,35 @@ func (r *lintProgramRequest) rebuild(
 		if added {
 			// Lazy compiler reads expanded coverage again. Serve this Program
 			// once, but do not retain it across the uncovered interval.
-			return program, sourceFile, nil
+			return program, nil
 		}
-		delete(r.store.projectMetadata, configFileName)
-		r.store.programs[r.key(configFileName)] = state
-		return r.result(configFileName, state)
+		return r.result(state)
 	}
 	panic("unreachable")
 }
 
-func (r *lintProgramRequest) result(
-	configFileName string,
-	state *lintProgramState,
-) (*compiler.Program, *ast.SourceFile, error) {
-	sourceFile := state.sources.SourceFileForTarget(
-		r.target.Path,
-		r.target.CanonicalPath,
-	)
-	if sourceFile != nil {
-		state.rememberSelectedTarget(r.target, r.store.server.fs)
-		r.usedKey = r.key(configFileName)
-		r.usedState = state
+// result keeps a stable candidate request-local until shared selection confirms
+// its actual source. Failed import probes never become resident Programs.
+func (r *lintProgramRequest) result(state *lintProgramState) (*compiler.Program, error) {
+	if r.pendingStates == nil {
+		r.pendingStates = make(map[*compiler.Program]*lintProgramState)
 	}
-	return state.program, sourceFile, nil
+	r.pendingStates[state.program] = state
+	return state.program, nil
+}
+
+func (r *lintProgramRequest) confirmSelection(program *compiler.Program) {
+	defer clear(r.pendingStates)
+	state := r.pendingStates[program]
+	if state == nil || r.freshOnly || !r.store.Usable() {
+		return
+	}
+	key := r.key(state.metadata.configPath)
+	delete(r.store.projectMetadata, state.metadata.configPath)
+	r.store.programs[key] = state
+	state.rememberSelectedTarget(r.target, r.store.server.fs)
+	r.usedKey = key
+	r.usedState = state
 }
 
 func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bool) {
@@ -427,6 +425,7 @@ func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bo
 }
 
 func (r *lintProgramRequest) finalize() {
+	clear(r.pendingStates)
 	if !r.store.Usable() || r.usedState == nil {
 		return
 	}

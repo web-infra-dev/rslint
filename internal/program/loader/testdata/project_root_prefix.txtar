@@ -1,5 +1,9 @@
 -- target.ts --
 export const target = 1;
+-- importer.ts --
+import "./target";
+-- import.json --
+{"files":["importer.ts"],"compilerOptions":{"noLib":true}}
 -- tsconfig.json --
 {"files":["target.ts"],"compilerOptions":{"noLib":true}}
 -- later/tsconfig.json --

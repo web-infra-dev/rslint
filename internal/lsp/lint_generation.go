@@ -142,7 +142,7 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		loaders, release = p.requestPrograms(ctx, p.uri, snapshot.target)
 	} else if server.lintPrograms.Usable() {
 		resident := server.lintPrograms.request(ctx, p.uri, snapshot.target, serviceEnabled)
-		loaders = lintProjectLoaders{program: resident.load, metadata: resident.loadMetadata}
+		loaders = resident.loaders()
 		release = resident.finalize
 		if serviceEnabled {
 			resident.prepareOverlay()

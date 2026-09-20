@@ -1985,9 +1985,9 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 		config.ProjectPolicy{},
 		fsys,
 		lintProjectLoaders{
-			program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+			program: func(*lintProjectMetadata) (*compiler.Program, error) {
 				loaderCalls++
-				return nil, nil, errors.New("standalone loader must not run")
+				return nil, errors.New("standalone loader must not run")
 			},
 			metadata: func(string) (*lintProjectMetadata, bool, error) {
 				rootLoaderCalls++
@@ -2022,9 +2022,9 @@ func TestSelectLintProgram_PrefersSessionProjectBeforeStandaloneLoader(t *testin
 		snapshot: documentLintSnapshotForTest(s, uri, entries, dir, false, nil),
 		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {
 			return lintProjectLoaders{
-				program: func(*lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
+				program: func(*lintProjectMetadata) (*compiler.Program, error) {
 					loaderCalls++
-					return nil, nil, errors.New("service must reuse the Session Program")
+					return nil, errors.New("service must reuse the Session Program")
 				},
 				metadata: func(configPath string) (*lintProjectMetadata, bool, error) {
 					rootLoaderCalls++
