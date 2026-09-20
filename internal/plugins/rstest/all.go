@@ -56,6 +56,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_be_truthy"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_contain"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_have_been_called"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_have_been_called_times"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_have_length"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_awaited_expect_poll"
@@ -129,6 +130,7 @@ func GetAllRules() []rule.Rule {
 		prefer_to_be_truthy.PreferToBeTruthyRule,
 		prefer_to_contain.PreferToContainRule,
 		prefer_to_have_been_called.PreferToHaveBeenCalledRule,
+		prefer_to_have_been_called_times.PreferToHaveBeenCalledTimesRule,
 		prefer_to_have_length.PreferToHaveLengthRule,
 		prefer_todo.PreferTodoRule,
 		require_awaited_expect_poll.RequireAwaitedExpectPollRule,
