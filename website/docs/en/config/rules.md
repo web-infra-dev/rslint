@@ -5,6 +5,13 @@
 
 Configures individual rules with a severity level and optional positional options.
 
+Plugin rule keys combine the configured plugin prefix with its rule name.
+For ordinary prefixes, the first `/` separates them: `custom/group/rule`
+means rule `group/rule` in plugin `custom`. Prefixes starting with `@` follow
+ESLint's scoped syntax and split at the last `/`: `@scope/plugin/rule`
+belongs to plugin `@scope/plugin`. Use the complete rule key in `--rule`
+arguments and disable comments as well.
+
 | Value          | Description                               |
 | -------------- | ----------------------------------------- |
 | `"error"`, `2` | Reports as an error; causes non-zero exit |

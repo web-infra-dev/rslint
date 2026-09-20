@@ -39,9 +39,16 @@ func TestNamespace(t *testing.T) {
 	}{
 		{ruleName: "@typescript-eslint/no-explicit-any", expected: "@typescript-eslint"},
 		{ruleName: "@scope/plugin/rule", expected: "@scope/plugin"},
+		{ruleName: "@scope/plugin/a/b", expected: "@scope/plugin/a"},
+		{ruleName: "node/prefer-global/url", expected: "node"},
+		{ruleName: "n/prefer-global/url", expected: "n"},
+		{ruleName: "plugin/a/b/c", expected: "plugin"},
+		{ruleName: "plugin//rule", expected: "plugin"},
+		{ruleName: "plugin/a/", expected: "plugin"},
 		{ruleName: "import/no-unresolved", expected: "import"},
 		{ruleName: "plugin/", expected: "plugin"},
 		{ruleName: "no-debugger", expected: ""},
+		{ruleName: "", expected: ""},
 	}
 	for _, test := range tests {
 		if actual := Namespace(test.ruleName); actual != test.expected {
@@ -55,19 +62,54 @@ func TestCatalogRuleNamesForNamespaceReturnsCopy(t *testing.T) {
 		Rule{Name: "core"},
 		Rule{Name: "plugin/first"},
 		Rule{Name: "plugin/second"},
+		Rule{Name: "plugin/nested/rule"},
 	)
 	coreNames := catalog.RuleNamesForNamespace("")
 	if len(coreNames) != 1 || coreNames[0] != "core" {
 		t.Fatalf("core names = %v, want [core]", coreNames)
 	}
 	pluginNames := catalog.RuleNamesForNamespace("plugin")
-	if len(pluginNames) != 2 || pluginNames[0] != "plugin/first" || pluginNames[1] != "plugin/second" {
+	if !slices.Equal(pluginNames, []string{"plugin/first", "plugin/nested/rule", "plugin/second"}) {
 		t.Fatalf("plugin names = %v, want sorted names", pluginNames)
 	}
 	pluginNames[0] = "changed"
 	for _, ruleName := range catalog.RuleNamesForNamespace("plugin") {
 		if ruleName == "changed" {
 			t.Fatal("mutating returned rule names changed catalog")
+		}
+	}
+}
+
+func TestCatalogForESLintPluginsUsesParsedNamespace(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		plugins := []ESLintPluginMetadata{
+			{Prefix: "n/prefer-global", RuleNames: []string{"url"}},
+			{Prefix: "n", RuleNames: []string{"prefer-global/url", "a/b/c"}},
+			{Prefix: "@scope/plugin", RuleNames: []string{"a/b", "rule"}},
+			{Prefix: "@scope/plugin/a", RuleNames: []string{"b"}},
+		}
+		if reverse {
+			slices.Reverse(plugins)
+		}
+		catalog, shadowed := NewCatalog().ForESLintPlugins(plugins)
+		if len(shadowed) != 0 {
+			t.Fatalf("unexpected collisions: %v", shadowed)
+		}
+		for _, name := range []string{"n/prefer-global/url", "n/a/b/c", "@scope/plugin/rule", "@scope/plugin/a/b"} {
+			if _, ok := catalog.Lookup(name); !ok {
+				t.Errorf("missing %q", name)
+			}
+		}
+		// Invalid splits alone must not expose a rule or shadow a native rule.
+		invalid, shadowed := NewCatalog(Rule{Name: "n/prefer-global/url"}).ForESLintPlugins([]ESLintPluginMetadata{
+			{Prefix: "n/prefer-global", RuleNames: []string{"url"}},
+			{Prefix: "@scope/plugin", RuleNames: []string{"a/b"}},
+		})
+		if len(shadowed) != 0 {
+			t.Errorf("invalid namespace reported native collisions: %v", shadowed)
+		}
+		if _, ok := invalid.Lookup("@scope/plugin/a/b"); ok {
+			t.Error("invalid scoped split became resolvable")
 		}
 	}
 }

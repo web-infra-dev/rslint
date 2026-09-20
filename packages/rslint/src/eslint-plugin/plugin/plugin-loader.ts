@@ -268,7 +268,15 @@ export async function loadPluginsFromConfigFile(
 
       if (plugin.rules) {
         for (const [ruleName, ruleDef] of Object.entries(plugin.rules)) {
-          rules.set(`${prefix}/${ruleName}`, ruleDef);
+          const fullName = `${prefix}/${ruleName}`;
+          // Match ESLint and Go's rule.Namespace. An alternative split of
+          // the same ID must not replace a rule owned by another plugin.
+          const slash = fullName.startsWith('@')
+            ? fullName.lastIndexOf('/')
+            : fullName.indexOf('/');
+          if (fullName.slice(0, slash) === prefix) {
+            rules.set(fullName, ruleDef);
+          }
         }
       }
     }

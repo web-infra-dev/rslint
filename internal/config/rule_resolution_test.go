@@ -8,6 +8,55 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+func TestResolveEnabledRules_MultiSlashNames(t *testing.T) {
+	for _, tc := range []struct {
+		prefix string
+		name   string
+	}{
+		{"node", "prefer-global/url"},
+		{"n", "prefer-global/url"},
+		{"custom", "a/b/c"},
+		{"@scope/plugin", "rule"},
+		{"@scope/plugin/a", "b"},
+	} {
+		t.Run(tc.prefix+"/"+tc.name, func(t *testing.T) {
+			fullName := tc.prefix + "/" + tc.name
+			for _, community := range []bool{false, true} {
+				catalog := rule.NewCatalog(rule.Rule{Name: fullName, Schema: rule.EmptyArraySchema})
+				if community {
+					catalog, _ = rule.NewCatalog().ForESLintPlugins([]rule.ESLintPluginMetadata{{Prefix: tc.prefix, RuleNames: []string{tc.name}}})
+				}
+				cfg := RslintConfig{
+					{Plugins: []string{tc.prefix}},
+					{Rules: Rules{fullName: "error"}},
+				}
+				if err := ValidateConfig(cfg); err != nil {
+					t.Fatal(err)
+				}
+				normalized, errors := ValidateRuleOptions(cfg, catalog)
+				if len(errors) != 0 {
+					t.Fatal(errors)
+				}
+				enabled, _ := ResolveEnabledRules(catalog, normalized, "src/app.ts", "")
+				if len(enabled) != 1 || enabled[0].Name != fullName || enabled[0].IsEslintPluginRule != community {
+					t.Fatalf("community=%v: enabled rules = %+v", community, enabled)
+				}
+				// A declaration for a partial rule ID must not grant permission
+				// to run a rule owned by a different namespace.
+				cfg[0].Plugins = []string{tc.prefix + "/unrelated"}
+				if enabled, _ := ResolveEnabledRules(catalog, cfg, "src/app.ts", ""); len(enabled) != 0 {
+					t.Fatalf("wrong plugin declaration enabled %+v", enabled)
+				}
+				cfg[0].Plugins = []string{tc.prefix}
+				cfg[1].Rules[fullName] = "off"
+				if enabled, _ := ResolveEnabledRules(catalog, cfg, "src/app.ts", ""); len(enabled) != 0 {
+					t.Fatalf("disabled rule enabled %+v", enabled)
+				}
+			}
+		})
+	}
+}
+
 func TestResolveEnabledRules_FiltersByEnabledState(t *testing.T) {
 
 	config := RslintConfig{

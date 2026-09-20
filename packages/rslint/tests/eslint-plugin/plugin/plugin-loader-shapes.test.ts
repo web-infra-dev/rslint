@@ -45,6 +45,42 @@ import path from 'node:path';
 
 import { loadPluginsFromConfigs } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 
+test.each([false, true])(
+  'rule IDs use their parsed plugin namespace (reverse=%s)',
+  async (reverse) => {
+    const entries = [
+      `['n', { rules: { 'prefer-global/url': { owner: 'n' } } }]`,
+      `['n/prefer-global', { rules: { url: { owner: 'wrong' } } }]`,
+      `['@scope/plugin', { rules: { 'a/b': { owner: 'wrong' }, rule: { owner: 'scoped' } } }]`,
+      `['@scope/plugin/a', { rules: { b: { owner: 'nested-scope' } } }]`,
+    ];
+    if (reverse) entries.reverse();
+    await withTempDir(
+      {
+        'rslint.config.mjs': `export default [{plugins: Object.fromEntries([${entries.join(',')}])}];`,
+      },
+      async (dir) => {
+        const loaded = (
+          await loadPluginsFromConfigs([
+            {
+              configPath: path.join(dir, 'rslint.config.mjs'),
+              configDirectory: dir,
+            },
+          ])
+        ).get(dir)!;
+        expect(loaded.rules.get('n/prefer-global/url')).toEqual({ owner: 'n' });
+        expect(loaded.rules.get('@scope/plugin/a/b')).toEqual({
+          owner: 'nested-scope',
+        });
+        expect(loaded.rules.get('@scope/plugin/rule')).toEqual({
+          owner: 'scoped',
+        });
+        expect(loaded.rules.size).toBe(3);
+      },
+    );
+  },
+);
+
 async function withTempDir<T>(
   files: Record<string, string>,
   fn: (dir: string) => Promise<T>,

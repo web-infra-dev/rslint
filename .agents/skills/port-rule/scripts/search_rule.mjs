@@ -19,18 +19,17 @@
 function parseRuleName(ruleName) {
   ruleName = ruleName.trim();
 
-  // @typescript-eslint/rule-name
-  if (ruleName.startsWith('@typescript-eslint/')) {
-    return {
-      plugin: 'typescript-eslint',
-      rule: ruleName.replace('@typescript-eslint/', ''),
-    };
-  }
-
-  // plugin/rule-name format (e.g., import/no-duplicates)
+  // Preserve the complete plugin-local name using ESLint's namespace syntax.
   if (ruleName.includes('/')) {
-    const [plugin, rule] = ruleName.split('/', 2);
-    return { plugin, rule };
+    const slash = ruleName.startsWith('@')
+      ? ruleName.lastIndexOf('/')
+      : ruleName.indexOf('/');
+    const plugin = ruleName.slice(0, slash);
+    const rule = ruleName.slice(slash + 1);
+    return {
+      plugin: plugin === '@typescript-eslint' ? 'typescript-eslint' : plugin,
+      rule,
+    };
   }
 
   // Core ESLint rule

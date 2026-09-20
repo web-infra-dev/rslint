@@ -237,11 +237,14 @@ function buildRuleDocContent(rule: RuleEntry): string {
  *       no-explicit-any.mdx
  *       ...
  */
-function writeRuleDocsToDir(rules: RuleEntry[]): void {
+export function writeRuleDocsToDir(
+  rules: RuleEntry[],
+  docsDir = RULES_DOCS_DIR,
+): void {
   // Clean all generated files, keeping only the source-controlled index.mdx
-  for (const name of fs.readdirSync(RULES_DOCS_DIR)) {
+  for (const name of fs.readdirSync(docsDir)) {
     if (name !== 'index.mdx') {
-      fs.rmSync(path.join(RULES_DOCS_DIR, name), {
+      fs.rmSync(path.join(docsDir, name), {
         recursive: true,
         force: true,
       });
@@ -282,13 +285,13 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
     })),
   ];
   fs.writeFileSync(
-    path.join(RULES_DOCS_DIR, '_meta.json'),
+    path.join(docsDir, '_meta.json'),
     JSON.stringify(topMeta, null, 2) + '\n',
   );
 
   // Write each group directory with _meta.json and rule .mdx files
   for (const [slug, groupRules] of sortedGroups) {
-    const groupDir = path.join(RULES_DOCS_DIR, slug);
+    const groupDir = path.join(docsDir, slug);
     fs.mkdirSync(groupDir, { recursive: true });
 
     const sorted = groupRules.sort((a, b) => a.name.localeCompare(b.name));
@@ -303,10 +306,9 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
     );
 
     for (const rule of sorted) {
-      fs.writeFileSync(
-        path.join(groupDir, `${rule.name}.mdx`),
-        buildRuleDocContent(rule),
-      );
+      const docPath = path.join(groupDir, `${rule.name}.mdx`);
+      fs.mkdirSync(path.dirname(docPath), { recursive: true });
+      fs.writeFileSync(docPath, buildRuleDocContent(rule));
     }
   }
 }

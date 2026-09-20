@@ -2,11 +2,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { normalizeVersion, compareVersions } = require('./version');
+const {
+  getRuleDirectories,
+  ruleDirectoryFromSource,
+} = require('../rule-paths');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const RELEASES_PATH = path.join(REPO_ROOT, 'website/releases.json');
-const CORE_RULES_DIR = path.join(REPO_ROOT, 'internal/rules');
-const PLUGINS_DIR = path.join(REPO_ROOT, 'internal/plugins');
 const STABLE_VERSION_RE = /^\d+\.\d+\.\d+$/;
 const PLUGIN_GROUP_FALLBACKS = new Map([
   ['import', 'eslint-plugin-import'],
@@ -28,9 +30,9 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
-function getGitOutput(args) {
+function getGitOutput(args, repoRoot = REPO_ROOT) {
   return execFileSync('git', args, {
-    cwd: REPO_ROOT,
+    cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
@@ -50,27 +52,26 @@ function getPluginGroup(content, plugin) {
   return match?.[1] || PLUGIN_GROUP_FALLBACKS.get(plugin) || plugin;
 }
 
-function getPluginGroupAtBlob(blob, plugin) {
+function getPluginGroupAtBlob(blob, plugin, repoRoot) {
   if (!blob) return getPluginGroup(undefined, plugin);
   const key = `${plugin}:${blob}`;
   if (!pluginGroupByBlob.has(key)) {
     pluginGroupByBlob.set(
       key,
-      getPluginGroup(getGitOutput(['cat-file', 'blob', blob]), plugin),
+      getPluginGroup(
+        getGitOutput(['cat-file', 'blob', blob], repoRoot),
+        plugin,
+      ),
     );
   }
   return pluginGroupByBlob.get(key);
 }
 
-function getRuleIdsAtRef(ref) {
-  const tree = getGitOutput([
-    'ls-tree',
-    '-r',
-    ref,
-    '--',
-    'internal/rules',
-    'internal/plugins',
-  ]);
+function getRuleIdsAtRef(ref, repoRoot = REPO_ROOT) {
+  const tree = getGitOutput(
+    ['ls-tree', '-r', ref, '--', 'internal/rules', 'internal/plugins'],
+    repoRoot,
+  );
   if (!tree) return [];
 
   const coreRules = new Set();
@@ -95,15 +96,11 @@ function getRuleIdsAtRef(ref) {
       continue;
     }
 
-    const pluginRule =
-      /^internal\/plugins\/([^/]+)\/rules\/([^/]+)\/([^/]+)\.go$/.exec(file);
-    if (
-      !pluginRule ||
-      ['fixtures', 'testdata'].includes(pluginRule[2]) ||
-      (pluginRule[2] !== pluginRule[3] && pluginRule[3] !== 'rule')
-    )
-      continue;
-    const [, plugin, rule] = pluginRule;
+    const pluginRule = /^internal\/plugins\/([^/]+)\/rules\/(.+)$/.exec(file);
+    if (!pluginRule) continue;
+    const [, plugin, source] = pluginRule;
+    const rule = ruleDirectoryFromSource(source);
+    if (rule === null) continue;
     if (!pluginRules.has(plugin)) pluginRules.set(plugin, new Set());
     pluginRules.get(plugin).add(rule);
   }
@@ -117,7 +114,11 @@ function getRuleIdsAtRef(ref) {
   );
 
   for (const [plugin, rules] of pluginRules) {
-    const group = getPluginGroupAtBlob(pluginBlobs.get(plugin), plugin);
+    const group = getPluginGroupAtBlob(
+      pluginBlobs.get(plugin),
+      plugin,
+      repoRoot,
+    );
     for (const rule of rules) {
       ruleIds.push(canonicalRuleId(group, rule));
     }
@@ -139,25 +140,19 @@ function getDirectories(directory) {
     .map((entry) => entry.name);
 }
 
-function getRuleDirectories(directory) {
-  return getDirectories(directory).filter((name) =>
-    [name, 'rule'].some((file) =>
-      fs.existsSync(path.join(directory, name, `${file}.go`)),
-    ),
-  );
-}
+function getCurrentRuleIds(repoRoot = REPO_ROOT) {
+  // Core IDs have no namespace separator; only plugin rules can be nested.
+  const ruleIds = getRuleDirectories(path.join(repoRoot, 'internal/rules'))
+    .filter((rule) => !rule.includes('/'))
+    .map((rule) => canonicalRuleId('eslint', rule));
 
-function getCurrentRuleIds() {
-  const ruleIds = getRuleDirectories(CORE_RULES_DIR).map((rule) =>
-    canonicalRuleId('eslint', rule),
-  );
-
-  for (const plugin of getDirectories(PLUGINS_DIR)) {
-    const rulesDirectory = path.join(PLUGINS_DIR, plugin, 'rules');
+  const pluginsDir = path.join(repoRoot, 'internal/plugins');
+  for (const plugin of getDirectories(pluginsDir)) {
+    const rulesDirectory = path.join(pluginsDir, plugin, 'rules');
     const rules = getRuleDirectories(rulesDirectory);
     if (rules.length === 0) continue;
 
-    const pluginFile = path.join(PLUGINS_DIR, plugin, 'plugin.go');
+    const pluginFile = path.join(pluginsDir, plugin, 'plugin.go');
     const content = fs.existsSync(pluginFile)
       ? fs.readFileSync(pluginFile, 'utf8')
       : undefined;
@@ -275,4 +270,9 @@ function syncCurrentVersion(getTypeScriptBinding) {
   return true;
 }
 
-module.exports = { syncFullHistory, syncCurrentVersion };
+module.exports = {
+  syncFullHistory,
+  syncCurrentVersion,
+  getCurrentRuleIds,
+  getRuleIdsAtRef,
+};
