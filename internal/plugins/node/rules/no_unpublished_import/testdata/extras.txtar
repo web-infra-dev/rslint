@@ -1,0 +1,56 @@
+Additional package fixtures for publication and import resolution.
+-- public/package.json --
+{"name":"self","files":["src","dist","!src/hidden*"],"dependencies":{"runtime":"*","null-version":null},"devDependencies":{"dev":"*","@scope/dev":"*","runtime":"*","peer":"*","optional":"*","self":"*","virtual:foo":"*","@alias/hidden":"*","9007199254740992":"*","9007199254740993":"*","true":"*","false":"*","null":"*","empty-version":null,"null-version":null},"peerDependencies":{"peer":"*"},"optionalDependencies":{"optional":"*"},"imports":{"#hidden":"./src/hidden.js","#public":"./src/public.js","#types":{"types":"./src/hidden.d.ts","default":"./src/public.js"}}}
+-- public/.npmignore --
+src/hidden.js
+src/hidden.d.ts
+-- public/tsconfig.json --
+{"compilerOptions":{"paths":{"@alias/*":["src/*"]}}}
+-- public/src/public.js --
+export const value = 1;
+-- public/src/public.ts --
+export const value = 1;
+-- public/src/hidden.js --
+export const value = 1;
+-- public/src/hidden.d.ts --
+export type Value = string;
+-- public/src/target.ts --
+export const value = 1;
+-- public/src/odd.xyz --
+export default 1;
+-- public/dist/hidden.js --
+export default 1;
+-- public/src/child/package.json --
+{"files":[],"private":true}
+-- public/src/child/index.js --
+export default 1;
+-- public/src/nested/.npmignore --
+ignored.js
+-- public/src/nested/ignored.js --
+export default 1;
+-- private/package.json --
+{"private":true,"devDependencies":{"dev":"*"}}
+-- string-private/package.json --
+{"private":"true","devDependencies":{"dev":"*"}}
+-- workspace/package.json --
+{"workspaces":["child"],"dependencies":{"dev":"*"}}
+-- workspace/child/package.json --
+{"devDependencies":{"dev":"*"}}
+-- git/package.json --
+{"devDependencies":{"dev":"*"}}
+-- git/.gitignore --
+test.js
+-- npm/package.json --
+{"devDependencies":{"dev":"*"}}
+-- npm/.gitignore --
+test.js
+-- npm/.npmignore --
+other.js
+-- main/package.json --
+{"main":"index.js","files":[],"devDependencies":{"dev":"*"}}
+-- metadata/package.json --
+{"files":[],"devDependencies":{"dev":"*"}}
+-- dot/package.json --
+{"files":["src"],"devDependencies":{"dev":"*"}}
+-- dot/src/..hidden.js --
+export default 1;

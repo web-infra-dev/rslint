@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { realpath } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
 import { lint } from '@rslint/core/internal';
 import { createTempDir, cleanupTempDir } from '../cli/js-config/helpers';
@@ -68,6 +69,9 @@ export class RuleTester {
               ]),
             ),
         );
+        // Resolved imports use real paths. Keep the package root in the same
+        // path space on macOS, where the temporary directory is a symlink.
+        root = await realpath(root);
       });
       afterAll(async () => {
         if (root) await cleanupTempDir(root);
