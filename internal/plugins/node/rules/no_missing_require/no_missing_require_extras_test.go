@@ -136,6 +136,8 @@ func TestNoMissingRequireExtras(t *testing.T) {
 		{Code: "require('unrelated');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"pkg/*": false}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'unrelated' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 20}}},
 		// documented invalid imports target diagnostic
 		{Code: "require('#invalid');", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve '#invalid' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 19}}},
+		// documented object alias priority uses sorted keys
+		{Code: "require('@app/special');", FileName: "src/input.js", Options: []any{map[string]any{"resolverConfig": map[string]any{"alias": map[string]any{"@app/special": "./present.js", "@app": "./absent"}}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve '@app/special' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 9, EndLine: 1, EndColumn: 23}}},
 		// body declarations do not shadow parameter initializers
 		{Code: "function load(value = require('missing')) { var require = other; }", FileName: "src/input.js", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "notFound", Message: strings.ReplaceAll("Can't resolve 'missing' in '/__root__/src'", "/__root__", root.Dir), Line: 1, Column: 31, EndLine: 1, EndColumn: 40}}},
 		// computed global require and method aliases

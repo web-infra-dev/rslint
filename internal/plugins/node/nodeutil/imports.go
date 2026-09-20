@@ -2,7 +2,9 @@
 package nodeutil
 
 import (
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -13,7 +15,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
-	"github.com/web-infra-dev/rslint/internal/utils/jsonorder"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 	"github.com/web-infra-dev/rslint/internal/utils/tsconfig"
@@ -235,13 +236,9 @@ func importResolutionOptions(ctx rule.RuleContext, conditions []string, options 
 	if result.Extensions == nil {
 		result.Extensions = moduleresolver.DefaultExtensions()
 	}
-	orders := [3]*jsonorder.Order{nil, ctx.SettingsKeyOrder.At("n", "resolverConfig"), ctx.SettingsKeyOrder.At("node", "resolverConfig")}
-	if len(ctx.OptionKeyOrder) != 0 {
-		orders[0] = ctx.OptionKeyOrder[0].At("resolverConfig")
-	}
-	for index, value := range settingValues("resolverConfig", options, settings) {
+	for _, value := range settingValues("resolverConfig", options, settings) {
 		if config, ok := value.(map[string]any); ok {
-			applyResolverConfig(&result, config, orders[index])
+			applyResolverConfig(&result, config)
 			break
 		}
 	}
@@ -256,7 +253,7 @@ func RequireResolutionOptions(ctx rule.RuleContext, options map[string]any) modu
 
 // Explicit resolver options replace the corresponding defaults, including
 // TypeScript aliases and extension mappings. An empty list remains meaningful.
-func applyResolverConfig(options *moduleresolver.Options, config map[string]any, order *jsonorder.Order) {
+func applyResolverConfig(options *moduleresolver.Options, config map[string]any) {
 	options.FullySpecified, _ = config["fullySpecified"].(bool)
 	for key, destination := range map[string]*[]string{
 		"modules": &options.Modules, "extensions": &options.Extensions, "conditionNames": &options.Conditions,
@@ -319,12 +316,12 @@ func applyResolverConfig(options *moduleresolver.Options, config map[string]any,
 	}
 	if value, present := config["alias"]; present {
 		// A configured empty list also disables the tsconfig fallback.
-		options.Aliases = resolverAliases(value, order.At("alias"))
+		options.Aliases = resolverAliases(value)
 	}
-	options.Fallbacks = resolverAliases(config["fallback"], order.At("fallback"))
+	options.Fallbacks = resolverAliases(config["fallback"])
 }
 
-func resolverAliases(value any, order *jsonorder.Order) []moduleresolver.Alias {
+func resolverAliases(value any) []moduleresolver.Alias {
 	aliases := []moduleresolver.Alias{}
 	appendAlias := func(name string, targets any, exact bool) {
 		alias := moduleresolver.Alias{Name: name, OnlyModule: exact}
@@ -340,7 +337,9 @@ func resolverAliases(value any, order *jsonorder.Order) []moduleresolver.Alias {
 	}
 	switch aliases := value.(type) {
 	case map[string]any:
-		for _, name := range order.PropertyKeys(aliases) {
+		// Settings maps have no declaration order. Array form preserves an
+		// explicit priority when keys overlap; object form is deterministic.
+		for _, name := range slices.Sorted(maps.Keys(aliases)) {
 			key, exact := strings.CutSuffix(name, "$")
 			appendAlias(key, aliases[name], exact)
 		}

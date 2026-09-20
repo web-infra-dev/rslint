@@ -107,7 +107,8 @@ Compared with `eslint-plugin-n` v18.3.0:
   instead of failing lint.
 - Unlisted `resolverConfig` properties are ignored. For example,
   `symlinks: false` does not preserve a symlink path; checks still use its real
-  target. See
+  target. Overlapping object-form `alias` and `fallback` entries use alphabetical
+  priority; use an array to specify the intended order. See
   [no-missing-import](../no_missing_import/no_missing_import.md#differences-from-upstream)
   for further unusual filename and alias cases.
 

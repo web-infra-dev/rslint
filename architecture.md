@@ -187,8 +187,8 @@ Explicit options select aliases, extensions, export conditions, package entry
 fields and directory entry names. Fallback aliases run only after ordinary
 resolution fails; `fullySpecified` limits file/directory guessing for the request
 while package entry points and alias redirects retain their own lookup rules.
-Package alias fields reuse shared package
-metadata; all aliases reuse the same file probes before symlink resolution.
+Package alias fields reuse shared package metadata; all aliases reuse the same
+file probes before symlink resolution.
 Results retain failure details and separate resource suffixes from filesystem
 paths. `internal/utils/tsconfig` shares explicit and nearest config queries using
 tsgo's parser, including `extends`, without creating another Program.
@@ -197,13 +197,6 @@ in `nodeutil`. Restrictions retain lexical paths for unresolved local sources
 and compare host filesystem spellings; normalized paths stay at the resolver/VFS
 boundary. The import and require restriction rules still share ordered matching
 and message construction there. Rules select exemptions, diagnostic nodes and edits.
-
-Rule options and shared settings retain object property order alongside maps using
-`internal/utils/jsonorder` and the existing hujson parser. Config merging owns
-that metadata's override semantics, and config serialization restores it without
-replacing current values or schema defaults. Native `RuleContext.OptionKeyOrder`
-and `SettingsKeyOrder` expose the effective order to consumers such as resolver
-aliases; the resolver itself accepts ordered alias lists and never reads config.
 
 `internal/utils/npmsemver` shares npm range parsing, minimum-version queries and
 subset checks. It reuses tsgo's range expansion and prerelease comparison while

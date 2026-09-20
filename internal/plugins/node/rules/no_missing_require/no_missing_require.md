@@ -92,8 +92,6 @@ in React modes. `allowImportingTsExtensions` uses source extensions directly.
 
 `resolverConfig.fallback` redirects unresolved requests, for example
 `{ fallback: { virtual: './shim.js' } }`. Existing targets take precedence.
-Object-form `alias` and `fallback` entries use declaration order, so place a
-specific alias before a broader prefix when both can match.
 `fullySpecified: true` disables extension and directory-entry guessing for
 ordinary requests: `./helper.js` can resolve while `./helper` cannot. Package
 entry points and alias redirects retain their normal lookup behavior.
@@ -102,6 +100,13 @@ entry points and alias redirects retain their normal lookup behavior.
 
 Unlisted `resolverConfig` properties are ignored. For example,
 `symlinks: false` does not preserve a symlink path; checks still use its real target.
+
+Overlapping object-form entries in `alias` and `fallback` are matched in
+alphabetical order. Upstream uses declaration order; for example,
+`{ '@app/special': './present.js', '@app': './absent' }` resolves
+`@app/special` upstream but fails in rslint when only `present.js` exists.
+Use an array to specify priority explicitly:
+`[{ name: '@app/special', alias: './present.js' }, { name: '@app', alias: './absent' }]`.
 
 Some invalid package imports mappings produce different diagnostic text.
 For example, `"#entry": [null, "./entry.js"]` produces an unresolved-import

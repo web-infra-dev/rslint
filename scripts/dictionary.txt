@@ -296,7 +296,6 @@ jscs
 jsnum
 jsonc
 jsonline
-jsonorder
 jsonschema
 jsxa
 jsxdev

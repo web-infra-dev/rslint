@@ -1,11 +1,5 @@
 package config
 
-import (
-	"strconv"
-
-	"github.com/web-infra-dev/rslint/internal/utils/jsonorder"
-)
-
 // configMatchKey is the exact resolver-local identity of the ordered config
 // entries that apply to one file. The first 64 entries avoid allocation; the
 // complete tail bitset keeps configs with more entries collision-free.
@@ -127,12 +121,6 @@ func (config RslintConfig) mergeConfigEntries(key configMatchKey, configDirector
 			}
 			if previous := merged.Rules[ruleName]; !hasOptions && previous != nil {
 				next.Options = append([]interface{}(nil), previous.Options...)
-				next.optionKeyOrder = previous.optionKeyOrder
-			} else if len(next.Options) != 0 && entry.propertyOrder != nil {
-				next.optionKeyOrder = make([]*jsonorder.Order, len(next.Options))
-				for index := range next.Options {
-					next.optionKeyOrder[index] = entry.propertyOrder.At("rules", ruleName, strconv.Itoa(index+1))
-				}
 			}
 			merged.Rules[ruleName] = next
 		}
@@ -142,7 +130,6 @@ func (config RslintConfig) mergeConfigEntries(key configMatchKey, configDirector
 		}
 
 		if entry.Settings != nil {
-			merged.settingsKeyOrder = mergeConfigObjectOrder(map[string]any(merged.Settings), map[string]any(entry.Settings), merged.settingsKeyOrder, entry.propertyOrder.At("settings"))
 			merged.Settings = Settings(deepMergeConfigObjects(
 				map[string]any(merged.Settings),
 				map[string]any(entry.Settings),
@@ -162,30 +149,5 @@ func (config RslintConfig) mergeConfigEntries(key configMatchKey, configDirector
 		}
 	}
 
-	return merged
-}
-
-// Overriding an existing property keeps its position; new properties append.
-// Object children merge recursively, while arrays and scalars replace them.
-func mergeConfigObjectOrder(base, override map[string]any, baseOrder, overrideOrder *jsonorder.Order) *jsonorder.Order {
-	if baseOrder == nil && overrideOrder == nil {
-		return nil
-	}
-	merged := &jsonorder.Order{Keys: baseOrder.PropertyKeys(base), Children: map[string]*jsonorder.Order{}}
-	for key := range base {
-		merged.Children[key] = baseOrder.At(key)
-	}
-	for _, key := range overrideOrder.PropertyKeys(override) {
-		if _, exists := base[key]; !exists {
-			merged.Keys = append(merged.Keys, key)
-		}
-		baseObject, baseIsObject := configObject(base[key])
-		overrideObject, overrideIsObject := configObject(override[key])
-		if baseIsObject && overrideIsObject {
-			merged.Children[key] = mergeConfigObjectOrder(baseObject, overrideObject, baseOrder.At(key), overrideOrder.At(key))
-		} else {
-			merged.Children[key] = overrideOrder.At(key)
-		}
-	}
 	return merged
 }

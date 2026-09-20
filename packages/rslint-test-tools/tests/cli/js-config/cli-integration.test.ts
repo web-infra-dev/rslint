@@ -12,18 +12,24 @@ import {
 describe('CLI JS config integration', () => {
   test.each([
     {
-      name: 'object aliases retain declaration order',
+      name: 'fallback arrays preserve priority',
       request: '@app/special',
       resolverConfig: {
-        alias: { '@app/special': './present.js', '@app': './absent' },
+        fallback: [
+          { name: '@app/special', alias: './present.js' },
+          { name: '@app', alias: './absent' },
+        ],
       },
       errors: false,
     },
     {
-      name: 'reversing overlapping aliases changes resolution',
+      name: 'reversing fallback arrays changes resolution',
       request: '@app/special',
       resolverConfig: {
-        alias: { '@app': './absent', '@app/special': './present.js' },
+        fallback: [
+          { name: '@app', alias: './absent' },
+          { name: '@app/special', alias: './present.js' },
+        ],
       },
       errors: true,
     },
@@ -74,15 +80,17 @@ describe('CLI JS config integration', () => {
     },
   );
 
-  test('retains resolver alias order through settings merge and CLI options', async () => {
+  test('uses fallback arrays in shared settings and CLI overrides', async () => {
     const tempDir = await createTempDir({
       'input.cjs': "require('@app/special');",
       'present.js': 'module.exports = 1;',
       'rslint.config.mjs': `export default [
         { plugins: ['node'], languageOptions: { sourceType: 'commonjs' },
           rules: { 'node/no-missing-require': 'error' },
-          settings: { node: { resolverConfig: { alias: { '@app/special': './present.js' } } } } },
-        { settings: { node: { resolverConfig: { alias: { '@app': './absent' } } } } }
+          settings: { node: { resolverConfig: { fallback: [
+            { name: '@app/special', alias: './present.js' },
+            { name: '@app', alias: './absent' }
+          ] } } } }
       ];`,
     });
     try {
@@ -91,11 +99,12 @@ describe('CLI JS config integration', () => {
         [
           'input.cjs',
           '--rule',
-          'node/no-missing-require: ["error", {"resolverConfig":{"alias":{"@app/special":"./present.js","@app":"./absent"}}}]',
+          'node/no-missing-require: ["error", {"resolverConfig":{"fallback":[{"name":"@app","alias":"./absent"},{"name":"@app/special","alias":"./present.js"}]}}]',
         ],
         tempDir,
       );
-      expect(result.exitCode).toBe(0);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toContain('node/no-missing-require');
     } finally {
       await cleanupTempDir(tempDir);
     }

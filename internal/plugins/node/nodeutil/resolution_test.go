@@ -21,7 +21,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/jsonorder"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
 )
 
@@ -237,7 +236,7 @@ func TestResolverOverrides(t *testing.T) {
 			config := func(alias any) map[string]any { return map[string]any{"alias": alias} }
 			if root != "/alias-project" {
 				var options moduleresolver.Options
-				applyResolverConfig(&options, config(map[string]any{"native": strings.ReplaceAll(local, "/", `\`)}), nil)
+				applyResolverConfig(&options, config(map[string]any{"native": strings.ReplaceAll(local, "/", `\`)}))
 				if got := moduleresolver.ResolveModule(p, "native", fileName, options); got != local {
 					t.Errorf("native path = %q, want %q", got, local)
 				}
@@ -257,7 +256,7 @@ func TestResolverOverrides(t *testing.T) {
 				{"virtual?raw#source", local + "#", "?raw#"},
 			} {
 				var options moduleresolver.Options
-				applyResolverConfig(&options, config(map[string]any{"virtual": query.target}), nil)
+				applyResolverConfig(&options, config(map[string]any{"virtual": query.target}))
 				if got := RequireFilePath(p, query.request, fileName, options); got != filepath.FromSlash(local)+query.suffix {
 					t.Errorf("alias query = %q", got)
 				}
@@ -313,12 +312,13 @@ func TestResolverEntryFields(t *testing.T) {
 		missing                           bool
 	}{
 		{"default", "./main", "input.js", `{}`, "main/main.js", false},
-		{"alias-object-order", "@app/special", "input.js", `{"alias":{"@app/special":"./src/server.js","@app":"./absent"}}`, "src/server.js", false},
-		{"alias-object-order-reversed", "@app/special", "input.js", `{"alias":{"@app":"./absent","@app/special":"./src/server.js"}}`, "", true},
-		{"alias-object-exact-order", "@app/special", "input.js", `{"alias":{"@app/special$":"./src/server.js","@app":"./absent"}}`, "src/server.js", false},
-		{"alias-object-wildcard-order", "@app/special", "input.js", `{"alias":{"@app/special":"./src/server.js","@app/*":"./absent/*"}}`, "src/server.js", false},
-		{"fallback-object-order", "@app/special", "input.js", `{"fallback":{"@app/special":"./src/server.js","@app":"./absent"}}`, "src/server.js", false},
-		{"fallback-object-order-reversed", "@app/special", "input.js", `{"fallback":{"@app":"./absent","@app/special":"./src/server.js"}}`, "", true},
+		{"alias-array-order", "@app/special", "input.js", `{"alias":[{"name":"@app/special","alias":"./src/server.js"},{"name":"@app","alias":"./absent"}]}`, "src/server.js", false},
+		{"alias-array-order-reversed", "@app/special", "input.js", `{"alias":[{"name":"@app","alias":"./absent"},{"name":"@app/special","alias":"./src/server.js"}]}`, "", true},
+		{"alias-array-exact-order", "@app/special", "input.js", `{"alias":[{"name":"@app/special","alias":"./src/server.js","onlyModule":true},{"name":"@app","alias":"./absent"}]}`, "src/server.js", false},
+		{"alias-array-wildcard-order", "@app/special", "input.js", `{"alias":[{"name":"@app/special","alias":"./src/server.js"},{"name":"@app/*","alias":"./absent/*"}]}`, "src/server.js", false},
+		{"fallback-array-order", "@app/special", "input.js", `{"fallback":[{"name":"@app/special","alias":"./src/server.js"},{"name":"@app","alias":"./absent"}]}`, "src/server.js", false},
+		{"fallback-array-order-reversed", "@app/special", "input.js", `{"fallback":[{"name":"@app","alias":"./absent"},{"name":"@app/special","alias":"./src/server.js"}]}`, "", true},
+		{"documented-fallback-object-priority", "@app/special", "input.js", `{"fallback":{"@app/special":"./src/server.js","@app":"./absent"}}`, "", true},
 		{"fallback-missing", "virtual", "input.js", `{"fallback":{"virtual":"./src/server.js"}}`, "src/server.js", false},
 		{"fallback-existing", "pkg-entry", "input.js", `{"fallback":{"pkg-entry":"./src/server.js"}}`, "node_modules/pkg-entry/index.js", false},
 		{"fallback-after-alias", "virtual", "input.js", `{"alias":{"virtual":"absent"},"fallback":{"virtual":"./src/server.js"}}`, "src/server.js", false},
@@ -485,11 +485,7 @@ func TestResolverEntryFields(t *testing.T) {
 						t.Fatal(err)
 					}
 					var options moduleresolver.Options
-					order, err := jsonorder.Parse([]byte(tc.config))
-					if err != nil {
-						t.Fatal(err)
-					}
-					applyResolverConfig(&options, config, order)
+					applyResolverConfig(&options, config)
 					// Windows entry filenames accept either separator. Requests using
 					// backslashes follow Node's path semantics; enhanced-resolve treats
 					// .\\ as a package and may resolve ..\\ through node_modules.
@@ -534,7 +530,7 @@ func TestResolverEntryFields(t *testing.T) {
 					{"./plain", map[string]any{"aliasFields": []string{"browser"}}, ""},
 				} {
 					var options moduleresolver.Options
-					applyResolverConfig(&options, tc.config, nil)
+					applyResolverConfig(&options, tc.config)
 					result := resolveImport(p, tc.request, tspath.ResolvePath(root, "input.js"), false, options)
 					want := tc.want
 					if want != "" {
@@ -605,7 +601,7 @@ func TestResolverEntryFieldSymlinks(t *testing.T) {
 		{"./linked-plain", map[string]any{"mainFiles": []string{"api"}}, "plain/api.js"},
 	} {
 		var options moduleresolver.Options
-		applyResolverConfig(&options, tc.config, nil)
+		applyResolverConfig(&options, tc.config)
 		want := osvfs.FS().Realpath(tspath.ResolvePath(root, tc.want))
 		if got, err := moduleresolver.ResolveModuleWithError(p, tc.request, fileName, options); got != want || err != "" {
 			t.Errorf("symlink %q (%v) = %q, %s; want %q", tc.request, tc.config, got, err, want)

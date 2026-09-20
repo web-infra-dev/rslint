@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/web-infra-dev/rslint/internal/utils/jsonorder"
 )
 
 // ParseCLIRuleFlag parses a single --rule flag value in ESLint-compatible format.
@@ -58,24 +56,13 @@ func BuildCLIRuleEntry(flags []string) (*ConfigEntry, error) {
 	}
 
 	rules := make(Rules, len(flags))
-	rulesOrder := &jsonorder.Order{Children: map[string]*jsonorder.Order{}}
 	for _, f := range flags {
 		name, value, err := ParseCLIRuleFlag(f)
 		if err != nil {
 			return nil, err
 		}
 		rules[name] = value
-		_, raw, _ := strings.Cut(f, ":")
-		if raw = strings.TrimSpace(raw); strings.HasPrefix(raw, "[") {
-			order, err := jsonorder.Parse([]byte(raw))
-			if err != nil {
-				return nil, err
-			}
-			rulesOrder.Children[name] = order
-		} else {
-			delete(rulesOrder.Children, name)
-		}
 	}
 
-	return &ConfigEntry{Rules: rules, propertyOrder: &jsonorder.Order{Children: map[string]*jsonorder.Order{"rules": rulesOrder}}}, nil
+	return &ConfigEntry{Rules: rules}, nil
 }
