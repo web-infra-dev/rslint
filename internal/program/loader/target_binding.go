@@ -312,10 +312,7 @@ func bindTargetToProgram(
 	if programIndex < 0 || programIndex >= len(set.compilerPrograms) {
 		return false
 	}
-	sourceFile := exactProgramSourceFile(set.compilerPrograms[programIndex], target.Path)
-	if sourceFile == nil {
-		sourceFile = programFiles.sourceFile(programIndexes, programIndex, target.CanonicalPath)
-	}
+	sourceFile := programFiles.sourceFileForTarget(programIndexes, programIndex, target)
 	if sourceFile == nil {
 		return false
 	}

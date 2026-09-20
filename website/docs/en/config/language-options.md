@@ -61,7 +61,7 @@ JavaScript files use the same discovery. A JS file explicitly listed in `files` 
 }
 ```
 
-`projectService: true` cannot be combined with an effective `project` string, array or `[]`, including values inherited from different matching entries. A final matching `project: false` or `project: null` clears that conflict and disables explicit binding for the target; service can still select a project. A final matching `projectService: false` disables automatic discovery and the implicit default project, but preserves the owner's explicit declarations described below. JavaScript configurations and legacy JSON migration also accept `projectService: null` as a runtime reset, outside the public TypeScript type.
+`projectService: true` cannot be combined with an effective `project` string, array or `[]`, including values inherited from different matching entries. A final matching `project: false` or `project: null` clears that conflict and disables explicit binding for the target; service can still select a project. A final matching `projectService: false` disables automatic discovery but preserves an effective explicit `project` value. JavaScript configurations and legacy JSON migration also accept `projectService: null` as a runtime reset, outside the public TypeScript type.
 
 A selected file that does not belong to a discovered project uses Rslint's existing [source-only gap fallback](/guide/type-checking#gap-files). Syntax diagnostics and rules that do not require types still run; type-aware rules are skipped. Other files in the same lint request keep their own project context. Config and Program failures are still errors.
 
@@ -86,7 +86,7 @@ This follows typescript-eslint's documented config-directory default. Its implem
 
 Validation applies to the final matched value. Invalid types, relative paths and empty strings in unmatched entries or replaced by a later value do not fail a lint request.
 
-An explicitly set `tsconfigRootDir` also anchors every relative `project` declaration for that target, preserving declaration order. Without it, or after a null reset, each declaration retains its own authored path origin described below. It does not move Rslint's implicit governing-directory `tsconfig.json` fallback when no project paths are declared.
+An explicitly set `tsconfigRootDir` also anchors every relative `project` declaration for that target, preserving declaration order. Without it, or after a null reset, each declaration retains its own authored path origin described below. It does not select a project when both `project` and `projectService` are omitted.
 
 | Configuration                                          | Default discovery boundary                       |
 | ------------------------------------------------------ | ------------------------------------------------ |
@@ -120,23 +120,25 @@ Files outside all tsconfigs are still linted, but only rules that do not require
 }
 ```
 
-Rslint collects explicit project strings and arrays from the governing config in declaration order. The list includes entries whose `files`, `ignores` or `basePath` do not match the target; a missing declaration can therefore fail the load. The first project listing the target as a root wins. Only when no project lists it as a root does Rslint try import membership in declaration order. Adding `projectService` or `tsconfigRootDir` does not change this ordinary project order.
+Ordinary lint uses the final `project` value after matching and merging configuration for each target file. A later matching value replaces an earlier one; declarations in entries that do not apply to the file are not used.
 
-This declaration list differs from typescript-eslint's final matching `project` value. Matching and merging still determine the effective service/root options, project/service conflicts and the new `false`/`null` clear values.
+| Matching entries in order                                        | Ordinary target binding                                       |
+| ---------------------------------------------------------------- | ------------------------------------------------------------- |
+| `project: 'a.json'`, then `project: 'b.json'`                    | Search b only                                                 |
+| `project: 'a.json'`, then `project: []`                          | Use no explicit project                                       |
+| Final `project: false` or `null`                                 | Use no explicit project; enabled service may still select one |
+| `project: 'a.json'`, then false, then `project: 'b.json'`        | Search b only                                                 |
+| `projectService: false`, with project only in an unmatched entry | Use source-only lint                                          |
 
-| Entries in order                                                                     | Ordinary target binding                                                        |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `project: 'a.json'`, then `project: 'b.json'`                                        | Search a, then b, with direct-root priority                                    |
-| `project: 'a.json'`, then `project: []`                                              | Keep a; [] does not erase earlier declarations                                 |
-| Final matching `project: false` or `null`                                            | Use no explicit/default project for that target; enabled service may still run |
-| `project: 'a.json'`, then false, then `project: 'b.json'`                            | Final clear is canceled; search the original a, b list again                   |
-| Matching `projectService: false`, with an explicit declaration in an unmatched entry | Disable automatic/default discovery but keep that explicit declaration         |
+Within the final project list, Rslint first tries the earliest project listing the target as a root, including physical file aliases. If no project lists it, or that first project's compiler options do not admit it, Rslint looks for the actual source in project-list order, including files brought in through imports. If none can provide the source, the file still receives syntax diagnostics and configured rules that do not require types. For example, a JavaScript file explicitly listed in a tsconfig with `allowJs: false` can use this gap fallback.
 
-When an entry has `basePath`, its explicit project literals and globs resolve from that directory unless the target has an explicit `tsconfigRootDir`. The directory remains literal even if its name contains glob characters. A later null root reset restores each declaration's original base. Targets with different roots keep separate eligible project lists even if their Programs contain overlapping files.
+No-argument, directory, explicit-file and API lint requests use the same project selection and fallback rules. All projects in the effective list have their paths and configuration metadata checked, even when an earlier project contains the target. A missing or unreadable effective configuration remains an error. Dependency graphs are constructed only as needed; import lookup stops once all selected targets have an owner. Projects may contain files outside the lint range without adding those files to lint execution.
 
-When both project settings are omitted, Rslint retains the governing config directory's default `tsconfig.json` fallback; neither `basePath` nor `tsconfigRootDir` moves this implicit lookup. A declaration of `project: []` suppresses fallback when no paths were declared. A final matching false/null or `projectService: false` disables default binding for that target. Unmatched false/null does not disable another target's fallback. See [`basePath`](/config/base-path) for path origins.
+Project paths retain the authored base of the final matching declaration, including its resolved `basePath` when present. An effective absolute `tsconfigRootDir` overrides that base; omission or a null reset restores the declaration's base. This explicit-project path base is separate from the default config-directory boundary used by `projectService`. See [`basePath`](/config/base-path) for path origins.
 
-Plain CLI/API lint selects projects from target membership. Whole-directory CLI lint still validates every explicit declaration of its active ordinary owners, even when a project does not need to be built. Files without a direct project may require building additional projects to check import membership. `--type-check` and `--type-check-only` retain [program-wide explicit checking](/guide/type-checking#what-gets-type-checked), including declarations outside the lint target scope. These modes also check complete service-selected Programs. A per-target clear does not erase the owner's program-wide declarations.
+When both project settings are omitted, ordinary lint uses source-only parsing and does not implicitly load a root `tsconfig.json`. Set `projectService: true` for automatic discovery or provide `project` paths explicitly.
+
+`--type-check` and `--type-check-only` retain [program-wide explicit checking](/guide/type-checking#what-gets-type-checked), including declarations outside the lint target scope and complete service-selected Programs. A per-target clear does not erase the owner's program-wide declarations.
 
 ## languageOptions.globals
 

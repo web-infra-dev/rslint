@@ -9,7 +9,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -23,7 +22,6 @@ type projectTargetBinding struct {
 type targetedProjectSlot struct {
 	parseOnce sync.Once
 	config    *tsoptions.ParsedCommandLine
-	rootFiles *lintprogram.RootFileIndex
 	parseErr  error
 
 	buildOnce sync.Once
@@ -32,7 +30,7 @@ type targetedProjectSlot struct {
 
 	lookupOnce sync.Once
 	lookupMu   sync.Mutex
-	lookup     *utils.ProgramSourceLookup
+	lookup     *programFileIndex
 }
 
 type targetedProjectExecution struct {
@@ -40,76 +38,19 @@ type targetedProjectExecution struct {
 	plan           projectPlan
 	singleThreaded bool
 	slots          []targetedProjectSlot
-}
-
-type targetedProjectBuildQueue struct {
-	execution *targetedProjectExecution
-	parallel  bool
-	workersN  int
-	jobs      chan int
-	workers   sync.WaitGroup
-	mu        sync.Mutex
-	enqueued  []bool
-	errs      []error
-}
-
-func newTargetedProjectBuildQueue(execution *targetedProjectExecution) *targetedProjectBuildQueue {
-	queue := &targetedProjectBuildQueue{
-		execution: execution,
-		enqueued:  make([]bool, len(execution.plan.specs)),
-		errs:      make([]error, len(execution.plan.specs)),
-	}
-	workerCount := min(runtime.GOMAXPROCS(0), len(execution.plan.specs))
-	queue.parallel = !execution.singleThreaded && workerCount > 1
-	queue.workersN = workerCount
-	return queue
-}
-
-func (queue *targetedProjectBuildQueue) enqueue(index int) error {
-	queue.mu.Lock()
-	if queue.enqueued[index] {
-		queue.mu.Unlock()
-		return nil
-	}
-	queue.enqueued[index] = true
-	if queue.parallel && queue.jobs == nil {
-		queue.execution.session.context.enableConcurrentProgramQueries()
-		queue.jobs = make(chan int, len(queue.execution.plan.specs))
-		queue.workers.Add(queue.workersN)
-		for range queue.workersN {
-			go func() {
-				defer queue.workers.Done()
-				for index := range queue.jobs {
-					queue.errs[index] = queue.execution.build(index)
-				}
-			}()
-		}
-	}
-	jobs := queue.jobs
-	queue.mu.Unlock()
-	if !queue.parallel {
-		queue.errs[index] = queue.execution.build(index)
-		return nil
-	}
-	jobs <- index
-	return nil
-}
-
-func (queue *targetedProjectBuildQueue) wait() {
-	if queue.parallel && queue.jobs != nil {
-		close(queue.jobs)
-		queue.workers.Wait()
-	}
+	targets        []target.File
 }
 
 func newTargetedProjectExecution(
 	session *Session,
 	plan projectPlan,
+	targets []target.File,
 	singleThreaded bool,
 ) *targetedProjectExecution {
 	return &targetedProjectExecution{
 		session:        session,
 		plan:           plan,
+		targets:        targets,
 		singleThreaded: singleThreaded,
 		slots:          make([]targetedProjectSlot, len(plan.specs)),
 	}
@@ -146,12 +87,6 @@ func (execution *targetedProjectExecution) parse(index int) (*targetedProjectSlo
 		}
 		if slot.parseErr == nil && slot.config == nil {
 			slot.parseErr = errors.New("no parsed config returned")
-		}
-		if slot.parseErr == nil {
-			slot.rootFiles = lintprogram.NewRootFileIndex(
-				slot.config.FileNames(),
-				execution.session.FS(),
-			)
 		}
 	})
 	if slot.parseErr != nil {
@@ -191,35 +126,22 @@ func (execution *targetedProjectExecution) containsTarget(
 		return false
 	}
 	slot.lookupOnce.Do(func() {
-		slot.lookup = utils.NewProgramSourceLookup(slot.program, execution.session.FS())
+		slot.lookup = newProgramFileIndex(
+			[]*compiler.Program{slot.program}, execution.targets, execution.session.FS(), execution.singleThreaded,
+		)
 	})
 	slot.lookupMu.Lock()
 	defer slot.lookupMu.Unlock()
-	return slot.lookup.SourceFileForTarget(target.Path, target.CanonicalPath) != nil
+	return slot.lookup.sourceFileForTarget([]int{0}, 0, target) != nil
 }
 
-func (execution *targetedProjectExecution) supportsTarget(
-	index int,
-	target target.File,
-) (bool, error) {
-	parsed, err := execution.parse(index)
-	if err != nil {
-		return false, err
-	}
-	return lintprogram.CompilerOptionsSupportFileName(
-		parsed.config.CompilerOptions(),
-		target.Path,
-	), nil
-}
-
-func (execution *targetedProjectExecution) parseConcurrent(indexes []int) {
-	if len(indexes) == 0 {
-		return
-	}
+// forEachProject bounds preparation work without letting completion order
+// decide ownership or errors. Callers inspect the slots in their stable order.
+func (execution *targetedProjectExecution) forEachProject(indexes []int, task func(int)) {
 	workerCount := min(runtime.GOMAXPROCS(0), len(indexes))
 	if execution.singleThreaded || workerCount <= 1 {
 		for _, index := range indexes {
-			_, _ = execution.parse(index)
+			task(index)
 		}
 		return
 	}
@@ -232,10 +154,7 @@ func (execution *targetedProjectExecution) parseConcurrent(indexes []int) {
 		go func() {
 			defer workers.Done()
 			for index := range jobs {
-				// Speculation must not make an otherwise unreachable malformed
-				// config observable. The ordered consumer below reports an error
-				// only if ownership resolution actually reaches this slot.
-				_, _ = execution.parse(index)
+				task(index)
 			}
 		}()
 	}
@@ -244,30 +163,6 @@ func (execution *targetedProjectExecution) parseConcurrent(indexes []int) {
 	}
 	close(jobs)
 	workers.Wait()
-}
-
-func (execution *targetedProjectExecution) predictedProjectPosition(
-	orderedProjectIndexes []int,
-	target target.File,
-) int {
-	useCaseSensitive := true
-	if fsys := execution.session.FS(); fsys != nil {
-		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
-	}
-	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: useCaseSensitive}
-	bestPosition := -1
-	bestDirectoryLength := -1
-	for position, projectIndex := range orderedProjectIndexes {
-		directory := execution.plan.specs[projectIndex].programCwd
-		if !tspath.ContainsPath(directory, target.Path, options) {
-			continue
-		}
-		if len(directory) > bestDirectoryLength {
-			bestPosition = position
-			bestDirectoryLength = len(directory)
-		}
-	}
-	return bestPosition
 }
 
 func runTargetProjectTasks(
@@ -394,29 +289,27 @@ func orderedProjectIndexesForConfig(plan projectPlan, configDir string) []int {
 	return indexes
 }
 
-// executeTargetProjectPlan retains the existing direct-root and import
-// selection tiers over each target's ordered candidates. All contexts share
-// one execution and one slot per declared tsconfig.
+// executeTargetProjectPlan uses one ownership and validation policy for every
+// ordinary lint request. Invocation spelling never changes project selection.
 func (s *Session) executeTargetProjectPlan(
 	plan projectPlan,
 	request ProjectBuildRequest,
 ) (ProjectSet, error) {
 	targetPlan := request.Targets
 	singleThreaded := request.SingleThreaded
-	execution := newTargetedProjectExecution(s, plan, singleThreaded)
-	if request.Scope == ActiveOwners {
-		// Broad lint still validates every active declaration, in plan order,
-		// before reporting a later path-resolution failure. Parsing metadata
-		// does not require loading any project's sources or imports.
-		indexes := make([]int, len(plan.specs))
-		for index := range indexes {
-			indexes[index] = index
-		}
-		execution.parseConcurrent(indexes)
-		for index := range indexes {
-			if err := execution.slots[index].parseErr; err != nil {
-				return ProjectSet{}, fmt.Errorf("create TypeScript Program from %q: %w", plan.specs[index].tsconfigPath, err)
-			}
+	execution := newTargetedProjectExecution(s, plan, targetPlan.Files, singleThreaded)
+
+	// Validate every effective candidate before constructing source graphs.
+	// Stable plan order also preserves the precedence of an earlier metadata
+	// failure over a later owner's project-path resolution failure.
+	indexes := make([]int, len(plan.specs))
+	for index := range indexes {
+		indexes[index] = index
+	}
+	execution.forEachProject(indexes, func(index int) { _, _ = execution.parse(index) })
+	for index := range indexes {
+		if err := execution.slots[index].parseErr; err != nil {
+			return ProjectSet{}, fmt.Errorf("create TypeScript Program from %q: %w", plan.specs[index].tsconfigPath, err)
 		}
 	}
 	if plan.terminalErr != nil {
@@ -426,234 +319,70 @@ func (s *Session) executeTargetProjectPlan(
 		return ProjectSet{targetProjects: plan.targetProjects}, nil
 	}
 
-	directBuilds := newTargetedProjectBuildQueue(execution)
-	directProjectByTarget := make([]int, len(targetPlan.Files))
-	for index := range directProjectByTarget {
-		directProjectByTarget[index] = -1
-	}
 	groups := groupTargetsByProjects(targetPlan.Files, plan.targetProjects, func(owner string) []int {
 		return orderedProjectIndexesForConfig(plan, owner)
 	})
-	if request.Scope == ActiveOwners {
-		roots := make([][]string, len(plan.specs))
-		for index := range roots {
-			roots[index] = execution.slots[index].config.FileNames()
+	roots := make([][]string, len(plan.specs))
+	for index := range roots {
+		roots[index] = execution.slots[index].config.FileNames()
+	}
+	// Root ranking filters its input groups; source fallback still needs all
+	// targets, including ones whose metadata root the compiler cannot admit.
+	directProjectByTarget := directRootOwners(roots, targetPlan.Files, plan.targetProjects,
+		append([]projectTargetGroup(nil), groups...), s.FS(), singleThreaded)
+
+	directIndexes := make([]int, 0, len(plan.specs))
+	seenDirect := make([]bool, len(plan.specs))
+	for _, index := range directProjectByTarget {
+		if index >= 0 && !seenDirect[index] {
+			seenDirect[index] = true
+			directIndexes = append(directIndexes, index)
 		}
-		// The eager binder's exact identity ranking is also valid before
-		// construction. Copy the groups because ranking filters its input slice.
-		directProjectByTarget = directRootOwners(roots, targetPlan.Files, plan.targetProjects,
-			append([]projectTargetGroup(nil), groups...), s.FS(), singleThreaded)
+	}
+	execution.forEachProject(directIndexes, func(index int) { _ = execution.build(index) })
+	for _, index := range directIndexes {
+		if err := execution.build(index); err != nil {
+			return ProjectSet{}, err
+		}
 	}
 
-	err := runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
-		if request.Scope == ActiveOwners {
-			for _, targetIndex := range group.targetIndexes {
-				if index := directProjectByTarget[targetIndex]; index >= 0 {
-					if err := directBuilds.enqueue(index); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		}
-		targetIndexes := group.targetIndexes
-		unresolved := len(targetIndexes)
-		orderedProjectIndexes := group.projectIndexes
-		scanProject := func(projectIndex int) error {
-			parsed, err := execution.parse(projectIndex)
-			if err != nil {
-				return err
-			}
-			selected := false
-			for _, targetIndex := range targetIndexes {
-				if directProjectByTarget[targetIndex] >= 0 {
-					continue
-				}
-				target := targetPlan.Files[targetIndex]
-				if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
-					directProjectByTarget[targetIndex] = projectIndex
-					unresolved--
-					selected = true
-				}
-			}
-			if selected {
-				if err := directBuilds.enqueue(projectIndex); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-
-		nextPosition := 0
-		if !singleThreaded {
-			predictedTargetsByProject := make(map[int][]int)
-			maxPredictedPosition := -1
-			for _, targetIndex := range targetIndexes {
-				position := execution.predictedProjectPosition(
-					orderedProjectIndexes,
-					targetPlan.Files[targetIndex],
-				)
-				if position < 0 {
-					continue
-				}
-				projectIndex := orderedProjectIndexes[position]
-				predictedTargetsByProject[projectIndex] = append(
-					predictedTargetsByProject[projectIndex],
-					targetIndex,
-				)
-				maxPredictedPosition = max(maxPredictedPosition, position)
-			}
-
-			if maxPredictedPosition >= 0 {
-				predictedProjects := make([]int, 0, len(predictedTargetsByProject))
-				for _, projectIndex := range orderedProjectIndexes[:maxPredictedPosition+1] {
-					if _, predicted := predictedTargetsByProject[projectIndex]; predicted {
-						predictedProjects = append(predictedProjects, projectIndex)
-					}
-				}
-				execution.parseConcurrent(predictedProjects)
-				for _, projectIndex := range predictedProjects {
-					parsed, parseErr := execution.parse(projectIndex)
-					if parseErr != nil {
-						continue
-					}
-					for _, targetIndex := range predictedTargetsByProject[projectIndex] {
-						target := targetPlan.Files[targetIndex]
-						if parsed.rootFiles.Contains(target.Path, target.CanonicalPath) {
-							if err := directBuilds.enqueue(projectIndex); err != nil {
-								return err
-							}
-							break
-						}
-					}
-				}
-
-				// The nearest containing tsconfig is only a latency hint. Parsing
-				// its declaration-order prefix concurrently proves whether an
-				// earlier config owns the target; results are still committed in
-				// order and no speculative Program can win by finishing first.
-				execution.parseConcurrent(orderedProjectIndexes[:maxPredictedPosition+1])
-				for nextPosition <= maxPredictedPosition && unresolved > 0 {
-					if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
-						return err
-					}
-					nextPosition++
-				}
-			}
-		}
-
-		for nextPosition < len(orderedProjectIndexes) && unresolved > 0 {
-			if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
-				return err
-			}
-			nextPosition++
-		}
-		return nil
-	})
-	directBuilds.wait()
-	if err != nil {
-		return ProjectSet{}, err
-	}
-	validatedDirectBuilds := make(map[int]struct{})
-	for _, projectIndex := range directProjectByTarget {
+	keep := make([]bool, len(plan.specs))
+	for targetIndex, projectIndex := range directProjectByTarget {
 		if projectIndex < 0 {
 			continue
 		}
-		if _, validated := validatedDirectBuilds[projectIndex]; validated {
+		if !execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
+			if plan.specs[projectIndex].sourceReferences {
+				return ProjectSet{}, fmt.Errorf(
+					"project root %q from %q was absent from its TypeScript Program",
+					targetPlan.Files[targetIndex].Path,
+					plan.specs[projectIndex].tsconfigPath,
+				)
+			}
+			// Explicit projects can list roots that their compiler options do
+			// not admit. Preserve ordered source fallback before creating gaps.
+			directProjectByTarget[targetIndex] = -1
 			continue
 		}
-		if err := execution.build(projectIndex); err != nil {
-			return ProjectSet{}, err
-		}
-		validatedDirectBuilds[projectIndex] = struct{}{}
+		keep[projectIndex] = true
 	}
 
-	for targetIndex, projectIndex := range directProjectByTarget {
-		if projectIndex >= 0 && !execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
-			if request.Scope == ActiveOwners && !plan.specs[projectIndex].sourceReferences {
-				// Ordinary broad lint has always tried ordered source membership
-				// when its first metadata root was not admitted by the compiler.
-				directProjectByTarget[targetIndex] = -1
-				continue
-			}
-			return ProjectSet{}, fmt.Errorf(
-				"project root %q from %q was absent from its TypeScript Program",
-				targetPlan.Files[targetIndex].Path,
-				plan.specs[projectIndex].tsconfigPath,
-			)
-		}
-	}
-	keep := make([]bool, len(plan.specs))
-	for _, projectIndex := range directProjectByTarget {
-		if projectIndex >= 0 {
-			keep[projectIndex] = true
-		}
-	}
-	if request.Scope == ActiveOwners {
-		// Canonical source aliases can have another extension, so broad lint
-		// cannot exclude import candidates using the target's name alone.
-		// Preserve parallel construction for the unresolved groups, sharing
-		// the same slots with direct builds and other owners.
-		fallbackBuilds := newTargetedProjectBuildQueue(execution)
-		for _, group := range groups {
-			for _, targetIndex := range group.targetIndexes {
-				if directProjectByTarget[targetIndex] >= 0 {
-					continue
-				}
-				for _, projectIndex := range group.projectIndexes {
-					if err := fallbackBuilds.enqueue(projectIndex); err != nil {
-						fallbackBuilds.wait()
-						return ProjectSet{}, err
-					}
-				}
-				break
-			}
-		}
-		fallbackBuilds.wait()
-		for index := range execution.slots {
-			if err := execution.slots[index].buildErr; err != nil {
-				return ProjectSet{}, fmt.Errorf("create TypeScript Program from %q: %w", plan.specs[index].tsconfigPath, err)
-			}
-			keep[index] = execution.slots[index].program != nil
-		}
-		// Every unresolved group's candidates are already built. Let binding
-		// perform their ordered source lookup once, using its shared identity
-		// index, instead of scanning the same sources during construction.
-		return execution.projectSet(keep, directProjectByTarget, targetPlan.Files), nil
-	}
-
-	// Direct ownership has been decided for every target before this fallback
-	// starts. A project built for another target cannot steal a direct target
-	// merely because it imports that file.
+	// Different candidate groups can proceed concurrently. Within a group,
+	// stop once all remaining targets have an actual source, so an import-only
+	// target does not construct every later candidate's dependency graph.
+	// A target's extension cannot exclude differently named physical aliases.
 	if !singleThreaded && len(groups) > 1 {
 		s.context.enableConcurrentProgramQueries()
 	}
 	var keepMu sync.Mutex
-	err = runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
-		pending := make(map[int]struct{})
+	err := runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
+		pending := make([]int, 0, len(group.targetIndexes))
 		for _, targetIndex := range group.targetIndexes {
 			if directProjectByTarget[targetIndex] < 0 {
-				pending[targetIndex] = struct{}{}
+				pending = append(pending, targetIndex)
 			}
 		}
-		orderedProjectIndexes := group.projectIndexes
-		fallbackProjectIndexes := make([]int, 0, len(orderedProjectIndexes))
-		for _, projectIndex := range orderedProjectIndexes {
-			for targetIndex := range pending {
-				supported, supportErr := execution.supportsTarget(
-					projectIndex,
-					targetPlan.Files[targetIndex],
-				)
-				if supportErr != nil {
-					return supportErr
-				}
-				if supported {
-					fallbackProjectIndexes = append(fallbackProjectIndexes, projectIndex)
-					break
-				}
-			}
-		}
-		for _, projectIndex := range fallbackProjectIndexes {
+		for _, projectIndex := range group.projectIndexes {
 			if len(pending) == 0 {
 				break
 			}
@@ -661,12 +390,25 @@ func (s *Session) executeTargetProjectPlan(
 				return err
 			}
 			selected := false
-			for targetIndex := range pending {
+			unresolved := pending[:0]
+			for _, targetIndex := range pending {
 				if execution.containsTarget(projectIndex, targetPlan.Files[targetIndex]) {
-					delete(pending, targetIndex)
 					selected = true
+					continue
 				}
+				// Service discovery promises an actual source. A case-folded
+				// metadata match can miss direct ranking; do not turn it into a
+				// silent gap by dropping this unbound service Program.
+				if plan.specs[projectIndex].sourceReferences {
+					return fmt.Errorf(
+						"project root %q from %q was absent from its TypeScript Program",
+						targetPlan.Files[targetIndex].Path,
+						plan.specs[projectIndex].tsconfigPath,
+					)
+				}
+				unresolved = append(unresolved, targetIndex)
 			}
+			pending = unresolved
 			if selected {
 				keepMu.Lock()
 				keep[projectIndex] = true

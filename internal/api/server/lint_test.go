@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -373,6 +374,64 @@ func TestHandleLint_SelectedTargetResolvesGoverningProject(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "missing.json") {
 		t.Fatalf("selected target must resolve its governing project, got %v", err)
+	}
+}
+
+func TestHandleLint_ProjectRootsKeepExactTargetSetAndCapabilities(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, ""))
+	file := tspath.ResolvePath(dir, "src/a.js")
+	clean := tspath.ResolvePath(dir, "src/clean.js")
+	ignored := tspath.ResolvePath(dir, "src/ignored.js")
+	for _, project := range []string{"./tsconfig.json", "./typed.json", "./missing.json"} {
+		for _, invocation := range []struct {
+			name  string
+			files []string
+			want  []string
+		}{
+			{name: "all", want: []string{"src/a.js", "src/clean.js"}},
+			{name: "file", files: []string{file}, want: []string{"src/a.js"}},
+			{name: "files", files: []string{file, clean}, want: []string{"src/a.js", "src/clean.js"}},
+			{name: "duplicates-and-ignored", files: []string{file, file, ignored, clean}, want: []string{"src/a.js", "src/clean.js"}},
+		} {
+			t.Run(project+"/"+invocation.name, func(t *testing.T) {
+				config := json.RawMessage(fmt.Sprintf(`[
+					{"ignores":["**/ignored.js"]},
+					{"files":["**/*.js"],"plugins":["@typescript-eslint"],
+					 "languageOptions":{"parserOptions":{"project":[%q]}},
+					 "rules":{"no-debugger":"error","@typescript-eslint/no-for-in-array":"error"}}
+				]`, project))
+				response, err := (&Handler{}).HandleLint(api.LintRequest{
+					Config: config, ConfigDirectory: dir, WorkingDirectory: dir, Files: invocation.files,
+				})
+				if project == "./missing.json" {
+					if err == nil || !strings.Contains(err.Error(), "missing.json") {
+						t.Fatalf("config failure became a gap: %v", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				slices.Sort(response.LintedFiles)
+				if !slices.Equal(response.LintedFiles, invocation.want) || response.FileCount != len(invocation.want) {
+					t.Fatalf("lint target set = %v (%d), want %v", response.LintedFiles, response.FileCount, invocation.want)
+				}
+				counts := make(map[string]int)
+				for _, diagnostic := range response.Diagnostics {
+					if diagnostic.FilePath != "src/a.js" {
+						t.Fatalf("diagnostic escaped selected target: %+v", diagnostic)
+					}
+					counts[diagnostic.RuleName]++
+				}
+				wantTyped := 0
+				if project == "./typed.json" {
+					wantTyped = 1
+				}
+				if counts["no-debugger"] != 1 || counts["@typescript-eslint/no-for-in-array"] != wantTyped || len(response.Diagnostics) != 1+wantTyped {
+					t.Fatalf("wrong gap/project rule capabilities: %v", counts)
+				}
+			})
+		}
 	}
 }
 

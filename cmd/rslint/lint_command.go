@@ -29,27 +29,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func isBroadProjectLoadScope(
-	allowFiles []string,
-	allowDirs []string,
-	currentDirectory string,
-	useCaseSensitive bool,
-) bool {
-	if len(allowDirs) == 0 {
-		return len(allowFiles) == 0
-	}
-	options := tspath.ComparePathsOptions{
-		CurrentDirectory:          currentDirectory,
-		UseCaseSensitiveFileNames: useCaseSensitive,
-	}
-	for _, directory := range allowDirs {
-		if tspath.ContainsPath(directory, currentDirectory, options) {
-			return true
-		}
-	}
-	return false
-}
-
 // resolveStartTime returns the start time for timing output.
 // If startTimeMs (epoch millis from the Node.js entry point) is positive,
 // it is used so the reported duration covers end-to-end execution.
@@ -325,11 +304,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: true,
 	}
-	projectScope := loader.Targeted
+	projectScope := loader.LintTargets
 	if typeCheck || typeCheckOnly {
 		projectScope = loader.AllDeclared
-	} else if isBroadProjectLoadScope(allowFiles, allowDirs, cwd, fs.UseCaseSensitiveFileNames()) {
-		projectScope = loader.ActiveOwners
 	}
 	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
 	// This keeps an explicit --config outside the current directory from

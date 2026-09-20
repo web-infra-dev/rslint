@@ -1,0 +1,12 @@
+-- tsconfig.json --
+{"files":["src/a.js","src/ignored.js"],"compilerOptions":{"allowJs":false}}
+-- typed.json --
+{"extends":"./tsconfig.json","compilerOptions":{"allowJs":true}}
+-- src/a.js --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;
+-- src/clean.js --
+export const clean = true;
+-- src/ignored.js --
+debugger;

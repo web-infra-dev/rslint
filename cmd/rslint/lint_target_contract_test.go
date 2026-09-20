@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
 type lintTargetContractDiagnostic struct {
@@ -225,5 +227,64 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 	}
 	if string(unselectedContent) != "var unselected = 1;\nexport { unselected };\n" {
 		t.Fatalf("--fix changed an unselected file: %q", unselectedContent)
+	}
+}
+
+func TestCLIProjectRootsKeepTargetsAcrossInvocationForms(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, ""))
+	src := tspath.ResolvePath(dir, "src")
+	file := tspath.ResolvePath(src, "a.js")
+	clean := tspath.ResolvePath(src, "clean.js")
+	for _, project := range []string{"./tsconfig.json", "./typed.json", "./missing.json"} {
+		for _, singleThreaded := range []bool{true, false} {
+			for _, invocation := range []struct {
+				name               string
+				cwd                string
+				files, directories []string
+				wantFiles          int
+			}{
+				{name: "implicit", cwd: dir, wantFiles: 2},
+				{name: "dot", cwd: dir, directories: []string{dir}, wantFiles: 2},
+				{name: "subdirectory", cwd: dir, directories: []string{src}, wantFiles: 2},
+				{name: "file", cwd: dir, files: []string{file}, wantFiles: 1},
+				{name: "files", cwd: dir, files: []string{file, clean}, wantFiles: 2},
+				{name: "overlap", cwd: dir, files: []string{file}, directories: []string{src}, wantFiles: 2},
+				{name: "child-implicit", cwd: src, wantFiles: 2},
+				{name: "child-file", cwd: src, files: []string{file}, wantFiles: 1},
+			} {
+				t.Run(fmt.Sprintf("%s/serial=%t/%s", project, singleThreaded, invocation.name), func(t *testing.T) {
+					config := rslintconfig.RslintConfig{
+						{Ignores: []string{"**/ignored.js"}},
+						{Files: []string{"**/*.js"}, Plugins: []string{"@typescript-eslint"},
+							LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{project}}},
+							Rules:           rslintconfig.Rules{"no-debugger": "error", "@typescript-eslint/no-for-in-array": "error"}},
+					}
+					code, stdout, stderr := runLintCommandForTest(t, invocation.cwd, lintArgs{
+						ConfigCatalog: explicitConfigCatalogForTest(dir, config),
+						AllowFiles:    invocation.files, AllowDirs: invocation.directories,
+						Format: "default", NoColor: true, SingleThreaded: singleThreaded,
+					})
+					if project == "./missing.json" {
+						if code != 1 || !strings.Contains(stderr, "missing.json") || strings.Contains(stdout, "no-debugger") {
+							t.Fatalf("config failure became a gap: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+						}
+						return
+					}
+					wantTyped := 0
+					if project == "./typed.json" {
+						wantTyped = 1
+					}
+					countText := fmt.Sprintf("(%d files,", invocation.wantFiles)
+					if invocation.wantFiles == 1 {
+						countText = "(1 file,"
+					}
+					if code != 1 || stderr != "" || !strings.Contains(stdout, countText) ||
+						strings.Count(stdout, "no-debugger") != 1 || strings.Count(stdout, "no-for-in-array") != wantTyped ||
+						strings.Contains(stdout, "ignored.js:") {
+						t.Fatalf("changed targets or capabilities: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+					}
+				})
+			}
+		}
 	}
 }

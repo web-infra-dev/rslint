@@ -1037,30 +1037,6 @@ func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 	}
 }
 
-func TestIsBroadProjectLoadScope(t *testing.T) {
-	const cwd = "/repo"
-	tests := []struct {
-		name       string
-		allowFiles []string
-		allowDirs  []string
-		want       bool
-	}{
-		{name: "implicit cwd", want: true},
-		{name: "explicit cwd", allowDirs: []string{"/repo"}, want: true},
-		{name: "cwd plus file", allowFiles: []string{"/repo/a.ts"}, allowDirs: []string{"/repo"}, want: true},
-		{name: "ancestor", allowDirs: []string{"/"}, want: true},
-		{name: "focused directory", allowDirs: []string{"/repo/packages/a"}},
-		{name: "focused file", allowFiles: []string{"/repo/packages/a/index.ts"}},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := isBroadProjectLoadScope(test.allowFiles, test.allowDirs, cwd, true); got != test.want {
-				t.Fatalf("isBroadProjectLoadScope() = %t, want %t", got, test.want)
-			}
-		})
-	}
-}
-
 func TestHandleLintCommandRejectsInvalidFormatBeforeWork(t *testing.T) {
 	code, stdout, stderr := runLintCommandForTest(t, t.TempDir(), lintArgs{
 		Format:         "stylish",
@@ -1174,14 +1150,13 @@ func TestHandleLintCommandBuildsOnlySelectedProjects(t *testing.T) {
 		Rules: rslintconfig.Rules{"no-debugger": "error"},
 	}}
 	for _, test := range []struct {
-		name            string
-		cwd             string
-		allowFiles      []string
-		allowDirs       []string
-		wantLaterConfig bool
+		name       string
+		cwd        string
+		allowFiles []string
+		allowDirs  []string
 	}{
-		{name: "implicit cwd", cwd: dir, wantLaterConfig: true},
-		{name: "explicit cwd", cwd: dir, allowDirs: []string{dir}, wantLaterConfig: true},
+		{name: "implicit cwd", cwd: dir},
+		{name: "explicit cwd", cwd: dir, allowDirs: []string{dir}},
 		{name: "file", cwd: dir, allowFiles: []string{targetPath}},
 		{name: "directory from parent", cwd: parent, allowDirs: []string{dir}},
 	} {
@@ -1223,10 +1198,10 @@ func TestHandleLintCommandBuildsOnlySelectedProjects(t *testing.T) {
 					t.Fatalf("unselected source %s reads=%d, want 0", name, got)
 				}
 			}
-			// Broad invocations still validate all declared project metadata;
-			// focused invocations stop once the target has a direct owner.
-			if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); (got > 0) != test.wantLaterConfig {
-				t.Fatalf("later project config reads=%d, want read=%t", got, test.wantLaterConfig)
+			// Every invocation validates the effective candidates without
+			// constructing the later project's source graph.
+			if got := fsys.readCount(tspath.ResolvePath(dir, "tsconfig-later.json")); got == 0 {
+				t.Fatal("later effective project config was not validated")
 			}
 		})
 	}

@@ -107,7 +107,7 @@ func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.S
 }
 
 // programFileIndex joins lint targets to Program sources by exact physical
-// path. It is scoped to one binding pass and builds the governing config's
+// path. It is scoped to one project-selection or binding pass and builds
 // Program indexes only after one of them misses an exact lexical lookup.
 // Canonical target identities established during discovery are reused before
 // consulting the filesystem, and unknown source paths are resolved at most once
@@ -170,6 +170,22 @@ func (index *programFileIndex) sourceFile(
 		index.buildPrograms(programIndexes)
 	}
 	return index.sourcesByProgram[programIndex][exactPathID(canonicalTarget)]
+}
+
+// sourceFileForTarget is shared by project selection and final binding so a
+// frozen target cannot be accepted during one stage and rejected by the other.
+func (index *programFileIndex) sourceFileForTarget(
+	programIndexes []int,
+	programIndex int,
+	target target.File,
+) *ast.SourceFile {
+	if index == nil || programIndex < 0 || programIndex >= len(index.programs) {
+		return nil
+	}
+	if sourceFile := exactProgramSourceFile(index.programs[programIndex], target.Path); sourceFile != nil {
+		return sourceFile
+	}
+	return index.sourceFile(programIndexes, programIndex, target.CanonicalPath)
 }
 
 type programSourceMembership struct {

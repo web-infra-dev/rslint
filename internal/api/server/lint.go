@@ -361,7 +361,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		Configs:  projectConfigs,
 		Targets:  targetPlan,
 		Policies: projectPolicies,
-		Scope:    loader.Targeted,
+		Scope:    loader.LintTargets,
 	}
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source

@@ -13,19 +13,17 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type configOrders map[string]int
 
-// ProjectScope preserves the validation and checking ranges of CLI/API callers.
-// Plain lint uses selected targets to guide project construction.
+// ProjectScope separates target-driven lint from program-wide type checking.
+// Ordinary CLI and API calls share the same LintTargets contract.
 type ProjectScope uint8
 
 const (
 	AllDeclared ProjectScope = iota
-	ActiveOwners
-	Targeted
+	LintTargets
 )
 
 type ProjectBuildRequest struct {
@@ -323,7 +321,7 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 }
 
 // BuildProjects prepares explicit and discovered configs in one project plan,
-// then applies the caller's existing construction scope. LoadCLI/LoadAPI bind
+// then applies lint or type-check scope. LoadCLI/LoadAPI bind
 // targets to that plan once; discovery never creates a separate Program set.
 func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error) {
 	if err := s.validate(); err != nil {
@@ -345,10 +343,11 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 	if err != nil {
 		return ProjectSet{}, err
 	}
-	if request.Scope != Targeted {
-		// Focused execution already validates every selected direct root. Eager
-		// modes need the same check before publishing service selections, even
+	if request.Scope == AllDeclared {
+		// Target-driven lint already validates every service source. Full
+		// project checking needs the same check before publishing selections, even
 		// when type-check-only will never enter the lint binding phase.
+		programFiles := newProgramFileIndex(set.compilerPrograms, request.Targets.Files, s.FS(), request.SingleThreaded)
 		for _, file := range request.Targets.Files {
 			if request.Policies[file].ServiceRootDirectory == "" {
 				continue
@@ -358,7 +357,7 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 				continue
 			}
 			program := set.compilerPrograms[indexes[0]]
-			if utils.NewProgramSourceLookup(program, s.FS()).SourceFileForTarget(file.Path, file.CanonicalPath) == nil {
+			if programFiles.sourceFileForTarget(indexes, indexes[0], file) == nil {
 				return ProjectSet{}, fmt.Errorf("project root %q from %q was absent from its TypeScript Program", file.Path, program.CommandLine().ConfigName())
 			}
 		}
