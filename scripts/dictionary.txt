@@ -254,6 +254,7 @@ goimports
 gojs
 golangci
 GOMAXPROCS
+GOMEMLIMIT
 goroutines
 gosec
 gotest
