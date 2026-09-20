@@ -40,7 +40,6 @@ type Runtime struct {
 	// suppress a report, so an adapter that cannot answer leaves it nil and
 	// the engine falls back to lexical nesting alone.
 	InsideDescribe func(*ast.Node) bool
-	Skip           bool
 }
 
 type Config struct {
@@ -99,7 +98,7 @@ func NewRule(config Config) rule.Rule {
 		Schema: rule.NewSchema(schemaJSON),
 		Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 			runtime := config.Prepare(ctx)
-			if runtime.Skip || runtime.Parse == nil {
+			if runtime.Parse == nil {
 				return rule.RuleListeners{}
 			}
 			opts := parseOptions(rawOptions)
