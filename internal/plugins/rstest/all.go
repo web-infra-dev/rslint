@@ -58,6 +58,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_to_have_been_called"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_awaited_expect_poll"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_hook"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_local_test_context_for_concurrent_snapshots"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_mock_type_parameters"
 	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/require_test_timeout"
@@ -130,6 +131,7 @@ func GetAllRules() []rule.Rule {
 		prefer_to_have_been_called.PreferToHaveBeenCalledRule,
 		prefer_todo.PreferTodoRule,
 		require_awaited_expect_poll.RequireAwaitedExpectPollRule,
+		require_hook.RequireHookRule,
 		require_local_test_context_for_concurrent_snapshots.RequireLocalTestContextForConcurrentSnapshotsRule,
 		require_mock_type_parameters.RequireMockTypeParametersRule,
 		require_test_timeout.RequireTestTimeoutRule,
