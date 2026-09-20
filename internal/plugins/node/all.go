@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unpublished_bin"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/no_unpublished_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/process"
+	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_global/text_decoder"
 	"github.com/web-infra-dev/rslint/internal/plugins/node/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -57,6 +58,7 @@ func GetAllRules() []rule.Rule {
 		no_unpublished_bin.NoUnpublishedBinRule,
 		no_unpublished_import.NoUnpublishedImportRule,
 		process.ProcessRule,
+		text_decoder.TextDecoderRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 	}
 }
