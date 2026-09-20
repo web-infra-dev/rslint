@@ -163,6 +163,18 @@ func TestNoUnnecessarySliceEndReviewRegressions(t *testing.T) {
 			Code:     "array.slice(options.start, array.length);",
 			FileName: "review.js",
 		},
+		{
+			Code:     "array.slice(start + 1, array.length);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "array.slice(index ?? 0, array.length);",
+			FileName: "review.js",
+		},
+		{
+			Code:     "array.slice(flag ? 1 : 2, array.length);",
+			FileName: "review.js",
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code:     "foo[-0].slice(1, foo[0].length)",
@@ -176,30 +188,6 @@ func TestNoUnnecessarySliceEndReviewRegressions(t *testing.T) {
 			Code:     `foo["a" + "b"].slice(1, foo.ab.length)`,
 			FileName: "review.js",
 			Output:   []string{`foo["a" + "b"].slice(1)`},
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "no-unnecessary-slice-end",
-			}},
-		},
-		{
-			Code:     "array.slice(start + 1, array.length);",
-			FileName: "review.js",
-			Output:   []string{"array.slice(start + 1);"},
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "no-unnecessary-slice-end",
-			}},
-		},
-		{
-			Code:     "array.slice(index ?? 0, array.length);",
-			FileName: "review.js",
-			Output:   []string{"array.slice(index ?? 0);"},
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "no-unnecessary-slice-end",
-			}},
-		},
-		{
-			Code:     "array.slice(flag ? 1 : 2, array.length);",
-			FileName: "review.js",
-			Output:   []string{"array.slice(flag ? 1 : 2);"},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "no-unnecessary-slice-end",
 			}},

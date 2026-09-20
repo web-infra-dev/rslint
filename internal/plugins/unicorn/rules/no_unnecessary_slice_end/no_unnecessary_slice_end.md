@@ -27,9 +27,10 @@ This rule has no options. It is enabled at `error` severity in `unicornPlugin.co
 Locally shadowed, disabled, or previously reassigned `Infinity` and `Number`
 globals are not assumed to be built-ins. When type information proves that the
 receiver is not an array, string, or typed array, the call is also left alone.
-For `.length` rewrites, known getter-backed receiver paths or a first argument
-that can change the receiver are skipped. These guards avoid semantics-changing
-autofixes that Unicorn v75.0.0 can still offer.
+For `.length` rewrites, the shared slice/splice safety helper also requires a
+repeatable receiver and a simple side-effect-free first argument; more complex
+first-argument expressions are conservatively left unchanged. These guards avoid
+semantics-changing autofixes that Unicorn v75.0.0 can still offer.
 
 ## Original Documentation
 
