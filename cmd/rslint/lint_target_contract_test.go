@@ -231,7 +231,7 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 }
 
 func TestCLIProjectRootsKeepTargetsAcrossInvocationForms(t *testing.T) {
-	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, ""))
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, "roots"))
 	src := tspath.ResolvePath(dir, "src")
 	file := tspath.ResolvePath(src, "a.js")
 	clean := tspath.ResolvePath(src, "clean.js")
@@ -285,6 +285,71 @@ func TestCLIProjectRootsKeepTargetsAcrossInvocationForms(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+func TestCLIProjectExtensionGateKeepsMixedTargetsAndEligibleFallback(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, "aliases"))
+	if err := os.Symlink("src/a.js", tspath.ResolvePath(dir, "alias.ts")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	main := tspath.ResolvePath(dir, "main.ts")
+	js := tspath.ResolvePath(dir, "src/a.js")
+	extra := tspath.ResolvePath(dir, "src/extra.js")
+	for _, laterProject := range []bool{false, true} {
+		projects := rslintconfig.ProjectPaths{"./tsconfig.json"}
+		if laterProject {
+			projects = append(projects, "./typed.json")
+		}
+		for _, invocation := range []struct {
+			name               string
+			files, directories []string
+			want               []string
+		}{
+			{name: "single-js", files: []string{js}, want: []string{js}},
+			{name: "mixed", files: []string{main, js, extra}, want: []string{main, js, extra}},
+			{name: "directory", directories: []string{dir}, want: []string{main, js, extra}},
+			{name: "implicit", want: []string{main, js, extra}},
+		} {
+			t.Run(fmt.Sprintf("later-project=%t/%s", laterProject, invocation.name), func(t *testing.T) {
+				config := rslintconfig.RslintConfig{
+					{Ignores: []string{"alias.ts", "typed-main.ts"}},
+					{Files: []string{"**/*.js", "**/*.ts"}, Plugins: []string{"@typescript-eslint"},
+						LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: projects}},
+						Rules:           rslintconfig.Rules{"no-debugger": "error", "@typescript-eslint/no-for-in-array": "error"}},
+				}
+				code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+					ConfigCatalog: explicitConfigCatalogForTest(dir, config),
+					AllowFiles:    invocation.files, AllowDirs: invocation.directories,
+					Format: "jsonline", NoColor: true,
+				})
+				if code != 1 || stderr != "" {
+					t.Fatalf("lint failed: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+				}
+				diagnostics := parseLintTargetContractDiagnostics(t, stdout)
+				// Every source has a debugger sentinel, including ignored helpers,
+				// so these paths expose dropped targets and leaked Program sources.
+				gotTargets := lintTargetContractPaths(t, dir, diagnostics, func(ruleName string) bool {
+					return ruleName == "no-debugger"
+				})
+				if !slices.Equal(gotTargets, invocation.want) {
+					t.Fatalf("lint targets = %v, want %v", gotTargets, invocation.want)
+				}
+				var wantTyped []string
+				if slices.Contains(invocation.want, main) {
+					wantTyped = append(wantTyped, main)
+				}
+				if laterProject {
+					wantTyped = append(wantTyped, js)
+				}
+				gotTyped := lintTargetContractPaths(t, dir, diagnostics, func(ruleName string) bool {
+					return ruleName == "@typescript-eslint/no-for-in-array"
+				})
+				if !slices.Equal(gotTyped, wantTyped) || len(diagnostics) != len(invocation.want)+len(wantTyped) {
+					t.Fatalf("typed targets = %v, want %v; diagnostics=%+v", gotTyped, wantTyped, diagnostics)
+				}
+			})
 		}
 	}
 }

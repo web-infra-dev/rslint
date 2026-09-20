@@ -106,6 +106,15 @@ func exactProgramSourceFile(program *compiler.Program, targetPath string) *ast.S
 	return sourceFile
 }
 
+// projectSupportsTarget uses the target's requested spelling, not its physical
+// alias, to check extension eligibility. Service Programs explicitly admit
+// non-TS roots; ordinary projects retain their authored compiler options.
+func projectSupportsTarget(options *core.CompilerOptions, file target.File, useCaseSensitiveFileNames bool) bool {
+	return options != nil && (options.AllowNonTsExtensions.IsTrue() ||
+		lintprogram.CompilerOptionsSupportFileName(options,
+			tspath.GetCanonicalFileName(file.Path, useCaseSensitiveFileNames)))
+}
+
 // programFileIndex joins lint targets to Program sources by exact physical
 // path. It is scoped to one project-selection or binding pass and builds
 // Program indexes only after one of them misses an exact lexical lookup.
@@ -182,7 +191,11 @@ func (index *programFileIndex) sourceFileForTarget(
 	if index == nil || programIndex < 0 || programIndex >= len(index.programs) {
 		return nil
 	}
-	if sourceFile := exactProgramSourceFile(index.programs[programIndex], target.Path); sourceFile != nil {
+	program := index.programs[programIndex]
+	if program == nil || !projectSupportsTarget(program.Options(), target, program.UseCaseSensitiveFileNames()) {
+		return nil
+	}
+	if sourceFile := exactProgramSourceFile(program, target.Path); sourceFile != nil {
 		return sourceFile
 	}
 	return index.sourceFile(programIndexes, programIndex, target.CanonicalPath)

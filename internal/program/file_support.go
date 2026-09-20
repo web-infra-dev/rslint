@@ -7,8 +7,8 @@ import (
 )
 
 // CompilerOptionsSupportFileName reports whether a TypeScript project can
-// admit fileName through normal source-file resolution. Direct config roots do
-// not need this guard because ParsedCommandLine.FileNames is authoritative.
+// admit fileName through normal source-file resolution. This checks extension
+// eligibility only; callers must still establish actual source membership.
 func CompilerOptionsSupportFileName(options *core.CompilerOptions, fileName string) bool {
 	if options == nil {
 		return false

@@ -378,7 +378,7 @@ func TestHandleLint_SelectedTargetResolvesGoverningProject(t *testing.T) {
 }
 
 func TestHandleLint_ProjectRootsKeepExactTargetSetAndCapabilities(t *testing.T) {
-	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, ""))
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, "roots"))
 	file := tspath.ResolvePath(dir, "src/a.js")
 	clean := tspath.ResolvePath(dir, "src/clean.js")
 	ignored := tspath.ResolvePath(dir, "src/ignored.js")
@@ -429,6 +429,73 @@ func TestHandleLint_ProjectRootsKeepExactTargetSetAndCapabilities(t *testing.T) 
 				}
 				if counts["no-debugger"] != 1 || counts["@typescript-eslint/no-for-in-array"] != wantTyped || len(response.Diagnostics) != 1+wantTyped {
 					t.Fatalf("wrong gap/project rule capabilities: %v", counts)
+				}
+			})
+		}
+	}
+}
+
+func TestHandleLint_ProjectExtensionGateKeepsMixedTargetsAndEligibleFallback(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_roots.txtar").Materialize(t, "aliases"))
+	if err := os.Symlink("src/a.js", tspath.ResolvePath(dir, "alias.ts")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	main := tspath.ResolvePath(dir, "main.ts")
+	js := tspath.ResolvePath(dir, "src/a.js")
+	extra := tspath.ResolvePath(dir, "src/extra.js")
+	for _, laterProject := range []bool{false, true} {
+		projects := `"./tsconfig.json"`
+		if laterProject {
+			projects += `,"./typed.json"`
+		}
+		for _, invocation := range []struct {
+			name  string
+			files []string
+			want  []string
+		}{
+			{name: "single-js", files: []string{js}, want: []string{"src/a.js"}},
+			{name: "mixed", files: []string{main, js, extra}, want: []string{"main.ts", "src/a.js", "src/extra.js"}},
+			{name: "implicit", want: []string{"main.ts", "src/a.js", "src/extra.js"}},
+		} {
+			t.Run(fmt.Sprintf("later-project=%t/%s", laterProject, invocation.name), func(t *testing.T) {
+				config := json.RawMessage(fmt.Sprintf(`[
+					{"ignores":["alias.ts","typed-main.ts"]},
+					{"files":["**/*.js","**/*.ts"],"plugins":["@typescript-eslint"],
+					 "languageOptions":{"parserOptions":{"project":[%s]}},
+					 "rules":{"no-debugger":"error","@typescript-eslint/no-for-in-array":"error"}}
+				]`, projects))
+				response, err := (&Handler{}).HandleLint(api.LintRequest{
+					Config: config, ConfigDirectory: dir, WorkingDirectory: dir, Files: invocation.files,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				slices.Sort(response.LintedFiles)
+				if !slices.Equal(response.LintedFiles, invocation.want) || response.FileCount != len(invocation.want) {
+					t.Fatalf("lint targets = %v (%d), want %v", response.LintedFiles, response.FileCount, invocation.want)
+				}
+				var gotSyntax, gotTyped []string
+				for _, diagnostic := range response.Diagnostics {
+					switch diagnostic.RuleName {
+					case "no-debugger":
+						gotSyntax = append(gotSyntax, diagnostic.FilePath)
+					case "@typescript-eslint/no-for-in-array":
+						gotTyped = append(gotTyped, diagnostic.FilePath)
+					default:
+						t.Fatalf("unexpected diagnostic: %+v", diagnostic)
+					}
+				}
+				slices.Sort(gotSyntax)
+				slices.Sort(gotTyped)
+				var wantTyped []string
+				if slices.Contains(invocation.want, "main.ts") {
+					wantTyped = append(wantTyped, "main.ts")
+				}
+				if laterProject {
+					wantTyped = append(wantTyped, "src/a.js")
+				}
+				if !slices.Equal(gotSyntax, invocation.want) || !slices.Equal(gotTyped, wantTyped) {
+					t.Fatalf("syntax targets = %v, want %v; typed targets = %v, want %v", gotSyntax, invocation.want, gotTyped, wantTyped)
 				}
 			})
 		}

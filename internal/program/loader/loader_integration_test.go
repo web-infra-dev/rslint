@@ -2407,48 +2407,203 @@ func TestBuildProjectsPreservesRootFallback(t *testing.T) {
 	}
 }
 
-func TestBuildProjectsPreservesImportedSourceAliases(t *testing.T) {
+func TestBuildProjectsFiltersUnsupportedImportedTargets(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/project_extension_admission.txtar")
 	for _, aliasTarget := range []bool{false, true} {
-		for _, singleThreaded := range []bool{false, true} {
-			dir := tspath.NormalizePath(t.TempDir())
-			source, alias := "real.js", "alias.ts"
-			lintTarget, imported := source, alias
-			if aliasTarget {
-				source, alias = "real.ts", "alias.js"
-				lintTarget, imported = alias, source
-			}
-			writeProgramTestFiles(t, dir, map[string]string{
-				"tsconfig.json": `{"files":["main.ts"],"compilerOptions":{"noLib":true,"allowJs":false}}`,
-				"main.ts":       `import "./` + imported + `";`,
-				source:          `export const value = 1;`,
-			})
-			if err := os.Symlink(source, tspath.ResolvePath(dir, alias)); err != nil {
-				t.Skipf("symlinks unavailable: %v", err)
-			}
-			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-			file := testLintTarget(fsys, dir, tspath.ResolvePath(dir, lintTarget))
-			plan := target.Plan{Files: []target.File{file}}
+		for _, test := range []struct {
+			name                          string
+			mixed, later, firstJS, listed bool
+		}{
+			{name: "single gap"},
+			{name: "listed gap", listed: true},
+			{name: "mixed gap", mixed: true},
+			{name: "single later project", later: true},
+			{name: "mixed later project", mixed: true, later: true},
+			{name: "listed later project", listed: true, later: true},
+			{name: "supported physical alias", firstJS: true},
+		} {
 			for _, scope := range []ProjectScope{AllDeclared, LintTargets} {
+				for _, singleThreaded := range []bool{false, true} {
+					t.Run(fmt.Sprintf("alias=%t/%s/scope=%d/serial=%t", aliasTarget, test.name, scope, singleThreaded), func(t *testing.T) {
+						fixture := "js_source"
+						source, alias := "real.js", "alias.ts"
+						lintTarget, imported := source, alias
+						if aliasTarget {
+							fixture = "js_alias"
+							source, alias = "real.ts", "alias.js"
+							lintTarget, imported = alias, source
+						}
+						dir := tspath.NormalizePath(archive.Materialize(t, fixture))
+						roots := `"main.ts","keep.ts"`
+						if test.listed {
+							roots += fmt.Sprintf(",%q", lintTarget)
+						}
+						writeProgramTestFiles(t, dir, map[string]string{
+							"first.json": fmt.Sprintf(`{"files":[%s],"compilerOptions":{"noLib":true,"allowJs":%t}}`, roots, test.firstJS),
+						})
+						if err := os.Symlink(source, tspath.ResolvePath(dir, alias)); err != nil {
+							t.Skipf("symlinks unavailable: %v", err)
+						}
+						fsys := &programReadCountingFS{FS: bundled.WrapFS(cachedvfs.From(osvfs.FS())), reads: make(map[string]int)}
+						file := testLintTarget(fsys, dir, tspath.ResolvePath(dir, lintTarget))
+						plan := target.Plan{Files: []target.File{file}}
+						if test.mixed {
+							plan.Files = append(plan.Files, testLintTarget(fsys, dir, tspath.ResolvePath(dir, "keep.ts")))
+						}
+						projects := []string{"./first.json"}
+						if test.later {
+							projects = append(projects, "./second.json")
+						}
+						session := NewSession(fsys)
+						set, err := session.buildProjectsForTest(t, ProjectBuildRequest{
+							Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig(projects...)},
+							Targets: plan, Scope: scope, SingleThreaded: singleThreaded,
+						})
+						if err != nil {
+							t.Fatal(err)
+						}
+						if scope == AllDeclared && set.Len() != len(projects) {
+							t.Fatalf("type-check scope lost Programs: %d, want %d", set.Len(), len(projects))
+						}
+						if scope == LintTargets && !test.mixed && !test.firstJS {
+							for _, name := range []string{"main.ts", "keep.ts", imported} {
+								if count := fsys.readCount(tspath.ResolvePath(dir, name)); count != 0 {
+									t.Fatalf("unsupported project's source %q read %d times", name, count)
+								}
+							}
+						}
+						binding, err := session.LoadAPI(set, plan, dir, singleThreaded)
+						if err != nil {
+							t.Fatal(err)
+						}
+						seen := make(map[string]int)
+						for index, sources := range binding.TargetsByProgram {
+							program := binding.Programs[index]
+							for _, name := range sources {
+								selected, ok := binding.LintTargetBySourcePath[exactPathID(name)]
+								if !ok {
+									t.Fatalf("bound source %q lost its lint target", name)
+								}
+								seen[selected.Path]++
+								wantConfig := ""
+								if selected.Path != file.Path || test.firstJS {
+									wantConfig = tspath.ResolvePath(dir, "first.json")
+								} else if test.later {
+									wantConfig = tspath.ResolvePath(dir, "second.json")
+								}
+								if program.Options().ConfigFilePath != wantConfig ||
+									program.CanProvideTypeChecker(program.GetSourceFile(name)) != (wantConfig != "") {
+									t.Fatalf("target %q borrowed wrong project: %q, want %q", selected.Path, program.Options().ConfigFilePath, wantConfig)
+								}
+							}
+						}
+						if len(seen) != len(plan.Files) {
+							t.Fatalf("lint target set changed: %v", seen)
+						}
+						for _, selected := range plan.Files {
+							if seen[selected.Path] != 1 {
+								t.Fatalf("target %q bound %d times", selected.Path, seen[selected.Path])
+							}
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestBuildProjectsMatchesCompilerExtensionAdmission(t *testing.T) {
+	for _, test := range []struct {
+		name, file, options      string
+		caseSensitive, supported bool
+	}{
+		{name: "TS case insensitive", file: "target.TS", options: `{}`, supported: true},
+		{name: "TS case sensitive", file: "target.TS", options: `{}`, caseSensitive: true},
+		{name: "JS case insensitive", file: "target.JS", options: `{"allowJs":true}`, supported: true},
+		{name: "JS case sensitive", file: "target.JS", options: `{"allowJs":true}`, caseSensitive: true},
+		{name: "JS disabled", file: "target.js", options: `{"allowJs":false}`},
+		{name: "checkJs implies allowJs", file: "target.js", options: `{"checkJs":true}`, supported: true},
+		{name: "explicit false overrides checkJs", file: "target.js", options: `{"allowJs":false,"checkJs":true}`},
+		{name: "module JS enabled", file: "target.mjs", options: `{"allowJs":true}`, caseSensitive: true, supported: true},
+		{name: "common JS enabled", file: "target.cjs", options: `{"allowJs":true}`, caseSensitive: true, supported: true},
+		{name: "JSX enabled", file: "target.jsx", options: `{"allowJs":true}`, caseSensitive: true, supported: true},
+	} {
+		for _, scope := range []ProjectScope{AllDeclared, LintTargets} {
+			t.Run(fmt.Sprintf("%s/scope=%d", test.name, scope), func(t *testing.T) {
+				const dir = "/repo"
+				file, configPath := tspath.ResolvePath(dir, test.file), tspath.ResolvePath(dir, "tsconfig.json")
+				fsys := newBindingIndexTestFS([]string{file, configPath}, nil)
+				fsys.caseSensitive = test.caseSensitive
+				fsys.files[configPath] = fmt.Sprintf(`{"files":[%q],"compilerOptions":%s}`, test.file, test.options)
+				plan := target.Plan{Files: []target.File{testLintTarget(fsys, dir, file)}}
+				config := projectConfig("./tsconfig.json")
+				config[0].Files = []string{test.file}
 				session := NewSession(fsys)
-				projects, err := session.buildProjectsForTest(t, ProjectBuildRequest{
-					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("./tsconfig.json")},
-					Targets: plan, Scope: scope, SingleThreaded: singleThreaded,
+				set, err := session.buildProjectsForTest(t, ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: config},
+					Targets: plan, Scope: scope, SingleThreaded: true,
 				})
 				if err != nil {
 					t.Fatal(err)
 				}
-				binding, err := session.LoadAPI(projects, plan, dir, singleThreaded)
+				if scope == LintTargets && !test.supported && set.Len() != 0 {
+					t.Fatal("unsupported root constructed a Program")
+				}
+				binding, unbound := session.bindTargetsToProjects(set, plan, true)
+				if (len(unbound) == 0) != test.supported {
+					t.Fatalf("compiler extension admission differs: unbound=%v supported=%t", unbound, test.supported)
+				}
+				if test.supported && (len(binding.TargetsByProgram) != 1 || !slices.Equal(binding.TargetsByProgram[0], []string{file})) {
+					t.Fatalf("supported root identity changed: %v", binding.TargetsByProgram)
+				}
+			})
+		}
+	}
+}
+
+func TestBuildProjectsKeepsServiceExtensionAdmissionLocal(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_extension_admission.txtar").Materialize(t, "service"))
+	config := rslintconfig.RslintConfig{
+		{Files: []string{"ordinary.js"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"./tsconfig.json"}}}},
+		{Files: []string{"service.js"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+	}
+	for _, scope := range []ProjectScope{AllDeclared, LintTargets} {
+		for _, serial := range []bool{false, true} {
+			t.Run(fmt.Sprintf("scope=%d/serial=%t", scope, serial), func(t *testing.T) {
+				fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+				plan := target.Plan{Files: []target.File{
+					testLintTarget(fsys, dir, tspath.ResolvePath(dir, "service.js")),
+					testLintTarget(fsys, dir, tspath.ResolvePath(dir, "ordinary.js")),
+				}}
+				session := NewSession(fsys)
+				set, err := session.buildProjectsForTest(t, ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: config}, Targets: plan, Scope: scope, SingleThreaded: serial,
+				})
 				if err != nil {
 					t.Fatal(err)
 				}
-				if len(binding.Programs) != 1 || len(binding.TargetsByProgram[0]) != 1 {
-					t.Fatalf("alias became a source-only gap: %v", binding.TargetsByProgram)
+				binding, err := session.LoadAPI(set, plan, dir, serial)
+				if err != nil {
+					t.Fatal(err)
 				}
-				name := binding.TargetsByProgram[0][0]
-				if name != tspath.ResolvePath(dir, imported) || !binding.Programs[0].CanProvideTypeChecker(binding.Programs[0].GetSourceFile(name)) {
-					t.Fatalf("wrong imported source/capability: %s", name)
+				seen := make(map[string]int)
+				for index, sources := range binding.TargetsByProgram {
+					program := binding.Programs[index]
+					for _, file := range sources {
+						seen[file]++
+						wantTypes := file == plan.Files[0].Path
+						if program.CanProvideTypeChecker(program.GetSourceFile(file)) != wantTypes {
+							t.Fatalf("service extension permission leaked: %s", file)
+						}
+						if wantTypes && program.GetSourceFile(plan.Files[1].Path) == nil {
+							t.Fatal("fixture did not exercise a service Program containing the ordinary JS target")
+						}
+					}
 				}
-			}
+				if len(seen) != len(plan.Files) || seen[plan.Files[0].Path] != 1 || seen[plan.Files[1].Path] != 1 {
+					t.Fatalf("lint target set changed: %v", seen)
+				}
+			})
 		}
 	}
 }

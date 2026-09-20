@@ -1,0 +1,26 @@
+-- js_source/main.ts --
+import "./alias.ts";
+-- js_source/keep.ts --
+export const keep = 1;
+-- js_source/other.ts --
+import "./real.js";
+-- js_source/real.js --
+export const value = 1;
+-- js_source/second.json --
+{"files":["other.ts"],"compilerOptions":{"noLib":true,"allowJs":true}}
+-- js_alias/main.ts --
+import "./real.ts";
+-- js_alias/keep.ts --
+export const keep = 1;
+-- js_alias/other.ts --
+import "./alias.js";
+-- js_alias/real.ts --
+export const value = 1;
+-- js_alias/second.json --
+{"files":["other.ts"],"compilerOptions":{"noLib":true,"allowJs":true}}
+-- service/tsconfig.json --
+{"files":["service.js","ordinary.js"],"compilerOptions":{"noLib":true,"allowJs":false}}
+-- service/service.js --
+export const service = 1;
+-- service/ordinary.js --
+export const ordinary = 1;

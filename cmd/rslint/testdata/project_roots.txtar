@@ -1,12 +1,30 @@
--- tsconfig.json --
+-- roots/tsconfig.json --
 {"files":["src/a.js","src/ignored.js"],"compilerOptions":{"allowJs":false}}
--- typed.json --
+-- roots/typed.json --
 {"extends":"./tsconfig.json","compilerOptions":{"allowJs":true}}
--- src/a.js --
+-- roots/src/a.js --
 export const values = [1, 2];
 for (const key in values) {}
 debugger;
--- src/clean.js --
+-- roots/src/clean.js --
 export const clean = true;
--- src/ignored.js --
+-- roots/src/ignored.js --
+debugger;
+-- aliases/tsconfig.json --
+{"files":["main.ts"],"compilerOptions":{"allowJs":false}}
+-- aliases/typed.json --
+{"files":["typed-main.ts"],"compilerOptions":{"allowJs":true}}
+-- aliases/main.ts --
+import "./alias";
+export const values = [1, 2];
+for (const key in values) {}
+debugger;
+-- aliases/typed-main.ts --
+import "./src/a.js";
+debugger;
+-- aliases/src/a.js --
+export const values = [1, 2];
+for (const key in values) {}
+debugger;
+-- aliases/src/extra.js --
 debugger;

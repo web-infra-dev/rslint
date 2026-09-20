@@ -135,6 +135,17 @@ func (execution *targetedProjectExecution) containsTarget(
 	return slot.lookup.sourceFileForTarget([]int{0}, 0, target) != nil
 }
 
+func (execution *targetedProjectExecution) supportsTarget(index int, file target.File) (bool, error) {
+	parsed, err := execution.parse(index)
+	if err != nil {
+		return false, err
+	}
+	// Service construction enables non-TS roots on a private options copy.
+	return execution.plan.specs[index].sourceReferences || projectSupportsTarget(
+		parsed.config.CompilerOptions(), file, execution.session.FS().UseCaseSensitiveFileNames(),
+	), nil
+}
+
 // forEachProject bounds preparation work without letting completion order
 // decide ownership or errors. Callers inspect the slots in their stable order.
 func (execution *targetedProjectExecution) forEachProject(indexes []int, task func(int)) {
@@ -382,8 +393,21 @@ func (s *Session) executeTargetProjectPlan(
 
 	directIndexes := make([]int, 0, len(plan.specs))
 	seenDirect := make([]bool, len(plan.specs))
-	for _, index := range directProjectByTarget {
-		if index >= 0 && !seenDirect[index] {
+	for targetIndex, index := range directProjectByTarget {
+		if index < 0 {
+			continue
+		}
+		supported, err := execution.supportsTarget(index, targetPlan.Files[targetIndex])
+		if err != nil {
+			return ProjectSet{}, err
+		}
+		if !supported {
+			// Keep metadata-root priority: a rejected first root proceeds to
+			// ordered source fallback, without constructing its source graph.
+			directProjectByTarget[targetIndex] = -1
+			continue
+		}
+		if !seenDirect[index] {
 			seenDirect[index] = true
 			directIndexes = append(directIndexes, index)
 		}
@@ -419,7 +443,8 @@ func (s *Session) executeTargetProjectPlan(
 	// Different candidate groups can proceed concurrently. Within a group,
 	// stop once all remaining targets have an actual source, so an import-only
 	// target does not construct every later candidate's dependency graph.
-	// A target's extension cannot exclude differently named physical aliases.
+	// Unsupported targets cannot require construction or borrow a Program built
+	// for another target; containsTarget applies the same per-file eligibility.
 	if !singleThreaded && len(groups) > 1 {
 		s.context.enableConcurrentProgramQueries()
 	}
@@ -434,6 +459,20 @@ func (s *Session) executeTargetProjectPlan(
 		for _, projectIndex := range group.projectIndexes {
 			if len(pending) == 0 {
 				break
+			}
+			supported := false
+			for _, targetIndex := range pending {
+				var err error
+				supported, err = execution.supportsTarget(projectIndex, targetPlan.Files[targetIndex])
+				if err != nil {
+					return err
+				}
+				if supported {
+					break
+				}
+			}
+			if !supported {
+				continue
 			}
 			if err := execution.build(projectIndex); err != nil {
 				return err
