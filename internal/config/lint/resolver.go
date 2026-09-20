@@ -4,9 +4,12 @@
 package lint
 
 import (
+	"errors"
 	"fmt"
+	"runtime"
 	"sort"
 
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -133,20 +136,35 @@ func (resolver *Resolver) ResolveTarget(file target.File) (config.ResolvedFileCo
 
 // ProjectPolicies projects the same final config used by lint rules. Every
 // target has an entry: a zero policy requests no project and must not inherit
-// another target's declarations during Program binding.
-func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]config.ProjectPolicy, error) {
+// another target's declarations during Program binding. File configuration is
+// resolved concurrently unless singleThreaded is set; policy projection and
+// errors retain the input order.
+func (resolver *Resolver) ProjectPolicies(files []target.File, singleThreaded bool) (map[target.File]config.ProjectPolicy, error) {
 	ownerRoots := make(map[*config.FileConfigResolver]string, len(resolver.configsByOwner))
 	for owner := range resolver.configsByOwner {
 		ownerRoots[resolver.resolversByOwnerPath[config.ExactPathID(owner)]] = owner
 	}
 	policies := make(map[target.File]config.ProjectPolicy, len(files))
 	resolvedPolicies := make(map[*config.MergedConfig]config.ProjectPolicy)
-	for _, file := range files {
+	var configs []projectTargetConfig
+	if workers := min(runtime.GOMAXPROCS(0), len(files)); !singleThreaded && workers > 1 {
+		configs = resolver.resolveProjectTargetConfigs(files, workers)
+	}
+	for index, file := range files {
 		defaultRootDirectory := resolver.defaultRootDirectory
 		if resolver.configsByOwner != nil {
 			defaultRootDirectory = ownerRoots[resolver.resolversByOwnerPath[config.ExactPathID(file.ConfigDirectory)]]
 		}
-		resolved, ok := resolver.ResolveTarget(file)
+		var resolved config.ResolvedFileConfig
+		var ok bool
+		if configs == nil {
+			resolved, ok = resolver.ResolveTarget(file)
+		} else {
+			if configs[index].panicValue != nil {
+				panic(configs[index].panicValue)
+			}
+			resolved, ok = configs[index].resolved, configs[index].available
+		}
 		if !ok {
 			return nil, fmt.Errorf("%s: missing governing configuration", file.Path)
 		}
@@ -162,6 +180,43 @@ func (resolver *Resolver) ProjectPolicies(files []target.File) (map[target.File]
 		policies[file] = policy
 	}
 	return policies, nil
+}
+
+type projectTargetConfig struct {
+	resolved   config.ResolvedFileConfig
+	available  bool
+	panicValue any
+}
+
+func (resolver *Resolver) resolveProjectTargetConfigs(files []target.File, workers int) []projectTargetConfig {
+	configs := make([]projectTargetConfig, len(files))
+	chunkSize := (len(files) + workers - 1) / workers
+	work := core.NewWorkGroup(false)
+	for start := 0; start < len(files); start += chunkSize {
+		end := min(start+chunkSize, len(files))
+		work.Queue(func() {
+			index := start
+			completed := false
+			defer func() {
+				if completed {
+					return
+				}
+				// Replay failures on the caller only when it reaches this file,
+				// so a later panic cannot hide an earlier configuration error.
+				value := recover()
+				if value == nil {
+					value = errors.New("file configuration worker exited without a panic value")
+				}
+				configs[index].panicValue = value
+			}()
+			for ; index < end; index++ {
+				configs[index].resolved, configs[index].available = resolver.ResolveTarget(files[index])
+			}
+			completed = true
+		})
+	}
+	work.RunAndWait()
+	return configs
 }
 
 func normalizeSourceTargetMappings(

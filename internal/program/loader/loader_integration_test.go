@@ -55,7 +55,7 @@ func (s *Session) buildProjectsForTest(t *testing.T, request ProjectBuildRequest
 			ConfigsByOwner: request.Configs, FS: s.FS(), PathSpaces: pathSpaces, Catalog: rule.NewCatalog(),
 		})
 		var err error
-		request.Policies, err = resolver.ProjectPolicies(request.Targets.Files)
+		request.Policies, err = resolver.ProjectPolicies(request.Targets.Files, request.SingleThreaded)
 		if err != nil {
 			return ProjectSet{}, err
 		}
@@ -514,7 +514,7 @@ func TestBuildProjectPlanReusesCandidatesAcrossRuleConfigs(t *testing.T) {
 			resolver := configLint.NewResolver(configLint.ResolverOptions{
 				Config: config, ConfigDirectory: dir, FS: fsys, PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
 			})
-			policies, err := resolver.ProjectPolicies(plan.Files)
+			policies, err := resolver.ProjectPolicies(plan.Files, false)
 			if err != nil {
 				t.Fatal(err)
 			}

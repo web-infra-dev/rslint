@@ -385,7 +385,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			PathSpaces:           targetPlan.PathSpaces(),
 			FS:                   fs,
 		})
-		projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files)
+		projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files, singleThreaded)
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}

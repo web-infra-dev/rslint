@@ -349,7 +349,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		PathSpaces:           targetPlan.PathSpaces(),
 		FS:                   fs,
 	})
-	projectPolicies, err := configResolver.ProjectPolicies(targetPlan.Files)
+	projectPolicies, err := configResolver.ProjectPolicies(targetPlan.Files, false)
 	if err != nil {
 		return nil, err
 	}
