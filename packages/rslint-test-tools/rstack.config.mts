@@ -195,6 +195,9 @@ define.test({
     './tests/eslint-plugin-node/rules/no-top-level-await.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-bin.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-import.test.ts',
+    './tests/eslint-plugin-node/rules/prefer-global/buffer.test.ts',
+    './tests/eslint-plugin-node/rules/prefer-global/process.test.ts',
+    './tests/eslint-plugin-node/rules/prefer-global/text-decoder.test.ts',
     './tests/eslint-plugin-node/rules/prefer-node-protocol.test.ts',
 
     // eslint-plugin-import
@@ -719,6 +722,7 @@ define.test({
     './tests/rstest/rules/prefer-to-be-truthy.test.ts',
     './tests/rstest/rules/prefer-to-contain.test.ts',
     './tests/rstest/rules/prefer-to-have-been-called.test.ts',
+    './tests/rstest/rules/prefer-to-have-length.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
     './tests/rstest/rules/require-awaited-expect-poll.test.ts',
     './tests/rstest/rules/require-to-throw-message.test.ts',
