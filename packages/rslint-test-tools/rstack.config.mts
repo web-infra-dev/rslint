@@ -759,6 +759,7 @@ define.test({
     './tests/eslint-plugin-unicorn/rules/no-array-from-fill.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-front-mutation.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-array-reverse.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-array-sort.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-expression-member.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-document-cookie.test.ts',
