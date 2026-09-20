@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/empty_brace_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/error_message"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/explicit_timer_delay"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/filename_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/new_for_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_array_concat_in_loop"
@@ -69,6 +70,7 @@ func GetAllRules() []rule.Rule {
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
 		empty_brace_spaces.EmptyBraceSpacesRule,
 		error_message.ErrorMessageRule,
+		explicit_timer_delay.ExplicitTimerDelayRule,
 		filename_case.FilenameCaseRule,
 		new_for_builtins.NewForBuiltinsRule,
 		no_array_concat_in_loop.NoArrayConcatInLoopRule,
