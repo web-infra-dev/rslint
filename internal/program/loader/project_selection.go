@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -49,7 +50,6 @@ type ProjectSourceSelection struct {
 
 type projectSelectionSlot struct {
 	parseOnce      sync.Once
-	metadataReady  chan struct{}
 	config         *tsoptions.ParsedCommandLine
 	parseErr       error
 	exactRoots     map[string]struct{}
@@ -66,6 +66,8 @@ type projectSelectionSlot struct {
 type projectSelection struct {
 	request ProjectSelectionRequest
 	slots   []projectSelectionSlot
+	// Speculative and on-demand metadata share the request's concurrency limit.
+	metadataWorkers chan struct{}
 	// Existing target/source identity machinery is shared across root probes.
 	// Only this request owns the index; no editor or loader cache retains it.
 	rootIdentityMu sync.Mutex
@@ -75,6 +77,10 @@ type projectSelection struct {
 func (selection *projectSelection) parseMetadata(index int) {
 	slot := &selection.slots[index]
 	slot.parseOnce.Do(func() {
+		if selection.metadataWorkers != nil {
+			selection.metadataWorkers <- struct{}{}
+			defer func() { <-selection.metadataWorkers }()
+		}
 		if selection.request.Metadata == nil {
 			slot.parseErr = errors.New("project metadata loader is unavailable")
 			return
@@ -92,13 +98,7 @@ func (selection *projectSelection) parseMetadata(index int) {
 
 func (selection *projectSelection) metadata(index int) (*projectSelectionSlot, error) {
 	slot := &selection.slots[index]
-	if slot.metadataReady != nil {
-		// Only the request's metadata workers parse prefetched candidates.
-		// Ordered consumers wait here instead of exceeding their concurrency cap.
-		<-slot.metadataReady
-	} else {
-		selection.parseMetadata(index)
-	}
+	selection.parseMetadata(index)
 	if slot.parseErr != nil {
 		return nil, fmt.Errorf("parse TypeScript config %q: %w", selection.request.Candidates[index].ConfigPath, slot.parseErr)
 	}
@@ -311,9 +311,54 @@ func runTargetProjectTasks(groups []projectTargetGroup, singleThreaded bool, tas
 	return nil
 }
 
-// prefetchMetadata shares one bounded worker pool across all target groups.
-// Selection consumes ready results in declaration order and alone reports errors.
-// Programs reuse these parsed configs but are acquired only after selection.
+// metadataPrefetchPrefix limits speculative directory scans to the declaration
+// prefix suggested by the nearest containing config directories. These are only
+// latency hints: ordered selection can continue beyond this prefix as needed.
+func (selection *projectSelection) metadataPrefetchPrefix(group projectTargetGroup) []int {
+	indexes := group.projectIndexes
+	if len(group.targetIndexes) == 0 {
+		return nil
+	}
+	if len(indexes) <= 1 {
+		return indexes
+	}
+	caseSensitive := selection.request.FS == nil || selection.request.FS.UseCaseSensitiveFileNames()
+	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
+	type directoryHint struct {
+		directory string
+		position  int
+	}
+	hints := make([]directoryHint, len(indexes))
+	for position, index := range indexes {
+		hints[position] = directoryHint{
+			directory: tspath.GetDirectoryPath(selection.request.Candidates[index].ConfigPath),
+			position:  position,
+		}
+	}
+	// Sort only hints, retaining declaration order for equal directory lengths.
+	// ContainsPath keeps the compiler's path-boundary, root and case rules.
+	sort.SliceStable(hints, func(left, right int) bool {
+		return len(hints[left].directory) > len(hints[right].directory)
+	})
+	end := 1
+	for _, targetIndex := range group.targetIndexes {
+		for _, hint := range hints {
+			if tspath.ContainsPath(hint.directory, selection.request.Targets[targetIndex].Path, options) {
+				end = max(end, hint.position+1)
+				break
+			}
+		}
+		if end == len(indexes) {
+			break
+		}
+	}
+	return indexes[:end]
+}
+
+// prefetchMetadata shares one bounded worker pool across the predicted prefixes.
+// It includes the first config; on-demand reads beyond a prefix use the same
+// concurrency limit and parseOnce. Only ordered selection reports errors or
+// acquires Programs, which reuse the parsed config.
 func (selection *projectSelection) prefetchMetadata(groups []projectTargetGroup) func() {
 	if selection.request.SingleThreaded || runtime.GOMAXPROCS(0) <= 1 {
 		return nil
@@ -321,7 +366,7 @@ func (selection *projectSelection) prefetchMetadata(groups []projectTargetGroup)
 	var indexes []int
 	seen := make([]bool, len(selection.slots))
 	for _, group := range groups {
-		for _, index := range group.projectIndexes {
+		for _, index := range selection.metadataPrefetchPrefix(group) {
 			if !seen[index] {
 				seen[index] = true
 				indexes = append(indexes, index)
@@ -331,15 +376,12 @@ func (selection *projectSelection) prefetchMetadata(groups []projectTargetGroup)
 	if len(indexes) <= 1 {
 		return nil
 	}
-	for _, index := range indexes {
-		selection.slots[index].metadataReady = make(chan struct{})
-	}
+	selection.metadataWorkers = make(chan struct{}, runtime.GOMAXPROCS(0))
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		forEachSelectedProject(false, indexes, func(index int) {
 			selection.parseMetadata(index)
-			close(selection.slots[index].metadataReady)
 		})
 	}()
 	return func() { <-done }
