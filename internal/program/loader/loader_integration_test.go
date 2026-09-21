@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2270,7 +2271,7 @@ func TestBuildTargetProjectStopsAfterSelectedRoot(t *testing.T) {
 	}
 }
 
-func TestBuildTargetProjectReadsOnlyNeededCandidates(t *testing.T) {
+func TestBuildTargetProjectReportsOnlyReachedConfigErrors(t *testing.T) {
 	for _, test := range []struct {
 		name        string
 		projects    []string
@@ -2284,7 +2285,7 @@ func TestBuildTargetProjectReadsOnlyNeededCandidates(t *testing.T) {
 	}{
 		{name: "direct root skips unreadable later config", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "later/tsconfig.json", wantConfig: "tsconfig.json"},
 		{name: "physical root skips unreadable later config", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"alias.ts"}, unreadable: "later/tsconfig.json", alias: true, wantConfig: "tsconfig.json"},
-		{name: "imported target still finds later direct root", projects: []string{"./import.json", "./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "later/tsconfig.json", wantConfig: "tsconfig.json"},
+		{name: "missed directory hint stops at later direct root", projects: []string{"./import.json", "./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "later/tsconfig.json", wantConfig: "tsconfig.json"},
 		{name: "imported target must read later candidate", projects: []string{"./import.json", "./tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "tsconfig.json", wantError: true, wantReads: 1},
 		{name: "another target needs later candidate", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts", "later/src/other.ts"}, unreadable: "later/tsconfig.json", wantError: true, wantReads: 1},
 		{name: "first candidate is unreadable", projects: []string{"./tsconfig.json", "./later/tsconfig.json"}, targets: []string{"target.ts"}, unreadable: "tsconfig.json", wantError: true, wantReads: 1},
@@ -2399,6 +2400,178 @@ func TestSelectProjectSourcesKeepsAuthoredEligibilityWithAdaptedProgram(t *testi
 		if selected[0].SourceFile == nil || (selected[1].SourceFile != nil) != service {
 			t.Fatalf("service=%t: selection borrowed an adapter's broader eligibility: %+v", service, selected)
 		}
+	}
+}
+
+func TestSelectProjectSourcesOverlapsConfirmedBuildsWithRequiredMetadata(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"a.ts":   "export const a = 1;",
+		"b.ts":   "export const b = 1;",
+		"a.json": `{"files":["a.ts"],"compilerOptions":{"noLib":true}}`,
+		"b.json": `{"files":["b.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	for _, test := range []struct {
+		name          string
+		serial        bool
+		metadataError bool
+	}{
+		{name: "parallel"},
+		{name: "serial", serial: true},
+		{name: "metadata error wins over early build error", metadataError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			serial := test.serial
+			if !serial && runtime.GOMAXPROCS(0) < 2 {
+				t.Skip("requires at least two Program workers")
+			}
+			fsys := bundled.WrapFS(osvfs.FS())
+			context := newBuildContext(fsys)
+			var candidates []ProjectCandidate
+			var metadata []*tsoptions.ParsedCommandLine
+			var targets []target.File
+			for _, name := range []string{"a", "b"} {
+				configPath := tspath.ResolvePath(dir, name+".json")
+				parsed, err := context.parseConfig(dir, configPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				candidates = append(candidates, ProjectCandidate{ConfigPath: configPath})
+				metadata = append(metadata, parsed)
+				targets = append(targets, testLintTarget(fsys, dir, tspath.ResolvePath(dir, name+".ts")))
+			}
+			started := make(chan struct{})
+			indexes := []int{0, 1}
+			metadataError := errors.New("required later metadata failed")
+			buildError := errors.New("earlier confirmed Program failed")
+			selected, err := SelectProjectSources(ProjectSelectionRequest{
+				Targets: targets, CandidateIndexes: [][]int{indexes, indexes},
+				Candidates: candidates, FS: fsys, SingleThreaded: serial,
+				Metadata: func(index int) (*tsoptions.ParsedCommandLine, error) {
+					if index == 1 {
+						if serial {
+							select {
+							case <-started:
+								return nil, errors.New("serial build started before root selection completed")
+							default:
+							}
+						} else {
+							select {
+							case <-started:
+							case <-time.After(5 * time.Second):
+								return nil, errors.New("confirmed Program waited for later metadata")
+							}
+						}
+						if test.metadataError {
+							return nil, metadataError
+						}
+					}
+					return metadata[index], nil
+				},
+				Program: func(index int, parsed *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
+					if index == 0 {
+						close(started)
+						if test.metadataError {
+							return nil, buildError
+						}
+					}
+					return context.createProjectProgramFromParsedConfig(serial, dir, parsed, false)
+				},
+			})
+			if test.metadataError {
+				if !errors.Is(err, metadataError) {
+					t.Fatalf("metadata error lost priority to early build: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for index, result := range selected {
+				if result.CandidateIndex != index || result.SourceFile == nil {
+					t.Fatalf("target %d lost its selected Program: %+v", index, result)
+				}
+			}
+		})
+	}
+}
+
+func TestSelectProjectSourcesPrefetchesMetadataWithoutSelectingItsErrors(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"first.json":       `{"files":[],"compilerOptions":{"noLib":true}}`,
+		"owner.json":       `{"files":["nested/target.ts"],"compilerOptions":{"noLib":true}}`,
+		"unused.json":      `{"files":[],"compilerOptions":{"noLib":true}}`,
+		"nested/target.ts": "export const value = 1;",
+	})
+	for _, serial := range []bool{false, true} {
+		t.Run(fmt.Sprintf("serial=%t", serial), func(t *testing.T) {
+			if !serial && runtime.GOMAXPROCS(0) < 2 {
+				t.Skip("requires concurrent metadata workers")
+			}
+			fsys := bundled.WrapFS(osvfs.FS())
+			context := newBuildContext(fsys)
+			candidates := []ProjectCandidate{
+				{ConfigPath: tspath.ResolvePath(dir, "first.json")},
+				{ConfigPath: tspath.ResolvePath(dir, "owner.json")},
+				{ConfigPath: tspath.ResolvePath(dir, "unused.json")},
+				{ConfigPath: tspath.ResolvePath(dir, "nested/unreadable.json")},
+			}
+			var metadata []*tsoptions.ParsedCommandLine
+			for _, candidate := range candidates[:3] {
+				parsed, err := context.parseConfig(dir, candidate.ConfigPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				metadata = append(metadata, parsed)
+			}
+			prefetched := make(chan struct{})
+			programCalls := make([]atomic.Int32, len(candidates))
+			selected, err := SelectProjectSources(ProjectSelectionRequest{
+				Targets:          []target.File{testLintTarget(fsys, dir, tspath.ResolvePath(dir, "nested/target.ts"))},
+				CandidateIndexes: [][]int{{0, 1, 2, 3}}, Candidates: candidates, FS: fsys, SingleThreaded: serial,
+				Metadata: func(index int) (*tsoptions.ParsedCommandLine, error) {
+					if index == 3 {
+						close(prefetched)
+						return nil, errors.New("unused prefetched metadata failed")
+					}
+					if index == 1 && !serial {
+						select {
+						case <-prefetched:
+						case <-time.After(5 * time.Second):
+							return nil, errors.New("metadata prefix was parsed serially")
+						}
+					}
+					return metadata[index], nil
+				},
+				Program: func(index int, parsed *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
+					programCalls[index].Add(1)
+					if index != 1 {
+						return nil, fmt.Errorf("unselected candidate %d acquired a Program", index)
+					}
+					return context.createProjectProgramFromParsedConfig(serial, dir, parsed, false)
+				},
+			})
+			if err != nil || len(selected) != 1 || selected[0].CandidateIndex != 1 || selected[0].SourceFile == nil {
+				t.Fatalf("prefetch changed ordered selection: selected=%+v err=%v", selected, err)
+			}
+			for index := range candidates {
+				want := int32(0)
+				if index == 1 {
+					want = 1
+				}
+				if got := programCalls[index].Load(); got != want {
+					t.Fatalf("candidate %d acquired %d Programs, want %d", index, got, want)
+				}
+			}
+			if serial {
+				select {
+				case <-prefetched:
+					t.Fatal("serial selection read past its winner")
+				default:
+				}
+			}
+		})
 	}
 }
 

@@ -31,8 +31,8 @@ type ProjectSelectionRequest struct {
 	Candidates       []ProjectCandidate
 	FS               vfs.FS
 	SingleThreaded   bool
-	// Metadata is called only when root/source selection reaches a candidate.
-	// A nil result without an error means the candidate is unavailable.
+	// Metadata may be prefetched concurrently. Only the ordered selection may
+	// report its errors. A nil result without an error means unavailable.
 	Metadata func(index int) (*tsoptions.ParsedCommandLine, error)
 	// Program must acquire the generation described by the selected metadata.
 	Program func(index int, parsed *tsoptions.ParsedCommandLine) (*compiler.Program, error)
@@ -119,26 +119,31 @@ func (selection *projectSelection) canonicalRoots(slot *projectSelectionSlot) ma
 	return slot.canonicalRoots
 }
 
-// matchRoots checks one candidate before advancing to the next. A physical
-// alias can therefore finish the search without reading a later configuration.
+// matchRoots checks exact and physical roots before advancing to the next
+// candidate, regardless of which metadata prefetch completed first.
 // All targets seed identity lookup, including targets in other candidate groups.
-func (selection *projectSelection) matchRoots(index int, pending []int, owners []int) ([]int, error) {
+func (selection *projectSelection) matchRoots(index int, pending []int, owners []int) ([]int, bool, error) {
 	slot, err := selection.metadata(index)
 	if err != nil || slot.config == nil {
-		return pending, err
+		return pending, false, err
+	}
+	supported := false
+	accept := func(targetIndex int) {
+		owners[targetIndex] = index
+		supported = supported || selection.supportsParsedTarget(index, slot.config, selection.request.Targets[targetIndex])
 	}
 	unresolved := pending[:0]
 	for _, targetIndex := range pending {
 		file := selection.request.Targets[targetIndex]
 		if _, exact := slot.exactRoots[exactPathID(file.Path)]; exact {
-			owners[targetIndex] = index
+			accept(targetIndex)
 		} else {
 			unresolved = append(unresolved, targetIndex)
 		}
 	}
 	pending = unresolved
 	if len(pending) == 0 || selection.request.FS == nil || len(slot.exactRoots) == 0 {
-		return pending, nil
+		return pending, supported, nil
 	}
 	canonicalRoots := selection.canonicalRoots(slot)
 	unresolved = pending[:0]
@@ -146,12 +151,12 @@ func (selection *projectSelection) matchRoots(index int, pending []int, owners [
 		file := selection.request.Targets[targetIndex]
 		_, found := canonicalRoots[exactPathID(file.CanonicalPath)]
 		if file.CanonicalPath != "" && found {
-			owners[targetIndex] = index
+			accept(targetIndex)
 		} else {
 			unresolved = append(unresolved, targetIndex)
 		}
 	}
-	return unresolved, nil
+	return unresolved, supported, nil
 }
 
 func (selection *projectSelection) supportsTarget(index int, file target.File) (bool, error) {
@@ -159,9 +164,13 @@ func (selection *projectSelection) supportsTarget(index int, file target.File) (
 	if err != nil || slot.config == nil {
 		return false, err
 	}
+	return selection.supportsParsedTarget(index, slot.config, file), nil
+}
+
+func (selection *projectSelection) supportsParsedTarget(index int, parsed *tsoptions.ParsedCommandLine, file target.File) bool {
 	caseSensitive := selection.request.FS == nil || selection.request.FS.UseCaseSensitiveFileNames()
 	return selection.request.Candidates[index].SourceReferences ||
-		projectSupportsTarget(slot.config.CompilerOptions(), file, caseSensitive), nil
+		projectSupportsTarget(parsed.CompilerOptions(), file, caseSensitive)
 }
 
 func (selection *projectSelection) build(index int) error {
@@ -191,9 +200,7 @@ func (selection *projectSelection) source(index int, file target.File) *ast.Sour
 	}
 	// Editor Programs can carry internal construction options. Another target
 	// causing acquisition must not broaden this target's authored eligibility.
-	caseSensitive := selection.request.FS == nil || selection.request.FS.UseCaseSensitiveFileNames()
-	if !selection.request.Candidates[index].SourceReferences &&
-		!projectSupportsTarget(slot.config.CompilerOptions(), file, caseSensitive) {
+	if !selection.supportsParsedTarget(index, slot.config, file) {
 		return nil
 	}
 	slot.lookupOnce.Do(func() {
@@ -208,6 +215,34 @@ func (selection *projectSelection) source(index int, file target.File) *ast.Sour
 func (selection *projectSelection) missingServiceSource(index int, file target.File) error {
 	return fmt.Errorf("project root %q from %q was absent from its TypeScript Program",
 		file.Path, selection.request.Candidates[index].ConfigPath)
+}
+
+// queueDirectBuilds overlaps confirmed root construction with metadata still
+// needed by other targets. It never acquires an unselected candidate's Program.
+// The ordered consumer reports errors after all submitted builds have joined.
+func (selection *projectSelection) queueDirectBuilds() (enqueue func(int), wait func()) {
+	workersN := min(runtime.GOMAXPROCS(0), len(selection.slots))
+	if selection.request.SingleThreaded || workersN <= 1 {
+		return nil, nil
+	}
+	jobs := make(chan int, workersN)
+	queued := make([]sync.Once, len(selection.slots))
+	var workers sync.WaitGroup
+	workers.Add(workersN)
+	for range workersN {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				_ = selection.build(index)
+			}
+		}()
+	}
+	return func(index int) {
+			queued[index].Do(func() { jobs <- index })
+		}, func() {
+			close(jobs)
+			workers.Wait()
+		}
 }
 
 func forEachSelectedProject(singleThreaded bool, indexes []int, task func(int)) {
@@ -259,8 +294,33 @@ func runTargetProjectTasks(groups []projectTargetGroup, singleThreaded bool, tas
 	return nil
 }
 
+// prefetchRootMetadata restores the declaration-prefix concurrency used by
+// focused lint. The nearest containing directory is only a latency hint, never
+// evidence of ownership. Beyond this one prefix, metadata is read on demand.
+func (selection *projectSelection) prefetchRootMetadata(indexes, pending []int) {
+	caseSensitive := selection.request.FS == nil || selection.request.FS.UseCaseSensitiveFileNames()
+	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
+	end := 1 // The first candidate has already been consumed.
+	for _, targetIndex := range pending {
+		file := selection.request.Targets[targetIndex]
+		predicted, longestDirectory := -1, -1
+		for position, index := range indexes {
+			directory := tspath.GetDirectoryPath(selection.request.Candidates[index].ConfigPath)
+			if len(directory) > longestDirectory && tspath.ContainsPath(directory, file.Path, options) {
+				predicted, longestDirectory = position, len(directory)
+			}
+		}
+		end = max(end, predicted+1)
+	}
+	forEachSelectedProject(false, indexes[1:end], func(index int) {
+		// Store failures in their slots; only a reached candidate can fail the
+		// request. Prefetch never acquires a Program or changes a target owner.
+		_, _ = selection.metadata(index)
+	})
+}
+
 // SelectProjectSources applies one project selection policy for CLI, API and
-// editor requests. It never changes targets, validates unused config contents,
+// editor requests. It never changes targets, reports unused metadata failures,
 // or constructs source-only Programs. Metadata-root priority, extension
 // eligibility, actual source membership and service errors are decided here.
 func SelectProjectSources(request ProjectSelectionRequest) ([]ProjectSourceSelection, error) {
@@ -287,20 +347,34 @@ func SelectProjectSources(request ProjectSelectionRequest) ([]ProjectSourceSelec
 	}
 	selection.rootIdentities.initialize()
 	groups := groupTargetsByProjects(request.Targets, candidatesByTarget, func(string) []int { return nil })
-	err := runTargetProjectTasks(groups, request.SingleThreaded, func(group projectTargetGroup) error {
-		pending := append([]int(nil), group.targetIndexes...)
-		for _, candidate := range group.projectIndexes {
-			if len(pending) == 0 {
-				break
-			}
-			var err error
-			pending, err = selection.matchRoots(candidate, pending, owners)
-			if err != nil {
-				return err
-			}
+	enqueueBuild, waitForBuilds := selection.queueDirectBuilds()
+	err := func() error {
+		if waitForBuilds != nil {
+			defer waitForBuilds()
 		}
-		return nil
-	})
+		return runTargetProjectTasks(groups, request.SingleThreaded, func(group projectTargetGroup) error {
+			pending := append([]int(nil), group.targetIndexes...)
+			for position, candidate := range group.projectIndexes {
+				if len(pending) == 0 {
+					break
+				}
+				// Give the first candidate a chance to finish without lookahead.
+				if position == 1 && !request.SingleThreaded && runtime.GOMAXPROCS(0) > 1 {
+					selection.prefetchRootMetadata(group.projectIndexes, pending)
+				}
+				var err error
+				var supported bool
+				pending, supported, err = selection.matchRoots(candidate, pending, owners)
+				if err != nil {
+					return err
+				}
+				if supported && enqueueBuild != nil {
+					enqueueBuild(candidate)
+				}
+			}
+			return nil
+		})
+	}()
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +398,9 @@ func SelectProjectSources(request ProjectSelectionRequest) ([]ProjectSourceSelec
 			direct = append(direct, candidate)
 		}
 	}
-	forEachSelectedProject(request.SingleThreaded, direct, func(index int) { _ = selection.build(index) })
+	if enqueueBuild == nil {
+		forEachSelectedProject(request.SingleThreaded, direct, func(index int) { _ = selection.build(index) })
+	}
 	for _, index := range direct {
 		if err := selection.build(index); err != nil {
 			return nil, err

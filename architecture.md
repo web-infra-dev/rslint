@@ -283,7 +283,7 @@ and cannot observe which construction path supplied it.
 
    Ordinary lint takes `project` only from each target's final matched configuration. Merging retains the winning declaration's patterns and literal authored base together; later project values replace or clear both. `config.ResolveProjectPaths` expands that effective declaration; an effective absolute `tsconfigRootDir` overrides its base, while omission or a null reset retains the authored base. No effective project or service means source-only lint, without an implicit root tsconfig lookup. The same config projection resolves the service boundary from the selected config module directory, or invocation cwd for inline-only API config. It returns the resolved service root separately from the explicit override used by ordinary project paths. Consumers do not infer defaults. Imports, preset composition and `basePath` do not redefine the module origin.
 
-   `program/loader.Session` assembles one project plan. Ordinary CLI and API lint use the same `LintTargets` scope regardless of invocation spelling. CLI, API and LSP call `loader.SelectProjectSources` with frozen targets and ordered candidate lists. Its adapters supply only parsed metadata and Programs; root ranking, extension eligibility, actual source membership and fallback belong to the selector. Config path expansion still validates declared literal paths and glob matches. Selection reads config contents only as needed, stopping after each target has its first exact or frozen physical root; it does not preflight unused later configs. An imported-only candidate does not end the root search, because a later direct root takes priority. JSON, option and extends diagnostics retain lenient parsing behavior.
+   `program/loader.Session` assembles one project plan. Ordinary CLI and API lint use the same `LintTargets` scope regardless of invocation spelling. CLI, API and LSP call `loader.SelectProjectSources` with frozen targets and ordered candidate lists. Its adapters supply only parsed metadata and Programs; root ranking, extension eligibility, actual source membership and fallback belong to the selector. Config path expansion still validates declared literal paths and glob matches. Selection consumes metadata in declaration order, stopping after each target has its first exact or frozen physical root. Parallel requests may prefetch a containing-directory prediction prefix, but unused metadata errors are not reported and prefetch never acquires a Program. Beyond that prefix, metadata is read on demand. An imported-only candidate does not end the root search, because a later direct root takes priority. JSON, option and extends diagnostics retain lenient parsing behavior.
 
    Before construction, the selector checks each target's requested extension against the project's authored compiler options, using the filesystem's case rules. A project is built only when at least one selected target qualifies. Selected root Programs are acquired concurrently for batch requests; LSP supplies a single-document serial request. If the first explicit metadata root does not admit the target, actual source membership is tried in declaration order before creating a gap; a missing service-selected source remains an error. Different candidate groups can run concurrently, but each group's source search stops once its pending targets are bound. Serial groups stop on the first error. Project selection and final binding share the extension predicate and `programFileIndex`'s exact-source and frozen-identity lookup, seeded with all selected targets. The selector rechecks authored eligibility per target before accepting a source, so a Program's internal construction options or another target cannot broaden it. The CLI/API binding reuses the chosen owner instead of ranking candidates again. Service construction retains its explicit non-TS root capability. No loader stage changes the target set.
 
@@ -1427,10 +1427,15 @@ collection, and plugin dispatch may still use infrastructure goroutines.
      planned serially in stable config/project order. Construction then uses at
      most `min(GOMAXPROCS, Program count)` workers and merges results and
      errors by the planned order.
-   - Focused lint parses each governing config's tsconfig frontier in declaration
-     order. Independent config frontiers and confirmed direct winner Programs
-     may run concurrently; import-only fallback remains serial within one
-     governing config so a later completion cannot overtake an earlier project.
+   - Ordinary lint consumes each governing config's tsconfig frontier in declaration
+     order. Metadata may be prefetched concurrently; a containing-directory hint
+     bounds the initial prefix without deciding ownership. Errors are reported
+     only when ordered selection reaches that candidate. Independent config
+     frontiers and confirmed direct winner Programs may run concurrently. A confirmed eligible root begins construction while
+     other targets continue their required metadata search; construction does
+     not wait for all root searches to finish. Import-only fallback remains
+     serial within one governing config so a later completion cannot overtake
+     an earlier project.
    - `--singleThreaded` executes the same state machine with one Go discovery
      worker and serializes module evaluation within each Node frontier batch.
      Coordinator batches and results remain ordered in either mode.
