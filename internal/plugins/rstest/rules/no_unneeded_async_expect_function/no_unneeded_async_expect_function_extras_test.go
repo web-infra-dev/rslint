@@ -157,6 +157,42 @@ test('reports', async ({ expect }) => {
   await expect(run()).rejects.toThrow();
 });
 `)
+	add(`
+import { expect } from '@rstest/playwright';
+expect(async () => { await run(); }).rejects.toThrow();
+`,
+		`async () => { await run(); }`,
+		`
+import { expect } from '@rstest/playwright';
+expect(run()).rejects.toThrow();
+`)
+	add(
+		`import.meta.rstest.expect(async () => { await run(); }).rejects.toThrow();`,
+		`async () => { await run(); }`,
+		`import.meta.rstest.expect(run()).rejects.toThrow();`,
+	)
+	// A non-null assertion on the optional import.meta.rstest namespace is not
+	// recognized as an Rstest binding by the shared expect parser, so the
+	// assertion behind it is left alone.
+	addValid(`import.meta.rstest!.expect(async () => { await run(); }).rejects.toThrow();`)
+	// A modifier written as a string key reads the same property.
+	add(
+		`expect(async () => { await run(); })["rejects"].toThrow();`,
+		`async () => { await run(); }`,
+		`expect(run())["rejects"].toThrow();`,
+	)
+	// An optional call on expect itself still hands the wrapper to rejects.
+	add(
+		`expect?.(async () => { await run(); }).rejects.toThrow();`,
+		`async () => { await run(); }`,
+		`expect?.(run()).rejects.toThrow();`,
+	)
+	// A later matcher in the chain asserts on the same promise either way.
+	add(
+		`expect(async () => { await run(); }).rejects.toThrow().toBe(1);`,
+		`async () => { await run(); }`,
+		`expect(run()).rejects.toThrow().toBe(1);`,
+	)
 
 	// The awaited call keeps its own spelling, and the wrapper's parentheses
 	// and the remaining expect arguments are preserved.
