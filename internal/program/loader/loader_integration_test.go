@@ -2526,6 +2526,8 @@ func TestSelectProjectSourcesPrefetchesMetadataWithoutSelectingItsErrors(t *test
 				metadata = append(metadata, parsed)
 			}
 			prefetched := make(chan struct{})
+			programStarted := make(chan struct{})
+			var prefetchWaitTimedOut atomic.Bool
 			programCalls := make([]atomic.Int32, len(candidates))
 			selected, err := SelectProjectSources(ProjectSelectionRequest{
 				Targets:          []target.File{testLintTarget(fsys, dir, tspath.ResolvePath(dir, "nested/target.ts"))},
@@ -2533,6 +2535,11 @@ func TestSelectProjectSourcesPrefetchesMetadataWithoutSelectingItsErrors(t *test
 				Metadata: func(index int) (*tsoptions.ParsedCommandLine, error) {
 					if index == 3 {
 						close(prefetched)
+						select {
+						case <-programStarted:
+						case <-time.After(5 * time.Second):
+							prefetchWaitTimedOut.Store(true)
+						}
 						return nil, errors.New("unused prefetched metadata failed")
 					}
 					if index == 1 && !serial {
@@ -2549,11 +2556,15 @@ func TestSelectProjectSourcesPrefetchesMetadataWithoutSelectingItsErrors(t *test
 					if index != 1 {
 						return nil, fmt.Errorf("unselected candidate %d acquired a Program", index)
 					}
+					close(programStarted)
 					return context.createProjectProgramFromParsedConfig(serial, dir, parsed, false)
 				},
 			})
 			if err != nil || len(selected) != 1 || selected[0].CandidateIndex != 1 || selected[0].SourceFile == nil {
 				t.Fatalf("prefetch changed ordered selection: selected=%+v err=%v", selected, err)
+			}
+			if prefetchWaitTimedOut.Load() {
+				t.Fatal("confirmed Program waited for an unused prefetched config")
 			}
 			for index := range candidates {
 				want := int32(0)
@@ -2569,6 +2580,98 @@ func TestSelectProjectSourcesPrefetchesMetadataWithoutSelectingItsErrors(t *test
 				case <-prefetched:
 					t.Fatal("serial selection read past its winner")
 				default:
+				}
+			}
+		})
+	}
+}
+
+type projectSelectionRealpathFS struct {
+	vfs.FS
+	beforeRealpath func(string)
+}
+
+func (fsys *projectSelectionRealpathFS) Realpath(filePath string) string {
+	fsys.beforeRealpath(tspath.NormalizePath(filePath))
+	return fsys.FS.Realpath(filePath)
+}
+
+func TestSelectProjectSourcesOverlapsConfirmedBuildWithRemainingRootIdentities(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"a.ts":     "export const a = 1;",
+		"b.ts":     "export const b = 1;",
+		"extra.ts": "export const extra = 1;",
+		"a.json":   `{"files":["a.ts","extra.ts"],"compilerOptions":{"noLib":true}}`,
+		"b.json":   `{"files":["b.ts"],"compilerOptions":{"noLib":true}}`,
+	})
+	for _, serial := range []bool{false, true} {
+		t.Run(fmt.Sprintf("serial=%t", serial), func(t *testing.T) {
+			if !serial && runtime.GOMAXPROCS(0) < 2 {
+				t.Skip("requires concurrent Program workers")
+			}
+			baseFS := bundled.WrapFS(osvfs.FS())
+			context := newBuildContext(baseFS)
+			var candidates []ProjectCandidate
+			var metadata []*tsoptions.ParsedCommandLine
+			var targets []target.File
+			for _, name := range []string{"a", "b"} {
+				configPath := tspath.ResolvePath(dir, name+".json")
+				parsed, err := context.parseConfig(dir, configPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				candidates = append(candidates, ProjectCandidate{ConfigPath: configPath})
+				metadata = append(metadata, parsed)
+				targets = append(targets, testLintTarget(baseFS, dir, tspath.ResolvePath(dir, name+".ts")))
+			}
+			started := make(chan struct{})
+			var checkedIdentity, wrongOrder atomic.Bool
+			fsys := &projectSelectionRealpathFS{FS: baseFS, beforeRealpath: func(filePath string) {
+				if filePath != tspath.ResolvePath(dir, "extra.ts") {
+					return
+				}
+				checkedIdentity.Store(true)
+				if serial {
+					select {
+					case <-started:
+						wrongOrder.Store(true)
+					default:
+					}
+					return
+				}
+				select {
+				case <-started:
+				case <-time.After(5 * time.Second):
+					wrongOrder.Store(true)
+				}
+			}}
+			indexes := []int{0, 1}
+			calls := make([]atomic.Int32, len(candidates))
+			selected, err := SelectProjectSources(ProjectSelectionRequest{
+				Targets: targets, CandidateIndexes: [][]int{indexes, indexes},
+				Candidates: candidates, FS: fsys, SingleThreaded: serial,
+				Metadata: func(index int) (*tsoptions.ParsedCommandLine, error) { return metadata[index], nil },
+				Program: func(index int, parsed *tsoptions.ParsedCommandLine) (*compiler.Program, error) {
+					calls[index].Add(1)
+					if index == 0 {
+						close(started)
+					}
+					return context.createProjectProgramFromParsedConfig(serial, dir, parsed, false)
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !checkedIdentity.Load() || wrongOrder.Load() {
+				t.Fatalf("confirmed build/root lookup order: checked=%t wrong=%t", checkedIdentity.Load(), wrongOrder.Load())
+			}
+			if len(selected) != len(targets) {
+				t.Fatalf("selected %d targets, want %d", len(selected), len(targets))
+			}
+			for index, result := range selected {
+				if result.CandidateIndex != index || result.SourceFile == nil || calls[index].Load() != 1 {
+					t.Fatalf("target %d: selection=%+v Program calls=%d", index, result, calls[index].Load())
 				}
 			}
 		})

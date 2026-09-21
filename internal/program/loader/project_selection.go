@@ -122,15 +122,20 @@ func (selection *projectSelection) canonicalRoots(slot *projectSelectionSlot) ma
 // matchRoots checks exact and physical roots before advancing to the next
 // candidate, regardless of which metadata prefetch completed first.
 // All targets seed identity lookup, including targets in other candidate groups.
-func (selection *projectSelection) matchRoots(index int, pending []int, owners []int) ([]int, bool, error) {
+func (selection *projectSelection) matchRoots(index int, pending []int, owners []int, enqueueBuild func(int)) ([]int, error) {
 	slot, err := selection.metadata(index)
 	if err != nil || slot.config == nil {
-		return pending, false, err
+		return pending, err
 	}
-	supported := false
+	enqueued := false
 	accept := func(targetIndex int) {
 		owners[targetIndex] = index
-		supported = supported || selection.supportsParsedTarget(index, slot.config, selection.request.Targets[targetIndex])
+		if enqueueBuild != nil && !enqueued && selection.supportsParsedTarget(index, slot.config, selection.request.Targets[targetIndex]) {
+			// This target has a confirmed owner. Its Program need not wait for
+			// the remaining targets' physical root identities to be resolved.
+			enqueueBuild(index)
+			enqueued = true
+		}
 	}
 	unresolved := pending[:0]
 	for _, targetIndex := range pending {
@@ -143,7 +148,7 @@ func (selection *projectSelection) matchRoots(index int, pending []int, owners [
 	}
 	pending = unresolved
 	if len(pending) == 0 || selection.request.FS == nil || len(slot.exactRoots) == 0 {
-		return pending, supported, nil
+		return pending, nil
 	}
 	canonicalRoots := selection.canonicalRoots(slot)
 	unresolved = pending[:0]
@@ -156,7 +161,7 @@ func (selection *projectSelection) matchRoots(index int, pending []int, owners [
 			unresolved = append(unresolved, targetIndex)
 		}
 	}
-	return unresolved, supported, nil
+	return unresolved, nil
 }
 
 func (selection *projectSelection) supportsTarget(index int, file target.File) (bool, error) {
@@ -296,8 +301,9 @@ func runTargetProjectTasks(groups []projectTargetGroup, singleThreaded bool, tas
 
 // prefetchRootMetadata restores the declaration-prefix concurrency used by
 // focused lint. The nearest containing directory is only a latency hint, never
-// evidence of ownership. Beyond this one prefix, metadata is read on demand.
-func (selection *projectSelection) prefetchRootMetadata(indexes, pending []int) {
+// evidence of ownership. The ordered consumer can use each ready slot without
+// waiting for the whole prefix. Its group must join this work before returning.
+func (selection *projectSelection) prefetchRootMetadata(indexes, pending []int) func() {
 	caseSensitive := selection.request.FS == nil || selection.request.FS.UseCaseSensitiveFileNames()
 	options := tspath.ComparePathsOptions{UseCaseSensitiveFileNames: caseSensitive}
 	end := 1 // The first candidate has already been consumed.
@@ -312,11 +318,22 @@ func (selection *projectSelection) prefetchRootMetadata(indexes, pending []int) 
 		}
 		end = max(end, predicted+1)
 	}
-	forEachSelectedProject(false, indexes[1:end], func(index int) {
-		// Store failures in their slots; only a reached candidate can fail the
-		// request. Prefetch never acquires a Program or changes a target owner.
-		_, _ = selection.metadata(index)
-	})
+	if end <= 2 {
+		// At most one unread slot offers no metadata parallelism. Leave it
+		// to the ordered consumer instead of adding a goroutine and a join.
+		return nil
+	}
+	prefix := indexes[1:end]
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		forEachSelectedProject(false, prefix, func(index int) {
+			// Store failures in their slots; only a reached candidate can fail
+			// the request. Prefetch never acquires a Program or selects an owner.
+			_, _ = selection.metadata(index)
+		})
+	}()
+	return func() { <-done }
 }
 
 // SelectProjectSources applies one project selection policy for CLI, API and
@@ -360,16 +377,14 @@ func SelectProjectSources(request ProjectSelectionRequest) ([]ProjectSourceSelec
 				}
 				// Give the first candidate a chance to finish without lookahead.
 				if position == 1 && !request.SingleThreaded && runtime.GOMAXPROCS(0) > 1 {
-					selection.prefetchRootMetadata(group.projectIndexes, pending)
+					if waitForMetadata := selection.prefetchRootMetadata(group.projectIndexes, pending); waitForMetadata != nil {
+						defer waitForMetadata()
+					}
 				}
 				var err error
-				var supported bool
-				pending, supported, err = selection.matchRoots(candidate, pending, owners)
+				pending, err = selection.matchRoots(candidate, pending, owners, enqueueBuild)
 				if err != nil {
 					return err
-				}
-				if supported && enqueueBuild != nil {
-					enqueueBuild(candidate)
 				}
 			}
 			return nil
