@@ -23,7 +23,7 @@ func TestConfiguredNodeVersion(t *testing.T) {
 		{name: "extreme engine keeps precedence", metadata: `{"engines":{"node":"<=4294967296"},"devEngines":{"runtime":{"name":"node","version":"^20"}}}`, expected: "<=4294967296"},
 		{name: "extreme dev engine keeps precedence", metadata: `{"devEngines":{"runtime":{"name":"node","version":"^0.0.4294967295"}}}`, expected: "^0.0.4294967295"},
 		{name: "engines", metadata: `{"engines":{"node":"^12.20.0"}}`, expected: "^12.20.0"},
-		{name: "empty engine range", metadata: `{"engines":{"node":""}}`, expected: "*"},
+		{name: "empty engine range", metadata: `{"engines":{"node":""}}`, expected: ""},
 		{name: "dev engine", metadata: `{"devEngines":{"runtime":{"name":"node","version":"^14.18.0"}}}`, expected: "^14.18.0"},
 		{name: "dev engine array", metadata: `{"devEngines":{"runtime":[null,42,{"name":"bun","version":"1"},{"name":"node"},{"name":"node","version":"^20"}]}}`, expected: "^20"},
 		{name: "engine precedence", metadata: `{"engines":{"node":"^12.20.0"},"devEngines":{"runtime":{"name":"node","version":"^20"}}}`, expected: "^12.20.0"},
@@ -38,7 +38,7 @@ func TestConfiguredNodeVersion(t *testing.T) {
 		{name: "invalid settings fall through", metadata: `{"engines":{"node":"^12"}}`, options: map[string]any{"version": "invalid"}, settings: map[string]any{"n": map[string]any{"version": "invalid"}, "node": map[string]any{"version": ""}}, expected: "^12"},
 		{name: "numeric setting", metadata: `{}`, settings: map[string]any{"node": map[string]any{"version": float64(12)}}, expected: "12"},
 		{name: "falsy setting", metadata: `{"engines":{"node":"^12"}}`, settings: map[string]any{"n": map[string]any{"version": false}, "node": map[string]any{"version": float64(0)}}, expected: "^12"},
-		{name: "array setting", metadata: `{}`, settings: map[string]any{"node": map[string]any{"version": []any{}}}, expected: "*"},
+		{name: "array setting", metadata: `{}`, settings: map[string]any{"node": map[string]any{"version": []any{}}}, expected: ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := packageRoot(t)

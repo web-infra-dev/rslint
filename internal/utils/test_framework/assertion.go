@@ -90,3 +90,28 @@ func MatchesAssertName(name string, compiled []*esregexp.RegExp) bool {
 	}
 	return false
 }
+
+// subjectMutatingChaiMatchers are the Chai matchers that replace the assertion
+// object's current value. A matcher written after one of them asserts on that
+// new value, so a rule that reasons about the value passed to expect() must
+// stop walking the chain when it reaches one.
+var subjectMutatingChaiMatchers = map[string]bool{
+	"property":                  true,
+	"ownProperty":               true,
+	"haveOwnProperty":           true,
+	"ownPropertyDescriptor":     true,
+	"haveOwnPropertyDescriptor": true,
+	"toContain":                 true,
+	"toThrow":                   true,
+	"toThrowError":              true,
+	"throw":                     true,
+	"throws":                    true,
+	"Throw":                     true,
+}
+
+// IsSubjectMutatingChaiMatcher reports whether a matcher replaces the assertion
+// object's current value, ending the chain for rules that target the original
+// subject.
+func IsSubjectMutatingChaiMatcher(name string) bool {
+	return subjectMutatingChaiMatchers[name]
+}

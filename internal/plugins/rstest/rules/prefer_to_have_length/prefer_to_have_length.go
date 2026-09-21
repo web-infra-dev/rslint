@@ -15,23 +15,6 @@ func endsAtOnlyMatcher(parsed *rstestUtils.ParsedRstestExpectCall) bool {
 		parsed.MemberEntries[len(parsed.MemberEntries)-1].Node == parsed.MatcherEntry.Node
 }
 
-// These Chai matchers replace the assertion object's current value. A later
-// equality matcher therefore no longer compares the value originally passed
-// to expect(), so prefer-to-have-length must stop at this boundary.
-var subjectMutatingChaiMatchers = map[string]bool{
-	"property":                  true,
-	"ownProperty":               true,
-	"haveOwnProperty":           true,
-	"ownPropertyDescriptor":     true,
-	"haveOwnPropertyDescriptor": true,
-	"toContain":                 true,
-	"toThrow":                   true,
-	"toThrowError":              true,
-	"throw":                     true,
-	"throws":                    true,
-	"Throw":                     true,
-}
-
 func isDiscardedAssertion(node *ast.Node) bool {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
 		if parent.Kind == ast.KindParenthesizedExpression {
@@ -43,42 +26,8 @@ func isDiscardedAssertion(node *ast.Node) bool {
 }
 
 func isSafeExpectedLength(node *ast.Node) bool {
-	_, negativeZero, ok := staticNumericLiteral(node)
+	_, negativeZero, ok := testFramework.StaticNumericLiteral(node)
 	return ok && !negativeZero
-}
-
-func staticNumericLiteral(node *ast.Node) (zero, negativeZero, ok bool) {
-	for node != nil {
-		node = ast.SkipParentheses(node)
-		switch node.Kind {
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
-		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
-		case ast.KindNumericLiteral:
-			return utils.NormalizeNumericLiteral(node.AsNumericLiteral().Text) == "0", false, true
-		case ast.KindPrefixUnaryExpression:
-			unary := node.AsPrefixUnaryExpression()
-			if unary == nil || (unary.Operator != ast.KindPlusToken && unary.Operator != ast.KindMinusToken) {
-				return false, false, false
-			}
-			zero, negativeZero, ok := staticNumericLiteral(unary.Operand)
-			if !ok {
-				return false, false, false
-			}
-			if zero && unary.Operator == ast.KindMinusToken {
-				negativeZero = !negativeZero
-			}
-			return zero, negativeZero, true
-		default:
-			return false, false, false
-		}
-	}
-	return false, false, false
 }
 
 func isSafeLengthReceiver(node *ast.Node) bool {
@@ -167,7 +116,7 @@ var PreferToHaveLengthRule = shared.NewRule(shared.Config{
 			matches := make([]*shared.ExpectCall, 0, len(parsed.Matchers))
 			for index := range parsed.Matchers {
 				matcher := &parsed.Matchers[index]
-				if subjectMutatingChaiMatchers[matcher.Name] {
+				if testFramework.IsSubjectMutatingChaiMatcher(matcher.Name) {
 					break
 				}
 				if matcher.Kind != rstestUtils.RstestExpectMatcherCall ||

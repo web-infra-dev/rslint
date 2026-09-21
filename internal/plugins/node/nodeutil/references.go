@@ -42,9 +42,13 @@ func readReference(trace *ReferenceTrace, node *ast.Node) {
 }
 
 // TrackModules follows CommonJS, process.getBuiltinModule and legacy ESM imports.
-// Builtin node: aliases use the same trace, retaining canonical callback names.
+// Builtin node: aliases use the same trace unless an explicit trace overrides it.
 func (tracker *ReferenceTracker) TrackModules(traces map[string]*ReferenceTrace) {
 	lookup := func(name string) *ReferenceTrace {
+		// A rule can give a prefixed module its own availability metadata.
+		if trace := traces[name]; trace != nil {
+			return trace
+		}
 		if strings.HasPrefix(name, "node:") {
 			if !modules.IsNodeBuiltin(name) {
 				return nil

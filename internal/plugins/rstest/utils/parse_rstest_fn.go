@@ -494,13 +494,15 @@ func resolveImportMetaRstestBinding(symbol *ast.Symbol) (string, *ast.Node, bool
 		}
 		binding := declaration.AsBindingElement()
 		if binding.PropertyName != nil {
-			name, ok := internalUtils.GetStaticStringLiteralValue(binding.PropertyName)
-			if ok {
+			// The property names the API; the local name only names the
+			// binding. Falling through to the local name when the key cannot
+			// be read would answer with the alias — `{ ['expect']: check }`
+			// would resolve to `check` and match no Rstest API at all — so an
+			// unreadable key resolves to nothing instead.
+			if name, ok := internalUtils.GetStaticPropertyName(binding.PropertyName); ok {
 				return name, binding.PropertyName, true
 			}
-			if binding.PropertyName.Kind == ast.KindIdentifier {
-				return binding.PropertyName.AsIdentifier().Text, binding.PropertyName, true
-			}
+			return "", nil, false
 		}
 		name := binding.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {

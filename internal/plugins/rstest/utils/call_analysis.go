@@ -14,6 +14,11 @@ type RstestCallAnalysis struct {
 	expectCalls map[*ast.Node]*ParsedRstestExpectCall
 	isExpect    map[*ast.Node]bool
 	expectRoots map[*ast.Symbol]rstestExpectRoot
+	// isAssert and assertRoots mirror isExpect and expectRoots for Rstest's
+	// Chai `assert` global, which rules that treat it as an assertion must
+	// resolve through the same bindings as `expect`.
+	isAssert    map[*ast.Node]bool
+	assertRoots map[*ast.Symbol]rstestExpectRootKind
 	calls       []*ast.Node
 	// globalExpectWritten records whether the file assigns to the unresolved
 	// global expect binding. Source-only programs cannot resolve that binding
@@ -21,6 +26,8 @@ type RstestCallAnalysis struct {
 	// cannot protect it. This fact is collected during the analysis's existing
 	// file walk so every expect consumer shares one linear-time check.
 	globalExpectWritten bool
+	// globalAssertWritten is the same fact for the unresolved global assert.
+	globalAssertWritten bool
 	// Expect customization is computed lazily from calls because only rules
 	// whose safety depends on the built-in matcher implementations need it. The
 	// source-file call index is already shared by every Rstest rule, so this never
@@ -81,6 +88,8 @@ func newRstestCallAnalysis(ctx rule.RuleContext) *RstestCallAnalysis {
 		expectCalls:      map[*ast.Node]*ParsedRstestExpectCall{},
 		isExpect:         map[*ast.Node]bool{},
 		expectRoots:      map[*ast.Symbol]rstestExpectRoot{},
+		isAssert:         map[*ast.Node]bool{},
+		assertRoots:      map[*ast.Symbol]rstestExpectRootKind{},
 		functions:        map[string]rstestFunctionEntry{},
 		callbackInfos:    map[*ast.Node]rstestCallbackInfo{},
 		callbackBindings: map[*ast.Symbol]rstestCallbackInfo{},
@@ -468,9 +477,11 @@ const (
 	rstestCandidateFn rstestCandidateKind = 1 << iota
 	rstestCandidateTest
 	rstestCandidateExpect
+	rstestCandidateAssert
 )
 
-const rstestCandidateAll = rstestCandidateFn | rstestCandidateTest | rstestCandidateExpect
+const rstestCandidateAll = rstestCandidateFn | rstestCandidateTest |
+	rstestCandidateExpect | rstestCandidateAssert
 
 func cloneRstestCandidateSeeds() map[string]rstestCandidateKind {
 	candidates := make(
@@ -488,6 +499,7 @@ func cloneRstestCandidateSeeds() map[string]rstestCandidateKind {
 		candidates[name] = kind
 	}
 	candidates["expect"] = rstestCandidateExpect
+	candidates[rstestAssertAPIName] = rstestCandidateAssert
 	return candidates
 }
 
@@ -501,16 +513,22 @@ func (analysis *RstestCallAnalysis) indexSourceFile() {
 		if node == nil {
 			return
 		}
-		if !analysis.globalExpectWritten &&
-			node.Kind == ast.KindIdentifier &&
-			node.AsIdentifier().Text == "expect" &&
-			internalUtils.IsWriteReference(node) {
-			if analysis.ctx.Refs != nil {
-				analysis.globalExpectWritten = analysis.ctx.Refs.IsGlobalReference(node)
-			} else {
-				// Preserve standalone parser-test behavior for manually assembled
-				// contexts. Normal lint runs always provide RefStore.
-				analysis.globalExpectWritten = !internalUtils.IsShadowed(node, "expect")
+		if node.Kind == ast.KindIdentifier && internalUtils.IsWriteReference(node) {
+			if name := node.AsIdentifier().Text; name == "expect" || name == rstestAssertAPIName {
+				written := &analysis.globalExpectWritten
+				if name == rstestAssertAPIName {
+					written = &analysis.globalAssertWritten
+				}
+				if !*written {
+					if analysis.ctx.Refs != nil {
+						*written = analysis.ctx.Refs.IsGlobalReference(node)
+					} else {
+						// Preserve standalone parser-test behavior for manually
+						// assembled contexts. Normal lint runs always provide
+						// RefStore.
+						*written = !internalUtils.IsShadowed(node, name)
+					}
+				}
 			}
 		}
 		switch node.Kind {
@@ -636,7 +654,21 @@ func (analysis *RstestCallAnalysis) collectVariableCandidates(
 			}
 			importedName := binding.Name().Text()
 			if binding.PropertyName != nil {
-				importedName = binding.PropertyName.Text()
+				// A computed key carries no text of its own, so the name has to
+				// be folded from the expression. `{ ['expect']: check }` names
+				// the same API as `{ expect: check }`.
+				resolved, known := internalUtils.GetStaticPropertyName(binding.PropertyName)
+				if !known {
+					// A genuinely dynamic key binds one Rstest API without
+					// saying which. Narrowing it to no candidate would make
+					// every rule treat the local as foreign — an assertion
+					// through it would read as no assertion at all. This is the
+					// same unknown a namespace import leaves behind, so it gets
+					// the same answer.
+					analysis.candidates[binding.Name().Text()] |= rstestCandidateAll
+					continue
+				}
+				importedName = resolved
 			}
 			analysis.candidates[binding.Name().Text()] |=
 				rstestImportedCandidateKind(importedName)
@@ -723,6 +755,9 @@ func rstestImportedCandidateKind(name string) rstestCandidateKind {
 	}
 	if name == "expect" {
 		kind |= rstestCandidateExpect
+	}
+	if name == rstestAssertAPIName {
+		kind |= rstestCandidateAssert
 	}
 	return kind
 }

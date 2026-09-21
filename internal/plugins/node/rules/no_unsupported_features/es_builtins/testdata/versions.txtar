@@ -1,0 +1,16 @@
+Package version sources for ES builtin diagnostics.
+
+-- engines/package.json --
+{"engines":{"node":"  ^14  "},"devEngines":{"runtime":{"name":"node","version":">=18"}}}
+
+-- dev-engines/package.json --
+{"devEngines":{"runtime":{"name":"node","version":"^14"}}}
+
+-- dev-engines-array/package.json --
+{"engines":{"node":"invalid"},"devEngines":{"runtime":[{"name":"bun","version":"1"},{"name":"node","version":"^14"}]}}
+
+-- engines/nested/package.json --
+{"engines":{"node":">=18"}}
+
+-- default/package.json --
+{}

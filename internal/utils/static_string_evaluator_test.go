@@ -151,6 +151,11 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"{ const Array = {of: () => [\"GET\"]}; const shadowedArrayOf = Array.of(\"GET\")[0]; }\n" +
 		"const stringRaw = String.raw`then`;\n" +
 		"const stringRawSubstitution = String.raw`th${\"e\"}n`;\n" +
+		"const stringRawEscapes = String.raw`\\p{Script=Kawi}\\n`;\n" +
+		"const stringRawEscapedSubstitution = String.raw`\\p{Script=${\"Ka\"}wi}\\n`;\n" +
+		"const stringRawEmptyParts = String.raw`${\"\\n\"}${1}`;\n" +
+		"const stringRawNewlines = String.raw`a\r\nb\rc`;\n" +
+		"const stringRawInvalidEscape = String.raw`\\u{110000}`;\n" +
 		"const RawString = String;\n" +
 		"const stringRawAlias = RawString.raw`then`;\n" +
 		"let MutableRawString = String;\n" +
@@ -333,6 +338,11 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "shadowedArrayOf"},
 		{name: "stringRaw", want: "then", ok: true},
 		{name: "stringRawSubstitution", want: "then", ok: true},
+		{name: "stringRawEscapes", want: `\p{Script=Kawi}\n`, ok: true},
+		{name: "stringRawEscapedSubstitution", want: `\p{Script=Kawi}\n`, ok: true},
+		{name: "stringRawEmptyParts", want: "\n1", ok: true},
+		{name: "stringRawNewlines", want: "a\nb\nc", ok: true},
+		{name: "stringRawInvalidEscape", want: `\u{110000}`, ok: true},
 		{name: "stringRawAlias", want: "then", ok: true},
 		{name: "stringRawMutableAlias"},
 		{name: "stringRawTypedAlias"},
@@ -417,6 +427,25 @@ func TestStaticStringEvaluator(t *testing.T) {
 	}
 	if isArray, known := staticEvaluator.EvalControlFlowArrayValue(findVariableInitializer(t, sourceFile, "controlArrayUse")); !known || !isArray {
 		t.Fatalf("EvalControlFlowArrayValue(controlArrayUse) = (%v, %v), want (true, true)", isArray, known)
+	}
+}
+
+func TestStaticStringEvaluatorConfiguredGlobals(t *testing.T) {
+	for _, expression := range []string{
+		"String.raw`\\n`", `String("x")`, `Array.of("x")[0]`,
+		`Object.freeze(["x"])[0]`, `undefined`, `Math.PI`, `Number.EPSILON`,
+	} {
+		t.Run(expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/globals.js", Path: "/globals.js"}, "const value = "+expression, core.ScriptKindJS)
+			evaluator := NewStaticStringEvaluatorWithSourceFile(nil, source)
+			initializer := findVariableInitializer(t, source, "value")
+			for _, access := range []GlobalAccess{GlobalAccessOff, GlobalAccessReadonly, GlobalAccessWritable} {
+				evaluator.GlobalAccess = func(string) GlobalAccess { return access }
+				if _, known := evaluator.EvalToString(initializer); known != access.IsDeclared() {
+					t.Fatalf("EvalToString with %s globals: known = %v", access, known)
+				}
+			}
+		})
 	}
 }
 
