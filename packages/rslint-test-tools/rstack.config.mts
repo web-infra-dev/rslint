@@ -731,6 +731,7 @@ define.test({
     './tests/rstest/rules/prefer-to-have-length.test.ts',
     './tests/rstest/rules/prefer-todo.test.ts',
     './tests/rstest/rules/require-awaited-expect-poll.test.ts',
+    './tests/rstest/rules/require-hook.test.ts',
     './tests/rstest/rules/require-to-throw-message.test.ts',
     './tests/rstest/rules/require-top-level-describe.test.ts',
     './tests/rstest/rules/require-local-test-context-for-concurrent-snapshots.test.ts',
