@@ -1,5 +1,6 @@
 // Ported from eslint-plugin-unicorn v75.0.0; see LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/test/prefer-type-error.js
+// cspell:ignore Piew Woohoo
 package prefer_type_error_test
 
 import (
