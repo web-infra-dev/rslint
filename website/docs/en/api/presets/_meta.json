@@ -48,5 +48,10 @@
     "type": "file",
     "name": "jsx-a11y-plugin",
     "label": "jsxA11yPlugin"
+  },
+  {
+    "type": "file",
+    "name": "vue-plugin",
+    "label": "vuePlugin"
   }
 ]

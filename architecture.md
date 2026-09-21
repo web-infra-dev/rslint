@@ -327,6 +327,53 @@ The parser and program builder are tolerant enough to support editor and fallbac
   observes an empty result through the same facade without testing their source
   kind
 
+### Vue Single File Components
+
+A `.vue` file is the one source whose bytes on disk are not the bytes the parser
+reads, so it is worth stating where that divergence lives and where it stops.
+
+`internal/vue/vuesfc` splits a component into its top-level blocks and returns a
+**projection**: a text of exactly the file's byte length, holding the
+`<script>` and `<script setup>` content at its own offsets with every other byte
+blanked and line terminators kept. This is `@vue/compiler-sfc`'s own
+`pad: 'space'` mode applied to every block. Because offsets are preserved, a
+range computed against the parsed AST indexes the component identically, and
+nothing downstream needs a source map.
+
+The divergence is resolved in exactly three places:
+
+- `utils.sourceForParse` is the only place a file's text and its parse input may
+  differ. It supplies the projection and the script kind the blocks' `lang`
+  names, since a filename cannot carry it. Both are functions of the file's text
+  and name, so the parse-cache key still identifies one parse input and
+  invariant I6 holds in those terms. Every production entry point reaches this
+  through the host wrapper in `loader.buildContext`.
+- `utils.TargetSourceText` supplies the fix pipeline the component's own text
+  rather than the projection. Splicing a fix into the projection and committing
+  it would replace the template and the style with spaces.
+- `linter.materializePluginTask` supplies the Node plugin worker the projection
+  and never lets it read the component off disk, because that worker parses with
+  a JavaScript parser and a component's own text is markup.
+
+A component is never admitted to a tsconfig program: it fails the extension test
+in `program.CompilerOptionsSupportFileName`, so target binding always leaves it
+unbound, and only `loader.allRootsSupportedByParser` makes room for it. The API
+load path, which otherwise keeps its compatibility admission, splits components
+out to root programs the same way. A component is therefore always linted by a
+checker-free root program, which makes lint planning drop type-aware rules
+through `rule.FilterNonTypeAwareRules` without a policy check anywhere. Rules
+that are not type-aware still run on it, so none of them may assume a checker.
+
+Template and style blocks are not parsed at all, so no rule can observe them.
+That matters to rules that reason about how a binding is used: a component with
+a `<script setup>` block exposes its top-level bindings to its template, and
+those rules would otherwise report bindings only the template uses.
+`RuleContext.IsExposedToTemplate` answers for them, and no-unused-vars in both
+variants, no-useless-assignment and prefer-const read it the way they already
+read an `/* exported */` global: as a binding consumed by code they cannot see.
+The answer is deliberately coarse, because telling which bindings the template
+really uses needs the template parsed.
+
 ## 5. Abstract Syntax Tree (AST)
 
 ### AST Representation
@@ -1307,7 +1354,7 @@ Additional current behaviors:
   no-candidate transaction removes the previous module catalog and exposes the
   empty-rule workspace fallback with its committed `.gitignore` view
 - bundled Go and third-party object-form plugin rules are always gated by their normalized declared prefixes; each CLI run and API request derives its own catalog, while LSP commits a module-owner catalog with the matching Node generation. Replacing or removing plugins therefore replaces that catalog instead of retaining process-wide placeholders
-- CLI/API lint target selection is independent from TypeScript `Program` membership and considers only rslint-supported script extensions. The `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` default baseline is always selected; explicit config `files` contributes candidates only within the supported set. Global ignores and `.gitignore` remove targets, while an entry-level ignore prevents only its own selector/config contribution
+- CLI/API lint target selection is independent from TypeScript `Program` membership and considers only rslint-supported script extensions. The `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts` default baseline is always selected; explicit config `files` contributes candidates only within the supported set. `.vue` is supported but deliberately outside that baseline, so a Vue single file component is a target only when a config names it. Adding it to the baseline would change what every existing project lints. Global ignores and `.gitignore` remove targets, while an entry-level ignore prevents only its own selector/config contribution
 - selected CLI/API targets can still appear as 0-rule lint results when no config entry contributes rules; this applies to default-baseline directory discovery and explicit supported files, and syntax diagnostics remain available in that state
 - automatic Rslint config discovery selects the nearest loadable lint config; explicit config selection uses that config directly. Matching entries determine service, root and reset options. Service discovery starts at the lexical source location; ordinary project declarations retain owner order and prefer the first direct-root project, then the first import-containing Program
 - omitting both project settings retains the config-directory `tsconfig.json` fallback. Effective `project: false` or `null` disables the target's ordinary binding. An empty array contributes no paths and suppresses fallback only when no other declaration supplies paths; `projectService: true` instead discovers configured ownership; unowned files use source-only gap linting. Built-in TypeScript presets do not set either project option, matching upstream preset composition. `tsconfigRootDir` is an absolute ancestor-search boundary, not a forced project, and defaults to the governing config directory (API cwd for inline-only configuration)

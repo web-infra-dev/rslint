@@ -1,6 +1,9 @@
 package rule
 
-import "github.com/microsoft/TypeScript/tsc/shim/ast"
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/vue/vast"
+)
 
 // DiagnosticSeverity represents the severity level of a diagnostic
 type DiagnosticSeverity int
@@ -94,6 +97,16 @@ func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
 
 type RuleListeners map[ast.Kind](func(node *ast.Node))
 
+// TemplateListeners is the Vue template counterpart of [RuleListeners]: it
+// dispatches on a template node's kind rather than a TypeScript node's.
+//
+// A template is a second syntax tree over the same file, so it needs a second
+// listener space. Reusing RuleListeners would mean giving a template node an
+// ast.Kind it has no meaning for, and generalizing both onto one interface
+// would put a boxed value in the traversal every one of the engine's several
+// hundred script rules runs through.
+type TemplateListeners map[vast.Kind](func(node *vast.Node))
+
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
@@ -112,6 +125,16 @@ type Rule struct {
 	// own ESLint validates) leave it nil.
 	Schema *Schema
 	Run    func(ctx RuleContext, options []any) RuleListeners
+	// RunTemplate registers listeners over a Vue component's `<template>`
+	// tree. It is nil for every rule that does not look at markup, which is
+	// every rule outside the vue plugin, and a nil value costs one comparison
+	// per rule per file. The linter parses a template only when some enabled
+	// rule returns listeners here.
+	//
+	// A rule may implement both: Run for its script half and RunTemplate for
+	// its template half, sharing state through the closure the two are built
+	// in, which is how upstream's defineTemplateBodyVisitor pairs them.
+	RunTemplate func(ctx RuleContext, options []any) TemplateListeners
 }
 
 func CreateRule(r Rule) Rule {
@@ -120,5 +143,6 @@ func CreateRule(r Rule) Rule {
 		RequiresTypeInfo: r.RequiresTypeInfo,
 		Schema:           r.Schema,
 		Run:              r.Run,
+		RunTemplate:      r.RunTemplate,
 	}
 }

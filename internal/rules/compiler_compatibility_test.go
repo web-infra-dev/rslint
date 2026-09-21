@@ -75,6 +75,11 @@ function unreachableForOf() { for (const value of (() => { throw 1; })()) { cons
 			Severity:    rule.SeverityError,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {
 				initialized[name]++
+				// A rule that only inspects a Vue template has no script half,
+				// and this fixture is not a component, so it listens to nothing.
+				if impl.Run == nil {
+					return nil
+				}
 				return impl.Run(ctx, options)
 			},
 		})

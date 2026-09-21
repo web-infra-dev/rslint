@@ -71,7 +71,8 @@
               "promise",
               "react",
               "react-hooks",
-              "unicorn"
+              "unicorn",
+              "vue"
             ]
           },
           "uniqueItems": true,

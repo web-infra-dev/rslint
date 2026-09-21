@@ -2544,3 +2544,241 @@ func TestParseLintFlagsTiming(t *testing.T) {
 		}
 	}
 }
+
+// TestHandleLintCommandFixesVueComponentWithoutTouchingTemplate is the
+// regression test for the one way .vue support could destroy a user's work.
+//
+// A component is parsed as a projection of its <script> blocks with every
+// other byte blanked. If an autofix were spliced into that projection and
+// written back, the template and the style would be replaced by spaces. The
+// fix pipeline must instead splice into the component's own text, which is
+// exact because the projection preserves every offset.
+//
+// The template here is deliberately not valid JavaScript, so a projection
+// leaking into the parser would surface as syntax diagnostics rather than as
+// the one expected rule diagnostic.
+func TestHandleLintCommandFixesVueComponentWithoutTouchingTemplate(t *testing.T) {
+	const component = `<template>
+  <div v-if="a < b && c > d">{{ msg }}</div>
+  <p>definitely not JavaScript: </div> <<< &amp; */</p>
+</template>
+
+<script>
+var value = 1;
+export default { data() { return { msg: 'hi' } } };
+</script>
+
+<style scoped>
+.a { color: red }
+</style>
+`
+
+	dir := t.TempDir()
+	componentPath := tspath.NormalizePath(filepath.Join(dir, "App.vue"))
+	if err := os.WriteFile(componentPath, []byte(component), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDir := tspath.NormalizePath(dir)
+
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: &discovery.ConfigCatalog{
+			Configs: map[string]rslintconfig.RslintConfig{configDir: {
+				{
+					Files: []string{"**/*.vue"},
+					Rules: rslintconfig.Rules{"no-var": "error"},
+				},
+			}},
+			Explicit: true,
+		},
+		AllowFiles:     []string{componentPath},
+		Fix:            true,
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+
+	fixedBytes, err := os.ReadFile(componentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed := string(fixedBytes)
+
+	if strings.Contains(stderr, "error:") {
+		t.Fatalf("lint reported a fatal error: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// The script was fixed.
+	if !strings.Contains(fixed, "let value = 1;") {
+		t.Errorf("no-var was not applied to the script block; file is:\n%s", fixed)
+	}
+	if strings.Contains(fixed, "var value = 1;") {
+		t.Errorf("the `var` survived; file is:\n%s", fixed)
+	}
+
+	// Everything outside the script block is byte-identical.
+	for _, fragment := range []string{
+		`<template>`,
+		`  <div v-if="a < b && c > d">{{ msg }}</div>`,
+		`  <p>definitely not JavaScript: </div> <<< &amp; */</p>`,
+		`</template>`,
+		`<style scoped>`,
+		`.a { color: red }`,
+		`</style>`,
+	} {
+		if !strings.Contains(fixed, fragment) {
+			t.Errorf("fix destroyed %q; file is:\n%s", fragment, fixed)
+		}
+	}
+
+	// The fix changed exactly the three bytes of the keyword and nothing else.
+	if want := strings.Replace(component, "var value = 1;", "let value = 1;", 1); fixed != want {
+		t.Errorf("fixed component differs beyond the keyword.\n got:\n%s\nwant:\n%s", fixed, want)
+	}
+}
+
+// TestCLIPluginReceivesVueProjectionNotMarkup checks what a third-party ESLint
+// plugin rule is handed for a Vue single file component.
+//
+// The worker parses with a JavaScript parser, and a component's own text is
+// markup: handed that, the worker would parse the template as if it were code.
+// It must receive the projection of the <script> blocks instead, the same text
+// the native pass parsed, and must never be left to read the component off
+// disk, which is what the initial CLI generation otherwise does to avoid
+// shipping a whole repository over the wire.
+func TestCLIPluginReceivesVueProjectionNotMarkup(t *testing.T) {
+	const component = `<template>
+  <div v-for="x in xs">{{ x }}</div>
+</template>
+
+<script>
+const xs = [1, 2];
+</script>
+`
+
+	dir := t.TempDir()
+	componentPath := tspath.NormalizePath(filepath.Join(dir, "App.vue"))
+	if err := os.WriteFile(componentPath, []byte(component), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDirectory := tspath.NormalizePath(dir)
+
+	var request linter.EslintPluginLintRequest
+	code, stdout, stderr := runLintCommandWithDispatcherForTest(
+		t,
+		dir,
+		lintArgs{
+			ConfigCatalog: &discovery.ConfigCatalog{
+				Configs: map[string]rslintconfig.RslintConfig{
+					configDirectory: {{
+						Files:   []string{"**/*.vue"},
+						Plugins: []string{"external"},
+						Rules:   rslintconfig.Rules{"external/check": "error"},
+					}},
+				},
+				EslintPlugins: []rslintconfig.EslintPluginEntry{{
+					Prefix:    "external",
+					RuleNames: []string{"check"},
+				}},
+				Explicit: true,
+			},
+			AllowFiles:     []string{componentPath},
+			Format:         "jsonline",
+			NoColor:        true,
+			SingleThreaded: true,
+		},
+		func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			request = got
+			results := make([]linter.EslintPluginFileResult, len(got.Files))
+			for index, file := range got.Files {
+				results[index].FilePath = file.Path
+			}
+			return &linter.EslintPluginLintResult{Results: results}, nil
+		},
+	)
+	if code != 0 || len(request.Files) != 1 {
+		t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q",
+			code, request, stdout, stderr)
+	}
+
+	text := request.Files[0].Text
+	if text == nil {
+		t.Fatal("the worker was left to read the component off disk, where it is markup")
+	}
+	if strings.Contains(*text, "<template>") || strings.Contains(*text, "v-for") {
+		t.Errorf("the worker received markup:\n%s", *text)
+	}
+	if !strings.Contains(*text, "const xs = [1, 2];") {
+		t.Errorf("the worker did not receive the script:\n%s", *text)
+	}
+	// Offsets are preserved, so a range the worker computes indexes the
+	// component identically.
+	if len(*text) != len(component) {
+		t.Errorf("projection length = %d, want the component's %d", len(*text), len(component))
+	}
+	if got, want := strings.Index(*text, "const xs"), strings.Index(component, "const xs"); got != want {
+		t.Errorf("script at offset %d on the wire, want %d", got, want)
+	}
+}
+
+// TestHandleLintCommandRunsBothVuePasses is the end-to-end proof that a Vue
+// component is linted by two syntax trees in one run: the TypeScript AST over
+// its <script setup>, and the template tree over its <template>.
+//
+// The two are independent (different parsers, different node kinds, different
+// listener spaces), so the only way to know they coexist on one file is to make
+// one file violate a rule in each and see both diagnostics come back.
+func TestHandleLintCommandRunsBothVuePasses(t *testing.T) {
+	const component = `<template>
+  <div foo="a" foo="b">{{ value }}</div>
+</template>
+
+<script setup>
+export const value = 1;
+</script>
+`
+
+	dir := t.TempDir()
+	componentPath := tspath.NormalizePath(filepath.Join(dir, "App.vue"))
+	if err := os.WriteFile(componentPath, []byte(component), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configDirectory := tspath.NormalizePath(dir)
+
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: &discovery.ConfigCatalog{
+			Configs: map[string]rslintconfig.RslintConfig{configDirectory: {{
+				Files:   []string{"**/*.vue"},
+				Plugins: []string{"vue"},
+				Rules: rslintconfig.Rules{
+					"vue/no-duplicate-attributes":   "error",
+					"vue/no-export-in-script-setup": "error",
+				},
+			}}},
+			Explicit: true,
+		},
+		AllowFiles:     []string{componentPath},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
+	})
+
+	if strings.Contains(stderr, "error:") {
+		t.Fatalf("lint reported a fatal error: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	// The template pass fired, on the template's own line.
+	if !strings.Contains(stdout, "vue/no-duplicate-attributes") {
+		t.Errorf("the template pass reported nothing:\n%s", stdout)
+	}
+	// The script pass fired, on the script's own line.
+	if !strings.Contains(stdout, "vue/no-export-in-script-setup") {
+		t.Errorf("the script pass reported nothing:\n%s", stdout)
+	}
+	// Both diagnostics point into the component, not into a projection of it:
+	// line 2 is the template's, line 6 the script's.
+	for _, want := range []string{`"line":2`, `"line":6`} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("no diagnostic at %s:\n%s", want, stdout)
+		}
+	}
+}
