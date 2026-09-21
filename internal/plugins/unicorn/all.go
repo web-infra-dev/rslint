@@ -49,10 +49,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_optional_catch_binding"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
@@ -116,6 +117,7 @@ func GetAllRules() []rule.Rule {
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
 		prefer_date_now.PreferDateNowRule,
 		prefer_dom_node_append.PreferDomNodeAppendRule,
+		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		prefer_reflect_apply.PreferReflectApplyRule,
