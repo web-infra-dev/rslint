@@ -73,7 +73,7 @@ export default [
   An empty array disables extension guessing.
 - `resolverConfig` supports `modules`, `alias`, `extensions`, `extensionAlias`,
   `conditionNames`, `mainFields`, `mainFiles`, and `aliasFields`, as described
-  for [no-missing-import](../no_missing_import/no_missing_import.md).
+  for [no-missing-import](https://rslint.rs/rules/node/no-missing-import).
 
 Except for `ignoreTypeImport` and `ignorePrivate`, these options can also be
 supplied through `settings.node`. Rule options take precedence over shared
@@ -110,7 +110,7 @@ Compared with `eslint-plugin-n` v18.3.0:
   the import. Use `alias` when a redirect should apply to every matching
   request. Overlapping object-form aliases also use alphabetical priority;
   use an alias array to preserve your intended order. See
-  [no-missing-import](../no_missing_import/no_missing_import.md#differences-from-upstream)
+  [no-missing-import](https://rslint.rs/rules/node/no-missing-import#differences-from-upstream)
   for further unusual filename and alias cases.
 
 ## References

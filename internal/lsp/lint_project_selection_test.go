@@ -28,6 +28,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+func projectMetadataListsRootForTest(metadata *lintProjectMetadata, fileName string) bool {
+	if metadata == nil || metadata.commandLine == nil {
+		return false
+	}
+	// Command lines can retain native separators or a different drive spelling.
+	// Preserve directory and filename case so distinct paths stay distinct.
+	want := config.ExactPathID(fileName)
+	return slices.ContainsFunc(metadata.commandLine.FileNames(), func(root string) bool {
+		return config.ExactPathID(root) == want
+	})
+}
+
 func TestSelectConfiguredLintProjectDirectRootOutranksEarlierImport(t *testing.T) {
 	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "selection"))
 	fs := bundled.WrapFS(osvfs.FS())
@@ -277,15 +289,15 @@ func (fs *configReadCountingFS) ReadFile(path string) (string, bool) {
 }
 
 func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
-	dir := t.TempDir()
-	firstSource := filepath.Join(dir, "first.ts")
-	secondSource := filepath.Join(dir, "second.ts")
+	dir := tspath.NormalizePath(t.TempDir())
+	firstSource := tspath.ResolvePath(dir, "first.ts")
+	secondSource := tspath.ResolvePath(dir, "second.ts")
 	for _, source := range []string{firstSource, secondSource} {
 		if err := os.WriteFile(source, []byte("export const value = 1;\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	configPath := filepath.Join(dir, "tsconfig.json")
+	configPath := tspath.ResolvePath(dir, "tsconfig.json")
 	if err := os.WriteFile(configPath, []byte(`{"files":["first.ts"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +318,7 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(firstSource)) {
+	if !projectMetadataListsRootForTest(metadata, firstSource) {
 		t.Fatal("initial parsed metadata does not contain its configured root")
 	}
 	if err := os.WriteFile(configPath, []byte(`{"files":["second.ts"]}`), 0o644); err != nil {
@@ -423,6 +435,60 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 	}
 }
 
+func TestSelectConfiguredLintProjectWindowsPathSpellings(t *testing.T) {
+	for _, test := range []struct {
+		name, root, configPath, targetPath string
+	}{
+		{"drive case", "c:/Repo", "C:/Repo/tsconfig.json", "C:/Repo/target.ts"},
+		{"backslashes", "c:/Repo", `C:\Repo\tsconfig.json`, `C:\Repo\target.ts`},
+		{"filename case", "c:/Repo", "C:/REPO/tsconfig.json", "C:/REPO/TARGET.TS"},
+		{"UNC", "//server/share/Repo", `\\SERVER\share\Repo\tsconfig.json`, `\\SERVER\share\Repo\target.ts`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			const content = "export const value = 1;\n"
+			const configContent = `{"compilerOptions":{"noLib":true},"files":["target.ts"]}`
+			configPath := tspath.NormalizePath(test.configPath)
+			rootPath := tspath.ResolvePath(tspath.GetDirectoryPath(configPath), "target.ts")
+			// Overlay keys preserve spelling. Give aliases identical content;
+			// the filesystem's Realpath maps them to one physical identity.
+			files := map[string]string{
+				tspath.ResolvePath(test.root, "tsconfig.json"): configContent,
+				tspath.ResolvePath(test.root, "target.ts"):     content,
+			}
+			files[configPath] = configContent
+			files[rootPath] = content
+			files[tspath.NormalizePath(test.targetPath)] = content
+			fsys := utils.NewOverlayVFS(&caseInsensitiveLSPTestFS{}, files)
+			file := lspConfigTarget(tspath.NormalizePath(test.targetPath), test.root, fsys)
+			request := newStandaloneLintProjectRequestWithFS(file, fsys)
+			loaders := request.loaders()
+			loadMetadata := loaders.metadata
+			loaders.metadata = func(path string) (*lintProjectMetadata, bool, error) {
+				if path != configPath {
+					t.Fatalf("read an unused project after the direct root: %q", path)
+				}
+				return loadMetadata(path)
+			}
+			selected, found, err := selectConfiguredLintProject(
+				[]string{configPath, tspath.ResolvePath(test.root, "unused.json")}, "", file, fsys, loaders,
+			)
+			if err != nil || !found || !selected.directRoot || selected.configPath != configPath || selected.sourceFile == nil {
+				t.Fatalf("selection=%+v found=%v error=%v", selected, found, err)
+			}
+			if selected.sourceFile.Text() != content {
+				t.Fatal("selected project lost the target source")
+			}
+			metadata, err := request.metadata(configPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !projectMetadataListsRootForTest(metadata, rootPath) {
+				t.Fatalf("roots=%q do not contain root %q", metadata.commandLine.FileNames(), rootPath)
+			}
+		})
+	}
+}
+
 func TestRunConfiguredLintForContentDirectRootSkipsEarlierImportProgram(t *testing.T) {
 	dir := t.TempDir()
 	targetPath := filepath.Join(dir, "src", "target.ts")
@@ -476,9 +542,9 @@ func TestRunConfiguredLintForContentDirectRootSkipsEarlierImportProgram(t *testi
 }
 
 func TestLintSessionProjectRootCacheUsesCommandLineGeneration(t *testing.T) {
-	dir := t.TempDir()
-	firstSource := filepath.Join(dir, "first.ts")
-	secondSource := filepath.Join(dir, "second.ts")
+	dir := tspath.NormalizePath(t.TempDir())
+	firstSource := tspath.ResolvePath(dir, "first.ts")
+	secondSource := tspath.ResolvePath(dir, "second.ts")
 	for _, source := range []string{firstSource, secondSource} {
 		if err := os.WriteFile(source, []byte("export const value = 1;\n"), 0o644); err != nil {
 			t.Fatal(err)
@@ -506,13 +572,13 @@ func TestLintSessionProjectRootCacheUsesCommandLineGeneration(t *testing.T) {
 	}
 
 	cache := newLintSessionProjectRootCache()
-	configPath := filepath.Join(dir, "tsconfig.json")
+	configPath := tspath.ResolvePath(dir, "tsconfig.json")
 	first := cache.metadata(configPath, firstProgram.CommandLine(), fs)
 	if reused := cache.metadata(configPath, firstProgram.CommandLine(), fs); reused != first {
 		t.Fatal("unchanged Session command line rebuilt its metadata")
 	}
 	second := cache.metadata(configPath, secondProgram.CommandLine(), fs)
-	if second == first || !slices.Contains(second.commandLine.FileNames(), tspath.NormalizePath(secondSource)) || slices.Contains(second.commandLine.FileNames(), tspath.NormalizePath(firstSource)) {
+	if second == first || !projectMetadataListsRootForTest(second, secondSource) || projectMetadataListsRootForTest(second, firstSource) {
 		t.Fatal("new Session command line did not replace cached root metadata")
 	}
 }
@@ -600,7 +666,7 @@ func TestDocumentProjectPolicyPreservesSymlinkDeclarationPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(aliasSource)) || slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(realSource)) {
+	if !projectMetadataListsRootForTest(metadata, aliasSource) || projectMetadataListsRootForTest(metadata, realSource) {
 		t.Fatal("symlinked tsconfig did not resolve includes from its declared directory")
 	}
 }

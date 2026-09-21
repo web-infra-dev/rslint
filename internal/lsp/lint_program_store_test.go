@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -529,7 +528,7 @@ func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 		t.Fatal("project metadata was unavailable")
 	}
 	finalize()
-	if metadata == nil || !slices.Contains(metadata.commandLine.FileNames(), fixture.sourcePath) {
+	if metadata == nil || !projectMetadataListsRootForTest(metadata, fixture.sourcePath) {
 		t.Fatalf("project metadata did not contain the configured source: %v", metadata)
 	}
 	_, loadMetadata, finalize = fixture.request(fixture.sourceURI)
@@ -563,7 +562,7 @@ func TestLintProgramStorePersistsWatcherProtectedProjectMetadata(t *testing.T) {
 		t.Fatal("reloaded project metadata was unavailable")
 	}
 	finalize()
-	if metadata == nil || slices.Contains(metadata.commandLine.FileNames(), fixture.sourcePath) {
+	if metadata == nil || projectMetadataListsRootForTest(metadata, fixture.sourcePath) {
 		t.Fatalf("invalidated project metadata leaked across requests: %v", metadata)
 	}
 }
@@ -601,7 +600,7 @@ func TestLintProgramStoreOpeningNewIncludedFileInvalidatesProjectMetadata(t *tes
 		t.Fatal("refreshed project metadata was unavailable")
 	}
 	finalize()
-	if after == before || !slices.Contains(after.commandLine.FileNames(), tspath.NormalizePath(newPath)) {
+	if after == before || !projectMetadataListsRootForTest(after, newPath) {
 		t.Fatal("newly included source was absent from refreshed project metadata")
 	}
 }
@@ -624,7 +623,7 @@ func TestLintProgramStoreDoesNotRetainNonContainingFallbackProgram(t *testing.T)
 	if !available {
 		t.Fatal("project metadata was unavailable")
 	}
-	if slices.Contains(metadata.commandLine.FileNames(), tspath.NormalizePath(outsidePath)) {
+	if projectMetadataListsRootForTest(metadata, outsidePath) {
 		t.Fatal("outside target unexpectedly became a direct project root")
 	}
 	_, sourceFile, err := loadProgram(fixture.configPath)
