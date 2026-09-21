@@ -3,6 +3,7 @@ package capitalized_comments
 import (
 	_ "embed"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -11,7 +12,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
-	"github.com/web-infra-dev/rslint/internal/utils/unicode17"
 )
 
 //go:embed capitalized_comments.schema.json
@@ -192,7 +192,7 @@ func isCommentValid(value string, capitalize string, opts commentOptions, isInli
 		return true
 	}
 	firstChar, _ := utf8.DecodeRuneInString(wordCharsOnly)
-	if !unicode17.IsLetter(firstChar) {
+	if !unicode.IsLetter(firstChar) {
 		return true
 	}
 
@@ -230,7 +230,7 @@ func buildFix(comment *ast.CommentRange, value string, capitalize string) []rule
 	idx := -1
 	var char rune
 	for i, r := range value {
-		if unicode17.IsLetter(r) {
+		if unicode.IsLetter(r) {
 			idx = i
 			char = r
 			break

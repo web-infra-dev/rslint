@@ -19,13 +19,12 @@ Look up the operation or named function needed by the current rule. Workflow and
 
 Values a rule is handed were written for JavaScript, and Go's standard library answers a nearby but different question about each of them. These packages hold the readings that match — see [JavaScript Semantics](#javascript-semantics-ecmascript-minimatch3-isglob).
 
-| Package                   | Description                                                      |
-| ------------------------- | ---------------------------------------------------------------- |
-| `utils/ecmascript`        | Trim, blank, whitespace, upper/lower case, number-to-string      |
-| `utils/ecmascript/regexp` | Compiles and matches a JavaScript RegExp, and `/i` comparison    |
-| `utils/unicode17`         | A general category — `\p{Lu}`, `\p{L}`, `\p{M}` — as Node has it |
-| `utils/minimatch3`        | Glob matching the way minimatch 3 does — what plugins pin        |
-| `utils/isglob`            | "Was this written as a glob, or is it a plain path?"             |
+| Package                   | Description                                                   |
+| ------------------------- | ------------------------------------------------------------- |
+| `utils/ecmascript`        | Trim, blank, whitespace, upper/lower case, number-to-string   |
+| `utils/ecmascript/regexp` | Compiles and matches a JavaScript RegExp, and `/i` comparison |
+| `utils/minimatch3`        | Glob matching the way minimatch 3 does — what plugins pin     |
+| `utils/isglob`            | "Was this written as a glob, or is it a plain path?"          |
 
 ---
 
@@ -882,26 +881,24 @@ Not covered: the `v` flag's set syntax (`Compile` refuses it), and case-insensit
 
 > `depguard` denies `github.com/dlclark/regexp2` under `internal/rules/**` and `internal/plugins/**`. Go through this package.
 
-### `internal/utils/unicode17` — the edition of Unicode Node reads
+### The standard library's `unicode` — a general category
 
 ```go
-import "github.com/web-infra-dev/rslint/internal/utils/unicode17"
+import "unicode"
 ```
 
-Go 1.26's `unicode` tables are Unicode 15.0; Node 26 carries ICU 78, which is Unicode 17.0. Two bicameral scripts, eight new case mappings, nine and a half thousand letters and ninety-three combining marks arrived in between, and a rule that asks Go about them gets an answer ESLint would not give. This package holds that difference, and answers the category questions outright:
+Go 1.27's tables are Unicode 17.0, which is the edition Node 26 reads through ICU 78, so a category question is asked of the standard library directly:
 
 ```go
-unicode17.IsUpper(r)  // \p{Lu}, as unicode.IsUpper would if it were on 17.0
-unicode17.IsLower(r)  // \p{Ll}
-unicode17.IsLetter(r) // \p{L}
-unicode17.IsMark(r)   // \p{M} — the combining marks
+unicode.IsUpper(r)        // \p{Lu}
+unicode.IsLower(r)        // \p{Ll}
+unicode.IsLetter(r)       // \p{L}
+unicode.Is(unicode.M, r)  // \p{M} — the combining marks
 ```
 
-Reach for it when the upstream rule reads a **character class**: change-case's `\p{Ll}` behind `unicorn/filename-case`, `\p{Uppercase_Letter}` behind `unicorn/prefer-array-flat`, `\p{M}` behind `no-misleading-character-class`. When upstream instead writes `c === c.toUpperCase()`, that is a case mapping and belongs to `ecmascript`, which reads this package on its own.
+Reach for these when the upstream rule reads a **character class**: change-case's `\p{Ll}` behind `unicorn/filename-case`, `\p{Uppercase_Letter}` behind `unicorn/prefer-array-flat`, `\p{M}` behind `no-misleading-character-class`. When upstream instead writes `c === c.toUpperCase()`, that is a case mapping and belongs to `ecmascript`.
 
-The package deletes itself: `TestDeltaStillNeeded` fails the moment the toolchain stops being Unicode 15.0, which on Go 1.27 is the signal to delete the package rather than maintain it.
-
-> `depguard` denies the standard library's `unicode` under `internal/rules/**` and `internal/plugins/**`. A case question goes to `ecmascript`, a category question here, and an identifier question — is this character allowed to start or continue an identifier? — to tsgo's `scanner.IsIdentifierStart` / `scanner.IsIdentifierPart`, which reads TypeScript's own tables so that a rule and the parser never disagree.
+> A category is all the standard library answers here. `forbidigo` denies `unicode.ToUpper`, `ToLower`, `ToTitle`, `To`, `SimpleFold` and `IsSpace` under `internal/rules/**` and `internal/plugins/**`.
 
 ### `internal/utils/minimatch3` — globs the way a plugin reads them
 

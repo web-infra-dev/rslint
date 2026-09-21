@@ -51,7 +51,6 @@ func TestForEachComment_ReuseFactoryReportsAllCommentsPerToken(t *testing.T) {
 	}
 	if sf == nil {
 		t.Fatal("source file not found")
-		return
 	}
 
 	type cmt struct {
@@ -144,7 +143,6 @@ func TestHasCommentInSpan(t *testing.T) {
 	sf := prog.GetSourceFile(file)
 	if sf == nil {
 		t.Fatal("source file not found")
-		return
 	}
 
 	// HasCommentInSpan takes the file's pre-collected, sorted comment list

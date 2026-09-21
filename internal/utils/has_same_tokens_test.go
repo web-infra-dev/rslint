@@ -55,7 +55,6 @@ func findBinaryOperands(t *testing.T, sourceFile *ast.SourceFile, code string) (
 	}
 	if bin == nil {
 		t.Fatalf("no BinaryExpression found in code: %s", code)
-		return nil, nil, nil
 	}
 	b := bin.AsBinaryExpression()
 	return sourceFile, b.Left, b.Right

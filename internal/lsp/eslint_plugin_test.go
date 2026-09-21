@@ -1492,7 +1492,6 @@ func TestHandleCodeAction_NativeFixAndPluginSuggestionCoexist(t *testing.T) {
 	nat := byTitle["Fix: native msg"]
 	if nat == nil {
 		t.Fatalf("missing native fix action; got titles %v", titleSet(byTitle))
-		return
 	}
 	if nat.IsPreferred == nil || !*nat.IsPreferred {
 		t.Error("native autofix must be IsPreferred=true")
@@ -1500,7 +1499,6 @@ func TestHandleCodeAction_NativeFixAndPluginSuggestionCoexist(t *testing.T) {
 	sug := byTitle["Suggestion: use baz"]
 	if sug == nil {
 		t.Fatalf("missing plugin suggestion action; got titles %v", titleSet(byTitle))
-		return
 	}
 	if sug.IsPreferred == nil || *sug.IsPreferred {
 		t.Error("plugin suggestion must be IsPreferred=false")
