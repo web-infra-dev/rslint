@@ -30,6 +30,7 @@ test("case", () => { check.equal(value, 1); });`},
 rstest.test("case", () => { rstest.assert.equal(value, 1); });`},
 			{Code: `const { assert: check } = import.meta.rstest;
 test("case", () => { check.equal(value, 1); });`},
+			{Code: `test("case", () => { import.meta.rstest.assert.equal(value, 1); });`},
 			// Assertion in a promise callback.
 			{Code: `it("case", () => somePromise().then(() => expect(true).toBeDefined()));`},
 
@@ -126,6 +127,17 @@ test("case", () => {});`},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
+			// A local binding that shadows the imported alias is not the
+			// framework's assert. The import stays so the local name remains an
+			// assertion candidate; without it the candidate gate short-circuits
+			// and the resolver is never reached.
+			{
+				Code: `import { test, assert as check } from '@rstest/core';
+test("case", () => { const check = () => {}; check(); });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 2, Column: 1, EndLine: 2, EndColumn: 5},
+				},
+			},
 			{
 				Code: `let run = () => { expect(true).toBeDefined(); }; run = () => {}; test("case", run);`,
 				Errors: []rule_tester.InvalidTestCaseError{

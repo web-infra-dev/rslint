@@ -50,6 +50,12 @@ func (analysis *RstestCallAnalysis) isAssertCandidate(node *ast.Node) bool {
 }
 
 func (analysis *RstestCallAnalysis) resolveAssertCall(node *ast.Node) bool {
+	// `import.meta.rstest.assert.equal(1, 1)` has no identifier root, so it has
+	// to be recognized before the identifier path, the way the expect resolver
+	// recognizes `import.meta.rstest.expect`.
+	if isImportMetaRstestAssertCall(node) {
+		return true
+	}
 	entries := firstRstestExpectEntries(node.AsCallExpression().Expression)
 	if entries.count == 0 || entries.first == nil || entries.first.Kind != ast.KindIdentifier {
 		return false
@@ -65,7 +71,7 @@ func (analysis *RstestCallAnalysis) resolveAssertCall(node *ast.Node) bool {
 	}
 	rootKind, ok := analysis.assertRoots[symbol]
 	if !ok {
-		rootKind = classifyRstestAssertRoot(symbol, analysis)
+		rootKind = classifyRstestAssertRoot(localName, root, symbol, analysis)
 		analysis.assertRoots[symbol] = rootKind
 	}
 	switch rootKind {
@@ -80,7 +86,15 @@ func (analysis *RstestCallAnalysis) resolveAssertCall(node *ast.Node) bool {
 
 // classifyRstestAssertRoot answers what the root identifier of a call chain
 // binds: Rstest's `assert` itself, an object that carries it, or neither.
+//
+// localName and root are the identifier as it is written at the call site, and
+// both have to be the real ones. The module resolver returns the name it was
+// given whenever it has no identifier to inspect, so handing it a placeholder
+// makes every symbol answer "assert" and a local binding that shadows the
+// import is then mistaken for the framework's own.
 func classifyRstestAssertRoot(
+	localName string,
+	root *ast.Node,
 	symbol *ast.Symbol,
 	analysis *RstestCallAnalysis,
 ) rstestExpectRootKind {
@@ -105,8 +119,8 @@ func classifyRstestAssertRoot(
 		return rstestExpectRootReceiver
 	}
 	name, _, _ := testFramework.ResolveFunctionIdentifierReferenceFromSymbolModules(
-		rstestAssertAPIName,
-		nil,
+		localName,
+		root,
 		symbol,
 		ctx.SourceFile,
 		RstestAllImportModules,
@@ -115,4 +129,16 @@ func classifyRstestAssertRoot(
 		return rstestExpectRootDirect
 	}
 	return rstestExpectRootNone
+}
+
+// isImportMetaRstestAssertCall reports whether node calls through
+// `import.meta.rstest.assert`, the form that names the API without ever
+// binding it to an identifier.
+func isImportMetaRstestAssertCall(node *ast.Node) bool {
+	call := node.AsCallExpression()
+	if call == nil {
+		return false
+	}
+	_, parts, _, ok := parseImportMetaRstestChain(call.Expression)
+	return ok && len(parts) > 0 && parts[0].name == rstestAssertAPIName
 }

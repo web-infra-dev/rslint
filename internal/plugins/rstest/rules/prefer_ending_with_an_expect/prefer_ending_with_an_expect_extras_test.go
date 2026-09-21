@@ -70,6 +70,10 @@ test('places the order', () => { check(checkout() === 'ok', 'ordered'); });`},
 rstest.test('places the order', () => { rstest.assert.equal(checkout(), 'ok'); });`},
 			{Code: `const { assert: check } = import.meta.rstest;
 test('places the order', () => { check.equal(checkout(), 'ok'); });`},
+			// `import.meta.rstest.assert` names the API without binding it to any
+			// identifier, so it resolves before the identifier path.
+			{Code: `test('places the order', () => { import.meta.rstest.assert.equal(checkout(), 'ok'); });`},
+			{Code: `test('places the order', () => { import.meta.rstest.assert(checkout() === 'ok', 'ordered'); });`},
 			// Chai asserts through property getters, so the last statement of
 			// these tests is a property access rather than a call.
 			{Code: `import { test, expect } from '@rstest/core';
@@ -79,6 +83,14 @@ test('places the order', () => { expect(checkout()).to.be.ok; });`},
 test('places the order', () => { check(checkout()).to.exist; });`},
 			{Code: `import { test, expect } from '@rstest/core';
 test('places the order', () => { expect(checkout())["to"]["be"]["ok"]; });`},
+			// Parentheses may wrap any link of the chain, and the expect parser
+			// reads through all of them.
+			{Code: `import { test, expect } from '@rstest/core';
+test('places the order', () => { (expect(checkout())).to.be.ok; });`},
+			{Code: `import { test, expect } from '@rstest/core';
+test('places the order', () => { (expect(checkout()).to.be).ok; });`},
+			{Code: `import { test, expect } from '@rstest/core';
+test('places the order', () => { ((expect(checkout()))).to.be.ok; });`},
 			{Code: `test('places the order', () => { expect.soft(checkout()).toBe('ok'); });`},
 			{Code: `test('places the order', async () => { await expect.poll(() => checkout()).toBe('ok'); });`},
 			{Code: `const cartTest = test.extend({ cart: async ({}, use) => use(createCart()) });
@@ -103,6 +115,31 @@ test('places the order', () => { check.equal(checkout(), 'ok'); });`,
 import * as chai from 'chai';
 test('places the order', () => { chai.assert.equal(checkout(), 'ok'); });`,
 				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(3, 1, 5)},
+			},
+			// A local binding that shadows the imported alias is not the
+			// framework's assert. Each of these keeps the import so the local
+			// name stays an assertion candidate; without it the candidate gate
+			// short-circuits and the resolver is never reached, which is what
+			// let an earlier version of this resolution go unnoticed.
+			{
+				Code: `import { test, assert as check } from '@rstest/core';
+test('places the order', () => { const check = () => {}; check(); });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(2, 1, 5)},
+			},
+			{
+				Code: `import { test, assert as check } from '@rstest/core';
+test('places the order', () => { function check() {} check(); });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(2, 1, 5)},
+			},
+			{
+				Code: `import { test, assert as check } from '@rstest/core';
+test('places the order', check => { check(); });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(2, 1, 5)},
+			},
+			// Another member of import.meta.rstest is not assert.
+			{
+				Code:   `test('places the order', () => { import.meta.rstest.notAssert.equal(checkout(), 'ok'); });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(1, 1, 5)},
 			},
 			// A chain that resolves no matcher asserts nothing, whether it
 			// stopped on a modifier or on an uncalled matcher.

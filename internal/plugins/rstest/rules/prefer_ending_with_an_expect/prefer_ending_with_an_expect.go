@@ -105,8 +105,18 @@ func rstestPropertyAssertion(
 
 // chainHeadCall returns the call a member chain starts from, so
 // `expect(cart).to.be.empty` yields `expect(cart)`.
+//
+// Parentheses are skipped at every step, not just at the outer expression.
+// They may wrap any link of the chain — `(expect(cart)).to.be.empty` and
+// `(expect(cart).to.be).empty` are the same assertion as the unparenthesized
+// one — and the expect parser already reads through them, so stopping here
+// would reject a chain the parser accepts.
 func chainHeadCall(node *ast.Node) *ast.Node {
 	for node != nil {
+		node = ast.SkipParentheses(node)
+		if node == nil {
+			return nil
+		}
 		switch node.Kind {
 		case ast.KindCallExpression:
 			return node
