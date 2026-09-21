@@ -271,11 +271,14 @@ func TestRstestCallAnalysisParseExpectCallFillsIdentityCache(t *testing.T) {
 
 func TestRstestCandidateSeedsMatchDirectRegistrationNames(t *testing.T) {
 	actual := cloneRstestCandidateSeeds()
-	if len(actual) != len(rstestDirectAPIStates)+1 {
+	// The registrations plus the two assertion APIs Rstest injects, `expect`
+	// and Chai's `assert`.
+	wantCount := len(rstestDirectAPIStates) + 2
+	if len(actual) != wantCount {
 		t.Fatalf(
 			"seed count = %d, want %d",
 			len(actual),
-			len(rstestDirectAPIStates)+1,
+			wantCount,
 		)
 	}
 	for name, states := range rstestDirectAPIStates {
@@ -297,6 +300,13 @@ func TestRstestCandidateSeedsMatchDirectRegistrationNames(t *testing.T) {
 	}
 	if actual["expect"] != rstestCandidateExpect {
 		t.Errorf("expect seed = %b, want %b", actual["expect"], rstestCandidateExpect)
+	}
+	if actual[rstestAssertAPIName] != rstestCandidateAssert {
+		t.Errorf(
+			"assert seed = %b, want %b",
+			actual[rstestAssertAPIName],
+			rstestCandidateAssert,
+		)
 	}
 	for _, hook := range testFramework.HooksOrder {
 		if actual[hook]&rstestCandidateFn == 0 {

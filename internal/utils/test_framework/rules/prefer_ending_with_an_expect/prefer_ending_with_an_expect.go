@@ -56,6 +56,16 @@ type Runtime struct {
 	// consulted only after the patterns miss. Frameworks whose `expect` is always
 	// a bare global leave it nil.
 	IsAssertion func(node *ast.Node) bool
+	// IsPropertyAssertion recognizes an assertion that is not a call at all.
+	// Chai exposes its truthiness assertions as property getters, so
+	// `expect(value).to.be.true` asserts without invoking anything and the
+	// statement the test ends with is a property access.
+	//
+	// A framework whose assertions are always calls leaves this nil, which
+	// keeps the call-only shape for every caller that came before it. It is
+	// consulted only for a statement that is not a call, so it can neither
+	// widen nor narrow what the assertFunctionNames patterns already match.
+	IsPropertyAssertion func(node *ast.Node) bool
 }
 
 type Config struct {
@@ -112,8 +122,11 @@ func isAssertionCall(
 	if node.Kind == ast.KindAwaitExpression {
 		node = ast.SkipParentheses(node.AsAwaitExpression().Expression)
 	}
-	if node == nil || node.Kind != ast.KindCallExpression {
+	if node == nil {
 		return false
+	}
+	if node.Kind != ast.KindCallExpression {
+		return runtime.IsPropertyAssertion != nil && runtime.IsPropertyAssertion(node)
 	}
 	if testFramework.MatchesAssertName(
 		testFramework.CalleeChainName(node.AsCallExpression().Expression),

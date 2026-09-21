@@ -21,6 +21,15 @@ func TestExpectExpectRule(t *testing.T) {
 			{Code: `test("case", () => expect(value).toBe(1));`},
 			// Rstest global `assert` counts by default (assertFunctionNames includes assert).
 			{Code: `test("case", () => { assert.equal(value, 1); });`},
+			// `assert` is resolved like `expect`, so aliases, namespace members and
+			// destructured `import.meta.rstest` keys count too. Matching the callee
+			// text alone recognizes only the literal spelling.
+			{Code: `import { test, assert as check } from '@rstest/core';
+test("case", () => { check.equal(value, 1); });`},
+			{Code: `import * as rstest from '@rstest/core';
+rstest.test("case", () => { rstest.assert.equal(value, 1); });`},
+			{Code: `const { assert: check } = import.meta.rstest;
+test("case", () => { check.equal(value, 1); });`},
 			// Assertion in a promise callback.
 			{Code: `it("case", () => somePromise().then(() => expect(true).toBeDefined()));`},
 

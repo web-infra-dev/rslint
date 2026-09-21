@@ -60,6 +60,25 @@ test('places the order', () => { check(checkout()).toBe('ok'); });`},
 test('places the order', () => { check(checkout()).toBe('ok'); });`},
 			// Chai's `assert` is an Rstest global, so it asserts by default.
 			{Code: `test('places the order', () => { assert.equal(checkout(), 'ok'); });`},
+			// `assert` is resolved like `expect`, so the forms whose callee text
+			// no pattern can match still assert.
+			{Code: `import { test, assert as check } from '@rstest/core';
+test('places the order', () => { check.equal(checkout(), 'ok'); });`},
+			{Code: `import { test, assert as check } from '@rstest/core';
+test('places the order', () => { check(checkout() === 'ok', 'ordered'); });`},
+			{Code: `import * as rstest from '@rstest/core';
+rstest.test('places the order', () => { rstest.assert.equal(checkout(), 'ok'); });`},
+			{Code: `const { assert: check } = import.meta.rstest;
+test('places the order', () => { check.equal(checkout(), 'ok'); });`},
+			// Chai asserts through property getters, so the last statement of
+			// these tests is a property access rather than a call.
+			{Code: `import { test, expect } from '@rstest/core';
+test('places the order', () => { expect(checkout()).to.be.ok; });`},
+			{Code: `test('places the order', context => { context.expect(checkout()).to.be.true; });`},
+			{Code: `import { test, expect as check } from '@rstest/core';
+test('places the order', () => { check(checkout()).to.exist; });`},
+			{Code: `import { test, expect } from '@rstest/core';
+test('places the order', () => { expect(checkout())["to"]["be"]["ok"]; });`},
 			{Code: `test('places the order', () => { expect.soft(checkout()).toBe('ok'); });`},
 			{Code: `test('places the order', async () => { await expect.poll(() => checkout()).toBe('ok'); });`},
 			{Code: `const cartTest = test.extend({ cart: async ({}, use) => use(createCart()) });
@@ -70,6 +89,39 @@ cartTest('places the order', ({ cart, expect }) => { expect(cart).toBeDefined();
 test('places the order', async ({ page }) => { await expect(page).toHaveTitle('Cart'); });`},
 		},
 		[]rule_tester.InvalidTestCase{
+			// ---- Dimension 0: shapes that resolve no assertion ----
+			// A foreign `assert` is not Rstest's, so an alias of it asserts
+			// nothing the rule recognizes.
+			{
+				Code: `import { test } from '@rstest/core';
+import { strict as check } from 'node:assert';
+test('places the order', () => { check.equal(checkout(), 'ok'); });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(3, 1, 5)},
+			},
+			{
+				Code: `import { test } from '@rstest/core';
+import * as chai from 'chai';
+test('places the order', () => { chai.assert.equal(checkout(), 'ok'); });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(3, 1, 5)},
+			},
+			// A chain that resolves no matcher asserts nothing, whether it
+			// stopped on a modifier or on an uncalled matcher.
+			{
+				Code: `import { test, expect } from '@rstest/core';
+test('places the order', () => { expect(checkout()).not; });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(2, 1, 5)},
+			},
+			{
+				Code: `import { test, expect } from '@rstest/core';
+test('places the order', () => { expect(checkout()).toBe; });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(2, 1, 5)},
+			},
+			{
+				Code: `import { test } from '@rstest/core';
+test('places the order', () => { cart.total; });`,
+				Errors: []rule_tester.InvalidTestCaseError{mustEndWithExpectError(2, 1, 5)},
+			},
+
 			// ---- Dimension 1: provenance ----
 			{
 				Code: `import { test as scenario } from '@rstest/core';
