@@ -42,4 +42,10 @@ test('retries the request twice', async () => {
 
 The fix removes the `.mock.calls` accessors from the assertion's subject and renames the matcher to `toHaveBeenCalledTimes`. It keeps the matcher's arguments, the second `expect` argument, modifiers, accessor quotes, optional chaining on the matcher, and any parentheses or comments written around the subject. Explicit type arguments on `expect()` and on the matcher are removed, because they describe the subject and the matcher that the fix replaces; when a comment sits inside either list, the assertion is reported without a fix.
 
+The fix is offered only when the expected count is a number written in source, such as `2`, `0x2` or `2 as const`. `toHaveLength` compares its argument loosely and `toHaveBeenCalledTimes` compares strictly, so rewriting `toHaveLength('1')` would turn a passing assertion into a failing one, and rewriting `not.toHaveLength('1')` would turn a failing one into a passing one. A count that is a variable, a string, a boolean or an expression is reported without a fix, as are a missing count and extra matcher arguments.
+
+`expect()` captures the `mock.calls` array as it runs, while `toHaveBeenCalledTimes` reads `mock.calls` when the matcher runs. Anything evaluated in between can reset the mock and change the count the rewritten assertion sees, so the remaining `expect()` arguments must be literals too: `expect(handler.mock.calls, 'called once')` is fixed, `expect(handler.mock.calls, (handler.mockClear(), 'called once'))` is not.
+
+An assertion whose subject is reached through `super`, as in `expect(super.mock.calls)`, is reported without a fix, because a bare `super` is not a value and `expect(super)` would not parse.
+
 Only standalone assertion statements are fixed; parentheses and `await` around the assertion are allowed. An assertion used in an assignment, a return value, an argument or another expression is reported without a fix, because the assertion object it returns carries the rewritten subject into every later matcher. Chains with more than one matcher, or with a property access or call after the matcher, are reported without a fix for the same reason.
