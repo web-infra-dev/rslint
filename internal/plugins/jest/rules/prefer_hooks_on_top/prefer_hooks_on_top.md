@@ -117,6 +117,28 @@ describe('foo', () => {
 });
 ```
 
+## Differences from upstream
+
+Every function body is a scope of its own, where upstream only opens a new scope at a
+call expression. A hook written in a function that is never called registers nothing at
+run time, and a function passed to `describe` by name is that suite's body rather than a
+continuation of the code around it, so neither inherits the test cases registered
+outside it:
+
+```javascript
+describe('foo', () => {
+  test('bar', () => {});
+
+  // Not reported here; upstream reports it.
+  function unused() {
+    beforeEach(() => {});
+  }
+});
+```
+
+The other side of that boundary is that a hook registered through a helper the suite
+does call is judged against the helper instead of the suite, and so goes unreported.
+
 ## Original Documentation
 
 - [eslint-plugin-jest: prefer-hooks-on-top](https://github.com/jest-community/eslint-plugin-jest/blob/v29.16.0/docs/rules/prefer-hooks-on-top.md)

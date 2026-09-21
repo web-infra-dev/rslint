@@ -3,12 +3,16 @@ package prefer_hooks_on_top_test
 import (
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/fixtures"
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_on_top"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/fixtures"
+	"github.com/web-infra-dev/rslint/internal/plugins/rstest/rules/prefer_hooks_on_top"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestPreferHooksOnTopRule(t *testing.T) {
+// TestPreferHooksOnTopUpstream migrates the full valid/invalid suite the
+// reference ESLint plugins keep for this rule, as preserved in rslint's Jest
+// port. Position assertions cover line/column for every invalid case.
+// Rstest-specific lock-in cases live in prefer_hooks_on_top_extras_test.go.
+func TestPreferHooksOnTopUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -62,67 +66,24 @@ describe('foo', () => {
     });
   });
 })`},
-			// A function body is a scope of its own: a hook in a function that
-			// is never called registers nothing, so the suite's cases cannot
-			// make it report.
-			{Code: `describe('foo', () => {
-  test('bar', () => {});
+			// The reference plugin needs a modifier exemption here so that
+			// building a fixture-extended test API does not close the scope.
+			// The Rstest parser reaches the same result without one: a factory
+			// call that is never invoked as a registration parses as no test
+			// API at all. prefer_hooks_on_top_extras_test.go locks in both
+			// halves of that distinction.
+			{Code: `import { test as baseTest } from "@rstest/core";
 
-  function unused() {
-    beforeEach(() => {});
-  }
-})`},
-			// A function passed to describe by name is that suite's body, so the
-			// cases registered above it do not count against it.
-			{Code: `test('bar', () => {});
+const test = baseTest.extend({});
 
-function foo() {
-  beforeEach(() => {});
-  test('baz', () => {});
-}
+beforeEach(() => {});
+afterEach(() => {});`},
+			{Code: `import { it as baseIt } from "@rstest/core";
 
-describe('foo', foo)`},
-			// A constructor and an accessor are scopes of their own as well:
-			// each body runs only when the class is instantiated or the
-			// property is touched.
-			{Code: `class Helper {
-  constructor() {
-    test('bar', () => {});
-  }
-}
-beforeEach(() => {})`},
-			{Code: `test('bar', () => {});
-class Helper {
-  constructor() {
-    beforeEach(() => {});
-  }
-}`},
-			{Code: `class Helper {
-  get value() {
-    test('bar', () => {});
-    return null;
-  }
-}
-beforeEach(() => {})`},
-			{Code: `test('bar', () => {});
-class Helper {
-  get value() {
-    beforeEach(() => {});
-    return null;
-  }
-}`},
-			{Code: `class Helper {
-  set value(v) {
-    test('bar', () => {});
-  }
-}
-beforeEach(() => {})`},
-			{Code: `test('bar', () => {});
-class Helper {
-  set value(v) {
-    beforeEach(() => {});
-  }
-}`},
+const it = baseIt.extend({});
+
+beforeEach(() => {});
+afterEach(() => {});`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
