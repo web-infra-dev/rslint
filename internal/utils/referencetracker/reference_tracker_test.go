@@ -56,6 +56,7 @@ func TestGlobalReferences(t *testing.T) {
 		{"template binding key", "const {[`fn`]: run} = api; run();", []string{"read: [`fn`]: run", "call: run()"}},
 		{"assignment default", `let run; ({fn: run = fallback} = api); run();`, []string{"read: fn: run = fallback", "call: run()"}},
 		{"parameter default", `function f(target = api) { target.fn(); }`, []string{"read: target.fn", "call: target.fn()"}},
+		{"parameter property default", `class C { constructor(private target = api) { target.fn(); this.target.fn(); } }`, []string{"read: target.fn", "call: target.fn()"}},
 		{"converging paths retain duplicates", `const target = flag ? api : globalThis.api; target.fn();`, []string{"read: target.fn", "call: target.fn()", "read: target.fn", "call: target.fn()"}},
 		{"cycle guard follows variable identity", `let target = api; let run = target.fn; target = run; target();`, []string{"read: target.fn"}},
 		{"aliases are flow insensitive", `let run = api.fn; run = other; run();`, []string{"read: api.fn", "call: run()"}},

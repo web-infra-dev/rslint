@@ -5,9 +5,30 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/binder"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 )
+
+func TestBindingNameSymbolForConstructorParameters(t *testing.T) {
+	for _, modifier := range []string{"", "public", "private", "protected", "readonly", "private readonly"} {
+		t.Run(modifier, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts", Path: "/test.ts",
+			}, "class C { constructor("+modifier+" value = input) { use(value); } }", core.ScriptKindTS)
+			binder.BindSourceFile(source)
+			constructor := source.Statements.Nodes[0].AsClassDeclaration().Members.Nodes[0]
+			parameter := constructor.Parameters()[0]
+			symbol := BindingNameSymbol(parameter.Name())
+			if symbol == nil || symbol != constructor.Locals()["value"] {
+				t.Fatal("binding name did not resolve to the constructor's local parameter")
+			}
+			if modifier != "" && symbol == parameter.Symbol() {
+				t.Fatal("binding name resolved to the class property instead of the parameter")
+			}
+		})
+	}
+}
 
 func TestForEachVariableDeclarationBinding(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{

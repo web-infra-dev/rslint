@@ -15,7 +15,13 @@ func BindingNameSymbol(ident *ast.Node) *ast.Symbol {
 	if ident == nil || ident.Parent == nil || ident.Parent.Name() != ident {
 		return nil
 	}
-	return ident.Parent.Symbol()
+	declaration := ident.Parent
+	if declaration.Parent != nil && ast.IsParameterPropertyDeclaration(declaration, declaration.Parent) && ast.IsIdentifier(ident) {
+		// A parameter property stores its class member symbol on the declaration.
+		// References to the parameter use the constructor's local symbol instead.
+		return declaration.Parent.Locals()[ident.Text()]
+	}
+	return declaration.Symbol()
 }
 
 // BindingSymbols returns the binder symbol of every name bound by a
