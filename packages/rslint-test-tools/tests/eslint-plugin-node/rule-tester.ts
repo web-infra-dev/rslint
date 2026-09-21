@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { realpath } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
+import type { LanguageOptions } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
 import { createTempDir, cleanupTempDir } from '../cli/js-config/helpers';
 
@@ -12,12 +13,6 @@ interface ExpectedError {
   endLine: number;
   endColumn: number;
   fix?: { range: [number, number]; text: string };
-}
-
-interface LanguageOptions {
-  globals?: Record<string, 'readonly' | 'writable' | 'off'>;
-  sourceType?: 'script' | 'module' | 'commonjs';
-  parserOptions?: { project?: string[] };
 }
 
 interface TestCase {

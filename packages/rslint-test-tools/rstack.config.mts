@@ -193,6 +193,7 @@ define.test({
     './tests/eslint-plugin-node/rules/no-restricted-require.test.ts',
     './tests/eslint-plugin-node/rules/no-sync.test.ts',
     './tests/eslint-plugin-node/rules/no-top-level-await.test.ts',
+    './tests/eslint-plugin-node/rules/no-unsupported-features/node-builtins.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-bin.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-import.test.ts',
     './tests/eslint-plugin-node/rules/no-unpublished-require.test.ts',

@@ -1,0 +1,15 @@
+Node version source precedence and diagnostic text.
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"noEmit":true,"target":"esnext","module":"nodenext"},"include":["**/*"]}
+-- package.json --
+{}
+-- engines/package.json --
+{"engines":{"node":"^18.0.0"},"devEngines":{"runtime":{"name":"node","version":"20"}}}
+-- dev/package.json --
+{"devEngines":{"runtime":{"name":"node","version":"20"}}}
+-- array/package.json --
+{"engines":{"node":"invalid"},"devEngines":{"runtime":[{"name":"bun","version":"1"},{"name":"node","version":"18"}]}}
+-- empty/package.json --
+{"engines":{"node":""}}
+-- engines/nearest/package.json --
+{}
