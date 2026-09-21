@@ -1,4 +1,4 @@
-// Code generated from eslint-plugin-n v18.3.0 by generate.mjs; DO NOT EDIT.
+// Code generated from eslint-plugin-n v18.3.0; DO NOT EDIT.
 // https://github.com/eslint-community/eslint-plugin-n/tree/v18.3.0/lib/unsupported-features
 // cspell:ignore CLEVEL Cipheriv Decipheriv Diffie Fips Keypress Naptr Spkac Tlsa Uncloneable alpn btlazy btopt btultra cpus debuglog dfast diffie dlopen execve fdatasync fips freemem initgroups loadavg onresourcetimingbufferfull ppid readv timerify totalmem webcrypto
 package node_builtins
